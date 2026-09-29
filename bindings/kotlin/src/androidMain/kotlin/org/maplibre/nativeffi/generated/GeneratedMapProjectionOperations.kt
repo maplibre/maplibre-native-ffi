@@ -6,12 +6,12 @@ import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 public actual abstract class GeneratedMapProjectionOperations internal actual constructor() {
   internal abstract fun bindingMapProjectionHandle(): Long
 
-  internal abstract fun bindingCloseMapProjection(call: (Long) -> Int)
+  internal abstract fun bindingCloseMapProjection(call: (Long) -> Unit)
 
   public actual fun close(): Unit {
     try {
@@ -23,7 +23,11 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
           owner.toLong(),
           "mln_map_projection_close",
         )
-        PointerScope().use { arena -> MaplibreNativeC.mln_map_projection_close(owner) }
+        PointerScope().use { arena ->
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_projection_close(owner, diagnostic)
+          }
+        }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)
@@ -40,9 +44,13 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       return PointerScope().use { arena ->
         val output = MaplibreNativeC.mln_camera_options()
         output.size(output.sizeof())
-        BindingStatus.check(
-          MaplibreNativeC.mln_map_projection_get_camera(bindingMapProjectionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_map_projection_get_camera(
+            bindingMapProjectionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         GeneratedValues.readCameraOptions(output)
       }
     } finally {
@@ -59,13 +67,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       )
       return PointerScope().use { arena ->
         val output = MaplibreNativeC.mln_lat_lng()
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MaplibreNativeC.mln_map_projection_lat_lng_for_pixel(
             bindingMapProjectionHandle(),
             GeneratedValues.writeScreenPoint(arena, point),
             output,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readLatLng(output)
       }
     } finally {
@@ -82,13 +91,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       )
       return PointerScope().use { arena ->
         val output = MaplibreNativeC.mln_lat_lng()
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MaplibreNativeC.mln_map_projection_lat_lng_for_pixel_unwrapped(
             bindingMapProjectionHandle(),
             GeneratedValues.writeScreenPoint(arena, point),
             output,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readLatLng(output)
       }
     } finally {
@@ -105,13 +115,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       )
       return PointerScope().use { arena ->
         val output = DoublePointer(1L)
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MaplibreNativeC.mln_map_projection_meters_per_pixel_at_latitude(
             bindingMapProjectionHandle(),
             latitude,
             output,
+            diagnostic,
           )
-        )
+        }
         output.get()
       }
     } finally {
@@ -128,13 +139,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       )
       return PointerScope().use { arena ->
         val output = MaplibreNativeC.mln_screen_point()
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MaplibreNativeC.mln_map_projection_pixel_for_lat_lng(
             bindingMapProjectionHandle(),
             GeneratedValues.writeLatLng(arena, coordinate),
             output,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readScreenPoint(output)
       }
     } finally {
@@ -150,12 +162,13 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
         "mln_map_projection_set_camera",
       )
       return PointerScope().use { arena ->
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MaplibreNativeC.mln_map_projection_set_camera(
             bindingMapProjectionHandle(),
             GeneratedValues.writeCameraOptions(arena, camera),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {
@@ -171,14 +184,15 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
         "mln_map_projection_set_visible_coordinates",
       )
       return PointerScope().use { arena ->
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MaplibreNativeC.mln_map_projection_set_visible_coordinates(
             bindingMapProjectionHandle(),
             GeneratedValues.writeLatLngArray(arena, coordinates),
             coordinates.size.toLong(),
             GeneratedValues.writeEdgeInsets(arena, padding),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {
@@ -194,13 +208,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
         "mln_map_projection_set_visible_geometry",
       )
       return PointerScope().use { arena ->
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MaplibreNativeC.mln_map_projection_set_visible_geometry(
             bindingMapProjectionHandle(),
             GeneratedValues.byteView(arena, geometry),
             GeneratedValues.writeEdgeInsets(arena, padding),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {

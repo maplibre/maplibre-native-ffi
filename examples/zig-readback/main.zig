@@ -32,14 +32,14 @@ pub fn main(init_args: std.process.Init) !void {
     _ = args.skip();
     const output_path = args.next() orelse "map.ppm";
 
-    try maplibre.logSetAsyncSeverityMask(.{});
-    defer maplibre.logSetAsyncSeverityMask(maplibre.LogSeverityMask.default) catch {};
+    try maplibre.logSetAsyncSeverityMask(.{}, null);
+    defer maplibre.logSetAsyncSeverityMask(maplibre.LogSeverityMask.default, null) catch {};
     try logAndValidateRenderBackend();
 
     var diagnostic_store = binding.DiagnosticStore.init(allocator);
     defer diagnostic_store.deinit();
 
-    var runtime = try maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:" });
+    var runtime = try maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:" }, null);
     defer runtime.deinit();
     defer if (maplibre.runtimeRelease(runtime)) |future| {
         var teardown = future;

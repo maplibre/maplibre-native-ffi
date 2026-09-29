@@ -18,10 +18,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_projection_create(
-          handle.raw,
-          completion
-        ) }
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_projection_create(
+            handle.raw,
+            completion,
+            diagnostic
+          ) }
         }) { result in try MapProjectionHandle(adopting: NativeCompletion.value(
           result,
           as: mln_map_projection.self

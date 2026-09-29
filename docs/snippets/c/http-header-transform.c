@@ -23,7 +23,8 @@ static mln_status add_authorization(
   // #region set
   // The helper copies the name and the value before it returns.
   return mln_http_header_transform_response_set(
-    out_response, header_name, sizeof(header_name) - 1, token, strlen(token)
+    out_response, header_name, sizeof(header_name) - 1, token, strlen(token),
+    NULL
   );
   // #endregion set
 }
@@ -37,6 +38,8 @@ mln_status install_header_transform(
     .callback = add_authorization,
     .user_data = token,
   };
-  return mln_runtime_set_http_header_transform(runtime, &transform, completion);
+  return mln_runtime_set_http_header_transform(
+    runtime, &transform, completion, NULL
+  );
 }
 // #endregion install

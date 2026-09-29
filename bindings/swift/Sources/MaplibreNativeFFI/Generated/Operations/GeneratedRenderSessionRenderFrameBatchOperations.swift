@@ -17,10 +17,13 @@ public extension RenderFrameBatchHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0 = 0
-      try checkStatus(arena.submit { mln_render_frame_batch_count(
-        handle.raw,
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_render_frame_batch_count(
+          handle.raw,
+          &value0,
+          diagnostic
+        ) }
+      }
       return value0
     }
   }
@@ -41,11 +44,12 @@ public extension RenderFrameBatchHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_render_frame_result()
       value0.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
-      try checkStatus(arena.submit { mln_render_frame_batch_get(
+      try checkStatus { diagnostic in arena.submit { mln_render_frame_batch_get(
         handle.raw,
         bindingArg0,
-        &value0
-      ) })
+        &value0,
+        diagnostic
+      ) } }
       return RenderFrameResult(raw: value0)
     }
   }

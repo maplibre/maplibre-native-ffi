@@ -30,7 +30,7 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
             handle,
             StartRelease,
             nameof(RuntimeHandle),
-            static live => NativeMethods.mln_runtime_dispose(live)
+            static (live, diagnostic) => NativeMethods.mln_runtime_dispose(live, diagnostic)
         );
     }
 
@@ -45,7 +45,7 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         catch
         {
             if (owner is null)
-                NativeMethods.mln_runtime_dispose(handle);
+                NativeMethods.mln_runtime_dispose(handle, null);
             else
                 owner.state.Retire();
             throw;
@@ -77,10 +77,10 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
             "mln_map_create"
         );
         return NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeOptions = NativeMapOptions(options);
-                return NativeMethods.mln_map_create(Handle, &nativeOptions, completion);
+                return NativeMethods.mln_map_create(Handle, &nativeOptions, completion, diagnostic);
             },
             result => MapHandle.Adopt(this, NativeCompletion.Value<MlnMap>(result))
         );
@@ -95,7 +95,8 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_runtime_barrier(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_runtime_barrier(Handle, completion, diagnostic),
                 result => true
             )
             .WaitAsync(cancellationToken);
@@ -110,8 +111,12 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
-                    NativeMethods.mln_runtime_clear_http_header_transform(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_runtime_clear_http_header_transform(
+                        Handle,
+                        completion,
+                        diagnostic
+                    ),
                 result => true
             )
             .WaitAsync(cancellationToken);
@@ -126,7 +131,12 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_runtime_clear_resource_provider(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_runtime_clear_resource_provider(
+                        Handle,
+                        completion,
+                        diagnostic
+                    ),
                 result => true
             )
             .WaitAsync(cancellationToken);
@@ -141,8 +151,12 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
-                    NativeMethods.mln_runtime_clear_resource_transform(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_runtime_clear_resource_transform(
+                        Handle,
+                        completion,
+                        diagnostic
+                    ),
                 result => true
             )
             .WaitAsync(cancellationToken);
@@ -158,7 +172,15 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
         var nativeOptions = NativeRuntimeOptions(options, scope);
         MlnRuntime outRuntime = default;
-        NativeStatus.Check(NativeMethods.mln_runtime_create(&nativeOptions, &outRuntime));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_runtime_create(
+                &nativeOptions,
+                &outRuntime,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         var owner = RuntimeHandle.Adopt(outRuntime);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -172,7 +194,15 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
             "mln_runtime_drain_events"
         );
         MlnEventBatch outBatch = default;
-        NativeStatus.Check(NativeMethods.mln_runtime_drain_events(Handle, &outBatch));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_runtime_drain_events(
+                Handle,
+                &outBatch,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return EventBatchHandle.Adopt(outBatch);
     }
 
@@ -185,7 +215,15 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
             "mln_runtime_get_event_mask"
         );
         ulong outMask = default;
-        NativeStatus.Check(NativeMethods.mln_runtime_get_event_mask(read.Handle, &outMask));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_runtime_get_event_mask(
+                read.Handle,
+                &outMask,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return (RuntimeEventMask)outMask;
     }
 
@@ -203,7 +241,7 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         var bufferMetadata = scope.Buffer(metadata);
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeDefinition = NativeOfflineRegionDefinition(definition, scope);
                 return NativeMethods.mln_runtime_offline_region_create(
@@ -211,7 +249,8 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
                     &nativeDefinition,
                     (byte*)bufferMetadata.data,
                     checked((nuint)bufferMetadata.size),
-                    completion
+                    completion,
+                    diagnostic
                 );
             },
             result => CopyOfflineRegionInfo(NativeCompletion.Value<mln_offline_region_info>(result))
@@ -232,8 +271,13 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
-                    NativeMethods.mln_runtime_offline_region_delete(Handle, regionId, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_runtime_offline_region_delete(
+                        Handle,
+                        regionId,
+                        completion,
+                        diagnostic
+                    ),
                 result => true
             )
             .WaitAsync(cancellationToken);
@@ -251,8 +295,13 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
-                    NativeMethods.mln_runtime_offline_region_get(Handle, regionId, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_runtime_offline_region_get(
+                        Handle,
+                        regionId,
+                        completion,
+                        diagnostic
+                    ),
                 result =>
                     result->value_count == 0
                         ? (OfflineRegionInfo?)null
@@ -275,11 +324,12 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_runtime_offline_region_get_status(
                         Handle,
                         regionId,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                     CopyOfflineRegionStatus(
@@ -301,11 +351,12 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_runtime_offline_region_invalidate(
                         Handle,
                         regionId,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result => true
             )
@@ -325,12 +376,13 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_runtime_offline_region_set_download_state(
                         Handle,
                         regionId,
                         (uint)state,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result => true
             )
@@ -350,12 +402,13 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_runtime_offline_region_set_observed(
                         Handle,
                         regionId,
                         (byte)(observed ? 1 : 0),
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result => true
             )
@@ -376,13 +429,14 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         var bufferMetadata = scope.Buffer(metadata);
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
                 NativeMethods.mln_runtime_offline_region_update_metadata(
                     Handle,
                     regionId,
                     (byte*)bufferMetadata.data,
                     checked((nuint)bufferMetadata.size),
-                    completion
+                    completion,
+                    diagnostic
                 ),
             result => CopyOfflineRegionInfo(NativeCompletion.Value<mln_offline_region_info>(result))
         );
@@ -401,7 +455,8 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_runtime_offline_regions_list(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_runtime_offline_regions_list(Handle, completion, diagnostic),
                 result =>
                 {
                     var values = NativeCompletion.Values<mln_offline_region_info>(result);
@@ -431,11 +486,12 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_runtime_offline_regions_merge_database(
                         Handle,
                         nativeSideDatabasePath.Pointer,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                 {
@@ -463,10 +519,11 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
 
     public ValueTask DisposeAsync() => new(CloseAsync());
 
-    private mln_status StartRelease(MlnRuntime handle)
+    private mln_status StartRelease(MlnRuntime handle, mln_diagnostic* _)
     {
-        teardown = NativeCompletion.SubmitUnit(completion =>
-            NativeMethods.mln_runtime_release(handle, completion)
+        teardown = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_release(handle, completion, diagnostic)
         );
         return mln_status.MLN_STATUS_OK;
     }
@@ -483,11 +540,12 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_runtime_run_ambient_cache_operation(
                         Handle,
                         (uint)operation,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result => true
             )
@@ -501,7 +559,15 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
             this,
             "mln_runtime_set_event_mask"
         );
-        NativeStatus.Check(NativeMethods.mln_runtime_set_event_mask(Handle, (ulong)mask));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_runtime_set_event_mask(
+                Handle,
+                (ulong)mask,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
     }
 
     public Task SetHttpHeaderTransformAsync(
@@ -516,13 +582,14 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
             "mln_runtime_set_http_header_transform"
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeTransform = NativeHttpHeaderTransform(transform, scope);
                 return NativeMethods.mln_runtime_set_http_header_transform(
                     Handle,
                     &nativeTransform,
-                    completion
+                    completion,
+                    diagnostic
                 );
             },
             result => true
@@ -543,11 +610,12 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_runtime_set_maximum_ambient_cache_size(
                         Handle,
                         size,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result => true
             )
@@ -566,13 +634,14 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
             "mln_runtime_set_resource_provider"
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeProvider = NativeResourceProvider(provider, scope);
                 return NativeMethods.mln_runtime_set_resource_provider(
                     Handle,
                     &nativeProvider,
-                    completion
+                    completion,
+                    diagnostic
                 );
             },
             result => true
@@ -593,13 +662,14 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
             "mln_runtime_set_resource_transform"
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeTransform = NativeResourceTransform(transform, scope);
                 return NativeMethods.mln_runtime_set_resource_transform(
                     Handle,
                     &nativeTransform,
-                    completion
+                    completion,
+                    diagnostic
                 );
             },
             result => true

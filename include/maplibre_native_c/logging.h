@@ -111,7 +111,7 @@ MLN_BINDING(
 MLN_API mln_status mln_log_set_callback(
   mln_log_callback callback,
   void* user_data MLN_BINDING("kind=context;ownership=borrowed"),
-  mln_log_callback_release release_user_data
+  mln_log_callback_release release_user_data, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -122,7 +122,8 @@ MLN_API mln_status mln_log_set_callback(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING("execution=immediate")
-MLN_API mln_status mln_log_clear_callback(void) MLN_NOEXCEPT;
+MLN_API mln_status
+mln_log_clear_callback(mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
 
 /**
  * Controls which log severities MapLibre Native may dispatch asynchronously.
@@ -138,7 +139,8 @@ MLN_API mln_status mln_log_clear_callback(void) MLN_NOEXCEPT;
  */
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_log_set_async_severity_mask(
-  uint32_t mask MLN_BINDING("enum=mln_log_severity_mask")
+  uint32_t mask MLN_BINDING("enum=mln_log_severity_mask"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

@@ -2000,17 +2000,22 @@ impl HttpHeaderTransformResponse<'_> {
             "mln_http_header_transform_response_set",
             self.raw.as_ptr() as usize as u64,
         )?;
-        crate::check(unsafe {
+        let name_size = name
+            .len()
+            .try_into()
+            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
+        let value_size = value
+            .len()
+            .try_into()
+            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
+        crate::check(|diagnostic| unsafe {
             maplibre_native_ffi_sys::mln_http_header_transform_response_set(
                 self.raw.as_ptr(),
                 (name).as_bytes().as_ptr().cast(),
-                name.len().try_into().map_err(|_| {
-                    crate::Error::invalid_argument("input exceeds native count range")
-                })?,
+                name_size,
                 (value).as_bytes().as_ptr().cast(),
-                value.len().try_into().map_err(|_| {
-                    crate::Error::invalid_argument("input exceeds native count range")
-                })?,
+                value_size,
+                diagnostic,
             )
         })
     }
@@ -5589,8 +5594,10 @@ impl ResourceRequestHandle {
         let mut arena = crate::input::InputArena::default();
         let response = response.to_native(&mut arena)?;
         self.state.complete_with(|handle| {
-            crate::check(unsafe {
-                maplibre_native_ffi_sys::mln_resource_request_complete(handle, &response)
+            crate::check(|diagnostic| unsafe {
+                maplibre_native_ffi_sys::mln_resource_request_complete(
+                    handle, &response, diagnostic,
+                )
             })
         })
     }
@@ -5598,8 +5605,12 @@ impl ResourceRequestHandle {
         let native = self.state.native_for_call()?;
         crate::callback::check("mln_resource_request_cancelled", native.0)?;
         let mut cancelled = false;
-        crate::check(unsafe {
-            maplibre_native_ffi_sys::mln_resource_request_cancelled(native, &mut cancelled)
+        crate::check(|diagnostic| unsafe {
+            maplibre_native_ffi_sys::mln_resource_request_cancelled(
+                native,
+                &mut cancelled,
+                diagnostic,
+            )
         })?;
         Ok(cancelled)
     }
@@ -5614,8 +5625,8 @@ impl ResourceRequestHandle {
     pub fn wait_until_retired(&self) -> crate::Result<()> {
         let native = self.state.issued_handle();
         crate::callback::check("mln_resource_request_wait_until_retired", native.0)?;
-        crate::check(unsafe {
-            maplibre_native_ffi_sys::mln_resource_request_wait_until_retired(native)
+        crate::check(|diagnostic| unsafe {
+            maplibre_native_ffi_sys::mln_resource_request_wait_until_retired(native, diagnostic)
         })
     }
     pub fn close(&self) -> crate::Result<()> {
@@ -5666,13 +5677,14 @@ impl crate::resource::ResourceRequestHandleState {
         let user_data =
             unsafe { arena.registration::<Registration>((handle.0, Some(callback)), release) };
         let mut cancelled = false;
-        crate::check(unsafe {
+        crate::check(|diagnostic| unsafe {
             maplibre_native_ffi_sys::mln_resource_request_set_cancel_callback(
                 handle,
                 Some(invoke),
                 user_data,
                 Some(release),
                 &mut cancelled,
+                diagnostic,
             )
         })?;
         if !cancelled {
@@ -5993,13 +6005,16 @@ impl ResourceTransformResponse<'_> {
             "mln_resource_transform_response_set_url",
             self.raw.as_ptr() as usize as u64,
         )?;
-        crate::check(unsafe {
+        let url_size = url
+            .len()
+            .try_into()
+            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
+        crate::check(|diagnostic| unsafe {
             maplibre_native_ffi_sys::mln_resource_transform_response_set_url(
                 self.raw.as_ptr(),
                 (url).as_bytes().as_ptr().cast(),
-                url.len().try_into().map_err(|_| {
-                    crate::Error::invalid_argument("input exceeds native count range")
-                })?,
+                url_size,
+                diagnostic,
             )
         })
     }
@@ -9586,31 +9601,41 @@ impl crate::values::NativeValue for WglContextDescriptor {
 pub unsafe fn acquired_frame_dispose(
     native: maplibre_native_ffi_sys::mln_acquired_frame,
 ) -> crate::Result<()> {
-    crate::check(unsafe { maplibre_native_ffi_sys::mln_acquired_frame_dispose(native) })
+    crate::check(|diagnostic| unsafe {
+        maplibre_native_ffi_sys::mln_acquired_frame_dispose(native, diagnostic)
+    })
 }
 
 #[doc(hidden)]
 pub unsafe fn map_dispose(native: maplibre_native_ffi_sys::mln_map) -> crate::Result<()> {
-    crate::check(unsafe { maplibre_native_ffi_sys::mln_map_dispose(native) })
+    crate::check(|diagnostic| unsafe {
+        maplibre_native_ffi_sys::mln_map_dispose(native, diagnostic)
+    })
 }
 
 #[doc(hidden)]
 pub unsafe fn map_projection_dispose(
     native: maplibre_native_ffi_sys::mln_map_projection,
 ) -> crate::Result<()> {
-    crate::check(unsafe { maplibre_native_ffi_sys::mln_map_projection_close(native) })
+    crate::check(|diagnostic| unsafe {
+        maplibre_native_ffi_sys::mln_map_projection_close(native, diagnostic)
+    })
 }
 
 #[doc(hidden)]
 pub unsafe fn render_session_dispose(
     native: maplibre_native_ffi_sys::mln_render_session,
 ) -> crate::Result<()> {
-    crate::check(unsafe { maplibre_native_ffi_sys::mln_render_session_dispose(native) })
+    crate::check(|diagnostic| unsafe {
+        maplibre_native_ffi_sys::mln_render_session_dispose(native, diagnostic)
+    })
 }
 
 #[doc(hidden)]
 pub unsafe fn runtime_dispose(native: maplibre_native_ffi_sys::mln_runtime) -> crate::Result<()> {
-    crate::check(unsafe { maplibre_native_ffi_sys::mln_runtime_dispose(native) })
+    crate::check(|diagnostic| unsafe {
+        maplibre_native_ffi_sys::mln_runtime_dispose(native, diagnostic)
+    })
 }
 
 pub const RESOURCE_REQUEST_HANDLE_FUNCTIONS: crate::resource::ResourceRequestHandleFns = unsafe {

@@ -41,14 +41,18 @@ void discard(mln_test_completion& completion) {
 // failure the caller saw, or its own.
 auto teardown(mln_render_session session, const char* failure) -> const char* {
   auto detach = mln_test_completion_default(0);
-  if (mln_render_session_detach(session, &detach.descriptor) != MLN_STATUS_OK) {
+  if (
+    mln_render_session_detach(session, &detach.descriptor, nullptr) !=
+    MLN_STATUS_OK
+  ) {
     discard(detach);
     if (failure == nullptr) failure = "the session detach was rejected";
   } else if (!finish(detach) && failure == nullptr) {
     failure = "the session detach failed";
   }
   if (
-    mln_render_session_destroy(session) != MLN_STATUS_OK && failure == nullptr
+    mln_render_session_destroy(session, nullptr) != MLN_STATUS_OK &&
+    failure == nullptr
   ) {
     failure = "the session destroy was rejected";
   }
@@ -75,7 +79,7 @@ extern "C" auto mln_test_metal_surface_retarget_retains_submission(mln_map map)
     auto attach = mln_test_completion_default(0);
     if (
       mln_metal_surface_attach(
-        map, &descriptor, &options, &session, &attach.descriptor
+        map, &descriptor, &options, &session, &attach.descriptor, nullptr
       ) != MLN_STATUS_OK
     ) {
       discard(attach);
@@ -120,7 +124,7 @@ extern "C" auto mln_test_metal_surface_retarget_retains_submission(mln_map map)
     descriptor.layer = (__bridge void*)replacement_layer;
     auto replacement = mln_test_completion_default(0);
     const auto replacement_status = mln_metal_surface_set_target(
-      session, &descriptor, &replacement.descriptor
+      session, &descriptor, &replacement.descriptor, nullptr
     );
     replacement_layer = nil;
     if (replacement_deallocated.load()) {

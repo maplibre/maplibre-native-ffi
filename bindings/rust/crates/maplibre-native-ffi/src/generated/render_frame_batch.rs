@@ -62,8 +62,8 @@ impl RenderFrameBatchHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_render_frame_batch_count", native.0)?;
         let mut binding_arg_1: usize = Default::default();
-        maplibre_core::check(unsafe {
-            sys::mln_render_frame_batch_count(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_render_frame_batch_count(native, &mut binding_arg_1, diagnostic)
         })?;
         Ok(binding_arg_1)
     }
@@ -75,8 +75,8 @@ impl RenderFrameBatchHandle {
         maplibre_core::callback::check("mln_render_frame_batch_get", native.0)?;
         let mut binding_arg_2: sys::mln_render_frame_result =
             maplibre_core::generated::RenderFrameResult::default().to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_render_frame_batch_get(native, binding_arg_1, &mut binding_arg_2)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_render_frame_batch_get(native, binding_arg_1, &mut binding_arg_2, diagnostic)
         })?;
         Ok(maplibre_core::generated::RenderFrameResult::from_native(
             binding_arg_2,

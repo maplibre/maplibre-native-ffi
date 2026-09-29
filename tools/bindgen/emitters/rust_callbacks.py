@@ -1,6 +1,6 @@
 """Retained callback descriptors and quiescent native release adapters."""
 
-from .rust import Unsupported, identifier, native_identifier
+from .rust import Unsupported, checked_call, identifier, native_identifier
 from .rust_dynamic_values import decode, encode
 
 
@@ -317,7 +317,7 @@ def response_declaration(values, value):
     for name in value.response.methods:
         plan = values.bound.operations_by_name[name]
         receiver = plan.scoped_receiver
-        args, signature = [], ["&mut self"]
+        args, signature, setup = [], ["&mut self"], []
         counts = {
             p.value.length: p.name
             for p in plan.inputs
@@ -330,9 +330,11 @@ def response_declaration(values, value):
             if parameter.name == receiver:
                 args.append("self.raw.as_ptr()")
             elif parameter.name in counts:
-                args.append(
-                    f'{identifier(counts[parameter.name])}.len().try_into().map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?'
+                # The checked closure returns a status, so fallible conversions precede it.
+                setup.append(
+                    f'let {local} = {identifier(counts[parameter.name])}.len().try_into().map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;'
                 )
+                args.append(local)
             elif parameter.value.kind == "buffer":
                 public = "&str" if parameter.value.encoding == "utf8" else "&[u8]"
                 signature.append(f"{local}: {public}")
@@ -343,7 +345,7 @@ def response_declaration(values, value):
                 )
         method = identifier(name.removeprefix(value.native + "_"))
         methods.append(
-            f'    pub fn {method}({", ".join(signature)}) -> crate::Result<()> {{ crate::callback::check("{name}", self.raw.as_ptr() as usize as u64)?; crate::check(unsafe {{ maplibre_native_ffi_sys::{name}({", ".join(args)}) }}) }}'
+            f'    pub fn {method}({", ".join(signature)}) -> crate::Result<()> {{ crate::callback::check("{name}", self.raw.as_ptr() as usize as u64)?; {" ".join(setup)} {checked_call(plan.function, args, "maplibre_native_ffi_sys::", "crate")} }}'
         )
     return f"""/// A native response borrowed only for one host callback.
 #[derive(Debug)]
@@ -364,6 +366,13 @@ def decision_declaration(values, value):
         if callback.decision and callback.decision.handle.native == value.native
     )
     complete = values.bound.operations_by_name[decision.complete]
+    functions = values.bound.source.functions_by_name
+
+    def checked(operation, *arguments):
+        return checked_call(
+            functions[operation], arguments, "maplibre_native_ffi_sys::", "crate"
+        )
+
     response = next(
         parameter.value.element
         for parameter in complete.inputs
@@ -384,13 +393,13 @@ impl {name} {{
         crate::callback::check("{decision.complete}", native.0)?;
         let mut arena = crate::input::InputArena::default();
         let response = response.to_native(&mut arena)?;
-        self.state.complete_with(|handle| crate::check(unsafe {{ maplibre_native_ffi_sys::{decision.complete}(handle, &response) }}))
+        self.state.complete_with(|handle| {checked(decision.complete, "handle", "&response")})
     }}
     pub fn {method(decision.cancelled)}(&self) -> crate::Result<bool> {{
         let native = self.state.native_for_call()?;
         crate::callback::check("{decision.cancelled}", native.0)?;
         let mut cancelled = false;
-        crate::check(unsafe {{ maplibre_native_ffi_sys::{decision.cancelled}(native, &mut cancelled) }})?;
+        {checked(decision.cancelled, "native", "&mut cancelled")}?;
         Ok(cancelled)
     }}
     pub fn {method(decision.cancel_registration)}(&self, callback: impl FnOnce() + Send + 'static) -> crate::Result<bool> {{
@@ -401,7 +410,7 @@ impl {name} {{
     pub fn {method(decision.wait_retired)}(&self) -> crate::Result<()> {{
         let native = self.state.issued_handle();
         crate::callback::check("{decision.wait_retired}", native.0)?;
-        crate::check(unsafe {{ maplibre_native_ffi_sys::{decision.wait_retired}(native) }})
+        {checked(decision.wait_retired, "native")}
     }}
     pub fn close(&self) -> crate::Result<()> {{
         crate::callback::check("{decision.handle.release}", self.state.issued_handle().0)?;
@@ -443,7 +452,12 @@ def cancel_registration(values, decision, method):
         registration.release_callback: "Some(release)",
         registration.accepted_unless: "&mut cancelled",
     }
-    call = ", ".join(arguments[p.name] for p in plan.function.parameters)
+    call = checked_call(
+        plan.function,
+        [arguments[p.name] for p in plan.function.parameters],
+        "maplibre_native_ffi_sys::",
+        "crate",
+    )
     return f"""impl crate::resource::ResourceRequestHandleState {{
     /// Registers a callback that runs at most once when MapLibre cancels the
     /// request, returning whether the request was already cancelled.
@@ -472,7 +486,7 @@ def cancel_registration(values, decision, method):
         // SAFETY: release reclaims exactly this box without unwinding.
         let user_data = unsafe {{ arena.registration::<Registration>((handle.0, Some(callback)), release) }};
         let mut cancelled = false;
-        crate::check(unsafe {{ maplibre_native_ffi_sys::{plan.name}({call}) }})?;
+        {call}?;
         if !cancelled {{ arena.accept_registrations(); }}
         Ok(cancelled)
     }}

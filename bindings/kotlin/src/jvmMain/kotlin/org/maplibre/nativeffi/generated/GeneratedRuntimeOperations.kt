@@ -11,14 +11,14 @@ import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.loader.CompletionBridge
 import org.maplibre.nativeffi.internal.loader.NativeAccess
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 public actual abstract class GeneratedRuntimeOperations internal actual constructor() {
   internal actual val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()
 
   internal abstract fun bindingRuntimeHandle(): Long
 
-  internal abstract fun bindingCloseRuntime(call: (Long) -> Int)
+  internal abstract fun bindingCloseRuntime(call: (Long) -> Unit)
 
   internal abstract fun bindingRetireRuntime(call: (Long) -> Deferred<Unit>): Deferred<Unit>
 
@@ -48,11 +48,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         },
         { completion ->
           Arena.ofConfined().use { arena ->
-            MapLibreNativeC.mln_map_create(
-              bindingRuntimeHandle(),
-              GeneratedValues.writeMapOptions(arena, options),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_map_create(
+                bindingRuntimeHandle(),
+                GeneratedValues.writeMapOptions(arena, options),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -70,7 +73,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_runtime_barrier(bindingRuntimeHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_runtime_barrier(bindingRuntimeHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -87,10 +92,13 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_runtime_clear_http_header_transform(
-            bindingRuntimeHandle(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_runtime_clear_http_header_transform(
+              bindingRuntimeHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -107,7 +115,13 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_runtime_clear_resource_provider(bindingRuntimeHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_runtime_clear_resource_provider(
+              bindingRuntimeHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -124,7 +138,13 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_runtime_clear_resource_transform(bindingRuntimeHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_runtime_clear_resource_transform(
+              bindingRuntimeHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -142,7 +162,11 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
           owner.toLong(),
           "mln_runtime_dispose",
         )
-        Arena.ofConfined().use { arena -> MapLibreNativeC.mln_runtime_dispose(owner) }
+        Arena.ofConfined().use { arena ->
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_runtime_dispose(owner, diagnostic)
+          }
+        }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)
@@ -158,9 +182,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return Arena.ofConfined().use { arena ->
         val output = arena.allocate(ValueLayout.JAVA_LONG)
-        BindingStatus.check(
-          MapLibreNativeC.mln_runtime_drain_events(bindingRuntimeHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MapLibreNativeC.mln_runtime_drain_events(bindingRuntimeHandle(), output, diagnostic)
+        }
         adoptOwned(
           output.get(ValueLayout.JAVA_LONG, 0),
           { GeneratedOwnerDisposal.eventBatch(it) },
@@ -181,9 +205,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return Arena.ofConfined().use { arena ->
         val output = arena.allocate(ValueLayout.JAVA_LONG)
-        BindingStatus.check(
-          MapLibreNativeC.mln_runtime_get_event_mask(bindingRuntimeHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MapLibreNativeC.mln_runtime_get_event_mask(bindingRuntimeHandle(), output, diagnostic)
+        }
         RuntimeEventMask(output.get(ValueLayout.JAVA_LONG, 0).toULong())
       }
     } finally {
@@ -209,13 +233,16 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         },
         { completion ->
           Arena.ofConfined().use { arena ->
-            MapLibreNativeC.mln_runtime_offline_region_create(
-              bindingRuntimeHandle(),
-              GeneratedValues.writeOfflineRegionDefinition(arena, definition),
-              GeneratedValues.rawBytes(arena, metadata),
-              metadata.size.toLong(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_runtime_offline_region_create(
+                bindingRuntimeHandle(),
+                GeneratedValues.writeOfflineRegionDefinition(arena, definition),
+                GeneratedValues.rawBytes(arena, metadata),
+                metadata.size.toLong(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -233,11 +260,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_runtime_offline_region_delete(
-            bindingRuntimeHandle(),
-            regionId,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_runtime_offline_region_delete(
+              bindingRuntimeHandle(),
+              regionId,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -262,11 +292,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         },
         { completion ->
           Arena.ofConfined().use { arena ->
-            MapLibreNativeC.mln_runtime_offline_region_get(
-              bindingRuntimeHandle(),
-              regionId,
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_runtime_offline_region_get(
+                bindingRuntimeHandle(),
+                regionId,
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -290,11 +323,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         },
         { completion ->
           Arena.ofConfined().use { arena ->
-            MapLibreNativeC.mln_runtime_offline_region_get_status(
-              bindingRuntimeHandle(),
-              regionId,
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_runtime_offline_region_get_status(
+                bindingRuntimeHandle(),
+                regionId,
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -312,11 +348,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_runtime_offline_region_invalidate(
-            bindingRuntimeHandle(),
-            regionId,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_runtime_offline_region_invalidate(
+              bindingRuntimeHandle(),
+              regionId,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -336,12 +375,15 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_runtime_offline_region_set_download_state(
-            bindingRuntimeHandle(),
-            regionId,
-            state.rawValue.toInt(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_runtime_offline_region_set_download_state(
+              bindingRuntimeHandle(),
+              regionId,
+              state.rawValue.toInt(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -358,12 +400,15 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_runtime_offline_region_set_observed(
-            bindingRuntimeHandle(),
-            regionId,
-            observed,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_runtime_offline_region_set_observed(
+              bindingRuntimeHandle(),
+              regionId,
+              observed,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -389,13 +434,16 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         },
         { completion ->
           Arena.ofConfined().use { arena ->
-            MapLibreNativeC.mln_runtime_offline_region_update_metadata(
-              bindingRuntimeHandle(),
-              regionId,
-              GeneratedValues.rawBytes(arena, metadata),
-              metadata.size.toLong(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_runtime_offline_region_update_metadata(
+                bindingRuntimeHandle(),
+                regionId,
+                GeneratedValues.rawBytes(arena, metadata),
+                metadata.size.toLong(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -420,7 +468,13 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         },
         { completion ->
           Arena.ofConfined().use { arena ->
-            MapLibreNativeC.mln_runtime_offline_regions_list(bindingRuntimeHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_runtime_offline_regions_list(
+                bindingRuntimeHandle(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -447,11 +501,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         },
         { completion ->
           Arena.ofConfined().use { arena ->
-            MapLibreNativeC.mln_runtime_offline_regions_merge_database(
-              bindingRuntimeHandle(),
-              GeneratedValues.cString(arena, sideDatabasePath),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_runtime_offline_regions_merge_database(
+                bindingRuntimeHandle(),
+                GeneratedValues.cString(arena, sideDatabasePath),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -471,7 +528,11 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
           "mln_runtime_release",
         )
         CompletionBridge.unitChecked { completion ->
-          Arena.ofConfined().use { arena -> MapLibreNativeC.mln_runtime_release(owner, completion) }
+          Arena.ofConfined().use { arena ->
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_runtime_release(owner, completion, diagnostic)
+            }
+          }
         }
       }
     } finally {
@@ -488,11 +549,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_runtime_run_ambient_cache_operation(
-            bindingRuntimeHandle(),
-            operation.rawValue.toInt(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_runtime_run_ambient_cache_operation(
+              bindingRuntimeHandle(),
+              operation.rawValue.toInt(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -508,9 +572,13 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         "mln_runtime_set_event_mask",
       )
       return Arena.ofConfined().use { arena ->
-        BindingStatus.check(
-          MapLibreNativeC.mln_runtime_set_event_mask(bindingRuntimeHandle(), mask.rawValue.toLong())
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MapLibreNativeC.mln_runtime_set_event_mask(
+            bindingRuntimeHandle(),
+            mask.rawValue.toLong(),
+            diagnostic,
+          )
+        }
         Unit
       }
     } finally {
@@ -528,14 +596,15 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         )
         CompletionBridge.unit { completion ->
           Arena.ofConfined().use { arena ->
-            val status =
+            NativeDiagnostics.check { diagnostic ->
               MapLibreNativeC.mln_runtime_set_http_header_transform(
                 bindingRuntimeHandle(),
                 GeneratedCallbacks.prepareHttpHeaderTransform(arena, transform, registrations),
                 completion,
+                diagnostic,
               )
-            if (status == 0) registrations.accept(bindingCallbacks)
-            status
+            }
+            registrations.accept(bindingCallbacks)
           }
         }
       }
@@ -553,11 +622,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_runtime_set_maximum_ambient_cache_size(
-            bindingRuntimeHandle(),
-            size.toLong(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_runtime_set_maximum_ambient_cache_size(
+              bindingRuntimeHandle(),
+              size.toLong(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -575,14 +647,15 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         )
         CompletionBridge.unit { completion ->
           Arena.ofConfined().use { arena ->
-            val status =
+            NativeDiagnostics.check { diagnostic ->
               MapLibreNativeC.mln_runtime_set_resource_provider(
                 bindingRuntimeHandle(),
                 GeneratedCallbacks.prepareResourceProvider(arena, provider, registrations),
                 completion,
+                diagnostic,
               )
-            if (status == 0) registrations.accept(bindingCallbacks)
-            status
+            }
+            registrations.accept(bindingCallbacks)
           }
         }
       }
@@ -601,14 +674,15 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         )
         CompletionBridge.unit { completion ->
           Arena.ofConfined().use { arena ->
-            val status =
+            NativeDiagnostics.check { diagnostic ->
               MapLibreNativeC.mln_runtime_set_resource_transform(
                 bindingRuntimeHandle(),
                 GeneratedCallbacks.prepareResourceTransform(arena, transform, registrations),
                 completion,
+                diagnostic,
               )
-            if (status == 0) registrations.accept(bindingCallbacks)
-            status
+            }
+            registrations.accept(bindingCallbacks)
           }
         }
       }

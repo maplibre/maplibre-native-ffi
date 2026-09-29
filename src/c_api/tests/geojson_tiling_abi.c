@@ -111,7 +111,7 @@ static void render_until_stopped(void* argument) {
     mln_frame_demand demand = mln_frame_demand_default();
     demand.flags = 0;
     mln_status status =
-      mln_render_session_request_frame(fixture.session, &demand);
+      mln_render_session_request_frame(fixture.session, &demand, NULL);
     if (status != MLN_STATUS_OK) {
       probe.render_status = status;
       break;
@@ -121,7 +121,7 @@ static void render_until_stopped(void* argument) {
       if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
         size_t serviced = 0;
         status = mln_render_session_service_driver_work(
-          fixture.session, SIZE_MAX, &serviced
+          fixture.session, SIZE_MAX, &serviced, NULL
         );
         if (status != MLN_STATUS_OK) {
           break;
@@ -130,7 +130,8 @@ static void render_until_stopped(void* argument) {
       mln_render_session_snapshot snapshot = {
         .size = sizeof(mln_render_session_snapshot)
       };
-      status = mln_render_session_get_snapshot(fixture.session, &snapshot);
+      status =
+        mln_render_session_get_snapshot(fixture.session, &snapshot, NULL);
       if (status != MLN_STATUS_OK) {
         break;
       }
@@ -140,7 +141,7 @@ static void render_until_stopped(void* argument) {
       }
       mln_render_frame_batch batch = MLN_HANDLE_NULL;
       const mln_status drain_status =
-        mln_render_session_drain_frame_results(fixture.session, &batch);
+        mln_render_session_drain_frame_results(fixture.session, &batch, NULL);
       if (drain_status == MLN_STATUS_OK) {
         mln_render_frame_batch_release(batch);
         settled = true;
@@ -179,7 +180,7 @@ static void replacing_data_during_async_tiling_survives(void) {
   camera_update.camera.zoom = 7.0;
   const mln_completion discard = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_update_camera(map, &camera_update, &discard)
+    MLN_STATUS_OK, mln_map_update_camera(map, &camera_update, &discard, NULL)
   );
 
   char* json = build_feature_collection();
@@ -187,21 +188,22 @@ static void replacing_data_during_async_tiling_survives(void) {
   const mln_buffer_view document = mln_test_buffer_view(json, strlen(json));
 
   mln_geojson_source_data current = MLN_HANDLE_NULL;
-  const mln_status create_status =
-    mln_geojson_source_data_create(document, &options, &current);
+  const mln_status create_status = mln_geojson_source_data_create(
+    document, &options, &current, MLN_TEST_DIAGNOSTIC
+  );
   TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK, create_status, mln_thread_last_error_message()
+    MLN_STATUS_OK, create_status, mln_test_last_error()
   );
 
   const mln_buffer_view source_id = MLN_BUFFER_LITERAL("points");
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(map, source_id, current, &discard)
+    mln_map_add_geojson_source_data(map, source_id, current, &discard, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_add_style_layer_json(
                      map, MLN_BUFFER_LITERAL(tiling_layer_json),
-                     MLN_BUFFER_LITERAL(""), &discard
+                     MLN_BUFFER_LITERAL(""), &discard, NULL
                    )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
@@ -223,8 +225,9 @@ static void replacing_data_during_async_tiling_survives(void) {
     mln_geojson_source_data prepared[TILING_BATCH_SIZE] = {0};
     unsigned int count = 0;
     for (; count < TILING_BATCH_SIZE; count += 1) {
-      loop_status =
-        mln_geojson_source_data_create(document, &options, &prepared[count]);
+      loop_status = mln_geojson_source_data_create(
+        document, &options, &prepared[count], NULL
+      );
       if (loop_status != MLN_STATUS_OK) {
         break;
       }
@@ -237,7 +240,7 @@ static void replacing_data_during_async_tiling_survives(void) {
          index += 1) {
       mln_test_drain_all(runtime);
       loop_status = mln_map_set_geojson_source_data(
-        map, source_id, prepared[index], &discard
+        map, source_id, prepared[index], &discard, NULL
       );
       if (loop_status == MLN_STATUS_OK) {
         mln_geojson_source_data_destroy(current);

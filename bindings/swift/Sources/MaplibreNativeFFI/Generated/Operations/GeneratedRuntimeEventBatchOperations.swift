@@ -18,7 +18,11 @@ public extension EventBatchHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_runtime_event_batch_view()
       value0.size = UInt32(MemoryLayout<mln_runtime_event_batch_view>.size)
-      try checkStatus(arena.submit { mln_event_batch_get(handle.raw, &value0) })
+      try checkStatus { diagnostic in arena.submit { mln_event_batch_get(
+        handle.raw,
+        &value0,
+        diagnostic
+      ) } }
       return try RuntimeEventBatchView(raw: value0)
     }
   }

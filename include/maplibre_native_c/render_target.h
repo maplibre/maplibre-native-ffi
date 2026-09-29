@@ -350,7 +350,8 @@ MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_target_extent_physical_size(
   const mln_render_target_extent* extent MLN_BINDING("length=1"),
   uint32_t* out_width MLN_BINDING("direction=out"),
-  uint32_t* out_height MLN_BINDING("direction=out")
+  uint32_t* out_height MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**

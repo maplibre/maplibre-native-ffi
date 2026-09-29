@@ -29,12 +29,15 @@ public static unsafe partial class Maplibre
             "mln_android_init"
         );
         global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_android_init(
                 (void*)jniEnv.Address,
                 (void*)jniClass.Address,
-                (void*)context.Address
-            )
+                (void*)context.Address,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
     }
 
@@ -57,11 +60,14 @@ public static unsafe partial class Maplibre
         );
         global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
         var outCoordinate = default(mln_lat_lng);
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_lat_lng_for_projected_meters(
                 NativeProjectedMeters(meters),
-                &outCoordinate
-            )
+                &outCoordinate,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return CopyLatLng(outCoordinate);
     }
@@ -73,7 +79,11 @@ public static unsafe partial class Maplibre
             "mln_log_clear_callback"
         );
         global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
-        NativeStatus.Check(NativeMethods.mln_log_clear_callback());
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_log_clear_callback(NativeDiagnostic.Prepare(&diagnostic)),
+            &diagnostic
+        );
     }
 
     public static void LogSetAsyncSeverityMask(LogSeverityMask mask)
@@ -83,7 +93,14 @@ public static unsafe partial class Maplibre
             "mln_log_set_async_severity_mask"
         );
         global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
-        NativeStatus.Check(NativeMethods.mln_log_set_async_severity_mask((uint)mask));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_log_set_async_severity_mask(
+                (uint)mask,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
     }
 
     public static void LogSetCallback(Func<LogSeverity, LogEvent, long, string, uint>? callback)
@@ -95,12 +112,15 @@ public static unsafe partial class Maplibre
         );
         global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
         var rootCallback = callback is null ? null : scope.Register(callback);
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_log_set_callback(
                 callback is null ? null : &InvokeLogCallback,
                 rootCallback,
-                &global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackRoot.Release
-            )
+                &global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackRoot.Release,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         scope.Accept();
     }
@@ -113,7 +133,11 @@ public static unsafe partial class Maplibre
         );
         global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
         uint outStatus = default;
-        NativeStatus.Check(NativeMethods.mln_network_status_get(&outStatus));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_network_status_get(&outStatus, NativeDiagnostic.Prepare(&diagnostic)),
+            &diagnostic
+        );
         return (NetworkStatus)outStatus;
     }
 
@@ -124,7 +148,14 @@ public static unsafe partial class Maplibre
             "mln_network_status_set"
         );
         global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
-        NativeStatus.Check(NativeMethods.mln_network_status_set((uint)status));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_network_status_set(
+                (uint)status,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
     }
 
     public static OpenglContextProviderFlag OpenglSupportedContextProviderMask()
@@ -157,8 +188,14 @@ public static unsafe partial class Maplibre
         );
         global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
         var outMeters = default(mln_projected_meters);
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_projected_meters_for_lat_lng(NativeLatLng(coordinate), &outMeters)
+            NativeMethods.mln_projected_meters_for_lat_lng(
+                NativeLatLng(coordinate),
+                &outMeters,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return CopyProjectedMeters(outMeters);
     }
@@ -175,12 +212,15 @@ public static unsafe partial class Maplibre
         var nativeExtent = NativeRenderTargetExtent(extent);
         uint outWidth = default;
         uint outHeight = default;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_render_target_extent_physical_size(
                 &nativeExtent,
                 &outWidth,
-                &outHeight
-            )
+                &outHeight,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return (outWidth, outHeight);
     }
@@ -231,16 +271,5 @@ public static unsafe partial class Maplibre
         global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
         var returned = NativeMethods.mln_supported_render_backend_mask();
         return (RenderBackendFlag)returned;
-    }
-
-    public static string ThreadLastErrorMessage()
-    {
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            null,
-            "mln_thread_last_error_message"
-        );
-        global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
-        var returned = NativeMethods.mln_thread_last_error_message();
-        return NativeCallScope.CopyCString(returned);
     }
 }

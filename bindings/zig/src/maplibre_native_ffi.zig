@@ -451,7 +451,6 @@ pub const styleTransitionOptionsDefault = generated.styleTransitionOptionsDefaul
 pub const supportedRenderBackendMask = generated.supportedRenderBackendMask;
 pub const textureImageInfoDefault = generated.textureImageInfoDefault;
 pub const textureReadPremultipliedRgba8 = generated.textureReadPremultipliedRgba8;
-pub const threadLastErrorMessage = generated.threadLastErrorMessage;
 pub const vulkanBorrowedTextureAttach = generated.vulkanBorrowedTextureAttach;
 pub const vulkanBorrowedTextureDescriptorDefault = generated.vulkanBorrowedTextureDescriptorDefault;
 pub const vulkanBorrowedTextureSetTarget = generated.vulkanBorrowedTextureSetTarget;

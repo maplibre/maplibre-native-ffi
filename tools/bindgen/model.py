@@ -54,6 +54,9 @@ class Function:
     location: Location
     documentation: str = ""
     variadic: bool = False
+    # The trailing mln_diagnostic* parameter, which the frontend removes from
+    # parameters because every binding supplies it the same way.
+    diagnostic: bool = False
 
 
 @dataclass(frozen=True)

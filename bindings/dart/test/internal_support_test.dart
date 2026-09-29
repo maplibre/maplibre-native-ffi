@@ -156,11 +156,11 @@ void main() {
       state.close((_) {
         closes += 1;
         return nativeStatusOk;
-      }, () => 'unused');
+      });
       state.close((_) {
         closes += 1;
         return nativeStatusOk;
-      }, () => 'unused');
+      });
 
       expect(closes, 1);
       expect(state.isClosed, isTrue);
@@ -173,12 +173,12 @@ void main() {
       );
 
       expect(
-        () => state.close((_) => nativeStatusInvalidState, () => 'busy'),
+        () => state.close((_) => nativeStatusInvalidState),
         throwsA(isA<InvalidStateException>()),
       );
 
       expect(state.isClosed, isFalse);
-      state.close((_) => nativeStatusOk, () => 'unused');
+      state.close((_) => nativeStatusOk);
       expect(state.isClosed, isTrue);
     });
   });
@@ -209,12 +209,13 @@ void main() {
             raw.mln_runtime_drain_events(
               runtime.identity.toSigned(64).toInt(),
               outBatch,
+              nullptr,
             ),
             nativeStatusOk,
           );
           try {
             expect(
-              raw.mln_event_batch_get(outBatch.value, view),
+              raw.mln_event_batch_get(outBatch.value, view, nullptr),
               nativeStatusOk,
             );
             expect(view.ref.event_size, sizeOf<raw.mln_runtime_event>());

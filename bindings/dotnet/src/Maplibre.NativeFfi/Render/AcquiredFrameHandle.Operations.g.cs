@@ -27,9 +27,9 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable
         nativeId = handle.Value;
         state = new NativeHandleState<MlnAcquiredFrame>(
             handle,
-            static live => NativeMethods.mln_acquired_frame_dispose(live),
+            static (live, diagnostic) => NativeMethods.mln_acquired_frame_dispose(live, diagnostic),
             nameof(AcquiredFrameHandle),
-            static live => NativeMethods.mln_acquired_frame_dispose(live),
+            static (live, diagnostic) => NativeMethods.mln_acquired_frame_dispose(live, diagnostic),
             retainedParent: parent
         );
     }
@@ -45,7 +45,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable
         catch
         {
             if (owner is null)
-                NativeMethods.mln_acquired_frame_dispose(handle);
+                NativeMethods.mln_acquired_frame_dispose(handle, null);
             else
                 owner.state.Retire();
             throw;
@@ -84,13 +84,24 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_adapter_acquired_frame_view_begin(read.Handle, &token)
+            NativeMethods.mln_adapter_acquired_frame_view_begin(
+                read.Handle,
+                &token,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         try
         {
             NativeStatus.Check(
-                NativeMethods.mln_acquired_frame_get_metal_texture(read.Handle, &outFrame)
+                NativeMethods.mln_acquired_frame_get_metal_texture(
+                    read.Handle,
+                    &outFrame,
+                    NativeDiagnostic.Prepare(&diagnostic)
+                ),
+                &diagnostic
             );
             callback(
                 new MetalOwnedTextureFrameView(CopyMetalOwnedTextureFrame(outFrame), viewScope)
@@ -118,13 +129,24 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_adapter_acquired_frame_view_begin(read.Handle, &token)
+            NativeMethods.mln_adapter_acquired_frame_view_begin(
+                read.Handle,
+                &token,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         try
         {
             NativeStatus.Check(
-                NativeMethods.mln_acquired_frame_get_opengl_texture(read.Handle, &outFrame)
+                NativeMethods.mln_acquired_frame_get_opengl_texture(
+                    read.Handle,
+                    &outFrame,
+                    NativeDiagnostic.Prepare(&diagnostic)
+                ),
+                &diagnostic
             );
             callback(
                 new OpenglOwnedTextureFrameView(CopyOpenglOwnedTextureFrame(outFrame), viewScope)
@@ -149,13 +171,24 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_adapter_acquired_frame_view_begin(read.Handle, &token)
+            NativeMethods.mln_adapter_acquired_frame_view_begin(
+                read.Handle,
+                &token,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         try
         {
             NativeStatus.Check(
-                NativeMethods.mln_acquired_frame_get_producer_sync(read.Handle, &outSync)
+                NativeMethods.mln_acquired_frame_get_producer_sync(
+                    read.Handle,
+                    &outSync,
+                    NativeDiagnostic.Prepare(&diagnostic)
+                ),
+                &diagnostic
             );
             callback(new GpuSyncView(CopyGpuSync(outSync), viewScope));
         }
@@ -178,7 +211,15 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable
         {
             size = (uint)sizeof(mln_render_frame_result),
         };
-        NativeStatus.Check(NativeMethods.mln_acquired_frame_get_result(read.Handle, &outResult));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_acquired_frame_get_result(
+                read.Handle,
+                &outResult,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return CopyRenderFrameResult(outResult);
     }
 
@@ -197,13 +238,24 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_adapter_acquired_frame_view_begin(read.Handle, &token)
+            NativeMethods.mln_adapter_acquired_frame_view_begin(
+                read.Handle,
+                &token,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         try
         {
             NativeStatus.Check(
-                NativeMethods.mln_acquired_frame_get_vulkan_texture(read.Handle, &outFrame)
+                NativeMethods.mln_acquired_frame_get_vulkan_texture(
+                    read.Handle,
+                    &outFrame,
+                    NativeDiagnostic.Prepare(&diagnostic)
+                ),
+                &diagnostic
             );
             callback(
                 new VulkanOwnedTextureFrameView(CopyVulkanOwnedTextureFrame(outFrame), viewScope)
@@ -231,13 +283,24 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_adapter_acquired_frame_view_begin(read.Handle, &token)
+            NativeMethods.mln_adapter_acquired_frame_view_begin(
+                read.Handle,
+                &token,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         try
         {
             NativeStatus.Check(
-                NativeMethods.mln_acquired_frame_get_webgpu_texture(read.Handle, &outFrame)
+                NativeMethods.mln_acquired_frame_get_webgpu_texture(
+                    read.Handle,
+                    &outFrame,
+                    NativeDiagnostic.Prepare(&diagnostic)
+                ),
+                &diagnostic
             );
             callback(
                 new WebgpuOwnedTextureFrameView(CopyWebgpuOwnedTextureFrame(outFrame), viewScope)
@@ -256,10 +319,16 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable
             this,
             "mln_acquired_frame_release"
         );
-        state.Release(live =>
-        {
-            var nativeConsumerCompletion = NativeGpuSync(consumerCompletion);
-            return NativeMethods.mln_acquired_frame_release(&live, &nativeConsumerCompletion);
-        });
+        state.Release(
+            (live, diagnostic) =>
+            {
+                var nativeConsumerCompletion = NativeGpuSync(consumerCompletion);
+                return NativeMethods.mln_acquired_frame_release(
+                    &live,
+                    &nativeConsumerCompletion,
+                    diagnostic
+                );
+            }
+        );
     }
 }

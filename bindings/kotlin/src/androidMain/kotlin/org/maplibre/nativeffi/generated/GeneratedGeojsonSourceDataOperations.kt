@@ -9,7 +9,7 @@ import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 public actual abstract class GeneratedGeojsonSourceDataOperations internal actual constructor() {
   internal abstract fun bindingGeojsonSourceDataHandle(): Long
 
-  internal abstract fun bindingCloseGeojsonSourceData(call: (Long) -> Int)
+  internal abstract fun bindingCloseGeojsonSourceData(call: (Long) -> Unit)
 
   public actual fun destroy(): Unit {
     try {
@@ -21,10 +21,7 @@ public actual abstract class GeneratedGeojsonSourceDataOperations internal actua
           owner.toLong(),
           "mln_geojson_source_data_destroy",
         )
-        PointerScope().use { arena ->
-          MaplibreNativeC.mln_geojson_source_data_destroy(owner)
-          0
-        }
+        PointerScope().use { arena -> MaplibreNativeC.mln_geojson_source_data_destroy(owner) }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)

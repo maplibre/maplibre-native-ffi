@@ -27,7 +27,7 @@ internal constructor(
     block(handle)
   }
 
-  internal override fun bindingCloseEventBatch(call: (ULong) -> Int) {
+  internal override fun bindingCloseEventBatch(call: (ULong) -> Unit) {
     core.closeOnce({ call(handle) })
   }
 

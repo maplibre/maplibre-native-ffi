@@ -15,18 +15,20 @@ public extension AcquiredFrameHandle {
       let access = try handle.borrow()
       defer { access.end(); withExtendedLifetime(self) {} }
       var token: UnsafeMutableRawPointer?
-      try checkStatus(mln_adapter_acquired_frame_view_begin(
+      try checkStatus { diagnostic in mln_adapter_acquired_frame_view_begin(
         access.handle.raw,
-        &token
-      ))
+        &token,
+        diagnostic
+      ) }
       let scope = NativeViewScope()
       defer { scope.expire(); mln_adapter_acquired_frame_view_end(token) }
       var raw = mln_metal_owned_texture_frame()
       raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
-      try checkStatus(mln_acquired_frame_get_metal_texture(
+      try checkStatus { diagnostic in mln_acquired_frame_get_metal_texture(
         access.handle.raw,
-        &raw
-      ))
+        &raw,
+        diagnostic
+      ) }
       return try body(MetalOwnedTextureFrameView(
         MetalOwnedTextureFrame(raw: raw),
         scope: scope
@@ -47,18 +49,20 @@ public extension AcquiredFrameHandle {
       let access = try handle.borrow()
       defer { access.end(); withExtendedLifetime(self) {} }
       var token: UnsafeMutableRawPointer?
-      try checkStatus(mln_adapter_acquired_frame_view_begin(
+      try checkStatus { diagnostic in mln_adapter_acquired_frame_view_begin(
         access.handle.raw,
-        &token
-      ))
+        &token,
+        diagnostic
+      ) }
       let scope = NativeViewScope()
       defer { scope.expire(); mln_adapter_acquired_frame_view_end(token) }
       var raw = mln_opengl_owned_texture_frame()
       raw.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
-      try checkStatus(mln_acquired_frame_get_opengl_texture(
+      try checkStatus { diagnostic in mln_acquired_frame_get_opengl_texture(
         access.handle.raw,
-        &raw
-      ))
+        &raw,
+        diagnostic
+      ) }
       return try body(OpenglOwnedTextureFrameView(
         OpenglOwnedTextureFrame(raw: raw),
         scope: scope
@@ -79,18 +83,20 @@ public extension AcquiredFrameHandle {
       let access = try handle.borrow()
       defer { access.end(); withExtendedLifetime(self) {} }
       var token: UnsafeMutableRawPointer?
-      try checkStatus(mln_adapter_acquired_frame_view_begin(
+      try checkStatus { diagnostic in mln_adapter_acquired_frame_view_begin(
         access.handle.raw,
-        &token
-      ))
+        &token,
+        diagnostic
+      ) }
       let scope = NativeViewScope()
       defer { scope.expire(); mln_adapter_acquired_frame_view_end(token) }
       var raw = mln_vulkan_owned_texture_frame()
       raw.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_frame>.size)
-      try checkStatus(mln_acquired_frame_get_vulkan_texture(
+      try checkStatus { diagnostic in mln_acquired_frame_get_vulkan_texture(
         access.handle.raw,
-        &raw
-      ))
+        &raw,
+        diagnostic
+      ) }
       return try body(VulkanOwnedTextureFrameView(
         VulkanOwnedTextureFrame(raw: raw),
         scope: scope
@@ -111,18 +117,20 @@ public extension AcquiredFrameHandle {
       let access = try handle.borrow()
       defer { access.end(); withExtendedLifetime(self) {} }
       var token: UnsafeMutableRawPointer?
-      try checkStatus(mln_adapter_acquired_frame_view_begin(
+      try checkStatus { diagnostic in mln_adapter_acquired_frame_view_begin(
         access.handle.raw,
-        &token
-      ))
+        &token,
+        diagnostic
+      ) }
       let scope = NativeViewScope()
       defer { scope.expire(); mln_adapter_acquired_frame_view_end(token) }
       var raw = mln_webgpu_owned_texture_frame()
       raw.size = UInt32(MemoryLayout<mln_webgpu_owned_texture_frame>.size)
-      try checkStatus(mln_acquired_frame_get_webgpu_texture(
+      try checkStatus { diagnostic in mln_acquired_frame_get_webgpu_texture(
         access.handle.raw,
-        &raw
-      ))
+        &raw,
+        diagnostic
+      ) }
       return try body(WebgpuOwnedTextureFrameView(
         WebgpuOwnedTextureFrame(raw: raw),
         scope: scope

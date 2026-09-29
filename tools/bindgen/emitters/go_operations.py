@@ -3,7 +3,7 @@
 from dataclasses import replace
 
 from ..model import ModelError
-from .go import GO_KEYWORDS, name
+from .go import GO_KEYWORDS, name, native_call
 from .go_values import Values, absent, public
 
 
@@ -42,6 +42,7 @@ def operation(plan, values):
     internal_names = {f"input{i}" for i in range(len(plan.inputs))} | {
         "receiver",
         "callback",
+        "diagnostic",
     }
     count_parameters = {
         p.value.length
@@ -259,11 +260,12 @@ def operation(plan, values):
         )
     else:
         converted = conversions[0] if conversions else "struct{}{}"
-    params = ", ".join(arguments[p.name] for p in plan.function.parameters)
-    call = f"C.{plan.name}({params})"
-    invocation = f"bindingCheck(func() int32 {{ return int32({call}) }})"
+    call = native_call(
+        plan.function, *(arguments[p.name] for p in plan.function.parameters)
+    )
+    invocation = f"bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {{ return int32({call}) }})"
     if plan.completion:
-        invocation = f"future, err := startCompletion(func(completion *C.mln_completion) int32 {{ return int32({call}) }}, {converter}); if err != nil {{ panic(bindingFailure{{err}}) }}"
+        invocation = f"future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {{ return int32({call}) }}, {converter}); if err != nil {{ panic(bindingFailure{{err}}) }}"
     elif plan.function.return_type.canonical == "void":
         invocation = call
     elif plan.function.return_type.spelling != "mln_status":
@@ -298,7 +300,7 @@ def operation(plan, values):
         if receiver
         else "0"
     )
-    admission = f"admitted := bindingAdmission(C.binding_operation_{plan.name}, {identity}); defer admitted()"
+    admission = f"bindingAdmission(C.binding_operation_{plan.name}, {identity})"
     if receiver:
         guard = (
             "receiver == nil || receiver.scope == nil"
@@ -335,8 +337,13 @@ def operation(plan, values):
         method = "With" + method.removeprefix("Get")
         setup.append('if callback == nil { arena.fail("view callback is nil") }')
         if plan.view.owner.view_begin:
+            begin = native_call(
+                values.api.source.functions_by_name[plan.view.owner.view_begin],
+                f"C.{handle.native}(raw)",
+                "&token",
+            )
             setup.append(
-                f"var token unsafe.Pointer; bindingCheck(func() int32 {{ return int32(C.{plan.view.owner.view_begin}(C.{handle.native}(raw), &token)) }}); defer C.{plan.view.owner.view_end}(token)"
+                f"var token unsafe.Pointer; bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {{ return int32({begin}) }}); defer C.{plan.view.owner.view_end}(token)"
             )
         setup.append("scope := bindingNewScope(); defer scope.alive.Store(false)")
         invocation += f"; if err := callback({view_type}{{value: {converted}, scope: scope}}); err != nil {{ panic(bindingFailure{{err}}) }}"

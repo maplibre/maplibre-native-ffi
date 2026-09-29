@@ -21,6 +21,7 @@ import org.maplibre.nativeffi.generated.ResourceProvider
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.runtime.use
 
 class ResourceRequestHandleAndroidTest {
@@ -32,13 +33,15 @@ class ResourceRequestHandleAndroidTest {
     val failure =
       assertFailsWith<InvalidArgumentException> {
         handle.bindingCompleteResourceRequestHandle {
-          MaplibreNativeC.mln_network_status_set(999_999)
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_network_status_set(999_999, diagnostic)
+          }
         }
       }
     assertTrue(failure.diagnostic.contains("network status"))
     assertEquals(0, releases)
-    handle.bindingCompleteResourceRequestHandle { 0 }
-    assertFailsWith<InvalidStateException> { handle.bindingCompleteResourceRequestHandle { 0 } }
+    handle.bindingCompleteResourceRequestHandle {}
+    assertFailsWith<InvalidStateException> { handle.bindingCompleteResourceRequestHandle {} }
     assertEquals(0, releases)
     handle.close()
     assertEquals(1, releases)
@@ -55,7 +58,6 @@ class ResourceRequestHandleAndroidTest {
       handle.bindingCompleteResourceRequestHandle {
         entered.countDown()
         check(leave.await(5, TimeUnit.SECONDS))
-        0
       }
     }
     try {
@@ -123,7 +125,7 @@ class ResourceRequestHandleAndroidTest {
 
   private fun isReleased(raw: Long): Boolean =
     PointerScope().use {
-      MaplibreNativeC.mln_resource_request_cancelled(raw, BoolPointer(1L)) !=
+      MaplibreNativeC.mln_resource_request_cancelled(raw, BoolPointer(1L), null) !=
         MaplibreStatus.OK.nativeCode
     }
 }

@@ -27,13 +27,13 @@ public sealed unsafe partial class BufferHandle : IDisposable
         nativeId = handle.Value;
         state = new NativeHandleState<MlnBuffer>(
             handle,
-            static live =>
+            static (live, _) =>
             {
                 NativeMethods.mln_buffer_destroy(live);
                 return mln_status.MLN_STATUS_OK;
             },
             nameof(BufferHandle),
-            static live =>
+            static (live, _) =>
             {
                 NativeMethods.mln_buffer_destroy(live);
                 return mln_status.MLN_STATUS_OK;
@@ -94,7 +94,15 @@ public sealed unsafe partial class BufferHandle : IDisposable
             "mln_buffer_get"
         );
         var outView = new mln_buffer_view { size = (uint)sizeof(mln_buffer_view) };
-        NativeStatus.Check(NativeMethods.mln_buffer_get(read.Handle, &outView));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_buffer_get(
+                read.Handle,
+                &outView,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return ValueStructs.CopyBufferView(outView);
     }
 }

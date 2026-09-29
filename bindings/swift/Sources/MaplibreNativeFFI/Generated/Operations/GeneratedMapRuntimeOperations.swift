@@ -15,10 +15,11 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_create(
+        .start({ completion, diagnostic in arena.submit { mln_map_create(
           handle.raw,
           arena.store(bindingArg0.nativeValue()),
-          completion
+          completion,
+          diagnostic
         ) } }) { result in try MapHandle(
           adopting: NativeCompletion.value(result, as: mln_map.self),
           parent: self
@@ -45,13 +46,14 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           try arena.submit { try mln_runtime_offline_region_create(
             handle.raw,
             arena.store(bindingArg0.nativeValue(arena: arena)),
             arena.view(bindingArg1).data?.assumingMemoryBound(to: UInt8.self),
             NativeInputArena.count(bindingArg1.count),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try OfflineRegionInfo(raw: NativeCompletion.value(
           result,
           as: mln_offline_region_info.self
@@ -75,11 +77,12 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_runtime_offline_region_delete(
             handle.raw,
             bindingArg0,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -103,17 +106,19 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_runtime_offline_region_get(
-          handle.raw,
-          bindingArg0,
-          completion
-        ) } }) { result in if result.pointee
+        .start({ completion, diagnostic in
+          arena.submit { mln_runtime_offline_region_get(
+            handle.raw,
+            bindingArg0,
+            completion,
+            diagnostic
+          ) } }) { result in if result.pointee
           .value_count ==
           0 { return nil
-          }; return try OfflineRegionInfo(raw: NativeCompletion.value(
-            result,
-            as: mln_offline_region_info.self
-          ))
+            }; return try OfflineRegionInfo(raw: NativeCompletion.value(
+              result,
+              as: mln_offline_region_info.self
+            ))
         }
     }
   }
@@ -136,11 +141,12 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_runtime_offline_region_get_status(
             handle.raw,
             bindingArg0,
-            completion
+            completion,
+            diagnostic
           ) }
         }) { result in try OfflineRegionStatus(raw: NativeCompletion.value(
           result,
@@ -165,11 +171,12 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_runtime_offline_region_invalidate(
             handle.raw,
             bindingArg0,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -194,12 +201,13 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_runtime_offline_region_set_download_state(
             handle.raw,
             bindingArg0,
             bindingArg1.nativeValue(),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -224,12 +232,13 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_runtime_offline_region_set_observed(
             handle.raw,
             bindingArg0,
             bindingArg1,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -254,13 +263,14 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           try arena.submit { try mln_runtime_offline_region_update_metadata(
             handle.raw,
             bindingArg0,
             arena.view(bindingArg1).data?.assumingMemoryBound(to: UInt8.self),
             NativeInputArena.count(bindingArg1.count),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try OfflineRegionInfo(raw: NativeCompletion.value(
           result,
           as: mln_offline_region_info.self
@@ -284,10 +294,12 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_runtime_offline_regions_list(
-          handle.raw,
-          completion
-        ) } }) { result in try NativeCompletion.values(
+        .start({ completion, diagnostic in
+          arena.submit { mln_runtime_offline_regions_list(
+            handle.raw,
+            completion,
+            diagnostic
+          ) } }) { result in try NativeCompletion.values(
           result,
           as: mln_offline_region_info.self
         ).map { try OfflineRegionInfo(raw: $0) } }
@@ -314,11 +326,12 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           try arena.submit { try mln_runtime_offline_regions_merge_database(
             handle.raw,
             arena.cString(bindingArg0),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try NativeCompletion.values(
           result,
           as: mln_offline_region_info.self

@@ -439,9 +439,9 @@ auto mln::capture::deliver_deferred(
 
 extern "C" MLN_API auto mln_adapter_deferred_callback_create(
   std::uint32_t callback, mln_adapter_deferred_call_listener listener,
-  void* listener_user_data, void** out_context
+  void* listener_user_data, void** out_context, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     auto state = create_deferred_state(callback, out_context);
     if (state == nullptr || listener == nullptr) {
       mln::core::set_thread_error("deferred callback arguments are invalid");
@@ -456,9 +456,9 @@ extern "C" MLN_API auto mln_adapter_deferred_callback_create(
 
 extern "C" MLN_API auto mln_adapter_dart_deferred_callback_create(
   std::uint32_t callback, void* post_cobject, std::int64_t port,
-  void** out_context
+  void** out_context, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     auto state = create_deferred_state(callback, out_context);
     if (state == nullptr || post_cobject == nullptr || port == 0) {
       mln::core::set_thread_error("deferred callback arguments are invalid");
@@ -510,9 +510,9 @@ extern "C" MLN_API void mln_adapter_deferred_call_record_destroy(
 extern "C" MLN_API auto mln_adapter_completion_create(
   std::uint32_t copy_kind, std::size_t element_size,
   mln_adapter_completion_listener listener, void* user_data,
-  mln_completion* out_completion
+  mln_completion* out_completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
       out_completion == nullptr || out_completion->size != 0 ||
       out_completion->callback != nullptr ||
@@ -541,19 +541,23 @@ extern "C" MLN_API auto mln_adapter_completion_create(
 
 extern "C" MLN_API auto mln_adapter_dart_completion_create(
   std::uint32_t copy_kind, std::size_t element_size, void* post_cobject,
-  std::int64_t port, std::int64_t token, mln_completion* out_completion
+  std::int64_t port, std::int64_t token, mln_completion* out_completion,
+  mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  if (!post_cobject || !port) return MLN_STATUS_INVALID_ARGUMENT;
-  const auto status = mln_adapter_completion_create(
-    copy_kind, element_size, [](void*, mln_adapter_completion_record*) {},
-    nullptr, out_completion
-  );
-  if (status != MLN_STATUS_OK) return status;
-  auto* state = static_cast<AdapterCompletionState*>(out_completion->user_data);
-  state->dart_port =
-    DartWake{reinterpret_cast<DartWake::Post>(post_cobject), port};
-  state->dart_token = token;
-  return MLN_STATUS_OK;
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (!post_cobject || !port) return MLN_STATUS_INVALID_ARGUMENT;
+    const auto status = mln_adapter_completion_create(
+      copy_kind, element_size, [](void*, mln_adapter_completion_record*) {},
+      nullptr, out_completion, nullptr
+    );
+    if (status != MLN_STATUS_OK) return status;
+    auto* state =
+      static_cast<AdapterCompletionState*>(out_completion->user_data);
+    state->dart_port =
+      DartWake{reinterpret_cast<DartWake::Post>(post_cobject), port};
+    state->dart_token = token;
+    return MLN_STATUS_OK;
+  });
 }
 
 extern "C" MLN_API void mln_adapter_completion_reject(
@@ -585,9 +589,10 @@ extern "C" MLN_API void mln_adapter_completion_record_destroy(
 }
 
 extern "C" MLN_API auto mln_adapter_dart_wake_create(
-  void* post_cobject, std::int64_t port, mln_wake* out_wake
+  void* post_cobject, std::int64_t port, mln_wake* out_wake,
+  mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (post_cobject == nullptr || port == 0 || out_wake == nullptr) {
       mln::core::set_thread_error(
         "Dart wake requires a posting function, port and output"
@@ -675,13 +680,14 @@ extern "C" MLN_API void mln_adapter_arena_destroy(void* arena) noexcept {
 }
 
 extern "C" MLN_API auto mln_adapter_arena_adopt_handle(
-  void* arena, std::uint64_t handle
+  void* arena, std::uint64_t handle, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  const auto status = mln::c_api::status_boundary([&]() -> mln_status {
-    if (!arena) return MLN_STATUS_INVALID_ARGUMENT;
-    static_cast<AdapterArena*>(arena)->handles.push_back(handle);
-    return MLN_STATUS_OK;
-  });
+  const auto status =
+    mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+      if (!arena) return MLN_STATUS_INVALID_ARGUMENT;
+      static_cast<AdapterArena*>(arena)->handles.push_back(handle);
+      return MLN_STATUS_OK;
+    });
   if (status != MLN_STATUS_OK) {
     const auto* type =
       mln::core::handle_kind_name(mln::core::handle_kind_of(handle));
@@ -691,25 +697,29 @@ extern "C" MLN_API auto mln_adapter_arena_adopt_handle(
 }
 
 extern "C" MLN_API auto mln_adapter_arena_adopt_release(
-  void* arena, mln_runtime_callback_release release, void* context
+  void* arena, mln_runtime_callback_release release, void* context,
+  mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   if (release == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
-  const auto status = mln::c_api::status_boundary([&]() -> mln_status {
-    if (!arena) return MLN_STATUS_INVALID_ARGUMENT;
-    static_cast<AdapterArena*>(arena)->releases.emplace_back(release, context);
-    return MLN_STATUS_OK;
-  });
+  const auto status =
+    mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+      if (!arena) return MLN_STATUS_INVALID_ARGUMENT;
+      static_cast<AdapterArena*>(arena)->releases.emplace_back(
+        release, context
+      );
+      return MLN_STATUS_OK;
+    });
   if (status != MLN_STATUS_OK) release(context);
   return status;
 }
 
 extern "C" MLN_API auto mln_adapter_dart_release_register(
   void* post_cobject, std::int64_t port, void* context, void* arena,
-  std::uint64_t* out_registration
+  std::uint64_t* out_registration, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   auto owned_arena =
     std::unique_ptr<AdapterArena>{static_cast<AdapterArena*>(arena)};
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (out_registration) *out_registration = 0;
     if (
       post_cobject == nullptr || port == 0 || context == nullptr ||
@@ -812,7 +822,8 @@ extern "C" MLN_API auto mln_adapter_resource_transform_rewrite_callback(
         return MLN_STATUS_OK;
       }
       return mln_resource_transform_response_set_url(
-        out_response, rule.replacement_url, std::strlen(rule.replacement_url)
+        out_response, rule.replacement_url, std::strlen(rule.replacement_url),
+        nullptr
       );
     }
   }
@@ -848,7 +859,7 @@ extern "C" MLN_API auto mln_adapter_http_header_transform_callback(
       const auto value_size =
         header.value == nullptr ? 0 : std::strlen(header.value);
       const auto status = mln_http_header_transform_response_set(
-        out_response, header.name, name_size, header.value, value_size
+        out_response, header.name, name_size, header.value, value_size, nullptr
       );
       if (status != MLN_STATUS_OK) {
         return status;
@@ -860,9 +871,9 @@ extern "C" MLN_API auto mln_adapter_http_header_transform_callback(
 }
 
 extern "C" MLN_API auto mln_adapter_http_header_validate(
-  const char* name, const char* value
+  const char* name, const char* value, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::validate_http_header(
       name, name == nullptr ? 0 : std::strlen(name), value,
       value == nullptr ? 0 : std::strlen(value)
@@ -891,7 +902,9 @@ extern "C" MLN_API auto mln_adapter_resource_provider_rules_callback(
         request->requested_url
       )
     ) {
-      static_cast<void>(mln_resource_request_complete(handle, &rule.response));
+      static_cast<void>(
+        mln_resource_request_complete(handle, &rule.response, nullptr)
+      );
       mln_resource_request_release(handle);
       return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
     }

@@ -6,7 +6,7 @@ from dataclasses import replace
 
 from ..managed_contracts import LOCALS
 from . import kotlin_callbacks
-from .kotlin_values import Unsupported, identifier, name, owner_name
+from .kotlin_values import Unsupported, identifier, name, native_call, owner_name
 
 
 def parameter_name(native):
@@ -329,7 +329,7 @@ def _operation(plan, values, platform):
         "androidMain": "MaplibreNativeC.",
         "nativeMain": "",
     }[platform]
-    call = prefix + plan.name + "(" + ", ".join(arguments) + ")"
+    call = native_call(plan.function, prefix, arguments)
     call = (
         "Arena.ofConfined().use { arena -> " + call + " }"
         if platform == "jvmMain"
@@ -482,13 +482,9 @@ def immediate(plan, values, platform):
         and platform == "jvmMain"
     ):
         args.insert(0, "arena")
-    call = prefix + plan.name + "(" + ", ".join(args) + ")"
-    status = (
-        plan.function.return_type.declaration == "mln_status"
-        or plan.function.return_type.spelling == "mln_status"
-    )
-    if status:
-        setup.append("BindingStatus.check(" + call + ")")
+    call = native_call(plan.function, prefix, args)
+    if plan.function.diagnostic:
+        setup.append(call)
     elif result:
         setup.append("val nativeResult = " + call)
         decoded = (
@@ -630,11 +626,8 @@ def owned_operation(plan, values, platform):
             + dispose(raw)
             + " }, { completion -> "
             + arena
-            + prefix
-            + plan.name
-            + "("
-            + ", ".join(args)
-            + ") } })"
+            + native_call(plan.function, prefix, args)
+            + " } })"
         )
     else:
         allocate = (
@@ -654,13 +647,13 @@ def owned_operation(plan, values, platform):
         args.append("output.ptr" if platform == "nativeMain" else "output")
         if attachment:
             args.append("completion")
-        native = prefix + plan.name + "(" + ", ".join(args) + ")"
+        native = native_call(plan.function, prefix, args)
         call = (
             "val ready = CompletionBridge.unitChecked { completion -> "
             + native
             + " }; "
             if attachment
-            else "BindingStatus.check(" + native + "); "
+            else native + "; "
         )
         wrapped = (
             "adoptOwned("
@@ -758,14 +751,12 @@ def view_operation(plan, values, platform):
         if platform == "nativeMain"
         else "PointerScope().use { arena -> "
     )
-    begin = (
-        prefix
-        + plan.view.owner.view_begin
-        + "("
-        + receiver_handle(plan)
-        + ", "
-        + token_pointer
-        + ")"
+    functions = values.bound.source.functions_by_name
+    begin = native_call(
+        functions[plan.view.owner.view_begin],
+        prefix,
+        [receiver_handle(plan), token_pointer],
     )
-    end = prefix + plan.view.owner.view_end + "(" + token_value + ")"
-    return f"  public actual fun <T> {method}(block: ({result_type}) -> T): T = {arena}\n    {admission(plan)}\n    val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()\n    val token = {token}\n    BindingStatus.check({begin})\n    try {{\n      val output = {allocate}\n      {size}\n      BindingStatus.check({prefix}{plan.name}({receiver_handle(plan)}, {pointer}))\n      block(GeneratedValues.read{name(native)}(output, scope))\n    }} finally {{ scope.close(); {end} }}\n  }}\n"
+    end = native_call(functions[plan.view.owner.view_end], prefix, [token_value])
+    read = native_call(plan.function, prefix, [receiver_handle(plan), pointer])
+    return f"  public actual fun <T> {method}(block: ({result_type}) -> T): T = {arena}\n    {admission(plan)}\n    val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()\n    val token = {token}\n    {begin}\n    try {{\n      val output = {allocate}\n      {size}\n      {read}\n      block(GeneratedValues.read{name(native)}(output, scope))\n    }} finally {{ scope.close(); {end} }}\n  }}\n"

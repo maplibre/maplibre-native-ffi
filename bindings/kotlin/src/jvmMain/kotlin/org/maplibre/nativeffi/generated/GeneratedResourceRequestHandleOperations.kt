@@ -9,7 +9,7 @@ import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.loader.NativeAccess
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 public actual abstract class GeneratedResourceRequestHandleOperations
 internal actual constructor() {
@@ -19,11 +19,11 @@ internal actual constructor() {
 
   internal abstract fun <T> bindingReadResourceRequestHandle(block: (Long) -> T): T
 
-  internal abstract fun bindingCompleteResourceRequestHandle(call: (Long) -> Int)
+  internal abstract fun bindingCompleteResourceRequestHandle(call: (Long) -> Unit)
 
   internal abstract fun bindingIssuedResourceRequestHandleHandle(): Long
 
-  internal abstract fun bindingCloseResourceRequestHandle(call: (Long) -> Int)
+  internal abstract fun bindingCloseResourceRequestHandle(call: (Long) -> Unit)
 
   public actual fun resourceRequestCancelled(): Boolean {
     try {
@@ -35,7 +35,9 @@ internal actual constructor() {
       return bindingReadResourceRequestHandle { raw ->
         Arena.ofConfined().use { arena ->
           val out = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-          BindingStatus.check(MapLibreNativeC.mln_resource_request_cancelled(raw, out))
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_resource_request_cancelled(raw, out, diagnostic)
+          }
           out.get(ValueLayout.JAVA_BOOLEAN, 0)
         }
       }
@@ -53,10 +55,13 @@ internal actual constructor() {
       )
       return bindingCompleteResourceRequestHandle { raw ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_resource_request_complete(
-            raw,
-            GeneratedValues.writeResourceResponse(arena, response),
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_resource_request_complete(
+              raw,
+              GeneratedValues.writeResourceResponse(arena, response),
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -74,10 +79,7 @@ internal actual constructor() {
           owner.toLong(),
           "mln_resource_request_release",
         )
-        Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_resource_request_release(owner)
-          0
-        }
+        Arena.ofConfined().use { arena -> MapLibreNativeC.mln_resource_request_release(owner) }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)
@@ -102,15 +104,16 @@ internal actual constructor() {
                 raw.toLong(),
               )
             val out = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-            BindingStatus.check(
+            NativeDiagnostics.check { diagnostic ->
               MapLibreNativeC.mln_resource_request_set_cancel_callback(
                 raw,
                 GeneratedDirectCallbacks.ResourceRequestCancelCallbackStub,
                 MemorySegment.ofAddress(token),
                 GeneratedDirectCallbacks.ResourceRequestCancelCallbackReleaseStub,
                 out,
+                diagnostic,
               )
-            )
+            }
             val outCancelled = out.get(ValueLayout.JAVA_BOOLEAN, 0)
             if (!outCancelled) registrations.accept(bindingCallbacks)
             outCancelled
@@ -130,11 +133,12 @@ internal actual constructor() {
         "mln_resource_request_wait_until_retired",
       )
       return Arena.ofConfined().use { arena ->
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_resource_request_wait_until_retired(
-            bindingIssuedResourceRequestHandleHandle()
+            bindingIssuedResourceRequestHandleHandle(),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {

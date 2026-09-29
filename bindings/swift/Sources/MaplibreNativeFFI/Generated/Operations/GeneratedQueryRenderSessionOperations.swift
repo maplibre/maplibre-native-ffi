@@ -24,7 +24,7 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_render_session_query_feature_extensions(
             handle.raw,
             arena.view(bindingArg0),
@@ -32,7 +32,8 @@ public extension RenderSessionHandle {
             arena.view(bindingArg2),
             arena.view(bindingArg3),
             bindingArg4.map { arena.store(arena.view($0)) },
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try NativeCompletion.data(result) }
     }
   }
@@ -56,12 +57,13 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           try arena.submit { try mln_render_session_query_rendered_features(
             handle.raw,
             arena.store(bindingArg0.nativeValue(arena: arena)),
             bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try NativeCompletion.values(
           result,
           as: mln_queried_feature.self
@@ -88,12 +90,13 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           try arena.submit { try mln_render_session_query_source_features(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try NativeCompletion.values(
           result,
           as: mln_queried_feature.self

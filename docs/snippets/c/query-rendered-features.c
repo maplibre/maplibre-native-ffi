@@ -49,7 +49,7 @@ mln_status features_at_screen_point(
     .callback = read_query_result,
   };
   return mln_render_session_query_rendered_features(
-    session, &geometry, &options, &completion
+    session, &geometry, &options, &completion, NULL
   );
   // #endregion query
 }

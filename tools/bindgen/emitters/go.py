@@ -40,6 +40,13 @@ def name(value: str) -> str:
     return "".join(word[:1].upper() + word[1:] for word in value.split("_"))
 
 
+def native_call(function, *arguments, diagnostic="diagnostic"):
+    """Calls a C function, passing diagnostic last when it takes one."""
+    if function.diagnostic:
+        arguments = (*arguments, diagnostic)
+    return f"C.{function.name}({', '.join(arguments)})"
+
+
 def lower(api):
     from .go_callbacks import sources
     from .go_operations import lower as lower_operations
@@ -67,8 +74,13 @@ def lower(api):
             raise ModelError(
                 [f"{native}: automatic ownership requires an unconditional disposer"]
             )
+        dispose = native_call(
+            bound.source.functions_by_name[disposer],
+            f"C.{native}(raw)",
+            diagnostic="nil",
+        )
         owners.append(
-            f"type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,func(raw uint64){{ C.{disposer}(C.{native}(raw)) }})}}; return owner }}"
+            f"type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,func(raw uint64){{ {dispose} }})}}; return owner }}"
         )
         used_support.add(disposer)
     go, header, c = [], [], []

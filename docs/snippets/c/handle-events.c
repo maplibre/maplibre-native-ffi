@@ -18,7 +18,7 @@ mln_status select_map_events(mln_map map, const mln_completion* completion) {
       MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED |
       MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
       MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED,
-    completion
+    completion, NULL
   );
 }
 // #endregion subscribe
@@ -35,11 +35,11 @@ static bool asks_for_a_repaint(const mln_runtime_event* event) {
 void drain_events(mln_runtime runtime, map_observer* observer) {
   // #region drain
   mln_event_batch batch = MLN_HANDLE_NULL;
-  if (mln_runtime_drain_events(runtime, &batch) != MLN_STATUS_OK) return;
+  if (mln_runtime_drain_events(runtime, &batch, NULL) != MLN_STATUS_OK) return;
   mln_runtime_event_batch_view view = {
     .size = sizeof(mln_runtime_event_batch_view)
   };
-  if (mln_event_batch_get(batch, &view) != MLN_STATUS_OK) {
+  if (mln_event_batch_get(batch, &view, NULL) != MLN_STATUS_OK) {
     mln_event_batch_release(batch);
     return;
   }

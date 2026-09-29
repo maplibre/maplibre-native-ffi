@@ -88,13 +88,14 @@ impl MapHandle {
                 size: 0,
             },
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_color_relief_layer(
                 native,
                 binding_arg_1,
                 binding_arg_2,
                 binding_arg_3,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -114,12 +115,13 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let submitted = crate::completion::submit_command(|completion| unsafe {
+        let submitted = crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_custom_geometry_source(
                 native,
                 binding_arg_1,
                 &binding_arg_2,
                 completion,
+                diagnostic,
             )
         });
         if submitted.is_ok() {
@@ -143,12 +145,13 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let submitted = crate::completion::submit_command(|completion| unsafe {
+        let submitted = crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_custom_mvt_vector_source(
                 native,
                 binding_arg_1,
                 &binding_arg_2,
                 completion,
+                diagnostic,
             )
         });
         if submitted.is_ok() {
@@ -171,12 +174,13 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         let binding_arg_2_native = binding_arg_2.inner.native()?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_geojson_source_data(
                 native,
                 binding_arg_1,
                 binding_arg_2_native,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -203,7 +207,7 @@ impl MapHandle {
         let binding_arg_3 = binding_arg_3
             .map(|value| value.to_native(&mut arena))
             .transpose()?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_geojson_source_url(
                 native,
                 binding_arg_1,
@@ -212,6 +216,7 @@ impl MapHandle {
                     .as_ref()
                     .map_or(std::ptr::null(), |value| value),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -244,13 +249,14 @@ impl MapHandle {
                 size: 0,
             },
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_hillshade_layer(
                 native,
                 binding_arg_1,
                 binding_arg_2,
                 binding_arg_3,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -279,7 +285,7 @@ impl MapHandle {
             .try_into()
             .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
         let binding_arg_4 = binding_arg_4.to_native(&mut arena)?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_image_source_image(
                 native,
                 binding_arg_1,
@@ -287,6 +293,7 @@ impl MapHandle {
                 binding_arg_3,
                 &binding_arg_4,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -317,7 +324,7 @@ impl MapHandle {
             data: (binding_arg_4).as_bytes().as_ptr().cast(),
             size: (binding_arg_4).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_image_source_url(
                 native,
                 binding_arg_1,
@@ -325,6 +332,7 @@ impl MapHandle {
                 binding_arg_3,
                 binding_arg_4,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -352,12 +360,13 @@ impl MapHandle {
                 size: 0,
             },
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_location_indicator_layer(
                 native,
                 binding_arg_1,
                 binding_arg_2,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -393,7 +402,7 @@ impl MapHandle {
         let binding_arg_4 = binding_arg_4
             .map(|value| value.to_native(&mut arena))
             .transpose()?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_raster_dem_source_tiles(
                 native,
                 binding_arg_1,
@@ -403,6 +412,7 @@ impl MapHandle {
                     .as_ref()
                     .map_or(std::ptr::null(), |value| value),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -429,7 +439,7 @@ impl MapHandle {
         let binding_arg_3 = binding_arg_3
             .map(|value| value.to_native(&mut arena))
             .transpose()?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_raster_dem_source_url(
                 native,
                 binding_arg_1,
@@ -438,6 +448,7 @@ impl MapHandle {
                     .as_ref()
                     .map_or(std::ptr::null(), |value| value),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -473,7 +484,7 @@ impl MapHandle {
         let binding_arg_4 = binding_arg_4
             .map(|value| value.to_native(&mut arena))
             .transpose()?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_raster_source_tiles(
                 native,
                 binding_arg_1,
@@ -483,6 +494,7 @@ impl MapHandle {
                     .as_ref()
                     .map_or(std::ptr::null(), |value| value),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -509,7 +521,7 @@ impl MapHandle {
         let binding_arg_3 = binding_arg_3
             .map(|value| value.to_native(&mut arena))
             .transpose()?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_raster_source_url(
                 native,
                 binding_arg_1,
@@ -518,6 +530,7 @@ impl MapHandle {
                     .as_ref()
                     .map_or(std::ptr::null(), |value| value),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -545,8 +558,14 @@ impl MapHandle {
                 size: 0,
             },
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_add_style_layer_json(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_add_style_layer_json(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -567,8 +586,14 @@ impl MapHandle {
             data: (binding_arg_2).as_ptr().cast(),
             size: (binding_arg_2).len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_add_style_source_json(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_add_style_source_json(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -603,7 +628,7 @@ impl MapHandle {
         let binding_arg_4 = binding_arg_4
             .map(|value| value.to_native(&mut arena))
             .transpose()?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_vector_source_tiles(
                 native,
                 binding_arg_1,
@@ -613,6 +638,7 @@ impl MapHandle {
                     .as_ref()
                     .map_or(std::ptr::null(), |value| value),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -639,7 +665,7 @@ impl MapHandle {
         let binding_arg_3 = binding_arg_3
             .map(|value| value.to_native(&mut arena))
             .transpose()?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_add_vector_source_url(
                 native,
                 binding_arg_1,
@@ -648,6 +674,7 @@ impl MapHandle {
                     .as_ref()
                     .map_or(std::ptr::null(), |value| value),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -661,8 +688,8 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_apply_camera_delta", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_apply_camera_delta(native, &binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_apply_camera_delta(native, &binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -681,7 +708,7 @@ impl MapHandle {
         };
         let binding_arg_2 = binding_arg_2.map(|value| value.to_native());
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_map_camera_for_geometry(
                     native,
                     binding_arg_1,
@@ -689,6 +716,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -709,7 +737,7 @@ impl MapHandle {
         maplibre_core::callback::check("mln_map_camera_for_lat_lng_bounds", native.0)?;
         let binding_arg_2 = binding_arg_2.map(|value| value.to_native());
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_map_camera_for_lat_lng_bounds(
                     native,
                     binding_arg_1.to_native(),
@@ -717,6 +745,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -745,7 +774,7 @@ impl MapHandle {
             .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
         let binding_arg_3 = binding_arg_3.map(|value| value.to_native());
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_map_camera_for_lat_lngs(
                     native,
                     binding_arg_1.as_ptr(),
@@ -754,6 +783,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -771,7 +801,9 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_camera_query", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_map_camera_query(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_map_camera_query(native, completion, diagnostic)
+            },
             |result| {
                 let value = crate::completion::copy_value::<sys::mln_camera_query_result>(result)?;
                 Ok(maplibre_core::generated::CameraQueryResult::from_native(
@@ -789,8 +821,13 @@ impl MapHandle {
         let mut binding_arg_1: sys::mln_camera_options =
             maplibre_core::generated::CameraOptions::default().to_native();
         let mut binding_arg_2: u64 = Default::default();
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_snapshot_get(native, &mut binding_arg_1, &mut binding_arg_2)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_map_camera_snapshot_get(
+                native,
+                &mut binding_arg_1,
+                &mut binding_arg_2,
+                diagnostic,
+            )
         })?;
         Ok((
             maplibre_core::generated::CameraOptions::from_native(binding_arg_1),
@@ -803,8 +840,8 @@ impl MapHandle {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_cancel_transitions", native.0)?;
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_cancel_transitions(native, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_cancel_transitions(native, completion, diagnostic)
         })
     }
 
@@ -821,8 +858,8 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_copy_layer_source_id(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_copy_layer_source_id(native, binding_arg_1, completion, diagnostic)
             },
             |result| {
                 let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
@@ -848,8 +885,8 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_copy_layer_source_layer(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_copy_layer_source_layer(native, binding_arg_1, completion, diagnostic)
             },
             |result| {
                 let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
@@ -875,8 +912,13 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_copy_style_image_premultiplied_rgba8(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_copy_style_image_premultiplied_rgba8(
+                    native,
+                    binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_buffer_view>(result)?
@@ -901,8 +943,13 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_copy_style_image_stretches(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_copy_style_image_stretches(
+                    native,
+                    binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_style_image_stretches_result>(result)?
@@ -929,8 +976,13 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_copy_style_source_attribution(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_copy_style_source_attribution(
+                    native,
+                    binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_buffer_view>(result)?
@@ -955,8 +1007,8 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_copy_style_source_url(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_copy_style_source_url(native, binding_arg_1, completion, diagnostic)
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_buffer_view>(result)?
@@ -972,7 +1024,7 @@ impl MapHandle {
     pub fn dispose(&self) -> Result<()> {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let result = self.inner.handle.close_with(|native| {
-            maplibre_core::check(unsafe { sys::mln_map_dispose(native) })?;
+            maplibre_core::check(|diagnostic| unsafe { sys::mln_map_dispose(native, diagnostic) })?;
             Ok(())
         })?;
         Ok(result.unwrap_or_else(|| Default::default()))
@@ -983,8 +1035,8 @@ impl MapHandle {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_dump_debug_logs", native.0)?;
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_dump_debug_logs(native, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_dump_debug_logs(native, completion, diagnostic)
         })
     }
 
@@ -999,8 +1051,8 @@ impl MapHandle {
         let mut arena = maplibre_core::input::InputArena::default();
         let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_get_feature_state(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_feature_state(native, &binding_arg_1, completion, diagnostic)
             },
             |result| {
                 let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
@@ -1015,7 +1067,9 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_get_global_state", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_map_get_global_state(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_global_state(native, completion, diagnostic)
+            },
             |result| {
                 let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
                 Ok(unsafe { maplibre_core::string::copy_string_view_bytes(value) }?)
@@ -1036,8 +1090,13 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_get_image_source_coordinates(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_image_source_coordinates(
+                    native,
+                    binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 if result.value.is_null() {
@@ -1066,8 +1125,8 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_get_layer_filter(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_layer_filter(native, binding_arg_1, completion, diagnostic)
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_buffer_view>(result)?
@@ -1097,8 +1156,14 @@ impl MapHandle {
             size: (binding_arg_2).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_get_layer_property(native, binding_arg_1, binding_arg_2, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_layer_property(
+                    native,
+                    binding_arg_1,
+                    binding_arg_2,
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_buffer_view>(result)?
@@ -1123,8 +1188,8 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_get_style_image_info(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_style_image_info(native, binding_arg_1, completion, diagnostic)
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_style_image_result>(result)?
@@ -1151,8 +1216,8 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_get_style_layer_info(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_style_layer_info(native, binding_arg_1, completion, diagnostic)
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_style_layer_result>(result)?
@@ -1179,8 +1244,8 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_get_style_layer_json(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_style_layer_json(native, binding_arg_1, completion, diagnostic)
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_buffer_view>(result)?
@@ -1205,8 +1270,8 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_get_style_light_property(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_style_light_property(native, binding_arg_1, completion, diagnostic)
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_buffer_view>(result)?
@@ -1231,8 +1296,8 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_get_style_source_info(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_style_source_info(native, binding_arg_1, completion, diagnostic)
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_style_source_result>(result)?
@@ -1259,8 +1324,13 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_get_style_source_tile_urls(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_style_source_tile_urls(
+                    native,
+                    binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_style_source_tile_urls_result>(result)?
@@ -1282,7 +1352,9 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_get_style_transition_options", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_map_get_style_transition_options(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_map_get_style_transition_options(native, completion, diagnostic)
+            },
             |result| {
                 let value =
                     crate::completion::copy_value::<sys::mln_style_transition_options>(result)?;
@@ -1307,12 +1379,13 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_invalidate_custom_geometry_source_region(
                 native,
                 binding_arg_1,
                 binding_arg_2.to_native(),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -1330,12 +1403,13 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_invalidate_custom_geometry_source_tile(
                 native,
                 binding_arg_1,
                 binding_arg_2.to_native(),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -1356,12 +1430,13 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_invalidate_custom_mvt_vector_source_tile(
                 native,
                 binding_arg_1,
                 binding_arg_2.to_native(),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -1376,8 +1451,13 @@ impl MapHandle {
         maplibre_core::callback::check("mln_map_lat_lng_bounds_for_camera", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_lat_lng_bounds_for_camera(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_lat_lng_bounds_for_camera(
+                    native,
+                    &binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 let value = crate::completion::copy_value::<sys::mln_lat_lng_bounds>(result)?;
@@ -1396,8 +1476,13 @@ impl MapHandle {
         maplibre_core::callback::check("mln_map_lat_lng_bounds_for_camera_unwrapped", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_lat_lng_bounds_for_camera_unwrapped(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_lat_lng_bounds_for_camera_unwrapped(
+                    native,
+                    &binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 let value = crate::completion::copy_value::<sys::mln_lat_lng_bounds>(result)?;
@@ -1415,8 +1500,13 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_lat_lng_for_pixel", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_lat_lng_for_pixel(native, binding_arg_1.to_native(), completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_lat_lng_for_pixel(
+                    native,
+                    binding_arg_1.to_native(),
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 let value = crate::completion::copy_value::<sys::mln_lat_lng>(result)?;
@@ -1434,11 +1524,12 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_lat_lng_for_pixel_unwrapped", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_map_lat_lng_for_pixel_unwrapped(
                     native,
                     binding_arg_1.to_native(),
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -1465,12 +1556,13 @@ impl MapHandle {
             .try_into()
             .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_map_lat_lngs_for_pixels(
                     native,
                     binding_arg_1.as_ptr(),
                     binding_arg_2,
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -1501,12 +1593,13 @@ impl MapHandle {
             .try_into()
             .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_map_lat_lngs_for_pixels_unwrapped(
                     native,
                     binding_arg_1.as_ptr(),
                     binding_arg_2,
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -1526,7 +1619,9 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_list_style_layer_ids", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_map_list_style_layer_ids(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_map_list_style_layer_ids(native, completion, diagnostic)
+            },
             |result| {
                 crate::completion::copy_slice::<sys::mln_buffer_view>(result)?
                     .into_iter()
@@ -1546,7 +1641,9 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_list_style_layers", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_map_list_style_layers(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_map_list_style_layers(native, completion, diagnostic)
+            },
             |result| {
                 crate::completion::copy_slice::<sys::mln_style_layer_entry>(result)?
                     .into_iter()
@@ -1566,7 +1663,9 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_list_style_source_ids", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_map_list_style_source_ids(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_map_list_style_source_ids(native, completion, diagnostic)
+            },
             |result| {
                 crate::completion::copy_slice::<sys::mln_buffer_view>(result)?
                     .into_iter()
@@ -1584,7 +1683,9 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_loaded_style_json", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_map_loaded_style_json(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_map_loaded_style_json(native, completion, diagnostic)
+            },
             |result| {
                 let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
                 Ok(unsafe { maplibre_core::string::copy_string_view_bytes(value) }?)
@@ -1598,8 +1699,13 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_meters_per_pixel_at_latitude", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_meters_per_pixel_at_latitude(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_meters_per_pixel_at_latitude(
+                    native,
+                    binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 let value = crate::completion::copy_value::<f64>(result)?;
@@ -1631,8 +1737,14 @@ impl MapHandle {
                 size: 0,
             },
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_move_style_layer(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_move_style_layer(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -1645,8 +1757,13 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_pixel_for_lat_lng", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_map_pixel_for_lat_lng(native, binding_arg_1.to_native(), completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_map_pixel_for_lat_lng(
+                    native,
+                    binding_arg_1.to_native(),
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 let value = crate::completion::copy_value::<sys::mln_screen_point>(result)?;
@@ -1672,12 +1789,13 @@ impl MapHandle {
             .try_into()
             .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_map_pixels_for_lat_lngs(
                     native,
                     binding_arg_1.as_ptr(),
                     binding_arg_2,
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -1697,7 +1815,9 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_projection_create", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_map_projection_create(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_map_projection_create(native, completion, diagnostic)
+            },
             move |result| {
                 let value = crate::completion::copy_value::<sys::mln_map_projection>(result)?;
                 crate::MapProjectionHandle::from_native(value)
@@ -1710,7 +1830,9 @@ impl MapHandle {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let result = self.inner.handle.close_with(|native| {
             crate::completion::submit(
-                |completion| unsafe { sys::mln_map_release(native, completion) },
+                |completion, diagnostic| unsafe {
+                    sys::mln_map_release(native, completion, diagnostic)
+                },
                 crate::completion::unit,
             )
         })?;
@@ -1727,8 +1849,8 @@ impl MapHandle {
         maplibre_core::callback::check("mln_map_remove_feature_state", native.0)?;
         let mut arena = maplibre_core::input::InputArena::default();
         let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_remove_feature_state(native, &binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_remove_feature_state(native, &binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -1744,8 +1866,8 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_remove_style_image(native, binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_remove_style_image(native, binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -1761,8 +1883,8 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_remove_style_layer(native, binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_remove_style_layer(native, binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -1778,8 +1900,8 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_remove_style_source(native, binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_remove_style_source(native, binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -1788,8 +1910,8 @@ impl MapHandle {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_request_repaint", native.0)?;
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_request_repaint(native, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_request_repaint(native, completion, diagnostic)
         })
     }
 
@@ -1799,7 +1921,9 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_request_still_image", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_map_request_still_image(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_map_request_still_image(native, completion, diagnostic)
+            },
             crate::completion::unit,
         )
     }
@@ -1812,8 +1936,8 @@ impl MapHandle {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_resize", native.0)?;
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_resize(native, binding_arg_1.to_native(), completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_resize(native, binding_arg_1.to_native(), completion, diagnostic)
         })
     }
 
@@ -1826,8 +1950,8 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_set_bounds", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_bounds(native, &binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_bounds(native, &binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -1849,13 +1973,14 @@ impl MapHandle {
             data: (binding_arg_3).as_ptr().cast(),
             size: (binding_arg_3).len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_custom_geometry_source_tile_data(
                 native,
                 binding_arg_1,
                 binding_arg_2.to_native(),
                 binding_arg_3,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -1878,13 +2003,14 @@ impl MapHandle {
             data: (binding_arg_3).as_ptr().cast(),
             size: (binding_arg_3).len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_custom_mvt_vector_source_tile_data(
                 native,
                 binding_arg_1,
                 binding_arg_2.to_native(),
                 binding_arg_3,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -1910,13 +2036,14 @@ impl MapHandle {
             data: (binding_arg_3).as_bytes().as_ptr().cast(),
             size: (binding_arg_3).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_custom_mvt_vector_source_tile_error(
                 native,
                 binding_arg_1,
                 binding_arg_2.to_native(),
                 binding_arg_3,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -1929,8 +2056,13 @@ impl MapHandle {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_set_debug_options", native.0)?;
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_debug_options(native, binding_arg_1.to_native(), completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_debug_options(
+                native,
+                binding_arg_1.to_native(),
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -1942,8 +2074,8 @@ impl MapHandle {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_set_event_mask", native.0)?;
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_event_mask(native, binding_arg_1.to_native(), completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_event_mask(native, binding_arg_1.to_native(), completion, diagnostic)
         })
     }
 
@@ -1962,8 +2094,14 @@ impl MapHandle {
             data: (binding_arg_2).as_ptr().cast(),
             size: (binding_arg_2).len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_feature_state(native, &binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_feature_state(
+                native,
+                &binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -1976,8 +2114,8 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_set_free_camera_options", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_free_camera_options(native, &binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_free_camera_options(native, &binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -1995,12 +2133,13 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         let binding_arg_2_native = binding_arg_2.inner.native()?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_geojson_source_data(
                 native,
                 binding_arg_1,
                 binding_arg_2_native,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -2018,12 +2157,13 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_geojson_source_synchronous_tiling(
                 native,
                 binding_arg_1,
                 binding_arg_2,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -2045,8 +2185,14 @@ impl MapHandle {
             data: (binding_arg_2).as_bytes().as_ptr().cast(),
             size: (binding_arg_2).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_geojson_source_url(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_geojson_source_url(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2067,8 +2213,14 @@ impl MapHandle {
             data: (binding_arg_2).as_ptr().cast(),
             size: (binding_arg_2).len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_global_state_property(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_global_state_property(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2093,13 +2245,14 @@ impl MapHandle {
             .len()
             .try_into()
             .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_image_source_coordinates(
                 native,
                 binding_arg_1,
                 binding_arg_2.as_ptr(),
                 binding_arg_3,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -2119,8 +2272,14 @@ impl MapHandle {
             size: (binding_arg_1).as_bytes().len(),
         };
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_image_source_image(native, binding_arg_1, &binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_image_source_image(
+                native,
+                binding_arg_1,
+                &binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2141,8 +2300,14 @@ impl MapHandle {
             data: (binding_arg_2).as_bytes().as_ptr().cast(),
             size: (binding_arg_2).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_image_source_url(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_image_source_url(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2167,7 +2332,7 @@ impl MapHandle {
                 })
             })
             .transpose()?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_layer_filter(
                 native,
                 binding_arg_1,
@@ -2175,6 +2340,7 @@ impl MapHandle {
                     .as_ref()
                     .map_or(std::ptr::null(), |value| value),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -2192,8 +2358,14 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_layer_max_zoom(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_layer_max_zoom(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2210,8 +2382,14 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_layer_min_zoom(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_layer_min_zoom(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2237,13 +2415,14 @@ impl MapHandle {
             data: (binding_arg_3).as_ptr().cast(),
             size: (binding_arg_3).len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_layer_property(
                 native,
                 binding_arg_1,
                 binding_arg_2,
                 binding_arg_3,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -2265,8 +2444,14 @@ impl MapHandle {
             data: (binding_arg_2).as_bytes().as_ptr().cast(),
             size: (binding_arg_2).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_layer_source_id(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_layer_source_id(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2293,8 +2478,14 @@ impl MapHandle {
                 size: 0,
             },
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_layer_source_layer(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_layer_source_layer(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2311,12 +2502,13 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_layer_visibility(
                 native,
                 binding_arg_1,
                 binding_arg_2.to_native(),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -2334,12 +2526,13 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_location_indicator_accuracy_radius(
                 native,
                 binding_arg_1,
                 binding_arg_2,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -2357,12 +2550,13 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_location_indicator_bearing(
                 native,
                 binding_arg_1,
                 binding_arg_2,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -2385,13 +2579,14 @@ impl MapHandle {
             data: (binding_arg_3).as_bytes().as_ptr().cast(),
             size: (binding_arg_3).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_location_indicator_image_name(
                 native,
                 binding_arg_1,
                 binding_arg_2.to_native(),
                 binding_arg_3,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -2410,13 +2605,14 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_location_indicator_location(
                 native,
                 binding_arg_1,
                 binding_arg_2.to_native(),
                 binding_arg_3,
                 completion,
+                diagnostic,
             )
         })
     }
@@ -2430,8 +2626,8 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_set_projection_mode", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_projection_mode(native, &binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_projection_mode(native, &binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -2443,8 +2639,13 @@ impl MapHandle {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_set_rendering_stats_view_enabled", native.0)?;
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_rendering_stats_view_enabled(native, binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_rendering_stats_view_enabled(
+                native,
+                binding_arg_1,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2467,7 +2668,7 @@ impl MapHandle {
         let binding_arg_3 = binding_arg_3
             .map(|value| value.to_native(&mut arena))
             .transpose()?;
-        crate::completion::submit_command(|completion| unsafe {
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
             sys::mln_map_set_style_image(
                 native,
                 binding_arg_1,
@@ -2476,6 +2677,7 @@ impl MapHandle {
                     .as_ref()
                     .map_or(std::ptr::null(), |value| value),
                 completion,
+                diagnostic,
             )
         })
     }
@@ -2492,8 +2694,8 @@ impl MapHandle {
             data: (binding_arg_1).as_ptr().cast(),
             size: (binding_arg_1).len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_style_json(native, binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_style_json(native, binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -2509,8 +2711,8 @@ impl MapHandle {
             data: (binding_arg_1).as_ptr().cast(),
             size: (binding_arg_1).len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_style_light_json(native, binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_style_light_json(native, binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -2531,8 +2733,14 @@ impl MapHandle {
             data: (binding_arg_2).as_ptr().cast(),
             size: (binding_arg_2).len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_style_light_property(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_style_light_property(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2549,8 +2757,14 @@ impl MapHandle {
             data: (binding_arg_1).as_bytes().as_ptr().cast(),
             size: (binding_arg_1).as_bytes().len(),
         };
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_style_source_volatile(native, binding_arg_1, binding_arg_2, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_style_source_volatile(
+                native,
+                binding_arg_1,
+                binding_arg_2,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2563,8 +2777,13 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_set_style_transition_options", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_style_transition_options(native, &binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_style_transition_options(
+                native,
+                &binding_arg_1,
+                completion,
+                diagnostic,
+            )
         })
     }
 
@@ -2577,8 +2796,8 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_set_style_url", native.0)?;
         let binding_arg_1 = maplibre_core::string::c_string(binding_arg_1)?;
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_style_url(native, binding_arg_1.as_ptr(), completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_style_url(native, binding_arg_1.as_ptr(), completion, diagnostic)
         })
     }
 
@@ -2591,8 +2810,8 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_set_tile_options", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_tile_options(native, &binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_tile_options(native, &binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -2605,8 +2824,8 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_set_viewport_options", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_set_viewport_options(native, &binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_set_viewport_options(native, &binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -2617,7 +2836,9 @@ impl MapHandle {
         maplibre_core::callback::check("mln_map_snapshot_get", native.0)?;
         let mut binding_arg_1: sys::mln_map_snapshot =
             maplibre_core::generated::MapSnapshot::default().to_native();
-        maplibre_core::check(unsafe { sys::mln_map_snapshot_get(native, &mut binding_arg_1) })?;
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_map_snapshot_get(native, &mut binding_arg_1, diagnostic)
+        })?;
         Ok(maplibre_core::generated::MapSnapshot::from_native(
             binding_arg_1,
         ))
@@ -2629,7 +2850,9 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_style_url", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_map_style_url(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_map_style_url(native, completion, diagnostic)
+            },
             |result| {
                 let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
                 Ok(unsafe { maplibre_core::string::copy_string_view(value) }?)
@@ -2646,8 +2869,8 @@ impl MapHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_update_camera", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_map_update_camera(native, &binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_map_update_camera(native, &binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -2668,13 +2891,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_metal_borrowed_texture_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -2703,13 +2927,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_metal_owned_texture_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -2738,13 +2963,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_metal_surface_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -2773,13 +2999,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_opengl_borrowed_texture_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -2808,13 +3035,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_opengl_owned_texture_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -2843,13 +3071,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_opengl_surface_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -2878,13 +3107,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_vulkan_borrowed_texture_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -2913,13 +3143,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_vulkan_owned_texture_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -2948,13 +3179,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_vulkan_surface_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -2983,13 +3215,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_webgpu_borrowed_texture_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -3018,13 +3251,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_webgpu_owned_texture_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -3053,13 +3287,14 @@ impl MapHandle {
         let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
         let mut binding_arg_3 = sys::mln_render_session(0);
         let submitted = crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_webgpu_surface_attach(
                     native,
                     &binding_arg_1,
                     &binding_arg_2,
                     &mut binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,

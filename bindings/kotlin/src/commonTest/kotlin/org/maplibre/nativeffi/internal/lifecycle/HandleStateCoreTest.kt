@@ -15,6 +15,7 @@ import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.NativeErrorException
+import org.maplibre.nativeffi.internal.status.Status
 
 class HandleStateCoreTest {
   @Test
@@ -80,7 +81,7 @@ class HandleStateCoreTest {
         state.closeOnce(
           destroy = {
             attempts += 1
-            MaplibreStatus.NATIVE_ERROR.nativeCode
+            throw Status.exception(MaplibreStatus.NATIVE_ERROR.nativeCode, "destroy failed")
           }
         )
       }
@@ -90,12 +91,7 @@ class HandleStateCoreTest {
     assertFalse(state.isReleased())
     state.requireLive()
 
-    state.closeOnce(
-      destroy = {
-        attempts += 1
-        MaplibreStatus.OK.nativeCode
-      }
-    )
+    state.closeOnce(destroy = { attempts += 1 })
 
     assertEquals(2, attempts)
     assertTrue(state.isReleased())
@@ -123,17 +119,9 @@ class HandleStateCoreTest {
         assertEquals("TestHandle is currently releasing", accessError.diagnostic)
 
         val closeError =
-          assertFailsWith<InvalidStateException> {
-            state.closeOnce(
-              destroy = {
-                attempts += 1
-                MaplibreStatus.OK.nativeCode
-              }
-            )
-          }
+          assertFailsWith<InvalidStateException> { state.closeOnce(destroy = { attempts += 1 }) }
         assertEquals(MaplibreStatus.INVALID_STATE, closeError.status)
         assertEquals("TestHandle is currently releasing", closeError.diagnostic)
-        MaplibreStatus.OK.nativeCode
       }
     )
 
@@ -165,10 +153,7 @@ class HandleStateCoreTest {
     // Runs while closeOnce holds the releasing state, the window a use on another thread
     // would land in.
     state.closeOnce(
-      destroy = {
-        refusal = assertFailsWith<InvalidStateException> { state.withLive {} }
-        MaplibreStatus.OK.nativeCode
-      }
+      destroy = { refusal = assertFailsWith<InvalidStateException> { state.withLive {} } }
     )
 
     assertTrue(refusal!!.message!!.contains("releasing"))
@@ -182,7 +167,7 @@ class HandleStateCoreTest {
     assertEquals(7, state.withLive { 7 })
     assertFailsWith<IllegalStateException> { state.withLive { error("boom") } }
 
-    state.closeOnce(destroy = { MaplibreStatus.OK.nativeCode })
+    state.closeOnce(destroy = {})
     assertTrue(state.isReleased())
   }
 }

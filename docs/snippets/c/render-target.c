@@ -25,7 +25,7 @@ mln_status attach_to_window(
   descriptor.surface = egl_surface;
   const mln_render_session_attach_options options = caller_driver();
   return mln_opengl_surface_attach(
-    map, &descriptor, &options, out_session, completion
+    map, &descriptor, &options, out_session, completion, NULL
   );
   // #endregion surface
 }
@@ -44,7 +44,7 @@ mln_status attach_to_own_texture(
   descriptor.context = *context;
   const mln_render_session_attach_options options = caller_driver();
   return mln_opengl_owned_texture_attach(
-    map, &descriptor, &options, out_session, completion
+    map, &descriptor, &options, out_session, completion, NULL
   );
   // #endregion owned
 }
@@ -68,7 +68,7 @@ mln_status attach_to_host_texture(
   descriptor.target = texture_target;
   const mln_render_session_attach_options options = caller_driver();
   return mln_opengl_borrowed_texture_attach(
-    map, &descriptor, &options, out_session, completion
+    map, &descriptor, &options, out_session, completion, NULL
   );
   // #endregion borrowed
 }
@@ -81,7 +81,7 @@ mln_status resize_session(
   const mln_render_target_extent extent = {
     .width = width, .height = height, .scale_factor = scale_factor
   };
-  return mln_render_session_resize(session, &extent, completion);
+  return mln_render_session_resize(session, &extent, completion, NULL);
   // #endregion resize
 }
 
@@ -98,7 +98,7 @@ mln_status resize_window_target(
   descriptor.extent.scale_factor = scale_factor;
   descriptor.context = *context;
   descriptor.surface = egl_surface;
-  return mln_opengl_surface_set_target(session, &descriptor, completion);
+  return mln_opengl_surface_set_target(session, &descriptor, completion, NULL);
   // #endregion set-target
 }
 
@@ -115,12 +115,12 @@ static void map_released(void* user_data, const mln_completion_result* result) {
 static void detached(void* user_data, const mln_completion_result* result) {
   teardown_state* state = user_data;
   if (result->status != MLN_STATUS_OK) return;
-  mln_render_session_destroy(state->session);
+  mln_render_session_destroy(state->session, NULL);
   const mln_completion completion = {
     .size = sizeof(mln_completion),
     .callback = map_released,
   };
-  (void)mln_map_release(state->map, &completion);
+  (void)mln_map_release(state->map, &completion, NULL);
 }
 
 mln_status release_map(
@@ -134,6 +134,6 @@ mln_status release_map(
     .callback = detached,
     .user_data = state,
   };
-  return mln_render_session_detach(session, &completion);
+  return mln_render_session_detach(session, &completion, NULL);
   // #endregion teardown
 }

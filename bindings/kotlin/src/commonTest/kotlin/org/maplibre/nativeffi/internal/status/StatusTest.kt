@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.NativeErrorException
 import org.maplibre.nativeffi.error.UnsupportedFeatureException
@@ -12,29 +13,30 @@ import org.maplibre.nativeffi.error.WrongThreadException
 
 class StatusTest {
   @Test
-  fun okStatusReturnsNormally() {
-    Status.check(MaplibreStatus.OK.nativeCode)
+  fun okStatusReturnsNormallyWithoutReadingTheDiagnostic() {
+    Status.check(MaplibreStatus.OK.nativeCode) { error("read the diagnostic of a successful call") }
   }
 
   @Test
   fun nonOkStatusesThrowMappedExceptionTypes() {
-    assertFailsWith<InvalidArgumentException> { Status.check(-1) }
-    assertFailsWith<InvalidStateException> { Status.check(-2) }
-    assertFailsWith<WrongThreadException> { Status.check(-3) }
-    assertFailsWith<UnsupportedFeatureException> { Status.check(-4) }
-    assertFailsWith<NativeErrorException> { Status.check(-5) }
+    assertFailsWith<InvalidArgumentException> { Status.check(-1) { "" } }
+    assertFailsWith<InvalidStateException> { Status.check(-2) { "" } }
+    assertFailsWith<WrongThreadException> { Status.check(-3) { "" } }
+    assertFailsWith<UnsupportedFeatureException> { Status.check(-4) { "" } }
+    assertFailsWith<NativeErrorException> { Status.check(-5) { "" } }
   }
 
   @Test
   fun unknownNativeStatusPreservesRawStatusCode() {
-    val exception = Status.exception(-127)
+    val exception = assertFailsWith<MaplibreException> { Status.check(-127) { "unknown" } }
 
     assertEquals(MaplibreStatus(-127), exception.status)
     assertEquals(-127, exception.nativeStatusCode)
+    assertEquals("unknown", exception.diagnostic)
   }
 
   @Test
-  fun bindingOwnedDiagnosticsDoNotReadNativeDiagnostic() {
+  fun bindingOwnedErrorsCarryTheirDiagnostic() {
     val released = Status.released("TestHandle")
     val invalidState = Status.invalidState("bad state")
     val invalidArgument = Status.invalidArgument("bad argument")

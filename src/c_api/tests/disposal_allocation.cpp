@@ -110,7 +110,7 @@ mln_runtime create_runtime(std::atomic_uint* releases = nullptr) {
   }
   auto runtime = mln_runtime{MLN_HANDLE_NULL};
   require(
-    mln_runtime_create(&options, &runtime) == MLN_STATUS_OK,
+    mln_runtime_create(&options, &runtime, nullptr) == MLN_STATUS_OK,
     "runtime creation failed"
   );
   return runtime;
@@ -151,7 +151,7 @@ void runtime_barriers_observe_retired_command_captures() {
             },
         };
         require(
-          mln_runtime_barrier(runtime, &barrier) == MLN_STATUS_OK,
+          mln_runtime_barrier(runtime, &barrier, nullptr) == MLN_STATUS_OK,
           "nested runtime barrier was rejected"
         );
         mln::core::complete(completion, MLN_STATUS_OK);
@@ -170,7 +170,7 @@ void runtime_barriers_observe_retired_command_captures() {
   auto closed = Result{};
   const auto close = descriptor(closed);
   require(
-    mln_runtime_release(runtime, &close) == MLN_STATUS_OK,
+    mln_runtime_release(runtime, &close, nullptr) == MLN_STATUS_OK,
     "capture-retirement runtime close was rejected"
   );
   wait([&] { return closed.releases.load() == 1; });
@@ -182,7 +182,7 @@ mln_map create_map(mln_runtime runtime) {
   auto options = mln_map_options_default();
   options.map_mode = MLN_MAP_MODE_STATIC;
   require(
-    mln_map_create(runtime, &options, &completion) == MLN_STATUS_OK,
+    mln_map_create(runtime, &options, &completion, nullptr) == MLN_STATUS_OK,
     "map creation failed"
   );
   wait([&] { return result.releases.load() == 1; });
@@ -206,20 +206,20 @@ void unclaimed_creation_disposes_on_the_callback_thread() {
       .callback = [](void*, const mln_completion_result*) {},
     };
     reject_allocations = true;
-    const auto release_status = mln_map_release(map, &discarded);
+    const auto release_status = mln_map_release(map, &discarded, nullptr);
     reject_allocations = false;
     require(
       release_status == MLN_STATUS_NATIVE_ERROR,
       "the native allocator bypassed fault injection"
     );
-    without_allocations([&] { return mln_map_dispose(map); });
+    without_allocations([&] { return mln_map_dispose(map, nullptr); });
   };
   require(
-    mln_map_create(runtime, nullptr, &completion) == MLN_STATUS_OK,
+    mln_map_create(runtime, nullptr, &completion, nullptr) == MLN_STATUS_OK,
     "creation admission failed"
   );
   wait([&] { return result.releases.load() == 1; });
-  without_allocations([&] { return mln_runtime_dispose(runtime); });
+  without_allocations([&] { return mln_runtime_dispose(runtime, nullptr); });
   wait([&] { return runtime_weak.expired() && wake_releases.load() == 1; });
 }
 
@@ -231,7 +231,7 @@ void disposal_drains_queued_work_and_map_cleanup() {
   auto rejected = Result{};
   const auto rejected_completion = descriptor(rejected);
   require(
-    mln_runtime_release(runtime, &rejected_completion) ==
+    mln_runtime_release(runtime, &rejected_completion, nullptr) ==
       MLN_STATUS_INVALID_STATE,
     "explicit close lost child preflight"
   );
@@ -254,18 +254,20 @@ void disposal_drains_queued_work_and_map_cleanup() {
   const auto resize_completion = descriptor(resize);
   const auto still_completion = descriptor(still);
   require(
-    mln_map_resize(map, {300, 200, 1.0}, &resize_completion) == MLN_STATUS_OK,
+    mln_map_resize(map, {300, 200, 1.0}, &resize_completion, nullptr) ==
+      MLN_STATUS_OK,
     "resize admission failed"
   );
   require(
-    mln_map_request_still_image(map, &still_completion) == MLN_STATUS_OK,
+    mln_map_request_still_image(map, &still_completion, nullptr) ==
+      MLN_STATUS_OK,
     "still-image admission failed"
   );
-  without_allocations([&] { return mln_runtime_dispose(runtime); });
+  without_allocations([&] { return mln_runtime_dispose(runtime, nullptr); });
   require(
     !mln::core::lease_runtime(runtime), "disposed parent is publicly live"
   );
-  without_allocations([&] { return mln_map_dispose(map); });
+  without_allocations([&] { return mln_map_dispose(map, nullptr); });
   worker_release = true;
   live.reset();
   wait([&] { return cleanup_entered.load(); });
@@ -287,13 +289,13 @@ void failed_creation_releases_parent_reservation() {
   auto result = Result{};
   const auto completion = descriptor(result);
   reject_allocations = true;
-  const auto status = mln_map_create(runtime, nullptr, &completion);
+  const auto status = mln_map_create(runtime, nullptr, &completion, nullptr);
   reject_allocations = false;
   require(
     status == MLN_STATUS_NATIVE_ERROR, "creation allocation did not fail"
   );
   require(result.releases == 0, "rejected creation retained completion");
-  without_allocations([&] { return mln_runtime_dispose(runtime); });
+  without_allocations([&] { return mln_runtime_dispose(runtime, nullptr); });
   wait([&] { return weak.expired(); });
 }
 
@@ -311,11 +313,11 @@ void disposed_parent_allows_observed_child_release() {
   const auto runtime = create_runtime();
   const auto map = create_map(runtime);
   auto weak = std::weak_ptr{mln::core::lease_runtime(runtime)};
-  without_allocations([&] { return mln_runtime_dispose(runtime); });
+  without_allocations([&] { return mln_runtime_dispose(runtime, nullptr); });
   auto result = Result{};
   const auto completion = descriptor(result);
   require(
-    mln_map_release(map, &completion) == MLN_STATUS_OK,
+    mln_map_release(map, &completion, nullptr) == MLN_STATUS_OK,
     "disposed parent rejected child release"
   );
   wait([&] { return weak.expired() && result.releases == 1; });
@@ -336,10 +338,10 @@ void disposal_waits_for_pending_child_creation() {
   auto result = Result{};
   const auto completion = descriptor(result);
   require(
-    mln_map_create(runtime, nullptr, &completion) == MLN_STATUS_OK,
+    mln_map_create(runtime, nullptr, &completion, nullptr) == MLN_STATUS_OK,
     "pending creation admission failed"
   );
-  without_allocations([&] { return mln_runtime_dispose(runtime); });
+  without_allocations([&] { return mln_runtime_dispose(runtime, nullptr); });
   live.reset();
   require(!weak.expired(), "parent retired before accepted child creation");
   release = true;
@@ -366,8 +368,12 @@ void a_pending_operation_keeps_only_its_runtime_alive() {
     "pending operation admission failed"
   );
   wait([&] { return entered.load(); });
-  without_allocations([&] { return mln_runtime_dispose(pending_runtime); });
-  without_allocations([&] { return mln_runtime_dispose(ready_runtime); });
+  without_allocations([&] {
+    return mln_runtime_dispose(pending_runtime, nullptr);
+  });
+  without_allocations([&] {
+    return mln_runtime_dispose(ready_runtime, nullptr);
+  });
   wait([&] { return ready_weak.expired(); });
   require(
     !pending_weak.expired(), "runtime retired before its pending operation"
@@ -468,15 +474,17 @@ void abandoned_frame_preserves_its_session_owner_without_synthesizing_gpu_sync()
     mln::core::handle_table<mln_acquired_frame_object>().insert(frame);
   auto session_weak = std::weak_ptr{session};
   auto frame_weak = std::weak_ptr{frame};
-  without_allocations([&] { return mln_runtime_dispose(runtime); });
-  without_allocations([&] { return mln_map_dispose(map); });
-  without_allocations([&] { return mln_acquired_frame_dispose(handle); });
+  without_allocations([&] { return mln_runtime_dispose(runtime, nullptr); });
+  without_allocations([&] { return mln_map_dispose(map, nullptr); });
+  without_allocations([&] {
+    return mln_acquired_frame_dispose(handle, nullptr);
+  });
   require(
     static_cast<bool>(mln::core::lease_render_session(session->self)),
     "frame disposal consumed its independent session owner"
   );
   without_allocations([&] {
-    return mln_render_session_dispose(session->self);
+    return mln_render_session_dispose(session->self, nullptr);
   });
   frame.reset();
   session.reset();
@@ -513,31 +521,34 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
     mln::core::RenderDriverWork{
       .execute = {},
       .abandon = [id = session->self, &reentrant_destroy_status] {
-        reentrant_destroy_status = mln_render_session_destroy(id);
+        reentrant_destroy_status = mln_render_session_destroy(id, nullptr);
       },
     }
   );
   void* scope = nullptr;
   without_allocations([&] {
-    return mln_adapter_acquired_frame_view_begin(frame_id, &scope);
+    return mln_adapter_acquired_frame_view_begin(frame_id, &scope, nullptr);
   });
   auto result =
     mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
   require(
-    mln_render_session_abandon(session->self, &result) == MLN_STATUS_BUSY,
+    mln_render_session_abandon(session->self, &result, nullptr) ==
+      MLN_STATUS_BUSY,
     "abandon ignored a live view"
   );
   auto sync = mln_gpu_sync_default();
   require(
-    mln_acquired_frame_release(&frame_id, &sync) == MLN_STATUS_BUSY,
+    mln_acquired_frame_release(&frame_id, &sync, nullptr) == MLN_STATUS_BUSY,
     "release ignored a live view"
   );
-  without_allocations([&] { return mln_map_dispose(map); });
-  without_allocations([&] { return mln_runtime_dispose(runtime); });
-  without_allocations([&] { return mln_acquired_frame_dispose(sibling_id); });
+  without_allocations([&] { return mln_map_dispose(map, nullptr); });
+  without_allocations([&] { return mln_runtime_dispose(runtime, nullptr); });
+  without_allocations([&] {
+    return mln_acquired_frame_dispose(sibling_id, nullptr);
+  });
   void* rejected = nullptr;
   require(
-    mln_adapter_acquired_frame_view_begin(frame_id, &rejected) ==
+    mln_adapter_acquired_frame_view_begin(frame_id, &rejected, nullptr) ==
         MLN_STATUS_TARGET_LOST &&
       rejected == nullptr,
     "sibling disposal allowed a later view"
@@ -554,11 +565,11 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
     return MLN_STATUS_OK;
   });
   require(
-    mln_acquired_frame_release(&frame_id, &sync) == MLN_STATUS_OK,
+    mln_acquired_frame_release(&frame_id, &sync, nullptr) == MLN_STATUS_OK,
     "released view did not release its frame"
   );
   without_allocations([&] {
-    return mln_render_session_destroy(session->self);
+    return mln_render_session_destroy(session->self, nullptr);
   });
   require(
     reentrant_destroy_status == MLN_STATUS_BUSY,
@@ -612,16 +623,16 @@ void undelivered_dart_completion_disposes_its_owned_result() {
   require(
     mln_adapter_dart_completion_create(
       MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map),
-      reinterpret_cast<void*>(post), 23, 31, &completion
+      reinterpret_cast<void*>(post), 23, 31, &completion, nullptr
     ) == MLN_STATUS_OK,
     "Dart completion creation failed"
   );
   require(
-    mln_map_create(runtime, nullptr, &completion) == MLN_STATUS_OK,
+    mln_map_create(runtime, nullptr, &completion, nullptr) == MLN_STATUS_OK,
     "Dart completion map creation failed"
   );
   wait([&] { return deliveries.load() == 1; });
-  without_allocations([&] { return mln_runtime_dispose(runtime); });
+  without_allocations([&] { return mln_runtime_dispose(runtime, nullptr); });
   wait([&] { return weak.expired() && releases.load() == 1; });
 }
 
@@ -740,7 +751,7 @@ void dart_deferred_callbacks_post_records_before_retirement() {
   require(
     mln_adapter_dart_deferred_callback_create(
       MLN_ADAPTER_DEFERRED_LOG_CALLBACK, reinterpret_cast<void*>(post), 29,
-      &context
+      &context, nullptr
     ) == MLN_STATUS_OK,
     "Dart deferred callback creation failed"
   );
@@ -772,8 +783,9 @@ void dart_ports_release_after_the_host_closes() {
   };
   auto wake = mln_wake{};
   require(
-    mln_adapter_dart_wake_create(reinterpret_cast<void*>(post), 17, &wake) ==
-      MLN_STATUS_OK,
+    mln_adapter_dart_wake_create(
+      reinterpret_cast<void*>(post), 17, &wake, nullptr
+    ) == MLN_STATUS_OK,
     "Dart wake creation failed"
   );
   without_allocations([&] {
@@ -811,20 +823,20 @@ void dart_ports_release_after_the_host_closes() {
   auto runtime_releases = std::atomic_uint{};
   const auto runtime = create_runtime(&runtime_releases);
   require(
-    mln_adapter_arena_adopt_handle(arena, runtime) == MLN_STATUS_OK,
+    mln_adapter_arena_adopt_handle(arena, runtime, nullptr) == MLN_STATUS_OK,
     "native callback owner adoption failed"
   );
   static auto context_releases = unsigned{};
   require(
     mln_adapter_arena_adopt_release(
-      arena, [](void*) { ++context_releases; }, nullptr
+      arena, [](void*) { ++context_releases; }, nullptr, nullptr
     ) == MLN_STATUS_OK,
     "native callback release adoption failed"
   );
   auto registration = std::uint64_t{};
   require(
     mln_adapter_dart_release_register(
-      reinterpret_cast<void*>(post), 17, context, arena, &registration
+      reinterpret_cast<void*>(post), 17, context, arena, &registration, nullptr
     ) == MLN_STATUS_OK,
     "Dart release registration failed"
   );
@@ -845,7 +857,8 @@ void dart_ports_release_after_the_host_closes() {
   auto second_registration = std::uint64_t{};
   require(
     mln_adapter_dart_release_register(
-      reinterpret_cast<void*>(post), 17, context, arena, &second_registration
+      reinterpret_cast<void*>(post), 17, context, arena, &second_registration,
+      nullptr
     ) == MLN_STATUS_OK,
     "reused callback address registration failed"
   );

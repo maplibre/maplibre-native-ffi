@@ -1,6 +1,6 @@
 """Group multiple C output parameters in a single copied Kotlin result."""
 
-from .kotlin_values import Unsupported, identifier, name
+from .kotlin_values import Unsupported, identifier, name, native_call
 
 
 def signature(plan, values):
@@ -87,7 +87,7 @@ def operation(plan, values, platform):
         if platform == "androidMain"
         else ""
     )
-    setup.append(f"BindingStatus.check({prefix}{plan.name}(" + ", ".join(args) + "))")
+    setup.append(native_call(plan.function, prefix, args))
     setup.append(result_type + "(" + ", ".join(copied) + ")")
     arena = (
         "Arena.ofConfined().use { arena -> "

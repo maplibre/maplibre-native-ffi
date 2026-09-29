@@ -11,7 +11,7 @@ static bool source_exists(mln_map map, const char* id) {
   const mln_buffer_view view = {.data = id, .size = strlen(id)};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_get_style_source_info(map, view, &completion.descriptor)
+    mln_map_get_style_source_info(map, view, &completion.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
   const bool found = mln_test_completion_value_count(&completion) == 1;
@@ -25,7 +25,7 @@ static bool image_exists(mln_map map, const char* id) {
   const mln_buffer_view view = {.data = id, .size = strlen(id)};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_get_style_image_info(map, view, &completion.descriptor)
+    mln_map_get_style_image_info(map, view, &completion.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
   const bool found = mln_test_completion_value_count(&completion) == 1;
@@ -61,7 +61,7 @@ static void style_command_deep_copies_and_ordered_read_observes_it(void) {
     MLN_STATUS_OK, mln_map_add_style_source_json(
                      map, (mln_buffer_view){.data = id, .size = strlen(id)},
                      (mln_buffer_view){.data = json, .size = strlen(json)},
-                     &completion.descriptor
+                     &completion.descriptor, NULL
                    )
   );
   memset(id, 'x', strlen(id));
@@ -81,12 +81,12 @@ static void duplicate_id_is_an_async_failed_terminal_event(void) {
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
-    mln_map_add_style_source_json(map, id, json, &completion.descriptor)
+    mln_map_add_style_source_json(map, id, json, &completion.descriptor, NULL)
   );
   mln_test_completion duplicate = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_add_style_source_json(map, id, json, &duplicate.descriptor)
+    mln_map_add_style_source_json(map, id, json, &duplicate.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_finish(&duplicate)
@@ -112,7 +112,7 @@ static void image_source_coordinates_are_borrowed_by_the_completion(void) {
     MLN_STATUS_OK, mln_map_add_image_source_url(
                      map, MLN_BUFFER_LITERAL("probe-image"), coordinates, 4,
                      MLN_BUFFER_LITERAL("https://example.invalid/image.png"),
-                     &completion.descriptor
+                     &completion.descriptor, NULL
                    )
   );
 
@@ -121,7 +121,7 @@ static void image_source_coordinates_are_borrowed_by_the_completion(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_get_image_source_coordinates(
-      map, MLN_BUFFER_LITERAL("probe-image"), &completion.descriptor
+      map, MLN_BUFFER_LITERAL("probe-image"), &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
@@ -182,7 +182,7 @@ static void style_image_stretches_are_borrowed_by_the_completion(void) {
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_set_style_image(
                      map, MLN_BUFFER_LITERAL("probe-stretches"), &image,
-                     &options, &completion.descriptor
+                     &options, &completion.descriptor, NULL
                    )
   );
 
@@ -194,9 +194,10 @@ static void style_image_stretches_are_borrowed_by_the_completion(void) {
     .user_data = &probe,
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_copy_style_image_stretches(
-                     map, MLN_BUFFER_LITERAL("probe-stretches"), &completion
-                   )
+    MLN_STATUS_OK,
+    mln_map_copy_style_image_stretches(
+      map, MLN_BUFFER_LITERAL("probe-stretches"), &completion, NULL
+    )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   TEST_ASSERT_TRUE(atomic_load(&probe.done));
@@ -217,16 +218,16 @@ static void remove_commands_commit_and_report_missing_ids(void) {
     "\"features\":[]}}"
   );
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_source_json(
-      map, MLN_BUFFER_LITERAL("doomed-source"), json, &completion.descriptor
-    )
+    MLN_STATUS_OK, mln_map_add_style_source_json(
+                     map, MLN_BUFFER_LITERAL("doomed-source"), json,
+                     &completion.descriptor, NULL
+                   )
   );
 
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
     mln_map_remove_style_source(
-      map, MLN_BUFFER_LITERAL("doomed-source"), &completion.descriptor
+      map, MLN_BUFFER_LITERAL("doomed-source"), &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_FALSE(source_exists(map, "doomed-source"));
@@ -235,7 +236,7 @@ static void remove_commands_commit_and_report_missing_ids(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_remove_style_source(
-      map, MLN_BUFFER_LITERAL("doomed-source"), &missing.descriptor
+      map, MLN_BUFFER_LITERAL("doomed-source"), &missing.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(
@@ -250,7 +251,7 @@ static void remove_commands_commit_and_report_missing_ids(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_remove_style_layer(
-      map, MLN_BUFFER_LITERAL("missing-layer"), &missing.descriptor
+      map, MLN_BUFFER_LITERAL("missing-layer"), &missing.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(
@@ -272,14 +273,14 @@ static void remove_commands_commit_and_report_missing_ids(void) {
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_set_style_image(
                      map, MLN_BUFFER_LITERAL("doomed-image"), &image, &options,
-                     &completion.descriptor
+                     &completion.descriptor, NULL
                    )
   );
 
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
     mln_map_remove_style_image(
-      map, MLN_BUFFER_LITERAL("doomed-image"), &completion.descriptor
+      map, MLN_BUFFER_LITERAL("doomed-image"), &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_FALSE(image_exists(map, "doomed-image"));
@@ -288,7 +289,7 @@ static void remove_commands_commit_and_report_missing_ids(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_remove_style_image(
-      map, MLN_BUFFER_LITERAL("doomed-image"), &missing.descriptor
+      map, MLN_BUFFER_LITERAL("doomed-image"), &missing.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(
@@ -356,7 +357,7 @@ static layer_probe take_layer_result(
   };
   const mln_buffer_view view = {.data = id, .size = strlen(id)};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_style_layer_info(map, view, &completion)
+    MLN_STATUS_OK, mln_map_get_style_layer_info(map, view, &completion, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   TEST_ASSERT_TRUE(atomic_load(&probe.done));
@@ -376,7 +377,7 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
     mln_map_add_style_source_json(
-      map, MLN_BUFFER_LITERAL("info-source"), json, &completion.descriptor
+      map, MLN_BUFFER_LITERAL("info-source"), json, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
@@ -386,7 +387,7 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
                        "{\"id\":\"info-layer\",\"type\":\"circle\",\"source\":"
                        "\"info-source\"}"
                      ),
-                     MLN_BUFFER_LITERAL(""), &completion.descriptor
+                     MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
                    )
   );
   layer_probe probe = take_layer_result(runtime, map, "info-layer");
@@ -411,25 +412,26 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
     mln_map_set_layer_min_zoom(
-      map, MLN_BUFFER_LITERAL("info-layer"), 3.0, &completion.descriptor
+      map, MLN_BUFFER_LITERAL("info-layer"), 3.0, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
     mln_map_set_layer_max_zoom(
-      map, MLN_BUFFER_LITERAL("info-layer"), 12.0, &completion.descriptor
+      map, MLN_BUFFER_LITERAL("info-layer"), 12.0, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_layer_visibility(
-                     map, MLN_BUFFER_LITERAL("info-layer"),
-                     MLN_STYLE_LAYER_VISIBILITY_NONE, &completion.descriptor
-                   )
+    MLN_STATUS_OK,
+    mln_map_set_layer_visibility(
+      map, MLN_BUFFER_LITERAL("info-layer"), MLN_STYLE_LAYER_VISIBILITY_NONE,
+      &completion.descriptor, NULL
+    )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_set_layer_source_layer(
                      map, MLN_BUFFER_LITERAL("info-layer"),
-                     MLN_BUFFER_LITERAL("roads"), &completion.descriptor
+                     MLN_BUFFER_LITERAL("roads"), &completion.descriptor, NULL
                    )
   );
   probe = take_layer_result(runtime, map, "info-layer");
@@ -449,7 +451,7 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_copy_layer_source_id(
-      map, MLN_BUFFER_LITERAL("info-layer"), &source_completion.descriptor
+      map, MLN_BUFFER_LITERAL("info-layer"), &source_completion.descriptor, NULL
     )
   );
   mln_buffer_view copied = {0};
@@ -476,7 +478,7 @@ static void missing_style_ids_report_not_found(void) {
     MLN_STATUS_NOT_FOUND, "layer does not exist",
     mln_map_move_style_layer(
       map, MLN_BUFFER_LITERAL("absent-layer"), MLN_BUFFER_LITERAL(""),
-      &completion.descriptor
+      &completion.descriptor, NULL
     )
   );
   EXPECT_STYLE_COMMAND_FAILED(
@@ -484,27 +486,27 @@ static void missing_style_ids_report_not_found(void) {
     mln_map_set_layer_property(
       map, MLN_BUFFER_LITERAL("absent-layer"),
       MLN_BUFFER_LITERAL("circle-radius"), MLN_BUFFER_LITERAL("4"),
-      &completion.descriptor
+      &completion.descriptor, NULL
     )
   );
   EXPECT_STYLE_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "layer does not exist",
     mln_map_set_layer_visibility(
       map, MLN_BUFFER_LITERAL("absent-layer"), MLN_STYLE_LAYER_VISIBILITY_NONE,
-      &completion.descriptor
+      &completion.descriptor, NULL
     )
   );
   // Queries report the same missing-ID status through their completion.
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_NOT_FOUND,
     mln_map_copy_layer_source_id(
-      map, MLN_BUFFER_LITERAL("absent-layer"), &completion.descriptor
+      map, MLN_BUFFER_LITERAL("absent-layer"), &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_NOT_FOUND,
     mln_map_get_layer_filter(
-      map, MLN_BUFFER_LITERAL("absent-layer"), &completion.descriptor
+      map, MLN_BUFFER_LITERAL("absent-layer"), &completion.descriptor, NULL
     )
   );
   EXPECT_STYLE_COMMAND_FAILED(
@@ -512,14 +514,14 @@ static void missing_style_ids_report_not_found(void) {
     mln_map_set_image_source_url(
       map, MLN_BUFFER_LITERAL("absent-source"),
       MLN_BUFFER_LITERAL("https://example.invalid/i.png"),
-      &completion.descriptor
+      &completion.descriptor, NULL
     )
   );
   EXPECT_STYLE_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "before_layer_id does not exist",
     mln_map_add_location_indicator_layer(
       map, MLN_BUFFER_LITERAL("indicator"), MLN_BUFFER_LITERAL("absent-layer"),
-      &completion.descriptor
+      &completion.descriptor, NULL
     )
   );
 
@@ -531,7 +533,8 @@ static bool read_style_source_volatility(mln_map map, mln_buffer_view id) {
   mln_test_completion info =
     mln_test_completion_default(sizeof(mln_style_source_result));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_style_source_info(map, id, &info.descriptor)
+    MLN_STATUS_OK,
+    mln_map_get_style_source_info(map, id, &info.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&info));
   mln_style_source_result result = {0};
@@ -589,7 +592,7 @@ static void read_tile_urls(
   };
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_get_style_source_tile_urls(map, source_id, &completion)
+    mln_map_get_style_source_tile_urls(map, source_id, &completion, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   TEST_ASSERT_TRUE(atomic_load(&probe->done));
@@ -606,16 +609,16 @@ static void style_source_tile_urls_distinguish_empty_from_missing(void) {
     MLN_BUFFER_LITERAL("https://example.com/b/{z}/{x}/{y}.mvt"),
   };
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_vector_source_tiles(
-      map, MLN_BUFFER_LITERAL("inline"), tiles, 2, NULL, &completion.descriptor
-    )
+    MLN_STATUS_OK, mln_map_add_vector_source_tiles(
+                     map, MLN_BUFFER_LITERAL("inline"), tiles, 2, NULL,
+                     &completion.descriptor, NULL
+                   )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_add_vector_source_url(
                      map, MLN_BUFFER_LITERAL("remote"),
                      MLN_BUFFER_LITERAL("https://example.com/tiles.json"), NULL,
-                     &completion.descriptor
+                     &completion.descriptor, NULL
                    )
   );
 
@@ -649,9 +652,10 @@ static void style_source_volatility_round_trips(void) {
     MLN_BUFFER_LITERAL("https://example.com/{z}/{x}/{y}.mvt"),
   };
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_vector_source_tiles(
-                     map, source_id, tiles, 1, NULL, &completion.descriptor
-                   )
+    MLN_STATUS_OK,
+    mln_map_add_vector_source_tiles(
+      map, source_id, tiles, 1, NULL, &completion.descriptor, NULL
+    )
   );
   TEST_ASSERT_FALSE(read_style_source_volatility(map, source_id));
 
@@ -659,8 +663,9 @@ static void style_source_volatility_round_trips(void) {
   // ordered command rather than a synchronous write.
   mln_test_completion enable = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_set_style_source_volatile(map, source_id, true, &enable.descriptor)
+    MLN_STATUS_OK, mln_map_set_style_source_volatile(
+                     map, source_id, true, &enable.descriptor, NULL
+                   )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&enable));
   TEST_ASSERT_EQUAL_UINT32(
@@ -672,7 +677,7 @@ static void style_source_volatility_round_trips(void) {
 
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_set_style_source_volatile(
-                     map, source_id, false, &completion.descriptor
+                     map, source_id, false, &completion.descriptor, NULL
                    )
   );
   TEST_ASSERT_FALSE(read_style_source_volatility(map, source_id));
@@ -680,7 +685,7 @@ static void style_source_volatility_round_trips(void) {
   EXPECT_STYLE_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "missing",
     mln_map_set_style_source_volatile(
-      map, MLN_BUFFER_LITERAL("missing"), true, &completion.descriptor
+      map, MLN_BUFFER_LITERAL("missing"), true, &completion.descriptor, NULL
     )
   );
 
@@ -698,7 +703,7 @@ static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
     mln_map_add_style_source_json(
-      map, MLN_BUFFER_LITERAL("in-use"), json, &completion.descriptor
+      map, MLN_BUFFER_LITERAL("in-use"), json, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
@@ -708,28 +713,30 @@ static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
       MLN_BUFFER_LITERAL(
         "{\"id\":\"user\",\"type\":\"circle\",\"source\":\"in-use\"}"
       ),
-      MLN_BUFFER_LITERAL(""), &completion.descriptor
+      MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
     )
   );
 
   EXPECT_STYLE_COMMAND_FAILED(
     MLN_STATUS_INVALID_STATE, "used by a layer",
     mln_map_remove_style_source(
-      map, MLN_BUFFER_LITERAL("in-use"), &completion.descriptor
+      map, MLN_BUFFER_LITERAL("in-use"), &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_TRUE(source_exists(map, "in-use"));
 
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_remove_style_layer(
-                     map, MLN_BUFFER_LITERAL("user"), &completion.descriptor
-                   )
+    MLN_STATUS_OK,
+    mln_map_remove_style_layer(
+      map, MLN_BUFFER_LITERAL("user"), &completion.descriptor, NULL
+    )
   );
 
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_remove_style_source(
-                     map, MLN_BUFFER_LITERAL("in-use"), &completion.descriptor
-                   )
+    MLN_STATUS_OK,
+    mln_map_remove_style_source(
+      map, MLN_BUFFER_LITERAL("in-use"), &completion.descriptor, NULL
+    )
   );
   TEST_ASSERT_FALSE(source_exists(map, "in-use"));
   mln_test_destroy_map(map);
@@ -745,7 +752,7 @@ static void geojson_source_data_create_rejects_unsafe_raw_values(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(trailing_geojson), NULL, &trailing_data
+      MLN_BUFFER_LITERAL(trailing_geojson), NULL, &trailing_data, NULL
     )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, trailing_data);
@@ -757,7 +764,7 @@ static void geojson_source_data_create_rejects_unsafe_raw_values(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_geojson_source_data_create(
       (mln_buffer_view){.data = nul_geojson, .size = sizeof(nul_geojson) - 1},
-      NULL, &nul_data
+      NULL, &nul_data, NULL
     )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, nul_data);
@@ -767,15 +774,16 @@ static void geojson_source_data_create_rejects_unsafe_raw_values(void) {
     "{\"type\":\"FeatureCollection\",\"features\":[]}";
   mln_geojson_source_data populated = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_geojson_source_data_create(
-                     MLN_BUFFER_LITERAL(empty_collection), NULL, &populated
-                   )
+    MLN_STATUS_OK,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(empty_collection), NULL, &populated, NULL
+    )
   );
   mln_geojson_source_data reused = populated;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(empty_collection), NULL, &reused
+      MLN_BUFFER_LITERAL(empty_collection), NULL, &reused, NULL
     )
   );
   mln_geojson_source_data_destroy(populated);
@@ -787,7 +795,7 @@ static void geojson_source_data_create_rejects_unsafe_raw_values(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(empty_collection), &short_size, &short_size_data
+      MLN_BUFFER_LITERAL(empty_collection), &short_size, &short_size_data, NULL
     )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, short_size_data);
@@ -811,12 +819,12 @@ static void clustered_geojson_data_reports_non_point_geometry(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(data), &clustered, &prepared
+      MLN_BUFFER_LITERAL(data), &clustered, &prepared, MLN_TEST_DIAGNOSTIC
     )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, prepared);
 
-  const char* message = mln_thread_last_error_message();
+  const char* message = mln_test_last_error();
   TEST_ASSERT_NOT_NULL(message);
   TEST_ASSERT_NOT_NULL(strstr(message, "point geometry on every feature"));
   TEST_ASSERT_NOT_NULL(strstr(message, "feature 1"));
@@ -825,8 +833,9 @@ static void clustered_geojson_data_reports_non_point_geometry(void) {
   // The constraint belongs to clustering alone, so the same data tiles fine
   // without it.
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_geojson_source_data_create(MLN_BUFFER_LITERAL(data), NULL, &prepared)
+    MLN_STATUS_OK, mln_geojson_source_data_create(
+                     MLN_BUFFER_LITERAL(data), NULL, &prepared, NULL
+                   )
   );
   mln_geojson_source_data_destroy(prepared);
 }
@@ -846,31 +855,29 @@ static void clustered_geojson_data_requires_a_feature_collection(void) {
   // tile unclustered rather than honouring the requested cluster option.
   mln_geojson_source_data prepared = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(bare_geometry), &clustered, &prepared
-    )
+    MLN_STATUS_INVALID_ARGUMENT, mln_geojson_source_data_create(
+                                   MLN_BUFFER_LITERAL(bare_geometry),
+                                   &clustered, &prepared, MLN_TEST_DIAGNOSTIC
+                                 )
   );
-  const char* message = mln_thread_last_error_message();
+  const char* message = mln_test_last_error();
   TEST_ASSERT_NOT_NULL(message);
   TEST_ASSERT_NOT_NULL(strstr(message, "requires a feature collection"));
   TEST_ASSERT_NOT_NULL(strstr(message, "a bare geometry"));
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(single_feature), &clustered, &prepared
-    )
+    MLN_STATUS_INVALID_ARGUMENT, mln_geojson_source_data_create(
+                                   MLN_BUFFER_LITERAL(single_feature),
+                                   &clustered, &prepared, MLN_TEST_DIAGNOSTIC
+                                 )
   );
-  TEST_ASSERT_NOT_NULL(
-    strstr(mln_thread_last_error_message(), "a single feature")
-  );
+  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "a single feature"));
 
   // The constraint belongs to clustering alone, so the same data tiles fine
   // without it.
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_geojson_source_data_create(
-                     MLN_BUFFER_LITERAL(bare_geometry), NULL, &prepared
+                     MLN_BUFFER_LITERAL(bare_geometry), NULL, &prepared, NULL
                    )
   );
   mln_geojson_source_data_destroy(prepared);
@@ -882,7 +889,7 @@ static void clustered_geojson_data_requires_a_feature_collection(void) {
     "{\"type\":\"FeatureCollection\",\"features\":[]}";
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_geojson_source_data_create(
-                     MLN_BUFFER_LITERAL(empty), &clustered, &prepared
+                     MLN_BUFFER_LITERAL(empty), &clustered, &prepared, NULL
                    )
   );
   mln_geojson_source_data_destroy(prepared);
@@ -908,25 +915,26 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
   mln_geojson_source_data clustered_data = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_geojson_source_data_create(
-                     MLN_BUFFER_LITERAL(points), NULL, &plain_data
+                     MLN_BUFFER_LITERAL(points), NULL, &plain_data, NULL
                    )
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_geojson_source_data_create(
-                     MLN_BUFFER_LITERAL(points), &clustered, &clustered_data
-                   )
+    MLN_STATUS_OK,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(points), &clustered, &clustered_data, NULL
+    )
   );
 
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
     mln_map_add_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("plain"), plain_data, &completion.descriptor
+      map, MLN_BUFFER_LITERAL("plain"), plain_data, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_add_geojson_source_data(
                      map, MLN_BUFFER_LITERAL("clustered"), clustered_data,
-                     &completion.descriptor
+                     &completion.descriptor, NULL
                    )
   );
 
@@ -935,7 +943,8 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
   EXPECT_STYLE_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "do not match",
     mln_map_set_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("clustered"), plain_data, &completion.descriptor
+      map, MLN_BUFFER_LITERAL("clustered"), plain_data, &completion.descriptor,
+      NULL
     )
   );
 
@@ -943,7 +952,7 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_set_geojson_source_data(
                      map, MLN_BUFFER_LITERAL("clustered"), clustered_data,
-                     &completion.descriptor
+                     &completion.descriptor, NULL
                    )
   );
 
@@ -956,14 +965,15 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
     MLN_BUFFER_LITERAL("{\"total\":[\"+\",[\"get\",\"rank\"]]}");
   mln_geojson_source_data aggregated_data = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_geojson_source_data_create(
-                     MLN_BUFFER_LITERAL(points), &aggregated, &aggregated_data
-                   )
+    MLN_STATUS_OK,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(points), &aggregated, &aggregated_data, NULL
+    )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_add_geojson_source_data(
                      map, MLN_BUFFER_LITERAL("aggregated"), aggregated_data,
-                     &completion.descriptor
+                     &completion.descriptor, NULL
                    )
   );
   mln_geojson_source_options reaggregated = aggregated;
@@ -973,14 +983,14 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(points), &reaggregated, &reaggregated_data
+      MLN_BUFFER_LITERAL(points), &reaggregated, &reaggregated_data, NULL
     )
   );
   EXPECT_STYLE_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "do not match",
     mln_map_set_geojson_source_data(
       map, MLN_BUFFER_LITERAL("aggregated"), reaggregated_data,
-      &completion.descriptor
+      &completion.descriptor, NULL
     )
   );
   mln_geojson_source_data_destroy(reaggregated_data);
@@ -989,14 +999,15 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
     MLN_BUFFER_LITERAL(" { \"total\" : [\"+\", [\"get\", \"rank\"]] } ");
   mln_geojson_source_data reformatted_data = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_geojson_source_data_create(
-                     MLN_BUFFER_LITERAL(points), &reformatted, &reformatted_data
-                   )
+    MLN_STATUS_OK,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(points), &reformatted, &reformatted_data, NULL
+    )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_set_geojson_source_data(
                      map, MLN_BUFFER_LITERAL("aggregated"), reformatted_data,
-                     &completion.descriptor
+                     &completion.descriptor, NULL
                    )
   );
   mln_geojson_source_data_destroy(reformatted_data);
@@ -1008,7 +1019,7 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_set_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("plain"), plain_data, &install.descriptor
+      map, MLN_BUFFER_LITERAL("plain"), plain_data, &install.descriptor, NULL
     )
   );
   mln_geojson_source_data_destroy(plain_data);
@@ -1019,19 +1030,19 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
     mln_map_set_geojson_source_synchronous_tiling(
-      map, MLN_BUFFER_LITERAL("plain"), true, &completion.descriptor
+      map, MLN_BUFFER_LITERAL("plain"), true, &completion.descriptor, NULL
     )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
     mln_map_set_geojson_source_synchronous_tiling(
-      map, MLN_BUFFER_LITERAL("plain"), false, &completion.descriptor
+      map, MLN_BUFFER_LITERAL("plain"), false, &completion.descriptor, NULL
     )
   );
   EXPECT_STYLE_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "source does not exist",
     mln_map_set_geojson_source_synchronous_tiling(
-      map, MLN_BUFFER_LITERAL("missing"), true, &completion.descriptor
+      map, MLN_BUFFER_LITERAL("missing"), true, &completion.descriptor, NULL
     )
   );
 
@@ -1043,7 +1054,7 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_set_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("plain"), plain_data, &rejected
+      map, MLN_BUFFER_LITERAL("plain"), plain_data, &rejected, NULL
     )
   );
   TEST_ASSERT_TRUE(source_exists(map, "plain"));
@@ -1059,7 +1070,7 @@ static mln_style_transition_options read_transition_options(mln_map map) {
     mln_test_completion_default(sizeof(mln_style_transition_options));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_get_style_transition_options(map, &completion.descriptor)
+    mln_map_get_style_transition_options(map, &completion.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
   mln_style_transition_options value = {0};
@@ -1083,8 +1094,9 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   applied.duration_ms = 250.0;
   applied.delay_ms = 75.0;
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_style_transition_options(map, &applied, &completion.descriptor)
+    MLN_STATUS_OK, mln_map_set_style_transition_options(
+                     map, &applied, &completion.descriptor, NULL
+                   )
   );
   mln_style_transition_options read = read_transition_options(map);
   TEST_ASSERT_EQUAL_DOUBLE(250.0, read.duration_ms);
@@ -1094,13 +1106,13 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   mln_completion discard = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_style_transition_options(map, NULL, &discard)
+    mln_map_set_style_transition_options(map, NULL, &discard, NULL)
   );
   mln_style_transition_options undersized = applied;
   undersized.size = sizeof(mln_style_transition_options) - 1;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_style_transition_options(map, &undersized, &discard)
+    mln_map_set_style_transition_options(map, &undersized, &discard, NULL)
   );
 
   // Unknown bits and unusable durations are the command's rejections.
@@ -1108,20 +1120,24 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   unknown.fields |= UINT32_C(1) << 31;
   EXPECT_STYLE_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "unknown bits",
-    mln_map_set_style_transition_options(map, &unknown, &completion.descriptor)
+    mln_map_set_style_transition_options(
+      map, &unknown, &completion.descriptor, NULL
+    )
   );
   mln_style_transition_options negative = applied;
   negative.duration_ms = -1.0;
   EXPECT_STYLE_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "duration_ms",
-    mln_map_set_style_transition_options(map, &negative, &completion.descriptor)
+    mln_map_set_style_transition_options(
+      map, &negative, &completion.descriptor, NULL
+    )
   );
   mln_style_transition_options not_finite = applied;
   not_finite.delay_ms = INFINITY;
   EXPECT_STYLE_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "delay_ms",
     mln_map_set_style_transition_options(
-      map, &not_finite, &completion.descriptor
+      map, &not_finite, &completion.descriptor, NULL
     )
   );
 
@@ -1140,20 +1156,20 @@ static void global_state_checks_views_and_completion(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_completion discard = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_global_state(map, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_global_state(map, NULL, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_set_global_state_property(
       map, (mln_buffer_view){.data = NULL, .size = 1},
-      MLN_BUFFER_LITERAL("true"), &discard
+      MLN_BUFFER_LITERAL("true"), &discard, NULL
     )
   );
   EXPECT_STYLE_COMMAND_FAILED(
     MLN_STATUS_INVALID_STATE, "style JSON has not loaded",
     mln_map_set_global_state_property(
       map, MLN_BUFFER_LITERAL("theme"), MLN_BUFFER_LITERAL("true"),
-      &completion.descriptor
+      &completion.descriptor, NULL
     )
   );
   mln_test_destroy_map(map);

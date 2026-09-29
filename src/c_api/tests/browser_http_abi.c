@@ -106,7 +106,7 @@ static void style_loads_over_http_from_the_runner_origin(void) {
     MLN_STATUS_OK,
     mln_map_get_style_layer_info(
       map, mln_test_buffer_view(fixture_layer_id, strlen(fixture_layer_id)),
-      &completion.descriptor
+      &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));

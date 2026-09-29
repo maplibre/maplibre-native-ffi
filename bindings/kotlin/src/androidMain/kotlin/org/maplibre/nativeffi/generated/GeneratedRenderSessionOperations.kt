@@ -9,7 +9,7 @@ import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 public actual abstract class GeneratedRenderSessionOperations internal actual constructor() {
@@ -17,7 +17,7 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
 
   internal abstract fun bindingRenderSessionHandle(): Long
 
-  internal abstract fun bindingCloseRenderSession(call: (Long) -> Int)
+  internal abstract fun bindingCloseRenderSession(call: (Long) -> Unit)
 
   public actual fun metalBorrowedTextureSetTarget(
     descriptor: MetalBorrowedTextureDescriptor
@@ -30,11 +30,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_metal_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeMetalBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_metal_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeMetalBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -51,11 +54,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_metal_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeMetalSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_metal_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeMetalSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -74,11 +80,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_opengl_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeOpenglBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_opengl_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeOpenglBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -95,11 +104,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_opengl_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeOpenglSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_opengl_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeOpenglSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -117,9 +129,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return PointerScope().use { arena ->
         val output = MaplibreNativeC.mln_render_abandon_result()
         output.size(output.sizeof())
-        BindingStatus.check(
-          MaplibreNativeC.mln_render_session_abandon(bindingRenderSessionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_render_session_abandon(
+            bindingRenderSessionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         GeneratedValues.readRenderAbandonResult(output)
       }
     } finally {
@@ -136,9 +152,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return PointerScope().use { arena ->
         val output = LongPointer(1L).put(0L)
-        BindingStatus.check(
-          MaplibreNativeC.mln_render_session_acquire_frame(bindingRenderSessionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_render_session_acquire_frame(
+            bindingRenderSessionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         adoptOwned(
           output.get(),
           { GeneratedOwnerDisposal.acquiredFrame(it) },
@@ -165,7 +185,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_render_session_barrier(bindingRenderSessionHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_render_session_barrier(
+              bindingRenderSessionHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -182,7 +208,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_render_session_clear_data(bindingRenderSessionHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_render_session_clear_data(
+              bindingRenderSessionHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -200,7 +232,11 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
           owner.toLong(),
           "mln_render_session_destroy",
         )
-        PointerScope().use { arena -> MaplibreNativeC.mln_render_session_destroy(owner) }
+        PointerScope().use { arena ->
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_render_session_destroy(owner, diagnostic)
+          }
+        }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)
@@ -216,7 +252,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_render_session_detach(bindingRenderSessionHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_render_session_detach(
+              bindingRenderSessionHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -234,7 +276,11 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
           owner.toLong(),
           "mln_render_session_dispose",
         )
-        PointerScope().use { arena -> MaplibreNativeC.mln_render_session_dispose(owner) }
+        PointerScope().use { arena ->
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_render_session_dispose(owner, diagnostic)
+          }
+        }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)
@@ -250,12 +296,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return PointerScope().use { arena ->
         val output = LongPointer(1L).put(0L)
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MaplibreNativeC.mln_render_session_drain_frame_results(
             bindingRenderSessionHandle(),
             output,
+            diagnostic,
           )
-        )
+        }
         adoptOwned(
           output.get(),
           { GeneratedOwnerDisposal.renderFrameBatch(it) },
@@ -276,10 +323,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_render_session_dump_debug_logs(
-            bindingRenderSessionHandle(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_render_session_dump_debug_logs(
+              bindingRenderSessionHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -297,9 +347,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return PointerScope().use { arena ->
         val output = MaplibreNativeC.mln_render_session_capabilities()
         output.size(output.sizeof())
-        BindingStatus.check(
-          MaplibreNativeC.mln_render_session_get_capabilities(bindingRenderSessionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_render_session_get_capabilities(
+            bindingRenderSessionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         GeneratedValues.readRenderSessionCapabilities(output)
       }
     } finally {
@@ -317,9 +371,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return PointerScope().use { arena ->
         val output = MaplibreNativeC.mln_render_session_snapshot()
         output.size(output.sizeof())
-        BindingStatus.check(
-          MaplibreNativeC.mln_render_session_get_snapshot(bindingRenderSessionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_render_session_get_snapshot(
+            bindingRenderSessionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         GeneratedValues.readRenderSessionSnapshot(output)
       }
     } finally {
@@ -336,9 +394,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return PointerScope().use { arena ->
         val output = LongPointer(1L).put(0L)
-        BindingStatus.check(
-          MaplibreNativeC.mln_render_session_projection_create(bindingRenderSessionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_render_session_projection_create(
+            bindingRenderSessionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         adoptOwned(
           output.get(),
           { GeneratedOwnerDisposal.mapProjection(it) },
@@ -367,15 +429,18 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         { result -> GeneratedValues.readBytes(MaplibreNativeC.mln_buffer_view(result.value())) },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_render_session_query_feature_extensions(
-              bindingRenderSessionHandle(),
-              GeneratedValues.stringView(arena, sourceId),
-              GeneratedValues.byteView(arena, feature),
-              GeneratedValues.stringView(arena, extension),
-              GeneratedValues.stringView(arena, extensionField),
-              if (arguments == null) null else GeneratedValues.byteView(arena, arguments!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_render_session_query_feature_extensions(
+                bindingRenderSessionHandle(),
+                GeneratedValues.stringView(arena, sourceId),
+                GeneratedValues.byteView(arena, feature),
+                GeneratedValues.stringView(arena, extension),
+                GeneratedValues.stringView(arena, extensionField),
+                if (arguments == null) null else GeneratedValues.byteView(arena, arguments!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -403,13 +468,16 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_render_session_query_rendered_features(
-              bindingRenderSessionHandle(),
-              GeneratedValues.writeRenderedQueryGeometry(arena, geometry),
-              if (options == null) null
-              else GeneratedValues.writeRenderedFeatureQueryOptions(arena, options!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_render_session_query_rendered_features(
+                bindingRenderSessionHandle(),
+                GeneratedValues.writeRenderedQueryGeometry(arena, geometry),
+                if (options == null) null
+                else GeneratedValues.writeRenderedFeatureQueryOptions(arena, options!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -437,13 +505,16 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_render_session_query_source_features(
-              bindingRenderSessionHandle(),
-              GeneratedValues.stringView(arena, sourceId),
-              if (options == null) null
-              else GeneratedValues.writeSourceFeatureQueryOptions(arena, options!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_render_session_query_source_features(
+                bindingRenderSessionHandle(),
+                GeneratedValues.stringView(arena, sourceId),
+                if (options == null) null
+                else GeneratedValues.writeSourceFeatureQueryOptions(arena, options!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -461,10 +532,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_render_session_reduce_memory_use(
-            bindingRenderSessionHandle(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_render_session_reduce_memory_use(
+              bindingRenderSessionHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -480,12 +554,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         "mln_render_session_request_frame",
       )
       return PointerScope().use { arena ->
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MaplibreNativeC.mln_render_session_request_frame(
             bindingRenderSessionHandle(),
             GeneratedValues.writeFrameDemand(arena, demand),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {
@@ -502,11 +577,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_render_session_resize(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeRenderTargetExtent(arena, extent),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_render_session_resize(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeRenderTargetExtent(arena, extent),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -523,13 +601,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return PointerScope().use { arena ->
         val output = SizeTPointer(1L)
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MaplibreNativeC.mln_render_session_service_driver_work(
             bindingRenderSessionHandle(),
             maxWork.toLong(),
             output,
+            diagnostic,
           )
-        )
+        }
         output.get().toULong()
       }
     } finally {
@@ -552,10 +631,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_texture_read_premultiplied_rgba8(
-              bindingRenderSessionHandle(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_texture_read_premultiplied_rgba8(
+                bindingRenderSessionHandle(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -575,11 +657,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_vulkan_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeVulkanBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_vulkan_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeVulkanBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -596,11 +681,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_vulkan_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeVulkanSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_vulkan_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeVulkanSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -619,11 +707,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_webgpu_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeWebgpuBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_webgpu_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeWebgpuBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -640,11 +731,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_webgpu_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeWebgpuSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_webgpu_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeWebgpuSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {

@@ -25,7 +25,7 @@ internal constructor(
     return handle
   }
 
-  internal override fun bindingCloseAcquiredFrame(call: (ULong) -> Int) {
+  internal override fun bindingCloseAcquiredFrame(call: (ULong) -> Unit) {
     core.closeOnce({ call(handle) })
   }
 

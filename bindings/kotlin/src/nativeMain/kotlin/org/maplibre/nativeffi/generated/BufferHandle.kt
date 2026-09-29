@@ -27,7 +27,7 @@ internal constructor(
     block(handle)
   }
 
-  internal override fun bindingCloseBuffer(call: (ULong) -> Int) {
+  internal override fun bindingCloseBuffer(call: (ULong) -> Unit) {
     core.closeOnce({ call(handle) })
   }
 

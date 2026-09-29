@@ -14,7 +14,9 @@ static mln_status add_layer(mln_map map, const mln_completion* completion) {
     "{\"id\":\"roads\",\"type\":\"line\",\"source\":\"basemap\","
     "\"source-layer\":\"transportation\"}";
   // #endregion layer
-  return mln_map_add_style_layer_json(map, view(layer), view(""), completion);
+  return mln_map_add_style_layer_json(
+    map, view(layer), view(""), completion, NULL
+  );
 }
 
 mln_status add_basemap(
@@ -24,7 +26,7 @@ mln_status add_basemap(
   // #region source
   const mln_status status = mln_map_add_vector_source_url(
     map, view("basemap"), view("https://tiles.example.com/planet/tiles.json"),
-    NULL, source_completion
+    NULL, source_completion, NULL
   );
   if (status != MLN_STATUS_OK) {
     return status;

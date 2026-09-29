@@ -72,7 +72,9 @@ impl BufferHandle {
         let native = binding_read.native;
         maplibre_core::callback::check("mln_buffer_get", native.0)?;
         let mut binding_arg_1: sys::mln_buffer_view = unsafe { std::mem::zeroed() };
-        maplibre_core::check(unsafe { sys::mln_buffer_get(native, &mut binding_arg_1) })?;
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_buffer_get(native, &mut binding_arg_1, diagnostic)
+        })?;
         Ok(unsafe { maplibre_core::string::copy_string_view_bytes(binding_arg_1) }?)
     }
 }

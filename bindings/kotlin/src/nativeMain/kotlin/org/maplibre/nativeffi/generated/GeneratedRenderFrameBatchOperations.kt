@@ -5,7 +5,7 @@ import kotlinx.cinterop.*
 import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import platform.posix.size_t
 import platform.posix.size_tVar
 
@@ -13,7 +13,7 @@ import platform.posix.size_tVar
 public actual abstract class GeneratedRenderFrameBatchOperations internal actual constructor() {
   internal abstract fun bindingRenderFrameBatchHandle(): ULong
 
-  internal abstract fun bindingCloseRenderFrameBatch(call: (ULong) -> Int)
+  internal abstract fun bindingCloseRenderFrameBatch(call: (ULong) -> Unit)
 
   public actual fun count(): ULong {
     try {
@@ -24,9 +24,9 @@ public actual abstract class GeneratedRenderFrameBatchOperations internal actual
       return memScoped {
         val arena = this
         val output = arena.alloc<size_tVar>()
-        BindingStatus.check(
-          mln_render_frame_batch_count(bindingRenderFrameBatchHandle(), output.ptr)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_render_frame_batch_count(bindingRenderFrameBatchHandle(), output.ptr, diagnostic)
+        }
         output.value.toULong()
       }
     } finally {
@@ -44,13 +44,14 @@ public actual abstract class GeneratedRenderFrameBatchOperations internal actual
         val arena = this
         val output = arena.alloc<mln_render_frame_result>()
         output.size = sizeOf<mln_render_frame_result>().toUInt()
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           mln_render_frame_batch_get(
             bindingRenderFrameBatchHandle(),
             indexValue.convert<size_t>(),
             output.ptr,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readRenderFrameResult(output)
       }
     } finally {
@@ -71,7 +72,6 @@ public actual abstract class GeneratedRenderFrameBatchOperations internal actual
         memScoped {
           val arena = this
           mln_render_frame_batch_release(owner)
-          0
         }
       }
     } finally {

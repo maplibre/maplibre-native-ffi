@@ -211,6 +211,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -222,7 +223,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view)
+     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_buffer_get$descriptor() {
@@ -232,7 +233,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view)
+     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_buffer_get$handle() {
@@ -242,7 +243,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view)
+     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_buffer_get$address() {
@@ -251,16 +252,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view)
+     * mln_status mln_buffer_get(mln_buffer buffer, mln_buffer_view *out_view, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_buffer_get(long buffer, MemorySegment out_view) {
+    public static int mln_buffer_get(long buffer, MemorySegment out_view, MemorySegment out_diagnostic) {
         var mh$ = mln_buffer_get.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_buffer_get", buffer, out_view);
+                traceDowncall("mln_buffer_get", buffer, out_view, out_diagnostic);
             }
-            return (int)mh$.invokeExact(buffer, out_view);
+            return (int)mh$.invokeExact(buffer, out_view, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -448,6 +449,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -459,7 +461,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_android_init(void *jni_env, void *jni_class, void *context)
+     * mln_status mln_android_init(void *jni_env, void *jni_class, void *context, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_android_init$descriptor() {
@@ -469,7 +471,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_android_init(void *jni_env, void *jni_class, void *context)
+     * mln_status mln_android_init(void *jni_env, void *jni_class, void *context, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_android_init$handle() {
@@ -479,7 +481,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_android_init(void *jni_env, void *jni_class, void *context)
+     * mln_status mln_android_init(void *jni_env, void *jni_class, void *context, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_android_init$address() {
@@ -488,16 +490,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_android_init(void *jni_env, void *jni_class, void *context)
+     * mln_status mln_android_init(void *jni_env, void *jni_class, void *context, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_android_init(MemorySegment jni_env, MemorySegment jni_class, MemorySegment context) {
+    public static int mln_android_init(MemorySegment jni_env, MemorySegment jni_class, MemorySegment context, MemorySegment out_diagnostic) {
         var mh$ = mln_android_init.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_android_init", jni_env, jni_class, context);
+                traceDowncall("mln_android_init", jni_env, jni_class, context, out_diagnostic);
             }
-            return (int)mh$.invokeExact(jni_env, jni_class, context);
+            return (int)mh$.invokeExact(jni_env, jni_class, context, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -1540,6 +1542,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_network_status_get {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -1551,7 +1554,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_network_status_get(uint32_t *out_status)
+     * mln_status mln_network_status_get(uint32_t *out_status, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_network_status_get$descriptor() {
@@ -1561,7 +1564,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_network_status_get(uint32_t *out_status)
+     * mln_status mln_network_status_get(uint32_t *out_status, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_network_status_get$handle() {
@@ -1571,7 +1574,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_network_status_get(uint32_t *out_status)
+     * mln_status mln_network_status_get(uint32_t *out_status, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_network_status_get$address() {
@@ -1580,16 +1583,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_network_status_get(uint32_t *out_status)
+     * mln_status mln_network_status_get(uint32_t *out_status, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_network_status_get(MemorySegment out_status) {
+    public static int mln_network_status_get(MemorySegment out_status, MemorySegment out_diagnostic) {
         var mh$ = mln_network_status_get.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_network_status_get", out_status);
+                traceDowncall("mln_network_status_get", out_status, out_diagnostic);
             }
-            return (int)mh$.invokeExact(out_status);
+            return (int)mh$.invokeExact(out_status, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -1600,7 +1603,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_network_status_set {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_INT
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_network_status_set");
@@ -1611,7 +1615,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_network_status_set(uint32_t status)
+     * mln_status mln_network_status_set(uint32_t status, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_network_status_set$descriptor() {
@@ -1621,7 +1625,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_network_status_set(uint32_t status)
+     * mln_status mln_network_status_set(uint32_t status, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_network_status_set$handle() {
@@ -1631,7 +1635,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_network_status_set(uint32_t status)
+     * mln_status mln_network_status_set(uint32_t status, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_network_status_set$address() {
@@ -1640,16 +1644,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_network_status_set(uint32_t status)
+     * mln_status mln_network_status_set(uint32_t status, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_network_status_set(int status) {
+    public static int mln_network_status_set(int status, MemorySegment out_diagnostic) {
         var mh$ = mln_network_status_set.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_network_status_set", status);
+                traceDowncall("mln_network_status_set", status, out_diagnostic);
             }
-            return (int)mh$.invokeExact(status);
+            return (int)mh$.invokeExact(status, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -1662,7 +1666,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_resource_transform_response_set_url");
@@ -1673,7 +1678,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_resource_transform_response_set_url(mln_resource_transform_response *response, const char *url, size_t url_size)
+     * mln_status mln_resource_transform_response_set_url(mln_resource_transform_response *response, const char *url, size_t url_size, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_resource_transform_response_set_url$descriptor() {
@@ -1683,7 +1688,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_resource_transform_response_set_url(mln_resource_transform_response *response, const char *url, size_t url_size)
+     * mln_status mln_resource_transform_response_set_url(mln_resource_transform_response *response, const char *url, size_t url_size, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_resource_transform_response_set_url$handle() {
@@ -1693,7 +1698,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_resource_transform_response_set_url(mln_resource_transform_response *response, const char *url, size_t url_size)
+     * mln_status mln_resource_transform_response_set_url(mln_resource_transform_response *response, const char *url, size_t url_size, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_resource_transform_response_set_url$address() {
@@ -1702,16 +1707,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_resource_transform_response_set_url(mln_resource_transform_response *response, const char *url, size_t url_size)
+     * mln_status mln_resource_transform_response_set_url(mln_resource_transform_response *response, const char *url, size_t url_size, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_resource_transform_response_set_url(MemorySegment response, MemorySegment url, long url_size) {
+    public static int mln_resource_transform_response_set_url(MemorySegment response, MemorySegment url, long url_size, MemorySegment out_diagnostic) {
         var mh$ = mln_resource_transform_response_set_url.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_resource_transform_response_set_url", response, url, url_size);
+                traceDowncall("mln_resource_transform_response_set_url", response, url, url_size, out_diagnostic);
             }
-            return (int)mh$.invokeExact(response, url, url_size);
+            return (int)mh$.invokeExact(response, url, url_size, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -1726,7 +1731,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_http_header_transform_response_set");
@@ -1737,7 +1743,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size)
+     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_http_header_transform_response_set$descriptor() {
@@ -1747,7 +1753,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size)
+     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_http_header_transform_response_set$handle() {
@@ -1757,7 +1763,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size)
+     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_http_header_transform_response_set$address() {
@@ -1766,16 +1772,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size)
+     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_http_header_transform_response_set(MemorySegment response, MemorySegment name, long name_size, MemorySegment value, long value_size) {
+    public static int mln_http_header_transform_response_set(MemorySegment response, MemorySegment name, long name_size, MemorySegment value, long value_size, MemorySegment out_diagnostic) {
         var mh$ = mln_http_header_transform_response_set.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_http_header_transform_response_set", response, name, name_size, value, value_size);
+                traceDowncall("mln_http_header_transform_response_set", response, name, name_size, value, value_size, out_diagnostic);
             }
-            return (int)mh$.invokeExact(response, name, name_size, value, value_size);
+            return (int)mh$.invokeExact(response, name, name_size, value, value_size, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -1845,6 +1851,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -1856,7 +1863,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime)
+     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_create$descriptor() {
@@ -1866,7 +1873,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime)
+     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_create$handle() {
@@ -1876,7 +1883,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime)
+     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_create$address() {
@@ -1885,16 +1892,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime)
+     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_create(MemorySegment options, MemorySegment out_runtime) {
+    public static int mln_runtime_create(MemorySegment options, MemorySegment out_runtime, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_create.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_create", options, out_runtime);
+                traceDowncall("mln_runtime_create", options, out_runtime, out_diagnostic);
             }
-            return (int)mh$.invokeExact(options, out_runtime);
+            return (int)mh$.invokeExact(options, out_runtime, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -1907,6 +1914,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -1918,7 +1926,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_resource_provider(mln_runtime runtime, const mln_resource_provider *provider, const mln_completion *completion)
+     * mln_status mln_runtime_set_resource_provider(mln_runtime runtime, const mln_resource_provider *provider, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_set_resource_provider$descriptor() {
@@ -1928,7 +1936,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_resource_provider(mln_runtime runtime, const mln_resource_provider *provider, const mln_completion *completion)
+     * mln_status mln_runtime_set_resource_provider(mln_runtime runtime, const mln_resource_provider *provider, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_set_resource_provider$handle() {
@@ -1938,7 +1946,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_resource_provider(mln_runtime runtime, const mln_resource_provider *provider, const mln_completion *completion)
+     * mln_status mln_runtime_set_resource_provider(mln_runtime runtime, const mln_resource_provider *provider, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_set_resource_provider$address() {
@@ -1947,16 +1955,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_resource_provider(mln_runtime runtime, const mln_resource_provider *provider, const mln_completion *completion)
+     * mln_status mln_runtime_set_resource_provider(mln_runtime runtime, const mln_resource_provider *provider, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_set_resource_provider(long runtime, MemorySegment provider, MemorySegment completion) {
+    public static int mln_runtime_set_resource_provider(long runtime, MemorySegment provider, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_set_resource_provider.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_set_resource_provider", runtime, provider, completion);
+                traceDowncall("mln_runtime_set_resource_provider", runtime, provider, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, provider, completion);
+            return (int)mh$.invokeExact(runtime, provider, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -1968,6 +1976,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -1979,7 +1988,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_resource_provider(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_resource_provider(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_clear_resource_provider$descriptor() {
@@ -1989,7 +1998,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_resource_provider(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_resource_provider(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_clear_resource_provider$handle() {
@@ -1999,7 +2008,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_resource_provider(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_resource_provider(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_clear_resource_provider$address() {
@@ -2008,16 +2017,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_resource_provider(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_resource_provider(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_clear_resource_provider(long runtime, MemorySegment completion) {
+    public static int mln_runtime_clear_resource_provider(long runtime, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_clear_resource_provider.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_clear_resource_provider", runtime, completion);
+                traceDowncall("mln_runtime_clear_resource_provider", runtime, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, completion);
+            return (int)mh$.invokeExact(runtime, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2029,6 +2038,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2040,7 +2050,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_complete(mln_resource_request_handle handle, const mln_resource_response *response)
+     * mln_status mln_resource_request_complete(mln_resource_request_handle handle, const mln_resource_response *response, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_resource_request_complete$descriptor() {
@@ -2050,7 +2060,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_complete(mln_resource_request_handle handle, const mln_resource_response *response)
+     * mln_status mln_resource_request_complete(mln_resource_request_handle handle, const mln_resource_response *response, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_resource_request_complete$handle() {
@@ -2060,7 +2070,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_complete(mln_resource_request_handle handle, const mln_resource_response *response)
+     * mln_status mln_resource_request_complete(mln_resource_request_handle handle, const mln_resource_response *response, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_resource_request_complete$address() {
@@ -2069,16 +2079,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_resource_request_complete(mln_resource_request_handle handle, const mln_resource_response *response)
+     * mln_status mln_resource_request_complete(mln_resource_request_handle handle, const mln_resource_response *response, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_resource_request_complete(long handle, MemorySegment response) {
+    public static int mln_resource_request_complete(long handle, MemorySegment response, MemorySegment out_diagnostic) {
         var mh$ = mln_resource_request_complete.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_resource_request_complete", handle, response);
+                traceDowncall("mln_resource_request_complete", handle, response, out_diagnostic);
             }
-            return (int)mh$.invokeExact(handle, response);
+            return (int)mh$.invokeExact(handle, response, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2090,6 +2100,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2101,7 +2112,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_cancelled(mln_resource_request_handle handle, bool *out_cancelled)
+     * mln_status mln_resource_request_cancelled(mln_resource_request_handle handle, bool *out_cancelled, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_resource_request_cancelled$descriptor() {
@@ -2111,7 +2122,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_cancelled(mln_resource_request_handle handle, bool *out_cancelled)
+     * mln_status mln_resource_request_cancelled(mln_resource_request_handle handle, bool *out_cancelled, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_resource_request_cancelled$handle() {
@@ -2121,7 +2132,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_cancelled(mln_resource_request_handle handle, bool *out_cancelled)
+     * mln_status mln_resource_request_cancelled(mln_resource_request_handle handle, bool *out_cancelled, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_resource_request_cancelled$address() {
@@ -2130,16 +2141,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_resource_request_cancelled(mln_resource_request_handle handle, bool *out_cancelled)
+     * mln_status mln_resource_request_cancelled(mln_resource_request_handle handle, bool *out_cancelled, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_resource_request_cancelled(long handle, MemorySegment out_cancelled) {
+    public static int mln_resource_request_cancelled(long handle, MemorySegment out_cancelled, MemorySegment out_diagnostic) {
         var mh$ = mln_resource_request_cancelled.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_resource_request_cancelled", handle, out_cancelled);
+                traceDowncall("mln_resource_request_cancelled", handle, out_cancelled, out_diagnostic);
             }
-            return (int)mh$.invokeExact(handle, out_cancelled);
+            return (int)mh$.invokeExact(handle, out_cancelled, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2154,6 +2165,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2165,7 +2177,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, mln_runtime_callback_release release_user_data, bool *out_cancelled)
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, mln_runtime_callback_release release_user_data, bool *out_cancelled, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_resource_request_set_cancel_callback$descriptor() {
@@ -2175,7 +2187,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, mln_runtime_callback_release release_user_data, bool *out_cancelled)
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, mln_runtime_callback_release release_user_data, bool *out_cancelled, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_resource_request_set_cancel_callback$handle() {
@@ -2185,7 +2197,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, mln_runtime_callback_release release_user_data, bool *out_cancelled)
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, mln_runtime_callback_release release_user_data, bool *out_cancelled, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_resource_request_set_cancel_callback$address() {
@@ -2194,16 +2206,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, mln_runtime_callback_release release_user_data, bool *out_cancelled)
+     * mln_status mln_resource_request_set_cancel_callback(mln_resource_request_handle handle, mln_resource_request_cancel_callback callback, void *user_data, mln_runtime_callback_release release_user_data, bool *out_cancelled, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_resource_request_set_cancel_callback(long handle, MemorySegment callback, MemorySegment user_data, MemorySegment release_user_data, MemorySegment out_cancelled) {
+    public static int mln_resource_request_set_cancel_callback(long handle, MemorySegment callback, MemorySegment user_data, MemorySegment release_user_data, MemorySegment out_cancelled, MemorySegment out_diagnostic) {
         var mh$ = mln_resource_request_set_cancel_callback.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_resource_request_set_cancel_callback", handle, callback, user_data, release_user_data, out_cancelled);
+                traceDowncall("mln_resource_request_set_cancel_callback", handle, callback, user_data, release_user_data, out_cancelled, out_diagnostic);
             }
-            return (int)mh$.invokeExact(handle, callback, user_data, release_user_data, out_cancelled);
+            return (int)mh$.invokeExact(handle, callback, user_data, release_user_data, out_cancelled, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2273,7 +2285,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_resource_request_wait_until_retired {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_resource_request_wait_until_retired");
@@ -2284,7 +2297,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_wait_until_retired(mln_resource_request_handle handle)
+     * mln_status mln_resource_request_wait_until_retired(mln_resource_request_handle handle, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_resource_request_wait_until_retired$descriptor() {
@@ -2294,7 +2307,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_wait_until_retired(mln_resource_request_handle handle)
+     * mln_status mln_resource_request_wait_until_retired(mln_resource_request_handle handle, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_resource_request_wait_until_retired$handle() {
@@ -2304,7 +2317,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_resource_request_wait_until_retired(mln_resource_request_handle handle)
+     * mln_status mln_resource_request_wait_until_retired(mln_resource_request_handle handle, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_resource_request_wait_until_retired$address() {
@@ -2313,16 +2326,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_resource_request_wait_until_retired(mln_resource_request_handle handle)
+     * mln_status mln_resource_request_wait_until_retired(mln_resource_request_handle handle, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_resource_request_wait_until_retired(long handle) {
+    public static int mln_resource_request_wait_until_retired(long handle, MemorySegment out_diagnostic) {
         var mh$ = mln_resource_request_wait_until_retired.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_resource_request_wait_until_retired", handle);
+                traceDowncall("mln_resource_request_wait_until_retired", handle, out_diagnostic);
             }
-            return (int)mh$.invokeExact(handle);
+            return (int)mh$.invokeExact(handle, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2335,6 +2348,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2346,7 +2360,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_resource_transform(mln_runtime runtime, const mln_resource_transform *transform, const mln_completion *completion)
+     * mln_status mln_runtime_set_resource_transform(mln_runtime runtime, const mln_resource_transform *transform, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_set_resource_transform$descriptor() {
@@ -2356,7 +2370,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_resource_transform(mln_runtime runtime, const mln_resource_transform *transform, const mln_completion *completion)
+     * mln_status mln_runtime_set_resource_transform(mln_runtime runtime, const mln_resource_transform *transform, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_set_resource_transform$handle() {
@@ -2366,7 +2380,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_resource_transform(mln_runtime runtime, const mln_resource_transform *transform, const mln_completion *completion)
+     * mln_status mln_runtime_set_resource_transform(mln_runtime runtime, const mln_resource_transform *transform, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_set_resource_transform$address() {
@@ -2375,16 +2389,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_resource_transform(mln_runtime runtime, const mln_resource_transform *transform, const mln_completion *completion)
+     * mln_status mln_runtime_set_resource_transform(mln_runtime runtime, const mln_resource_transform *transform, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_set_resource_transform(long runtime, MemorySegment transform, MemorySegment completion) {
+    public static int mln_runtime_set_resource_transform(long runtime, MemorySegment transform, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_set_resource_transform.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_set_resource_transform", runtime, transform, completion);
+                traceDowncall("mln_runtime_set_resource_transform", runtime, transform, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, transform, completion);
+            return (int)mh$.invokeExact(runtime, transform, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2396,6 +2410,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2407,7 +2422,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_resource_transform(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_resource_transform(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_clear_resource_transform$descriptor() {
@@ -2417,7 +2432,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_resource_transform(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_resource_transform(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_clear_resource_transform$handle() {
@@ -2427,7 +2442,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_resource_transform(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_resource_transform(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_clear_resource_transform$address() {
@@ -2436,16 +2451,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_resource_transform(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_resource_transform(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_clear_resource_transform(long runtime, MemorySegment completion) {
+    public static int mln_runtime_clear_resource_transform(long runtime, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_clear_resource_transform.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_clear_resource_transform", runtime, completion);
+                traceDowncall("mln_runtime_clear_resource_transform", runtime, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, completion);
+            return (int)mh$.invokeExact(runtime, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2458,6 +2473,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2469,7 +2485,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform, const mln_completion *completion)
+     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_set_http_header_transform$descriptor() {
@@ -2479,7 +2495,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform, const mln_completion *completion)
+     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_set_http_header_transform$handle() {
@@ -2489,7 +2505,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform, const mln_completion *completion)
+     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_set_http_header_transform$address() {
@@ -2498,16 +2514,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform, const mln_completion *completion)
+     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_set_http_header_transform(long runtime, MemorySegment transform, MemorySegment completion) {
+    public static int mln_runtime_set_http_header_transform(long runtime, MemorySegment transform, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_set_http_header_transform.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_set_http_header_transform", runtime, transform, completion);
+                traceDowncall("mln_runtime_set_http_header_transform", runtime, transform, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, transform, completion);
+            return (int)mh$.invokeExact(runtime, transform, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2519,6 +2535,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2530,7 +2547,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_clear_http_header_transform$descriptor() {
@@ -2540,7 +2557,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_clear_http_header_transform$handle() {
@@ -2550,7 +2567,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_clear_http_header_transform$address() {
@@ -2559,16 +2576,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_clear_http_header_transform(long runtime, MemorySegment completion) {
+    public static int mln_runtime_clear_http_header_transform(long runtime, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_clear_http_header_transform.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_clear_http_header_transform", runtime, completion);
+                traceDowncall("mln_runtime_clear_http_header_transform", runtime, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, completion);
+            return (int)mh$.invokeExact(runtime, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2581,6 +2598,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2592,7 +2610,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_run_ambient_cache_operation(mln_runtime runtime, uint32_t operation, const mln_completion *completion)
+     * mln_status mln_runtime_run_ambient_cache_operation(mln_runtime runtime, uint32_t operation, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_run_ambient_cache_operation$descriptor() {
@@ -2602,7 +2620,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_run_ambient_cache_operation(mln_runtime runtime, uint32_t operation, const mln_completion *completion)
+     * mln_status mln_runtime_run_ambient_cache_operation(mln_runtime runtime, uint32_t operation, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_run_ambient_cache_operation$handle() {
@@ -2612,7 +2630,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_run_ambient_cache_operation(mln_runtime runtime, uint32_t operation, const mln_completion *completion)
+     * mln_status mln_runtime_run_ambient_cache_operation(mln_runtime runtime, uint32_t operation, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_run_ambient_cache_operation$address() {
@@ -2621,16 +2639,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_run_ambient_cache_operation(mln_runtime runtime, uint32_t operation, const mln_completion *completion)
+     * mln_status mln_runtime_run_ambient_cache_operation(mln_runtime runtime, uint32_t operation, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_run_ambient_cache_operation(long runtime, int operation, MemorySegment completion) {
+    public static int mln_runtime_run_ambient_cache_operation(long runtime, int operation, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_run_ambient_cache_operation.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_run_ambient_cache_operation", runtime, operation, completion);
+                traceDowncall("mln_runtime_run_ambient_cache_operation", runtime, operation, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, operation, completion);
+            return (int)mh$.invokeExact(runtime, operation, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2643,6 +2661,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2654,7 +2673,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_maximum_ambient_cache_size(mln_runtime runtime, uint64_t size, const mln_completion *completion)
+     * mln_status mln_runtime_set_maximum_ambient_cache_size(mln_runtime runtime, uint64_t size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_set_maximum_ambient_cache_size$descriptor() {
@@ -2664,7 +2683,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_maximum_ambient_cache_size(mln_runtime runtime, uint64_t size, const mln_completion *completion)
+     * mln_status mln_runtime_set_maximum_ambient_cache_size(mln_runtime runtime, uint64_t size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_set_maximum_ambient_cache_size$handle() {
@@ -2674,7 +2693,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_maximum_ambient_cache_size(mln_runtime runtime, uint64_t size, const mln_completion *completion)
+     * mln_status mln_runtime_set_maximum_ambient_cache_size(mln_runtime runtime, uint64_t size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_set_maximum_ambient_cache_size$address() {
@@ -2683,16 +2702,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_maximum_ambient_cache_size(mln_runtime runtime, uint64_t size, const mln_completion *completion)
+     * mln_status mln_runtime_set_maximum_ambient_cache_size(mln_runtime runtime, uint64_t size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_set_maximum_ambient_cache_size(long runtime, long size, MemorySegment completion) {
+    public static int mln_runtime_set_maximum_ambient_cache_size(long runtime, long size, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_set_maximum_ambient_cache_size.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_set_maximum_ambient_cache_size", runtime, size, completion);
+                traceDowncall("mln_runtime_set_maximum_ambient_cache_size", runtime, size, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, size, completion);
+            return (int)mh$.invokeExact(runtime, size, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2704,6 +2723,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2715,7 +2735,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_barrier(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_barrier(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_barrier$descriptor() {
@@ -2725,7 +2745,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_barrier(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_barrier(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_barrier$handle() {
@@ -2735,7 +2755,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_barrier(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_barrier(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_barrier$address() {
@@ -2744,16 +2764,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_barrier(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_barrier(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_barrier(long runtime, MemorySegment completion) {
+    public static int mln_runtime_barrier(long runtime, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_barrier.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_barrier", runtime, completion);
+                traceDowncall("mln_runtime_barrier", runtime, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, completion);
+            return (int)mh$.invokeExact(runtime, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2765,6 +2785,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2776,7 +2797,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_release$descriptor() {
@@ -2786,7 +2807,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_release$handle() {
@@ -2796,7 +2817,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_release$address() {
@@ -2805,16 +2826,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_release(long runtime, MemorySegment completion) {
+    public static int mln_runtime_release(long runtime, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_release.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_release", runtime, completion);
+                traceDowncall("mln_runtime_release", runtime, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, completion);
+            return (int)mh$.invokeExact(runtime, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2825,7 +2846,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_runtime_dispose {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_dispose");
@@ -2836,7 +2858,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_dispose(mln_runtime runtime)
+     * mln_status mln_runtime_dispose(mln_runtime runtime, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_dispose$descriptor() {
@@ -2846,7 +2868,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_dispose(mln_runtime runtime)
+     * mln_status mln_runtime_dispose(mln_runtime runtime, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_dispose$handle() {
@@ -2856,7 +2878,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_dispose(mln_runtime runtime)
+     * mln_status mln_runtime_dispose(mln_runtime runtime, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_dispose$address() {
@@ -2865,16 +2887,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_dispose(mln_runtime runtime)
+     * mln_status mln_runtime_dispose(mln_runtime runtime, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_dispose(long runtime) {
+    public static int mln_runtime_dispose(long runtime, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_dispose.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_dispose", runtime);
+                traceDowncall("mln_runtime_dispose", runtime, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime);
+            return (int)mh$.invokeExact(runtime, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2886,6 +2908,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2897,7 +2920,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch)
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_drain_events$descriptor() {
@@ -2907,7 +2930,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch)
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_drain_events$handle() {
@@ -2917,7 +2940,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch)
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_drain_events$address() {
@@ -2926,16 +2949,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch)
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_drain_events(long runtime, MemorySegment out_batch) {
+    public static int mln_runtime_drain_events(long runtime, MemorySegment out_batch, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_drain_events.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_drain_events", runtime, out_batch);
+                traceDowncall("mln_runtime_drain_events", runtime, out_batch, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, out_batch);
+            return (int)mh$.invokeExact(runtime, out_batch, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -2947,6 +2970,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2958,7 +2982,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_event_batch_get(mln_event_batch batch, mln_runtime_event_batch_view *out_view)
+     * mln_status mln_event_batch_get(mln_event_batch batch, mln_runtime_event_batch_view *out_view, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_event_batch_get$descriptor() {
@@ -2968,7 +2992,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_event_batch_get(mln_event_batch batch, mln_runtime_event_batch_view *out_view)
+     * mln_status mln_event_batch_get(mln_event_batch batch, mln_runtime_event_batch_view *out_view, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_event_batch_get$handle() {
@@ -2978,7 +3002,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_event_batch_get(mln_event_batch batch, mln_runtime_event_batch_view *out_view)
+     * mln_status mln_event_batch_get(mln_event_batch batch, mln_runtime_event_batch_view *out_view, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_event_batch_get$address() {
@@ -2987,16 +3011,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_event_batch_get(mln_event_batch batch, mln_runtime_event_batch_view *out_view)
+     * mln_status mln_event_batch_get(mln_event_batch batch, mln_runtime_event_batch_view *out_view, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_event_batch_get(long batch, MemorySegment out_view) {
+    public static int mln_event_batch_get(long batch, MemorySegment out_view, MemorySegment out_diagnostic) {
         var mh$ = mln_event_batch_get.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_event_batch_get", batch, out_view);
+                traceDowncall("mln_event_batch_get", batch, out_view, out_diagnostic);
             }
-            return (int)mh$.invokeExact(batch, out_view);
+            return (int)mh$.invokeExact(batch, out_view, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -3067,7 +3091,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_set_event_mask");
@@ -3078,7 +3103,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask)
+     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_set_event_mask$descriptor() {
@@ -3088,7 +3113,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask)
+     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_set_event_mask$handle() {
@@ -3098,7 +3123,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask)
+     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_set_event_mask$address() {
@@ -3107,16 +3132,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask)
+     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_set_event_mask(long runtime, long mask) {
+    public static int mln_runtime_set_event_mask(long runtime, long mask, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_set_event_mask.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_set_event_mask", runtime, mask);
+                traceDowncall("mln_runtime_set_event_mask", runtime, mask, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, mask);
+            return (int)mh$.invokeExact(runtime, mask, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -3128,6 +3153,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -3139,7 +3165,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask)
+     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_get_event_mask$descriptor() {
@@ -3149,7 +3175,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask)
+     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_get_event_mask$handle() {
@@ -3159,7 +3185,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask)
+     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_get_event_mask$address() {
@@ -3168,16 +3194,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask)
+     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_get_event_mask(long runtime, MemorySegment out_mask) {
+    public static int mln_runtime_get_event_mask(long runtime, MemorySegment out_mask, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_get_event_mask.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_get_event_mask", runtime, out_mask);
+                traceDowncall("mln_runtime_get_event_mask", runtime, out_mask, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, out_mask);
+            return (int)mh$.invokeExact(runtime, out_mask, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -3831,6 +3857,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -3842,7 +3869,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_create(mln_runtime runtime, const mln_offline_region_definition *definition, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_create(mln_runtime runtime, const mln_offline_region_definition *definition, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_offline_region_create$descriptor() {
@@ -3852,7 +3879,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_create(mln_runtime runtime, const mln_offline_region_definition *definition, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_create(mln_runtime runtime, const mln_offline_region_definition *definition, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_offline_region_create$handle() {
@@ -3862,7 +3889,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_create(mln_runtime runtime, const mln_offline_region_definition *definition, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_create(mln_runtime runtime, const mln_offline_region_definition *definition, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_offline_region_create$address() {
@@ -3871,16 +3898,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_create(mln_runtime runtime, const mln_offline_region_definition *definition, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_create(mln_runtime runtime, const mln_offline_region_definition *definition, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_offline_region_create(long runtime, MemorySegment definition, MemorySegment metadata, long metadata_size, MemorySegment completion) {
+    public static int mln_runtime_offline_region_create(long runtime, MemorySegment definition, MemorySegment metadata, long metadata_size, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_offline_region_create.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_offline_region_create", runtime, definition, metadata, metadata_size, completion);
+                traceDowncall("mln_runtime_offline_region_create", runtime, definition, metadata, metadata_size, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, definition, metadata, metadata_size, completion);
+            return (int)mh$.invokeExact(runtime, definition, metadata, metadata_size, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -3893,6 +3920,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -3904,7 +3932,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_get(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_get(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_offline_region_get$descriptor() {
@@ -3914,7 +3942,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_get(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_get(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_offline_region_get$handle() {
@@ -3924,7 +3952,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_get(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_get(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_offline_region_get$address() {
@@ -3933,16 +3961,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_get(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_get(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_offline_region_get(long runtime, long region_id, MemorySegment completion) {
+    public static int mln_runtime_offline_region_get(long runtime, long region_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_offline_region_get.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_offline_region_get", runtime, region_id, completion);
+                traceDowncall("mln_runtime_offline_region_get", runtime, region_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, region_id, completion);
+            return (int)mh$.invokeExact(runtime, region_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -3954,6 +3982,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -3965,7 +3994,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_regions_list(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_offline_regions_list(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_offline_regions_list$descriptor() {
@@ -3975,7 +4004,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_regions_list(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_offline_regions_list(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_offline_regions_list$handle() {
@@ -3985,7 +4014,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_regions_list(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_offline_regions_list(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_offline_regions_list$address() {
@@ -3994,16 +4023,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_regions_list(mln_runtime runtime, const mln_completion *completion)
+     * mln_status mln_runtime_offline_regions_list(mln_runtime runtime, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_offline_regions_list(long runtime, MemorySegment completion) {
+    public static int mln_runtime_offline_regions_list(long runtime, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_offline_regions_list.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_offline_regions_list", runtime, completion);
+                traceDowncall("mln_runtime_offline_regions_list", runtime, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, completion);
+            return (int)mh$.invokeExact(runtime, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4016,6 +4045,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4027,7 +4057,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_regions_merge_database(mln_runtime runtime, const char *side_database_path, const mln_completion *completion)
+     * mln_status mln_runtime_offline_regions_merge_database(mln_runtime runtime, const char *side_database_path, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_offline_regions_merge_database$descriptor() {
@@ -4037,7 +4067,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_regions_merge_database(mln_runtime runtime, const char *side_database_path, const mln_completion *completion)
+     * mln_status mln_runtime_offline_regions_merge_database(mln_runtime runtime, const char *side_database_path, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_offline_regions_merge_database$handle() {
@@ -4047,7 +4077,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_regions_merge_database(mln_runtime runtime, const char *side_database_path, const mln_completion *completion)
+     * mln_status mln_runtime_offline_regions_merge_database(mln_runtime runtime, const char *side_database_path, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_offline_regions_merge_database$address() {
@@ -4056,16 +4086,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_regions_merge_database(mln_runtime runtime, const char *side_database_path, const mln_completion *completion)
+     * mln_status mln_runtime_offline_regions_merge_database(mln_runtime runtime, const char *side_database_path, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_offline_regions_merge_database(long runtime, MemorySegment side_database_path, MemorySegment completion) {
+    public static int mln_runtime_offline_regions_merge_database(long runtime, MemorySegment side_database_path, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_offline_regions_merge_database.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_offline_regions_merge_database", runtime, side_database_path, completion);
+                traceDowncall("mln_runtime_offline_regions_merge_database", runtime, side_database_path, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, side_database_path, completion);
+            return (int)mh$.invokeExact(runtime, side_database_path, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4080,6 +4110,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4091,7 +4122,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_update_metadata(mln_runtime runtime, mln_offline_region_id region_id, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_update_metadata(mln_runtime runtime, mln_offline_region_id region_id, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_offline_region_update_metadata$descriptor() {
@@ -4101,7 +4132,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_update_metadata(mln_runtime runtime, mln_offline_region_id region_id, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_update_metadata(mln_runtime runtime, mln_offline_region_id region_id, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_offline_region_update_metadata$handle() {
@@ -4111,7 +4142,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_update_metadata(mln_runtime runtime, mln_offline_region_id region_id, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_update_metadata(mln_runtime runtime, mln_offline_region_id region_id, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_offline_region_update_metadata$address() {
@@ -4120,16 +4151,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_update_metadata(mln_runtime runtime, mln_offline_region_id region_id, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_update_metadata(mln_runtime runtime, mln_offline_region_id region_id, const uint8_t *metadata, size_t metadata_size, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_offline_region_update_metadata(long runtime, long region_id, MemorySegment metadata, long metadata_size, MemorySegment completion) {
+    public static int mln_runtime_offline_region_update_metadata(long runtime, long region_id, MemorySegment metadata, long metadata_size, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_offline_region_update_metadata.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_offline_region_update_metadata", runtime, region_id, metadata, metadata_size, completion);
+                traceDowncall("mln_runtime_offline_region_update_metadata", runtime, region_id, metadata, metadata_size, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, region_id, metadata, metadata_size, completion);
+            return (int)mh$.invokeExact(runtime, region_id, metadata, metadata_size, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4142,6 +4173,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4153,7 +4185,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_get_status(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_get_status(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_offline_region_get_status$descriptor() {
@@ -4163,7 +4195,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_get_status(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_get_status(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_offline_region_get_status$handle() {
@@ -4173,7 +4205,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_get_status(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_get_status(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_offline_region_get_status$address() {
@@ -4182,16 +4214,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_get_status(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_get_status(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_offline_region_get_status(long runtime, long region_id, MemorySegment completion) {
+    public static int mln_runtime_offline_region_get_status(long runtime, long region_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_offline_region_get_status.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_offline_region_get_status", runtime, region_id, completion);
+                traceDowncall("mln_runtime_offline_region_get_status", runtime, region_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, region_id, completion);
+            return (int)mh$.invokeExact(runtime, region_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4205,6 +4237,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_BOOL,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4216,7 +4249,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_set_observed(mln_runtime runtime, mln_offline_region_id region_id, bool observed, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_set_observed(mln_runtime runtime, mln_offline_region_id region_id, bool observed, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_offline_region_set_observed$descriptor() {
@@ -4226,7 +4259,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_set_observed(mln_runtime runtime, mln_offline_region_id region_id, bool observed, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_set_observed(mln_runtime runtime, mln_offline_region_id region_id, bool observed, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_offline_region_set_observed$handle() {
@@ -4236,7 +4269,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_set_observed(mln_runtime runtime, mln_offline_region_id region_id, bool observed, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_set_observed(mln_runtime runtime, mln_offline_region_id region_id, bool observed, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_offline_region_set_observed$address() {
@@ -4245,16 +4278,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_set_observed(mln_runtime runtime, mln_offline_region_id region_id, bool observed, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_set_observed(mln_runtime runtime, mln_offline_region_id region_id, bool observed, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_offline_region_set_observed(long runtime, long region_id, boolean observed, MemorySegment completion) {
+    public static int mln_runtime_offline_region_set_observed(long runtime, long region_id, boolean observed, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_offline_region_set_observed.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_offline_region_set_observed", runtime, region_id, observed, completion);
+                traceDowncall("mln_runtime_offline_region_set_observed", runtime, region_id, observed, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, region_id, observed, completion);
+            return (int)mh$.invokeExact(runtime, region_id, observed, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4268,6 +4301,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4279,7 +4313,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_set_download_state(mln_runtime runtime, mln_offline_region_id region_id, uint32_t state, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_set_download_state(mln_runtime runtime, mln_offline_region_id region_id, uint32_t state, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_offline_region_set_download_state$descriptor() {
@@ -4289,7 +4323,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_set_download_state(mln_runtime runtime, mln_offline_region_id region_id, uint32_t state, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_set_download_state(mln_runtime runtime, mln_offline_region_id region_id, uint32_t state, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_offline_region_set_download_state$handle() {
@@ -4299,7 +4333,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_set_download_state(mln_runtime runtime, mln_offline_region_id region_id, uint32_t state, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_set_download_state(mln_runtime runtime, mln_offline_region_id region_id, uint32_t state, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_offline_region_set_download_state$address() {
@@ -4308,16 +4342,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_set_download_state(mln_runtime runtime, mln_offline_region_id region_id, uint32_t state, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_set_download_state(mln_runtime runtime, mln_offline_region_id region_id, uint32_t state, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_offline_region_set_download_state(long runtime, long region_id, int state, MemorySegment completion) {
+    public static int mln_runtime_offline_region_set_download_state(long runtime, long region_id, int state, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_offline_region_set_download_state.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_offline_region_set_download_state", runtime, region_id, state, completion);
+                traceDowncall("mln_runtime_offline_region_set_download_state", runtime, region_id, state, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, region_id, state, completion);
+            return (int)mh$.invokeExact(runtime, region_id, state, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4330,6 +4364,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4341,7 +4376,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_invalidate(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_invalidate(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_offline_region_invalidate$descriptor() {
@@ -4351,7 +4386,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_invalidate(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_invalidate(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_offline_region_invalidate$handle() {
@@ -4361,7 +4396,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_invalidate(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_invalidate(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_offline_region_invalidate$address() {
@@ -4370,16 +4405,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_invalidate(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_invalidate(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_offline_region_invalidate(long runtime, long region_id, MemorySegment completion) {
+    public static int mln_runtime_offline_region_invalidate(long runtime, long region_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_offline_region_invalidate.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_offline_region_invalidate", runtime, region_id, completion);
+                traceDowncall("mln_runtime_offline_region_invalidate", runtime, region_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, region_id, completion);
+            return (int)mh$.invokeExact(runtime, region_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4392,6 +4427,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4403,7 +4439,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_delete(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_delete(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_runtime_offline_region_delete$descriptor() {
@@ -4413,7 +4449,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_delete(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_delete(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_runtime_offline_region_delete$handle() {
@@ -4423,7 +4459,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_delete(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_delete(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_runtime_offline_region_delete$address() {
@@ -4432,16 +4468,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_offline_region_delete(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion)
+     * mln_status mln_runtime_offline_region_delete(mln_runtime runtime, mln_offline_region_id region_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_runtime_offline_region_delete(long runtime, long region_id, MemorySegment completion) {
+    public static int mln_runtime_offline_region_delete(long runtime, long region_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_runtime_offline_region_delete.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_offline_region_delete", runtime, region_id, completion);
+                traceDowncall("mln_runtime_offline_region_delete", runtime, region_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, region_id, completion);
+            return (int)mh$.invokeExact(runtime, region_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4512,6 +4548,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4523,7 +4560,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_create(mln_runtime runtime, const mln_map_options *options, const mln_completion *completion)
+     * mln_status mln_map_create(mln_runtime runtime, const mln_map_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_create$descriptor() {
@@ -4533,7 +4570,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_create(mln_runtime runtime, const mln_map_options *options, const mln_completion *completion)
+     * mln_status mln_map_create(mln_runtime runtime, const mln_map_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_create$handle() {
@@ -4543,7 +4580,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_create(mln_runtime runtime, const mln_map_options *options, const mln_completion *completion)
+     * mln_status mln_map_create(mln_runtime runtime, const mln_map_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_create$address() {
@@ -4552,16 +4589,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_create(mln_runtime runtime, const mln_map_options *options, const mln_completion *completion)
+     * mln_status mln_map_create(mln_runtime runtime, const mln_map_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_create(long runtime, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_create(long runtime, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_create.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_create", runtime, options, completion);
+                traceDowncall("mln_map_create", runtime, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(runtime, options, completion);
+            return (int)mh$.invokeExact(runtime, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4573,6 +4610,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4584,7 +4622,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_snapshot_get(mln_map map, mln_map_snapshot *out_snapshot)
+     * mln_status mln_map_snapshot_get(mln_map map, mln_map_snapshot *out_snapshot, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_snapshot_get$descriptor() {
@@ -4594,7 +4632,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_snapshot_get(mln_map map, mln_map_snapshot *out_snapshot)
+     * mln_status mln_map_snapshot_get(mln_map map, mln_map_snapshot *out_snapshot, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_snapshot_get$handle() {
@@ -4604,7 +4642,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_snapshot_get(mln_map map, mln_map_snapshot *out_snapshot)
+     * mln_status mln_map_snapshot_get(mln_map map, mln_map_snapshot *out_snapshot, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_snapshot_get$address() {
@@ -4613,16 +4651,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_snapshot_get(mln_map map, mln_map_snapshot *out_snapshot)
+     * mln_status mln_map_snapshot_get(mln_map map, mln_map_snapshot *out_snapshot, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_snapshot_get(long map, MemorySegment out_snapshot) {
+    public static int mln_map_snapshot_get(long map, MemorySegment out_snapshot, MemorySegment out_diagnostic) {
         var mh$ = mln_map_snapshot_get.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_snapshot_get", map, out_snapshot);
+                traceDowncall("mln_map_snapshot_get", map, out_snapshot, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, out_snapshot);
+            return (int)mh$.invokeExact(map, out_snapshot, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4635,6 +4673,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_logical_extent.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4646,7 +4685,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_resize(mln_map map, mln_logical_extent extent, const mln_completion *completion)
+     * mln_status mln_map_resize(mln_map map, mln_logical_extent extent, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_resize$descriptor() {
@@ -4656,7 +4695,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_resize(mln_map map, mln_logical_extent extent, const mln_completion *completion)
+     * mln_status mln_map_resize(mln_map map, mln_logical_extent extent, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_resize$handle() {
@@ -4666,7 +4705,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_resize(mln_map map, mln_logical_extent extent, const mln_completion *completion)
+     * mln_status mln_map_resize(mln_map map, mln_logical_extent extent, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_resize$address() {
@@ -4675,16 +4714,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_resize(mln_map map, mln_logical_extent extent, const mln_completion *completion)
+     * mln_status mln_map_resize(mln_map map, mln_logical_extent extent, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_resize(long map, MemorySegment extent, MemorySegment completion) {
+    public static int mln_map_resize(long map, MemorySegment extent, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_resize.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_resize", map, extent, completion);
+                traceDowncall("mln_map_resize", map, extent, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, extent, completion);
+            return (int)mh$.invokeExact(map, extent, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4696,6 +4735,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4707,7 +4747,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_request_repaint(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_request_repaint(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_request_repaint$descriptor() {
@@ -4717,7 +4757,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_request_repaint(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_request_repaint(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_request_repaint$handle() {
@@ -4727,7 +4767,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_request_repaint(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_request_repaint(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_request_repaint$address() {
@@ -4736,16 +4776,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_request_repaint(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_request_repaint(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_request_repaint(long map, MemorySegment completion) {
+    public static int mln_map_request_repaint(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_request_repaint.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_request_repaint", map, completion);
+                traceDowncall("mln_map_request_repaint", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4759,6 +4799,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4770,7 +4811,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_feature_state(mln_map map, const mln_feature_state_selector *selector, mln_buffer_view state, const mln_completion *completion)
+     * mln_status mln_map_set_feature_state(mln_map map, const mln_feature_state_selector *selector, mln_buffer_view state, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_feature_state$descriptor() {
@@ -4780,7 +4821,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_feature_state(mln_map map, const mln_feature_state_selector *selector, mln_buffer_view state, const mln_completion *completion)
+     * mln_status mln_map_set_feature_state(mln_map map, const mln_feature_state_selector *selector, mln_buffer_view state, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_feature_state$handle() {
@@ -4790,7 +4831,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_feature_state(mln_map map, const mln_feature_state_selector *selector, mln_buffer_view state, const mln_completion *completion)
+     * mln_status mln_map_set_feature_state(mln_map map, const mln_feature_state_selector *selector, mln_buffer_view state, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_feature_state$address() {
@@ -4799,16 +4840,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_feature_state(mln_map map, const mln_feature_state_selector *selector, mln_buffer_view state, const mln_completion *completion)
+     * mln_status mln_map_set_feature_state(mln_map map, const mln_feature_state_selector *selector, mln_buffer_view state, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_feature_state(long map, MemorySegment selector, MemorySegment state, MemorySegment completion) {
+    public static int mln_map_set_feature_state(long map, MemorySegment selector, MemorySegment state, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_feature_state.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_feature_state", map, selector, state, completion);
+                traceDowncall("mln_map_set_feature_state", map, selector, state, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, selector, state, completion);
+            return (int)mh$.invokeExact(map, selector, state, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4821,6 +4862,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4832,7 +4874,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion)
+     * mln_status mln_map_get_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_feature_state$descriptor() {
@@ -4842,7 +4884,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion)
+     * mln_status mln_map_get_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_feature_state$handle() {
@@ -4852,7 +4894,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion)
+     * mln_status mln_map_get_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_feature_state$address() {
@@ -4861,16 +4903,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion)
+     * mln_status mln_map_get_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_feature_state(long map, MemorySegment selector, MemorySegment completion) {
+    public static int mln_map_get_feature_state(long map, MemorySegment selector, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_feature_state.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_feature_state", map, selector, completion);
+                traceDowncall("mln_map_get_feature_state", map, selector, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, selector, completion);
+            return (int)mh$.invokeExact(map, selector, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4883,6 +4925,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4894,7 +4937,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion)
+     * mln_status mln_map_remove_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_remove_feature_state$descriptor() {
@@ -4904,7 +4947,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion)
+     * mln_status mln_map_remove_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_remove_feature_state$handle() {
@@ -4914,7 +4957,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion)
+     * mln_status mln_map_remove_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_remove_feature_state$address() {
@@ -4923,16 +4966,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_remove_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion)
+     * mln_status mln_map_remove_feature_state(mln_map map, const mln_feature_state_selector *selector, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_remove_feature_state(long map, MemorySegment selector, MemorySegment completion) {
+    public static int mln_map_remove_feature_state(long map, MemorySegment selector, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_remove_feature_state.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_remove_feature_state", map, selector, completion);
+                traceDowncall("mln_map_remove_feature_state", map, selector, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, selector, completion);
+            return (int)mh$.invokeExact(map, selector, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -4944,6 +4987,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -4955,7 +4999,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_request_still_image(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_request_still_image(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_request_still_image$descriptor() {
@@ -4965,7 +5009,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_request_still_image(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_request_still_image(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_request_still_image$handle() {
@@ -4975,7 +5019,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_request_still_image(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_request_still_image(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_request_still_image$address() {
@@ -4984,16 +5028,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_request_still_image(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_request_still_image(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_request_still_image(long map, MemorySegment completion) {
+    public static int mln_map_request_still_image(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_request_still_image.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_request_still_image", map, completion);
+                traceDowncall("mln_map_request_still_image", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -5005,6 +5049,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -5016,7 +5061,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_release(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_release(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_release$descriptor() {
@@ -5026,7 +5071,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_release(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_release(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_release$handle() {
@@ -5036,7 +5081,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_release(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_release(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_release$address() {
@@ -5045,16 +5090,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_release(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_release(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_release(long map, MemorySegment completion) {
+    public static int mln_map_release(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_release.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_release", map, completion);
+                traceDowncall("mln_map_release", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -5065,7 +5110,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_map_dispose {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_dispose");
@@ -5076,7 +5122,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_dispose(mln_map map)
+     * mln_status mln_map_dispose(mln_map map, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_dispose$descriptor() {
@@ -5086,7 +5132,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_dispose(mln_map map)
+     * mln_status mln_map_dispose(mln_map map, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_dispose$handle() {
@@ -5096,7 +5142,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_dispose(mln_map map)
+     * mln_status mln_map_dispose(mln_map map, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_dispose$address() {
@@ -5105,16 +5151,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_dispose(mln_map map)
+     * mln_status mln_map_dispose(mln_map map, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_dispose(long map) {
+    public static int mln_map_dispose(long map, MemorySegment out_diagnostic) {
         var mh$ = mln_map_dispose.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_dispose", map);
+                traceDowncall("mln_map_dispose", map, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map);
+            return (int)mh$.invokeExact(map, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -5127,6 +5173,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -5138,7 +5185,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_url(mln_map map, const char *url, const mln_completion *completion)
+     * mln_status mln_map_set_style_url(mln_map map, const char *url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_style_url$descriptor() {
@@ -5148,7 +5195,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_url(mln_map map, const char *url, const mln_completion *completion)
+     * mln_status mln_map_set_style_url(mln_map map, const char *url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_style_url$handle() {
@@ -5158,7 +5205,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_url(mln_map map, const char *url, const mln_completion *completion)
+     * mln_status mln_map_set_style_url(mln_map map, const char *url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_style_url$address() {
@@ -5167,16 +5214,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_url(mln_map map, const char *url, const mln_completion *completion)
+     * mln_status mln_map_set_style_url(mln_map map, const char *url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_style_url(long map, MemorySegment url, MemorySegment completion) {
+    public static int mln_map_set_style_url(long map, MemorySegment url, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_style_url.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_style_url", map, url, completion);
+                traceDowncall("mln_map_set_style_url", map, url, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, url, completion);
+            return (int)mh$.invokeExact(map, url, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -5189,6 +5236,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -5200,7 +5248,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_json(mln_map map, mln_buffer_view json, const mln_completion *completion)
+     * mln_status mln_map_set_style_json(mln_map map, mln_buffer_view json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_style_json$descriptor() {
@@ -5210,7 +5258,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_json(mln_map map, mln_buffer_view json, const mln_completion *completion)
+     * mln_status mln_map_set_style_json(mln_map map, mln_buffer_view json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_style_json$handle() {
@@ -5220,7 +5268,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_json(mln_map map, mln_buffer_view json, const mln_completion *completion)
+     * mln_status mln_map_set_style_json(mln_map map, mln_buffer_view json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_style_json$address() {
@@ -5229,16 +5277,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_json(mln_map map, mln_buffer_view json, const mln_completion *completion)
+     * mln_status mln_map_set_style_json(mln_map map, mln_buffer_view json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_style_json(long map, MemorySegment json, MemorySegment completion) {
+    public static int mln_map_set_style_json(long map, MemorySegment json, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_style_json.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_style_json", map, json, completion);
+                traceDowncall("mln_map_set_style_json", map, json, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, json, completion);
+            return (int)mh$.invokeExact(map, json, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -5250,6 +5298,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -5261,7 +5310,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_loaded_style_json(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_loaded_style_json(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_loaded_style_json$descriptor() {
@@ -5271,7 +5320,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_loaded_style_json(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_loaded_style_json(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_loaded_style_json$handle() {
@@ -5281,7 +5330,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_loaded_style_json(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_loaded_style_json(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_loaded_style_json$address() {
@@ -5290,16 +5339,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_loaded_style_json(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_loaded_style_json(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_loaded_style_json(long map, MemorySegment completion) {
+    public static int mln_map_loaded_style_json(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_loaded_style_json.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_loaded_style_json", map, completion);
+                traceDowncall("mln_map_loaded_style_json", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -5311,6 +5360,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -5322,7 +5372,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_style_url(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_style_url(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_style_url$descriptor() {
@@ -5332,7 +5382,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_style_url(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_style_url(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_style_url$handle() {
@@ -5342,7 +5392,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_style_url(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_style_url(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_style_url$address() {
@@ -5351,16 +5401,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_style_url(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_style_url(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_style_url(long map, MemorySegment completion) {
+    public static int mln_map_style_url(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_style_url.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_style_url", map, completion);
+                traceDowncall("mln_map_style_url", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -5373,6 +5423,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -5384,7 +5435,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask, const mln_completion *completion)
+     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_event_mask$descriptor() {
@@ -5394,7 +5445,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask, const mln_completion *completion)
+     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_event_mask$handle() {
@@ -5404,7 +5455,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask, const mln_completion *completion)
+     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_event_mask$address() {
@@ -5413,16 +5464,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask, const mln_completion *completion)
+     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_event_mask(long map, long mask, MemorySegment completion) {
+    public static int mln_map_set_event_mask(long map, long mask, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_event_mask.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_event_mask", map, mask, completion);
+                traceDowncall("mln_map_set_event_mask", map, mask, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, mask, completion);
+            return (int)mh$.invokeExact(map, mask, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6015,6 +6066,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6026,7 +6078,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_debug_options(mln_map map, uint32_t options, const mln_completion *completion)
+     * mln_status mln_map_set_debug_options(mln_map map, uint32_t options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_debug_options$descriptor() {
@@ -6036,7 +6088,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_debug_options(mln_map map, uint32_t options, const mln_completion *completion)
+     * mln_status mln_map_set_debug_options(mln_map map, uint32_t options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_debug_options$handle() {
@@ -6046,7 +6098,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_debug_options(mln_map map, uint32_t options, const mln_completion *completion)
+     * mln_status mln_map_set_debug_options(mln_map map, uint32_t options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_debug_options$address() {
@@ -6055,16 +6107,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_debug_options(mln_map map, uint32_t options, const mln_completion *completion)
+     * mln_status mln_map_set_debug_options(mln_map map, uint32_t options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_debug_options(long map, int options, MemorySegment completion) {
+    public static int mln_map_set_debug_options(long map, int options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_debug_options.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_debug_options", map, options, completion);
+                traceDowncall("mln_map_set_debug_options", map, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, options, completion);
+            return (int)mh$.invokeExact(map, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6077,6 +6129,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_BOOL,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6088,7 +6141,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_rendering_stats_view_enabled(mln_map map, bool enabled, const mln_completion *completion)
+     * mln_status mln_map_set_rendering_stats_view_enabled(mln_map map, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_rendering_stats_view_enabled$descriptor() {
@@ -6098,7 +6151,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_rendering_stats_view_enabled(mln_map map, bool enabled, const mln_completion *completion)
+     * mln_status mln_map_set_rendering_stats_view_enabled(mln_map map, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_rendering_stats_view_enabled$handle() {
@@ -6108,7 +6161,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_rendering_stats_view_enabled(mln_map map, bool enabled, const mln_completion *completion)
+     * mln_status mln_map_set_rendering_stats_view_enabled(mln_map map, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_rendering_stats_view_enabled$address() {
@@ -6117,16 +6170,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_rendering_stats_view_enabled(mln_map map, bool enabled, const mln_completion *completion)
+     * mln_status mln_map_set_rendering_stats_view_enabled(mln_map map, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_rendering_stats_view_enabled(long map, boolean enabled, MemorySegment completion) {
+    public static int mln_map_set_rendering_stats_view_enabled(long map, boolean enabled, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_rendering_stats_view_enabled.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_rendering_stats_view_enabled", map, enabled, completion);
+                traceDowncall("mln_map_set_rendering_stats_view_enabled", map, enabled, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, enabled, completion);
+            return (int)mh$.invokeExact(map, enabled, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6138,6 +6191,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6149,7 +6203,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_dump_debug_logs(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_dump_debug_logs(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_dump_debug_logs$descriptor() {
@@ -6159,7 +6213,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_dump_debug_logs(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_dump_debug_logs(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_dump_debug_logs$handle() {
@@ -6169,7 +6223,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_dump_debug_logs(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_dump_debug_logs(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_dump_debug_logs$address() {
@@ -6178,16 +6232,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_dump_debug_logs(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_dump_debug_logs(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_dump_debug_logs(long map, MemorySegment completion) {
+    public static int mln_map_dump_debug_logs(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_dump_debug_logs.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_dump_debug_logs", map, completion);
+                traceDowncall("mln_map_dump_debug_logs", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6200,6 +6254,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6211,7 +6266,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_viewport_options(mln_map map, const mln_map_viewport_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_viewport_options(mln_map map, const mln_map_viewport_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_viewport_options$descriptor() {
@@ -6221,7 +6276,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_viewport_options(mln_map map, const mln_map_viewport_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_viewport_options(mln_map map, const mln_map_viewport_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_viewport_options$handle() {
@@ -6231,7 +6286,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_viewport_options(mln_map map, const mln_map_viewport_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_viewport_options(mln_map map, const mln_map_viewport_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_viewport_options$address() {
@@ -6240,16 +6295,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_viewport_options(mln_map map, const mln_map_viewport_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_viewport_options(mln_map map, const mln_map_viewport_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_viewport_options(long map, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_set_viewport_options(long map, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_viewport_options.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_viewport_options", map, options, completion);
+                traceDowncall("mln_map_set_viewport_options", map, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, options, completion);
+            return (int)mh$.invokeExact(map, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6262,6 +6317,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6273,7 +6329,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_tile_options(mln_map map, const mln_map_tile_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_tile_options(mln_map map, const mln_map_tile_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_tile_options$descriptor() {
@@ -6283,7 +6339,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_tile_options(mln_map map, const mln_map_tile_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_tile_options(mln_map map, const mln_map_tile_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_tile_options$handle() {
@@ -6293,7 +6349,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_tile_options(mln_map map, const mln_map_tile_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_tile_options(mln_map map, const mln_map_tile_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_tile_options$address() {
@@ -6302,16 +6358,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_tile_options(mln_map map, const mln_map_tile_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_tile_options(mln_map map, const mln_map_tile_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_tile_options(long map, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_set_tile_options(long map, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_tile_options.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_tile_options", map, options, completion);
+                traceDowncall("mln_map_set_tile_options", map, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, options, completion);
+            return (int)mh$.invokeExact(map, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6324,6 +6380,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6335,7 +6392,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_snapshot_get(mln_map map, mln_camera_options *out_camera, uint64_t *out_generation)
+     * mln_status mln_map_camera_snapshot_get(mln_map map, mln_camera_options *out_camera, uint64_t *out_generation, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_camera_snapshot_get$descriptor() {
@@ -6345,7 +6402,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_snapshot_get(mln_map map, mln_camera_options *out_camera, uint64_t *out_generation)
+     * mln_status mln_map_camera_snapshot_get(mln_map map, mln_camera_options *out_camera, uint64_t *out_generation, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_camera_snapshot_get$handle() {
@@ -6355,7 +6412,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_snapshot_get(mln_map map, mln_camera_options *out_camera, uint64_t *out_generation)
+     * mln_status mln_map_camera_snapshot_get(mln_map map, mln_camera_options *out_camera, uint64_t *out_generation, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_camera_snapshot_get$address() {
@@ -6364,16 +6421,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_camera_snapshot_get(mln_map map, mln_camera_options *out_camera, uint64_t *out_generation)
+     * mln_status mln_map_camera_snapshot_get(mln_map map, mln_camera_options *out_camera, uint64_t *out_generation, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_camera_snapshot_get(long map, MemorySegment out_camera, MemorySegment out_generation) {
+    public static int mln_map_camera_snapshot_get(long map, MemorySegment out_camera, MemorySegment out_generation, MemorySegment out_diagnostic) {
         var mh$ = mln_map_camera_snapshot_get.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_camera_snapshot_get", map, out_camera, out_generation);
+                traceDowncall("mln_map_camera_snapshot_get", map, out_camera, out_generation, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, out_camera, out_generation);
+            return (int)mh$.invokeExact(map, out_camera, out_generation, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6386,6 +6443,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6397,7 +6455,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_update_camera(mln_map map, const mln_camera_update *update, const mln_completion *completion)
+     * mln_status mln_map_update_camera(mln_map map, const mln_camera_update *update, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_update_camera$descriptor() {
@@ -6407,7 +6465,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_update_camera(mln_map map, const mln_camera_update *update, const mln_completion *completion)
+     * mln_status mln_map_update_camera(mln_map map, const mln_camera_update *update, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_update_camera$handle() {
@@ -6417,7 +6475,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_update_camera(mln_map map, const mln_camera_update *update, const mln_completion *completion)
+     * mln_status mln_map_update_camera(mln_map map, const mln_camera_update *update, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_update_camera$address() {
@@ -6426,16 +6484,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_update_camera(mln_map map, const mln_camera_update *update, const mln_completion *completion)
+     * mln_status mln_map_update_camera(mln_map map, const mln_camera_update *update, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_update_camera(long map, MemorySegment update, MemorySegment completion) {
+    public static int mln_map_update_camera(long map, MemorySegment update, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_update_camera.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_update_camera", map, update, completion);
+                traceDowncall("mln_map_update_camera", map, update, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, update, completion);
+            return (int)mh$.invokeExact(map, update, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6448,6 +6506,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6459,7 +6518,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_apply_camera_delta(mln_map map, const mln_camera_delta *delta, const mln_completion *completion)
+     * mln_status mln_map_apply_camera_delta(mln_map map, const mln_camera_delta *delta, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_apply_camera_delta$descriptor() {
@@ -6469,7 +6528,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_apply_camera_delta(mln_map map, const mln_camera_delta *delta, const mln_completion *completion)
+     * mln_status mln_map_apply_camera_delta(mln_map map, const mln_camera_delta *delta, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_apply_camera_delta$handle() {
@@ -6479,7 +6538,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_apply_camera_delta(mln_map map, const mln_camera_delta *delta, const mln_completion *completion)
+     * mln_status mln_map_apply_camera_delta(mln_map map, const mln_camera_delta *delta, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_apply_camera_delta$address() {
@@ -6488,16 +6547,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_apply_camera_delta(mln_map map, const mln_camera_delta *delta, const mln_completion *completion)
+     * mln_status mln_map_apply_camera_delta(mln_map map, const mln_camera_delta *delta, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_apply_camera_delta(long map, MemorySegment delta, MemorySegment completion) {
+    public static int mln_map_apply_camera_delta(long map, MemorySegment delta, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_apply_camera_delta.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_apply_camera_delta", map, delta, completion);
+                traceDowncall("mln_map_apply_camera_delta", map, delta, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, delta, completion);
+            return (int)mh$.invokeExact(map, delta, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6509,6 +6568,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6520,7 +6580,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_cancel_transitions$descriptor() {
@@ -6530,7 +6590,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_cancel_transitions$handle() {
@@ -6540,7 +6600,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_cancel_transitions$address() {
@@ -6549,16 +6609,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_cancel_transitions(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_cancel_transitions(long map, MemorySegment completion) {
+    public static int mln_map_cancel_transitions(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_cancel_transitions.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_cancel_transitions", map, completion);
+                traceDowncall("mln_map_cancel_transitions", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6570,6 +6630,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6581,7 +6642,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_query(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_camera_query(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_camera_query$descriptor() {
@@ -6591,7 +6652,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_query(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_camera_query(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_camera_query$handle() {
@@ -6601,7 +6662,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_query(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_camera_query(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_camera_query$address() {
@@ -6610,16 +6671,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_camera_query(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_camera_query(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_camera_query(long map, MemorySegment completion) {
+    public static int mln_map_camera_query(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_camera_query.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_camera_query", map, completion);
+                traceDowncall("mln_map_camera_query", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6633,6 +6694,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_lat_lng_bounds.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6644,7 +6706,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_lat_lng_bounds(mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_lat_lng_bounds(mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_camera_for_lat_lng_bounds$descriptor() {
@@ -6654,7 +6716,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_lat_lng_bounds(mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_lat_lng_bounds(mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_camera_for_lat_lng_bounds$handle() {
@@ -6664,7 +6726,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_lat_lng_bounds(mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_lat_lng_bounds(mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_camera_for_lat_lng_bounds$address() {
@@ -6673,16 +6735,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_lat_lng_bounds(mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_lat_lng_bounds(mln_map map, mln_lat_lng_bounds bounds, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_camera_for_lat_lng_bounds(long map, MemorySegment bounds, MemorySegment fit_options, MemorySegment completion) {
+    public static int mln_map_camera_for_lat_lng_bounds(long map, MemorySegment bounds, MemorySegment fit_options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_camera_for_lat_lng_bounds.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_camera_for_lat_lng_bounds", map, bounds, fit_options, completion);
+                traceDowncall("mln_map_camera_for_lat_lng_bounds", map, bounds, fit_options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, bounds, fit_options, completion);
+            return (int)mh$.invokeExact(map, bounds, fit_options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6697,6 +6759,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6708,7 +6771,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_camera_for_lat_lngs$descriptor() {
@@ -6718,7 +6781,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_camera_for_lat_lngs$handle() {
@@ -6728,7 +6791,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_camera_for_lat_lngs$address() {
@@ -6737,16 +6800,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_camera_for_lat_lngs(long map, MemorySegment coordinates, long coordinate_count, MemorySegment fit_options, MemorySegment completion) {
+    public static int mln_map_camera_for_lat_lngs(long map, MemorySegment coordinates, long coordinate_count, MemorySegment fit_options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_camera_for_lat_lngs.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_camera_for_lat_lngs", map, coordinates, coordinate_count, fit_options, completion);
+                traceDowncall("mln_map_camera_for_lat_lngs", map, coordinates, coordinate_count, fit_options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, coordinates, coordinate_count, fit_options, completion);
+            return (int)mh$.invokeExact(map, coordinates, coordinate_count, fit_options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6760,6 +6823,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6771,7 +6835,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_geometry(mln_map map, mln_buffer_view geometry, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_geometry(mln_map map, mln_buffer_view geometry, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_camera_for_geometry$descriptor() {
@@ -6781,7 +6845,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_geometry(mln_map map, mln_buffer_view geometry, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_geometry(mln_map map, mln_buffer_view geometry, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_camera_for_geometry$handle() {
@@ -6791,7 +6855,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_geometry(mln_map map, mln_buffer_view geometry, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_geometry(mln_map map, mln_buffer_view geometry, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_camera_for_geometry$address() {
@@ -6800,16 +6864,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_camera_for_geometry(mln_map map, mln_buffer_view geometry, const mln_camera_fit_options *fit_options, const mln_completion *completion)
+     * mln_status mln_map_camera_for_geometry(mln_map map, mln_buffer_view geometry, const mln_camera_fit_options *fit_options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_camera_for_geometry(long map, MemorySegment geometry, MemorySegment fit_options, MemorySegment completion) {
+    public static int mln_map_camera_for_geometry(long map, MemorySegment geometry, MemorySegment fit_options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_camera_for_geometry.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_camera_for_geometry", map, geometry, fit_options, completion);
+                traceDowncall("mln_map_camera_for_geometry", map, geometry, fit_options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, geometry, fit_options, completion);
+            return (int)mh$.invokeExact(map, geometry, fit_options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6822,6 +6886,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6833,7 +6898,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_bounds_for_camera(mln_map map, const mln_camera_options *camera, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_bounds_for_camera(mln_map map, const mln_camera_options *camera, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_lat_lng_bounds_for_camera$descriptor() {
@@ -6843,7 +6908,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_bounds_for_camera(mln_map map, const mln_camera_options *camera, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_bounds_for_camera(mln_map map, const mln_camera_options *camera, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_lat_lng_bounds_for_camera$handle() {
@@ -6853,7 +6918,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_bounds_for_camera(mln_map map, const mln_camera_options *camera, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_bounds_for_camera(mln_map map, const mln_camera_options *camera, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_lat_lng_bounds_for_camera$address() {
@@ -6862,16 +6927,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_bounds_for_camera(mln_map map, const mln_camera_options *camera, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_bounds_for_camera(mln_map map, const mln_camera_options *camera, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_lat_lng_bounds_for_camera(long map, MemorySegment camera, MemorySegment completion) {
+    public static int mln_map_lat_lng_bounds_for_camera(long map, MemorySegment camera, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_lat_lng_bounds_for_camera.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_lat_lng_bounds_for_camera", map, camera, completion);
+                traceDowncall("mln_map_lat_lng_bounds_for_camera", map, camera, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, camera, completion);
+            return (int)mh$.invokeExact(map, camera, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6884,6 +6949,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6895,7 +6961,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(mln_map map, const mln_camera_options *camera, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(mln_map map, const mln_camera_options *camera, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_lat_lng_bounds_for_camera_unwrapped$descriptor() {
@@ -6905,7 +6971,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(mln_map map, const mln_camera_options *camera, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(mln_map map, const mln_camera_options *camera, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_lat_lng_bounds_for_camera_unwrapped$handle() {
@@ -6915,7 +6981,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(mln_map map, const mln_camera_options *camera, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(mln_map map, const mln_camera_options *camera, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_lat_lng_bounds_for_camera_unwrapped$address() {
@@ -6924,16 +6990,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(mln_map map, const mln_camera_options *camera, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(mln_map map, const mln_camera_options *camera, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_lat_lng_bounds_for_camera_unwrapped(long map, MemorySegment camera, MemorySegment completion) {
+    public static int mln_map_lat_lng_bounds_for_camera_unwrapped(long map, MemorySegment camera, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_lat_lng_bounds_for_camera_unwrapped.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_lat_lng_bounds_for_camera_unwrapped", map, camera, completion);
+                traceDowncall("mln_map_lat_lng_bounds_for_camera_unwrapped", map, camera, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, camera, completion);
+            return (int)mh$.invokeExact(map, camera, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -6946,6 +7012,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -6957,7 +7024,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_bounds(mln_map map, const mln_bound_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_bounds(mln_map map, const mln_bound_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_bounds$descriptor() {
@@ -6967,7 +7034,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_bounds(mln_map map, const mln_bound_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_bounds(mln_map map, const mln_bound_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_bounds$handle() {
@@ -6977,7 +7044,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_bounds(mln_map map, const mln_bound_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_bounds(mln_map map, const mln_bound_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_bounds$address() {
@@ -6986,16 +7053,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_bounds(mln_map map, const mln_bound_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_bounds(mln_map map, const mln_bound_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_bounds(long map, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_set_bounds(long map, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_bounds.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_bounds", map, options, completion);
+                traceDowncall("mln_map_set_bounds", map, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, options, completion);
+            return (int)mh$.invokeExact(map, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7008,6 +7075,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -7019,7 +7087,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_free_camera_options(mln_map map, const mln_free_camera_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_free_camera_options(mln_map map, const mln_free_camera_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_free_camera_options$descriptor() {
@@ -7029,7 +7097,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_free_camera_options(mln_map map, const mln_free_camera_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_free_camera_options(mln_map map, const mln_free_camera_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_free_camera_options$handle() {
@@ -7039,7 +7107,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_free_camera_options(mln_map map, const mln_free_camera_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_free_camera_options(mln_map map, const mln_free_camera_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_free_camera_options$address() {
@@ -7048,16 +7116,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_free_camera_options(mln_map map, const mln_free_camera_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_free_camera_options(mln_map map, const mln_free_camera_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_free_camera_options(long map, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_set_free_camera_options(long map, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_free_camera_options.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_free_camera_options", map, options, completion);
+                traceDowncall("mln_map_set_free_camera_options", map, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, options, completion);
+            return (int)mh$.invokeExact(map, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7070,6 +7138,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -7081,7 +7150,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_projection_mode(mln_map map, const mln_projection_mode *mode, const mln_completion *completion)
+     * mln_status mln_map_set_projection_mode(mln_map map, const mln_projection_mode *mode, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_projection_mode$descriptor() {
@@ -7091,7 +7160,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_projection_mode(mln_map map, const mln_projection_mode *mode, const mln_completion *completion)
+     * mln_status mln_map_set_projection_mode(mln_map map, const mln_projection_mode *mode, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_projection_mode$handle() {
@@ -7101,7 +7170,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_projection_mode(mln_map map, const mln_projection_mode *mode, const mln_completion *completion)
+     * mln_status mln_map_set_projection_mode(mln_map map, const mln_projection_mode *mode, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_projection_mode$address() {
@@ -7110,16 +7179,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_projection_mode(mln_map map, const mln_projection_mode *mode, const mln_completion *completion)
+     * mln_status mln_map_set_projection_mode(mln_map map, const mln_projection_mode *mode, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_projection_mode(long map, MemorySegment mode, MemorySegment completion) {
+    public static int mln_map_set_projection_mode(long map, MemorySegment mode, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_projection_mode.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_projection_mode", map, mode, completion);
+                traceDowncall("mln_map_set_projection_mode", map, mode, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, mode, completion);
+            return (int)mh$.invokeExact(map, mode, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7132,6 +7201,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_lat_lng.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -7143,7 +7213,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_pixel_for_lat_lng(mln_map map, mln_lat_lng coordinate, const mln_completion *completion)
+     * mln_status mln_map_pixel_for_lat_lng(mln_map map, mln_lat_lng coordinate, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_pixel_for_lat_lng$descriptor() {
@@ -7153,7 +7223,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_pixel_for_lat_lng(mln_map map, mln_lat_lng coordinate, const mln_completion *completion)
+     * mln_status mln_map_pixel_for_lat_lng(mln_map map, mln_lat_lng coordinate, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_pixel_for_lat_lng$handle() {
@@ -7163,7 +7233,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_pixel_for_lat_lng(mln_map map, mln_lat_lng coordinate, const mln_completion *completion)
+     * mln_status mln_map_pixel_for_lat_lng(mln_map map, mln_lat_lng coordinate, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_pixel_for_lat_lng$address() {
@@ -7172,16 +7242,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_pixel_for_lat_lng(mln_map map, mln_lat_lng coordinate, const mln_completion *completion)
+     * mln_status mln_map_pixel_for_lat_lng(mln_map map, mln_lat_lng coordinate, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_pixel_for_lat_lng(long map, MemorySegment coordinate, MemorySegment completion) {
+    public static int mln_map_pixel_for_lat_lng(long map, MemorySegment coordinate, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_pixel_for_lat_lng.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_pixel_for_lat_lng", map, coordinate, completion);
+                traceDowncall("mln_map_pixel_for_lat_lng", map, coordinate, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, coordinate, completion);
+            return (int)mh$.invokeExact(map, coordinate, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7194,6 +7264,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_screen_point.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -7205,7 +7276,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_for_pixel(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_for_pixel(mln_map map, mln_screen_point point, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_lat_lng_for_pixel$descriptor() {
@@ -7215,7 +7286,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_for_pixel(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_for_pixel(mln_map map, mln_screen_point point, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_lat_lng_for_pixel$handle() {
@@ -7225,7 +7296,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_for_pixel(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_for_pixel(mln_map map, mln_screen_point point, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_lat_lng_for_pixel$address() {
@@ -7234,16 +7305,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_for_pixel(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_for_pixel(mln_map map, mln_screen_point point, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_lat_lng_for_pixel(long map, MemorySegment point, MemorySegment completion) {
+    public static int mln_map_lat_lng_for_pixel(long map, MemorySegment point, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_lat_lng_for_pixel.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_lat_lng_for_pixel", map, point, completion);
+                traceDowncall("mln_map_lat_lng_for_pixel", map, point, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, point, completion);
+            return (int)mh$.invokeExact(map, point, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7256,6 +7327,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_screen_point.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -7267,7 +7339,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_lat_lng_for_pixel_unwrapped$descriptor() {
@@ -7277,7 +7349,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_lat_lng_for_pixel_unwrapped$handle() {
@@ -7287,7 +7359,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_lat_lng_for_pixel_unwrapped$address() {
@@ -7296,16 +7368,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion)
+     * mln_status mln_map_lat_lng_for_pixel_unwrapped(mln_map map, mln_screen_point point, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_lat_lng_for_pixel_unwrapped(long map, MemorySegment point, MemorySegment completion) {
+    public static int mln_map_lat_lng_for_pixel_unwrapped(long map, MemorySegment point, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_lat_lng_for_pixel_unwrapped.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_lat_lng_for_pixel_unwrapped", map, point, completion);
+                traceDowncall("mln_map_lat_lng_for_pixel_unwrapped", map, point, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, point, completion);
+            return (int)mh$.invokeExact(map, point, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7319,6 +7391,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -7330,7 +7403,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_pixels_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion)
+     * mln_status mln_map_pixels_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_pixels_for_lat_lngs$descriptor() {
@@ -7340,7 +7413,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_pixels_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion)
+     * mln_status mln_map_pixels_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_pixels_for_lat_lngs$handle() {
@@ -7350,7 +7423,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_pixels_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion)
+     * mln_status mln_map_pixels_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_pixels_for_lat_lngs$address() {
@@ -7359,16 +7432,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_pixels_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion)
+     * mln_status mln_map_pixels_for_lat_lngs(mln_map map, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_pixels_for_lat_lngs(long map, MemorySegment coordinates, long coordinate_count, MemorySegment completion) {
+    public static int mln_map_pixels_for_lat_lngs(long map, MemorySegment coordinates, long coordinate_count, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_pixels_for_lat_lngs.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_pixels_for_lat_lngs", map, coordinates, coordinate_count, completion);
+                traceDowncall("mln_map_pixels_for_lat_lngs", map, coordinates, coordinate_count, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, coordinates, coordinate_count, completion);
+            return (int)mh$.invokeExact(map, coordinates, coordinate_count, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7382,6 +7455,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -7393,7 +7467,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lngs_for_pixels(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * mln_status mln_map_lat_lngs_for_pixels(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_lat_lngs_for_pixels$descriptor() {
@@ -7403,7 +7477,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lngs_for_pixels(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * mln_status mln_map_lat_lngs_for_pixels(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_lat_lngs_for_pixels$handle() {
@@ -7413,7 +7487,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lngs_for_pixels(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * mln_status mln_map_lat_lngs_for_pixels(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_lat_lngs_for_pixels$address() {
@@ -7422,16 +7496,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lngs_for_pixels(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * mln_status mln_map_lat_lngs_for_pixels(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_lat_lngs_for_pixels(long map, MemorySegment points, long point_count, MemorySegment completion) {
+    public static int mln_map_lat_lngs_for_pixels(long map, MemorySegment points, long point_count, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_lat_lngs_for_pixels.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_lat_lngs_for_pixels", map, points, point_count, completion);
+                traceDowncall("mln_map_lat_lngs_for_pixels", map, points, point_count, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, points, point_count, completion);
+            return (int)mh$.invokeExact(map, points, point_count, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7445,6 +7519,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -7456,7 +7531,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_lat_lngs_for_pixels_unwrapped$descriptor() {
@@ -7466,7 +7541,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_lat_lngs_for_pixels_unwrapped$handle() {
@@ -7476,7 +7551,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_lat_lngs_for_pixels_unwrapped$address() {
@@ -7485,16 +7560,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion)
+     * mln_status mln_map_lat_lngs_for_pixels_unwrapped(mln_map map, const mln_screen_point *points, size_t point_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_lat_lngs_for_pixels_unwrapped(long map, MemorySegment points, long point_count, MemorySegment completion) {
+    public static int mln_map_lat_lngs_for_pixels_unwrapped(long map, MemorySegment points, long point_count, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_lat_lngs_for_pixels_unwrapped.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_lat_lngs_for_pixels_unwrapped", map, points, point_count, completion);
+                traceDowncall("mln_map_lat_lngs_for_pixels_unwrapped", map, points, point_count, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, points, point_count, completion);
+            return (int)mh$.invokeExact(map, points, point_count, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7507,6 +7582,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -7518,7 +7594,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, const mln_completion *completion)
+     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_meters_per_pixel_at_latitude$descriptor() {
@@ -7528,7 +7604,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, const mln_completion *completion)
+     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_meters_per_pixel_at_latitude$handle() {
@@ -7538,7 +7614,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, const mln_completion *completion)
+     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_meters_per_pixel_at_latitude$address() {
@@ -7547,74 +7623,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, const mln_completion *completion)
+     * mln_status mln_map_meters_per_pixel_at_latitude(mln_map map, double latitude, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_meters_per_pixel_at_latitude(long map, double latitude, MemorySegment completion) {
+    public static int mln_map_meters_per_pixel_at_latitude(long map, double latitude, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_meters_per_pixel_at_latitude.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_meters_per_pixel_at_latitude", map, latitude, completion);
+                traceDowncall("mln_map_meters_per_pixel_at_latitude", map, latitude, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, latitude, completion);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_thread_last_error_message {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_POINTER    );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_thread_last_error_message");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * const char *mln_thread_last_error_message()
-     * }
-     */
-    public static FunctionDescriptor mln_thread_last_error_message$descriptor() {
-        return mln_thread_last_error_message.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * const char *mln_thread_last_error_message()
-     * }
-     */
-    public static MethodHandle mln_thread_last_error_message$handle() {
-        return mln_thread_last_error_message.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * const char *mln_thread_last_error_message()
-     * }
-     */
-    public static MemorySegment mln_thread_last_error_message$address() {
-        return mln_thread_last_error_message.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * const char *mln_thread_last_error_message()
-     * }
-     */
-    public static MemorySegment mln_thread_last_error_message() {
-        var mh$ = mln_thread_last_error_message.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_thread_last_error_message");
-            }
-            return (MemorySegment)mh$.invokeExact();
+            return (int)mh$.invokeExact(map, latitude, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7852,6 +7870,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -7863,7 +7882,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data)
+     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_log_set_callback$descriptor() {
@@ -7873,7 +7892,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data)
+     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_log_set_callback$handle() {
@@ -7883,7 +7902,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data)
+     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_log_set_callback$address() {
@@ -7892,16 +7911,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data)
+     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_log_set_callback(MemorySegment callback, MemorySegment user_data, MemorySegment release_user_data) {
+    public static int mln_log_set_callback(MemorySegment callback, MemorySegment user_data, MemorySegment release_user_data, MemorySegment out_diagnostic) {
         var mh$ = mln_log_set_callback.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_log_set_callback", callback, user_data, release_user_data);
+                traceDowncall("mln_log_set_callback", callback, user_data, release_user_data, out_diagnostic);
             }
-            return (int)mh$.invokeExact(callback, user_data, release_user_data);
+            return (int)mh$.invokeExact(callback, user_data, release_user_data, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7911,7 +7930,9 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     private static class mln_log_clear_callback {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT    );
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_POINTER
+        );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_log_clear_callback");
 
@@ -7921,7 +7942,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_log_clear_callback()
+     * mln_status mln_log_clear_callback(mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_log_clear_callback$descriptor() {
@@ -7931,7 +7952,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_log_clear_callback()
+     * mln_status mln_log_clear_callback(mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_log_clear_callback$handle() {
@@ -7941,7 +7962,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_log_clear_callback()
+     * mln_status mln_log_clear_callback(mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_log_clear_callback$address() {
@@ -7950,16 +7971,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_log_clear_callback()
+     * mln_status mln_log_clear_callback(mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_log_clear_callback() {
+    public static int mln_log_clear_callback(MemorySegment out_diagnostic) {
         var mh$ = mln_log_clear_callback.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_log_clear_callback");
+                traceDowncall("mln_log_clear_callback", out_diagnostic);
             }
-            return (int)mh$.invokeExact();
+            return (int)mh$.invokeExact(out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -7970,7 +7991,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_log_set_async_severity_mask {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_INT
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_log_set_async_severity_mask");
@@ -7981,7 +8003,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_log_set_async_severity_mask(uint32_t mask)
+     * mln_status mln_log_set_async_severity_mask(uint32_t mask, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_log_set_async_severity_mask$descriptor() {
@@ -7991,7 +8013,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_log_set_async_severity_mask(uint32_t mask)
+     * mln_status mln_log_set_async_severity_mask(uint32_t mask, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_log_set_async_severity_mask$handle() {
@@ -8001,7 +8023,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_log_set_async_severity_mask(uint32_t mask)
+     * mln_status mln_log_set_async_severity_mask(uint32_t mask, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_log_set_async_severity_mask$address() {
@@ -8010,16 +8032,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_log_set_async_severity_mask(uint32_t mask)
+     * mln_status mln_log_set_async_severity_mask(uint32_t mask, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_log_set_async_severity_mask(int mask) {
+    public static int mln_log_set_async_severity_mask(int mask, MemorySegment out_diagnostic) {
         var mh$ = mln_log_set_async_severity_mask.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_log_set_async_severity_mask", mask);
+                traceDowncall("mln_log_set_async_severity_mask", mask, out_diagnostic);
             }
-            return (int)mh$.invokeExact(mask);
+            return (int)mh$.invokeExact(mask, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8031,6 +8053,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -8042,7 +8065,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_create(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_projection_create(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_projection_create$descriptor() {
@@ -8052,7 +8075,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_create(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_projection_create(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_projection_create$handle() {
@@ -8062,7 +8085,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_create(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_projection_create(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_projection_create$address() {
@@ -8071,16 +8094,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_projection_create(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_projection_create(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_projection_create(long map, MemorySegment completion) {
+    public static int mln_map_projection_create(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_projection_create.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_projection_create", map, completion);
+                traceDowncall("mln_map_projection_create", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8091,7 +8114,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_map_projection_close {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_projection_close");
@@ -8102,7 +8126,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_close(mln_map_projection projection)
+     * mln_status mln_map_projection_close(mln_map_projection projection, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_projection_close$descriptor() {
@@ -8112,7 +8136,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_close(mln_map_projection projection)
+     * mln_status mln_map_projection_close(mln_map_projection projection, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_projection_close$handle() {
@@ -8122,7 +8146,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_close(mln_map_projection projection)
+     * mln_status mln_map_projection_close(mln_map_projection projection, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_projection_close$address() {
@@ -8131,16 +8155,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_projection_close(mln_map_projection projection)
+     * mln_status mln_map_projection_close(mln_map_projection projection, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_projection_close(long projection) {
+    public static int mln_map_projection_close(long projection, MemorySegment out_diagnostic) {
         var mh$ = mln_map_projection_close.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_projection_close", projection);
+                traceDowncall("mln_map_projection_close", projection, out_diagnostic);
             }
-            return (int)mh$.invokeExact(projection);
+            return (int)mh$.invokeExact(projection, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8152,6 +8176,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -8163,7 +8188,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_get_camera(mln_map_projection projection, mln_camera_options *out_camera)
+     * mln_status mln_map_projection_get_camera(mln_map_projection projection, mln_camera_options *out_camera, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_projection_get_camera$descriptor() {
@@ -8173,7 +8198,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_get_camera(mln_map_projection projection, mln_camera_options *out_camera)
+     * mln_status mln_map_projection_get_camera(mln_map_projection projection, mln_camera_options *out_camera, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_projection_get_camera$handle() {
@@ -8183,7 +8208,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_get_camera(mln_map_projection projection, mln_camera_options *out_camera)
+     * mln_status mln_map_projection_get_camera(mln_map_projection projection, mln_camera_options *out_camera, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_projection_get_camera$address() {
@@ -8192,16 +8217,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_projection_get_camera(mln_map_projection projection, mln_camera_options *out_camera)
+     * mln_status mln_map_projection_get_camera(mln_map_projection projection, mln_camera_options *out_camera, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_projection_get_camera(long projection, MemorySegment out_camera) {
+    public static int mln_map_projection_get_camera(long projection, MemorySegment out_camera, MemorySegment out_diagnostic) {
         var mh$ = mln_map_projection_get_camera.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_projection_get_camera", projection, out_camera);
+                traceDowncall("mln_map_projection_get_camera", projection, out_camera, out_diagnostic);
             }
-            return (int)mh$.invokeExact(projection, out_camera);
+            return (int)mh$.invokeExact(projection, out_camera, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8213,6 +8238,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -8224,7 +8250,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_camera(mln_map_projection projection, const mln_camera_options *camera)
+     * mln_status mln_map_projection_set_camera(mln_map_projection projection, const mln_camera_options *camera, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_projection_set_camera$descriptor() {
@@ -8234,7 +8260,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_camera(mln_map_projection projection, const mln_camera_options *camera)
+     * mln_status mln_map_projection_set_camera(mln_map_projection projection, const mln_camera_options *camera, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_projection_set_camera$handle() {
@@ -8244,7 +8270,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_camera(mln_map_projection projection, const mln_camera_options *camera)
+     * mln_status mln_map_projection_set_camera(mln_map_projection projection, const mln_camera_options *camera, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_projection_set_camera$address() {
@@ -8253,16 +8279,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_camera(mln_map_projection projection, const mln_camera_options *camera)
+     * mln_status mln_map_projection_set_camera(mln_map_projection projection, const mln_camera_options *camera, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_projection_set_camera(long projection, MemorySegment camera) {
+    public static int mln_map_projection_set_camera(long projection, MemorySegment camera, MemorySegment out_diagnostic) {
         var mh$ = mln_map_projection_set_camera.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_projection_set_camera", projection, camera);
+                traceDowncall("mln_map_projection_set_camera", projection, camera, out_diagnostic);
             }
-            return (int)mh$.invokeExact(projection, camera);
+            return (int)mh$.invokeExact(projection, camera, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8276,7 +8302,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
-            mln_edge_insets.layout()
+            mln_edge_insets.layout(),
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_projection_set_visible_coordinates");
@@ -8287,7 +8314,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_visible_coordinates(mln_map_projection projection, const mln_lat_lng *coordinates, size_t coordinate_count, mln_edge_insets padding)
+     * mln_status mln_map_projection_set_visible_coordinates(mln_map_projection projection, const mln_lat_lng *coordinates, size_t coordinate_count, mln_edge_insets padding, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_projection_set_visible_coordinates$descriptor() {
@@ -8297,7 +8324,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_visible_coordinates(mln_map_projection projection, const mln_lat_lng *coordinates, size_t coordinate_count, mln_edge_insets padding)
+     * mln_status mln_map_projection_set_visible_coordinates(mln_map_projection projection, const mln_lat_lng *coordinates, size_t coordinate_count, mln_edge_insets padding, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_projection_set_visible_coordinates$handle() {
@@ -8307,7 +8334,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_visible_coordinates(mln_map_projection projection, const mln_lat_lng *coordinates, size_t coordinate_count, mln_edge_insets padding)
+     * mln_status mln_map_projection_set_visible_coordinates(mln_map_projection projection, const mln_lat_lng *coordinates, size_t coordinate_count, mln_edge_insets padding, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_projection_set_visible_coordinates$address() {
@@ -8316,16 +8343,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_visible_coordinates(mln_map_projection projection, const mln_lat_lng *coordinates, size_t coordinate_count, mln_edge_insets padding)
+     * mln_status mln_map_projection_set_visible_coordinates(mln_map_projection projection, const mln_lat_lng *coordinates, size_t coordinate_count, mln_edge_insets padding, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_projection_set_visible_coordinates(long projection, MemorySegment coordinates, long coordinate_count, MemorySegment padding) {
+    public static int mln_map_projection_set_visible_coordinates(long projection, MemorySegment coordinates, long coordinate_count, MemorySegment padding, MemorySegment out_diagnostic) {
         var mh$ = mln_map_projection_set_visible_coordinates.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_projection_set_visible_coordinates", projection, coordinates, coordinate_count, padding);
+                traceDowncall("mln_map_projection_set_visible_coordinates", projection, coordinates, coordinate_count, padding, out_diagnostic);
             }
-            return (int)mh$.invokeExact(projection, coordinates, coordinate_count, padding);
+            return (int)mh$.invokeExact(projection, coordinates, coordinate_count, padding, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8338,7 +8365,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
-            mln_edge_insets.layout()
+            mln_edge_insets.layout(),
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_projection_set_visible_geometry");
@@ -8349,7 +8377,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_visible_geometry(mln_map_projection projection, mln_buffer_view geometry, mln_edge_insets padding)
+     * mln_status mln_map_projection_set_visible_geometry(mln_map_projection projection, mln_buffer_view geometry, mln_edge_insets padding, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_projection_set_visible_geometry$descriptor() {
@@ -8359,7 +8387,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_visible_geometry(mln_map_projection projection, mln_buffer_view geometry, mln_edge_insets padding)
+     * mln_status mln_map_projection_set_visible_geometry(mln_map_projection projection, mln_buffer_view geometry, mln_edge_insets padding, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_projection_set_visible_geometry$handle() {
@@ -8369,7 +8397,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_visible_geometry(mln_map_projection projection, mln_buffer_view geometry, mln_edge_insets padding)
+     * mln_status mln_map_projection_set_visible_geometry(mln_map_projection projection, mln_buffer_view geometry, mln_edge_insets padding, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_projection_set_visible_geometry$address() {
@@ -8378,16 +8406,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_projection_set_visible_geometry(mln_map_projection projection, mln_buffer_view geometry, mln_edge_insets padding)
+     * mln_status mln_map_projection_set_visible_geometry(mln_map_projection projection, mln_buffer_view geometry, mln_edge_insets padding, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_projection_set_visible_geometry(long projection, MemorySegment geometry, MemorySegment padding) {
+    public static int mln_map_projection_set_visible_geometry(long projection, MemorySegment geometry, MemorySegment padding, MemorySegment out_diagnostic) {
         var mh$ = mln_map_projection_set_visible_geometry.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_projection_set_visible_geometry", projection, geometry, padding);
+                traceDowncall("mln_map_projection_set_visible_geometry", projection, geometry, padding, out_diagnostic);
             }
-            return (int)mh$.invokeExact(projection, geometry, padding);
+            return (int)mh$.invokeExact(projection, geometry, padding, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8400,6 +8428,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_lat_lng.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -8411,7 +8440,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_pixel_for_lat_lng(mln_map_projection projection, mln_lat_lng coordinate, mln_screen_point *out_point)
+     * mln_status mln_map_projection_pixel_for_lat_lng(mln_map_projection projection, mln_lat_lng coordinate, mln_screen_point *out_point, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_projection_pixel_for_lat_lng$descriptor() {
@@ -8421,7 +8450,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_pixel_for_lat_lng(mln_map_projection projection, mln_lat_lng coordinate, mln_screen_point *out_point)
+     * mln_status mln_map_projection_pixel_for_lat_lng(mln_map_projection projection, mln_lat_lng coordinate, mln_screen_point *out_point, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_projection_pixel_for_lat_lng$handle() {
@@ -8431,7 +8460,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_pixel_for_lat_lng(mln_map_projection projection, mln_lat_lng coordinate, mln_screen_point *out_point)
+     * mln_status mln_map_projection_pixel_for_lat_lng(mln_map_projection projection, mln_lat_lng coordinate, mln_screen_point *out_point, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_projection_pixel_for_lat_lng$address() {
@@ -8440,16 +8469,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_projection_pixel_for_lat_lng(mln_map_projection projection, mln_lat_lng coordinate, mln_screen_point *out_point)
+     * mln_status mln_map_projection_pixel_for_lat_lng(mln_map_projection projection, mln_lat_lng coordinate, mln_screen_point *out_point, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_projection_pixel_for_lat_lng(long projection, MemorySegment coordinate, MemorySegment out_point) {
+    public static int mln_map_projection_pixel_for_lat_lng(long projection, MemorySegment coordinate, MemorySegment out_point, MemorySegment out_diagnostic) {
         var mh$ = mln_map_projection_pixel_for_lat_lng.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_projection_pixel_for_lat_lng", projection, coordinate, out_point);
+                traceDowncall("mln_map_projection_pixel_for_lat_lng", projection, coordinate, out_point, out_diagnostic);
             }
-            return (int)mh$.invokeExact(projection, coordinate, out_point);
+            return (int)mh$.invokeExact(projection, coordinate, out_point, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8462,6 +8491,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_screen_point.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -8473,7 +8503,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_lat_lng_for_pixel(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * mln_status mln_map_projection_lat_lng_for_pixel(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_projection_lat_lng_for_pixel$descriptor() {
@@ -8483,7 +8513,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_lat_lng_for_pixel(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * mln_status mln_map_projection_lat_lng_for_pixel(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_projection_lat_lng_for_pixel$handle() {
@@ -8493,7 +8523,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_lat_lng_for_pixel(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * mln_status mln_map_projection_lat_lng_for_pixel(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_projection_lat_lng_for_pixel$address() {
@@ -8502,16 +8532,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_projection_lat_lng_for_pixel(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * mln_status mln_map_projection_lat_lng_for_pixel(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_projection_lat_lng_for_pixel(long projection, MemorySegment point, MemorySegment out_coordinate) {
+    public static int mln_map_projection_lat_lng_for_pixel(long projection, MemorySegment point, MemorySegment out_coordinate, MemorySegment out_diagnostic) {
         var mh$ = mln_map_projection_lat_lng_for_pixel.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_projection_lat_lng_for_pixel", projection, point, out_coordinate);
+                traceDowncall("mln_map_projection_lat_lng_for_pixel", projection, point, out_coordinate, out_diagnostic);
             }
-            return (int)mh$.invokeExact(projection, point, out_coordinate);
+            return (int)mh$.invokeExact(projection, point, out_coordinate, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8524,6 +8554,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_screen_point.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -8535,7 +8566,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_projection_lat_lng_for_pixel_unwrapped$descriptor() {
@@ -8545,7 +8576,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_projection_lat_lng_for_pixel_unwrapped$handle() {
@@ -8555,7 +8586,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_projection_lat_lng_for_pixel_unwrapped$address() {
@@ -8564,16 +8595,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate)
+     * mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(mln_map_projection projection, mln_screen_point point, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_projection_lat_lng_for_pixel_unwrapped(long projection, MemorySegment point, MemorySegment out_coordinate) {
+    public static int mln_map_projection_lat_lng_for_pixel_unwrapped(long projection, MemorySegment point, MemorySegment out_coordinate, MemorySegment out_diagnostic) {
         var mh$ = mln_map_projection_lat_lng_for_pixel_unwrapped.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_projection_lat_lng_for_pixel_unwrapped", projection, point, out_coordinate);
+                traceDowncall("mln_map_projection_lat_lng_for_pixel_unwrapped", projection, point, out_coordinate, out_diagnostic);
             }
-            return (int)mh$.invokeExact(projection, point, out_coordinate);
+            return (int)mh$.invokeExact(projection, point, out_coordinate, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8586,6 +8617,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -8597,7 +8629,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel)
+     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_projection_meters_per_pixel_at_latitude$descriptor() {
@@ -8607,7 +8639,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel)
+     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_projection_meters_per_pixel_at_latitude$handle() {
@@ -8617,7 +8649,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel)
+     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_projection_meters_per_pixel_at_latitude$address() {
@@ -8626,16 +8658,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel)
+     * mln_status mln_map_projection_meters_per_pixel_at_latitude(mln_map_projection projection, double latitude, double *out_meters_per_pixel, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_projection_meters_per_pixel_at_latitude(long projection, double latitude, MemorySegment out_meters_per_pixel) {
+    public static int mln_map_projection_meters_per_pixel_at_latitude(long projection, double latitude, MemorySegment out_meters_per_pixel, MemorySegment out_diagnostic) {
         var mh$ = mln_map_projection_meters_per_pixel_at_latitude.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_projection_meters_per_pixel_at_latitude", projection, latitude, out_meters_per_pixel);
+                traceDowncall("mln_map_projection_meters_per_pixel_at_latitude", projection, latitude, out_meters_per_pixel, out_diagnostic);
             }
-            return (int)mh$.invokeExact(projection, latitude, out_meters_per_pixel);
+            return (int)mh$.invokeExact(projection, latitude, out_meters_per_pixel, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8647,6 +8679,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             mln_lat_lng.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -8658,7 +8691,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_projected_meters_for_lat_lng(mln_lat_lng coordinate, mln_projected_meters *out_meters)
+     * mln_status mln_projected_meters_for_lat_lng(mln_lat_lng coordinate, mln_projected_meters *out_meters, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_projected_meters_for_lat_lng$descriptor() {
@@ -8668,7 +8701,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_projected_meters_for_lat_lng(mln_lat_lng coordinate, mln_projected_meters *out_meters)
+     * mln_status mln_projected_meters_for_lat_lng(mln_lat_lng coordinate, mln_projected_meters *out_meters, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_projected_meters_for_lat_lng$handle() {
@@ -8678,7 +8711,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_projected_meters_for_lat_lng(mln_lat_lng coordinate, mln_projected_meters *out_meters)
+     * mln_status mln_projected_meters_for_lat_lng(mln_lat_lng coordinate, mln_projected_meters *out_meters, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_projected_meters_for_lat_lng$address() {
@@ -8687,16 +8720,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_projected_meters_for_lat_lng(mln_lat_lng coordinate, mln_projected_meters *out_meters)
+     * mln_status mln_projected_meters_for_lat_lng(mln_lat_lng coordinate, mln_projected_meters *out_meters, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_projected_meters_for_lat_lng(MemorySegment coordinate, MemorySegment out_meters) {
+    public static int mln_projected_meters_for_lat_lng(MemorySegment coordinate, MemorySegment out_meters, MemorySegment out_diagnostic) {
         var mh$ = mln_projected_meters_for_lat_lng.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_projected_meters_for_lat_lng", coordinate, out_meters);
+                traceDowncall("mln_projected_meters_for_lat_lng", coordinate, out_meters, out_diagnostic);
             }
-            return (int)mh$.invokeExact(coordinate, out_meters);
+            return (int)mh$.invokeExact(coordinate, out_meters, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -8708,6 +8741,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             mln_projected_meters.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -8719,7 +8753,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_lat_lng_for_projected_meters(mln_projected_meters meters, mln_lat_lng *out_coordinate)
+     * mln_status mln_lat_lng_for_projected_meters(mln_projected_meters meters, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_lat_lng_for_projected_meters$descriptor() {
@@ -8729,7 +8763,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_lat_lng_for_projected_meters(mln_projected_meters meters, mln_lat_lng *out_coordinate)
+     * mln_status mln_lat_lng_for_projected_meters(mln_projected_meters meters, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_lat_lng_for_projected_meters$handle() {
@@ -8739,7 +8773,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_lat_lng_for_projected_meters(mln_projected_meters meters, mln_lat_lng *out_coordinate)
+     * mln_status mln_lat_lng_for_projected_meters(mln_projected_meters meters, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_lat_lng_for_projected_meters$address() {
@@ -8748,16 +8782,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_lat_lng_for_projected_meters(mln_projected_meters meters, mln_lat_lng *out_coordinate)
+     * mln_status mln_lat_lng_for_projected_meters(mln_projected_meters meters, mln_lat_lng *out_coordinate, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_lat_lng_for_projected_meters(MemorySegment meters, MemorySegment out_coordinate) {
+    public static int mln_lat_lng_for_projected_meters(MemorySegment meters, MemorySegment out_coordinate, MemorySegment out_diagnostic) {
         var mh$ = mln_lat_lng_for_projected_meters.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_lat_lng_for_projected_meters", meters, out_coordinate);
+                traceDowncall("mln_lat_lng_for_projected_meters", meters, out_coordinate, out_diagnostic);
             }
-            return (int)mh$.invokeExact(meters, out_coordinate);
+            return (int)mh$.invokeExact(meters, out_coordinate, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -9140,6 +9174,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -9151,7 +9186,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_rendered_features(mln_render_session session, const mln_rendered_query_geometry *geometry, const mln_rendered_feature_query_options *options, const mln_completion *completion)
+     * mln_status mln_render_session_query_rendered_features(mln_render_session session, const mln_rendered_query_geometry *geometry, const mln_rendered_feature_query_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_query_rendered_features$descriptor() {
@@ -9161,7 +9196,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_rendered_features(mln_render_session session, const mln_rendered_query_geometry *geometry, const mln_rendered_feature_query_options *options, const mln_completion *completion)
+     * mln_status mln_render_session_query_rendered_features(mln_render_session session, const mln_rendered_query_geometry *geometry, const mln_rendered_feature_query_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_query_rendered_features$handle() {
@@ -9171,7 +9206,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_rendered_features(mln_render_session session, const mln_rendered_query_geometry *geometry, const mln_rendered_feature_query_options *options, const mln_completion *completion)
+     * mln_status mln_render_session_query_rendered_features(mln_render_session session, const mln_rendered_query_geometry *geometry, const mln_rendered_feature_query_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_query_rendered_features$address() {
@@ -9180,16 +9215,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_rendered_features(mln_render_session session, const mln_rendered_query_geometry *geometry, const mln_rendered_feature_query_options *options, const mln_completion *completion)
+     * mln_status mln_render_session_query_rendered_features(mln_render_session session, const mln_rendered_query_geometry *geometry, const mln_rendered_feature_query_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_query_rendered_features(long session, MemorySegment geometry, MemorySegment options, MemorySegment completion) {
+    public static int mln_render_session_query_rendered_features(long session, MemorySegment geometry, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_query_rendered_features.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_query_rendered_features", session, geometry, options, completion);
+                traceDowncall("mln_render_session_query_rendered_features", session, geometry, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, geometry, options, completion);
+            return (int)mh$.invokeExact(session, geometry, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -9203,6 +9238,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -9214,7 +9250,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_source_features(mln_render_session session, mln_buffer_view source_id, const mln_source_feature_query_options *options, const mln_completion *completion)
+     * mln_status mln_render_session_query_source_features(mln_render_session session, mln_buffer_view source_id, const mln_source_feature_query_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_query_source_features$descriptor() {
@@ -9224,7 +9260,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_source_features(mln_render_session session, mln_buffer_view source_id, const mln_source_feature_query_options *options, const mln_completion *completion)
+     * mln_status mln_render_session_query_source_features(mln_render_session session, mln_buffer_view source_id, const mln_source_feature_query_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_query_source_features$handle() {
@@ -9234,7 +9270,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_source_features(mln_render_session session, mln_buffer_view source_id, const mln_source_feature_query_options *options, const mln_completion *completion)
+     * mln_status mln_render_session_query_source_features(mln_render_session session, mln_buffer_view source_id, const mln_source_feature_query_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_query_source_features$address() {
@@ -9243,16 +9279,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_source_features(mln_render_session session, mln_buffer_view source_id, const mln_source_feature_query_options *options, const mln_completion *completion)
+     * mln_status mln_render_session_query_source_features(mln_render_session session, mln_buffer_view source_id, const mln_source_feature_query_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_query_source_features(long session, MemorySegment source_id, MemorySegment options, MemorySegment completion) {
+    public static int mln_render_session_query_source_features(long session, MemorySegment source_id, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_query_source_features.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_query_source_features", session, source_id, options, completion);
+                traceDowncall("mln_render_session_query_source_features", session, source_id, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, source_id, options, completion);
+            return (int)mh$.invokeExact(session, source_id, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -9269,6 +9305,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -9280,7 +9317,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_feature_extensions(mln_render_session session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, const mln_buffer_view *arguments, const mln_completion *completion)
+     * mln_status mln_render_session_query_feature_extensions(mln_render_session session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, const mln_buffer_view *arguments, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_query_feature_extensions$descriptor() {
@@ -9290,7 +9327,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_feature_extensions(mln_render_session session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, const mln_buffer_view *arguments, const mln_completion *completion)
+     * mln_status mln_render_session_query_feature_extensions(mln_render_session session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, const mln_buffer_view *arguments, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_query_feature_extensions$handle() {
@@ -9300,7 +9337,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_feature_extensions(mln_render_session session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, const mln_buffer_view *arguments, const mln_completion *completion)
+     * mln_status mln_render_session_query_feature_extensions(mln_render_session session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, const mln_buffer_view *arguments, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_query_feature_extensions$address() {
@@ -9309,16 +9346,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_query_feature_extensions(mln_render_session session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, const mln_buffer_view *arguments, const mln_completion *completion)
+     * mln_status mln_render_session_query_feature_extensions(mln_render_session session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, const mln_buffer_view *arguments, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_query_feature_extensions(long session, MemorySegment source_id, MemorySegment feature, MemorySegment extension, MemorySegment extension_field, MemorySegment arguments, MemorySegment completion) {
+    public static int mln_render_session_query_feature_extensions(long session, MemorySegment source_id, MemorySegment feature, MemorySegment extension, MemorySegment extension_field, MemorySegment arguments, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_query_feature_extensions.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_query_feature_extensions", session, source_id, feature, extension, extension_field, arguments, completion);
+                traceDowncall("mln_render_session_query_feature_extensions", session, source_id, feature, extension, extension_field, arguments, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, source_id, feature, extension, extension_field, arguments, completion);
+            return (int)mh$.invokeExact(session, source_id, feature, extension, extension_field, arguments, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -9672,6 +9709,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -9683,7 +9721,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_target_extent_physical_size(const mln_render_target_extent *extent, uint32_t *out_width, uint32_t *out_height)
+     * mln_status mln_render_target_extent_physical_size(const mln_render_target_extent *extent, uint32_t *out_width, uint32_t *out_height, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_target_extent_physical_size$descriptor() {
@@ -9693,7 +9731,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_target_extent_physical_size(const mln_render_target_extent *extent, uint32_t *out_width, uint32_t *out_height)
+     * mln_status mln_render_target_extent_physical_size(const mln_render_target_extent *extent, uint32_t *out_width, uint32_t *out_height, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_target_extent_physical_size$handle() {
@@ -9703,7 +9741,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_target_extent_physical_size(const mln_render_target_extent *extent, uint32_t *out_width, uint32_t *out_height)
+     * mln_status mln_render_target_extent_physical_size(const mln_render_target_extent *extent, uint32_t *out_width, uint32_t *out_height, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_target_extent_physical_size$address() {
@@ -9712,16 +9750,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_target_extent_physical_size(const mln_render_target_extent *extent, uint32_t *out_width, uint32_t *out_height)
+     * mln_status mln_render_target_extent_physical_size(const mln_render_target_extent *extent, uint32_t *out_width, uint32_t *out_height, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_target_extent_physical_size(MemorySegment extent, MemorySegment out_width, MemorySegment out_height) {
+    public static int mln_render_target_extent_physical_size(MemorySegment extent, MemorySegment out_width, MemorySegment out_height, MemorySegment out_diagnostic) {
         var mh$ = mln_render_target_extent_physical_size.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_target_extent_physical_size", extent, out_width, out_height);
+                traceDowncall("mln_render_target_extent_physical_size", extent, out_width, out_height, out_diagnostic);
             }
-            return (int)mh$.invokeExact(extent, out_width, out_height);
+            return (int)mh$.invokeExact(extent, out_width, out_height, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -9791,6 +9829,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -9802,7 +9841,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_projection_create$descriptor() {
@@ -9812,7 +9851,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_projection_create$handle() {
@@ -9822,7 +9861,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_projection_create$address() {
@@ -9831,16 +9870,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection)
+     * mln_status mln_render_session_projection_create(mln_render_session session, mln_map_projection *out_projection, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_projection_create(long session, MemorySegment out_projection) {
+    public static int mln_render_session_projection_create(long session, MemorySegment out_projection, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_projection_create.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_projection_create", session, out_projection);
+                traceDowncall("mln_render_session_projection_create", session, out_projection, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, out_projection);
+            return (int)mh$.invokeExact(session, out_projection, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10054,6 +10093,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10065,7 +10105,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_get_capabilities(mln_render_session session, mln_render_session_capabilities *out_capabilities)
+     * mln_status mln_render_session_get_capabilities(mln_render_session session, mln_render_session_capabilities *out_capabilities, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_get_capabilities$descriptor() {
@@ -10075,7 +10115,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_get_capabilities(mln_render_session session, mln_render_session_capabilities *out_capabilities)
+     * mln_status mln_render_session_get_capabilities(mln_render_session session, mln_render_session_capabilities *out_capabilities, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_get_capabilities$handle() {
@@ -10085,7 +10125,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_get_capabilities(mln_render_session session, mln_render_session_capabilities *out_capabilities)
+     * mln_status mln_render_session_get_capabilities(mln_render_session session, mln_render_session_capabilities *out_capabilities, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_get_capabilities$address() {
@@ -10094,16 +10134,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_get_capabilities(mln_render_session session, mln_render_session_capabilities *out_capabilities)
+     * mln_status mln_render_session_get_capabilities(mln_render_session session, mln_render_session_capabilities *out_capabilities, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_get_capabilities(long session, MemorySegment out_capabilities) {
+    public static int mln_render_session_get_capabilities(long session, MemorySegment out_capabilities, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_get_capabilities.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_get_capabilities", session, out_capabilities);
+                traceDowncall("mln_render_session_get_capabilities", session, out_capabilities, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, out_capabilities);
+            return (int)mh$.invokeExact(session, out_capabilities, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10115,6 +10155,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10126,7 +10167,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_get_snapshot(mln_render_session session, mln_render_session_snapshot *out_snapshot)
+     * mln_status mln_render_session_get_snapshot(mln_render_session session, mln_render_session_snapshot *out_snapshot, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_get_snapshot$descriptor() {
@@ -10136,7 +10177,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_get_snapshot(mln_render_session session, mln_render_session_snapshot *out_snapshot)
+     * mln_status mln_render_session_get_snapshot(mln_render_session session, mln_render_session_snapshot *out_snapshot, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_get_snapshot$handle() {
@@ -10146,7 +10187,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_get_snapshot(mln_render_session session, mln_render_session_snapshot *out_snapshot)
+     * mln_status mln_render_session_get_snapshot(mln_render_session session, mln_render_session_snapshot *out_snapshot, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_get_snapshot$address() {
@@ -10155,16 +10196,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_get_snapshot(mln_render_session session, mln_render_session_snapshot *out_snapshot)
+     * mln_status mln_render_session_get_snapshot(mln_render_session session, mln_render_session_snapshot *out_snapshot, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_get_snapshot(long session, MemorySegment out_snapshot) {
+    public static int mln_render_session_get_snapshot(long session, MemorySegment out_snapshot, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_get_snapshot.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_get_snapshot", session, out_snapshot);
+                traceDowncall("mln_render_session_get_snapshot", session, out_snapshot, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, out_snapshot);
+            return (int)mh$.invokeExact(session, out_snapshot, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10176,6 +10217,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10187,7 +10229,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_request_frame(mln_render_session session, const mln_frame_demand *demand)
+     * mln_status mln_render_session_request_frame(mln_render_session session, const mln_frame_demand *demand, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_request_frame$descriptor() {
@@ -10197,7 +10239,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_request_frame(mln_render_session session, const mln_frame_demand *demand)
+     * mln_status mln_render_session_request_frame(mln_render_session session, const mln_frame_demand *demand, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_request_frame$handle() {
@@ -10207,7 +10249,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_request_frame(mln_render_session session, const mln_frame_demand *demand)
+     * mln_status mln_render_session_request_frame(mln_render_session session, const mln_frame_demand *demand, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_request_frame$address() {
@@ -10216,16 +10258,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_request_frame(mln_render_session session, const mln_frame_demand *demand)
+     * mln_status mln_render_session_request_frame(mln_render_session session, const mln_frame_demand *demand, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_request_frame(long session, MemorySegment demand) {
+    public static int mln_render_session_request_frame(long session, MemorySegment demand, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_request_frame.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_request_frame", session, demand);
+                traceDowncall("mln_render_session_request_frame", session, demand, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, demand);
+            return (int)mh$.invokeExact(session, demand, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10237,6 +10279,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10248,7 +10291,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch)
+     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_drain_frame_results$descriptor() {
@@ -10258,7 +10301,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch)
+     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_drain_frame_results$handle() {
@@ -10268,7 +10311,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch)
+     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_drain_frame_results$address() {
@@ -10277,16 +10320,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch)
+     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_drain_frame_results(long session, MemorySegment out_batch) {
+    public static int mln_render_session_drain_frame_results(long session, MemorySegment out_batch, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_drain_frame_results.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_drain_frame_results", session, out_batch);
+                traceDowncall("mln_render_session_drain_frame_results", session, out_batch, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, out_batch);
+            return (int)mh$.invokeExact(session, out_batch, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10298,6 +10341,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10309,7 +10353,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_frame_batch_count(mln_render_frame_batch batch, size_t *out_count)
+     * mln_status mln_render_frame_batch_count(mln_render_frame_batch batch, size_t *out_count, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_frame_batch_count$descriptor() {
@@ -10319,7 +10363,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_frame_batch_count(mln_render_frame_batch batch, size_t *out_count)
+     * mln_status mln_render_frame_batch_count(mln_render_frame_batch batch, size_t *out_count, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_frame_batch_count$handle() {
@@ -10329,7 +10373,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_frame_batch_count(mln_render_frame_batch batch, size_t *out_count)
+     * mln_status mln_render_frame_batch_count(mln_render_frame_batch batch, size_t *out_count, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_frame_batch_count$address() {
@@ -10338,16 +10382,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_frame_batch_count(mln_render_frame_batch batch, size_t *out_count)
+     * mln_status mln_render_frame_batch_count(mln_render_frame_batch batch, size_t *out_count, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_frame_batch_count(long batch, MemorySegment out_count) {
+    public static int mln_render_frame_batch_count(long batch, MemorySegment out_count, MemorySegment out_diagnostic) {
         var mh$ = mln_render_frame_batch_count.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_frame_batch_count", batch, out_count);
+                traceDowncall("mln_render_frame_batch_count", batch, out_count, out_diagnostic);
             }
-            return (int)mh$.invokeExact(batch, out_count);
+            return (int)mh$.invokeExact(batch, out_count, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10360,6 +10404,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10371,7 +10416,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_frame_batch_get(mln_render_frame_batch batch, size_t index, mln_render_frame_result *out_result)
+     * mln_status mln_render_frame_batch_get(mln_render_frame_batch batch, size_t index, mln_render_frame_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_frame_batch_get$descriptor() {
@@ -10381,7 +10426,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_frame_batch_get(mln_render_frame_batch batch, size_t index, mln_render_frame_result *out_result)
+     * mln_status mln_render_frame_batch_get(mln_render_frame_batch batch, size_t index, mln_render_frame_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_frame_batch_get$handle() {
@@ -10391,7 +10436,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_frame_batch_get(mln_render_frame_batch batch, size_t index, mln_render_frame_result *out_result)
+     * mln_status mln_render_frame_batch_get(mln_render_frame_batch batch, size_t index, mln_render_frame_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_frame_batch_get$address() {
@@ -10400,16 +10445,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_frame_batch_get(mln_render_frame_batch batch, size_t index, mln_render_frame_result *out_result)
+     * mln_status mln_render_frame_batch_get(mln_render_frame_batch batch, size_t index, mln_render_frame_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_frame_batch_get(long batch, long index, MemorySegment out_result) {
+    public static int mln_render_frame_batch_get(long batch, long index, MemorySegment out_result, MemorySegment out_diagnostic) {
         var mh$ = mln_render_frame_batch_get.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_frame_batch_get", batch, index, out_result);
+                traceDowncall("mln_render_frame_batch_get", batch, index, out_result, out_diagnostic);
             }
-            return (int)mh$.invokeExact(batch, index, out_result);
+            return (int)mh$.invokeExact(batch, index, out_result, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10480,6 +10525,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10491,7 +10537,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_acquire_frame(mln_render_session session, mln_acquired_frame *out_frame)
+     * mln_status mln_render_session_acquire_frame(mln_render_session session, mln_acquired_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_acquire_frame$descriptor() {
@@ -10501,7 +10547,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_acquire_frame(mln_render_session session, mln_acquired_frame *out_frame)
+     * mln_status mln_render_session_acquire_frame(mln_render_session session, mln_acquired_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_acquire_frame$handle() {
@@ -10511,7 +10557,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_acquire_frame(mln_render_session session, mln_acquired_frame *out_frame)
+     * mln_status mln_render_session_acquire_frame(mln_render_session session, mln_acquired_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_acquire_frame$address() {
@@ -10520,16 +10566,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_acquire_frame(mln_render_session session, mln_acquired_frame *out_frame)
+     * mln_status mln_render_session_acquire_frame(mln_render_session session, mln_acquired_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_acquire_frame(long session, MemorySegment out_frame) {
+    public static int mln_render_session_acquire_frame(long session, MemorySegment out_frame, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_acquire_frame.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_acquire_frame", session, out_frame);
+                traceDowncall("mln_render_session_acquire_frame", session, out_frame, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, out_frame);
+            return (int)mh$.invokeExact(session, out_frame, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10541,6 +10587,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10552,7 +10599,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_result(mln_acquired_frame frame, mln_render_frame_result *out_result)
+     * mln_status mln_acquired_frame_get_result(mln_acquired_frame frame, mln_render_frame_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_acquired_frame_get_result$descriptor() {
@@ -10562,7 +10609,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_result(mln_acquired_frame frame, mln_render_frame_result *out_result)
+     * mln_status mln_acquired_frame_get_result(mln_acquired_frame frame, mln_render_frame_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_acquired_frame_get_result$handle() {
@@ -10572,7 +10619,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_result(mln_acquired_frame frame, mln_render_frame_result *out_result)
+     * mln_status mln_acquired_frame_get_result(mln_acquired_frame frame, mln_render_frame_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_acquired_frame_get_result$address() {
@@ -10581,16 +10628,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_result(mln_acquired_frame frame, mln_render_frame_result *out_result)
+     * mln_status mln_acquired_frame_get_result(mln_acquired_frame frame, mln_render_frame_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_acquired_frame_get_result(long frame, MemorySegment out_result) {
+    public static int mln_acquired_frame_get_result(long frame, MemorySegment out_result, MemorySegment out_diagnostic) {
         var mh$ = mln_acquired_frame_get_result.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_acquired_frame_get_result", frame, out_result);
+                traceDowncall("mln_acquired_frame_get_result", frame, out_result, out_diagnostic);
             }
-            return (int)mh$.invokeExact(frame, out_result);
+            return (int)mh$.invokeExact(frame, out_result, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10602,6 +10649,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10613,7 +10661,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_producer_sync(mln_acquired_frame frame, mln_gpu_sync *out_sync)
+     * mln_status mln_acquired_frame_get_producer_sync(mln_acquired_frame frame, mln_gpu_sync *out_sync, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_acquired_frame_get_producer_sync$descriptor() {
@@ -10623,7 +10671,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_producer_sync(mln_acquired_frame frame, mln_gpu_sync *out_sync)
+     * mln_status mln_acquired_frame_get_producer_sync(mln_acquired_frame frame, mln_gpu_sync *out_sync, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_acquired_frame_get_producer_sync$handle() {
@@ -10633,7 +10681,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_producer_sync(mln_acquired_frame frame, mln_gpu_sync *out_sync)
+     * mln_status mln_acquired_frame_get_producer_sync(mln_acquired_frame frame, mln_gpu_sync *out_sync, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_acquired_frame_get_producer_sync$address() {
@@ -10642,16 +10690,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_producer_sync(mln_acquired_frame frame, mln_gpu_sync *out_sync)
+     * mln_status mln_acquired_frame_get_producer_sync(mln_acquired_frame frame, mln_gpu_sync *out_sync, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_acquired_frame_get_producer_sync(long frame, MemorySegment out_sync) {
+    public static int mln_acquired_frame_get_producer_sync(long frame, MemorySegment out_sync, MemorySegment out_diagnostic) {
         var mh$ = mln_acquired_frame_get_producer_sync.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_acquired_frame_get_producer_sync", frame, out_sync);
+                traceDowncall("mln_acquired_frame_get_producer_sync", frame, out_sync, out_diagnostic);
             }
-            return (int)mh$.invokeExact(frame, out_sync);
+            return (int)mh$.invokeExact(frame, out_sync, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10662,6 +10710,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_acquired_frame_release {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
@@ -10674,7 +10723,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion)
+     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_acquired_frame_release$descriptor() {
@@ -10684,7 +10733,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion)
+     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_acquired_frame_release$handle() {
@@ -10694,7 +10743,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion)
+     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_acquired_frame_release$address() {
@@ -10703,16 +10752,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion)
+     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_acquired_frame_release(MemorySegment frame, MemorySegment consumer_completion) {
+    public static int mln_acquired_frame_release(MemorySegment frame, MemorySegment consumer_completion, MemorySegment out_diagnostic) {
         var mh$ = mln_acquired_frame_release.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_acquired_frame_release", frame, consumer_completion);
+                traceDowncall("mln_acquired_frame_release", frame, consumer_completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(frame, consumer_completion);
+            return (int)mh$.invokeExact(frame, consumer_completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10725,6 +10774,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10736,7 +10786,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_resize(mln_render_session session, const mln_render_target_extent *extent, const mln_completion *completion)
+     * mln_status mln_render_session_resize(mln_render_session session, const mln_render_target_extent *extent, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_resize$descriptor() {
@@ -10746,7 +10796,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_resize(mln_render_session session, const mln_render_target_extent *extent, const mln_completion *completion)
+     * mln_status mln_render_session_resize(mln_render_session session, const mln_render_target_extent *extent, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_resize$handle() {
@@ -10756,7 +10806,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_resize(mln_render_session session, const mln_render_target_extent *extent, const mln_completion *completion)
+     * mln_status mln_render_session_resize(mln_render_session session, const mln_render_target_extent *extent, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_resize$address() {
@@ -10765,16 +10815,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_resize(mln_render_session session, const mln_render_target_extent *extent, const mln_completion *completion)
+     * mln_status mln_render_session_resize(mln_render_session session, const mln_render_target_extent *extent, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_resize(long session, MemorySegment extent, MemorySegment completion) {
+    public static int mln_render_session_resize(long session, MemorySegment extent, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_resize.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_resize", session, extent, completion);
+                traceDowncall("mln_render_session_resize", session, extent, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, extent, completion);
+            return (int)mh$.invokeExact(session, extent, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10786,6 +10836,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10797,7 +10848,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_barrier(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_barrier(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_barrier$descriptor() {
@@ -10807,7 +10858,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_barrier(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_barrier(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_barrier$handle() {
@@ -10817,7 +10868,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_barrier(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_barrier(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_barrier$address() {
@@ -10826,16 +10877,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_barrier(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_barrier(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_barrier(long session, MemorySegment completion) {
+    public static int mln_render_session_barrier(long session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_barrier.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_barrier", session, completion);
+                traceDowncall("mln_render_session_barrier", session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, completion);
+            return (int)mh$.invokeExact(session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10847,6 +10898,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10858,7 +10910,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_reduce_memory_use(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_reduce_memory_use(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_reduce_memory_use$descriptor() {
@@ -10868,7 +10920,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_reduce_memory_use(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_reduce_memory_use(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_reduce_memory_use$handle() {
@@ -10878,7 +10930,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_reduce_memory_use(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_reduce_memory_use(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_reduce_memory_use$address() {
@@ -10887,16 +10939,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_reduce_memory_use(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_reduce_memory_use(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_reduce_memory_use(long session, MemorySegment completion) {
+    public static int mln_render_session_reduce_memory_use(long session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_reduce_memory_use.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_reduce_memory_use", session, completion);
+                traceDowncall("mln_render_session_reduce_memory_use", session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, completion);
+            return (int)mh$.invokeExact(session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10908,6 +10960,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10919,7 +10972,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_clear_data(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_clear_data(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_clear_data$descriptor() {
@@ -10929,7 +10982,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_clear_data(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_clear_data(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_clear_data$handle() {
@@ -10939,7 +10992,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_clear_data(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_clear_data(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_clear_data$address() {
@@ -10948,16 +11001,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_clear_data(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_clear_data(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_clear_data(long session, MemorySegment completion) {
+    public static int mln_render_session_clear_data(long session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_clear_data.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_clear_data", session, completion);
+                traceDowncall("mln_render_session_clear_data", session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, completion);
+            return (int)mh$.invokeExact(session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -10969,6 +11022,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10980,7 +11034,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_dump_debug_logs(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_dump_debug_logs(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_dump_debug_logs$descriptor() {
@@ -10990,7 +11044,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_dump_debug_logs(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_dump_debug_logs(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_dump_debug_logs$handle() {
@@ -11000,7 +11054,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_dump_debug_logs(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_dump_debug_logs(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_dump_debug_logs$address() {
@@ -11009,16 +11063,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_dump_debug_logs(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_dump_debug_logs(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_dump_debug_logs(long session, MemorySegment completion) {
+    public static int mln_render_session_dump_debug_logs(long session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_dump_debug_logs.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_dump_debug_logs", session, completion);
+                traceDowncall("mln_render_session_dump_debug_logs", session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, completion);
+            return (int)mh$.invokeExact(session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -11031,6 +11085,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -11042,7 +11097,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_service_driver_work(mln_render_session session, size_t max_work, size_t *out_serviced)
+     * mln_status mln_render_session_service_driver_work(mln_render_session session, size_t max_work, size_t *out_serviced, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_service_driver_work$descriptor() {
@@ -11052,7 +11107,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_service_driver_work(mln_render_session session, size_t max_work, size_t *out_serviced)
+     * mln_status mln_render_session_service_driver_work(mln_render_session session, size_t max_work, size_t *out_serviced, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_service_driver_work$handle() {
@@ -11062,7 +11117,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_service_driver_work(mln_render_session session, size_t max_work, size_t *out_serviced)
+     * mln_status mln_render_session_service_driver_work(mln_render_session session, size_t max_work, size_t *out_serviced, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_service_driver_work$address() {
@@ -11071,16 +11126,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_service_driver_work(mln_render_session session, size_t max_work, size_t *out_serviced)
+     * mln_status mln_render_session_service_driver_work(mln_render_session session, size_t max_work, size_t *out_serviced, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_service_driver_work(long session, long max_work, MemorySegment out_serviced) {
+    public static int mln_render_session_service_driver_work(long session, long max_work, MemorySegment out_serviced, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_service_driver_work.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_service_driver_work", session, max_work, out_serviced);
+                traceDowncall("mln_render_session_service_driver_work", session, max_work, out_serviced, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, max_work, out_serviced);
+            return (int)mh$.invokeExact(session, max_work, out_serviced, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -11092,6 +11147,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -11103,7 +11159,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_detach(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_detach(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_detach$descriptor() {
@@ -11113,7 +11169,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_detach(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_detach(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_detach$handle() {
@@ -11123,7 +11179,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_detach(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_detach(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_detach$address() {
@@ -11132,16 +11188,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_detach(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_render_session_detach(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_detach(long session, MemorySegment completion) {
+    public static int mln_render_session_detach(long session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_detach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_detach", session, completion);
+                traceDowncall("mln_render_session_detach", session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, completion);
+            return (int)mh$.invokeExact(session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -11153,6 +11209,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -11164,7 +11221,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_abandon(mln_render_session session, mln_render_abandon_result *out_result)
+     * mln_status mln_render_session_abandon(mln_render_session session, mln_render_abandon_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_abandon$descriptor() {
@@ -11174,7 +11231,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_abandon(mln_render_session session, mln_render_abandon_result *out_result)
+     * mln_status mln_render_session_abandon(mln_render_session session, mln_render_abandon_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_abandon$handle() {
@@ -11184,7 +11241,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_abandon(mln_render_session session, mln_render_abandon_result *out_result)
+     * mln_status mln_render_session_abandon(mln_render_session session, mln_render_abandon_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_abandon$address() {
@@ -11193,16 +11250,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_abandon(mln_render_session session, mln_render_abandon_result *out_result)
+     * mln_status mln_render_session_abandon(mln_render_session session, mln_render_abandon_result *out_result, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_abandon(long session, MemorySegment out_result) {
+    public static int mln_render_session_abandon(long session, MemorySegment out_result, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_abandon.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_abandon", session, out_result);
+                traceDowncall("mln_render_session_abandon", session, out_result, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, out_result);
+            return (int)mh$.invokeExact(session, out_result, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -11213,7 +11270,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_render_session_destroy {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_render_session_destroy");
@@ -11224,7 +11282,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_destroy(mln_render_session session)
+     * mln_status mln_render_session_destroy(mln_render_session session, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_destroy$descriptor() {
@@ -11234,7 +11292,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_destroy(mln_render_session session)
+     * mln_status mln_render_session_destroy(mln_render_session session, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_destroy$handle() {
@@ -11244,7 +11302,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_destroy(mln_render_session session)
+     * mln_status mln_render_session_destroy(mln_render_session session, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_destroy$address() {
@@ -11253,16 +11311,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_destroy(mln_render_session session)
+     * mln_status mln_render_session_destroy(mln_render_session session, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_destroy(long session) {
+    public static int mln_render_session_destroy(long session, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_destroy.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_destroy", session);
+                traceDowncall("mln_render_session_destroy", session, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session);
+            return (int)mh$.invokeExact(session, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -11273,7 +11331,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_render_session_dispose {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_render_session_dispose");
@@ -11284,7 +11343,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_dispose(mln_render_session session)
+     * mln_status mln_render_session_dispose(mln_render_session session, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_render_session_dispose$descriptor() {
@@ -11294,7 +11353,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_dispose(mln_render_session session)
+     * mln_status mln_render_session_dispose(mln_render_session session, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_render_session_dispose$handle() {
@@ -11304,7 +11363,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_dispose(mln_render_session session)
+     * mln_status mln_render_session_dispose(mln_render_session session, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_render_session_dispose$address() {
@@ -11313,16 +11372,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_dispose(mln_render_session session)
+     * mln_status mln_render_session_dispose(mln_render_session session, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_render_session_dispose(long session) {
+    public static int mln_render_session_dispose(long session, MemorySegment out_diagnostic) {
         var mh$ = mln_render_session_dispose.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_dispose", session);
+                traceDowncall("mln_render_session_dispose", session, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session);
+            return (int)mh$.invokeExact(session, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -11333,7 +11392,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_acquired_frame_dispose {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_acquired_frame_dispose");
@@ -11344,7 +11404,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_dispose(mln_acquired_frame frame)
+     * mln_status mln_acquired_frame_dispose(mln_acquired_frame frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_acquired_frame_dispose$descriptor() {
@@ -11354,7 +11414,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_dispose(mln_acquired_frame frame)
+     * mln_status mln_acquired_frame_dispose(mln_acquired_frame frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_acquired_frame_dispose$handle() {
@@ -11364,7 +11424,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_dispose(mln_acquired_frame frame)
+     * mln_status mln_acquired_frame_dispose(mln_acquired_frame frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_acquired_frame_dispose$address() {
@@ -11373,16 +11433,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_dispose(mln_acquired_frame frame)
+     * mln_status mln_acquired_frame_dispose(mln_acquired_frame frame, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_acquired_frame_dispose(long frame) {
+    public static int mln_acquired_frame_dispose(long frame, MemorySegment out_diagnostic) {
         var mh$ = mln_acquired_frame_dispose.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_acquired_frame_dispose", frame);
+                traceDowncall("mln_acquired_frame_dispose", frame, out_diagnostic);
             }
-            return (int)mh$.invokeExact(frame);
+            return (int)mh$.invokeExact(frame, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -11396,6 +11456,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -11407,7 +11468,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_global_state_property$descriptor() {
@@ -11417,7 +11478,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_global_state_property$handle() {
@@ -11427,7 +11488,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_global_state_property$address() {
@@ -11436,16 +11497,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_global_state_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_global_state_property(long map, MemorySegment property_name, MemorySegment value, MemorySegment completion) {
+    public static int mln_map_set_global_state_property(long map, MemorySegment property_name, MemorySegment value, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_global_state_property.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_global_state_property", map, property_name, value, completion);
+                traceDowncall("mln_map_set_global_state_property", map, property_name, value, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, property_name, value, completion);
+            return (int)mh$.invokeExact(map, property_name, value, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -11457,6 +11518,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -11468,7 +11530,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_global_state$descriptor() {
@@ -11478,7 +11540,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_global_state$handle() {
@@ -11488,7 +11550,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_global_state$address() {
@@ -11497,16 +11559,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_get_global_state(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_global_state(long map, MemorySegment completion) {
+    public static int mln_map_get_global_state(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_global_state.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_global_state", map, completion);
+                traceDowncall("mln_map_get_global_state", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -12605,6 +12667,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -12616,7 +12679,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_style_source_json(mln_map map, mln_buffer_view source_id, mln_buffer_view source_json, const mln_completion *completion)
+     * mln_status mln_map_add_style_source_json(mln_map map, mln_buffer_view source_id, mln_buffer_view source_json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_style_source_json$descriptor() {
@@ -12626,7 +12689,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_style_source_json(mln_map map, mln_buffer_view source_id, mln_buffer_view source_json, const mln_completion *completion)
+     * mln_status mln_map_add_style_source_json(mln_map map, mln_buffer_view source_id, mln_buffer_view source_json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_style_source_json$handle() {
@@ -12636,7 +12699,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_style_source_json(mln_map map, mln_buffer_view source_id, mln_buffer_view source_json, const mln_completion *completion)
+     * mln_status mln_map_add_style_source_json(mln_map map, mln_buffer_view source_id, mln_buffer_view source_json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_style_source_json$address() {
@@ -12645,16 +12708,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_style_source_json(mln_map map, mln_buffer_view source_id, mln_buffer_view source_json, const mln_completion *completion)
+     * mln_status mln_map_add_style_source_json(mln_map map, mln_buffer_view source_id, mln_buffer_view source_json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_style_source_json(long map, MemorySegment source_id, MemorySegment source_json, MemorySegment completion) {
+    public static int mln_map_add_style_source_json(long map, MemorySegment source_id, MemorySegment source_json, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_style_source_json.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_style_source_json", map, source_id, source_json, completion);
+                traceDowncall("mln_map_add_style_source_json", map, source_id, source_json, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, source_json, completion);
+            return (int)mh$.invokeExact(map, source_id, source_json, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -12667,6 +12730,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -12678,7 +12742,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_source(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_source(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_remove_style_source$descriptor() {
@@ -12688,7 +12752,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_source(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_source(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_remove_style_source$handle() {
@@ -12698,7 +12762,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_source(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_source(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_remove_style_source$address() {
@@ -12707,16 +12771,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_source(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_source(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_remove_style_source(long map, MemorySegment source_id, MemorySegment completion) {
+    public static int mln_map_remove_style_source(long map, MemorySegment source_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_remove_style_source.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_remove_style_source", map, source_id, completion);
+                traceDowncall("mln_map_remove_style_source", map, source_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, completion);
+            return (int)mh$.invokeExact(map, source_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -12729,6 +12793,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -12740,7 +12805,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_source_info(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_source_info(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_style_source_info$descriptor() {
@@ -12750,7 +12815,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_source_info(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_source_info(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_style_source_info$handle() {
@@ -12760,7 +12825,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_source_info(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_source_info(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_style_source_info$address() {
@@ -12769,16 +12834,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_source_info(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_source_info(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_style_source_info(long map, MemorySegment source_id, MemorySegment completion) {
+    public static int mln_map_get_style_source_info(long map, MemorySegment source_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_style_source_info.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_style_source_info", map, source_id, completion);
+                traceDowncall("mln_map_get_style_source_info", map, source_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, completion);
+            return (int)mh$.invokeExact(map, source_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -12792,6 +12857,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_BOOL,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -12803,7 +12869,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion)
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_style_source_volatile$descriptor() {
@@ -12813,7 +12879,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion)
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_style_source_volatile$handle() {
@@ -12823,7 +12889,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion)
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_style_source_volatile$address() {
@@ -12832,16 +12898,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion)
+     * mln_status mln_map_set_style_source_volatile(mln_map map, mln_buffer_view source_id, bool is_volatile, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_style_source_volatile(long map, MemorySegment source_id, boolean is_volatile, MemorySegment completion) {
+    public static int mln_map_set_style_source_volatile(long map, MemorySegment source_id, boolean is_volatile, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_style_source_volatile.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_style_source_volatile", map, source_id, is_volatile, completion);
+                traceDowncall("mln_map_set_style_source_volatile", map, source_id, is_volatile, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, is_volatile, completion);
+            return (int)mh$.invokeExact(map, source_id, is_volatile, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -12854,6 +12920,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -12865,7 +12932,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_source_attribution(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_source_attribution(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_copy_style_source_attribution$descriptor() {
@@ -12875,7 +12942,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_source_attribution(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_source_attribution(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_copy_style_source_attribution$handle() {
@@ -12885,7 +12952,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_source_attribution(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_source_attribution(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_copy_style_source_attribution$address() {
@@ -12894,16 +12961,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_source_attribution(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_source_attribution(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_copy_style_source_attribution(long map, MemorySegment source_id, MemorySegment completion) {
+    public static int mln_map_copy_style_source_attribution(long map, MemorySegment source_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_copy_style_source_attribution.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_copy_style_source_attribution", map, source_id, completion);
+                traceDowncall("mln_map_copy_style_source_attribution", map, source_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, completion);
+            return (int)mh$.invokeExact(map, source_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -12916,6 +12983,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -12927,7 +12995,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_source_url(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_source_url(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_copy_style_source_url$descriptor() {
@@ -12937,7 +13005,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_source_url(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_source_url(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_copy_style_source_url$handle() {
@@ -12947,7 +13015,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_source_url(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_source_url(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_copy_style_source_url$address() {
@@ -12956,16 +13024,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_source_url(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_source_url(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_copy_style_source_url(long map, MemorySegment source_id, MemorySegment completion) {
+    public static int mln_map_copy_style_source_url(long map, MemorySegment source_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_copy_style_source_url.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_copy_style_source_url", map, source_id, completion);
+                traceDowncall("mln_map_copy_style_source_url", map, source_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, completion);
+            return (int)mh$.invokeExact(map, source_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -12978,6 +13046,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -12989,7 +13058,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_style_source_tile_urls$descriptor() {
@@ -12999,7 +13068,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_style_source_tile_urls$handle() {
@@ -13009,7 +13078,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_style_source_tile_urls$address() {
@@ -13018,16 +13087,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_style_source_tile_urls(long map, MemorySegment source_id, MemorySegment completion) {
+    public static int mln_map_get_style_source_tile_urls(long map, MemorySegment source_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_style_source_tile_urls.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_style_source_tile_urls", map, source_id, completion);
+                traceDowncall("mln_map_get_style_source_tile_urls", map, source_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, completion);
+            return (int)mh$.invokeExact(map, source_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13039,6 +13108,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13050,7 +13120,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_source_ids(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_source_ids(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_list_style_source_ids$descriptor() {
@@ -13060,7 +13130,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_source_ids(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_source_ids(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_list_style_source_ids$handle() {
@@ -13070,7 +13140,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_source_ids(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_source_ids(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_list_style_source_ids$address() {
@@ -13079,16 +13149,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_source_ids(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_source_ids(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_list_style_source_ids(long map, MemorySegment completion) {
+    public static int mln_map_list_style_source_ids(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_list_style_source_ids.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_list_style_source_ids", map, completion);
+                traceDowncall("mln_map_list_style_source_ids", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13103,6 +13173,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13114,7 +13185,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_geojson_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_geojson_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_geojson_source_url$descriptor() {
@@ -13124,7 +13195,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_geojson_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_geojson_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_geojson_source_url$handle() {
@@ -13134,7 +13205,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_geojson_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_geojson_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_geojson_source_url$address() {
@@ -13143,16 +13214,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_geojson_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_geojson_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_geojson_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_add_geojson_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_geojson_source_url.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_geojson_source_url", map, source_id, url, options, completion);
+                traceDowncall("mln_map_add_geojson_source_url", map, source_id, url, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, url, options, completion);
+            return (int)mh$.invokeExact(map, source_id, url, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13165,6 +13236,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13176,7 +13248,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data)
+     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_geojson_source_data_create$descriptor() {
@@ -13186,7 +13258,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data)
+     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_geojson_source_data_create$handle() {
@@ -13196,7 +13268,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data)
+     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_geojson_source_data_create$address() {
@@ -13205,16 +13277,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data)
+     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_geojson_source_data_create(MemorySegment data, MemorySegment options, MemorySegment out_data) {
+    public static int mln_geojson_source_data_create(MemorySegment data, MemorySegment options, MemorySegment out_data, MemorySegment out_diagnostic) {
         var mh$ = mln_geojson_source_data_create.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_geojson_source_data_create", data, options, out_data);
+                traceDowncall("mln_geojson_source_data_create", data, options, out_data, out_diagnostic);
             }
-            return (int)mh$.invokeExact(data, options, out_data);
+            return (int)mh$.invokeExact(data, options, out_data, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13287,6 +13359,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13298,7 +13371,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion)
+     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_geojson_source_data$descriptor() {
@@ -13308,7 +13381,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion)
+     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_geojson_source_data$handle() {
@@ -13318,7 +13391,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion)
+     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_geojson_source_data$address() {
@@ -13327,16 +13400,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion)
+     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_geojson_source_data(long map, MemorySegment source_id, long data, MemorySegment completion) {
+    public static int mln_map_add_geojson_source_data(long map, MemorySegment source_id, long data, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_geojson_source_data.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_geojson_source_data", map, source_id, data, completion);
+                traceDowncall("mln_map_add_geojson_source_data", map, source_id, data, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, data, completion);
+            return (int)mh$.invokeExact(map, source_id, data, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13350,6 +13423,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13361,7 +13435,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_geojson_source_url$descriptor() {
@@ -13371,7 +13445,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_geojson_source_url$handle() {
@@ -13381,7 +13455,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_geojson_source_url$address() {
@@ -13390,16 +13464,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_geojson_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment completion) {
+    public static int mln_map_set_geojson_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_geojson_source_url.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_geojson_source_url", map, source_id, url, completion);
+                traceDowncall("mln_map_set_geojson_source_url", map, source_id, url, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, url, completion);
+            return (int)mh$.invokeExact(map, source_id, url, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13413,6 +13487,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13424,7 +13499,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_geojson_source_data$descriptor() {
@@ -13434,7 +13509,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_geojson_source_data$handle() {
@@ -13444,7 +13519,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_geojson_source_data$address() {
@@ -13453,16 +13528,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_geojson_source_data(long map, MemorySegment source_id, long data, MemorySegment completion) {
+    public static int mln_map_set_geojson_source_data(long map, MemorySegment source_id, long data, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_geojson_source_data.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_geojson_source_data", map, source_id, data, completion);
+                traceDowncall("mln_map_set_geojson_source_data", map, source_id, data, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, data, completion);
+            return (int)mh$.invokeExact(map, source_id, data, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13476,6 +13551,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_BOOL,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13487,7 +13563,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_geojson_source_synchronous_tiling$descriptor() {
@@ -13497,7 +13573,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_geojson_source_synchronous_tiling$handle() {
@@ -13507,7 +13583,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_geojson_source_synchronous_tiling$address() {
@@ -13516,16 +13592,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled, const mln_completion *completion)
+     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_geojson_source_synchronous_tiling(long map, MemorySegment source_id, boolean enabled, MemorySegment completion) {
+    public static int mln_map_set_geojson_source_synchronous_tiling(long map, MemorySegment source_id, boolean enabled, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_geojson_source_synchronous_tiling.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_geojson_source_synchronous_tiling", map, source_id, enabled, completion);
+                traceDowncall("mln_map_set_geojson_source_synchronous_tiling", map, source_id, enabled, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, enabled, completion);
+            return (int)mh$.invokeExact(map, source_id, enabled, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13540,6 +13616,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13551,7 +13628,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_vector_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_vector_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_vector_source_url$descriptor() {
@@ -13561,7 +13638,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_vector_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_vector_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_vector_source_url$handle() {
@@ -13571,7 +13648,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_vector_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_vector_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_vector_source_url$address() {
@@ -13580,16 +13657,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_vector_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_vector_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_vector_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_add_vector_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_vector_source_url.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_vector_source_url", map, source_id, url, options, completion);
+                traceDowncall("mln_map_add_vector_source_url", map, source_id, url, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, url, options, completion);
+            return (int)mh$.invokeExact(map, source_id, url, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13605,6 +13682,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13616,7 +13694,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_vector_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_vector_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_vector_source_tiles$descriptor() {
@@ -13626,7 +13704,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_vector_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_vector_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_vector_source_tiles$handle() {
@@ -13636,7 +13714,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_vector_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_vector_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_vector_source_tiles$address() {
@@ -13645,16 +13723,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_vector_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_vector_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_vector_source_tiles(long map, MemorySegment source_id, MemorySegment tiles, long tile_count, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_add_vector_source_tiles(long map, MemorySegment source_id, MemorySegment tiles, long tile_count, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_vector_source_tiles.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_vector_source_tiles", map, source_id, tiles, tile_count, options, completion);
+                traceDowncall("mln_map_add_vector_source_tiles", map, source_id, tiles, tile_count, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, tiles, tile_count, options, completion);
+            return (int)mh$.invokeExact(map, source_id, tiles, tile_count, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13669,6 +13747,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13680,7 +13759,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_raster_source_url$descriptor() {
@@ -13690,7 +13769,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_raster_source_url$handle() {
@@ -13700,7 +13779,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_raster_source_url$address() {
@@ -13709,16 +13788,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_raster_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_add_raster_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_raster_source_url.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_raster_source_url", map, source_id, url, options, completion);
+                traceDowncall("mln_map_add_raster_source_url", map, source_id, url, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, url, options, completion);
+            return (int)mh$.invokeExact(map, source_id, url, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13734,6 +13813,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13745,7 +13825,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_raster_source_tiles$descriptor() {
@@ -13755,7 +13835,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_raster_source_tiles$handle() {
@@ -13765,7 +13845,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_raster_source_tiles$address() {
@@ -13774,16 +13854,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_raster_source_tiles(long map, MemorySegment source_id, MemorySegment tiles, long tile_count, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_add_raster_source_tiles(long map, MemorySegment source_id, MemorySegment tiles, long tile_count, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_raster_source_tiles.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_raster_source_tiles", map, source_id, tiles, tile_count, options, completion);
+                traceDowncall("mln_map_add_raster_source_tiles", map, source_id, tiles, tile_count, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, tiles, tile_count, options, completion);
+            return (int)mh$.invokeExact(map, source_id, tiles, tile_count, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13798,6 +13878,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13809,7 +13890,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_dem_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_dem_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_raster_dem_source_url$descriptor() {
@@ -13819,7 +13900,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_dem_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_dem_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_raster_dem_source_url$handle() {
@@ -13829,7 +13910,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_dem_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_dem_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_raster_dem_source_url$address() {
@@ -13838,16 +13919,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_dem_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_dem_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_raster_dem_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_add_raster_dem_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_raster_dem_source_url.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_raster_dem_source_url", map, source_id, url, options, completion);
+                traceDowncall("mln_map_add_raster_dem_source_url", map, source_id, url, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, url, options, completion);
+            return (int)mh$.invokeExact(map, source_id, url, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13863,6 +13944,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13874,7 +13956,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_dem_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_dem_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_raster_dem_source_tiles$descriptor() {
@@ -13884,7 +13966,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_dem_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_dem_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_raster_dem_source_tiles$handle() {
@@ -13894,7 +13976,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_dem_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_dem_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_raster_dem_source_tiles$address() {
@@ -13903,16 +13985,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_raster_dem_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_raster_dem_source_tiles(mln_map map, mln_buffer_view source_id, const mln_buffer_view *tiles, size_t tile_count, const mln_style_tile_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_raster_dem_source_tiles(long map, MemorySegment source_id, MemorySegment tiles, long tile_count, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_add_raster_dem_source_tiles(long map, MemorySegment source_id, MemorySegment tiles, long tile_count, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_raster_dem_source_tiles.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_raster_dem_source_tiles", map, source_id, tiles, tile_count, options, completion);
+                traceDowncall("mln_map_add_raster_dem_source_tiles", map, source_id, tiles, tile_count, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, tiles, tile_count, options, completion);
+            return (int)mh$.invokeExact(map, source_id, tiles, tile_count, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13926,6 +14008,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -13937,7 +14020,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_custom_geometry_source(mln_map map, mln_buffer_view source_id, const mln_custom_geometry_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_custom_geometry_source(mln_map map, mln_buffer_view source_id, const mln_custom_geometry_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_custom_geometry_source$descriptor() {
@@ -13947,7 +14030,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_custom_geometry_source(mln_map map, mln_buffer_view source_id, const mln_custom_geometry_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_custom_geometry_source(mln_map map, mln_buffer_view source_id, const mln_custom_geometry_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_custom_geometry_source$handle() {
@@ -13957,7 +14040,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_custom_geometry_source(mln_map map, mln_buffer_view source_id, const mln_custom_geometry_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_custom_geometry_source(mln_map map, mln_buffer_view source_id, const mln_custom_geometry_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_custom_geometry_source$address() {
@@ -13966,16 +14049,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_custom_geometry_source(mln_map map, mln_buffer_view source_id, const mln_custom_geometry_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_custom_geometry_source(mln_map map, mln_buffer_view source_id, const mln_custom_geometry_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_custom_geometry_source(long map, MemorySegment source_id, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_add_custom_geometry_source(long map, MemorySegment source_id, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_custom_geometry_source.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_custom_geometry_source", map, source_id, options, completion);
+                traceDowncall("mln_map_add_custom_geometry_source", map, source_id, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, options, completion);
+            return (int)mh$.invokeExact(map, source_id, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13990,6 +14073,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_canonical_tile_id.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14001,7 +14085,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_geometry_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion)
+     * mln_status mln_map_set_custom_geometry_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_custom_geometry_source_tile_data$descriptor() {
@@ -14011,7 +14095,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_geometry_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion)
+     * mln_status mln_map_set_custom_geometry_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_custom_geometry_source_tile_data$handle() {
@@ -14021,7 +14105,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_geometry_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion)
+     * mln_status mln_map_set_custom_geometry_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_custom_geometry_source_tile_data$address() {
@@ -14030,16 +14114,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_geometry_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion)
+     * mln_status mln_map_set_custom_geometry_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_custom_geometry_source_tile_data(long map, MemorySegment source_id, MemorySegment tile_id, MemorySegment data, MemorySegment completion) {
+    public static int mln_map_set_custom_geometry_source_tile_data(long map, MemorySegment source_id, MemorySegment tile_id, MemorySegment data, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_custom_geometry_source_tile_data.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_custom_geometry_source_tile_data", map, source_id, tile_id, data, completion);
+                traceDowncall("mln_map_set_custom_geometry_source_tile_data", map, source_id, tile_id, data, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, tile_id, data, completion);
+            return (int)mh$.invokeExact(map, source_id, tile_id, data, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14053,6 +14137,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_canonical_tile_id.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14064,7 +14149,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_geometry_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_geometry_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_invalidate_custom_geometry_source_tile$descriptor() {
@@ -14074,7 +14159,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_geometry_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_geometry_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_invalidate_custom_geometry_source_tile$handle() {
@@ -14084,7 +14169,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_geometry_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_geometry_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_invalidate_custom_geometry_source_tile$address() {
@@ -14093,16 +14178,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_geometry_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_geometry_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_invalidate_custom_geometry_source_tile(long map, MemorySegment source_id, MemorySegment tile_id, MemorySegment completion) {
+    public static int mln_map_invalidate_custom_geometry_source_tile(long map, MemorySegment source_id, MemorySegment tile_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_invalidate_custom_geometry_source_tile.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_invalidate_custom_geometry_source_tile", map, source_id, tile_id, completion);
+                traceDowncall("mln_map_invalidate_custom_geometry_source_tile", map, source_id, tile_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, tile_id, completion);
+            return (int)mh$.invokeExact(map, source_id, tile_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14116,6 +14201,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_lat_lng_bounds.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14127,7 +14213,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_geometry_source_region(mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_geometry_source_region(mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_invalidate_custom_geometry_source_region$descriptor() {
@@ -14137,7 +14223,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_geometry_source_region(mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_geometry_source_region(mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_invalidate_custom_geometry_source_region$handle() {
@@ -14147,7 +14233,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_geometry_source_region(mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_geometry_source_region(mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_invalidate_custom_geometry_source_region$address() {
@@ -14156,16 +14242,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_geometry_source_region(mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_geometry_source_region(mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_invalidate_custom_geometry_source_region(long map, MemorySegment source_id, MemorySegment bounds, MemorySegment completion) {
+    public static int mln_map_invalidate_custom_geometry_source_region(long map, MemorySegment source_id, MemorySegment bounds, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_invalidate_custom_geometry_source_region.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_invalidate_custom_geometry_source_region", map, source_id, bounds, completion);
+                traceDowncall("mln_map_invalidate_custom_geometry_source_region", map, source_id, bounds, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, bounds, completion);
+            return (int)mh$.invokeExact(map, source_id, bounds, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14179,6 +14265,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14190,7 +14277,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_custom_mvt_vector_source(mln_map map, mln_buffer_view source_id, const mln_custom_mvt_vector_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_custom_mvt_vector_source(mln_map map, mln_buffer_view source_id, const mln_custom_mvt_vector_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_custom_mvt_vector_source$descriptor() {
@@ -14200,7 +14287,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_custom_mvt_vector_source(mln_map map, mln_buffer_view source_id, const mln_custom_mvt_vector_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_custom_mvt_vector_source(mln_map map, mln_buffer_view source_id, const mln_custom_mvt_vector_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_custom_mvt_vector_source$handle() {
@@ -14210,7 +14297,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_custom_mvt_vector_source(mln_map map, mln_buffer_view source_id, const mln_custom_mvt_vector_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_custom_mvt_vector_source(mln_map map, mln_buffer_view source_id, const mln_custom_mvt_vector_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_custom_mvt_vector_source$address() {
@@ -14219,16 +14306,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_custom_mvt_vector_source(mln_map map, mln_buffer_view source_id, const mln_custom_mvt_vector_source_options *options, const mln_completion *completion)
+     * mln_status mln_map_add_custom_mvt_vector_source(mln_map map, mln_buffer_view source_id, const mln_custom_mvt_vector_source_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_custom_mvt_vector_source(long map, MemorySegment source_id, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_add_custom_mvt_vector_source(long map, MemorySegment source_id, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_custom_mvt_vector_source.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_custom_mvt_vector_source", map, source_id, options, completion);
+                traceDowncall("mln_map_add_custom_mvt_vector_source", map, source_id, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, options, completion);
+            return (int)mh$.invokeExact(map, source_id, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14243,6 +14330,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_canonical_tile_id.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14254,7 +14342,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_mvt_vector_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion)
+     * mln_status mln_map_set_custom_mvt_vector_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_custom_mvt_vector_source_tile_data$descriptor() {
@@ -14264,7 +14352,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_mvt_vector_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion)
+     * mln_status mln_map_set_custom_mvt_vector_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_custom_mvt_vector_source_tile_data$handle() {
@@ -14274,7 +14362,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_mvt_vector_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion)
+     * mln_status mln_map_set_custom_mvt_vector_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_custom_mvt_vector_source_tile_data$address() {
@@ -14283,16 +14371,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_mvt_vector_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion)
+     * mln_status mln_map_set_custom_mvt_vector_source_tile_data(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_custom_mvt_vector_source_tile_data(long map, MemorySegment source_id, MemorySegment tile_id, MemorySegment data, MemorySegment completion) {
+    public static int mln_map_set_custom_mvt_vector_source_tile_data(long map, MemorySegment source_id, MemorySegment tile_id, MemorySegment data, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_custom_mvt_vector_source_tile_data.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_custom_mvt_vector_source_tile_data", map, source_id, tile_id, data, completion);
+                traceDowncall("mln_map_set_custom_mvt_vector_source_tile_data", map, source_id, tile_id, data, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, tile_id, data, completion);
+            return (int)mh$.invokeExact(map, source_id, tile_id, data, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14307,6 +14395,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_canonical_tile_id.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14318,7 +14407,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_mvt_vector_source_tile_error(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view message, const mln_completion *completion)
+     * mln_status mln_map_set_custom_mvt_vector_source_tile_error(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view message, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_custom_mvt_vector_source_tile_error$descriptor() {
@@ -14328,7 +14417,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_mvt_vector_source_tile_error(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view message, const mln_completion *completion)
+     * mln_status mln_map_set_custom_mvt_vector_source_tile_error(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view message, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_custom_mvt_vector_source_tile_error$handle() {
@@ -14338,7 +14427,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_mvt_vector_source_tile_error(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view message, const mln_completion *completion)
+     * mln_status mln_map_set_custom_mvt_vector_source_tile_error(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view message, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_custom_mvt_vector_source_tile_error$address() {
@@ -14347,16 +14436,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_custom_mvt_vector_source_tile_error(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view message, const mln_completion *completion)
+     * mln_status mln_map_set_custom_mvt_vector_source_tile_error(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view message, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_custom_mvt_vector_source_tile_error(long map, MemorySegment source_id, MemorySegment tile_id, MemorySegment message, MemorySegment completion) {
+    public static int mln_map_set_custom_mvt_vector_source_tile_error(long map, MemorySegment source_id, MemorySegment tile_id, MemorySegment message, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_custom_mvt_vector_source_tile_error.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_custom_mvt_vector_source_tile_error", map, source_id, tile_id, message, completion);
+                traceDowncall("mln_map_set_custom_mvt_vector_source_tile_error", map, source_id, tile_id, message, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, tile_id, message, completion);
+            return (int)mh$.invokeExact(map, source_id, tile_id, message, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14370,6 +14459,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_canonical_tile_id.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14381,7 +14471,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_mvt_vector_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_mvt_vector_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_invalidate_custom_mvt_vector_source_tile$descriptor() {
@@ -14391,7 +14481,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_mvt_vector_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_mvt_vector_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_invalidate_custom_mvt_vector_source_tile$handle() {
@@ -14401,7 +14491,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_mvt_vector_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_mvt_vector_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_invalidate_custom_mvt_vector_source_tile$address() {
@@ -14410,16 +14500,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_invalidate_custom_mvt_vector_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion)
+     * mln_status mln_map_invalidate_custom_mvt_vector_source_tile(mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_invalidate_custom_mvt_vector_source_tile(long map, MemorySegment source_id, MemorySegment tile_id, MemorySegment completion) {
+    public static int mln_map_invalidate_custom_mvt_vector_source_tile(long map, MemorySegment source_id, MemorySegment tile_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_invalidate_custom_mvt_vector_source_tile.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_invalidate_custom_mvt_vector_source_tile", map, source_id, tile_id, completion);
+                traceDowncall("mln_map_invalidate_custom_mvt_vector_source_tile", map, source_id, tile_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, tile_id, completion);
+            return (int)mh$.invokeExact(map, source_id, tile_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14434,6 +14524,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14445,7 +14536,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_image(mln_map map, mln_buffer_view image_id, const mln_premultiplied_rgba8_image *image, const mln_style_image_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_style_image(mln_map map, mln_buffer_view image_id, const mln_premultiplied_rgba8_image *image, const mln_style_image_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_style_image$descriptor() {
@@ -14455,7 +14546,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_image(mln_map map, mln_buffer_view image_id, const mln_premultiplied_rgba8_image *image, const mln_style_image_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_style_image(mln_map map, mln_buffer_view image_id, const mln_premultiplied_rgba8_image *image, const mln_style_image_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_style_image$handle() {
@@ -14465,7 +14556,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_image(mln_map map, mln_buffer_view image_id, const mln_premultiplied_rgba8_image *image, const mln_style_image_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_style_image(mln_map map, mln_buffer_view image_id, const mln_premultiplied_rgba8_image *image, const mln_style_image_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_style_image$address() {
@@ -14474,16 +14565,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_image(mln_map map, mln_buffer_view image_id, const mln_premultiplied_rgba8_image *image, const mln_style_image_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_style_image(mln_map map, mln_buffer_view image_id, const mln_premultiplied_rgba8_image *image, const mln_style_image_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_style_image(long map, MemorySegment image_id, MemorySegment image, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_set_style_image(long map, MemorySegment image_id, MemorySegment image, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_style_image.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_style_image", map, image_id, image, options, completion);
+                traceDowncall("mln_map_set_style_image", map, image_id, image, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, image_id, image, options, completion);
+            return (int)mh$.invokeExact(map, image_id, image, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14496,6 +14587,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14507,7 +14599,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_image(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_image(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_remove_style_image$descriptor() {
@@ -14517,7 +14609,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_image(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_image(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_remove_style_image$handle() {
@@ -14527,7 +14619,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_image(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_image(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_remove_style_image$address() {
@@ -14536,16 +14628,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_image(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_image(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_remove_style_image(long map, MemorySegment image_id, MemorySegment completion) {
+    public static int mln_map_remove_style_image(long map, MemorySegment image_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_remove_style_image.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_remove_style_image", map, image_id, completion);
+                traceDowncall("mln_map_remove_style_image", map, image_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, image_id, completion);
+            return (int)mh$.invokeExact(map, image_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14558,6 +14650,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14569,7 +14662,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_image_info(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_image_info(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_style_image_info$descriptor() {
@@ -14579,7 +14672,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_image_info(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_image_info(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_style_image_info$handle() {
@@ -14589,7 +14682,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_image_info(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_image_info(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_style_image_info$address() {
@@ -14598,16 +14691,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_image_info(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_image_info(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_style_image_info(long map, MemorySegment image_id, MemorySegment completion) {
+    public static int mln_map_get_style_image_info(long map, MemorySegment image_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_style_image_info.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_style_image_info", map, image_id, completion);
+                traceDowncall("mln_map_get_style_image_info", map, image_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, image_id, completion);
+            return (int)mh$.invokeExact(map, image_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14620,6 +14713,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14631,7 +14725,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_image_premultiplied_rgba8(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_image_premultiplied_rgba8(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_copy_style_image_premultiplied_rgba8$descriptor() {
@@ -14641,7 +14735,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_image_premultiplied_rgba8(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_image_premultiplied_rgba8(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_copy_style_image_premultiplied_rgba8$handle() {
@@ -14651,7 +14745,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_image_premultiplied_rgba8(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_image_premultiplied_rgba8(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_copy_style_image_premultiplied_rgba8$address() {
@@ -14660,16 +14754,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_image_premultiplied_rgba8(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_image_premultiplied_rgba8(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_copy_style_image_premultiplied_rgba8(long map, MemorySegment image_id, MemorySegment completion) {
+    public static int mln_map_copy_style_image_premultiplied_rgba8(long map, MemorySegment image_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_copy_style_image_premultiplied_rgba8.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_copy_style_image_premultiplied_rgba8", map, image_id, completion);
+                traceDowncall("mln_map_copy_style_image_premultiplied_rgba8", map, image_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, image_id, completion);
+            return (int)mh$.invokeExact(map, image_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14682,6 +14776,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14693,7 +14788,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_image_stretches(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_image_stretches(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_copy_style_image_stretches$descriptor() {
@@ -14703,7 +14798,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_image_stretches(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_image_stretches(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_copy_style_image_stretches$handle() {
@@ -14713,7 +14808,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_image_stretches(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_image_stretches(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_copy_style_image_stretches$address() {
@@ -14722,16 +14817,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_copy_style_image_stretches(mln_map map, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_copy_style_image_stretches(mln_map map, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_copy_style_image_stretches(long map, MemorySegment image_id, MemorySegment completion) {
+    public static int mln_map_copy_style_image_stretches(long map, MemorySegment image_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_copy_style_image_stretches.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_copy_style_image_stretches", map, image_id, completion);
+                traceDowncall("mln_map_copy_style_image_stretches", map, image_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, image_id, completion);
+            return (int)mh$.invokeExact(map, image_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14747,6 +14842,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14758,7 +14854,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_image_source_url(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_add_image_source_url(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_image_source_url$descriptor() {
@@ -14768,7 +14864,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_image_source_url(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_add_image_source_url(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_image_source_url$handle() {
@@ -14778,7 +14874,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_image_source_url(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_add_image_source_url(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_image_source_url$address() {
@@ -14787,16 +14883,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_image_source_url(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_add_image_source_url(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_image_source_url(long map, MemorySegment source_id, MemorySegment coordinates, long coordinate_count, MemorySegment url, MemorySegment completion) {
+    public static int mln_map_add_image_source_url(long map, MemorySegment source_id, MemorySegment coordinates, long coordinate_count, MemorySegment url, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_image_source_url.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_image_source_url", map, source_id, coordinates, coordinate_count, url, completion);
+                traceDowncall("mln_map_add_image_source_url", map, source_id, coordinates, coordinate_count, url, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, coordinates, coordinate_count, url, completion);
+            return (int)mh$.invokeExact(map, source_id, coordinates, coordinate_count, url, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14812,6 +14908,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14823,7 +14920,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_image_source_image(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_premultiplied_rgba8_image *image, const mln_completion *completion)
+     * mln_status mln_map_add_image_source_image(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_premultiplied_rgba8_image *image, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_image_source_image$descriptor() {
@@ -14833,7 +14930,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_image_source_image(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_premultiplied_rgba8_image *image, const mln_completion *completion)
+     * mln_status mln_map_add_image_source_image(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_premultiplied_rgba8_image *image, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_image_source_image$handle() {
@@ -14843,7 +14940,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_image_source_image(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_premultiplied_rgba8_image *image, const mln_completion *completion)
+     * mln_status mln_map_add_image_source_image(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_premultiplied_rgba8_image *image, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_image_source_image$address() {
@@ -14852,16 +14949,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_image_source_image(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_premultiplied_rgba8_image *image, const mln_completion *completion)
+     * mln_status mln_map_add_image_source_image(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_premultiplied_rgba8_image *image, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_image_source_image(long map, MemorySegment source_id, MemorySegment coordinates, long coordinate_count, MemorySegment image, MemorySegment completion) {
+    public static int mln_map_add_image_source_image(long map, MemorySegment source_id, MemorySegment coordinates, long coordinate_count, MemorySegment image, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_image_source_image.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_image_source_image", map, source_id, coordinates, coordinate_count, image, completion);
+                traceDowncall("mln_map_add_image_source_image", map, source_id, coordinates, coordinate_count, image, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, coordinates, coordinate_count, image, completion);
+            return (int)mh$.invokeExact(map, source_id, coordinates, coordinate_count, image, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14875,6 +14972,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14886,7 +14984,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_image_source_url$descriptor() {
@@ -14896,7 +14994,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_image_source_url$handle() {
@@ -14906,7 +15004,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_image_source_url$address() {
@@ -14915,16 +15013,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_url(mln_map map, mln_buffer_view source_id, mln_buffer_view url, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_image_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment completion) {
+    public static int mln_map_set_image_source_url(long map, MemorySegment source_id, MemorySegment url, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_image_source_url.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_image_source_url", map, source_id, url, completion);
+                traceDowncall("mln_map_set_image_source_url", map, source_id, url, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, url, completion);
+            return (int)mh$.invokeExact(map, source_id, url, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -14938,6 +15036,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -14949,7 +15048,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_image(mln_map map, mln_buffer_view source_id, const mln_premultiplied_rgba8_image *image, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_image(mln_map map, mln_buffer_view source_id, const mln_premultiplied_rgba8_image *image, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_image_source_image$descriptor() {
@@ -14959,7 +15058,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_image(mln_map map, mln_buffer_view source_id, const mln_premultiplied_rgba8_image *image, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_image(mln_map map, mln_buffer_view source_id, const mln_premultiplied_rgba8_image *image, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_image_source_image$handle() {
@@ -14969,7 +15068,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_image(mln_map map, mln_buffer_view source_id, const mln_premultiplied_rgba8_image *image, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_image(mln_map map, mln_buffer_view source_id, const mln_premultiplied_rgba8_image *image, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_image_source_image$address() {
@@ -14978,16 +15077,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_image(mln_map map, mln_buffer_view source_id, const mln_premultiplied_rgba8_image *image, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_image(mln_map map, mln_buffer_view source_id, const mln_premultiplied_rgba8_image *image, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_image_source_image(long map, MemorySegment source_id, MemorySegment image, MemorySegment completion) {
+    public static int mln_map_set_image_source_image(long map, MemorySegment source_id, MemorySegment image, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_image_source_image.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_image_source_image", map, source_id, image, completion);
+                traceDowncall("mln_map_set_image_source_image", map, source_id, image, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, image, completion);
+            return (int)mh$.invokeExact(map, source_id, image, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15002,6 +15101,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15013,7 +15113,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_image_source_coordinates$descriptor() {
@@ -15023,7 +15123,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_image_source_coordinates$handle() {
@@ -15033,7 +15133,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_image_source_coordinates$address() {
@@ -15042,16 +15142,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion)
+     * mln_status mln_map_set_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_lat_lng *coordinates, size_t coordinate_count, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_image_source_coordinates(long map, MemorySegment source_id, MemorySegment coordinates, long coordinate_count, MemorySegment completion) {
+    public static int mln_map_set_image_source_coordinates(long map, MemorySegment source_id, MemorySegment coordinates, long coordinate_count, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_image_source_coordinates.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_image_source_coordinates", map, source_id, coordinates, coordinate_count, completion);
+                traceDowncall("mln_map_set_image_source_coordinates", map, source_id, coordinates, coordinate_count, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, coordinates, coordinate_count, completion);
+            return (int)mh$.invokeExact(map, source_id, coordinates, coordinate_count, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15064,6 +15164,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15075,7 +15176,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_image_source_coordinates$descriptor() {
@@ -15085,7 +15186,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_image_source_coordinates$handle() {
@@ -15095,7 +15196,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_image_source_coordinates$address() {
@@ -15104,16 +15205,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_get_image_source_coordinates(mln_map map, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_image_source_coordinates(long map, MemorySegment source_id, MemorySegment completion) {
+    public static int mln_map_get_image_source_coordinates(long map, MemorySegment source_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_image_source_coordinates.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_image_source_coordinates", map, source_id, completion);
+                traceDowncall("mln_map_get_image_source_coordinates", map, source_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, source_id, completion);
+            return (int)mh$.invokeExact(map, source_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15128,6 +15229,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15139,7 +15241,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_hillshade_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_hillshade_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_hillshade_layer$descriptor() {
@@ -15149,7 +15251,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_hillshade_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_hillshade_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_hillshade_layer$handle() {
@@ -15159,7 +15261,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_hillshade_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_hillshade_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_hillshade_layer$address() {
@@ -15168,16 +15270,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_hillshade_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_hillshade_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_hillshade_layer(long map, MemorySegment layer_id, MemorySegment source_id, MemorySegment before_layer_id, MemorySegment completion) {
+    public static int mln_map_add_hillshade_layer(long map, MemorySegment layer_id, MemorySegment source_id, MemorySegment before_layer_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_hillshade_layer.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_hillshade_layer", map, layer_id, source_id, before_layer_id, completion);
+                traceDowncall("mln_map_add_hillshade_layer", map, layer_id, source_id, before_layer_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, source_id, before_layer_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, source_id, before_layer_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15192,6 +15294,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15203,7 +15306,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_color_relief_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_color_relief_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_color_relief_layer$descriptor() {
@@ -15213,7 +15316,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_color_relief_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_color_relief_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_color_relief_layer$handle() {
@@ -15223,7 +15326,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_color_relief_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_color_relief_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_color_relief_layer$address() {
@@ -15232,16 +15335,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_color_relief_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_color_relief_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_color_relief_layer(long map, MemorySegment layer_id, MemorySegment source_id, MemorySegment before_layer_id, MemorySegment completion) {
+    public static int mln_map_add_color_relief_layer(long map, MemorySegment layer_id, MemorySegment source_id, MemorySegment before_layer_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_color_relief_layer.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_color_relief_layer", map, layer_id, source_id, before_layer_id, completion);
+                traceDowncall("mln_map_add_color_relief_layer", map, layer_id, source_id, before_layer_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, source_id, before_layer_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, source_id, before_layer_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15255,6 +15358,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15266,7 +15370,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_location_indicator_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_location_indicator_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_location_indicator_layer$descriptor() {
@@ -15276,7 +15380,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_location_indicator_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_location_indicator_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_location_indicator_layer$handle() {
@@ -15286,7 +15390,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_location_indicator_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_location_indicator_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_location_indicator_layer$address() {
@@ -15295,16 +15399,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_location_indicator_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_location_indicator_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_location_indicator_layer(long map, MemorySegment layer_id, MemorySegment before_layer_id, MemorySegment completion) {
+    public static int mln_map_add_location_indicator_layer(long map, MemorySegment layer_id, MemorySegment before_layer_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_location_indicator_layer.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_location_indicator_layer", map, layer_id, before_layer_id, completion);
+                traceDowncall("mln_map_add_location_indicator_layer", map, layer_id, before_layer_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, before_layer_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, before_layer_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15319,6 +15423,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_lat_lng.layout(),
             MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15330,7 +15435,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_location(mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_location(mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_location_indicator_location$descriptor() {
@@ -15340,7 +15445,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_location(mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_location(mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_location_indicator_location$handle() {
@@ -15350,7 +15455,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_location(mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_location(mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_location_indicator_location$address() {
@@ -15359,16 +15464,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_location(mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_location(mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_location_indicator_location(long map, MemorySegment layer_id, MemorySegment coordinate, double altitude, MemorySegment completion) {
+    public static int mln_map_set_location_indicator_location(long map, MemorySegment layer_id, MemorySegment coordinate, double altitude, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_location_indicator_location.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_location_indicator_location", map, layer_id, coordinate, altitude, completion);
+                traceDowncall("mln_map_set_location_indicator_location", map, layer_id, coordinate, altitude, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, coordinate, altitude, completion);
+            return (int)mh$.invokeExact(map, layer_id, coordinate, altitude, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15382,6 +15487,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15393,7 +15499,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_bearing(mln_map map, mln_buffer_view layer_id, double bearing, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_bearing(mln_map map, mln_buffer_view layer_id, double bearing, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_location_indicator_bearing$descriptor() {
@@ -15403,7 +15509,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_bearing(mln_map map, mln_buffer_view layer_id, double bearing, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_bearing(mln_map map, mln_buffer_view layer_id, double bearing, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_location_indicator_bearing$handle() {
@@ -15413,7 +15519,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_bearing(mln_map map, mln_buffer_view layer_id, double bearing, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_bearing(mln_map map, mln_buffer_view layer_id, double bearing, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_location_indicator_bearing$address() {
@@ -15422,16 +15528,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_bearing(mln_map map, mln_buffer_view layer_id, double bearing, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_bearing(mln_map map, mln_buffer_view layer_id, double bearing, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_location_indicator_bearing(long map, MemorySegment layer_id, double bearing, MemorySegment completion) {
+    public static int mln_map_set_location_indicator_bearing(long map, MemorySegment layer_id, double bearing, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_location_indicator_bearing.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_location_indicator_bearing", map, layer_id, bearing, completion);
+                traceDowncall("mln_map_set_location_indicator_bearing", map, layer_id, bearing, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, bearing, completion);
+            return (int)mh$.invokeExact(map, layer_id, bearing, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15445,6 +15551,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15456,7 +15563,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_accuracy_radius(mln_map map, mln_buffer_view layer_id, double radius, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_accuracy_radius(mln_map map, mln_buffer_view layer_id, double radius, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_location_indicator_accuracy_radius$descriptor() {
@@ -15466,7 +15573,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_accuracy_radius(mln_map map, mln_buffer_view layer_id, double radius, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_accuracy_radius(mln_map map, mln_buffer_view layer_id, double radius, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_location_indicator_accuracy_radius$handle() {
@@ -15476,7 +15583,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_accuracy_radius(mln_map map, mln_buffer_view layer_id, double radius, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_accuracy_radius(mln_map map, mln_buffer_view layer_id, double radius, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_location_indicator_accuracy_radius$address() {
@@ -15485,16 +15592,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_accuracy_radius(mln_map map, mln_buffer_view layer_id, double radius, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_accuracy_radius(mln_map map, mln_buffer_view layer_id, double radius, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_location_indicator_accuracy_radius(long map, MemorySegment layer_id, double radius, MemorySegment completion) {
+    public static int mln_map_set_location_indicator_accuracy_radius(long map, MemorySegment layer_id, double radius, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_location_indicator_accuracy_radius.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_location_indicator_accuracy_radius", map, layer_id, radius, completion);
+                traceDowncall("mln_map_set_location_indicator_accuracy_radius", map, layer_id, radius, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, radius, completion);
+            return (int)mh$.invokeExact(map, layer_id, radius, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15509,6 +15616,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             MapLibreNativeC.C_INT,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15520,7 +15628,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_image_name(mln_map map, mln_buffer_view layer_id, uint32_t image_kind, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_image_name(mln_map map, mln_buffer_view layer_id, uint32_t image_kind, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_location_indicator_image_name$descriptor() {
@@ -15530,7 +15638,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_image_name(mln_map map, mln_buffer_view layer_id, uint32_t image_kind, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_image_name(mln_map map, mln_buffer_view layer_id, uint32_t image_kind, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_location_indicator_image_name$handle() {
@@ -15540,7 +15648,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_image_name(mln_map map, mln_buffer_view layer_id, uint32_t image_kind, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_image_name(mln_map map, mln_buffer_view layer_id, uint32_t image_kind, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_location_indicator_image_name$address() {
@@ -15549,16 +15657,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_location_indicator_image_name(mln_map map, mln_buffer_view layer_id, uint32_t image_kind, mln_buffer_view image_id, const mln_completion *completion)
+     * mln_status mln_map_set_location_indicator_image_name(mln_map map, mln_buffer_view layer_id, uint32_t image_kind, mln_buffer_view image_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_location_indicator_image_name(long map, MemorySegment layer_id, int image_kind, MemorySegment image_id, MemorySegment completion) {
+    public static int mln_map_set_location_indicator_image_name(long map, MemorySegment layer_id, int image_kind, MemorySegment image_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_location_indicator_image_name.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_location_indicator_image_name", map, layer_id, image_kind, image_id, completion);
+                traceDowncall("mln_map_set_location_indicator_image_name", map, layer_id, image_kind, image_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, image_kind, image_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, image_kind, image_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15572,6 +15680,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15583,7 +15692,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_style_layer_json(mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_style_layer_json(mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_add_style_layer_json$descriptor() {
@@ -15593,7 +15702,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_style_layer_json(mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_style_layer_json(mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_add_style_layer_json$handle() {
@@ -15603,7 +15712,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_style_layer_json(mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_style_layer_json(mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_add_style_layer_json$address() {
@@ -15612,16 +15721,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_style_layer_json(mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_add_style_layer_json(mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_add_style_layer_json(long map, MemorySegment layer_json, MemorySegment before_layer_id, MemorySegment completion) {
+    public static int mln_map_add_style_layer_json(long map, MemorySegment layer_json, MemorySegment before_layer_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_add_style_layer_json.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_style_layer_json", map, layer_json, before_layer_id, completion);
+                traceDowncall("mln_map_add_style_layer_json", map, layer_json, before_layer_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_json, before_layer_id, completion);
+            return (int)mh$.invokeExact(map, layer_json, before_layer_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15634,6 +15743,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15645,7 +15755,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_remove_style_layer$descriptor() {
@@ -15655,7 +15765,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_remove_style_layer$handle() {
@@ -15665,7 +15775,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_remove_style_layer$address() {
@@ -15674,16 +15784,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_remove_style_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_remove_style_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_remove_style_layer(long map, MemorySegment layer_id, MemorySegment completion) {
+    public static int mln_map_remove_style_layer(long map, MemorySegment layer_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_remove_style_layer.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_remove_style_layer", map, layer_id, completion);
+                traceDowncall("mln_map_remove_style_layer", map, layer_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15696,6 +15806,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15707,7 +15818,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_layer_info(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_layer_info(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_style_layer_info$descriptor() {
@@ -15717,7 +15828,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_layer_info(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_layer_info(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_style_layer_info$handle() {
@@ -15727,7 +15838,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_layer_info(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_layer_info(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_style_layer_info$address() {
@@ -15736,16 +15847,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_layer_info(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_layer_info(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_style_layer_info(long map, MemorySegment layer_id, MemorySegment completion) {
+    public static int mln_map_get_style_layer_info(long map, MemorySegment layer_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_style_layer_info.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_style_layer_info", map, layer_id, completion);
+                traceDowncall("mln_map_get_style_layer_info", map, layer_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15757,6 +15868,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15768,7 +15880,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_layer_ids(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_layer_ids(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_list_style_layer_ids$descriptor() {
@@ -15778,7 +15890,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_layer_ids(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_layer_ids(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_list_style_layer_ids$handle() {
@@ -15788,7 +15900,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_layer_ids(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_layer_ids(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_list_style_layer_ids$address() {
@@ -15797,16 +15909,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_layer_ids(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_layer_ids(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_list_style_layer_ids(long map, MemorySegment completion) {
+    public static int mln_map_list_style_layer_ids(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_list_style_layer_ids.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_list_style_layer_ids", map, completion);
+                traceDowncall("mln_map_list_style_layer_ids", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15818,6 +15930,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15829,7 +15942,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_layers(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_layers(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_list_style_layers$descriptor() {
@@ -15839,7 +15952,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_layers(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_layers(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_list_style_layers$handle() {
@@ -15849,7 +15962,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_layers(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_layers(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_list_style_layers$address() {
@@ -15858,16 +15971,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_list_style_layers(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_list_style_layers(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_list_style_layers(long map, MemorySegment completion) {
+    public static int mln_map_list_style_layers(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_list_style_layers.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_list_style_layers", map, completion);
+                traceDowncall("mln_map_list_style_layers", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15881,6 +15994,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15892,7 +16006,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_move_style_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_move_style_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_move_style_layer$descriptor() {
@@ -15902,7 +16016,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_move_style_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_move_style_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_move_style_layer$handle() {
@@ -15912,7 +16026,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_move_style_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_move_style_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_move_style_layer$address() {
@@ -15921,16 +16035,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_move_style_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion)
+     * mln_status mln_map_move_style_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_move_style_layer(long map, MemorySegment layer_id, MemorySegment before_layer_id, MemorySegment completion) {
+    public static int mln_map_move_style_layer(long map, MemorySegment layer_id, MemorySegment before_layer_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_move_style_layer.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_move_style_layer", map, layer_id, before_layer_id, completion);
+                traceDowncall("mln_map_move_style_layer", map, layer_id, before_layer_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, before_layer_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, before_layer_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -15943,6 +16057,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -15954,7 +16069,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_layer_json(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_layer_json(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_style_layer_json$descriptor() {
@@ -15964,7 +16079,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_layer_json(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_layer_json(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_style_layer_json$handle() {
@@ -15974,7 +16089,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_layer_json(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_layer_json(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_style_layer_json$address() {
@@ -15983,16 +16098,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_layer_json(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_style_layer_json(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_style_layer_json(long map, MemorySegment layer_id, MemorySegment completion) {
+    public static int mln_map_get_style_layer_json(long map, MemorySegment layer_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_style_layer_json.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_style_layer_json", map, layer_id, completion);
+                traceDowncall("mln_map_get_style_layer_json", map, layer_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16005,6 +16120,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16016,7 +16132,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_light_json(mln_map map, mln_buffer_view light_json, const mln_completion *completion)
+     * mln_status mln_map_set_style_light_json(mln_map map, mln_buffer_view light_json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_style_light_json$descriptor() {
@@ -16026,7 +16142,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_light_json(mln_map map, mln_buffer_view light_json, const mln_completion *completion)
+     * mln_status mln_map_set_style_light_json(mln_map map, mln_buffer_view light_json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_style_light_json$handle() {
@@ -16036,7 +16152,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_light_json(mln_map map, mln_buffer_view light_json, const mln_completion *completion)
+     * mln_status mln_map_set_style_light_json(mln_map map, mln_buffer_view light_json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_style_light_json$address() {
@@ -16045,16 +16161,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_light_json(mln_map map, mln_buffer_view light_json, const mln_completion *completion)
+     * mln_status mln_map_set_style_light_json(mln_map map, mln_buffer_view light_json, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_style_light_json(long map, MemorySegment light_json, MemorySegment completion) {
+    public static int mln_map_set_style_light_json(long map, MemorySegment light_json, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_style_light_json.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_style_light_json", map, light_json, completion);
+                traceDowncall("mln_map_set_style_light_json", map, light_json, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, light_json, completion);
+            return (int)mh$.invokeExact(map, light_json, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16068,6 +16184,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16079,7 +16196,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_light_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_style_light_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_style_light_property$descriptor() {
@@ -16089,7 +16206,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_light_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_style_light_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_style_light_property$handle() {
@@ -16099,7 +16216,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_light_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_style_light_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_style_light_property$address() {
@@ -16108,16 +16225,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_light_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_style_light_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_style_light_property(long map, MemorySegment property_name, MemorySegment value, MemorySegment completion) {
+    public static int mln_map_set_style_light_property(long map, MemorySegment property_name, MemorySegment value, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_style_light_property.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_style_light_property", map, property_name, value, completion);
+                traceDowncall("mln_map_set_style_light_property", map, property_name, value, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, property_name, value, completion);
+            return (int)mh$.invokeExact(map, property_name, value, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16130,6 +16247,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16141,7 +16259,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_light_property(mln_map map, mln_buffer_view property_name, const mln_completion *completion)
+     * mln_status mln_map_get_style_light_property(mln_map map, mln_buffer_view property_name, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_style_light_property$descriptor() {
@@ -16151,7 +16269,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_light_property(mln_map map, mln_buffer_view property_name, const mln_completion *completion)
+     * mln_status mln_map_get_style_light_property(mln_map map, mln_buffer_view property_name, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_style_light_property$handle() {
@@ -16161,7 +16279,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_light_property(mln_map map, mln_buffer_view property_name, const mln_completion *completion)
+     * mln_status mln_map_get_style_light_property(mln_map map, mln_buffer_view property_name, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_style_light_property$address() {
@@ -16170,16 +16288,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_light_property(mln_map map, mln_buffer_view property_name, const mln_completion *completion)
+     * mln_status mln_map_get_style_light_property(mln_map map, mln_buffer_view property_name, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_style_light_property(long map, MemorySegment property_name, MemorySegment completion) {
+    public static int mln_map_get_style_light_property(long map, MemorySegment property_name, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_style_light_property.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_style_light_property", map, property_name, completion);
+                traceDowncall("mln_map_get_style_light_property", map, property_name, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, property_name, completion);
+            return (int)mh$.invokeExact(map, property_name, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16192,6 +16310,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16203,7 +16322,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_transition_options(mln_map map, const mln_style_transition_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_style_transition_options(mln_map map, const mln_style_transition_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_style_transition_options$descriptor() {
@@ -16213,7 +16332,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_transition_options(mln_map map, const mln_style_transition_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_style_transition_options(mln_map map, const mln_style_transition_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_style_transition_options$handle() {
@@ -16223,7 +16342,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_transition_options(mln_map map, const mln_style_transition_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_style_transition_options(mln_map map, const mln_style_transition_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_style_transition_options$address() {
@@ -16232,16 +16351,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_style_transition_options(mln_map map, const mln_style_transition_options *options, const mln_completion *completion)
+     * mln_status mln_map_set_style_transition_options(mln_map map, const mln_style_transition_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_style_transition_options(long map, MemorySegment options, MemorySegment completion) {
+    public static int mln_map_set_style_transition_options(long map, MemorySegment options, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_style_transition_options.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_style_transition_options", map, options, completion);
+                traceDowncall("mln_map_set_style_transition_options", map, options, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, options, completion);
+            return (int)mh$.invokeExact(map, options, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16253,6 +16372,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16264,7 +16384,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_transition_options(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_get_style_transition_options(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_style_transition_options$descriptor() {
@@ -16274,7 +16394,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_transition_options(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_get_style_transition_options(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_style_transition_options$handle() {
@@ -16284,7 +16404,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_transition_options(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_get_style_transition_options(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_style_transition_options$address() {
@@ -16293,16 +16413,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_style_transition_options(mln_map map, const mln_completion *completion)
+     * mln_status mln_map_get_style_transition_options(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_style_transition_options(long map, MemorySegment completion) {
+    public static int mln_map_get_style_transition_options(long map, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_style_transition_options.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_style_transition_options", map, completion);
+                traceDowncall("mln_map_get_style_transition_options", map, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, completion);
+            return (int)mh$.invokeExact(map, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16317,6 +16437,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16328,7 +16449,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_layer_property$descriptor() {
@@ -16338,7 +16459,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_layer_property$handle() {
@@ -16348,7 +16469,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_layer_property$address() {
@@ -16357,16 +16478,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion)
+     * mln_status mln_map_set_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, mln_buffer_view value, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_layer_property(long map, MemorySegment layer_id, MemorySegment property_name, MemorySegment value, MemorySegment completion) {
+    public static int mln_map_set_layer_property(long map, MemorySegment layer_id, MemorySegment property_name, MemorySegment value, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_layer_property.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_layer_property", map, layer_id, property_name, value, completion);
+                traceDowncall("mln_map_set_layer_property", map, layer_id, property_name, value, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, property_name, value, completion);
+            return (int)mh$.invokeExact(map, layer_id, property_name, value, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16380,6 +16501,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16391,7 +16513,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, const mln_completion *completion)
+     * mln_status mln_map_get_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_layer_property$descriptor() {
@@ -16401,7 +16523,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, const mln_completion *completion)
+     * mln_status mln_map_get_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_layer_property$handle() {
@@ -16411,7 +16533,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, const mln_completion *completion)
+     * mln_status mln_map_get_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_layer_property$address() {
@@ -16420,16 +16542,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, const mln_completion *completion)
+     * mln_status mln_map_get_layer_property(mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_layer_property(long map, MemorySegment layer_id, MemorySegment property_name, MemorySegment completion) {
+    public static int mln_map_get_layer_property(long map, MemorySegment layer_id, MemorySegment property_name, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_layer_property.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_layer_property", map, layer_id, property_name, completion);
+                traceDowncall("mln_map_get_layer_property", map, layer_id, property_name, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, property_name, completion);
+            return (int)mh$.invokeExact(map, layer_id, property_name, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16443,6 +16565,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16454,7 +16577,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_buffer_view *filter, const mln_completion *completion)
+     * mln_status mln_map_set_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_buffer_view *filter, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_layer_filter$descriptor() {
@@ -16464,7 +16587,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_buffer_view *filter, const mln_completion *completion)
+     * mln_status mln_map_set_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_buffer_view *filter, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_layer_filter$handle() {
@@ -16474,7 +16597,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_buffer_view *filter, const mln_completion *completion)
+     * mln_status mln_map_set_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_buffer_view *filter, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_layer_filter$address() {
@@ -16483,16 +16606,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_buffer_view *filter, const mln_completion *completion)
+     * mln_status mln_map_set_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_buffer_view *filter, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_layer_filter(long map, MemorySegment layer_id, MemorySegment filter, MemorySegment completion) {
+    public static int mln_map_set_layer_filter(long map, MemorySegment layer_id, MemorySegment filter, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_layer_filter.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_layer_filter", map, layer_id, filter, completion);
+                traceDowncall("mln_map_set_layer_filter", map, layer_id, filter, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, filter, completion);
+            return (int)mh$.invokeExact(map, layer_id, filter, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16505,6 +16628,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16516,7 +16640,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_get_layer_filter$descriptor() {
@@ -16526,7 +16650,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_get_layer_filter$handle() {
@@ -16536,7 +16660,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_get_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_get_layer_filter$address() {
@@ -16545,16 +16669,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_get_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_get_layer_filter(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_get_layer_filter(long map, MemorySegment layer_id, MemorySegment completion) {
+    public static int mln_map_get_layer_filter(long map, MemorySegment layer_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_get_layer_filter.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_get_layer_filter", map, layer_id, completion);
+                traceDowncall("mln_map_get_layer_filter", map, layer_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16568,6 +16692,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16579,7 +16704,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_source_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer, const mln_completion *completion)
+     * mln_status mln_map_set_layer_source_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_layer_source_layer$descriptor() {
@@ -16589,7 +16714,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_source_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer, const mln_completion *completion)
+     * mln_status mln_map_set_layer_source_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_layer_source_layer$handle() {
@@ -16599,7 +16724,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_source_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer, const mln_completion *completion)
+     * mln_status mln_map_set_layer_source_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_layer_source_layer$address() {
@@ -16608,16 +16733,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_source_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer, const mln_completion *completion)
+     * mln_status mln_map_set_layer_source_layer(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_layer_source_layer(long map, MemorySegment layer_id, MemorySegment source_layer, MemorySegment completion) {
+    public static int mln_map_set_layer_source_layer(long map, MemorySegment layer_id, MemorySegment source_layer, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_layer_source_layer.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_layer_source_layer", map, layer_id, source_layer, completion);
+                traceDowncall("mln_map_set_layer_source_layer", map, layer_id, source_layer, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, source_layer, completion);
+            return (int)mh$.invokeExact(map, layer_id, source_layer, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16630,6 +16755,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16641,7 +16767,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_layer_source_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_copy_layer_source_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_copy_layer_source_layer$descriptor() {
@@ -16651,7 +16777,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_layer_source_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_copy_layer_source_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_copy_layer_source_layer$handle() {
@@ -16661,7 +16787,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_layer_source_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_copy_layer_source_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_copy_layer_source_layer$address() {
@@ -16670,16 +16796,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_copy_layer_source_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_copy_layer_source_layer(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_copy_layer_source_layer(long map, MemorySegment layer_id, MemorySegment completion) {
+    public static int mln_map_copy_layer_source_layer(long map, MemorySegment layer_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_copy_layer_source_layer.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_copy_layer_source_layer", map, layer_id, completion);
+                traceDowncall("mln_map_copy_layer_source_layer", map, layer_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16693,6 +16819,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16704,7 +16831,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_source_id(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_set_layer_source_id(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_layer_source_id$descriptor() {
@@ -16714,7 +16841,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_source_id(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_set_layer_source_id(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_layer_source_id$handle() {
@@ -16724,7 +16851,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_source_id(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_set_layer_source_id(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_layer_source_id$address() {
@@ -16733,16 +16860,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_source_id(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, const mln_completion *completion)
+     * mln_status mln_map_set_layer_source_id(mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_layer_source_id(long map, MemorySegment layer_id, MemorySegment source_id, MemorySegment completion) {
+    public static int mln_map_set_layer_source_id(long map, MemorySegment layer_id, MemorySegment source_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_layer_source_id.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_layer_source_id", map, layer_id, source_id, completion);
+                traceDowncall("mln_map_set_layer_source_id", map, layer_id, source_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, source_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, source_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16755,6 +16882,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16766,7 +16894,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_layer_source_id(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_copy_layer_source_id(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_copy_layer_source_id$descriptor() {
@@ -16776,7 +16904,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_layer_source_id(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_copy_layer_source_id(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_copy_layer_source_id$handle() {
@@ -16786,7 +16914,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_copy_layer_source_id(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_copy_layer_source_id(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_copy_layer_source_id$address() {
@@ -16795,16 +16923,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_copy_layer_source_id(mln_map map, mln_buffer_view layer_id, const mln_completion *completion)
+     * mln_status mln_map_copy_layer_source_id(mln_map map, mln_buffer_view layer_id, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_copy_layer_source_id(long map, MemorySegment layer_id, MemorySegment completion) {
+    public static int mln_map_copy_layer_source_id(long map, MemorySegment layer_id, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_copy_layer_source_id.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_copy_layer_source_id", map, layer_id, completion);
+                traceDowncall("mln_map_copy_layer_source_id", map, layer_id, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, completion);
+            return (int)mh$.invokeExact(map, layer_id, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16818,6 +16946,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16829,7 +16958,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_min_zoom(mln_map map, mln_buffer_view layer_id, double min_zoom, const mln_completion *completion)
+     * mln_status mln_map_set_layer_min_zoom(mln_map map, mln_buffer_view layer_id, double min_zoom, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_layer_min_zoom$descriptor() {
@@ -16839,7 +16968,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_min_zoom(mln_map map, mln_buffer_view layer_id, double min_zoom, const mln_completion *completion)
+     * mln_status mln_map_set_layer_min_zoom(mln_map map, mln_buffer_view layer_id, double min_zoom, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_layer_min_zoom$handle() {
@@ -16849,7 +16978,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_min_zoom(mln_map map, mln_buffer_view layer_id, double min_zoom, const mln_completion *completion)
+     * mln_status mln_map_set_layer_min_zoom(mln_map map, mln_buffer_view layer_id, double min_zoom, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_layer_min_zoom$address() {
@@ -16858,16 +16987,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_min_zoom(mln_map map, mln_buffer_view layer_id, double min_zoom, const mln_completion *completion)
+     * mln_status mln_map_set_layer_min_zoom(mln_map map, mln_buffer_view layer_id, double min_zoom, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_layer_min_zoom(long map, MemorySegment layer_id, double min_zoom, MemorySegment completion) {
+    public static int mln_map_set_layer_min_zoom(long map, MemorySegment layer_id, double min_zoom, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_layer_min_zoom.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_layer_min_zoom", map, layer_id, min_zoom, completion);
+                traceDowncall("mln_map_set_layer_min_zoom", map, layer_id, min_zoom, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, min_zoom, completion);
+            return (int)mh$.invokeExact(map, layer_id, min_zoom, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16881,6 +17010,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16892,7 +17022,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_max_zoom(mln_map map, mln_buffer_view layer_id, double max_zoom, const mln_completion *completion)
+     * mln_status mln_map_set_layer_max_zoom(mln_map map, mln_buffer_view layer_id, double max_zoom, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_layer_max_zoom$descriptor() {
@@ -16902,7 +17032,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_max_zoom(mln_map map, mln_buffer_view layer_id, double max_zoom, const mln_completion *completion)
+     * mln_status mln_map_set_layer_max_zoom(mln_map map, mln_buffer_view layer_id, double max_zoom, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_layer_max_zoom$handle() {
@@ -16912,7 +17042,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_max_zoom(mln_map map, mln_buffer_view layer_id, double max_zoom, const mln_completion *completion)
+     * mln_status mln_map_set_layer_max_zoom(mln_map map, mln_buffer_view layer_id, double max_zoom, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_layer_max_zoom$address() {
@@ -16921,16 +17051,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_max_zoom(mln_map map, mln_buffer_view layer_id, double max_zoom, const mln_completion *completion)
+     * mln_status mln_map_set_layer_max_zoom(mln_map map, mln_buffer_view layer_id, double max_zoom, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_layer_max_zoom(long map, MemorySegment layer_id, double max_zoom, MemorySegment completion) {
+    public static int mln_map_set_layer_max_zoom(long map, MemorySegment layer_id, double max_zoom, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_layer_max_zoom.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_layer_max_zoom", map, layer_id, max_zoom, completion);
+                traceDowncall("mln_map_set_layer_max_zoom", map, layer_id, max_zoom, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, max_zoom, completion);
+            return (int)mh$.invokeExact(map, layer_id, max_zoom, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -16944,6 +17074,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
             MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -16955,7 +17086,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_visibility(mln_map map, mln_buffer_view layer_id, uint32_t visibility, const mln_completion *completion)
+     * mln_status mln_map_set_layer_visibility(mln_map map, mln_buffer_view layer_id, uint32_t visibility, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_map_set_layer_visibility$descriptor() {
@@ -16965,7 +17096,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_visibility(mln_map map, mln_buffer_view layer_id, uint32_t visibility, const mln_completion *completion)
+     * mln_status mln_map_set_layer_visibility(mln_map map, mln_buffer_view layer_id, uint32_t visibility, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_map_set_layer_visibility$handle() {
@@ -16975,7 +17106,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_visibility(mln_map map, mln_buffer_view layer_id, uint32_t visibility, const mln_completion *completion)
+     * mln_status mln_map_set_layer_visibility(mln_map map, mln_buffer_view layer_id, uint32_t visibility, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_map_set_layer_visibility$address() {
@@ -16984,16 +17115,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_layer_visibility(mln_map map, mln_buffer_view layer_id, uint32_t visibility, const mln_completion *completion)
+     * mln_status mln_map_set_layer_visibility(mln_map map, mln_buffer_view layer_id, uint32_t visibility, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_map_set_layer_visibility(long map, MemorySegment layer_id, int visibility, MemorySegment completion) {
+    public static int mln_map_set_layer_visibility(long map, MemorySegment layer_id, int visibility, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_map_set_layer_visibility.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_set_layer_visibility", map, layer_id, visibility, completion);
+                traceDowncall("mln_map_set_layer_visibility", map, layer_id, visibility, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, layer_id, visibility, completion);
+            return (int)mh$.invokeExact(map, layer_id, visibility, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -17240,6 +17371,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -17251,7 +17383,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_metal_surface_attach(mln_map map, const mln_metal_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_surface_attach(mln_map map, const mln_metal_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_metal_surface_attach$descriptor() {
@@ -17261,7 +17393,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_metal_surface_attach(mln_map map, const mln_metal_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_surface_attach(mln_map map, const mln_metal_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_metal_surface_attach$handle() {
@@ -17271,7 +17403,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_metal_surface_attach(mln_map map, const mln_metal_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_surface_attach(mln_map map, const mln_metal_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_metal_surface_attach$address() {
@@ -17280,16 +17412,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_metal_surface_attach(mln_map map, const mln_metal_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_surface_attach(mln_map map, const mln_metal_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_metal_surface_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_metal_surface_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_metal_surface_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_metal_surface_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_metal_surface_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -17304,6 +17436,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -17315,7 +17448,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_surface_attach(mln_map map, const mln_vulkan_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_surface_attach(mln_map map, const mln_vulkan_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_vulkan_surface_attach$descriptor() {
@@ -17325,7 +17458,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_surface_attach(mln_map map, const mln_vulkan_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_surface_attach(mln_map map, const mln_vulkan_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_vulkan_surface_attach$handle() {
@@ -17335,7 +17468,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_surface_attach(mln_map map, const mln_vulkan_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_surface_attach(mln_map map, const mln_vulkan_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_vulkan_surface_attach$address() {
@@ -17344,16 +17477,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_vulkan_surface_attach(mln_map map, const mln_vulkan_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_surface_attach(mln_map map, const mln_vulkan_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_vulkan_surface_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_vulkan_surface_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_vulkan_surface_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_vulkan_surface_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_vulkan_surface_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -17368,6 +17501,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -17379,7 +17513,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_surface_attach(mln_map map, const mln_opengl_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_surface_attach(mln_map map, const mln_opengl_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_opengl_surface_attach$descriptor() {
@@ -17389,7 +17523,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_surface_attach(mln_map map, const mln_opengl_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_surface_attach(mln_map map, const mln_opengl_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_opengl_surface_attach$handle() {
@@ -17399,7 +17533,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_surface_attach(mln_map map, const mln_opengl_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_surface_attach(mln_map map, const mln_opengl_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_opengl_surface_attach$address() {
@@ -17408,16 +17542,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_opengl_surface_attach(mln_map map, const mln_opengl_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_surface_attach(mln_map map, const mln_opengl_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_opengl_surface_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_opengl_surface_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_opengl_surface_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_opengl_surface_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_opengl_surface_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -17432,6 +17566,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -17443,7 +17578,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_surface_attach(mln_map map, const mln_webgpu_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_surface_attach(mln_map map, const mln_webgpu_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_webgpu_surface_attach$descriptor() {
@@ -17453,7 +17588,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_surface_attach(mln_map map, const mln_webgpu_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_surface_attach(mln_map map, const mln_webgpu_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_webgpu_surface_attach$handle() {
@@ -17463,7 +17598,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_surface_attach(mln_map map, const mln_webgpu_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_surface_attach(mln_map map, const mln_webgpu_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_webgpu_surface_attach$address() {
@@ -17472,16 +17607,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_webgpu_surface_attach(mln_map map, const mln_webgpu_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_surface_attach(mln_map map, const mln_webgpu_surface_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_webgpu_surface_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_webgpu_surface_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_webgpu_surface_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_webgpu_surface_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_webgpu_surface_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -17494,6 +17629,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -17505,7 +17641,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_metal_surface_set_target$descriptor() {
@@ -17515,7 +17651,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_metal_surface_set_target$handle() {
@@ -17525,7 +17661,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_metal_surface_set_target$address() {
@@ -17534,16 +17670,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_metal_surface_set_target(long session, MemorySegment descriptor, MemorySegment completion) {
+    public static int mln_metal_surface_set_target(long session, MemorySegment descriptor, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_metal_surface_set_target.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_metal_surface_set_target", session, descriptor, completion);
+                traceDowncall("mln_metal_surface_set_target", session, descriptor, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, descriptor, completion);
+            return (int)mh$.invokeExact(session, descriptor, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -17556,6 +17692,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -17567,7 +17704,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_vulkan_surface_set_target$descriptor() {
@@ -17577,7 +17714,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_vulkan_surface_set_target$handle() {
@@ -17587,7 +17724,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_vulkan_surface_set_target$address() {
@@ -17596,16 +17733,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_vulkan_surface_set_target(long session, MemorySegment descriptor, MemorySegment completion) {
+    public static int mln_vulkan_surface_set_target(long session, MemorySegment descriptor, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_vulkan_surface_set_target.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_vulkan_surface_set_target", session, descriptor, completion);
+                traceDowncall("mln_vulkan_surface_set_target", session, descriptor, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, descriptor, completion);
+            return (int)mh$.invokeExact(session, descriptor, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -17618,6 +17755,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -17629,7 +17767,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_opengl_surface_set_target$descriptor() {
@@ -17639,7 +17777,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_opengl_surface_set_target$handle() {
@@ -17649,7 +17787,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_opengl_surface_set_target$address() {
@@ -17658,16 +17796,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_opengl_surface_set_target(long session, MemorySegment descriptor, MemorySegment completion) {
+    public static int mln_opengl_surface_set_target(long session, MemorySegment descriptor, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_opengl_surface_set_target.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_opengl_surface_set_target", session, descriptor, completion);
+                traceDowncall("mln_opengl_surface_set_target", session, descriptor, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, descriptor, completion);
+            return (int)mh$.invokeExact(session, descriptor, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -17680,6 +17818,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -17691,7 +17830,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_surface_set_target(mln_render_session session, const mln_webgpu_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_webgpu_surface_set_target(mln_render_session session, const mln_webgpu_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_webgpu_surface_set_target$descriptor() {
@@ -17701,7 +17840,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_surface_set_target(mln_render_session session, const mln_webgpu_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_webgpu_surface_set_target(mln_render_session session, const mln_webgpu_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_webgpu_surface_set_target$handle() {
@@ -17711,7 +17850,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_surface_set_target(mln_render_session session, const mln_webgpu_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_webgpu_surface_set_target(mln_render_session session, const mln_webgpu_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_webgpu_surface_set_target$address() {
@@ -17720,16 +17859,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_webgpu_surface_set_target(mln_render_session session, const mln_webgpu_surface_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_webgpu_surface_set_target(mln_render_session session, const mln_webgpu_surface_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_webgpu_surface_set_target(long session, MemorySegment descriptor, MemorySegment completion) {
+    public static int mln_webgpu_surface_set_target(long session, MemorySegment descriptor, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_webgpu_surface_set_target.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_webgpu_surface_set_target", session, descriptor, completion);
+                traceDowncall("mln_webgpu_surface_set_target", session, descriptor, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, descriptor, completion);
+            return (int)mh$.invokeExact(session, descriptor, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18266,6 +18405,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18277,7 +18417,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_metal_owned_texture_attach(mln_map map, const mln_metal_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_owned_texture_attach(mln_map map, const mln_metal_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_metal_owned_texture_attach$descriptor() {
@@ -18287,7 +18427,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_metal_owned_texture_attach(mln_map map, const mln_metal_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_owned_texture_attach(mln_map map, const mln_metal_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_metal_owned_texture_attach$handle() {
@@ -18297,7 +18437,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_metal_owned_texture_attach(mln_map map, const mln_metal_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_owned_texture_attach(mln_map map, const mln_metal_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_metal_owned_texture_attach$address() {
@@ -18306,16 +18446,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_metal_owned_texture_attach(mln_map map, const mln_metal_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_owned_texture_attach(mln_map map, const mln_metal_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_metal_owned_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_metal_owned_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_metal_owned_texture_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_metal_owned_texture_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_metal_owned_texture_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18330,6 +18470,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18341,7 +18482,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_metal_borrowed_texture_attach(mln_map map, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_borrowed_texture_attach(mln_map map, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_metal_borrowed_texture_attach$descriptor() {
@@ -18351,7 +18492,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_metal_borrowed_texture_attach(mln_map map, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_borrowed_texture_attach(mln_map map, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_metal_borrowed_texture_attach$handle() {
@@ -18361,7 +18502,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_metal_borrowed_texture_attach(mln_map map, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_borrowed_texture_attach(mln_map map, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_metal_borrowed_texture_attach$address() {
@@ -18370,16 +18511,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_metal_borrowed_texture_attach(mln_map map, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_metal_borrowed_texture_attach(mln_map map, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_metal_borrowed_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_metal_borrowed_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_metal_borrowed_texture_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_metal_borrowed_texture_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_metal_borrowed_texture_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18394,6 +18535,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18405,7 +18547,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_owned_texture_attach(mln_map map, const mln_vulkan_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_owned_texture_attach(mln_map map, const mln_vulkan_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_vulkan_owned_texture_attach$descriptor() {
@@ -18415,7 +18557,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_owned_texture_attach(mln_map map, const mln_vulkan_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_owned_texture_attach(mln_map map, const mln_vulkan_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_vulkan_owned_texture_attach$handle() {
@@ -18425,7 +18567,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_owned_texture_attach(mln_map map, const mln_vulkan_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_owned_texture_attach(mln_map map, const mln_vulkan_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_vulkan_owned_texture_attach$address() {
@@ -18434,16 +18576,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_vulkan_owned_texture_attach(mln_map map, const mln_vulkan_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_owned_texture_attach(mln_map map, const mln_vulkan_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_vulkan_owned_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_vulkan_owned_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_vulkan_owned_texture_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_vulkan_owned_texture_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_vulkan_owned_texture_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18458,6 +18600,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18469,7 +18612,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_borrowed_texture_attach(mln_map map, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_borrowed_texture_attach(mln_map map, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_vulkan_borrowed_texture_attach$descriptor() {
@@ -18479,7 +18622,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_borrowed_texture_attach(mln_map map, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_borrowed_texture_attach(mln_map map, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_vulkan_borrowed_texture_attach$handle() {
@@ -18489,7 +18632,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_borrowed_texture_attach(mln_map map, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_borrowed_texture_attach(mln_map map, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_vulkan_borrowed_texture_attach$address() {
@@ -18498,16 +18641,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_vulkan_borrowed_texture_attach(mln_map map, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_vulkan_borrowed_texture_attach(mln_map map, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_vulkan_borrowed_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_vulkan_borrowed_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_vulkan_borrowed_texture_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_vulkan_borrowed_texture_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_vulkan_borrowed_texture_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18522,6 +18665,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18533,7 +18677,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_owned_texture_attach(mln_map map, const mln_opengl_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_owned_texture_attach(mln_map map, const mln_opengl_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_opengl_owned_texture_attach$descriptor() {
@@ -18543,7 +18687,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_owned_texture_attach(mln_map map, const mln_opengl_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_owned_texture_attach(mln_map map, const mln_opengl_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_opengl_owned_texture_attach$handle() {
@@ -18553,7 +18697,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_owned_texture_attach(mln_map map, const mln_opengl_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_owned_texture_attach(mln_map map, const mln_opengl_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_opengl_owned_texture_attach$address() {
@@ -18562,16 +18706,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_opengl_owned_texture_attach(mln_map map, const mln_opengl_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_owned_texture_attach(mln_map map, const mln_opengl_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_opengl_owned_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_opengl_owned_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_opengl_owned_texture_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_opengl_owned_texture_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_opengl_owned_texture_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18586,6 +18730,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18597,7 +18742,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_borrowed_texture_attach(mln_map map, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_borrowed_texture_attach(mln_map map, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_opengl_borrowed_texture_attach$descriptor() {
@@ -18607,7 +18752,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_borrowed_texture_attach(mln_map map, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_borrowed_texture_attach(mln_map map, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_opengl_borrowed_texture_attach$handle() {
@@ -18617,7 +18762,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_borrowed_texture_attach(mln_map map, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_borrowed_texture_attach(mln_map map, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_opengl_borrowed_texture_attach$address() {
@@ -18626,16 +18771,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_opengl_borrowed_texture_attach(mln_map map, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_opengl_borrowed_texture_attach(mln_map map, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_opengl_borrowed_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_opengl_borrowed_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_opengl_borrowed_texture_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_opengl_borrowed_texture_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_opengl_borrowed_texture_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18650,6 +18795,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18661,7 +18807,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_webgpu_owned_texture_attach$descriptor() {
@@ -18671,7 +18817,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_webgpu_owned_texture_attach$handle() {
@@ -18681,7 +18827,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_webgpu_owned_texture_attach$address() {
@@ -18690,16 +18836,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_webgpu_owned_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_webgpu_owned_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_webgpu_owned_texture_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_webgpu_owned_texture_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_webgpu_owned_texture_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18714,6 +18860,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18725,7 +18872,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_webgpu_borrowed_texture_attach$descriptor() {
@@ -18735,7 +18882,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_webgpu_borrowed_texture_attach$handle() {
@@ -18745,7 +18892,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_webgpu_borrowed_texture_attach$address() {
@@ -18754,16 +18901,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion)
+     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_render_session_attach_options *options, mln_render_session *out_session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_webgpu_borrowed_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion) {
+    public static int mln_webgpu_borrowed_texture_attach(long map, MemorySegment descriptor, MemorySegment options, MemorySegment out_session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_webgpu_borrowed_texture_attach.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_webgpu_borrowed_texture_attach", map, descriptor, options, out_session, completion);
+                traceDowncall("mln_webgpu_borrowed_texture_attach", map, descriptor, options, out_session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion);
+            return (int)mh$.invokeExact(map, descriptor, options, out_session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18776,6 +18923,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18787,7 +18935,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_metal_borrowed_texture_set_target$descriptor() {
@@ -18797,7 +18945,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_metal_borrowed_texture_set_target$handle() {
@@ -18807,7 +18955,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_metal_borrowed_texture_set_target$address() {
@@ -18816,16 +18964,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_metal_borrowed_texture_set_target(long session, MemorySegment descriptor, MemorySegment completion) {
+    public static int mln_metal_borrowed_texture_set_target(long session, MemorySegment descriptor, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_metal_borrowed_texture_set_target.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_metal_borrowed_texture_set_target", session, descriptor, completion);
+                traceDowncall("mln_metal_borrowed_texture_set_target", session, descriptor, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, descriptor, completion);
+            return (int)mh$.invokeExact(session, descriptor, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18838,6 +18986,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18849,7 +18998,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_vulkan_borrowed_texture_set_target$descriptor() {
@@ -18859,7 +19008,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_vulkan_borrowed_texture_set_target$handle() {
@@ -18869,7 +19018,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_vulkan_borrowed_texture_set_target$address() {
@@ -18878,16 +19027,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_vulkan_borrowed_texture_set_target(long session, MemorySegment descriptor, MemorySegment completion) {
+    public static int mln_vulkan_borrowed_texture_set_target(long session, MemorySegment descriptor, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_vulkan_borrowed_texture_set_target.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_vulkan_borrowed_texture_set_target", session, descriptor, completion);
+                traceDowncall("mln_vulkan_borrowed_texture_set_target", session, descriptor, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, descriptor, completion);
+            return (int)mh$.invokeExact(session, descriptor, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18900,6 +19049,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18911,7 +19061,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_opengl_borrowed_texture_set_target$descriptor() {
@@ -18921,7 +19071,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_opengl_borrowed_texture_set_target$handle() {
@@ -18931,7 +19081,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_opengl_borrowed_texture_set_target$address() {
@@ -18940,16 +19090,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_opengl_borrowed_texture_set_target(long session, MemorySegment descriptor, MemorySegment completion) {
+    public static int mln_opengl_borrowed_texture_set_target(long session, MemorySegment descriptor, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_opengl_borrowed_texture_set_target.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_opengl_borrowed_texture_set_target", session, descriptor, completion);
+                traceDowncall("mln_opengl_borrowed_texture_set_target", session, descriptor, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, descriptor, completion);
+            return (int)mh$.invokeExact(session, descriptor, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -18962,6 +19112,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -18973,7 +19124,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_webgpu_borrowed_texture_set_target$descriptor() {
@@ -18983,7 +19134,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_webgpu_borrowed_texture_set_target$handle() {
@@ -18993,7 +19144,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_webgpu_borrowed_texture_set_target$address() {
@@ -19002,16 +19153,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_completion *completion)
+     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_webgpu_borrowed_texture_set_target(long session, MemorySegment descriptor, MemorySegment completion) {
+    public static int mln_webgpu_borrowed_texture_set_target(long session, MemorySegment descriptor, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_webgpu_borrowed_texture_set_target.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_webgpu_borrowed_texture_set_target", session, descriptor, completion);
+                traceDowncall("mln_webgpu_borrowed_texture_set_target", session, descriptor, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, descriptor, completion);
+            return (int)mh$.invokeExact(session, descriptor, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -19023,6 +19174,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -19034,7 +19186,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_texture_read_premultiplied_rgba8(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_texture_read_premultiplied_rgba8(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_texture_read_premultiplied_rgba8$descriptor() {
@@ -19044,7 +19196,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_texture_read_premultiplied_rgba8(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_texture_read_premultiplied_rgba8(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_texture_read_premultiplied_rgba8$handle() {
@@ -19054,7 +19206,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_texture_read_premultiplied_rgba8(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_texture_read_premultiplied_rgba8(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_texture_read_premultiplied_rgba8$address() {
@@ -19063,16 +19215,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_texture_read_premultiplied_rgba8(mln_render_session session, const mln_completion *completion)
+     * mln_status mln_texture_read_premultiplied_rgba8(mln_render_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_texture_read_premultiplied_rgba8(long session, MemorySegment completion) {
+    public static int mln_texture_read_premultiplied_rgba8(long session, MemorySegment completion, MemorySegment out_diagnostic) {
         var mh$ = mln_texture_read_premultiplied_rgba8.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_texture_read_premultiplied_rgba8", session, completion);
+                traceDowncall("mln_texture_read_premultiplied_rgba8", session, completion, out_diagnostic);
             }
-            return (int)mh$.invokeExact(session, completion);
+            return (int)mh$.invokeExact(session, completion, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -19084,6 +19236,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -19095,7 +19248,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_metal_texture(mln_acquired_frame frame, mln_metal_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_metal_texture(mln_acquired_frame frame, mln_metal_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_acquired_frame_get_metal_texture$descriptor() {
@@ -19105,7 +19258,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_metal_texture(mln_acquired_frame frame, mln_metal_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_metal_texture(mln_acquired_frame frame, mln_metal_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_acquired_frame_get_metal_texture$handle() {
@@ -19115,7 +19268,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_metal_texture(mln_acquired_frame frame, mln_metal_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_metal_texture(mln_acquired_frame frame, mln_metal_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_acquired_frame_get_metal_texture$address() {
@@ -19124,16 +19277,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_metal_texture(mln_acquired_frame frame, mln_metal_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_metal_texture(mln_acquired_frame frame, mln_metal_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_acquired_frame_get_metal_texture(long frame, MemorySegment out_frame) {
+    public static int mln_acquired_frame_get_metal_texture(long frame, MemorySegment out_frame, MemorySegment out_diagnostic) {
         var mh$ = mln_acquired_frame_get_metal_texture.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_acquired_frame_get_metal_texture", frame, out_frame);
+                traceDowncall("mln_acquired_frame_get_metal_texture", frame, out_frame, out_diagnostic);
             }
-            return (int)mh$.invokeExact(frame, out_frame);
+            return (int)mh$.invokeExact(frame, out_frame, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -19145,6 +19298,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -19156,7 +19310,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_vulkan_texture(mln_acquired_frame frame, mln_vulkan_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_vulkan_texture(mln_acquired_frame frame, mln_vulkan_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_acquired_frame_get_vulkan_texture$descriptor() {
@@ -19166,7 +19320,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_vulkan_texture(mln_acquired_frame frame, mln_vulkan_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_vulkan_texture(mln_acquired_frame frame, mln_vulkan_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_acquired_frame_get_vulkan_texture$handle() {
@@ -19176,7 +19330,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_vulkan_texture(mln_acquired_frame frame, mln_vulkan_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_vulkan_texture(mln_acquired_frame frame, mln_vulkan_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_acquired_frame_get_vulkan_texture$address() {
@@ -19185,16 +19339,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_vulkan_texture(mln_acquired_frame frame, mln_vulkan_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_vulkan_texture(mln_acquired_frame frame, mln_vulkan_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_acquired_frame_get_vulkan_texture(long frame, MemorySegment out_frame) {
+    public static int mln_acquired_frame_get_vulkan_texture(long frame, MemorySegment out_frame, MemorySegment out_diagnostic) {
         var mh$ = mln_acquired_frame_get_vulkan_texture.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_acquired_frame_get_vulkan_texture", frame, out_frame);
+                traceDowncall("mln_acquired_frame_get_vulkan_texture", frame, out_frame, out_diagnostic);
             }
-            return (int)mh$.invokeExact(frame, out_frame);
+            return (int)mh$.invokeExact(frame, out_frame, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -19206,6 +19360,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -19217,7 +19372,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_opengl_texture(mln_acquired_frame frame, mln_opengl_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_opengl_texture(mln_acquired_frame frame, mln_opengl_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_acquired_frame_get_opengl_texture$descriptor() {
@@ -19227,7 +19382,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_opengl_texture(mln_acquired_frame frame, mln_opengl_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_opengl_texture(mln_acquired_frame frame, mln_opengl_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_acquired_frame_get_opengl_texture$handle() {
@@ -19237,7 +19392,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_opengl_texture(mln_acquired_frame frame, mln_opengl_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_opengl_texture(mln_acquired_frame frame, mln_opengl_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_acquired_frame_get_opengl_texture$address() {
@@ -19246,16 +19401,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_opengl_texture(mln_acquired_frame frame, mln_opengl_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_opengl_texture(mln_acquired_frame frame, mln_opengl_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_acquired_frame_get_opengl_texture(long frame, MemorySegment out_frame) {
+    public static int mln_acquired_frame_get_opengl_texture(long frame, MemorySegment out_frame, MemorySegment out_diagnostic) {
         var mh$ = mln_acquired_frame_get_opengl_texture.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_acquired_frame_get_opengl_texture", frame, out_frame);
+                traceDowncall("mln_acquired_frame_get_opengl_texture", frame, out_frame, out_diagnostic);
             }
-            return (int)mh$.invokeExact(frame, out_frame);
+            return (int)mh$.invokeExact(frame, out_frame, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -19267,6 +19422,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -19278,7 +19434,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_acquired_frame_get_webgpu_texture$descriptor() {
@@ -19288,7 +19444,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_acquired_frame_get_webgpu_texture$handle() {
@@ -19298,7 +19454,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_acquired_frame_get_webgpu_texture$address() {
@@ -19307,16 +19463,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame)
+     * mln_status mln_acquired_frame_get_webgpu_texture(mln_acquired_frame frame, mln_webgpu_owned_texture_frame *out_frame, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_acquired_frame_get_webgpu_texture(long frame, MemorySegment out_frame) {
+    public static int mln_acquired_frame_get_webgpu_texture(long frame, MemorySegment out_frame, MemorySegment out_diagnostic) {
         var mh$ = mln_acquired_frame_get_webgpu_texture.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_acquired_frame_get_webgpu_texture", frame, out_frame);
+                traceDowncall("mln_acquired_frame_get_webgpu_texture", frame, out_frame, out_diagnostic);
             }
-            return (int)mh$.invokeExact(frame, out_frame);
+            return (int)mh$.invokeExact(frame, out_frame, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -19328,6 +19484,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -19339,7 +19496,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_adapter_acquired_frame_view_begin(mln_acquired_frame frame, void **out_scope)
+     * mln_status mln_adapter_acquired_frame_view_begin(mln_acquired_frame frame, void **out_scope, mln_diagnostic *out_diagnostic)
      * }
      */
     public static FunctionDescriptor mln_adapter_acquired_frame_view_begin$descriptor() {
@@ -19349,7 +19506,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_adapter_acquired_frame_view_begin(mln_acquired_frame frame, void **out_scope)
+     * mln_status mln_adapter_acquired_frame_view_begin(mln_acquired_frame frame, void **out_scope, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MethodHandle mln_adapter_acquired_frame_view_begin$handle() {
@@ -19359,7 +19516,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_adapter_acquired_frame_view_begin(mln_acquired_frame frame, void **out_scope)
+     * mln_status mln_adapter_acquired_frame_view_begin(mln_acquired_frame frame, void **out_scope, mln_diagnostic *out_diagnostic)
      * }
      */
     public static MemorySegment mln_adapter_acquired_frame_view_begin$address() {
@@ -19368,16 +19525,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_adapter_acquired_frame_view_begin(mln_acquired_frame frame, void **out_scope)
+     * mln_status mln_adapter_acquired_frame_view_begin(mln_acquired_frame frame, void **out_scope, mln_diagnostic *out_diagnostic)
      * }
      */
-    public static int mln_adapter_acquired_frame_view_begin(long frame, MemorySegment out_scope) {
+    public static int mln_adapter_acquired_frame_view_begin(long frame, MemorySegment out_scope, MemorySegment out_diagnostic) {
         var mh$ = mln_adapter_acquired_frame_view_begin.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_adapter_acquired_frame_view_begin", frame, out_scope);
+                traceDowncall("mln_adapter_acquired_frame_view_begin", frame, out_scope, out_diagnostic);
             }
-            return (int)mh$.invokeExact(frame, out_scope);
+            return (int)mh$.invokeExact(frame, out_scope, out_diagnostic);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

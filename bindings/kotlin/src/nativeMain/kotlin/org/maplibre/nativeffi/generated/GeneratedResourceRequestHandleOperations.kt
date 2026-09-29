@@ -5,7 +5,7 @@ import kotlinx.cinterop.*
 import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 @OptIn(ExperimentalForeignApi::class)
 public actual abstract class GeneratedResourceRequestHandleOperations
@@ -16,11 +16,11 @@ internal actual constructor() {
 
   internal abstract fun <T> bindingReadResourceRequestHandle(block: (ULong) -> T): T
 
-  internal abstract fun bindingCompleteResourceRequestHandle(call: (ULong) -> Int)
+  internal abstract fun bindingCompleteResourceRequestHandle(call: (ULong) -> Unit)
 
   internal abstract fun bindingIssuedResourceRequestHandleHandle(): ULong
 
-  internal abstract fun bindingCloseResourceRequestHandle(call: (ULong) -> Int)
+  internal abstract fun bindingCloseResourceRequestHandle(call: (ULong) -> Unit)
 
   public actual fun resourceRequestCancelled(): Boolean {
     try {
@@ -32,7 +32,9 @@ internal actual constructor() {
         memScoped {
           val arena = this
           val out = alloc<BooleanVar>()
-          BindingStatus.check(mln_resource_request_cancelled(raw, out.ptr))
+          NativeDiagnostics.check { diagnostic ->
+            mln_resource_request_cancelled(raw, out.ptr, diagnostic)
+          }
           out.value
         }
       }
@@ -50,7 +52,13 @@ internal actual constructor() {
       return bindingCompleteResourceRequestHandle { raw ->
         memScoped {
           val arena = this
-          mln_resource_request_complete(raw, GeneratedValues.writeResourceResponse(arena, response))
+          NativeDiagnostics.check { diagnostic ->
+            mln_resource_request_complete(
+              raw,
+              GeneratedValues.writeResourceResponse(arena, response),
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -71,7 +79,6 @@ internal actual constructor() {
         memScoped {
           val arena = this
           mln_resource_request_release(owner)
-          0
         }
       }
     } finally {
@@ -96,15 +103,16 @@ internal actual constructor() {
                 raw.toLong(),
               )
             val out = alloc<BooleanVar>()
-            BindingStatus.check(
+            NativeDiagnostics.check { diagnostic ->
               mln_resource_request_set_cancel_callback(
                 raw,
                 GeneratedDirectCallbacks.ResourceRequestCancelCallbackStub,
                 token.toCPointer<ByteVar>(),
                 GeneratedDirectCallbacks.ResourceRequestCancelCallbackReleaseStub,
                 out.ptr,
+                diagnostic,
               )
-            )
+            }
             val outCancelled = out.value
             if (!outCancelled) registrations.accept(bindingCallbacks)
             outCancelled
@@ -124,9 +132,12 @@ internal actual constructor() {
       )
       return memScoped {
         val arena = this
-        BindingStatus.check(
-          mln_resource_request_wait_until_retired(bindingIssuedResourceRequestHandleHandle())
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_resource_request_wait_until_retired(
+            bindingIssuedResourceRequestHandleHandle(),
+            diagnostic,
+          )
+        }
         Unit
       }
     } finally {

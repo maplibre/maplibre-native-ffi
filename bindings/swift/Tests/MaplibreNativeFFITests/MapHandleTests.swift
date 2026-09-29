@@ -353,7 +353,7 @@ private func drainCameraEvents(_ runtime: RuntimeHandle) throws
   // which is what makes the outcome deterministic. No render session is
   // attached, so the map never gets to serve it.
   let pending = try NativeCompletion.startUnit {
-    try mln_map_request_still_image(map.requireLiveHandle().raw, $0)
+    try mln_map_request_still_image(map.requireLiveHandle().raw, $0, $1)
   }
   try await map.close()
 

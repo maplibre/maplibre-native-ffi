@@ -7,18 +7,6 @@ import org.maplibre.nativeffi.internal.status.Status
 
 /** Small helpers for adapting Kotlin Android code to JavaCPP's generated C layer. */
 internal object JavaCppSupport {
-  private val threadDiagnostic = ThreadLocal<String>()
-
-  fun setThreadDiagnostic(diagnostic: String) {
-    threadDiagnostic.set(diagnostic)
-  }
-
-  fun takeThreadDiagnostic(): String? {
-    val diagnostic = threadDiagnostic.get()
-    if (diagnostic != null) threadDiagnostic.remove()
-    return diagnostic
-  }
-
   fun cString(pointer: BytePointer?): String =
     if (pointer == null || pointer.isNull) "" else pointer.getString(StandardCharsets.UTF_8)
 

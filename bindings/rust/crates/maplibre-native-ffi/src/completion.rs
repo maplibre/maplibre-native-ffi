@@ -169,7 +169,7 @@ unsafe extern "C" fn release<T>(user_data: *mut c_void) {
 pub(crate) fn submit<T, S, C>(submit: S, convert: C) -> Result<NativeFuture<T>>
 where
     T: Send + 'static,
-    S: FnOnce(*const sys::mln_completion) -> sys::mln_status,
+    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
     C: FnOnce(&sys::mln_completion_result) -> Result<T> + Send + 'static,
 {
     submit_with(submit, convert, false)
@@ -180,7 +180,7 @@ where
 /// it.
 pub(crate) fn submit_command<S>(submit: S) -> Result<NativeFuture<CommandCompletion>>
 where
-    S: FnOnce(*const sys::mln_completion) -> sys::mln_status,
+    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
 {
     submit_with(submit, command, true)
 }
@@ -188,7 +188,7 @@ where
 fn submit_with<T, S, C>(submit: S, convert: C, accept_error_status: bool) -> Result<NativeFuture<T>>
 where
     T: Send + 'static,
-    S: FnOnce(*const sys::mln_completion) -> sys::mln_status,
+    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
     C: FnOnce(&sys::mln_completion_result) -> Result<T> + Send + 'static,
 {
     let state = Arc::new(State {
@@ -208,11 +208,10 @@ where
         user_data: bridge.cast(),
         release_user_data: Some(release::<T>),
     };
-    let status = submit(&completion);
-    if status != sys::MLN_STATUS_OK {
+    if let Err(error) = core::check(|diagnostic| submit(&completion, diagnostic)) {
         // SAFETY: rejected submissions invoke neither callback and retain no pointer.
         drop(unsafe { Box::from_raw(bridge) });
-        return core::check(status).map(|()| unreachable!());
+        return Err(error);
     }
     Ok(NativeFuture { state })
 }
@@ -352,7 +351,7 @@ mod tests {
     {
         let mut accepted = None;
         let future = submit_with(
-            |completion| {
+            |completion, _| {
                 // SAFETY: submit borrows a complete descriptor for this call.
                 let completion = unsafe { &*completion };
                 accepted = Some(AcceptedSubmission {
@@ -459,7 +458,7 @@ mod tests {
         let dropped = Arc::new(AtomicBool::new(false));
         let probe = DropProbe(Arc::clone(&dropped));
         let error = submit(
-            |_| sys::MLN_STATUS_INVALID_STATE,
+            |_, _| sys::MLN_STATUS_INVALID_STATE,
             move |_| {
                 // The converter owns the probe, so freeing the bridge drops it.
                 let _ = &probe;

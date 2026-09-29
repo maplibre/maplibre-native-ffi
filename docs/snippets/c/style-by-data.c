@@ -24,7 +24,8 @@ mln_status size_and_filter_by_magnitude(
   // #endregion property
   // #region set
   const mln_status status = mln_map_set_layer_property(
-    map, view(layer_id), view("circle-radius"), radius_json, property_completion
+    map, view(layer_id), view("circle-radius"), radius_json,
+    property_completion, NULL
   );
   if (status != MLN_STATUS_OK) return status;
   // #endregion set
@@ -33,7 +34,7 @@ mln_status size_and_filter_by_magnitude(
   // [">=", ["get", "mag"], 2.5]
   const mln_buffer_view filter = view("[\">=\",[\"get\",\"mag\"],2.5]");
   return mln_map_set_layer_filter(
-    map, view(layer_id), &filter, filter_completion
+    map, view(layer_id), &filter, filter_completion, NULL
   );
   // #endregion filter
 }

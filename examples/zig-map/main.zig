@@ -35,8 +35,8 @@ pub fn main(init_args: std.process.Init) !void {
     const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
     try validateNativeRenderBackend();
 
-    try maplibre.logSetCallback(.{ .call = diagnostics.logRecord });
-    defer maplibre.logSetCallback(null) catch {};
+    try maplibre.logSetCallback(.{ .call = diagnostics.logRecord }, null);
+    defer maplibre.logSetCallback(null, null) catch {};
 
     if (uses_egl) {
         _ = c.SDL_SetHint(c.SDL_HINT_VIDEO_FORCE_EGL, "1");

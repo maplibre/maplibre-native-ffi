@@ -18,7 +18,7 @@ pub const MapState = struct {
             allocator.destroy(diagnostic_store);
         }
 
-        var runtime = maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:", .event_wake = wake }) catch |err| {
+        var runtime = maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:", .event_wake = wake }, diagnostic_store) catch |err| {
             diagnostics.logError("runtime create failed", err, diagnostic_store);
             return types.AppError.RuntimeCreateFailed;
         };

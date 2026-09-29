@@ -1,13 +1,8 @@
 // Raw C ABI coverage: core runtime/map/style/event/diagnostic tests for unsafe
-// inputs, stale handles, and thread-local diagnostics hidden by bindings.
+// inputs, stale handles, and diagnostic writes hidden by bindings.
 
+#include <stddef.h>
 #include <string.h>
-
-#if defined(_WIN32)
-#include <windows.h>
-#else
-#include <pthread.h>
-#endif
 
 #include "abi_tests.h"
 #include "test_support.h"
@@ -15,25 +10,27 @@
 
 static void runtime_rejects_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(NULL, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(NULL, NULL, NULL)
   );
 
   mln_runtime_options small_options = mln_runtime_options_default();
   small_options.size = sizeof(mln_runtime_options) - 1;
   mln_runtime runtime = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&small_options, &runtime)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_create(&small_options, &runtime, NULL)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
 
   runtime = 1;
   const mln_runtime_options options = mln_runtime_options_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&options, &runtime)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&options, &runtime, NULL)
   );
   const mln_completion discard = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_release(MLN_HANDLE_NULL, &discard)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_release(MLN_HANDLE_NULL, &discard, NULL)
   );
 }
 
@@ -42,10 +39,10 @@ static void runtime_rejects_stale_handles(void) {
   mln_test_destroy_runtime(runtime);
   mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_release(runtime, &completion)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_release(runtime, &completion, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_barrier(runtime, &completion)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_barrier(runtime, &completion, NULL)
   );
 }
 
@@ -53,7 +50,7 @@ static void runtime_barrier_rejects_null_runtime(void) {
   mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_barrier(MLN_HANDLE_NULL, &completion)
+    mln_runtime_barrier(MLN_HANDLE_NULL, &completion, NULL)
   );
 }
 
@@ -62,25 +59,25 @@ static void map_create_rejects_invalid_arguments(void) {
   mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_create(MLN_HANDLE_NULL, &options, &completion)
+    mln_map_create(MLN_HANDLE_NULL, &options, &completion, NULL)
   );
 
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_create(runtime, &options, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_create(runtime, &options, NULL, NULL)
   );
   mln_map_options small_options = mln_map_options_default();
   small_options.size = sizeof(mln_map_options) - 1;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_create(runtime, &small_options, &completion)
+    mln_map_create(runtime, &small_options, &completion, NULL)
   );
 
   mln_map_options invalid_options = mln_map_options_default();
   invalid_options.map_mode = (mln_map_mode)999;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_create(runtime, &invalid_options, &completion)
+    mln_map_create(runtime, &invalid_options, &completion, NULL)
   );
   mln_test_destroy_runtime(runtime);
 }
@@ -99,7 +96,8 @@ static void map_lifecycle_rejects_invalid_state_and_stale_handles(void) {
   );
   mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_request_still_image(map, &completion)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_request_still_image(map, &completion, NULL)
   );
   mln_camera_options camera = mln_camera_options_default();
   TEST_ASSERT_EQUAL_INT(
@@ -123,18 +121,18 @@ static void style_functions_reject_null_inputs(void) {
   // caller still owns the user_data and releases it itself.
   mln_test_completion held = mln_test_completion_buffer_view();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_loaded_style_json(map, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_loaded_style_json(map, NULL, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_style_url(map, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_loaded_style_json(MLN_HANDLE_NULL, &held.descriptor)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_style_url(map, NULL, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_style_url(MLN_HANDLE_NULL, &held.descriptor)
+    mln_map_loaded_style_json(MLN_HANDLE_NULL, &held.descriptor, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_style_url(MLN_HANDLE_NULL, &held.descriptor, NULL)
   );
   TEST_ASSERT_FALSE(mln_test_completion_poll(&held));
   mln_test_completion_reject(&held);
@@ -144,69 +142,35 @@ static void style_functions_reject_null_inputs(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void failing_status_sets_and_successful_status_clears_diagnostics(void) {
+static void a_failed_call_writes_its_diagnostic_and_a_successful_call_clears_it(
+  void
+) {
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  mln_buffer_view view = {0};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_runtime_close(MLN_HANDLE_NULL)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_buffer_get(MLN_HANDLE_NULL, &view, &diagnostic)
   );
-  TEST_ASSERT_GREATER_THAN_size_t(0, strlen(mln_thread_last_error_message()));
-  mln_runtime runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_size_t(0, strlen(mln_thread_last_error_message()));
-  mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_GREATER_THAN_size_t(0, strlen(diagnostic.message));
+
+  uint32_t network_status = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_network_status_get(&network_status, &diagnostic)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, strlen(diagnostic.message));
 }
 
-typedef struct worker_diagnostic {
-  mln_status status;
-  size_t message_length;
-} worker_diagnostic;
-
-#if defined(_WIN32)
-static DWORD WINAPI fail_on_thread(void* opaque_result) {
-#else
-static void* fail_on_thread(void* opaque_result) {
-#endif
-  worker_diagnostic* result = opaque_result;
-  result->status = mln_test_runtime_close(MLN_HANDLE_NULL);
-  result->message_length = strlen(mln_thread_last_error_message());
-#if defined(_WIN32)
-  return 0;
-#else
-  return NULL;
-#endif
-}
-
-static void diagnostics_are_thread_local(void) {
+static void a_diagnostic_is_written_within_its_declared_size(void) {
+  mln_diagnostic diagnostic;
+  memset(&diagnostic, 'x', sizeof(diagnostic));
+  diagnostic.size = (uint32_t)(offsetof(mln_diagnostic, message) + 4);
+  mln_buffer_view view = {0};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_runtime_close(MLN_HANDLE_NULL)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_buffer_get(MLN_HANDLE_NULL, &view, &diagnostic)
   );
-  char main_message[512] = {0};
-  strncpy(
-    main_message, mln_thread_last_error_message(), sizeof(main_message) - 1
-  );
-  TEST_ASSERT_GREATER_THAN_size_t(0, strlen(main_message));
-
-  worker_diagnostic worker_result = {0};
-#if defined(_WIN32)
-  HANDLE worker =
-    CreateThread(NULL, 0, fail_on_thread, &worker_result, 0, NULL);
-  TEST_ASSERT_NOT_NULL(worker);
-  TEST_ASSERT_EQUAL_UINT32(
-    WAIT_OBJECT_0, WaitForSingleObject(worker, INFINITE)
-  );
-  TEST_ASSERT_TRUE(CloseHandle(worker));
-#else
-  pthread_t worker;
-  TEST_ASSERT_EQUAL_INT(
-    0, pthread_create(&worker, NULL, fail_on_thread, &worker_result)
-  );
-  TEST_ASSERT_EQUAL_INT(0, pthread_join(worker, NULL));
-#endif
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, worker_result.status);
-  TEST_ASSERT_TRUE(worker_result.message_length > 0);
-  TEST_ASSERT_EQUAL_STRING(main_message, mln_thread_last_error_message());
-
-  mln_runtime runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_size_t(0, strlen(mln_thread_last_error_message()));
-  mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_EQUAL_size_t(3, strlen(diagnostic.message));
+  TEST_ASSERT_EQUAL_INT('x', diagnostic.message[4]);
 }
 
 static uint32_t ignore_log_record(
@@ -229,7 +193,7 @@ static void log_callback_releases_owned_user_data(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_log_set_callback(
-      ignore_log_record, &first_releases, count_log_callback_release
+      ignore_log_record, &first_releases, count_log_callback_release, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(0, first_releases);
@@ -237,15 +201,15 @@ static void log_callback_releases_owned_user_data(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_log_set_callback(
-      ignore_log_record, &second_releases, count_log_callback_release
+      ignore_log_record, &second_releases, count_log_callback_release, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(1, first_releases);
   TEST_ASSERT_EQUAL_INT(0, second_releases);
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback());
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_INT(1, second_releases);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback());
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_INT(1, second_releases);
 }
 
@@ -257,7 +221,7 @@ void run_core_abi_tests(void) {
   RUN_TEST(map_create_rejects_invalid_arguments);
   RUN_TEST(map_lifecycle_rejects_invalid_state_and_stale_handles);
   RUN_TEST(style_functions_reject_null_inputs);
-  RUN_TEST(failing_status_sets_and_successful_status_clears_diagnostics);
-  RUN_TEST(diagnostics_are_thread_local);
+  RUN_TEST(a_failed_call_writes_its_diagnostic_and_a_successful_call_clears_it);
+  RUN_TEST(a_diagnostic_is_written_within_its_declared_size);
   RUN_TEST(log_callback_releases_owned_user_data);
 }

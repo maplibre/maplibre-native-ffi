@@ -23,6 +23,13 @@ from .dart_values import (
 )
 
 
+def native_call(function, arguments):
+    """Call a C function, passing the isolate's diagnostic when it takes one."""
+    if function.diagnostic:
+        arguments = [*arguments, "nativeDiagnostic"]
+    return f"raw.{function.name}({', '.join(arguments)})"
+
+
 def adopt_owner(owned, expression, receiver, function, values):
     if owned.handle.native not in values.bound.public_handles:
         raise Unsupported("owned output requires a generated class")
@@ -42,11 +49,9 @@ def adopt_owner(owned, expression, receiver, function, values):
         result = f"({result}.._state.retain(registrations))"
     if not owned.handle.dispose:
         raise Unsupported("owned adoption requires a native disposer")
-    cleanup = f"raw.{owned.handle.dispose}(handle)"
-    if (
-        values.bound.operations_by_name[owned.handle.dispose].function.return_type.kind
-        != "void"
-    ):
+    dispose = values.bound.source.functions_by_name[owned.handle.dispose]
+    cleanup = native_call(dispose, ["handle"])
+    if dispose.return_type.kind != "void":
         cleanup = f"_check({cleanup})"
     result = f"_adoptOwned({expression}, () => {result}, (handle) {{ {cleanup}; }})"
     return public, result
@@ -115,7 +120,7 @@ def lower_port_registration(plan, registration, callback, values):
         registration.release_callback: "Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(raw.mln_adapter_dart_port_release).cast()",
         registration.accepted_unless: "declined",
     }
-    call = f"raw.{function.name}({', '.join(arguments[p.name] for p in function.parameters)})"
+    call = native_call(function, [arguments[p.name] for p in function.parameters])
     if declined:
         storage = "      final declined = arena<Bool>();\n"
         accept, result, public = (
@@ -183,7 +188,7 @@ def lower_deferred_registration(plan, registration, callback, values):
     else:
         name = camel(function.name.removeprefix("mln_"))
         roots = "_globalCallbackPorts"
-    call = f"raw.{function.name}({', '.join(arguments[p.name] for p in function.parameters)})"
+    call = native_call(function, [arguments[p.name] for p in function.parameters])
     body = (
         f"    final port = {roots}.registerDeferred({key}, (message) => _deliver{public_name(callback.native)}(callback, message));\n"
         f"    var accepted = false;\n    try {{\n      _check({call});\n      accepted = true;\n    }} finally {{ if (!accepted) {{ port.reject(); }} }}"
@@ -416,7 +421,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             args.append(values.native(value, local))
     if optional:
         signature.append("{" + ", ".join(optional) + "}")
-    call = f"raw.{function.name}({', '.join(args)})"
+    call = native_call(function, args)
     if plan.consumes and not plan.completion:
         if not receiver or returns:
             raise Unsupported("consumption requires an owned receiver without outputs")
@@ -427,7 +432,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         )
         return (
             owner,
-            f"  void {name}({', '.join(signature)}) => _state.close((handle) => withNativeArena((arena) {{\n{body}\n  }}), threadLastErrorMessage);\n",
+            f"  void {name}({', '.join(signature)}) => _state.close((handle) => withNativeArena((arena) {{\n{body}\n  }}));\n",
         )
     if not plan.completion:
         if not status_return and plan.result:
@@ -612,9 +617,13 @@ def lower(api: Api | BoundApi):
 def render_scoped_views(bound, generated, values):
     chunks = []
     emitted = set()
+    diagnostic = set()
     for plan in bound.operations:
         if not plan.view or plan.name not in generated:
             continue
+        diagnostic.add(
+            bound.source.functions_by_name[plan.view.owner.view_begin].diagnostic
+        )
         value = plan.outputs[0].value.element
         public = values.public(value)
         if public in emitted:
@@ -639,16 +648,18 @@ def render_scoped_views(bound, generated, values):
             + "\n}\n"
         )
     if chunks:
+        if diagnostic != {True}:
+            raise Unsupported("borrowed view scopes require a diagnostic begin")
         chunks.append("""final class _GeneratedNativeViewScope {
   _GeneratedNativeViewScope(this.handle, this.begin, this.end);
   final NativeHandle Function() handle;
-  final int Function(int, Pointer<Pointer<Void>>) begin;
+  final int Function(int, Pointer<Pointer<Void>>, Pointer<raw.mln_diagnostic>) begin;
   final void Function(Pointer<Void>) end;
   int _active = 0;
   void checkActive() { if (_active == 0) { throwInvalidState('borrowed native value requires an active withView callback'); } }
   T use<T>(T Function() callback) => withNativeArena((arena) {
     final token = arena<Pointer<Void>>();
-    _check(begin(handle().raw, token));
+    _check(begin(handle().raw, token, nativeDiagnostic));
     _active++;
     try {
       final result = callback();

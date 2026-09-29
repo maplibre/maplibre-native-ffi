@@ -35,6 +35,19 @@ TypeKind: Any = cindex.TypeKind
 ANNOTATION_PREFIX = "mln:"
 
 
+DIAGNOSTIC_RECORD = "mln_diagnostic"
+
+
+def is_diagnostic_type(native: cindex.Type) -> bool:
+    if native.kind != cindex.TypeKind.POINTER:
+        return False
+    pointee = native.get_pointee()
+    return (
+        not pointee.is_const_qualified()
+        and pointee.get_canonical().get_declaration().spelling == DIAGNOSTIC_RECORD
+    )
+
+
 def enum_value(cursor, underlying) -> int:
     """Preserve the integer domain after resolving an enum's underlying typedef."""
     canonical = underlying.get_canonical()
@@ -266,6 +279,14 @@ class Extractor:
             kind = cursor.kind
             name = cursor.spelling
             if kind == CursorKind.FUNCTION_DECL:
+                arguments = list(cursor.get_arguments())
+                diagnostic = bool(arguments) and is_diagnostic_type(arguments[-1].type)
+                if diagnostic:
+                    arguments.pop()
+                if any(is_diagnostic_type(argument.type) for argument in arguments):
+                    self.errors.append(
+                        f"{self.location(cursor)}: {name}: mln_diagnostic* must be the last parameter"
+                    )
                 function = Function(
                     name=name,
                     return_type=self.type(cursor.result_type),
@@ -275,12 +296,13 @@ class Extractor:
                             self.type(argument.type),
                             self.metadata(argument),
                         )
-                        for argument in cursor.get_arguments()
+                        for argument in arguments
                     ),
                     metadata=self.metadata(cursor),
                     location=self.location(cursor),
                     documentation=cursor.raw_comment or "",
                     variadic=cursor.type.is_function_variadic(),
+                    diagnostic=diagnostic,
                 )
                 if name in functions:
                     self.errors.append(
@@ -288,7 +310,8 @@ class Extractor:
                     )
                 functions[name] = function
             elif kind in (CursorKind.STRUCT_DECL, CursorKind.UNION_DECL):
-                self.record(cursor)
+                if self.record_name(cursor) != DIAGNOSTIC_RECORD:
+                    self.record(cursor)
             elif kind == CursorKind.ENUM_DECL:
                 enums[name] = Enum(
                     name=name,
@@ -306,6 +329,8 @@ class Extractor:
                     location=self.location(cursor),
                     documentation=cursor.raw_comment or "",
                 )
+            elif kind == CursorKind.TYPEDEF_DECL and name == DIAGNOSTIC_RECORD:
+                continue
             elif kind == CursorKind.TYPEDEF_DECL:
                 typedefs[name] = Typedef(
                     name=name,

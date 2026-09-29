@@ -49,10 +49,15 @@ pub fn handle(value: anytype) if (@typeInfo(@TypeOf(value)) == .pointer) @typeIn
 }
 
 pub fn createRuntime(options: anytype) !maplibre.Runtime {
+    return createRuntimeWithDiagnostics(options, null);
+}
+
+/// Creates a runtime whose handles report failures into `diagnostic_store`.
+pub fn createRuntimeWithDiagnostics(options: anytype, diagnostic_store: ?*maplibre.DiagnosticStore) !maplibre.Runtime {
     var defaults = try maplibre.runtimeOptionsDefault(testing.allocator);
     defer defaults.deinit();
     inline for (@typeInfo(@TypeOf(options)).@"struct".fields) |field| @field(defaults.value, field.name) = @field(options, field.name);
-    return maplibre.runtimeCreate(testing.allocator, defaults.value);
+    return maplibre.runtimeCreate(testing.allocator, defaults.value, diagnostic_store);
 }
 
 pub fn waitForEvent(runtime: *maplibre.Runtime, event_type: maplibre.RuntimeEventType) !bool {

@@ -999,7 +999,9 @@ test "a session with no rendered frame has nothing to acquire or read back" {
 test "live render session blocks map close until detached" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
 
-    var runtime = try support.createRuntime(.{});
+    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
+    defer diagnostics.deinit();
+    var runtime = try support.createRuntimeWithDiagnostics(.{}, &diagnostics);
     errdefer support.closeRuntime(&runtime) catch {};
     var map = try support.createMap(&runtime, .{ .width = 32, .height = 32, .scale_factor = 1.0 });
     errdefer support.closeMap(&map) catch {};
@@ -1007,9 +1009,7 @@ test "live render session blocks map close until detached" {
     errdefer owned.close() catch {};
 
     try testing.expectError(error.InvalidState, maplibre.mapRelease(support.handle(map)));
-    var message = try maplibre.threadLastErrorMessage(testing.allocator);
-    defer message.deinit();
-    try testing.expectEqualStrings("map still has an attached render session", message.value);
+    try testing.expectEqualStrings("map still has an attached render session", diagnostics.get().?.message);
 
     try owned.close();
     try support.closeMap(&map);

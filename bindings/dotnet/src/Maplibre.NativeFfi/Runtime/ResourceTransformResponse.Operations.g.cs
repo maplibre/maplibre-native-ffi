@@ -26,12 +26,15 @@ public sealed unsafe partial class ResourceTransformResponse
             "mln_resource_transform_response_set_url"
         );
         var bufferUrl = scope.Utf8(url);
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_resource_transform_response_set_url(
                 Pointer,
                 (sbyte*)bufferUrl.data,
-                checked((nuint)bufferUrl.size)
-            )
+                checked((nuint)bufferUrl.size),
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         scope.Accept();
     }

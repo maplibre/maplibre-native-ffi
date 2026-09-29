@@ -25,7 +25,7 @@ mln_status add_hillshading(
   };
   const mln_status status = mln_map_add_raster_dem_source_tiles(
     map, view("terrain"), tiles, sizeof(tiles) / sizeof(tiles[0]), &options,
-    source_completion
+    source_completion, NULL
   );
   // #endregion source
   if (status != MLN_STATUS_OK) {
@@ -35,7 +35,7 @@ mln_status add_hillshading(
   // #region layer
   // An empty before-layer ID puts the layer on top of the style.
   return mln_map_add_hillshade_layer(
-    map, view("hillshading"), view("terrain"), view(""), layer_completion
+    map, view("hillshading"), view("terrain"), view(""), layer_completion, NULL
   );
   // #endregion layer
 }

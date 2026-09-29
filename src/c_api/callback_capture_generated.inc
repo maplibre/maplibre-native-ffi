@@ -386,14 +386,14 @@ inline auto discard(
   switch (kind) {
     case MLN_ADAPTER_COMPLETION_COPY_MAP:
       for (std::size_t index = 0; index < result.value_count; ++index)
-        static_cast<void>(
-          mln_map_dispose(static_cast<const mln_map*>(result.value)[index])
-        );
+        static_cast<void>(mln_map_dispose(
+          static_cast<const mln_map*>(result.value)[index], nullptr
+        ));
       break;
     case MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION:
       for (std::size_t index = 0; index < result.value_count; ++index)
         static_cast<void>(mln_map_projection_close(
-          static_cast<const mln_map_projection*>(result.value)[index]
+          static_cast<const mln_map_projection*>(result.value)[index], nullptr
         ));
       break;
     default:
@@ -623,7 +623,9 @@ inline auto dispose_owner(
 ) noexcept -> mln_status {
   if (native_type == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
   if (std::strcmp(native_type, "mln_acquired_frame") == 0) {
-    return mln_acquired_frame_dispose(static_cast<mln_acquired_frame>(handle));
+    return mln_acquired_frame_dispose(
+      static_cast<mln_acquired_frame>(handle), nullptr
+    );
   }
   if (std::strcmp(native_type, "mln_buffer") == 0) {
     mln_buffer_destroy(static_cast<mln_buffer>(handle));
@@ -640,17 +642,21 @@ inline auto dispose_owner(
     return MLN_STATUS_OK;
   }
   if (std::strcmp(native_type, "mln_map") == 0) {
-    return mln_map_dispose(static_cast<mln_map>(handle));
+    return mln_map_dispose(static_cast<mln_map>(handle), nullptr);
   }
   if (std::strcmp(native_type, "mln_map_projection") == 0) {
-    return mln_map_projection_close(static_cast<mln_map_projection>(handle));
+    return mln_map_projection_close(
+      static_cast<mln_map_projection>(handle), nullptr
+    );
   }
   if (std::strcmp(native_type, "mln_render_frame_batch") == 0) {
     mln_render_frame_batch_release(static_cast<mln_render_frame_batch>(handle));
     return MLN_STATUS_OK;
   }
   if (std::strcmp(native_type, "mln_render_session") == 0) {
-    return mln_render_session_dispose(static_cast<mln_render_session>(handle));
+    return mln_render_session_dispose(
+      static_cast<mln_render_session>(handle), nullptr
+    );
   }
   if (std::strcmp(native_type, "mln_resource_request_handle") == 0) {
     mln_resource_request_release(
@@ -659,7 +665,7 @@ inline auto dispose_owner(
     return MLN_STATUS_OK;
   }
   if (std::strcmp(native_type, "mln_runtime") == 0) {
-    return mln_runtime_dispose(static_cast<mln_runtime>(handle));
+    return mln_runtime_dispose(static_cast<mln_runtime>(handle), nullptr);
   }
   return MLN_STATUS_INVALID_ARGUMENT;
 }

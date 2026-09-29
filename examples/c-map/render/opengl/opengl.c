@@ -600,7 +600,8 @@ app_error render_target_attach(
       descriptor.context =
         opengl_context_descriptor(&target->as.owned.compositor.context);
       status = mln_opengl_owned_texture_attach(
-        map, &descriptor, &options, &session, completion
+        map, &descriptor, &options, &session, completion,
+        &target->session.diagnostic
       );
       break;
     }
@@ -608,7 +609,8 @@ app_error render_target_attach(
       const mln_opengl_borrowed_texture_descriptor descriptor =
         borrowed_texture_descriptor(target, current_viewport);
       status = mln_opengl_borrowed_texture_attach(
-        map, &descriptor, &options, &session, completion
+        map, &descriptor, &options, &session, completion,
+        &target->session.diagnostic
       );
       break;
     }
@@ -616,7 +618,8 @@ app_error render_target_attach(
       const mln_opengl_surface_descriptor descriptor =
         surface_descriptor(target, current_viewport);
       status = mln_opengl_surface_attach(
-        map, &descriptor, &options, &session, completion
+        map, &descriptor, &options, &session, completion,
+        &target->session.diagnostic
       );
       break;
     }
@@ -679,7 +682,8 @@ static app_error resize_borrowed(
     render_session_begin_submission(
       &target->session, APP_ERROR_TEXTURE_RESIZE_FAILED,
       "OpenGL borrowed texture set target failed"
-    )
+    ),
+    &target->session.diagnostic
   );
   if (status != MLN_STATUS_OK) {
     target->as.borrowed.texture = previous;
@@ -722,7 +726,8 @@ static app_error resize_surface(
     render_session_begin_submission(
       &target->session, APP_ERROR_SURFACE_ATTACH_FAILED,
       "OpenGL surface set target failed"
-    )
+    ),
+    &target->session.diagnostic
   );
   MAP_TRY(render_session_submitted(&target->session, status));
   return render_session_resize_map(&target->session, current_viewport);
@@ -786,14 +791,18 @@ static app_error render_update_owned(
   }
 
   mln_acquired_frame acquired = MLN_HANDLE_NULL;
-  mln_status status =
-    mln_render_session_acquire_frame(target->session.handle, &acquired);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  mln_status status = mln_render_session_acquire_frame(
+    target->session.handle, &acquired, &diagnostic
+  );
   if (status == MLN_STATUS_NOT_READY) {
     out_outcome->rendered = false;
     return APP_OK;
   }
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("OpenGL texture acquire failed", status);
+    diagnostics_log_status(
+      "OpenGL texture acquire failed", status, &diagnostic
+    );
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
   app_error error = render_session_require_cpu_complete_producer(
@@ -801,7 +810,7 @@ static app_error render_update_owned(
   );
   if (error == APP_OK) {
     mln_opengl_owned_texture_frame frame = {.size = sizeof(frame)};
-    status = mln_acquired_frame_get_opengl_texture(acquired, &frame);
+    status = mln_acquired_frame_get_opengl_texture(acquired, &frame, NULL);
     error = status == MLN_STATUS_OK
               ? opengl_compositor_draw_texture(
                   &target->as.owned.compositor, frame.texture, current_viewport
@@ -812,9 +821,11 @@ static app_error render_update_owned(
   // sampling commands finish before the ring slot goes back.
   MAP_TRY(opengl_compositor_finish_frame(&target->as.owned.compositor));
   mln_gpu_sync sync = mln_gpu_sync_default();
-  status = mln_acquired_frame_release(&acquired, &sync);
+  status = mln_acquired_frame_release(&acquired, &sync, &diagnostic);
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("OpenGL texture release failed", status);
+    diagnostics_log_status(
+      "OpenGL texture release failed", status, &diagnostic
+    );
   }
   return error;
 }

@@ -10,8 +10,16 @@ from __future__ import annotations
 import zlib
 
 from .compiler import compile_api
-from .model import Api, CType, ModelError
+from .model import Api, CType, Function, ModelError
+from .schema import has_diagnostic
 from .semantic import BoundApi, FieldPlan, ValuePlan
+
+
+def native_call(function: Function, *arguments: str) -> str:
+    """Calls a C function, discarding its diagnostic when it takes one."""
+    if has_diagnostic(function):
+        arguments = (*arguments, "nullptr")
+    return f"{function.name}({', '.join(arguments)})"
 
 
 def copy_kind(native: str) -> str:
@@ -170,7 +178,7 @@ def _deferred(bound: BoundApi) -> tuple[list[str], list[str]]:
         if decision is None:
             continue
         release = source.functions_by_name[decision.handle.release]
-        release_call = f"{decision.handle.release}(arguments.{decision.parameter})"
+        release_call = native_call(release, f"arguments.{decision.parameter}")
         output.extend(
             [
                 f"    case {deferred_constant(callback.native)}: {{",
@@ -289,7 +297,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             [
                 f"    case {copy_kind(native)}:",
                 "      for (std::size_t index = 0; index < result.value_count; ++index)",
-                f"        static_cast<void>({plan.handle.dispose}(static_cast<const {native}*>(result.value)[index]));",
+                f"        static_cast<void>({native_call(source.functions_by_name[plan.handle.dispose], f'static_cast<const {native}*>(result.value)[index]')});",
                 "      break;",
             ]
         )
@@ -353,7 +361,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         if not handle.dispose:
             continue
         operation = source.functions_by_name[handle.dispose]
-        call = f"{handle.dispose}(static_cast<{handle.native}>(handle))"
+        call = native_call(operation, f"static_cast<{handle.native}>(handle)")
         body = (
             f"{call}; return MLN_STATUS_OK;"
             if operation.return_type.kind == "void"

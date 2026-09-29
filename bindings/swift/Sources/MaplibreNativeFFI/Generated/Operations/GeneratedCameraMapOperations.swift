@@ -21,11 +21,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_apply_camera_delta(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_apply_camera_delta(
+            handle.raw,
+            arena.store(bindingArg0.nativeValue()),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -48,12 +51,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_camera_for_geometry(
-          handle.raw,
-          arena.view(bindingArg0),
-          bindingArg1.map { arena.store($0.nativeValue()) },
-          completion
-        ) } }) { result in try CameraOptions(raw: NativeCompletion.value(
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_camera_for_geometry(
+            handle.raw,
+            arena.view(bindingArg0),
+            bindingArg1.map { arena.store($0.nativeValue()) },
+            completion,
+            diagnostic
+          ) } }) { result in try CameraOptions(raw: NativeCompletion.value(
           result,
           as: mln_camera_options.self
         )) }
@@ -79,12 +84,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_camera_for_lat_lng_bounds(
-          handle.raw,
-          bindingArg0.nativeValue(),
-          bindingArg1.map { arena.store($0.nativeValue()) },
-          completion
-        ) } }) { result in try CameraOptions(raw: NativeCompletion.value(
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_camera_for_lat_lng_bounds(
+            handle.raw,
+            bindingArg0.nativeValue(),
+            bindingArg1.map { arena.store($0.nativeValue()) },
+            completion,
+            diagnostic
+          ) } }) { result in try CameraOptions(raw: NativeCompletion.value(
           result,
           as: mln_camera_options.self
         )) }
@@ -110,13 +117,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           try arena.submit { try mln_map_camera_for_lat_lngs(
             handle.raw,
             arena.array(bindingArg0.map { $0.nativeValue() }),
             NativeInputArena.count(bindingArg0.count),
             bindingArg2.map { arena.store($0.nativeValue()) },
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try CameraOptions(raw: NativeCompletion.value(
           result,
           as: mln_camera_options.self
@@ -140,9 +148,10 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_camera_query(
+        .start({ completion, diagnostic in arena.submit { mln_map_camera_query(
           handle.raw,
-          completion
+          completion,
+          diagnostic
         ) } }) { result in try CameraQueryResult(raw: NativeCompletion.value(
           result,
           as: mln_camera_query_result.self
@@ -168,11 +177,14 @@ public extension MapHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_camera_options = mln_camera_options_default()
       var value1: UInt64 = 0
-      try checkStatus(arena.submit { mln_map_camera_snapshot_get(
-        handle.raw,
-        &value0,
-        &value1
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_map_camera_snapshot_get(
+          handle.raw,
+          &value0,
+          &value1,
+          diagnostic
+        ) }
+      }
       return (CameraOptions(raw: value0), value1)
     }
   }
@@ -194,10 +206,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_cancel_transitions(
-          handle.raw,
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_cancel_transitions(
+            handle.raw,
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -218,10 +233,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_dump_debug_logs(
-          handle.raw,
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_dump_debug_logs(
+            handle.raw,
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -243,11 +261,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_lat_lng_bounds_for_camera(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          completion
-        ) } }) { result in try LatLngBounds(raw: NativeCompletion.value(
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_lat_lng_bounds_for_camera(
+            handle.raw,
+            arena.store(bindingArg0.nativeValue()),
+            completion,
+            diagnostic
+          ) } }) { result in try LatLngBounds(raw: NativeCompletion.value(
           result,
           as: mln_lat_lng_bounds.self
         )) }
@@ -274,11 +294,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_map_lat_lng_bounds_for_camera_unwrapped(
             handle.raw,
             arena.store(bindingArg0.nativeValue()),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try LatLngBounds(raw: NativeCompletion.value(
           result,
           as: mln_lat_lng_bounds.self
@@ -302,11 +323,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_lat_lng_for_pixel(
-          handle.raw,
-          bindingArg0.nativeValue(),
-          completion
-        ) } }) { result in try LatLng(raw: NativeCompletion.value(
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_lat_lng_for_pixel(
+            handle.raw,
+            bindingArg0.nativeValue(),
+            completion,
+            diagnostic
+          ) } }) { result in try LatLng(raw: NativeCompletion.value(
           result,
           as: mln_lat_lng.self
         )) }
@@ -331,11 +354,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_map_lat_lng_for_pixel_unwrapped(
             handle.raw,
             bindingArg0.nativeValue(),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try LatLng(raw: NativeCompletion.value(
           result,
           as: mln_lat_lng.self
@@ -361,12 +385,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           try arena.submit { try mln_map_lat_lngs_for_pixels(
             handle.raw,
             arena.array(bindingArg0.map { $0.nativeValue() }),
             NativeInputArena.count(bindingArg0.count),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try NativeCompletion.values(
           result,
           as: mln_lat_lng.self
@@ -392,12 +417,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           try arena.submit { try mln_map_lat_lngs_for_pixels_unwrapped(
             handle.raw,
             arena.array(bindingArg0.map { $0.nativeValue() }),
             NativeInputArena.count(bindingArg0.count),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try NativeCompletion.values(
           result,
           as: mln_lat_lng.self
@@ -423,11 +449,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_map_meters_per_pixel_at_latitude(
             handle.raw,
             bindingArg0,
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try NativeCompletion
           .value(result, as: Double.self)
         }
@@ -452,11 +479,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_pixel_for_lat_lng(
-          handle.raw,
-          bindingArg0.nativeValue(),
-          completion
-        ) } }) { result in try ScreenPoint(raw: NativeCompletion.value(
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_pixel_for_lat_lng(
+            handle.raw,
+            bindingArg0.nativeValue(),
+            completion,
+            diagnostic
+          ) } }) { result in try ScreenPoint(raw: NativeCompletion.value(
           result,
           as: mln_screen_point.self
         )) }
@@ -481,12 +510,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           try arena.submit { try mln_map_pixels_for_lat_lngs(
             handle.raw,
             arena.array(bindingArg0.map { $0.nativeValue() }),
             NativeInputArena.count(bindingArg0.count),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try NativeCompletion.values(
           result,
           as: mln_screen_point.self
@@ -513,11 +543,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_set_bounds(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_set_bounds(
+            handle.raw,
+            arena.store(bindingArg0.nativeValue()),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -540,11 +573,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_set_debug_options(
-          handle.raw,
-          bindingArg0.nativeValue(),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_set_debug_options(
+            handle.raw,
+            bindingArg0.nativeValue(),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -567,11 +603,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_free_camera_options(
             handle.raw,
             arena.store(bindingArg0.nativeValue()),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -596,11 +633,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_projection_mode(
             handle.raw,
             arena.store(bindingArg0.nativeValue()),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -625,11 +663,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_rendering_stats_view_enabled(
             handle.raw,
             bindingArg0,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -654,11 +693,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_set_tile_options(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_set_tile_options(
+            handle.raw,
+            arena.store(bindingArg0.nativeValue()),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -681,11 +723,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_viewport_options(
             handle.raw,
             arena.store(bindingArg0.nativeValue()),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -710,11 +753,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_update_camera(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_update_camera(
+            handle.raw,
+            arena.store(bindingArg0.nativeValue()),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }

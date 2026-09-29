@@ -3597,6 +3597,7 @@ void androidInit(
       Pointer<Void>.fromAddress(jniEnv.address).cast(),
       Pointer<Void>.fromAddress(jniClass.address).cast(),
       Pointer<Void>.fromAddress(context.address).cast(),
+      nativeDiagnostic,
     ),
   );
 });
@@ -3691,6 +3692,7 @@ GeojsonSourceDataHandle geojsonSourceDataCreate(
       nativeBufferView(data, arena),
       options == null ? nullptr : _writeGeojsonSourceOptions(options, arena),
       outData,
+      nativeDiagnostic,
     ),
   );
   return _adoptOwned(
@@ -3724,6 +3726,7 @@ LatLng latLngForProjectedMeters(ProjectedMeters meters) =>
         raw.mln_lat_lng_for_projected_meters(
           _writeProjectedMeters(meters, arena).ref,
           outCoordinate,
+          nativeDiagnostic,
         ),
       );
       return _readLatLng(outCoordinate.ref);
@@ -3732,13 +3735,13 @@ LatLng latLngForProjectedMeters(ProjectedMeters meters) =>
 void logClearCallback() => withNativeArena((arena) {
   ensureAbiVersion();
 
-  _check(raw.mln_log_clear_callback());
+  _check(raw.mln_log_clear_callback(nativeDiagnostic));
 });
 
 void logSetAsyncSeverityMask(LogSeverityMask mask) => withNativeArena((arena) {
   ensureAbiVersion();
 
-  _check(raw.mln_log_set_async_severity_mask(mask.rawValue));
+  _check(raw.mln_log_set_async_severity_mask(mask.rawValue, nativeDiagnostic));
 });
 
 void logSetCallback(LogCallback callback) {
@@ -3764,6 +3767,7 @@ void logSetCallback(LogCallback callback) {
         Native.addressOf<NativeFunction<raw.mln_log_callback_releaseFunction>>(
           raw.mln_adapter_deferred_callback_release,
         ).cast(),
+        nativeDiagnostic,
       ),
     );
     accepted = true;
@@ -3822,14 +3826,14 @@ MetalSurfaceDescriptor metalSurfaceDescriptorDefault() =>
 NetworkStatus networkStatusGet() => withNativeArena((arena) {
   ensureAbiVersion();
   final outStatus = arena<Uint32>();
-  _check(raw.mln_network_status_get(outStatus));
+  _check(raw.mln_network_status_get(outStatus, nativeDiagnostic));
   return NetworkStatus.fromRawValue(outStatus.value);
 });
 
 void networkStatusSet(NetworkStatus status) => withNativeArena((arena) {
   ensureAbiVersion();
 
-  _check(raw.mln_network_status_set(status.rawValue));
+  _check(raw.mln_network_status_set(status.rawValue, nativeDiagnostic));
 });
 
 OpenglBorrowedTextureDescriptor openglBorrowedTextureDescriptorDefault() =>
@@ -3887,6 +3891,7 @@ ProjectedMeters projectedMetersForLatLng(LatLng coordinate) =>
         raw.mln_projected_meters_for_lat_lng(
           _writeLatLng(coordinate, arena).ref,
           outMeters,
+          nativeDiagnostic,
         ),
       );
       return _readProjectedMeters(outMeters.ref);
@@ -3917,6 +3922,7 @@ RenderSessionAttachOptions renderSessionAttachOptionsDefault() =>
           _writeRenderTargetExtent(extent, arena),
           outWidth,
           outHeight,
+          nativeDiagnostic,
         ),
       );
       return (outWidth.value, outHeight.value);
@@ -3976,6 +3982,7 @@ RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
       raw.mln_runtime_create(
         _writeRuntimeOptions(options, arena, registrations),
         outRuntime,
+        nativeDiagnostic,
       ),
     );
     registrations.accept();
@@ -3985,7 +3992,7 @@ RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
           (RuntimeHandle._(NativeRuntime(outRuntime.value))
             .._state.retain(registrations)),
       (handle) {
-        _check(raw.mln_runtime_dispose(handle));
+        _check(raw.mln_runtime_dispose(handle, nativeDiagnostic));
       },
     );
   } finally {
@@ -4050,13 +4057,6 @@ TextureImageInfo textureImageInfoDefault() => withNativeArena((arena) {
 
   final nativeResult = raw.mln_texture_image_info_default();
   return _readTextureImageInfo(nativeResult);
-});
-
-String threadLastErrorMessage() => withNativeArena((arena) {
-  ensureAbiVersion();
-
-  final nativeResult = raw.mln_thread_last_error_message();
-  return nativeResult.cast<Utf8>().toDartString();
 });
 
 VulkanBorrowedTextureDescriptor vulkanBorrowedTextureDescriptorDefault() =>
@@ -4128,14 +4128,19 @@ final class AcquiredFrameHandle implements Finalizable {
 
   void dispose() => _state.close(
     (handle) => withNativeArena((arena) {
-      return raw.mln_acquired_frame_dispose(handle.raw);
+      return raw.mln_acquired_frame_dispose(handle.raw, nativeDiagnostic);
     }),
-    threadLastErrorMessage,
   );
   ScopedMetalOwnedTextureFrame getMetalTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_metal_owned_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_metal_owned_texture_frame>();
-    _check(raw.mln_acquired_frame_get_metal_texture(_handle.raw, outFrame));
+    _check(
+      raw.mln_acquired_frame_get_metal_texture(
+        _handle.raw,
+        outFrame,
+        nativeDiagnostic,
+      ),
+    );
     return ScopedMetalOwnedTextureFrame._(
       this,
       _readMetalOwnedTextureFrame(outFrame.ref),
@@ -4144,7 +4149,13 @@ final class AcquiredFrameHandle implements Finalizable {
   ScopedOpenglOwnedTextureFrame getOpenglTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_opengl_owned_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_opengl_owned_texture_frame>();
-    _check(raw.mln_acquired_frame_get_opengl_texture(_handle.raw, outFrame));
+    _check(
+      raw.mln_acquired_frame_get_opengl_texture(
+        _handle.raw,
+        outFrame,
+        nativeDiagnostic,
+      ),
+    );
     return ScopedOpenglOwnedTextureFrame._(
       this,
       _readOpenglOwnedTextureFrame(outFrame.ref),
@@ -4153,19 +4164,37 @@ final class AcquiredFrameHandle implements Finalizable {
   ScopedGpuSync getProducerSync() => withNativeArena((arena) {
     final outSync = arena<raw.mln_gpu_sync>();
     outSync.ref = raw.mln_gpu_sync_default();
-    _check(raw.mln_acquired_frame_get_producer_sync(_handle.raw, outSync));
+    _check(
+      raw.mln_acquired_frame_get_producer_sync(
+        _handle.raw,
+        outSync,
+        nativeDiagnostic,
+      ),
+    );
     return ScopedGpuSync._(this, _readGpuSync(outSync.ref));
   });
   RenderFrameResult getResult() => withNativeArena((arena) {
     final outResult = arena<raw.mln_render_frame_result>();
     outResult.ref.size = sizeOf<raw.mln_render_frame_result>();
-    _check(raw.mln_acquired_frame_get_result(_handle.raw, outResult));
+    _check(
+      raw.mln_acquired_frame_get_result(
+        _handle.raw,
+        outResult,
+        nativeDiagnostic,
+      ),
+    );
     return _readRenderFrameResult(outResult.ref);
   });
   ScopedVulkanOwnedTextureFrame getVulkanTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_vulkan_owned_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_vulkan_owned_texture_frame>();
-    _check(raw.mln_acquired_frame_get_vulkan_texture(_handle.raw, outFrame));
+    _check(
+      raw.mln_acquired_frame_get_vulkan_texture(
+        _handle.raw,
+        outFrame,
+        nativeDiagnostic,
+      ),
+    );
     return ScopedVulkanOwnedTextureFrame._(
       this,
       _readVulkanOwnedTextureFrame(outFrame.ref),
@@ -4174,7 +4203,13 @@ final class AcquiredFrameHandle implements Finalizable {
   ScopedWebgpuOwnedTextureFrame getWebgpuTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_webgpu_owned_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_webgpu_owned_texture_frame>();
-    _check(raw.mln_acquired_frame_get_webgpu_texture(_handle.raw, outFrame));
+    _check(
+      raw.mln_acquired_frame_get_webgpu_texture(
+        _handle.raw,
+        outFrame,
+        nativeDiagnostic,
+      ),
+    );
     return ScopedWebgpuOwnedTextureFrame._(
       this,
       _readWebgpuOwnedTextureFrame(outFrame.ref),
@@ -4186,9 +4221,9 @@ final class AcquiredFrameHandle implements Finalizable {
       return raw.mln_acquired_frame_release(
         receiverPointer,
         _writeGpuSync(consumerCompletion, arena),
+        nativeDiagnostic,
       );
     }),
-    threadLastErrorMessage,
   );
 }
 
@@ -4213,11 +4248,10 @@ final class BufferHandle implements Finalizable {
       raw.mln_buffer_destroy(handle.raw);
       return nativeStatusOk;
     }),
-    threadLastErrorMessage,
   );
   Uint8List getValue() => withNativeArena((arena) {
     final outView = arena<raw.mln_buffer_view>();
-    _check(raw.mln_buffer_get(_handle.raw, outView));
+    _check(raw.mln_buffer_get(_handle.raw, outView, nativeDiagnostic));
     return _copyBufferView(outView.ref);
   });
 }
@@ -4241,7 +4275,7 @@ final class EventBatchHandle implements Finalizable {
   RuntimeEventBatchView getValue() => withNativeArena((arena) {
     final outView = arena<raw.mln_runtime_event_batch_view>();
     outView.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
-    _check(raw.mln_event_batch_get(_handle.raw, outView));
+    _check(raw.mln_event_batch_get(_handle.raw, outView, nativeDiagnostic));
     return _readRuntimeEventBatchView(outView.ref);
   });
   void close() => _state.close(
@@ -4249,7 +4283,6 @@ final class EventBatchHandle implements Finalizable {
       raw.mln_event_batch_release(handle.raw);
       return nativeStatusOk;
     }),
-    threadLastErrorMessage,
   );
 }
 
@@ -4274,7 +4307,6 @@ final class GeojsonSourceDataHandle implements Finalizable {
       raw.mln_geojson_source_data_destroy(handle.raw);
       return nativeStatusOk;
     }),
-    threadLastErrorMessage,
   );
 }
 
@@ -4311,6 +4343,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(sourceId, arena).value,
         nativeStringView((beforeLayerId ?? ''), arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4326,6 +4359,7 @@ final class MapHandle implements Finalizable {
           nativeStringView(sourceId, arena).value,
           registrations.prepareCustomGeometrySourceOptions(options),
           completion,
+          nativeDiagnostic,
         );
         if (status == nativeStatusOk) {
           registrations.accept();
@@ -4348,6 +4382,7 @@ final class MapHandle implements Finalizable {
           nativeStringView(sourceId, arena).value,
           registrations.prepareCustomMvtVectorSourceOptions(options),
           completion,
+          nativeDiagnostic,
         );
         if (status == nativeStatusOk) {
           registrations.accept();
@@ -4368,6 +4403,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(sourceId, arena).value,
         data._handle.raw,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4383,6 +4419,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(url, arena).value,
         options == null ? nullptr : _writeGeojsonSourceOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4398,6 +4435,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(sourceId, arena).value,
         nativeStringView((beforeLayerId ?? ''), arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4420,6 +4458,7 @@ final class MapHandle implements Finalizable {
         coordinates.length,
         _writePremultipliedRgba8Image(image, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4442,6 +4481,7 @@ final class MapHandle implements Finalizable {
         coordinates.length,
         nativeStringView(url, arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4455,6 +4495,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(layerId, arena).value,
         nativeStringView((beforeLayerId ?? ''), arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4479,6 +4520,7 @@ final class MapHandle implements Finalizable {
             ? nullptr
             : _writeStyleTileSourceOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4496,6 +4538,7 @@ final class MapHandle implements Finalizable {
             ? nullptr
             : _writeStyleTileSourceOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4520,6 +4563,7 @@ final class MapHandle implements Finalizable {
             ? nullptr
             : _writeStyleTileSourceOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4537,6 +4581,7 @@ final class MapHandle implements Finalizable {
             ? nullptr
             : _writeStyleTileSourceOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4550,6 +4595,7 @@ final class MapHandle implements Finalizable {
         nativeBufferView(layerJson, arena),
         nativeStringView((beforeLayerId ?? ''), arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4563,6 +4609,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(sourceId, arena).value,
         nativeBufferView(sourceJson, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4587,6 +4634,7 @@ final class MapHandle implements Finalizable {
             ? nullptr
             : _writeStyleTileSourceOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4604,6 +4652,7 @@ final class MapHandle implements Finalizable {
             ? nullptr
             : _writeStyleTileSourceOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -4614,6 +4663,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             _writeCameraDelta(delta, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -4633,6 +4683,7 @@ final class MapHandle implements Finalizable {
             ? nullptr
             : _writeCameraFitOptions(fitOptions, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) =>
@@ -4655,6 +4706,7 @@ final class MapHandle implements Finalizable {
             ? nullptr
             : _writeCameraFitOptions(fitOptions, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) =>
@@ -4684,6 +4736,7 @@ final class MapHandle implements Finalizable {
             ? nullptr
             : _writeCameraFitOptions(fitOptions, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) =>
@@ -4696,7 +4749,11 @@ final class MapHandle implements Finalizable {
         .MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT,
     elementSize: sizeOf<raw.mln_camera_query_result>(),
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_camera_query(_handle.raw, completion);
+      return raw.mln_map_camera_query(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) => _readCameraQueryResult(
       result.value.cast<raw.mln_camera_query_result>().ref,
@@ -4708,7 +4765,12 @@ final class MapHandle implements Finalizable {
     outCamera.ref = raw.mln_camera_options_default();
     final outGeneration = arena<Uint64>();
     _check(
-      raw.mln_map_camera_snapshot_get(_handle.raw, outCamera, outGeneration),
+      raw.mln_map_camera_snapshot_get(
+        _handle.raw,
+        outCamera,
+        outGeneration,
+        nativeDiagnostic,
+      ),
     );
     return (
       _readCameraOptions(outCamera.ref),
@@ -4717,7 +4779,11 @@ final class MapHandle implements Finalizable {
   });
   Future<CommandCompletion> cancelTransitions() => _startCommand(
     (completion) => withNativeArena((arena) {
-      return raw.mln_map_cancel_transitions(_handle.raw, completion);
+      return raw.mln_map_cancel_transitions(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
   );
   Future<String?> copyLayerSourceId(String layerId) => startNativeCompletion(
@@ -4730,6 +4796,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         nativeStringView(layerId, arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => result.value.cast<raw.mln_buffer_view>().ref.size == 0
@@ -4749,6 +4816,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         nativeStringView(layerId, arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => result.value.cast<raw.mln_buffer_view>().ref.size == 0
@@ -4769,6 +4837,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             nativeStringView(imageId, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value_count == 0
@@ -4789,6 +4858,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             nativeStringView(imageId, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value_count == 0
@@ -4809,6 +4879,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             nativeStringView(sourceId, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value_count == 0
@@ -4830,6 +4901,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         nativeStringView(sourceId, arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => result.value_count == 0
@@ -4843,13 +4915,16 @@ final class MapHandle implements Finalizable {
   );
   void dispose() => _state.close(
     (handle) => withNativeArena((arena) {
-      return raw.mln_map_dispose(handle.raw);
+      return raw.mln_map_dispose(handle.raw, nativeDiagnostic);
     }),
-    threadLastErrorMessage,
   );
   Future<CommandCompletion> dumpDebugLogs() => _startCommand(
     (completion) => withNativeArena((arena) {
-      return raw.mln_map_dump_debug_logs(_handle.raw, completion);
+      return raw.mln_map_dump_debug_logs(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
   );
   Future<Uint8List> getFeatureState(FeatureStateSelector selector) =>
@@ -4863,6 +4938,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             _writeFeatureStateSelector(selector, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) =>
@@ -4875,7 +4951,11 @@ final class MapHandle implements Finalizable {
         .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
     elementSize: sizeOf<raw.mln_buffer_view>(),
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_get_global_state(_handle.raw, completion);
+      return raw.mln_map_get_global_state(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) =>
         _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
@@ -4892,6 +4972,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             nativeStringView(sourceId, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value == nullptr
@@ -4915,6 +4996,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         nativeStringView(layerId, arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => result.value_count == 0
@@ -4936,6 +5018,7 @@ final class MapHandle implements Finalizable {
             nativeStringView(layerId, arena).value,
             nativeStringView(propertyName, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value_count == 0
@@ -4956,6 +5039,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             nativeStringView(imageId, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value_count == 0
@@ -4976,6 +5060,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             nativeStringView(layerId, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value_count == 0
@@ -4995,6 +5080,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         nativeStringView(layerId, arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => result.value_count == 0
@@ -5015,6 +5101,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             nativeStringView(propertyName, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value_count == 0
@@ -5035,6 +5122,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             nativeStringView(sourceId, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value_count == 0
@@ -5055,6 +5143,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             nativeStringView(sourceId, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value_count == 0
@@ -5074,6 +5163,7 @@ final class MapHandle implements Finalizable {
           return raw.mln_map_get_style_transition_options(
             _handle.raw,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => _readStyleTransitionOptions(
@@ -5091,6 +5181,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(sourceId, arena).value,
         _writeLatLngBounds(bounds, arena).ref,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5104,6 +5195,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(sourceId, arena).value,
         _writeCanonicalTileId(tileId, arena).ref,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5117,6 +5209,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(sourceId, arena).value,
         _writeCanonicalTileId(tileId, arena).ref,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5131,6 +5224,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             _writeCameraOptions(camera, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) =>
@@ -5148,6 +5242,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             _writeCameraOptions(camera, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) =>
@@ -5164,6 +5259,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         _writeScreenPoint(point, arena).ref,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => _readLatLng(result.value.cast<raw.mln_lat_lng>().ref),
@@ -5180,6 +5276,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             _writeScreenPoint(point, arena).ref,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) =>
@@ -5204,6 +5301,7 @@ final class MapHandle implements Finalizable {
             nativepoints,
             points.length,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => List<LatLng>.unmodifiable(
@@ -5232,6 +5330,7 @@ final class MapHandle implements Finalizable {
             nativepoints,
             points.length,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => List<LatLng>.unmodifiable(
@@ -5248,7 +5347,11 @@ final class MapHandle implements Finalizable {
         .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
     elementSize: sizeOf<raw.mln_buffer_view>(),
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_list_style_layer_ids(_handle.raw, completion);
+      return raw.mln_map_list_style_layer_ids(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) => List<String>.unmodifiable(
       List.generate(
@@ -5266,7 +5369,11 @@ final class MapHandle implements Finalizable {
         .MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY,
     elementSize: sizeOf<raw.mln_style_layer_entry>(),
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_list_style_layers(_handle.raw, completion);
+      return raw.mln_map_list_style_layers(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) => List<StyleLayerEntry>.unmodifiable(
       List.generate(
@@ -5284,7 +5391,11 @@ final class MapHandle implements Finalizable {
         .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
     elementSize: sizeOf<raw.mln_buffer_view>(),
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_list_style_source_ids(_handle.raw, completion);
+      return raw.mln_map_list_style_source_ids(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) => List<String>.unmodifiable(
       List.generate(
@@ -5302,7 +5413,11 @@ final class MapHandle implements Finalizable {
         .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
     elementSize: sizeOf<raw.mln_buffer_view>(),
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_loaded_style_json(_handle.raw, completion);
+      return raw.mln_map_loaded_style_json(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) =>
         _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
@@ -5319,6 +5434,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             latitude,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value.cast<Double>().value,
@@ -5334,6 +5450,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(layerId, arena).value,
         nativeStringView((beforeLayerId ?? ''), arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5348,6 +5465,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             _writeLatLng(coordinate, arena).ref,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) =>
@@ -5373,6 +5491,7 @@ final class MapHandle implements Finalizable {
         nativecoordinates,
         coordinates.length,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => List<ScreenPoint>.unmodifiable(
@@ -5390,7 +5509,11 @@ final class MapHandle implements Finalizable {
         .MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION,
     elementSize: sizeOf<Uint64>(),
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_projection_create(_handle.raw, completion);
+      return raw.mln_map_projection_create(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) => _adoptOwned(
       result.value.cast<Uint64>().value,
@@ -5398,7 +5521,7 @@ final class MapHandle implements Finalizable {
         NativeMapProjection(result.value.cast<Uint64>().value),
       ),
       (handle) {
-        _check(raw.mln_map_projection_close(handle));
+        _check(raw.mln_map_projection_close(handle, nativeDiagnostic));
       },
     ),
     claimBeforeDecode: true,
@@ -5409,7 +5532,7 @@ final class MapHandle implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        return raw.mln_map_release(handle.raw, completion);
+        return raw.mln_map_release(handle.raw, completion, nativeDiagnostic);
       }),
       decode: (result) {},
     ),
@@ -5421,6 +5544,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             _writeFeatureStateSelector(selector, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5430,6 +5554,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         nativeStringView(imageId, arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5439,6 +5564,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         nativeStringView(layerId, arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5448,12 +5574,17 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         nativeStringView(sourceId, arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
   Future<CommandCompletion> requestRepaint() => _startCommand(
     (completion) => withNativeArena((arena) {
-      return raw.mln_map_request_repaint(_handle.raw, completion);
+      return raw.mln_map_request_repaint(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
   );
   Future<void> requestStillImage() => startNativeCompletion(
@@ -5461,7 +5592,11 @@ final class MapHandle implements Finalizable {
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: 0,
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_request_still_image(_handle.raw, completion);
+      return raw.mln_map_request_still_image(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) {},
     claimBeforeDecode: false,
@@ -5472,6 +5607,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         _writeLogicalExtent(extent, arena).ref,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5481,6 +5617,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         _writeBoundOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5496,6 +5633,7 @@ final class MapHandle implements Finalizable {
         _writeCanonicalTileId(tileId, arena).ref,
         nativeBufferView(data, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5511,6 +5649,7 @@ final class MapHandle implements Finalizable {
         _writeCanonicalTileId(tileId, arena).ref,
         nativeBufferView(data, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5526,6 +5665,7 @@ final class MapHandle implements Finalizable {
         _writeCanonicalTileId(tileId, arena).ref,
         nativeStringView(message, arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5536,6 +5676,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             options.rawValue,
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5546,6 +5687,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             mask.rawValue,
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5559,6 +5701,7 @@ final class MapHandle implements Finalizable {
         _writeFeatureStateSelector(selector, arena),
         nativeBufferView(state, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5569,6 +5712,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             _writeFreeCameraOptions(options, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5582,6 +5726,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(sourceId, arena).value,
         data._handle.raw,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5595,6 +5740,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(sourceId, arena).value,
         enabled,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5606,6 +5752,7 @@ final class MapHandle implements Finalizable {
             nativeStringView(sourceId, arena).value,
             nativeStringView(url, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5619,6 +5766,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(propertyName, arena).value,
         nativeBufferView(value, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5639,6 +5787,7 @@ final class MapHandle implements Finalizable {
         nativecoordinates,
         coordinates.length,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5652,6 +5801,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(sourceId, arena).value,
         _writePremultipliedRgba8Image(image, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5663,6 +5813,7 @@ final class MapHandle implements Finalizable {
             nativeStringView(sourceId, arena).value,
             nativeStringView(url, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5682,6 +5833,7 @@ final class MapHandle implements Finalizable {
                 return storage;
               })(),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5693,6 +5845,7 @@ final class MapHandle implements Finalizable {
             nativeStringView(layerId, arena).value,
             maxZoom,
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5704,6 +5857,7 @@ final class MapHandle implements Finalizable {
             nativeStringView(layerId, arena).value,
             minZoom,
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5719,6 +5873,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(propertyName, arena).value,
         nativeBufferView(value, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5730,6 +5885,7 @@ final class MapHandle implements Finalizable {
             nativeStringView(layerId, arena).value,
             nativeStringView(sourceId, arena).value,
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5743,6 +5899,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(layerId, arena).value,
         nativeStringView((sourceLayer ?? ''), arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5756,6 +5913,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(layerId, arena).value,
         visibility.rawValue,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5769,6 +5927,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(layerId, arena).value,
         radius,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5782,6 +5941,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(layerId, arena).value,
         bearing,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5797,6 +5957,7 @@ final class MapHandle implements Finalizable {
         imageKind.rawValue,
         nativeStringView(imageId, arena).value,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5812,6 +5973,7 @@ final class MapHandle implements Finalizable {
         _writeLatLng(coordinate, arena).ref,
         altitude,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5822,6 +5984,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             _writeProjectionMode(mode, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5832,6 +5995,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             enabled,
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5847,6 +6011,7 @@ final class MapHandle implements Finalizable {
         _writePremultipliedRgba8Image(image, arena),
         options == null ? nullptr : _writeStyleImageOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5856,6 +6021,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         nativeBufferView(json, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5866,6 +6032,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             nativeBufferView(lightJson, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5879,6 +6046,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(propertyName, arena).value,
         nativeBufferView(value, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5892,6 +6060,7 @@ final class MapHandle implements Finalizable {
         nativeStringView(sourceId, arena).value,
         isVolatile,
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5903,6 +6072,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         _writeStyleTransitionOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5912,6 +6082,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         nativeUtf8CString(url, arena).pointer.cast<Char>(),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5922,6 +6093,7 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             _writeMapTileOptions(options, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
       );
@@ -5932,13 +6104,16 @@ final class MapHandle implements Finalizable {
             _handle.raw,
             _writeMapViewportOptions(options, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
       );
   MapSnapshot snapshotGet() => withNativeArena((arena) {
     final outSnapshot = arena<raw.mln_map_snapshot>();
     outSnapshot.ref.size = sizeOf<raw.mln_map_snapshot>();
-    _check(raw.mln_map_snapshot_get(_handle.raw, outSnapshot));
+    _check(
+      raw.mln_map_snapshot_get(_handle.raw, outSnapshot, nativeDiagnostic),
+    );
     return _readMapSnapshot(outSnapshot.ref);
   });
   Future<String> styleUrl() => startNativeCompletion(
@@ -5947,7 +6122,7 @@ final class MapHandle implements Finalizable {
         .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
     elementSize: sizeOf<raw.mln_buffer_view>(),
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_style_url(_handle.raw, completion);
+      return raw.mln_map_style_url(_handle.raw, completion, nativeDiagnostic);
     }),
     decode: (result) => utf8.decode(
       _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
@@ -5960,6 +6135,7 @@ final class MapHandle implements Finalizable {
         _handle.raw,
         _writeCameraUpdate(update, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -5984,6 +6160,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -5995,7 +6172,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6044,6 +6223,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -6055,7 +6235,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6104,6 +6286,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -6115,7 +6298,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6164,6 +6349,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -6175,7 +6361,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6224,6 +6412,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -6235,7 +6424,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6284,6 +6475,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -6295,7 +6487,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6344,6 +6538,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -6355,7 +6550,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6404,6 +6601,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -6415,7 +6613,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6464,6 +6664,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -6475,7 +6676,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6524,6 +6727,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -6535,7 +6739,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6584,6 +6790,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -6595,7 +6802,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6644,6 +6853,7 @@ final class MapHandle implements Finalizable {
             _writeRenderSessionAttachOptions(options, arena, registrations),
             outSession,
             completion,
+            nativeDiagnostic,
           );
           if (status == nativeStatusOk) {
             registrations.accept();
@@ -6655,7 +6865,9 @@ final class MapHandle implements Finalizable {
                   NativeRenderSession(outSession.value),
                 ).._state.retain(registrations)),
                 (handle) {
-                  _check(raw.mln_render_session_dispose(handle));
+                  _check(
+                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
+                  );
                 },
               );
             } catch (error, stack) {
@@ -6702,14 +6914,19 @@ final class MapProjectionHandle implements Finalizable {
 
   void close() => _state.close(
     (handle) => withNativeArena((arena) {
-      return raw.mln_map_projection_close(handle.raw);
+      return raw.mln_map_projection_close(handle.raw, nativeDiagnostic);
     }),
-    threadLastErrorMessage,
   );
   CameraOptions getCamera() => withNativeArena((arena) {
     final outCamera = arena<raw.mln_camera_options>();
     outCamera.ref = raw.mln_camera_options_default();
-    _check(raw.mln_map_projection_get_camera(_handle.raw, outCamera));
+    _check(
+      raw.mln_map_projection_get_camera(
+        _handle.raw,
+        outCamera,
+        nativeDiagnostic,
+      ),
+    );
     return _readCameraOptions(outCamera.ref);
   });
   LatLng latLngForPixel(ScreenPoint point) => withNativeArena((arena) {
@@ -6719,6 +6936,7 @@ final class MapProjectionHandle implements Finalizable {
         _handle.raw,
         _writeScreenPoint(point, arena).ref,
         outCoordinate,
+        nativeDiagnostic,
       ),
     );
     return _readLatLng(outCoordinate.ref);
@@ -6730,6 +6948,7 @@ final class MapProjectionHandle implements Finalizable {
         _handle.raw,
         _writeScreenPoint(point, arena).ref,
         outCoordinate,
+        nativeDiagnostic,
       ),
     );
     return _readLatLng(outCoordinate.ref);
@@ -6741,6 +6960,7 @@ final class MapProjectionHandle implements Finalizable {
         _handle.raw,
         latitude,
         outMetersPerPixel,
+        nativeDiagnostic,
       ),
     );
     return outMetersPerPixel.value;
@@ -6752,6 +6972,7 @@ final class MapProjectionHandle implements Finalizable {
         _handle.raw,
         _writeLatLng(coordinate, arena).ref,
         outPoint,
+        nativeDiagnostic,
       ),
     );
     return _readScreenPoint(outPoint.ref);
@@ -6761,6 +6982,7 @@ final class MapProjectionHandle implements Finalizable {
       raw.mln_map_projection_set_camera(
         _handle.raw,
         _writeCameraOptions(camera, arena),
+        nativeDiagnostic,
       ),
     );
   });
@@ -6781,6 +7003,7 @@ final class MapProjectionHandle implements Finalizable {
             nativecoordinates,
             coordinates.length,
             _writeEdgeInsets(padding, arena).ref,
+            nativeDiagnostic,
           ),
         );
       });
@@ -6791,6 +7014,7 @@ final class MapProjectionHandle implements Finalizable {
             _handle.raw,
             nativeBufferView(geometry, arena),
             _writeEdgeInsets(padding, arena).ref,
+            nativeDiagnostic,
           ),
         );
       });
@@ -6814,7 +7038,9 @@ final class RenderFrameBatchHandle implements Finalizable {
 
   int count() => withNativeArena((arena) {
     final outCount = arena<Size>();
-    _check(raw.mln_render_frame_batch_count(_handle.raw, outCount));
+    _check(
+      raw.mln_render_frame_batch_count(_handle.raw, outCount, nativeDiagnostic),
+    );
     return outCount.value;
   });
   RenderFrameResult getValue(int indexValue) => withNativeArena((arena) {
@@ -6829,6 +7055,7 @@ final class RenderFrameBatchHandle implements Finalizable {
           sizeOf<Size>() == 4 ? 4294967295 : 0x7fffffffffffffff,
         ),
         outResult,
+        nativeDiagnostic,
       ),
     );
     return _readRenderFrameResult(outResult.ref);
@@ -6838,7 +7065,6 @@ final class RenderFrameBatchHandle implements Finalizable {
       raw.mln_render_frame_batch_release(handle.raw);
       return nativeStatusOk;
     }),
-    threadLastErrorMessage,
   );
 }
 
@@ -6872,6 +7098,7 @@ final class RenderSessionHandle implements Finalizable {
         _handle.raw,
         _writeMetalBorrowedTextureDescriptor(descriptor, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) {},
@@ -6888,6 +7115,7 @@ final class RenderSessionHandle implements Finalizable {
             _handle.raw,
             _writeMetalSurfaceDescriptor(descriptor, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) {},
@@ -6904,6 +7132,7 @@ final class RenderSessionHandle implements Finalizable {
         _handle.raw,
         _writeOpenglBorrowedTextureDescriptor(descriptor, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) {},
@@ -6920,6 +7149,7 @@ final class RenderSessionHandle implements Finalizable {
             _handle.raw,
             _writeOpenglSurfaceDescriptor(descriptor, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) {},
@@ -6928,17 +7158,25 @@ final class RenderSessionHandle implements Finalizable {
   RenderAbandonResult abandon() => withNativeArena((arena) {
     final outResult = arena<raw.mln_render_abandon_result>();
     outResult.ref.size = sizeOf<raw.mln_render_abandon_result>();
-    _check(raw.mln_render_session_abandon(_handle.raw, outResult));
+    _check(
+      raw.mln_render_session_abandon(_handle.raw, outResult, nativeDiagnostic),
+    );
     return _readRenderAbandonResult(outResult.ref);
   });
   AcquiredFrameHandle acquireFrame() => withNativeArena((arena) {
     final outFrame = arena<Uint64>();
-    _check(raw.mln_render_session_acquire_frame(_handle.raw, outFrame));
+    _check(
+      raw.mln_render_session_acquire_frame(
+        _handle.raw,
+        outFrame,
+        nativeDiagnostic,
+      ),
+    );
     return _adoptOwned(
       outFrame.value,
       () => AcquiredFrameHandle._(this, NativeAcquiredFrame(outFrame.value)),
       (handle) {
-        _check(raw.mln_acquired_frame_dispose(handle));
+        _check(raw.mln_acquired_frame_dispose(handle, nativeDiagnostic));
       },
     );
   });
@@ -6947,7 +7185,11 @@ final class RenderSessionHandle implements Finalizable {
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: 0,
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_barrier(_handle.raw, completion);
+      return raw.mln_render_session_barrier(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) {},
     claimBeforeDecode: false,
@@ -6957,36 +7199,48 @@ final class RenderSessionHandle implements Finalizable {
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: 0,
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_clear_data(_handle.raw, completion);
+      return raw.mln_render_session_clear_data(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) {},
     claimBeforeDecode: false,
   );
   void close() => _state.close(
     (handle) => withNativeArena((arena) {
-      return raw.mln_render_session_destroy(handle.raw);
+      return raw.mln_render_session_destroy(handle.raw, nativeDiagnostic);
     }),
-    threadLastErrorMessage,
   );
   Future<void> detach() => startNativeCompletion(
     copyKind:
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: 0,
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_detach(_handle.raw, completion);
+      return raw.mln_render_session_detach(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) {},
     claimBeforeDecode: false,
   );
   void dispose() => _state.close(
     (handle) => withNativeArena((arena) {
-      return raw.mln_render_session_dispose(handle.raw);
+      return raw.mln_render_session_dispose(handle.raw, nativeDiagnostic);
     }),
-    threadLastErrorMessage,
   );
   RenderFrameBatchHandle drainFrameResults() => withNativeArena((arena) {
     final outBatch = arena<Uint64>();
-    _check(raw.mln_render_session_drain_frame_results(_handle.raw, outBatch));
+    _check(
+      raw.mln_render_session_drain_frame_results(
+        _handle.raw,
+        outBatch,
+        nativeDiagnostic,
+      ),
+    );
     return _adoptOwned(
       outBatch.value,
       () => RenderFrameBatchHandle._(NativeRenderFrameBatch(outBatch.value)),
@@ -7000,7 +7254,11 @@ final class RenderSessionHandle implements Finalizable {
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: 0,
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_dump_debug_logs(_handle.raw, completion);
+      return raw.mln_render_session_dump_debug_logs(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) {},
     claimBeforeDecode: false,
@@ -7009,26 +7267,40 @@ final class RenderSessionHandle implements Finalizable {
     final outCapabilities = arena<raw.mln_render_session_capabilities>();
     outCapabilities.ref.size = sizeOf<raw.mln_render_session_capabilities>();
     _check(
-      raw.mln_render_session_get_capabilities(_handle.raw, outCapabilities),
+      raw.mln_render_session_get_capabilities(
+        _handle.raw,
+        outCapabilities,
+        nativeDiagnostic,
+      ),
     );
     return _readRenderSessionCapabilities(outCapabilities.ref);
   });
   RenderSessionSnapshot getSnapshot() => withNativeArena((arena) {
     final outSnapshot = arena<raw.mln_render_session_snapshot>();
     outSnapshot.ref.size = sizeOf<raw.mln_render_session_snapshot>();
-    _check(raw.mln_render_session_get_snapshot(_handle.raw, outSnapshot));
+    _check(
+      raw.mln_render_session_get_snapshot(
+        _handle.raw,
+        outSnapshot,
+        nativeDiagnostic,
+      ),
+    );
     return _readRenderSessionSnapshot(outSnapshot.ref);
   });
   MapProjectionHandle projectionCreate() => withNativeArena((arena) {
     final outProjection = arena<Uint64>();
     _check(
-      raw.mln_render_session_projection_create(_handle.raw, outProjection),
+      raw.mln_render_session_projection_create(
+        _handle.raw,
+        outProjection,
+        nativeDiagnostic,
+      ),
     );
     return _adoptOwned(
       outProjection.value,
       () => MapProjectionHandle._(NativeMapProjection(outProjection.value)),
       (handle) {
-        _check(raw.mln_map_projection_close(handle));
+        _check(raw.mln_map_projection_close(handle, nativeDiagnostic));
       },
     );
   });
@@ -7058,6 +7330,7 @@ final class RenderSessionHandle implements Finalizable {
                 return storage;
               })(),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) =>
@@ -7080,6 +7353,7 @@ final class RenderSessionHandle implements Finalizable {
             ? nullptr
             : _writeRenderedFeatureQueryOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => List<QueriedFeature>.unmodifiable(
@@ -7108,6 +7382,7 @@ final class RenderSessionHandle implements Finalizable {
             ? nullptr
             : _writeSourceFeatureQueryOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => List<QueriedFeature>.unmodifiable(
@@ -7125,7 +7400,11 @@ final class RenderSessionHandle implements Finalizable {
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: 0,
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_reduce_memory_use(_handle.raw, completion);
+      return raw.mln_render_session_reduce_memory_use(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) {},
     claimBeforeDecode: false,
@@ -7135,6 +7414,7 @@ final class RenderSessionHandle implements Finalizable {
       raw.mln_render_session_request_frame(
         _handle.raw,
         _writeFrameDemand(demand, arena),
+        nativeDiagnostic,
       ),
     );
   });
@@ -7144,6 +7424,7 @@ final class RenderSessionHandle implements Finalizable {
         _handle.raw,
         _writeRenderTargetExtent(extent, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
   );
@@ -7158,6 +7439,7 @@ final class RenderSessionHandle implements Finalizable {
           sizeOf<Size>() == 4 ? 4294967295 : 0x7fffffffffffffff,
         ),
         outServiced,
+        nativeDiagnostic,
       ),
     );
     return outServiced.value;
@@ -7172,6 +7454,7 @@ final class RenderSessionHandle implements Finalizable {
           return raw.mln_texture_read_premultiplied_rgba8(
             _handle.raw,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => _readTextureReadbackResult(
@@ -7190,6 +7473,7 @@ final class RenderSessionHandle implements Finalizable {
         _handle.raw,
         _writeVulkanBorrowedTextureDescriptor(descriptor, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) {},
@@ -7206,6 +7490,7 @@ final class RenderSessionHandle implements Finalizable {
             _handle.raw,
             _writeVulkanSurfaceDescriptor(descriptor, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) {},
@@ -7222,6 +7507,7 @@ final class RenderSessionHandle implements Finalizable {
         _handle.raw,
         _writeWebgpuBorrowedTextureDescriptor(descriptor, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) {},
@@ -7238,6 +7524,7 @@ final class RenderSessionHandle implements Finalizable {
             _handle.raw,
             _writeWebgpuSurfaceDescriptor(descriptor, arena),
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) {},
@@ -7265,7 +7552,13 @@ final class ResourceRequestHandle implements Finalizable {
 
   bool cancelled() => withNativeArena((arena) {
     final outCancelled = arena<Bool>();
-    _check(raw.mln_resource_request_cancelled(_handle.raw, outCancelled));
+    _check(
+      raw.mln_resource_request_cancelled(
+        _handle.raw,
+        outCancelled,
+        nativeDiagnostic,
+      ),
+    );
     return outCancelled.value;
   });
   void complete(ResourceResponse response) => withNativeArena((arena) {
@@ -7273,6 +7566,7 @@ final class ResourceRequestHandle implements Finalizable {
       raw.mln_resource_request_complete(
         _handle.raw,
         _writeResourceResponse(response, arena),
+        nativeDiagnostic,
       ),
     );
   });
@@ -7281,7 +7575,6 @@ final class ResourceRequestHandle implements Finalizable {
       raw.mln_resource_request_release(handle.raw);
       return nativeStatusOk;
     }),
-    threadLastErrorMessage,
   );
   bool setCancelCallback(
     ResourceRequestCancelCallback callback,
@@ -7317,6 +7610,7 @@ final class ResourceRequestHandle implements Finalizable {
               >(raw.mln_adapter_dart_port_release)
               .cast(),
           declined,
+          nativeDiagnostic,
         ),
       );
       accepted = !declined.value;
@@ -7328,7 +7622,12 @@ final class ResourceRequestHandle implements Finalizable {
     }
   });
   void waitUntilRetired() => withNativeArena((arena) {
-    _check(raw.mln_resource_request_wait_until_retired(_state.handleId));
+    _check(
+      raw.mln_resource_request_wait_until_retired(
+        _state.handleId,
+        nativeDiagnostic,
+      ),
+    );
   });
 }
 
@@ -7359,13 +7658,14 @@ final class RuntimeHandle implements Finalizable {
         _handle.raw,
         _writeMapOptions(options, arena),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => _adoptOwned(
       result.value.cast<Uint64>().value,
       () => MapHandle._(this, NativeMap(result.value.cast<Uint64>().value)),
       (handle) {
-        _check(raw.mln_map_dispose(handle));
+        _check(raw.mln_map_dispose(handle, nativeDiagnostic));
       },
     ),
     claimBeforeDecode: true,
@@ -7375,7 +7675,7 @@ final class RuntimeHandle implements Finalizable {
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: 0,
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_barrier(_handle.raw, completion);
+      return raw.mln_runtime_barrier(_handle.raw, completion, nativeDiagnostic);
     }),
     decode: (result) {},
     claimBeforeDecode: false,
@@ -7388,6 +7688,7 @@ final class RuntimeHandle implements Finalizable {
       return raw.mln_runtime_clear_http_header_transform(
         _handle.raw,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) {},
@@ -7398,7 +7699,11 @@ final class RuntimeHandle implements Finalizable {
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: 0,
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_clear_resource_provider(_handle.raw, completion);
+      return raw.mln_runtime_clear_resource_provider(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) {},
     claimBeforeDecode: false,
@@ -7408,20 +7713,25 @@ final class RuntimeHandle implements Finalizable {
         raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: 0,
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_clear_resource_transform(_handle.raw, completion);
+      return raw.mln_runtime_clear_resource_transform(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) {},
     claimBeforeDecode: false,
   );
   void dispose() => _state.close(
     (handle) => withNativeArena((arena) {
-      return raw.mln_runtime_dispose(handle.raw);
+      return raw.mln_runtime_dispose(handle.raw, nativeDiagnostic);
     }),
-    threadLastErrorMessage,
   );
   EventBatchHandle drainEvents() => withNativeArena((arena) {
     final outBatch = arena<Uint64>();
-    _check(raw.mln_runtime_drain_events(_handle.raw, outBatch));
+    _check(
+      raw.mln_runtime_drain_events(_handle.raw, outBatch, nativeDiagnostic),
+    );
     return _adoptOwned(
       outBatch.value,
       () => EventBatchHandle._(NativeEventBatch(outBatch.value)),
@@ -7432,7 +7742,9 @@ final class RuntimeHandle implements Finalizable {
   });
   RuntimeEventMask getEventMask() => withNativeArena((arena) {
     final outMask = arena<Uint64>();
-    _check(raw.mln_runtime_get_event_mask(_handle.raw, outMask));
+    _check(
+      raw.mln_runtime_get_event_mask(_handle.raw, outMask, nativeDiagnostic),
+    );
     return RuntimeEventMask.fromRawValue(outMask.value);
   });
   Future<OfflineRegionInfo> offlineRegionCreate(
@@ -7451,6 +7763,7 @@ final class RuntimeHandle implements Finalizable {
         bytesmetadata.data.cast(),
         bytesmetadata.size,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => _readOfflineRegionInfo(
@@ -7467,6 +7780,7 @@ final class RuntimeHandle implements Finalizable {
         _handle.raw,
         regionId,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) {},
@@ -7483,6 +7797,7 @@ final class RuntimeHandle implements Finalizable {
             _handle.raw,
             regionId,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => result.value_count == 0
@@ -7503,6 +7818,7 @@ final class RuntimeHandle implements Finalizable {
             _handle.raw,
             regionId,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) => _readOfflineRegionStatus(
@@ -7519,6 +7835,7 @@ final class RuntimeHandle implements Finalizable {
         _handle.raw,
         regionId,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) {},
@@ -7537,6 +7854,7 @@ final class RuntimeHandle implements Finalizable {
         regionId,
         state.rawValue,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) {},
@@ -7554,6 +7872,7 @@ final class RuntimeHandle implements Finalizable {
             regionId,
             observed,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) {},
@@ -7575,6 +7894,7 @@ final class RuntimeHandle implements Finalizable {
         bytesmetadata.data.cast(),
         bytesmetadata.size,
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => _readOfflineRegionInfo(
@@ -7588,7 +7908,11 @@ final class RuntimeHandle implements Finalizable {
         .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO,
     elementSize: sizeOf<raw.mln_offline_region_info>(),
     start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_offline_regions_list(_handle.raw, completion);
+      return raw.mln_runtime_offline_regions_list(
+        _handle.raw,
+        completion,
+        nativeDiagnostic,
+      );
     }),
     decode: (result) => List<OfflineRegionInfo>.unmodifiable(
       List.generate(
@@ -7612,6 +7936,7 @@ final class RuntimeHandle implements Finalizable {
         _handle.raw,
         nativeUtf8CString(sideDatabasePath, arena).pointer.cast<Char>(),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) => List<OfflineRegionInfo>.unmodifiable(
@@ -7630,7 +7955,11 @@ final class RuntimeHandle implements Finalizable {
           raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
       elementSize: 0,
       start: (completion) => withNativeArena((arena) {
-        return raw.mln_runtime_release(handle.raw, completion);
+        return raw.mln_runtime_release(
+          handle.raw,
+          completion,
+          nativeDiagnostic,
+        );
       }),
       decode: (result) {},
     ),
@@ -7646,13 +7975,20 @@ final class RuntimeHandle implements Finalizable {
             _handle.raw,
             operation.rawValue,
             completion,
+            nativeDiagnostic,
           );
         }),
         decode: (result) {},
         claimBeforeDecode: false,
       );
   void setEventMask(RuntimeEventMask mask) => withNativeArena((arena) {
-    _check(raw.mln_runtime_set_event_mask(_handle.raw, mask.rawValue));
+    _check(
+      raw.mln_runtime_set_event_mask(
+        _handle.raw,
+        mask.rawValue,
+        nativeDiagnostic,
+      ),
+    );
   });
   Future<void> setHttpHeaderTransform(HttpHeaderTransform transform) =>
       startNativeCompletion(
@@ -7667,6 +8003,7 @@ final class RuntimeHandle implements Finalizable {
               _handle.raw,
               registrations.prepareHttpHeaderTransform(transform),
               completion,
+              nativeDiagnostic,
             );
             if (status == nativeStatusOk) {
               registrations.accept();
@@ -7688,6 +8025,7 @@ final class RuntimeHandle implements Finalizable {
         _handle.raw,
         uint64ToNative(size, 'uint64_t'),
         completion,
+        nativeDiagnostic,
       );
     }),
     decode: (result) {},
@@ -7706,6 +8044,7 @@ final class RuntimeHandle implements Finalizable {
               _handle.raw,
               registrations.prepareResourceProvider(provider),
               completion,
+              nativeDiagnostic,
             );
             if (status == nativeStatusOk) {
               registrations.accept();
@@ -7731,6 +8070,7 @@ final class RuntimeHandle implements Finalizable {
               _handle.raw,
               registrations.prepareResourceTransform(transform),
               completion,
+              nativeDiagnostic,
             );
             if (status == nativeStatusOk) {
               registrations.accept();
@@ -8042,7 +8382,8 @@ final class ScopedWebgpuOwnedTextureFrame {
 final class _GeneratedNativeViewScope {
   _GeneratedNativeViewScope(this.handle, this.begin, this.end);
   final NativeHandle Function() handle;
-  final int Function(int, Pointer<Pointer<Void>>) begin;
+  final int Function(int, Pointer<Pointer<Void>>, Pointer<raw.mln_diagnostic>)
+  begin;
   final void Function(Pointer<Void>) end;
   int _active = 0;
   void checkActive() {
@@ -8055,7 +8396,7 @@ final class _GeneratedNativeViewScope {
 
   T use<T>(T Function() callback) => withNativeArena((arena) {
     final token = arena<Pointer<Void>>();
-    _check(begin(handle().raw, token));
+    _check(begin(handle().raw, token, nativeDiagnostic));
     _active++;
     try {
       final result = callback();

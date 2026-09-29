@@ -103,7 +103,10 @@ enum NativeCompletion {
   /// `call` may throw while materializing its arguments; the completion state
   /// it never reached is released before the error propagates.
   static func start<Value: Sendable>(
-    _ call: (UnsafePointer<mln_completion>) throws -> mln_status,
+    _ call: (
+      UnsafePointer<mln_completion>,
+      UnsafeMutablePointer<mln_diagnostic>
+    ) throws -> mln_status,
     acceptErrorStatus: Bool = false,
     convert: @escaping (UnsafePointer<mln_completion_result>) throws -> Value
   ) throws -> NativeFuture<Value> {
@@ -126,28 +129,31 @@ enum NativeCompletion {
       Unmanaged<AnyObject>.fromOpaque(userData).release()
     }
 
-    let status: mln_status
     do {
-      status = try withUnsafePointer(to: &descriptor, call)
+      try withUnsafePointer(to: &descriptor) { completion in
+        try checkStatus { try call(completion, $0) }
+      }
     } catch {
       retained.release()
       throw error
-    }
-    if status != MLN_STATUS_OK {
-      retained.release()
-      try checkStatus(status)
     }
     return NativeFuture(state: state)
   }
 
   static func startUnit(
-    _ call: (UnsafePointer<mln_completion>) throws -> mln_status
+    _ call: (
+      UnsafePointer<mln_completion>,
+      UnsafeMutablePointer<mln_diagnostic>
+    ) throws -> mln_status
   ) throws -> NativeFuture<Void> {
     try start(call) { _ in () }
   }
 
   static func startCommand(
-    _ call: (UnsafePointer<mln_completion>) throws -> mln_status
+    _ call: (
+      UnsafePointer<mln_completion>,
+      UnsafeMutablePointer<mln_diagnostic>
+    ) throws -> mln_status
   ) throws -> NativeFuture<CommandCompletion> {
     try start(call, acceptErrorStatus: true) { result in
       try CommandCompletion(

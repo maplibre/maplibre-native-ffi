@@ -23,13 +23,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_add_color_relief_layer(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
             bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -55,12 +56,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_custom_geometry_source(
             handle.raw,
             arena.view(bindingArg0),
             arena.store(bindingArg1.nativeValue(arena: arena)),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -86,12 +88,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_custom_mvt_vector_source(
             handle.raw,
             arena.view(bindingArg0),
             arena.store(bindingArg1.nativeValue(arena: arena)),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -117,12 +120,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_geojson_source_data(
             handle.raw,
             arena.view(bindingArg0),
             arena.borrow(bindingArg1.handle),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -149,13 +153,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_geojson_source_url(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
             bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -182,13 +187,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_add_hillshade_layer(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
             bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -215,14 +221,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_image_source_image(
             handle.raw,
             arena.view(bindingArg0),
             arena.array(bindingArg1.map { $0.nativeValue() }),
             NativeInputArena.count(bindingArg1.count),
             arena.store(bindingArg3.nativeValue(arena: arena)),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -249,14 +256,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_image_source_url(
             handle.raw,
             arena.view(bindingArg0),
             arena.array(bindingArg1.map { $0.nativeValue() }),
             NativeInputArena.count(bindingArg1.count),
             arena.view(bindingArg3),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -282,12 +290,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_add_location_indicator_layer(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -314,14 +323,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_raster_dem_source_tiles(
             handle.raw,
             arena.view(bindingArg0),
             arena.array(bindingArg1.map { arena.view($0) }),
             NativeInputArena.count(bindingArg1.count),
             bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -348,13 +358,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_raster_dem_source_url(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
             bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -381,14 +392,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_raster_source_tiles(
             handle.raw,
             arena.view(bindingArg0),
             arena.array(bindingArg1.map { arena.view($0) }),
             NativeInputArena.count(bindingArg1.count),
             bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -415,13 +427,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_raster_source_url(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
             bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -447,12 +460,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_add_style_layer_json(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -478,12 +492,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_add_style_source_json(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -510,14 +525,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_vector_source_tiles(
             handle.raw,
             arena.view(bindingArg0),
             arena.array(bindingArg1.map { arena.view($0) }),
             NativeInputArena.count(bindingArg1.count),
             bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -544,13 +560,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_add_vector_source_url(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
             bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -572,11 +589,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_copy_layer_source_id(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }) { result in try NativeCompletion.value(
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_copy_layer_source_id(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) } }) { result in try NativeCompletion.value(
           result,
           as: mln_buffer_view.self
         ).size == 0 ? nil : try NativeCompletion.string(result) }
@@ -601,11 +620,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_copy_layer_source_layer(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }) { result in try NativeCompletion.value(
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_copy_layer_source_layer(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) } }) { result in try NativeCompletion.value(
           result,
           as: mln_buffer_view.self
         ).size == 0 ? nil : try NativeCompletion.string(result) }
@@ -632,11 +653,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_map_copy_style_image_premultiplied_rgba8(
             handle.raw,
             arena.view(bindingArg0),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
                       .data(result)
@@ -662,11 +684,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_map_copy_style_image_stretches(
             handle.raw,
             arena.view(bindingArg0),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in if result.pointee
           .value_count ==
           0 { return nil
@@ -696,11 +719,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_map_copy_style_source_attribution(
             handle.raw,
             arena.view(bindingArg0),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
                       .string(result)
@@ -726,13 +750,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_copy_style_source_url(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }) { result in if result.pointee
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_copy_style_source_url(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) } }) { result in if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                    .string(result)
+                      .string(result)
         }
     }
   }
@@ -753,10 +779,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_get_global_state(
-          handle.raw,
-          completion
-        ) } }) { result in try NativeCompletion.data(result) }
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_get_global_state(
+            handle.raw,
+            completion,
+            diagnostic
+          ) } }) { result in try NativeCompletion.data(result) }
     }
   }
 }
@@ -778,11 +806,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_map_get_image_source_coordinates(
             handle.raw,
             arena.view(bindingArg0),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in if result.pointee
           .value == nil { return nil }; return try NativeCompletion.values(
               result,
@@ -808,13 +837,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_get_layer_filter(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }) { result in if result.pointee
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_get_layer_filter(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) } }) { result in if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                    .data(result)
+                      .data(result)
         }
     }
   }
@@ -838,14 +869,16 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_get_layer_property(
-          handle.raw,
-          arena.view(bindingArg0),
-          arena.view(bindingArg1),
-          completion
-        ) } }) { result in if result.pointee
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_get_layer_property(
+            handle.raw,
+            arena.view(bindingArg0),
+            arena.view(bindingArg1),
+            completion,
+            diagnostic
+          ) } }) { result in if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                    .data(result)
+                      .data(result)
         }
     }
   }
@@ -868,17 +901,19 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_get_style_image_info(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }) { result in if result.pointee
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_get_style_image_info(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) } }) { result in if result.pointee
           .value_count ==
           0 { return nil
-          }; return try StyleImageResult(raw: NativeCompletion.value(
-            result,
-            as: mln_style_image_result.self
-          ))
+            }; return try StyleImageResult(raw: NativeCompletion.value(
+              result,
+              as: mln_style_image_result.self
+            ))
         }
     }
   }
@@ -901,17 +936,19 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_get_style_layer_info(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }) { result in if result.pointee
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_get_style_layer_info(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) } }) { result in if result.pointee
           .value_count ==
           0 { return nil
-          }; return try StyleLayerResult(raw: NativeCompletion.value(
-            result,
-            as: mln_style_layer_result.self
-          ))
+            }; return try StyleLayerResult(raw: NativeCompletion.value(
+              result,
+              as: mln_style_layer_result.self
+            ))
         }
     }
   }
@@ -932,13 +969,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_get_style_layer_json(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }) { result in if result.pointee
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_get_style_layer_json(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) } }) { result in if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                    .data(result)
+                      .data(result)
         }
     }
   }
@@ -961,13 +1000,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_get_style_light_property(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }) { result in if result.pointee
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_get_style_light_property(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) } }) { result in if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                    .data(result)
+                      .data(result)
         }
     }
   }
@@ -990,17 +1031,19 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_get_style_source_info(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }) { result in if result.pointee
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_get_style_source_info(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) } }) { result in if result.pointee
           .value_count ==
           0 { return nil
-          }; return try StyleSourceResult(raw: NativeCompletion.value(
-            result,
-            as: mln_style_source_result.self
-          ))
+            }; return try StyleSourceResult(raw: NativeCompletion.value(
+              result,
+              as: mln_style_source_result.self
+            ))
         }
     }
   }
@@ -1023,11 +1066,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_map_get_style_source_tile_urls(
             handle.raw,
             arena.view(bindingArg0),
-            completion
+            completion,
+            diagnostic
           ) } }) { result in if result.pointee
           .value_count ==
           0 { return nil
@@ -1055,10 +1099,11 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_map_get_style_transition_options(
             handle.raw,
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try StyleTransitionOptions(
           raw: NativeCompletion.value(
             result,
@@ -1088,12 +1133,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_invalidate_custom_geometry_source_region(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.nativeValue(),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1119,12 +1165,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_invalidate_custom_geometry_source_tile(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.nativeValue(),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1150,12 +1197,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_invalidate_custom_mvt_vector_source_tile(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.nativeValue(),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1177,10 +1225,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_list_style_layer_ids(
-          handle.raw,
-          completion
-        ) } }) { result in try NativeCompletion.values(
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_list_style_layer_ids(
+            handle.raw,
+            completion,
+            diagnostic
+          ) } }) { result in try NativeCompletion.values(
           result,
           as: mln_buffer_view.self
         ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } }
@@ -1203,10 +1253,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_list_style_layers(
-          handle.raw,
-          completion
-        ) } }) { result in try NativeCompletion.values(
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_list_style_layers(
+            handle.raw,
+            completion,
+            diagnostic
+          ) } }) { result in try NativeCompletion.values(
           result,
           as: mln_style_layer_entry.self
         ).map { try StyleLayerEntry(raw: $0) } }
@@ -1229,10 +1281,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_list_style_source_ids(
-          handle.raw,
-          completion
-        ) } }) { result in try NativeCompletion.values(
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_list_style_source_ids(
+            handle.raw,
+            completion,
+            diagnostic
+          ) } }) { result in try NativeCompletion.values(
           result,
           as: mln_buffer_view.self
         ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } }
@@ -1259,12 +1313,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_move_style_layer(
-          handle.raw,
-          arena.view(bindingArg0),
-          bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_move_style_layer(
+            handle.raw,
+            arena.view(bindingArg0),
+            bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -1287,11 +1344,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_remove_style_image(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_remove_style_image(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -1314,11 +1374,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_remove_style_layer(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_remove_style_layer(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -1341,11 +1404,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_remove_style_source(
             handle.raw,
             arena.view(bindingArg0),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1372,13 +1436,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_custom_geometry_source_tile_data(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.nativeValue(),
             arena.view(bindingArg2),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1405,13 +1470,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_custom_mvt_vector_source_tile_data(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.nativeValue(),
             arena.view(bindingArg2),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1438,13 +1504,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_custom_mvt_vector_source_tile_error(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.nativeValue(),
             arena.view(bindingArg2),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1470,12 +1537,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_set_geojson_source_data(
             handle.raw,
             arena.view(bindingArg0),
             arena.borrow(bindingArg1.handle),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1501,12 +1569,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_geojson_source_synchronous_tiling(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1532,12 +1601,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_geojson_source_url(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1563,12 +1633,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_global_state_property(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1594,13 +1665,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_set_image_source_coordinates(
             handle.raw,
             arena.view(bindingArg0),
             arena.array(bindingArg1.map { $0.nativeValue() }),
             NativeInputArena.count(bindingArg1.count),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1626,12 +1698,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_set_image_source_image(
             handle.raw,
             arena.view(bindingArg0),
             arena.store(bindingArg1.nativeValue(arena: arena)),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1657,12 +1730,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_image_source_url(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1688,12 +1762,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_set_layer_filter(
-          handle.raw,
-          arena.view(bindingArg0),
-          bindingArg1.map { arena.store(arena.view($0)) },
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_set_layer_filter(
+            handle.raw,
+            arena.view(bindingArg0),
+            bindingArg1.map { arena.store(arena.view($0)) },
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -1717,12 +1794,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_set_layer_max_zoom(
-          handle.raw,
-          arena.view(bindingArg0),
-          bindingArg1,
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_set_layer_max_zoom(
+            handle.raw,
+            arena.view(bindingArg0),
+            bindingArg1,
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -1746,12 +1826,15 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_set_layer_min_zoom(
-          handle.raw,
-          arena.view(bindingArg0),
-          bindingArg1,
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_set_layer_min_zoom(
+            handle.raw,
+            arena.view(bindingArg0),
+            bindingArg1,
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -1776,13 +1859,16 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_set_layer_property(
-          handle.raw,
-          arena.view(bindingArg0),
-          arena.view(bindingArg1),
-          arena.view(bindingArg2),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_set_layer_property(
+            handle.raw,
+            arena.view(bindingArg0),
+            arena.view(bindingArg1),
+            arena.view(bindingArg2),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -1806,12 +1892,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_layer_source_id(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1837,12 +1924,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_layer_source_layer(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1868,12 +1956,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_layer_visibility(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.nativeValue(),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1899,12 +1988,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_location_indicator_accuracy_radius(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1930,12 +2020,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_location_indicator_bearing(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1962,13 +2053,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_location_indicator_image_name(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.nativeValue(),
             arena.view(bindingArg2),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -1995,13 +2087,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_location_indicator_location(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1.nativeValue(),
             bindingArg2,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -2028,13 +2121,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_set_style_image(
             handle.raw,
             arena.view(bindingArg0),
             arena.store(bindingArg1.nativeValue(arena: arena)),
             bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -2059,11 +2153,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_style_light_json(
             handle.raw,
             arena.view(bindingArg0),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -2089,12 +2184,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_style_light_property(
             handle.raw,
             arena.view(bindingArg0),
             arena.view(bindingArg1),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -2120,12 +2216,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_style_source_volatile(
             handle.raw,
             arena.view(bindingArg0),
             bindingArg1,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -2152,11 +2249,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           arena.submit { mln_map_set_style_transition_options(
             handle.raw,
             arena.store(bindingArg0.nativeValue()),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }

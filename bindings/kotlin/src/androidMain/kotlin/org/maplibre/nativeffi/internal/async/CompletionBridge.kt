@@ -10,7 +10,6 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.CommandDisposition
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 internal object CompletionBridge {
@@ -40,7 +39,7 @@ internal object CompletionBridge {
 
   fun <T> submit(
     convert: (MaplibreNativeC.mln_completion_result) -> T,
-    call: (MaplibreNativeC.mln_completion) -> Int,
+    call: (MaplibreNativeC.mln_completion) -> Unit,
   ): Deferred<T> = submitInternal(convert, false, false, call)
 
   /**
@@ -51,7 +50,7 @@ internal object CompletionBridge {
     convert: (MaplibreNativeC.mln_completion_result) -> T,
     closeDropped: (T) -> Unit,
     disposeUnadopted: (MaplibreNativeC.mln_completion_result) -> Unit,
-    call: (MaplibreNativeC.mln_completion) -> Int,
+    call: (MaplibreNativeC.mln_completion) -> Unit,
   ): Deferred<T> =
     submitInternal(
       { result -> adoptOwned(result, disposeUnadopted, convert) },
@@ -65,7 +64,7 @@ internal object CompletionBridge {
     convert: (MaplibreNativeC.mln_completion_result) -> T,
     rejectSynchronously: Boolean,
     acceptErrorStatus: Boolean,
-    call: (MaplibreNativeC.mln_completion) -> Int,
+    call: (MaplibreNativeC.mln_completion) -> Unit,
     closeDropped: (T) -> Unit = {},
   ): Deferred<T> {
     val state = State(convert, acceptErrorStatus, closeDropped)
@@ -76,7 +75,7 @@ internal object CompletionBridge {
         completion.callback(callback)
         completion.user_data(state.token)
         completion.release_user_data(release)
-        Status.check(call(completion))
+        call(completion)
       }
     } catch (failure: Throwable) {
       if (states.remove(state.token.address(), state)) state.token.close()
@@ -86,16 +85,16 @@ internal object CompletionBridge {
     return state.deferred
   }
 
-  fun unit(call: (MaplibreNativeC.mln_completion) -> Int): Deferred<Unit> = submit({ _ -> }, call)
+  fun unit(call: (MaplibreNativeC.mln_completion) -> Unit): Deferred<Unit> = submit({ _ -> }, call)
 
-  fun unitChecked(call: (MaplibreNativeC.mln_completion) -> Int): Deferred<Unit> =
+  fun unitChecked(call: (MaplibreNativeC.mln_completion) -> Unit): Deferred<Unit> =
     submitInternal({ _ -> }, true, false, call)
 
-  fun command(call: (MaplibreNativeC.mln_completion) -> Int): Deferred<CommandCompletion> =
+  fun command(call: (MaplibreNativeC.mln_completion) -> Unit): Deferred<CommandCompletion> =
     submitInternal(::commandCompletion, false, true, call)
 
   /** Submits an ordered command and throws instead of deferring a synchronous rejection. */
-  fun commandChecked(call: (MaplibreNativeC.mln_completion) -> Int): Deferred<CommandCompletion> =
+  fun commandChecked(call: (MaplibreNativeC.mln_completion) -> Unit): Deferred<CommandCompletion> =
     submitInternal(::commandCompletion, true, true, call)
 
   private fun commandCompletion(result: MaplibreNativeC.mln_completion_result): CommandCompletion =

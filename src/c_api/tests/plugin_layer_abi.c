@@ -529,12 +529,13 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
     mln_frame_demand demand = mln_frame_demand_default();
     demand.flags = 0;
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &demand)
+      MLN_STATUS_OK,
+      mln_render_session_request_frame(fixture.session, &demand, NULL)
     );
     mln_test_completion barrier = mln_test_completion_default(0);
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
-      mln_render_session_barrier(fixture.session, &barrier.descriptor)
+      mln_render_session_barrier(fixture.session, &barrier.descriptor, NULL)
     );
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
@@ -544,18 +545,18 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
-      mln_render_session_drain_frame_results(fixture.session, &batch)
+      mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
     );
     mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_frame_batch_get(batch, 0, &result)
+      MLN_STATUS_OK, mln_render_frame_batch_get(batch, 0, &result, NULL)
     );
     mln_render_frame_batch_release(batch);
     if (result.disposition == MLN_RENDER_RESULT_RENDERED) {
       mln_test_completion readback = mln_test_completion_readback();
       TEST_ASSERT_EQUAL_INT(
         MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
-                         fixture.session, &readback.descriptor
+                         fixture.session, &readback.descriptor, NULL
                        )
       );
       TEST_ASSERT_EQUAL_INT(

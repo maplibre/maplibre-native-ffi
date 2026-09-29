@@ -474,7 +474,8 @@ app_error render_target_attach(
       descriptor.context =
         metal_context_descriptor(target->as.owned.compositor.view.device);
       status = mln_metal_owned_texture_attach(
-        map, &descriptor, &options, &session, completion
+        map, &descriptor, &options, &session, completion,
+        &target->session.diagnostic
       );
       break;
     }
@@ -482,7 +483,8 @@ app_error render_target_attach(
       const mln_metal_borrowed_texture_descriptor descriptor =
         borrowed_texture_descriptor(target, current_viewport);
       status = mln_metal_borrowed_texture_attach(
-        map, &descriptor, &options, &session, completion
+        map, &descriptor, &options, &session, completion,
+        &target->session.diagnostic
       );
       break;
     }
@@ -494,7 +496,8 @@ app_error render_target_attach(
         metal_context_descriptor(target->as.surface.view.device);
       descriptor.layer = target->as.surface.view.layer;
       status = mln_metal_surface_attach(
-        map, &descriptor, &options, &session, completion
+        map, &descriptor, &options, &session, completion,
+        &target->session.diagnostic
       );
       break;
     }
@@ -551,7 +554,8 @@ static app_error resize_borrowed(
     render_session_begin_submission(
       &target->session, APP_ERROR_TEXTURE_RESIZE_FAILED,
       "Metal borrowed texture set target failed"
-    )
+    ),
+    &target->session.diagnostic
   );
   if (status != MLN_STATUS_OK) {
     target->as.borrowed.texture = previous;
@@ -603,14 +607,16 @@ static app_error render_update_owned(
   }
 
   mln_acquired_frame acquired = MLN_HANDLE_NULL;
-  mln_status status =
-    mln_render_session_acquire_frame(target->session.handle, &acquired);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  mln_status status = mln_render_session_acquire_frame(
+    target->session.handle, &acquired, &diagnostic
+  );
   if (status == MLN_STATUS_NOT_READY) {
     out_outcome->rendered = false;
     return APP_OK;
   }
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("Metal texture acquire failed", status);
+    diagnostics_log_status("Metal texture acquire failed", status, &diagnostic);
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
   bool presented = false;
@@ -619,7 +625,7 @@ static app_error render_update_owned(
   );
   if (error == APP_OK) {
     mln_metal_owned_texture_frame frame = {.size = sizeof(frame)};
-    status = mln_acquired_frame_get_metal_texture(acquired, &frame);
+    status = mln_acquired_frame_get_metal_texture(acquired, &frame, NULL);
     error = status == MLN_STATUS_OK
               ? metal_compositor_draw_texture(
                   &target->as.owned.compositor, (id)frame.texture, &presented
@@ -627,9 +633,9 @@ static app_error render_update_owned(
               : APP_ERROR_BACKEND_DRAW_FAILED;
   }
   mln_gpu_sync sync = mln_gpu_sync_default();
-  status = mln_acquired_frame_release(&acquired, &sync);
+  status = mln_acquired_frame_release(&acquired, &sync, &diagnostic);
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("Metal texture release failed", status);
+    diagnostics_log_status("Metal texture release failed", status, &diagnostic);
   }
   MAP_TRY(error);
   out_outcome->rendered = presented;

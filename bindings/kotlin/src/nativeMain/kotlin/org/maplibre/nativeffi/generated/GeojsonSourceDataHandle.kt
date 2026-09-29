@@ -23,7 +23,7 @@ internal constructor(
     return handle
   }
 
-  internal override fun bindingCloseGeojsonSourceData(call: (ULong) -> Int) {
+  internal override fun bindingCloseGeojsonSourceData(call: (ULong) -> Unit) {
     core.closeOnce({ call(handle) })
   }
 

@@ -23,7 +23,8 @@ mln_status show_earthquakes(
   // #endregion options
   // #region source
   mln_status status = mln_map_add_geojson_source_url(
-    map, view("earthquakes"), view(geojson_url), &options, source_completion
+    map, view("earthquakes"), view(geojson_url), &options, source_completion,
+    NULL
   );
   if (status != MLN_STATUS_OK) return status;
   // #endregion source
@@ -36,7 +37,7 @@ mln_status show_earthquakes(
 
   // #region add-layer
   return mln_map_add_style_layer_json(
-    map, view(layer), view(""), layer_completion
+    map, view(layer), view(""), layer_completion, NULL
   );
   // #endregion add-layer
 }
@@ -60,11 +61,12 @@ mln_status show_one_point(
   // A null options pointer selects the defaults. Clustering is off by default.
   mln_geojson_source_data prepared = MLN_HANDLE_NULL;
   mln_status status =
-    mln_geojson_source_data_create(view(data), NULL, &prepared);
+    mln_geojson_source_data_create(view(data), NULL, &prepared, NULL);
   if (status != MLN_STATUS_OK) return status;
 
-  status =
-    mln_map_add_geojson_source_data(map, view("pins"), prepared, completion);
+  status = mln_map_add_geojson_source_data(
+    map, view("pins"), prepared, completion, NULL
+  );
   mln_geojson_source_data_destroy(prepared);
   return status;
   // #endregion inline-data

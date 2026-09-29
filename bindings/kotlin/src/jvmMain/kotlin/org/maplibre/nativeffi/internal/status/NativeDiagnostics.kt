@@ -1,37 +1,30 @@
 package org.maplibre.nativeffi.internal.status
 
-import java.lang.foreign.FunctionDescriptor
-import java.lang.foreign.Linker
+import java.lang.foreign.Arena
 import java.lang.foreign.MemorySegment
-import java.lang.foreign.SymbolLookup
 import java.nio.charset.StandardCharsets
-import java.util.NoSuchElementException
+import org.maplibre.nativeffi.internal.c.mln_diagnostic
 
-internal actual object NativeDiagnostics {
-  actual fun currentDiagnostic(): String =
-    try {
-      currentNativeDiagnostic()
-    } catch (_: IllegalCallerException) {
-      ""
-    } catch (_: NoSuchElementException) {
-      ""
-    } catch (_: UnsatisfiedLinkError) {
-      ""
-    }
+/**
+ * Supplies the `mln_diagnostic` that each status-returning C call writes its message into.
+ *
+ * Each thread reuses one buffer. Native writes the message when a call exits and [check] reads it
+ * right after on the same thread, so calls nested in callbacks during that call cannot clobber it.
+ */
+internal object NativeDiagnostics {
+  private val SIZE = mln_diagnostic.sizeof().toInt()
+  private val buffers = ThreadLocal.withInitial { mln_diagnostic.allocate(Arena.ofAuto()) }
 
-  private fun currentNativeDiagnostic(): String {
-    val symbol =
-      SymbolLookup.loaderLookup().find("mln_thread_last_error_message").orElseThrow {
-        NoSuchElementException("mln_thread_last_error_message")
-      }
-    val address =
-      Linker.nativeLinker()
-        .downcallHandle(symbol, FunctionDescriptor.of(java.lang.foreign.ValueLayout.ADDRESS))
-        .invokeWithArguments() as MemorySegment
-    return if (address == MemorySegment.NULL) {
-      ""
-    } else {
-      address.reinterpret(Long.MAX_VALUE).getString(0, StandardCharsets.UTF_8)
-    }
+  /** Calls native with this thread's diagnostic and throws the mapped exception on failure. */
+  inline fun check(call: (MemorySegment) -> Int) {
+    val diagnostic = buffer()
+    Status.check(call(diagnostic)) { message(diagnostic) }
   }
+
+  /** Returns this thread's diagnostic, sized for the next call. */
+  fun buffer(): MemorySegment = buffers.get().also { mln_diagnostic.size(it, SIZE) }
+
+  /** Copies the message that the last call through [diagnostic] wrote. */
+  fun message(diagnostic: MemorySegment): String =
+    mln_diagnostic.message(diagnostic).getString(0, StandardCharsets.UTF_8)
 }

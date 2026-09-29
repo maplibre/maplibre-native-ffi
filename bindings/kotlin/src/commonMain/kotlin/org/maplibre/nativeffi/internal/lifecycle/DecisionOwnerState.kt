@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
-import org.maplibre.nativeffi.internal.status.Status
-
 /**
  * The owner state behind a handle that a native callback issues and then decides about.
  *
@@ -29,12 +27,11 @@ internal class DecisionOwnerState(
   fun <T> withLive(block: () -> T): T = core.withLiveHandle(block)
 
   /** Runs a native completion call, keeping the owner retryable when native rejects it. */
-  fun complete(call: () -> Int) {
+  fun complete(call: () -> Unit) {
     val operation = core.beginComplete()
     try {
-      val status = call()
-      if (status == 0) operation.markCompleted() else operation.markNotReachedNative()
-      Status.check(status)
+      call()
+      operation.markCompleted()
     } catch (error: Throwable) {
       operation.markNotReachedNative()
       throw error

@@ -2,13 +2,11 @@ import 'generated_workflows.dart';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
-import 'package:maplibre_native_ffi/maplibre_native_ffi.dart'
-    hide threadLastErrorMessage;
+import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart'
-    show threadLastErrorMessage;
+    show checkNativeCall, nativeDiagnostic;
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
-import 'package:maplibre_native_ffi/src/internal/status/status.dart';
 import 'package:test/test.dart';
 
 void _discardCompletion(
@@ -26,10 +24,7 @@ void _mapSnapshotById(int map) {
   try {
     final snapshot = arena<raw.mln_map_snapshot>();
     snapshot.ref.size = sizeOf<raw.mln_map_snapshot>();
-    checkNativeStatus(
-      raw.mln_map_snapshot_get(map, snapshot),
-      threadLastErrorMessage,
-    );
+    checkNativeCall(raw.mln_map_snapshot_get(map, snapshot, nativeDiagnostic));
   } finally {
     arena.releaseAll();
   }
@@ -50,9 +45,8 @@ void _runtimeBarrierById(int handle) {
             _discardCompletionState,
           ),
     );
-    checkNativeStatus(
-      raw.mln_runtime_barrier(handle, completion),
-      threadLastErrorMessage,
+    checkNativeCall(
+      raw.mln_runtime_barrier(handle, completion, nativeDiagnostic),
     );
   } finally {
     arena.releaseAll();

@@ -206,7 +206,8 @@ MLN_API mln_status mln_render_session_query_rendered_features(
   const mln_rendered_query_geometry* geometry MLN_BINDING("length=1"),
   const mln_rendered_feature_query_options* options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -235,7 +236,8 @@ MLN_API mln_status mln_render_session_query_source_features(
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   const mln_source_feature_query_options* options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -268,7 +270,8 @@ MLN_API mln_status mln_render_session_query_feature_extensions(
   mln_buffer_view extension_field MLN_BINDING("encoding=utf8;lifetime=call"),
   const mln_buffer_view* arguments
     MLN_BINDING("length=1;encoding=json;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

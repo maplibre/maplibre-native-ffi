@@ -41,7 +41,7 @@ func bindingCall[T any](call func() T) (value T, err error) {
 	return
 }
 
-func bindingCheck(call func() int32) {
+func bindingCheck(call func(*C.mln_diagnostic) int32) {
 	if err := checkNative(call); err != nil {
 		panic(bindingFailure{err})
 	}
@@ -370,13 +370,13 @@ func mlnGoCallbackOwner(pointer unsafe.Pointer) C.uint64_t {
 	return 0
 }
 
-func bindingAdmission(operation uint32, owner uint64) func() {
-	runtime.LockOSThread()
+// bindingAdmission needs no thread pin: a goroutine inside a cgo callback is
+// already locked to the callback's thread, and every other goroutine sees an
+// empty policy stack on whichever thread it runs.
+func bindingAdmission(operation uint32, owner uint64) {
 	if !bool(C.binding_policy_check(C.uint32_t(operation), C.uint64_t(owner))) {
-		runtime.UnlockOSThread()
 		panic(bindingFailure{newBindingError(ErrInvalidState, "operation is unavailable in this native callback")})
 	}
-	return runtime.UnlockOSThread
 }
 
 type bindingScope struct {

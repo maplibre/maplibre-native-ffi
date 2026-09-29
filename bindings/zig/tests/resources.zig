@@ -123,19 +123,19 @@ fn writeTempStyle() !TempStyle {
 }
 
 test "network status APIs wrap process-global MapLibre status" {
-    const original_status = try maplibre.networkStatusGet();
-    defer maplibre.networkStatusSet(original_status) catch @panic("network status restore failed");
+    const original_status = try maplibre.networkStatusGet(null);
+    defer maplibre.networkStatusSet(original_status, null) catch @panic("network status restore failed");
 
-    try maplibre.networkStatusSet(.offline);
-    try testing.expect(std.meta.eql(try maplibre.networkStatusGet(), maplibre.NetworkStatus.offline));
+    try maplibre.networkStatusSet(.offline, null);
+    try testing.expect(std.meta.eql(try maplibre.networkStatusGet(null), maplibre.NetworkStatus.offline));
 
-    try maplibre.networkStatusSet(.online);
-    try testing.expect(std.meta.eql(try maplibre.networkStatusGet(), maplibre.NetworkStatus.online));
+    try maplibre.networkStatusSet(.online, null);
+    try testing.expect(std.meta.eql(try maplibre.networkStatusGet(null), maplibre.NetworkStatus.online));
 
-    try testing.expectError(error.InvalidArgument, maplibre.networkStatusSet(@enumFromInt(999)));
-    var message = try maplibre.threadLastErrorMessage(testing.allocator);
-    defer message.deinit();
-    try testing.expect(message.value.len > 0);
+    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
+    defer diagnostics.deinit();
+    try testing.expectError(error.InvalidArgument, maplibre.networkStatusSet(@enumFromInt(999), &diagnostics));
+    try testing.expect(diagnostics.get().?.message.len > 0);
 }
 
 test "ambient cache operations validate cache configuration" {
@@ -235,7 +235,7 @@ const TransformState = struct {
 fn rewriteStyleUrl(context: ?*anyopaque, _: maplibre.ResourceKind, _: []const u8, response: maplibre.ResourceTransformResponse) maplibre.Error!void {
     const state: *TransformState = @ptrCast(@alignCast(context.?));
     _ = state.calls.fetchAdd(1, .seq_cst);
-    try maplibre.resourceTransformResponseSetUrl(response, state.replacement_url);
+    try maplibre.resourceTransformResponseSetUrl(response, state.replacement_url, null);
 }
 
 fn setResourceTransformOnThread(
@@ -279,8 +279,8 @@ fn serveOneHttpStyle(state: *HttpServerState) void {
 }
 
 test "resource transform can be cleared after map creation" {
-    try maplibre.networkStatusSet(.online);
-    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
+    try maplibre.networkStatusSet(.online, null);
+    defer maplibre.networkStatusSet(.online, null) catch @panic("network status restore failed");
 
     var runtime = try support.createRuntime(.{});
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
@@ -314,8 +314,8 @@ test "resource transform can be cleared after map creation" {
 }
 
 test "http URL style loads through native network provider" {
-    try maplibre.networkStatusSet(.online);
-    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
+    try maplibre.networkStatusSet(.online, null);
+    defer maplibre.networkStatusSet(.online, null) catch @panic("network status restore failed");
 
     var address = try std.Io.net.IpAddress.parse("127.0.0.1", 0);
     var server = try address.listen(testing.io, .{ .reuse_address = true });
@@ -361,8 +361,8 @@ fn passThroughStyleProvider(
 }
 
 test "http style can load from ambient cache after online load" {
-    try maplibre.networkStatusSet(.online);
-    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
+    try maplibre.networkStatusSet(.online, null);
+    defer maplibre.networkStatusSet(.online, null) catch @panic("network status restore failed");
 
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
@@ -397,7 +397,7 @@ test "http style can load from ambient cache after online load" {
     try testing.expectEqual(@as(?anyerror, null), server_state.err);
     try testing.expect(server_state.served);
 
-    try maplibre.networkStatusSet(.offline);
+    try maplibre.networkStatusSet(.offline, null);
     var cached_runtime = try support.createRuntime(.{ .cache_path = cache_path });
     defer support.closeRuntime(&cached_runtime) catch @panic("cached runtime close failed");
     var cached_map = try support.createMap(&cached_runtime, .{});
@@ -407,8 +407,8 @@ test "http style can load from ambient cache after online load" {
 }
 
 test "resource provider pass-through delegates to native HTTP" {
-    try maplibre.networkStatusSet(.online);
-    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
+    try maplibre.networkStatusSet(.online, null);
+    defer maplibre.networkStatusSet(.online, null) catch @panic("network status restore failed");
 
     var address = try std.Io.net.IpAddress.parse("127.0.0.1", 0);
     var server = try address.listen(testing.io, .{ .reuse_address = true });
@@ -443,8 +443,8 @@ test "resource provider pass-through delegates to native HTTP" {
 // A replacement transform, installed from another thread, is the one every
 // later request reaches.
 test "a replacement resource transform rewrites later style URLs" {
-    try maplibre.networkStatusSet(.online);
-    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
+    try maplibre.networkStatusSet(.online, null);
+    defer maplibre.networkStatusSet(.online, null) catch @panic("network status restore failed");
 
     var runtime = try support.createRuntime(.{});
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
@@ -721,8 +721,8 @@ fn loadProbeStyle(runtime: *maplibre.Runtime, map: *maplibre.Map, style_url: []c
 }
 
 test "resource provider can be replaced and cleared after map creation" {
-    try maplibre.networkStatusSet(.online);
-    defer maplibre.networkStatusSet(.online) catch @panic("network status restore failed");
+    try maplibre.networkStatusSet(.online, null);
+    defer maplibre.networkStatusSet(.online, null) catch @panic("network status restore failed");
 
     var runtime = try support.createRuntime(.{});
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
@@ -1276,9 +1276,6 @@ test "resource provider observes cancellation before late completion" {
     try waitForRequestCancellation(handle);
     try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json }));
     try testing.expectError(error.InvalidState, maplibre.resourceRequestComplete(testing.allocator, support.handle(handle), .{ .bytes = support.style_json }));
-    var message = try maplibre.threadLastErrorMessage(testing.allocator);
-    defer message.deinit();
-    try testing.expect(message.value.len > 0);
 }
 
 // Native code releases an accepted cancellation registration once, after its

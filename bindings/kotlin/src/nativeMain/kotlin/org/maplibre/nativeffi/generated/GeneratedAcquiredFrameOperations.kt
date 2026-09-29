@@ -5,13 +5,13 @@ import kotlinx.cinterop.*
 import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 @OptIn(ExperimentalForeignApi::class)
 public actual abstract class GeneratedAcquiredFrameOperations internal actual constructor() {
   internal abstract fun bindingAcquiredFrameHandle(): ULong
 
-  internal abstract fun bindingCloseAcquiredFrame(call: (ULong) -> Int)
+  internal abstract fun bindingCloseAcquiredFrame(call: (ULong) -> Unit)
 
   public actual fun dispose(): Unit {
     try {
@@ -25,7 +25,7 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         memScoped {
           val arena = this
-          mln_acquired_frame_dispose(owner)
+          NativeDiagnostics.check { diagnostic -> mln_acquired_frame_dispose(owner, diagnostic) }
         }
       }
     } finally {
@@ -43,15 +43,19 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = arena.alloc<COpaquePointerVar>()
-        BindingStatus.check(
-          mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token.ptr)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token.ptr, diagnostic)
+        }
         try {
           val output = arena.alloc<mln_metal_owned_texture_frame>()
           output.size = sizeOf<mln_metal_owned_texture_frame>().toUInt()
-          BindingStatus.check(
-            mln_acquired_frame_get_metal_texture(bindingAcquiredFrameHandle(), output.ptr)
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_acquired_frame_get_metal_texture(
+              bindingAcquiredFrameHandle(),
+              output.ptr,
+              diagnostic,
+            )
+          }
           block(GeneratedValues.readMetalOwnedTextureFrame(output, scope))
         } finally {
           scope.close()
@@ -73,15 +77,19 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = arena.alloc<COpaquePointerVar>()
-        BindingStatus.check(
-          mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token.ptr)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token.ptr, diagnostic)
+        }
         try {
           val output = arena.alloc<mln_opengl_owned_texture_frame>()
           output.size = sizeOf<mln_opengl_owned_texture_frame>().toUInt()
-          BindingStatus.check(
-            mln_acquired_frame_get_opengl_texture(bindingAcquiredFrameHandle(), output.ptr)
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_acquired_frame_get_opengl_texture(
+              bindingAcquiredFrameHandle(),
+              output.ptr,
+              diagnostic,
+            )
+          }
           block(GeneratedValues.readOpenglOwnedTextureFrame(output, scope))
         } finally {
           scope.close()
@@ -103,15 +111,19 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = arena.alloc<COpaquePointerVar>()
-        BindingStatus.check(
-          mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token.ptr)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token.ptr, diagnostic)
+        }
         try {
           val output = arena.alloc<mln_gpu_sync>()
           output.size = sizeOf<mln_gpu_sync>().toUInt()
-          BindingStatus.check(
-            mln_acquired_frame_get_producer_sync(bindingAcquiredFrameHandle(), output.ptr)
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_acquired_frame_get_producer_sync(
+              bindingAcquiredFrameHandle(),
+              output.ptr,
+              diagnostic,
+            )
+          }
           block(GeneratedValues.readGpuSync(output, scope))
         } finally {
           scope.close()
@@ -133,7 +145,9 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         val arena = this
         val output = arena.alloc<mln_render_frame_result>()
         output.size = sizeOf<mln_render_frame_result>().toUInt()
-        BindingStatus.check(mln_acquired_frame_get_result(bindingAcquiredFrameHandle(), output.ptr))
+        NativeDiagnostics.check { diagnostic ->
+          mln_acquired_frame_get_result(bindingAcquiredFrameHandle(), output.ptr, diagnostic)
+        }
         GeneratedValues.readRenderFrameResult(output)
       }
     } finally {
@@ -151,15 +165,19 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = arena.alloc<COpaquePointerVar>()
-        BindingStatus.check(
-          mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token.ptr)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token.ptr, diagnostic)
+        }
         try {
           val output = arena.alloc<mln_vulkan_owned_texture_frame>()
           output.size = sizeOf<mln_vulkan_owned_texture_frame>().toUInt()
-          BindingStatus.check(
-            mln_acquired_frame_get_vulkan_texture(bindingAcquiredFrameHandle(), output.ptr)
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_acquired_frame_get_vulkan_texture(
+              bindingAcquiredFrameHandle(),
+              output.ptr,
+              diagnostic,
+            )
+          }
           block(GeneratedValues.readVulkanOwnedTextureFrame(output, scope))
         } finally {
           scope.close()
@@ -181,15 +199,19 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = arena.alloc<COpaquePointerVar>()
-        BindingStatus.check(
-          mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token.ptr)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token.ptr, diagnostic)
+        }
         try {
           val output = arena.alloc<mln_webgpu_owned_texture_frame>()
           output.size = sizeOf<mln_webgpu_owned_texture_frame>().toUInt()
-          BindingStatus.check(
-            mln_acquired_frame_get_webgpu_texture(bindingAcquiredFrameHandle(), output.ptr)
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_acquired_frame_get_webgpu_texture(
+              bindingAcquiredFrameHandle(),
+              output.ptr,
+              diagnostic,
+            )
+          }
           block(GeneratedValues.readWebgpuOwnedTextureFrame(output, scope))
         } finally {
           scope.close()
@@ -214,10 +236,13 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         memScoped {
           val arena = this
           val holder = arena.alloc<ULongVar>().also { it.value = owner }
-          mln_acquired_frame_release(
-            holder.ptr,
-            GeneratedValues.writeGpuSync(arena, consumerCompletion),
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_acquired_frame_release(
+              holder.ptr,
+              GeneratedValues.writeGpuSync(arena, consumerCompletion),
+              diagnostic,
+            )
+          }
         }
       }
     } finally {

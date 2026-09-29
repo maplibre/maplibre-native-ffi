@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.resource
 
 import java.lang.foreign.Arena
+import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -22,6 +23,7 @@ import org.maplibre.nativeffi.generated.ResourceRequestHandle
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.loader.NativeAccess
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.runtime.runSuspendTest
 import org.maplibre.nativeffi.runtime.use
 
@@ -35,13 +37,15 @@ class ResourceRequestHandleJvmTest {
     val failure =
       assertFailsWith<InvalidArgumentException> {
         handle.bindingCompleteResourceRequestHandle {
-          MapLibreNativeC.mln_network_status_set(999_999)
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_network_status_set(999_999, diagnostic)
+          }
         }
       }
     assertTrue(failure.diagnostic.contains("network status"))
     assertEquals(0, releases)
-    handle.bindingCompleteResourceRequestHandle { 0 }
-    assertFailsWith<InvalidStateException> { handle.bindingCompleteResourceRequestHandle { 0 } }
+    handle.bindingCompleteResourceRequestHandle {}
+    assertFailsWith<InvalidStateException> { handle.bindingCompleteResourceRequestHandle {} }
     assertEquals(0, releases)
     handle.close()
     assertEquals(1, releases)
@@ -62,7 +66,6 @@ class ResourceRequestHandleJvmTest {
       handle.bindingCompleteResourceRequestHandle {
         entered.countDown()
         check(leave.await(5, TimeUnit.SECONDS))
-        0
       }
     }
     try {
@@ -133,6 +136,7 @@ class ResourceRequestHandleJvmTest {
       MapLibreNativeC.mln_resource_request_cancelled(
         raw,
         arena.allocate(ValueLayout.JAVA_BOOLEAN),
+        MemorySegment.NULL,
       ) != MaplibreStatus.OK.nativeCode
     }
 }

@@ -18,10 +18,11 @@ public extension RenderSessionHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_render_abandon_result()
       value0.size = UInt32(MemoryLayout<mln_render_abandon_result>.size)
-      try checkStatus(arena.submit { mln_render_session_abandon(
+      try checkStatus { diagnostic in arena.submit { mln_render_session_abandon(
         handle.raw,
-        &value0
-      ) })
+        &value0,
+        diagnostic
+      ) } }
       return RenderAbandonResult(raw: value0)
     }
   }
@@ -41,10 +42,13 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_acquired_frame = 0
-      try checkStatus(arena.submit { mln_render_session_acquire_frame(
-        handle.raw,
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_render_session_acquire_frame(
+          handle.raw,
+          &value0,
+          diagnostic
+        ) }
+      }
       return try AcquiredFrameHandle(adopting: value0, parent: self)
     }
   }
@@ -65,10 +69,13 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in arena.submit { mln_render_session_barrier(
-          handle.raw,
-          completion
-        ) } }
+        .startUnit { completion, diagnostic in
+          arena.submit { mln_render_session_barrier(
+            handle.raw,
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -88,10 +95,13 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in arena.submit { mln_render_session_clear_data(
-          handle.raw,
-          completion
-        ) } }
+        .startUnit { completion, diagnostic in
+          arena.submit { mln_render_session_clear_data(
+            handle.raw,
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -103,7 +113,10 @@ public extension RenderSessionHandle {
       operation: "mln_render_session_destroy"
     )
     try mapNativeFailure { try handle.closeOnce { live in
-      try checkStatus(mln_render_session_destroy(live.raw))
+      try checkStatus { diagnostic in mln_render_session_destroy(
+        live.raw,
+        diagnostic
+      ) }
     } }
   }
 }
@@ -123,10 +136,13 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in arena.submit { mln_render_session_detach(
-          handle.raw,
-          completion
-        ) } }
+        .startUnit { completion, diagnostic in
+          arena.submit { mln_render_session_detach(
+            handle.raw,
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -138,7 +154,10 @@ public extension RenderSessionHandle {
       operation: "mln_render_session_dispose"
     )
     try mapNativeFailure { try handle.closeOnce { live in
-      try checkStatus(mln_render_session_dispose(live.raw))
+      try checkStatus { diagnostic in mln_render_session_dispose(
+        live.raw,
+        diagnostic
+      ) }
     } }
   }
 }
@@ -157,10 +176,13 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_render_frame_batch = 0
-      try checkStatus(arena.submit { mln_render_session_drain_frame_results(
-        handle.raw,
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_render_session_drain_frame_results(
+          handle.raw,
+          &value0,
+          diagnostic
+        ) }
+      }
       return try RenderFrameBatchHandle(adopting: value0)
     }
   }
@@ -181,10 +203,11 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_render_session_dump_debug_logs(
             handle.raw,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -206,10 +229,13 @@ public extension RenderSessionHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_render_session_capabilities()
       value0.size = UInt32(MemoryLayout<mln_render_session_capabilities>.size)
-      try checkStatus(arena.submit { mln_render_session_get_capabilities(
-        handle.raw,
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_render_session_get_capabilities(
+          handle.raw,
+          &value0,
+          diagnostic
+        ) }
+      }
       return RenderSessionCapabilities(raw: value0)
     }
   }
@@ -230,10 +256,13 @@ public extension RenderSessionHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_render_session_snapshot()
       value0.size = UInt32(MemoryLayout<mln_render_session_snapshot>.size)
-      try checkStatus(arena.submit { mln_render_session_get_snapshot(
-        handle.raw,
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_render_session_get_snapshot(
+          handle.raw,
+          &value0,
+          diagnostic
+        ) }
+      }
       return RenderSessionSnapshot(raw: value0)
     }
   }
@@ -253,10 +282,13 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_map_projection = 0
-      try checkStatus(arena.submit { mln_render_session_projection_create(
-        handle.raw,
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_render_session_projection_create(
+          handle.raw,
+          &value0,
+          diagnostic
+        ) }
+      }
       return try MapProjectionHandle(adopting: value0)
     }
   }
@@ -277,10 +309,11 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_render_session_reduce_memory_use(
             handle.raw,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -301,10 +334,13 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena.submit { mln_render_session_request_frame(
-        handle.raw,
-        arena.store(bindingArg0.nativeValue())
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_render_session_request_frame(
+          handle.raw,
+          arena.store(bindingArg0.nativeValue()),
+          diagnostic
+        ) }
+      }
       return ()
     }
   }
@@ -328,11 +364,14 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_render_session_resize(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_render_session_resize(
+            handle.raw,
+            arena.store(bindingArg0.nativeValue()),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -351,11 +390,14 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0 = 0
-      try checkStatus(arena.submit { mln_render_session_service_driver_work(
-        handle.raw,
-        bindingArg0,
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_render_session_service_driver_work(
+          handle.raw,
+          bindingArg0,
+          &value0,
+          diagnostic
+        ) }
+      }
       return value0
     }
   }

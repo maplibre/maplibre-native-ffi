@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Maplibre.NativeFfi.Internal.C
@@ -16,6 +17,21 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_STATUS_TARGET_LOST = -8,
         MLN_STATUS_NOT_READY = -9,
         MLN_STATUS_NOT_FOUND = -10,
+    }
+
+    internal partial struct mln_diagnostic
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("char[4096]")]
+        public _message_e__FixedBuffer message;
+
+        [InlineArray(4096)]
+        public partial struct _message_e__FixedBuffer
+        {
+            public sbyte e0;
+        }
     }
 
     [NativeTypeName("uint32_t")]
@@ -39,7 +55,7 @@ namespace Maplibre.NativeFfi.Internal.C
     internal static unsafe partial class NativeMethods
     {
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_buffer_get([NativeTypeName("mln_buffer")] MlnBuffer buffer, mln_buffer_view* out_view);
+        public static extern mln_status mln_buffer_get([NativeTypeName("mln_buffer")] MlnBuffer buffer, mln_buffer_view* out_view, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void mln_buffer_destroy([NativeTypeName("mln_buffer")] MlnBuffer buffer);

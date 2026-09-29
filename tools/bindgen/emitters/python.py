@@ -9,7 +9,7 @@ from keyword import iskeyword
 from textwrap import dedent
 
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.emitters.rust import RUST_KEYWORDS
+from tools.bindgen.emitters.rust import RUST_KEYWORDS, native_call
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.semantic import BoundApi, DecisionPlan, HandlePlan, OperationPlan
 
@@ -404,9 +404,9 @@ def operation(
         ):
             helper = "submit_python_owned_future"
             discard = f"|result| {{ if !result.value.is_null() && result.value_count == 1 {{ unsafe {{ generated_dispose_{plan.result.native}(result.value.cast::<sys::{plan.result.native}>().read()); }} }} }}"
-        call_args = ", ".join(arguments[p.name] for p in function.parameters)
+        call = native_call(function, [arguments[p.name] for p in function.parameters])
         body = setup + [
-            f"        {helper}(py, |completion| unsafe {{ generated_native_call(py, || sys::{function.name}({call_args})) }}"
+            f"        {helper}(py, |completion, diagnostic| unsafe {{ generated_native_call(py, || {call}) }}"
             + (f", {converter}" if converter else "")
             + (f", {discard}" if discard else "")
             + ")"
@@ -484,7 +484,7 @@ def operation(
                 if converted != "value":
                     expression = f"map_future({expression}, lambda value: {converted})"
     else:
-        call_args = ", ".join(arguments[p.name] for p in function.parameters)
+        call = native_call(function, [arguments[p.name] for p in function.parameters])
         if decision and plan.name == decision.handle.release:
             body = [line for line in setup if "let storage =" not in line] + [
                 # Native release retires the cancel registration and its root.
@@ -503,22 +503,20 @@ def operation(
                 "    def close(self) -> None: ...\n",
                 None,
             )
+        status = ctype(function.return_type) == "mln_status"
         body = setup + [
-            f"        let result = unsafe {{ generated_native_call(py, || sys::{function.name}({call_args})) }};"
+            f"        let result = maplibre_core::check(|diagnostic| unsafe {{ generated_native_call(py, || {call}) }});"
+            if status
+            else f"        let result = unsafe {{ generated_native_call(py, || {call}) }};"
         ]
-        decision_complete = decision and plan.name == decision.complete
-        if decision_complete:
+        if decision and plan.name == decision.complete:
             body[-1] = (
-                f"        let result = unsafe {{ generated_native_call(py, || self.state.complete_with(|handle| maplibre_core::check(sys::{function.name}({call_args})))) }};"
+                f"        let result = unsafe {{ generated_native_call(py, || self.state.complete_with(|handle| maplibre_core::check(|diagnostic| {call}))) }};"
             )
-        if ctype(function.return_type) == "mln_status":
+        if status:
             if plan.consumes == "always":
                 body.append("        reservation.commit();")
-            body.append(
-                "        result.map_err(map_error)?;"
-                if decision_complete
-                else "        maplibre_core::check(result).map_err(map_error)?;"
-            )
+            body.append("        result.map_err(map_error)?;")
             if abandon:
                 state = "self.state()"
                 body.append(f"        {state}.views_valid = false;")
@@ -602,7 +600,7 @@ def operation(
                 next(
                     i
                     for i, line in enumerate(body)
-                    if "maplibre_core::check(result)" in line
+                    if "result.map_err(map_error)?" in line
                 )
                 + 1
             )
@@ -840,7 +838,8 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         ):
             continue
         disposer = bound.source.functions_by_name[handle.dispose]
-        call = f"unsafe {{ sys::{handle.dispose}(handle) }}"
+        # Finalization reports only whether disposal succeeded.
+        call = f"unsafe {{ {native_call(disposer, ['handle'], diagnostic='std::ptr::null_mut()')} }}"
         if ctype(disposer.return_type) == "void":
             call += "; sys::MLN_STATUS_OK"
         rust_values += f'\nunsafe extern "C" fn generated_dispose_{handle.native}(handle: sys::{handle.native}) -> sys::mln_status {{ {call} }}\n'

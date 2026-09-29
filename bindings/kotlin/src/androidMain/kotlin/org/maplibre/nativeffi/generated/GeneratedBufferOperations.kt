@@ -6,14 +6,14 @@ import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 public actual abstract class GeneratedBufferOperations internal actual constructor() {
   internal abstract fun bindingBufferHandle(): Long
 
   internal abstract fun <T> bindingReadBuffer(block: (Long) -> T): T
 
-  internal abstract fun bindingCloseBuffer(call: (Long) -> Int)
+  internal abstract fun bindingCloseBuffer(call: (Long) -> Unit)
 
   public actual fun destroy(): Unit {
     try {
@@ -25,10 +25,7 @@ public actual abstract class GeneratedBufferOperations internal actual construct
           owner.toLong(),
           "mln_buffer_destroy",
         )
-        PointerScope().use { arena ->
-          MaplibreNativeC.mln_buffer_destroy(owner)
-          0
-        }
+        PointerScope().use { arena -> MaplibreNativeC.mln_buffer_destroy(owner) }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)
@@ -45,7 +42,9 @@ public actual abstract class GeneratedBufferOperations internal actual construct
       return bindingReadBuffer {
         PointerScope().use { arena ->
           val output = MaplibreNativeC.mln_buffer_view()
-          BindingStatus.check(MaplibreNativeC.mln_buffer_get(bindingBufferHandle(), output))
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_buffer_get(bindingBufferHandle(), output, diagnostic)
+          }
           GeneratedValues.readBytes(output)
         }
       }

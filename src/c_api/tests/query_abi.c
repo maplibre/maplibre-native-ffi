@@ -19,9 +19,10 @@ static void feature_query_validation_rejects_raw_descriptor_shapes(void) {
   );
   geometry.size = sizeof(mln_rendered_query_geometry) - 1;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_render_session_query_rendered_features(
-                                   fixture.session, &geometry, NULL, &completion
-                                 )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_render_session_query_rendered_features(
+      fixture.session, &geometry, NULL, &completion, NULL
+    )
   );
 
   mln_rendered_feature_query_options options =
@@ -33,14 +34,14 @@ static void feature_query_validation_rejects_raw_descriptor_shapes(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_render_session_query_rendered_features(
-      fixture.session, &geometry, &options, &completion
+      fixture.session, &geometry, &options, &completion, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_render_session_query_source_features(
       fixture.session, (mln_buffer_view){.data = NULL, .size = 1}, NULL,
-      &completion
+      &completion, NULL
     )
   );
 
@@ -62,12 +63,13 @@ static void empty_feature_query_completes_with_an_empty_borrowed_array(void) {
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &demand)
+    MLN_STATUS_OK,
+    mln_render_session_request_frame(fixture.session, &demand, NULL)
   );
   mln_test_completion barrier = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_render_session_barrier(fixture.session, &barrier.descriptor)
+    mln_render_session_barrier(fixture.session, &barrier.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &barrier)
@@ -76,7 +78,7 @@ static void empty_feature_query_completes_with_an_empty_borrowed_array(void) {
   mln_render_frame_batch frame_batch = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_render_session_drain_frame_results(fixture.session, &frame_batch)
+    mln_render_session_drain_frame_results(fixture.session, &frame_batch, NULL)
   );
   mln_render_frame_batch_release(frame_batch);
 
@@ -85,7 +87,7 @@ static void empty_feature_query_completes_with_an_empty_borrowed_array(void) {
   mln_test_completion query = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_render_session_query_rendered_features(
-                     fixture.session, &geometry, NULL, &query.descriptor
+                     fixture.session, &geometry, NULL, &query.descriptor, NULL
                    )
   );
   TEST_ASSERT_EQUAL_INT(

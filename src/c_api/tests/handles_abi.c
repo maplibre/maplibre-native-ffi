@@ -8,7 +8,7 @@
 
 // Matches a substring so tests do not depend on the exact diagnostic wording.
 static bool last_error_mentions(const char* fragment) {
-  const char* message = mln_thread_last_error_message();
+  const char* message = mln_test_last_error();
   return message != NULL && strstr(message, fragment) != NULL;
 }
 

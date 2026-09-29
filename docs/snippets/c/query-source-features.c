@@ -37,7 +37,7 @@ mln_status list_source_features(mln_render_session session) {
     .callback = read_features,
   };
   return mln_render_session_query_source_features(
-    session, view("places"), &options, &completion
+    session, view("places"), &options, &completion, NULL
   );
   // #endregion query
 }

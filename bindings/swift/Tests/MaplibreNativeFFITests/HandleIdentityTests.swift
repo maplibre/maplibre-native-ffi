@@ -18,7 +18,7 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
 private func readSnapshot(_ map: NativeMapHandle) throws {
   var snapshot = mln_map_snapshot()
   snapshot.size = UInt32(MemoryLayout<mln_map_snapshot>.size)
-  try checkStatus(mln_map_snapshot_get(map.raw, &snapshot))
+  try checkStatus { mln_map_snapshot_get(map.raw, &snapshot, $0) }
 }
 
 @Test func releasedMapIdReplayedAfterANewMapIsReportedStale() async throws {
@@ -64,7 +64,7 @@ private func readSnapshot(_ map: NativeMapHandle) throws {
     release_user_data: nil
   )
   do {
-    try checkStatus(mln_runtime_barrier(wrongKind, &completion))
+    try checkStatus { mln_runtime_barrier(wrongKind, &completion, $0) }
     Issue.record("a map id should not name a runtime")
   } catch let failure as NativeStatusFailure {
     #expect(failure.rawStatus == MLN_STATUS_INVALID_ARGUMENT.rawValue)

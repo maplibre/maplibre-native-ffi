@@ -7,7 +7,7 @@ mln_status load_style_from_url(
   mln_map map, const char* style_url, const mln_completion* completion
 ) {
   // #region url
-  return mln_map_set_style_url(map, style_url, completion);
+  return mln_map_set_style_url(map, style_url, completion, NULL);
   // #endregion url
 }
 
@@ -16,6 +16,6 @@ mln_status load_style_from_text(
 ) {
   // #region json
   const mln_buffer_view json = {.data = style_json, .size = strlen(style_json)};
-  return mln_map_set_style_json(map, json, completion);
+  return mln_map_set_style_json(map, json, completion, NULL);
   // #endregion json
 }

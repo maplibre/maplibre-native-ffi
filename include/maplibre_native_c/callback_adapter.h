@@ -92,7 +92,8 @@ MLN_API mln_status mln_adapter_completion_create(
   uint32_t copy_kind, size_t element_size,
   mln_adapter_completion_listener listener,
   void* user_data MLN_BINDING("kind=context;lifetime=owner"),
-  mln_completion* out_completion MLN_BINDING("direction=out")
+  mln_completion* out_completion MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Releases adapter state after the submitting C API rejected a completion. */
@@ -178,7 +179,8 @@ MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_deferred_callback_create(
   uint32_t callback, mln_adapter_deferred_call_listener listener,
   void* listener_user_data MLN_BINDING("kind=context;lifetime=owner"),
-  void** out_context MLN_BINDING("direction=out;kind=context;lifetime=owner")
+  void** out_context MLN_BINDING("direction=out;kind=context;lifetime=owner"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -194,7 +196,8 @@ MLN_API mln_status mln_adapter_dart_deferred_callback_create(
   uint32_t callback,
   void* post_cobject MLN_BINDING("kind=native_pointer;lifetime=process"),
   int64_t port,
-  void** out_context MLN_BINDING("direction=out;kind=context;lifetime=owner")
+  void** out_context MLN_BINDING("direction=out;kind=context;lifetime=owner"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -456,7 +459,8 @@ typedef struct mln_adapter_routed_resource_provider {
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_dart_wake_create(
   void* post_cobject MLN_BINDING("kind=native_pointer;lifetime=process"),
-  int64_t port, mln_wake* out_wake MLN_BINDING("direction=out")
+  int64_t port, mln_wake* out_wake MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -471,7 +475,8 @@ MLN_API mln_status mln_adapter_dart_completion_create(
   uint32_t copy_kind, size_t element_size,
   void* post_cobject MLN_BINDING("kind=native_pointer;lifetime=process"),
   int64_t port, int64_t token,
-  mln_completion* out_completion MLN_BINDING("direction=out")
+  mln_completion* out_completion MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Creates a native notification port context for generated void callbacks. */
@@ -511,7 +516,8 @@ MLN_API void mln_adapter_arena_destroy(
 /** Transfers a handle on entry; failure disposes the handle immediately. */
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_arena_adopt_handle(
-  void* arena MLN_BINDING("kind=context;lifetime=owner"), uint64_t handle
+  void* arena MLN_BINDING("kind=context;lifetime=owner"), uint64_t handle,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -524,7 +530,8 @@ MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_arena_adopt_release(
   void* arena MLN_BINDING("kind=context;lifetime=owner"),
   mln_runtime_callback_release release,
-  void* context MLN_BINDING("kind=context;lifetime=owner")
+  void* context MLN_BINDING("kind=context;lifetime=owner"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -539,7 +546,8 @@ MLN_API mln_status mln_adapter_dart_release_register(
   void* post_cobject MLN_BINDING("kind=native_pointer;lifetime=process"),
   int64_t port, void* context MLN_BINDING("kind=context;lifetime=owner"),
   void* arena MLN_BINDING("kind=context;lifetime=owner;nullable=true"),
-  uint64_t* out_registration MLN_BINDING("direction=out")
+  uint64_t* out_registration MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Removes a registration, posts its identifier and releases its native arena.
@@ -639,7 +647,8 @@ MLN_API mln_status mln_adapter_http_header_validate(
   const char* name
     MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed"),
   const char* value
-    MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed")
+    MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -715,7 +724,8 @@ MLN_API void mln_adapter_custom_mvt_vector_callbacks_retire(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_acquired_frame_view_begin(
   mln_acquired_frame frame,
-  void** out_scope MLN_BINDING("direction=out;kind=context;lifetime=owner")
+  void** out_scope MLN_BINDING("direction=out;kind=context;lifetime=owner"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Ends one borrowed-frame scope. Null is a no-op. */

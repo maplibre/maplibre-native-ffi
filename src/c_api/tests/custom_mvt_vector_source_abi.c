@@ -70,7 +70,7 @@ static void add_mvt_source(mln_map map, release_probe* probe) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL(source_id), &options, &add.descriptor
+      map, MLN_BUFFER_LITERAL(source_id), &options, &add.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&add));
@@ -110,9 +110,10 @@ static void an_explicit_removal_releases_once(void) {
 
   mln_test_completion removal = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_remove_style_source(
-                     map, MLN_BUFFER_LITERAL(source_id), &removal.descriptor
-                   )
+    MLN_STATUS_OK,
+    mln_map_remove_style_source(
+      map, MLN_BUFFER_LITERAL(source_id), &removal.descriptor, NULL
+    )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&removal));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
@@ -140,7 +141,7 @@ static void accepted_adds_release_their_callback_state(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL(source_id), &options, &rejected.descriptor
+      map, MLN_BUFFER_LITERAL(source_id), &options, &rejected.descriptor, NULL
     )
   );
   rejected.descriptor.release_user_data(rejected.descriptor.user_data);
@@ -150,10 +151,10 @@ static void accepted_adds_release_their_callback_state(void) {
   options.fetch_tile = NULL;
   mln_test_completion missing_fetch = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL(source_id), &options, &missing_fetch.descriptor
-    )
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_add_custom_mvt_vector_source(
+                                   map, MLN_BUFFER_LITERAL(source_id), &options,
+                                   &missing_fetch.descriptor, NULL
+                                 )
   );
   missing_fetch.descriptor.release_user_data(
     missing_fetch.descriptor.user_data
@@ -165,7 +166,7 @@ static void accepted_adds_release_their_callback_state(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL(source_id), &options, &first.descriptor
+      map, MLN_BUFFER_LITERAL(source_id), &options, &first.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&first));
@@ -175,7 +176,7 @@ static void accepted_adds_release_their_callback_state(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL(source_id), &options, &duplicate.descriptor
+      map, MLN_BUFFER_LITERAL(source_id), &options, &duplicate.descriptor, NULL
     )
   );
   TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, mln_test_completion_settle(&duplicate));
@@ -200,7 +201,7 @@ static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
     mln_test_completion_default(sizeof(mln_style_source_result));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_get_style_source_info(
-                     map, MLN_BUFFER_LITERAL(source_id), &info.descriptor
+                     map, MLN_BUFFER_LITERAL(source_id), &info.descriptor, NULL
                    )
   );
   mln_style_source_result source_result = {0};
@@ -219,7 +220,7 @@ static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_set_custom_mvt_vector_source_tile_data(
-      map, MLN_BUFFER_LITERAL(source_id), tile_id, empty, &data.descriptor
+      map, MLN_BUFFER_LITERAL(source_id), tile_id, empty, &data.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&data));
@@ -227,7 +228,7 @@ static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_custom_mvt_vector_source_tile_error(
                      map, MLN_BUFFER_LITERAL(source_id), tile_id,
-                     MLN_BUFFER_LITERAL("missing"), &error.descriptor
+                     MLN_BUFFER_LITERAL("missing"), &error.descriptor, NULL
                    )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&error));
@@ -235,7 +236,7 @@ static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_invalidate_custom_mvt_vector_source_tile(
-      map, MLN_BUFFER_LITERAL(source_id), tile_id, &invalidate.descriptor
+      map, MLN_BUFFER_LITERAL(source_id), tile_id, &invalidate.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&invalidate));
@@ -260,7 +261,7 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_add_custom_geometry_source(
                      map, MLN_BUFFER_LITERAL(geometry_source_id),
-                     &geometry_options, &add.descriptor
+                     &geometry_options, &add.descriptor, NULL
                    )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&add));
@@ -273,16 +274,17 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_custom_mvt_vector_source_tile_data(
                      map, MLN_BUFFER_LITERAL(geometry_source_id), tile_id,
-                     empty, &wrong_data.descriptor
+                     empty, &wrong_data.descriptor, NULL
                    )
   );
   TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, mln_test_completion_settle(&wrong_data));
   mln_test_completion wrong_error = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_custom_mvt_vector_source_tile_error(
-                     map, MLN_BUFFER_LITERAL(geometry_source_id), tile_id,
-                     MLN_BUFFER_LITERAL("missing"), &wrong_error.descriptor
-                   )
+    MLN_STATUS_OK,
+    mln_map_set_custom_mvt_vector_source_tile_error(
+      map, MLN_BUFFER_LITERAL(geometry_source_id), tile_id,
+      MLN_BUFFER_LITERAL("missing"), &wrong_error.descriptor, NULL
+    )
   );
   TEST_ASSERT_NOT_EQUAL(
     MLN_STATUS_OK, mln_test_completion_settle(&wrong_error)
@@ -291,7 +293,7 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_invalidate_custom_mvt_vector_source_tile(
                      map, MLN_BUFFER_LITERAL(geometry_source_id), tile_id,
-                     &wrong_invalidate.descriptor
+                     &wrong_invalidate.descriptor, NULL
                    )
   );
   TEST_ASSERT_NOT_EQUAL(
@@ -303,7 +305,7 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
     mln_map_set_custom_geometry_source_tile_data(
       map, MLN_BUFFER_LITERAL(source_id), tile_id,
       MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
-      &wrong_geometry.descriptor
+      &wrong_geometry.descriptor, NULL
     )
   );
   TEST_ASSERT_NOT_EQUAL(
@@ -314,7 +316,7 @@ static void tile_operations_reject_the_other_custom_source_kind(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_invalidate_custom_geometry_source_tile(
                      map, MLN_BUFFER_LITERAL(source_id), tile_id,
-                     &wrong_geometry_invalidate.descriptor
+                     &wrong_geometry_invalidate.descriptor, NULL
                    )
   );
   TEST_ASSERT_NOT_EQUAL(

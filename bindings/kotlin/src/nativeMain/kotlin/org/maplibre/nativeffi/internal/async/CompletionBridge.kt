@@ -21,7 +21,6 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.CommandDisposition
 import org.maplibre.nativeffi.internal.c.mln_completion
 import org.maplibre.nativeffi.internal.c.mln_completion_result
-import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 @OptIn(ExperimentalForeignApi::class)
@@ -60,7 +59,7 @@ internal object CompletionBridge {
 
   fun <T> submit(
     convert: (CPointer<mln_completion_result>) -> T,
-    call: (CPointer<mln_completion>) -> Int,
+    call: (CPointer<mln_completion>) -> Unit,
   ): Deferred<T> = submitInternal(convert, false, false, call)
 
   /**
@@ -71,7 +70,7 @@ internal object CompletionBridge {
     convert: (CPointer<mln_completion_result>) -> T,
     closeDropped: (T) -> Unit,
     disposeUnadopted: (CPointer<mln_completion_result>) -> Unit,
-    call: (CPointer<mln_completion>) -> Int,
+    call: (CPointer<mln_completion>) -> Unit,
   ): Deferred<T> =
     submitInternal(
       { result -> adoptOwned(result, disposeUnadopted, convert) },
@@ -85,7 +84,7 @@ internal object CompletionBridge {
     convert: (CPointer<mln_completion_result>) -> T,
     rejectSynchronously: Boolean,
     acceptErrorStatus: Boolean,
-    call: (CPointer<mln_completion>) -> Int,
+    call: (CPointer<mln_completion>) -> Unit,
     closeDropped: (T) -> Unit = {},
   ): Deferred<T> {
     val state = State(convert, acceptErrorStatus, closeDropped)
@@ -97,7 +96,7 @@ internal object CompletionBridge {
         completion.callback = staticCFunction(::completeNative)
         completion.user_data = reference.asCPointer()
         completion.release_user_data = staticCFunction(::releaseNative)
-        Status.check(call(completion.ptr))
+        call(completion.ptr)
       }
     } catch (failure: Throwable) {
       // Only a rejected submission reaches here, and a rejection never hands the reference to
@@ -109,12 +108,12 @@ internal object CompletionBridge {
     return state.deferred
   }
 
-  fun unit(call: (CPointer<mln_completion>) -> Int): Deferred<Unit> = submit({ _ -> }, call)
+  fun unit(call: (CPointer<mln_completion>) -> Unit): Deferred<Unit> = submit({ _ -> }, call)
 
-  fun unitChecked(call: (CPointer<mln_completion>) -> Int): Deferred<Unit> =
+  fun unitChecked(call: (CPointer<mln_completion>) -> Unit): Deferred<Unit> =
     submitInternal({ _ -> }, true, false, call)
 
-  fun command(call: (CPointer<mln_completion>) -> Int): Deferred<CommandCompletion> =
+  fun command(call: (CPointer<mln_completion>) -> Unit): Deferred<CommandCompletion> =
     submitInternal(::commandCompletion, false, true, call)
 
   private fun commandCompletion(result: CPointer<mln_completion_result>): CommandCompletion =

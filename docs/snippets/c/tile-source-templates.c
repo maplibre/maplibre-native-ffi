@@ -12,7 +12,9 @@ static mln_buffer_view view(const char* text) {
 static mln_status add_layer(mln_map map, const mln_completion* completion) {
   const char layer[] =
     "{\"id\":\"ortho\",\"type\":\"raster\",\"source\":\"ortho\"}";
-  return mln_map_add_style_layer_json(map, view(layer), view(""), completion);
+  return mln_map_add_style_layer_json(
+    map, view(layer), view(""), completion, NULL
+  );
 }
 
 mln_status add_orthophotos(
@@ -48,7 +50,7 @@ mln_status add_orthophotos(
   // #region source
   const mln_status status = mln_map_add_raster_source_tiles(
     map, view("ortho"), tiles, sizeof(tiles) / sizeof(tiles[0]), &options,
-    source_completion
+    source_completion, NULL
   );
   if (status != MLN_STATUS_OK) {
     return status;

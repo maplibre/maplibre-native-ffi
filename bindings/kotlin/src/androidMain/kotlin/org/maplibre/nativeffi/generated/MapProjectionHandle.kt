@@ -22,7 +22,7 @@ internal constructor(
     return handle
   }
 
-  internal override fun bindingCloseMapProjection(call: (Long) -> Int) {
+  internal override fun bindingCloseMapProjection(call: (Long) -> Unit) {
     core.closeOnce({ call(handle) })
   }
 

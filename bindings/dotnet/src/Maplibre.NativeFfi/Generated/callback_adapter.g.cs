@@ -147,7 +147,7 @@ namespace Maplibre.NativeFfi.Internal.C
     internal static unsafe partial class NativeMethods
     {
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_adapter_completion_create([NativeTypeName("uint32_t")] uint copy_kind, [NativeTypeName("size_t")] nuint element_size, [NativeTypeName("mln_adapter_completion_listener")] delegate* unmanaged[Cdecl]<void*, mln_adapter_completion_record*, void> listener, void* user_data, mln_completion* out_completion);
+        public static extern mln_status mln_adapter_completion_create([NativeTypeName("uint32_t")] uint copy_kind, [NativeTypeName("size_t")] nuint element_size, [NativeTypeName("mln_adapter_completion_listener")] delegate* unmanaged[Cdecl]<void*, mln_adapter_completion_record*, void> listener, void* user_data, mln_completion* out_completion, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void mln_adapter_completion_reject(mln_completion* completion);
@@ -159,10 +159,10 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern void mln_adapter_completion_record_destroy(mln_adapter_completion_record* record);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_adapter_deferred_callback_create([NativeTypeName("uint32_t")] uint callback, [NativeTypeName("mln_adapter_deferred_call_listener")] delegate* unmanaged[Cdecl]<void*, mln_adapter_deferred_call_record*, void> listener, void* listener_user_data, void** out_context);
+        public static extern mln_status mln_adapter_deferred_callback_create([NativeTypeName("uint32_t")] uint callback, [NativeTypeName("mln_adapter_deferred_call_listener")] delegate* unmanaged[Cdecl]<void*, mln_adapter_deferred_call_record*, void> listener, void* listener_user_data, void** out_context, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_adapter_dart_deferred_callback_create([NativeTypeName("uint32_t")] uint callback, void* post_cobject, [NativeTypeName("int64_t")] long port, void** out_context);
+        public static extern mln_status mln_adapter_dart_deferred_callback_create([NativeTypeName("uint32_t")] uint callback, void* post_cobject, [NativeTypeName("int64_t")] long port, void** out_context, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void* mln_adapter_deferred_callback_function([NativeTypeName("uint32_t")] uint callback);
@@ -177,10 +177,10 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern void mln_adapter_deferred_call_record_destroy(mln_adapter_deferred_call_record* record);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_adapter_dart_wake_create(void* post_cobject, [NativeTypeName("int64_t")] long port, mln_wake* out_wake);
+        public static extern mln_status mln_adapter_dart_wake_create(void* post_cobject, [NativeTypeName("int64_t")] long port, mln_wake* out_wake, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_adapter_dart_completion_create([NativeTypeName("uint32_t")] uint copy_kind, [NativeTypeName("size_t")] nuint element_size, void* post_cobject, [NativeTypeName("int64_t")] long port, [NativeTypeName("int64_t")] long token, mln_completion* out_completion);
+        public static extern mln_status mln_adapter_dart_completion_create([NativeTypeName("uint32_t")] uint copy_kind, [NativeTypeName("size_t")] nuint element_size, void* post_cobject, [NativeTypeName("int64_t")] long port, [NativeTypeName("int64_t")] long token, mln_completion* out_completion, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void* mln_adapter_dart_port_create(void* post_cobject, [NativeTypeName("int64_t")] long port);
@@ -201,13 +201,13 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern void mln_adapter_arena_destroy(void* arena);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_adapter_arena_adopt_handle(void* arena, [NativeTypeName("uint64_t")] ulong handle);
+        public static extern mln_status mln_adapter_arena_adopt_handle(void* arena, [NativeTypeName("uint64_t")] ulong handle, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_adapter_arena_adopt_release(void* arena, [NativeTypeName("mln_runtime_callback_release")] delegate* unmanaged[Cdecl]<void*, void> release, void* context);
+        public static extern mln_status mln_adapter_arena_adopt_release(void* arena, [NativeTypeName("mln_runtime_callback_release")] delegate* unmanaged[Cdecl]<void*, void> release, void* context, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_adapter_dart_release_register(void* post_cobject, [NativeTypeName("int64_t")] long port, void* context, void* arena, [NativeTypeName("uint64_t *")] ulong* out_registration);
+        public static extern mln_status mln_adapter_dart_release_register(void* post_cobject, [NativeTypeName("int64_t")] long port, void* context, void* arena, [NativeTypeName("uint64_t *")] ulong* out_registration, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void mln_adapter_dart_release(void* context);
@@ -228,7 +228,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_adapter_http_header_transform_callback(void* user_data, [NativeTypeName("uint32_t")] uint kind, [NativeTypeName("const char *")] sbyte* url, mln_http_header_transform_response* out_response);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_adapter_http_header_validate([NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* value);
+        public static extern mln_status mln_adapter_http_header_validate([NativeTypeName("const char *")] sbyte* name, [NativeTypeName("const char *")] sbyte* value, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("uint32_t")]
@@ -245,7 +245,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern void mln_adapter_custom_mvt_vector_callbacks_retire([NativeTypeName("mln_custom_mvt_vector_source_tile_callback")] delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> fetch_tile, [NativeTypeName("mln_custom_mvt_vector_source_tile_callback")] delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> cancel_tile, void* user_data);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_adapter_acquired_frame_view_begin([NativeTypeName("mln_acquired_frame")] MlnAcquiredFrame frame, void** out_scope);
+        public static extern mln_status mln_adapter_acquired_frame_view_begin([NativeTypeName("mln_acquired_frame")] MlnAcquiredFrame frame, void** out_scope, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void mln_adapter_acquired_frame_view_end(void* scope);

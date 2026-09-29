@@ -46,7 +46,8 @@ MLN_BINDING(
   "execution=lifecycle;result=mln_map_projection;shape=value;ownership=owned"
 )
 MLN_API mln_status mln_map_projection_create(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -63,8 +64,9 @@ MLN_API mln_status mln_map_projection_create(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING("execution=immediate")
-MLN_API mln_status
-mln_map_projection_close(mln_map_projection projection) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_projection_close(
+  mln_map_projection projection, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
 
 /**
  * Copies the projection camera into out_camera.
@@ -82,7 +84,8 @@ mln_map_projection_close(mln_map_projection projection) MLN_NOEXCEPT;
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_get_camera(
   mln_map_projection projection,
-  mln_camera_options* out_camera MLN_BINDING("direction=out")
+  mln_camera_options* out_camera MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -102,7 +105,8 @@ MLN_API mln_status mln_map_projection_get_camera(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_set_camera(
   mln_map_projection projection,
-  const mln_camera_options* camera MLN_BINDING("length=1")
+  const mln_camera_options* camera MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -123,7 +127,8 @@ MLN_API mln_status mln_map_projection_set_visible_coordinates(
   mln_map_projection projection,
   const mln_lat_lng* coordinates
     MLN_BINDING("length=coordinate_count;ownership=borrowed"),
-  size_t coordinate_count, mln_edge_insets padding
+  size_t coordinate_count, mln_edge_insets padding,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -145,7 +150,7 @@ MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_set_visible_geometry(
   mln_map_projection projection,
   mln_buffer_view geometry MLN_BINDING("encoding=json;lifetime=call"),
-  mln_edge_insets padding
+  mln_edge_insets padding, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -164,7 +169,8 @@ MLN_API mln_status mln_map_projection_set_visible_geometry(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
-  mln_screen_point* out_point MLN_BINDING("direction=out")
+  mln_screen_point* out_point MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -184,7 +190,8 @@ MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
   mln_map_projection projection, mln_screen_point point,
-  mln_lat_lng* out_coordinate MLN_BINDING("direction=out")
+  mln_lat_lng* out_coordinate MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -204,7 +211,8 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
-  mln_lat_lng* out_coordinate MLN_BINDING("direction=out")
+  mln_lat_lng* out_coordinate MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -224,7 +232,8 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_meters_per_pixel_at_latitude(
   mln_map_projection projection, double latitude,
-  double* out_meters_per_pixel MLN_BINDING("direction=out")
+  double* out_meters_per_pixel MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -239,7 +248,8 @@ MLN_API mln_status mln_map_projection_meters_per_pixel_at_latitude(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_projected_meters_for_lat_lng(
   mln_lat_lng coordinate,
-  mln_projected_meters* out_meters MLN_BINDING("direction=out")
+  mln_projected_meters* out_meters MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -254,7 +264,8 @@ MLN_API mln_status mln_projected_meters_for_lat_lng(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_lat_lng_for_projected_meters(
   mln_projected_meters meters,
-  mln_lat_lng* out_coordinate MLN_BINDING("direction=out")
+  mln_lat_lng* out_coordinate MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

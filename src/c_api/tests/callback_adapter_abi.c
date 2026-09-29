@@ -318,23 +318,24 @@ static void http_header_validation_uses_the_native_policy(void) {
   static const char invalid_utf8[] = {'b', 'a', 'd', (char)0xFF, '\0'};
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_http_header_validate("X-Test", "caf\xC3\xA9")
+    MLN_STATUS_OK,
+    mln_adapter_http_header_validate("X-Test", "caf\xC3\xA9", NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_http_header_validate("Bad Name", "value")
+    mln_adapter_http_header_validate("Bad Name", "value", NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_http_header_validate("Range", "bytes=0-1")
+    mln_adapter_http_header_validate("Range", "bytes=0-1", NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_http_header_validate("Authorization", "bad\r\nvalue")
+    mln_adapter_http_header_validate("Authorization", "bad\r\nvalue", NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_http_header_validate("Authorization", invalid_utf8)
+    mln_adapter_http_header_validate("Authorization", invalid_utf8, NULL)
   );
 }
 
@@ -345,7 +346,7 @@ static void completion_copy_failures_use_the_adapter_failure_channel(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_adapter_completion_create(
                      MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT, 0,
-                     completion_listener, NULL, &completion
+                     completion_listener, NULL, &completion, NULL
                    )
   );
 
@@ -397,7 +398,7 @@ static void* deferred_context(uint32_t callback, deferred_probe* probe) {
   void* context = NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_adapter_deferred_callback_create(
-                     callback, deferred_listener, probe, &context
+                     callback, deferred_listener, probe, &context, NULL
                    )
   );
   TEST_ASSERT_NOT_NULL(context);
@@ -428,21 +429,22 @@ static void deferred_callbacks_reject_raw_invalid_arguments(void) {
   void* context = NULL;
   TEST_ASSERT_NULL(mln_adapter_deferred_callback_function(0));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_deferred_callback_create(0, deferred_listener, &probe, &context)
+    MLN_STATUS_INVALID_ARGUMENT, mln_adapter_deferred_callback_create(
+                                   0, deferred_listener, &probe, &context, NULL
+                                 )
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_adapter_deferred_callback_create(
-      MLN_ADAPTER_DEFERRED_LOG_CALLBACK, NULL, &probe, &context
+      MLN_ADAPTER_DEFERRED_LOG_CALLBACK, NULL, &probe, &context, NULL
     )
   );
   context = &probe;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_deferred_callback_create(
-      MLN_ADAPTER_DEFERRED_LOG_CALLBACK, deferred_listener, &probe, &context
-    )
+    MLN_STATUS_INVALID_ARGUMENT, mln_adapter_deferred_callback_create(
+                                   MLN_ADAPTER_DEFERRED_LOG_CALLBACK,
+                                   deferred_listener, &probe, &context, NULL
+                                 )
   );
   TEST_ASSERT_EQUAL_PTR(&probe, context);
   TEST_ASSERT_EQUAL_size_t(0, atomic_load(&probe.releases));
@@ -510,15 +512,15 @@ static void deferred_log_registration_releases_its_context_once(void) {
   deferred_probe probe = {0};
   void* context = deferred_context(MLN_ADAPTER_DEFERRED_LOG_CALLBACK, &probe);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_log_set_callback(
-      deferred_log_callback(), context, mln_adapter_deferred_callback_release
-    )
+    MLN_STATUS_OK, mln_log_set_callback(
+                     deferred_log_callback(), context,
+                     mln_adapter_deferred_callback_release, NULL
+                   )
   );
   TEST_ASSERT_EQUAL_size_t(0, atomic_load(&probe.releases));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback());
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.releases));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback());
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.releases));
 }
 
@@ -544,7 +546,7 @@ static mln_status set_provider_committed(
 ) {
   mln_test_completion completion = mln_test_completion_default(0);
   const mln_status status = mln_runtime_set_resource_provider(
-    runtime, provider, &completion.descriptor
+    runtime, provider, &completion.descriptor, NULL
   );
   if (status != MLN_STATUS_OK) {
     mln_test_completion_reject(&completion);
@@ -557,7 +559,7 @@ static mln_status set_provider_committed(
 static mln_status clear_provider_committed(mln_runtime runtime) {
   mln_test_completion completion = mln_test_completion_default(0);
   const mln_status status =
-    mln_runtime_clear_resource_provider(runtime, &completion.descriptor);
+    mln_runtime_clear_resource_provider(runtime, &completion.descriptor, NULL);
   if (status != MLN_STATUS_OK) {
     mln_test_completion_reject(&completion);
     mln_test_completion_destroy(&completion);
@@ -621,7 +623,7 @@ static void routed_deferred_provider_delivers_a_request_the_host_completes(
     .byte_count = sizeof(inline_style_json) - 1,
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_complete(handle, &response)
+    MLN_STATUS_OK, mln_resource_request_complete(handle, &response, NULL)
   );
   mln_resource_request_release(handle);
   TEST_ASSERT_TRUE(wait_for_map_event(

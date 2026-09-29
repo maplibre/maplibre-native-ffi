@@ -66,7 +66,9 @@ impl EventBatchHandle {
             value.size = std::mem::size_of::<sys::mln_runtime_event_batch_view>() as _;
             value
         };
-        maplibre_core::check(unsafe { sys::mln_event_batch_get(native, &mut binding_arg_1) })?;
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_event_batch_get(native, &mut binding_arg_1, diagnostic)
+        })?;
         Ok(unsafe { maplibre_core::generated::RuntimeEventBatchView::from_native(binding_arg_1) }?)
     }
 

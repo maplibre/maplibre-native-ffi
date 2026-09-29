@@ -48,6 +48,18 @@ def native(type_: CType) -> str:
     return type_.declaration or type_.spelling.removeprefix("const ")
 
 
+def native_call(function: Function, *arguments: str) -> str:
+    """Calls a C function, passing the enclosing `diagnostic` when it takes one."""
+    if function.diagnostic:
+        arguments = (*arguments, "diagnostic")
+    return f"{function.name}({', '.join(arguments)})"
+
+
+def checked(statement: str) -> str:
+    """Runs a status-returning statement under a fresh per-call diagnostic."""
+    return f"try checkStatus {{ diagnostic in {statement} }}"
+
+
 def unsupported(function: Function | Record, detail: str) -> ModelError:
     return ModelError([f"{function.location}: Swift: {function.name}: {detail}"])
 
@@ -207,19 +219,17 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
     if method in {"close", "requireLiveHandle", "deinit"}:
         raise unsupported(function, "method name is reserved by the handle runtime")
     method = identifier(method)
-    args = ", ".join(
-        [
-            *(
-                ["try nativePointer" if plan.scoped_receiver else "handle.raw"]
-                if receiver
-                else []
-            ),
-            *arguments,
-            *(["completion"] if completion else []),
-        ]
-    )
-    call = f"{function.name}({args})"
-    submit_try = "try " if "try " in args else ""
+    args = [
+        *(
+            ["try nativePointer" if plan.scoped_receiver else "handle.raw"]
+            if receiver
+            else []
+        ),
+        *arguments,
+        *(["completion"] if completion else []),
+    ]
+    call = native_call(function, *args)
+    submit_try = "try " if "try " in call else ""
     doc = f"  /// Calls `{function.name}`.\n"
     modifier = "" if receiver else "static "
     receiver_setup = (
@@ -261,7 +271,7 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
       let arena = NativeInputArena()
       defer {{ withExtendedLifetime(arena) {{}} }}
       var value0: {owned.handle.native} = 0
-      let future = try NativeCompletion.startUnit {{ completion in {submit_try}arena.submit {{ {call} }} }}
+      let future = try NativeCompletion.startUnit {{ completion, diagnostic in {submit_try}arena.submit {{ {call} }} }}
       let owner = try {public}(adopting: value0{parent})
       return {result}({member}: owner, completion: Task {{ [owner] in
         defer {{ withExtendedLifetime(owner) {{}} }}
@@ -369,7 +379,7 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
 {receiver_setup}
       let arena = NativeInputArena()
       defer {{ withExtendedLifetime(arena) {{}} }}
-      return try NativeCompletion.{start}({{ completion in {submit_try}arena.submit {{ {call} }} }}){conversion}
+      return try NativeCompletion.{start}({{ completion, diagnostic in {submit_try}arena.submit {{ {call} }} }}){conversion}
     }}
   }}
 }}
@@ -383,6 +393,10 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
         if plan.result:
             from .swift_dynamic_values import decode
 
+            if function.diagnostic:
+                raise unsupported(
+                    function, "a returned value cannot carry a status diagnostic"
+                )
             value_types.add(plan.result)
             result = value_types.public(plan.result)
             raw = "value"
@@ -457,7 +471,7 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
       let arena = NativeInputArena()
       defer {{ withExtendedLifetime(arena) {{}} }}
 {chr(10).join(storage)}
-      try checkStatus(arena.submit {{ {call} }})
+      {checked(f"{submit_try}arena.submit {{ {call} }}")}
 {hook}      return {copied}
     }}
   }}

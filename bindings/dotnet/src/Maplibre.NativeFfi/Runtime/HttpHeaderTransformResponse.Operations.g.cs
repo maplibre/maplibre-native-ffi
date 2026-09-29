@@ -27,14 +27,17 @@ public sealed unsafe partial class HttpHeaderTransformResponse
         );
         var bufferName = scope.Utf8(name);
         var bufferValue = scope.Utf8(value);
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_http_header_transform_response_set(
                 Pointer,
                 (sbyte*)bufferName.data,
                 checked((nuint)bufferName.size),
                 (sbyte*)bufferValue.data,
-                checked((nuint)bufferValue.size)
-            )
+                checked((nuint)bufferValue.size),
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         scope.Accept();
     }

@@ -341,7 +341,8 @@ typedef enum mln_resource_provider_decision : uint32_t {
  */
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_network_status_get(
-  uint32_t* out_status MLN_BINDING("direction=out;enum=mln_network_status")
+  uint32_t* out_status MLN_BINDING("direction=out;enum=mln_network_status"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -359,7 +360,8 @@ MLN_API mln_status mln_network_status_get(
  */
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_network_status_set(
-  uint32_t status MLN_BINDING("enum=mln_network_status")
+  uint32_t status MLN_BINDING("enum=mln_network_status"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Options used when creating a runtime. */
@@ -633,7 +635,7 @@ MLN_API mln_status mln_resource_transform_response_set_url(
   const char* url MLN_BINDING(
     "encoding=utf8;lifetime=call;length=url_size;ownership=borrowed"
   ),
-  size_t url_size
+  size_t url_size, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -724,7 +726,7 @@ MLN_API mln_status mln_http_header_transform_response_set(
   const char* value MLN_BINDING(
     "encoding=utf8;lifetime=call;length=value_size;ownership=borrowed"
   ),
-  size_t value_size
+  size_t value_size, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -923,7 +925,8 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_runtime_create(
   const mln_runtime_options* options MLN_BINDING("length=1"),
-  mln_runtime* out_runtime MLN_BINDING("direction=out;ownership=owned")
+  mln_runtime* out_runtime MLN_BINDING("direction=out;ownership=owned"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -959,7 +962,8 @@ MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_set_resource_provider(
   mln_runtime runtime,
   const mln_resource_provider* provider MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -981,7 +985,8 @@ MLN_API mln_status mln_runtime_set_resource_provider(
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_clear_resource_provider(
-  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1")
+  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1005,7 +1010,8 @@ MLN_API mln_status mln_runtime_clear_resource_provider(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_resource_request_complete(
   mln_resource_request_handle handle,
-  const mln_resource_response* response MLN_BINDING("length=1")
+  const mln_resource_response* response MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1023,7 +1029,8 @@ MLN_API mln_status mln_resource_request_complete(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_resource_request_cancelled(
   mln_resource_request_handle handle,
-  bool* out_cancelled MLN_BINDING("direction=out")
+  bool* out_cancelled MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1064,7 +1071,8 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
   mln_resource_request_cancel_callback callback,
   void* user_data MLN_BINDING("kind=context;ownership=borrowed"),
   mln_runtime_callback_release release_user_data,
-  bool* out_cancelled MLN_BINDING("direction=out")
+  bool* out_cancelled MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1100,7 +1108,8 @@ MLN_API void mln_resource_request_release(
  */
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_resource_request_wait_until_retired(
-  mln_resource_request_handle handle MLN_BINDING("handle_access=issued")
+  mln_resource_request_handle handle MLN_BINDING("handle_access=issued"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1131,7 +1140,8 @@ MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_set_resource_transform(
   mln_runtime runtime,
   const mln_resource_transform* transform MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1152,7 +1162,8 @@ MLN_API mln_status mln_runtime_set_resource_transform(
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_clear_resource_transform(
-  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1")
+  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1186,7 +1197,8 @@ MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_set_http_header_transform(
   mln_runtime runtime,
   const mln_http_header_transform* transform MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1206,7 +1218,8 @@ MLN_API mln_status mln_runtime_set_http_header_transform(
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_clear_http_header_transform(
-  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1")
+  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1231,7 +1244,8 @@ MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_run_ambient_cache_operation(
   mln_runtime runtime,
   uint32_t operation MLN_BINDING("enum=mln_ambient_cache_operation"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1259,7 +1273,8 @@ MLN_API mln_status mln_runtime_run_ambient_cache_operation(
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
   mln_runtime runtime, uint64_t size,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1277,7 +1292,8 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_barrier(
-  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1")
+  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1306,7 +1322,8 @@ MLN_API mln_status mln_runtime_barrier(
  */
 MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_release(
-  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1")
+  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1326,7 +1343,9 @@ MLN_API mln_status mln_runtime_release(
  * - MLN_STATUS_INVALID_STATE when the runtime is already closing.
  */
 MLN_BINDING("execution=immediate")
-MLN_API mln_status mln_runtime_dispose(mln_runtime runtime) MLN_NOEXCEPT;
+MLN_API mln_status mln_runtime_dispose(
+  mln_runtime runtime, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
 
 /**
  * Drains this runtime's queued events into a new owned batch.
@@ -1355,7 +1374,8 @@ MLN_API mln_status mln_runtime_dispose(mln_runtime runtime) MLN_NOEXCEPT;
 MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_runtime_drain_events(
   mln_runtime runtime,
-  mln_event_batch* out_batch MLN_BINDING("direction=out;ownership=owned")
+  mln_event_batch* out_batch MLN_BINDING("direction=out;ownership=owned"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1370,7 +1390,8 @@ MLN_API mln_status mln_runtime_drain_events(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_event_batch_get(
   mln_event_batch batch,
-  mln_runtime_event_batch_view* out_view MLN_BINDING("direction=out")
+  mln_runtime_event_batch_view* out_view MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Releases an owned event batch. A null handle is a no-op. */
@@ -1406,7 +1427,8 @@ MLN_API void mln_event_batch_release(mln_event_batch batch) MLN_NOEXCEPT;
  */
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_runtime_set_event_mask(
-  mln_runtime runtime, uint64_t mask MLN_BINDING("enum=mln_runtime_event_mask")
+  mln_runtime runtime, uint64_t mask MLN_BINDING("enum=mln_runtime_event_mask"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1427,7 +1449,8 @@ MLN_API mln_status mln_runtime_set_event_mask(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_runtime_get_event_mask(
   mln_runtime runtime,
-  uint64_t* out_mask MLN_BINDING("direction=out;enum=mln_runtime_event_mask")
+  uint64_t* out_mask MLN_BINDING("direction=out;enum=mln_runtime_event_mask"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

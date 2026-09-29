@@ -6,12 +6,12 @@ import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 public actual abstract class GeneratedAcquiredFrameOperations internal actual constructor() {
   internal abstract fun bindingAcquiredFrameHandle(): Long
 
-  internal abstract fun bindingCloseAcquiredFrame(call: (Long) -> Int)
+  internal abstract fun bindingCloseAcquiredFrame(call: (Long) -> Unit)
 
   public actual fun dispose(): Unit {
     try {
@@ -23,7 +23,11 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
           owner.toLong(),
           "mln_acquired_frame_dispose",
         )
-        PointerScope().use { arena -> MaplibreNativeC.mln_acquired_frame_dispose(owner) }
+        PointerScope().use { arena ->
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_acquired_frame_dispose(owner, diagnostic)
+          }
+        }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)
@@ -39,18 +43,23 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = PointerPointer<Pointer>(1L)
-        BindingStatus.check(
-          MaplibreNativeC.mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_adapter_acquired_frame_view_begin(
+            bindingAcquiredFrameHandle(),
+            token,
+            diagnostic,
+          )
+        }
         try {
           val output = MaplibreNativeC.mln_metal_owned_texture_frame()
           output.size(output.sizeof())
-          BindingStatus.check(
+          NativeDiagnostics.check { diagnostic ->
             MaplibreNativeC.mln_acquired_frame_get_metal_texture(
               bindingAcquiredFrameHandle(),
               output,
+              diagnostic,
             )
-          )
+          }
           block(GeneratedValues.readMetalOwnedTextureFrame(output, scope))
         } finally {
           scope.close()
@@ -71,18 +80,23 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = PointerPointer<Pointer>(1L)
-        BindingStatus.check(
-          MaplibreNativeC.mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_adapter_acquired_frame_view_begin(
+            bindingAcquiredFrameHandle(),
+            token,
+            diagnostic,
+          )
+        }
         try {
           val output = MaplibreNativeC.mln_opengl_owned_texture_frame()
           output.size(output.sizeof())
-          BindingStatus.check(
+          NativeDiagnostics.check { diagnostic ->
             MaplibreNativeC.mln_acquired_frame_get_opengl_texture(
               bindingAcquiredFrameHandle(),
               output,
+              diagnostic,
             )
-          )
+          }
           block(GeneratedValues.readOpenglOwnedTextureFrame(output, scope))
         } finally {
           scope.close()
@@ -103,18 +117,23 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = PointerPointer<Pointer>(1L)
-        BindingStatus.check(
-          MaplibreNativeC.mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_adapter_acquired_frame_view_begin(
+            bindingAcquiredFrameHandle(),
+            token,
+            diagnostic,
+          )
+        }
         try {
           val output = MaplibreNativeC.mln_gpu_sync()
           output.size(output.sizeof())
-          BindingStatus.check(
+          NativeDiagnostics.check { diagnostic ->
             MaplibreNativeC.mln_acquired_frame_get_producer_sync(
               bindingAcquiredFrameHandle(),
               output,
+              diagnostic,
             )
-          )
+          }
           block(GeneratedValues.readGpuSync(output, scope))
         } finally {
           scope.close()
@@ -136,9 +155,13 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
       return PointerScope().use { arena ->
         val output = MaplibreNativeC.mln_render_frame_result()
         output.size(output.sizeof())
-        BindingStatus.check(
-          MaplibreNativeC.mln_acquired_frame_get_result(bindingAcquiredFrameHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_acquired_frame_get_result(
+            bindingAcquiredFrameHandle(),
+            output,
+            diagnostic,
+          )
+        }
         GeneratedValues.readRenderFrameResult(output)
       }
     } finally {
@@ -155,18 +178,23 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = PointerPointer<Pointer>(1L)
-        BindingStatus.check(
-          MaplibreNativeC.mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_adapter_acquired_frame_view_begin(
+            bindingAcquiredFrameHandle(),
+            token,
+            diagnostic,
+          )
+        }
         try {
           val output = MaplibreNativeC.mln_vulkan_owned_texture_frame()
           output.size(output.sizeof())
-          BindingStatus.check(
+          NativeDiagnostics.check { diagnostic ->
             MaplibreNativeC.mln_acquired_frame_get_vulkan_texture(
               bindingAcquiredFrameHandle(),
               output,
+              diagnostic,
             )
-          )
+          }
           block(GeneratedValues.readVulkanOwnedTextureFrame(output, scope))
         } finally {
           scope.close()
@@ -187,18 +215,23 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope()
         val token = PointerPointer<Pointer>(1L)
-        BindingStatus.check(
-          MaplibreNativeC.mln_adapter_acquired_frame_view_begin(bindingAcquiredFrameHandle(), token)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_adapter_acquired_frame_view_begin(
+            bindingAcquiredFrameHandle(),
+            token,
+            diagnostic,
+          )
+        }
         try {
           val output = MaplibreNativeC.mln_webgpu_owned_texture_frame()
           output.size(output.sizeof())
-          BindingStatus.check(
+          NativeDiagnostics.check { diagnostic ->
             MaplibreNativeC.mln_acquired_frame_get_webgpu_texture(
               bindingAcquiredFrameHandle(),
               output,
+              diagnostic,
             )
-          )
+          }
           block(GeneratedValues.readWebgpuOwnedTextureFrame(output, scope))
         } finally {
           scope.close()
@@ -222,10 +255,13 @@ public actual abstract class GeneratedAcquiredFrameOperations internal actual co
         )
         PointerScope().use { arena ->
           val holder = LongPointer(1L).put(owner)
-          MaplibreNativeC.mln_acquired_frame_release(
-            holder,
-            GeneratedValues.writeGpuSync(arena, consumerCompletion),
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_acquired_frame_release(
+              holder,
+              GeneratedValues.writeGpuSync(arena, consumerCompletion),
+              diagnostic,
+            )
+          }
         }
       }
     } finally {

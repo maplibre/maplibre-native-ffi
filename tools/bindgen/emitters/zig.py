@@ -49,6 +49,14 @@ def failure(decl: Function | Record, reason: str) -> ModelError:
     return ModelError([f"{decl.location}: Zig: {decl.name}: {reason}"])
 
 
+def status_call(function: Function, arguments: list[str], diagnostic_store: str) -> str:
+    """Calls a status-returning C function through the diagnostic runtime."""
+    if not function.diagnostic:
+        raise failure(function, "status result requires a diagnostic parameter")
+    tuple_ = ".{ " + ", ".join(arguments) + " }" if arguments else ".{}"
+    return f"try status.call(c.{function.name}, {tuple_}, {diagnostic_store});"
+
+
 def expose_parameter_names(plan, code):
     """Keep generated temporaries private while naming parameters from the header."""
     marker = f"pub fn {camel(plan.name.removeprefix('mln_'))}("
@@ -129,26 +137,11 @@ const completion = @import("completion.zig");
 const status = @import("status.zig");
 const diagnostics = @import("diagnostics.zig");
 
-fn submit(comptime T: type, diagnostic_store: ?*diagnostics.DiagnosticStore, comptime copy: *const fn (*const c.mln_completion_result) status.Error!T, comptime start: anytype, arguments: anytype) status.Error!completion.Future(T) {
-    return completion.submit(T, diagnostic_store, copy, arguments, struct {
-        fn call(args: @TypeOf(arguments), descriptor: *const c.mln_completion) c.mln_status { return @call(.auto, start, args ++ .{descriptor}); }
-    }.call);
-}
 const OwnerCopyContext = struct {
     parent: ?owner.Anchor,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     pub fn deinit(self: *OwnerCopyContext) void { if (self.parent) |parent| parent.release(); }
 };
-fn submitContext(comptime T: type, comptime Context: type, diagnostic_store: ?*diagnostics.DiagnosticStore, comptime copy: *const fn (*const c.mln_completion_result, *Context) status.Error!T, context: Context, comptime start: anytype, arguments: anytype) status.Error!completion.Future(T) {
-    return completion.submitWithCopyContext(T, Context, diagnostic_store, copy, context, arguments, struct {
-        fn call(args: @TypeOf(arguments), descriptor: *const c.mln_completion) c.mln_status { return @call(.auto, start, args ++ .{descriptor}); }
-    }.call);
-}
-fn submitAllocated(comptime T: type, diagnostic_store: ?*diagnostics.DiagnosticStore, allocator: std.mem.Allocator, comptime copy: *const fn (*const c.mln_completion_result, *std.mem.Allocator) status.Error!T, comptime start: anytype, arguments: anytype) status.Error!completion.Future(T) {
-    return completion.submitWithCopyContext(T, std.mem.Allocator, diagnostic_store, copy, allocator, arguments, struct {
-        fn call(args: @TypeOf(arguments), descriptor: *const c.mln_completion) c.mln_status { return @call(.auto, start, args ++ .{descriptor}); }
-    }.call);
-}
 
 /// A copied native value and the allocator that frees it. Move it rather than
 /// copy it: deinit on two copies releases the value twice.
@@ -203,11 +196,10 @@ fn copyView(allocator: std.mem.Allocator, raw: c.mln_buffer_view) status.Error![
         calls = []
         for finalizer in handle.finalize:
             function = bound.operations_by_name[finalizer].function
-            call = f"c.{finalizer}(raw)"
             calls.append(
-                call + ";"
+                f"c.{finalizer}(raw);"
                 if function.return_type.kind == "void"
-                else f"try status.checkStatus({call}, null);"
+                else status_call(function, ["raw"], "null")
             )
         owners.append(
             f'pub const {pascal(handle.native.removeprefix("mln_"))} = owner.Handle("{handle.native}", struct {{ fn dispose(raw: u64) status.Error!void {{ {" ".join(calls)} }} }}.dispose);'

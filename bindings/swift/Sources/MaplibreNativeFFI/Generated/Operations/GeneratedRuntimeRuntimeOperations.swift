@@ -18,10 +18,13 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in arena.submit { mln_runtime_barrier(
-          handle.raw,
-          completion
-        ) } }
+        .startUnit { completion, diagnostic in
+          arena.submit { mln_runtime_barrier(
+            handle.raw,
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -41,10 +44,11 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_runtime_clear_http_header_transform(
             handle.raw,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -66,10 +70,11 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_runtime_clear_resource_provider(
             handle.raw,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -91,10 +96,11 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_runtime_clear_resource_transform(
             handle.raw,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -105,7 +111,10 @@ public extension RuntimeHandle {
   func dispose() throws {
     try NativeCallbackGuard.check(owner: self, operation: "mln_runtime_dispose")
     try mapNativeFailure { try handle.closeOnce { live in
-      try checkStatus(mln_runtime_dispose(live.raw))
+      try checkStatus { diagnostic in mln_runtime_dispose(
+        live.raw,
+        diagnostic
+      ) }
     } }
   }
 }
@@ -124,10 +133,11 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_event_batch = 0
-      try checkStatus(arena.submit { mln_runtime_drain_events(
+      try checkStatus { diagnostic in arena.submit { mln_runtime_drain_events(
         handle.raw,
-        &value0
-      ) })
+        &value0,
+        diagnostic
+      ) } }
       return try EventBatchHandle(adopting: value0)
     }
   }
@@ -147,10 +157,11 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0: UInt64 = 0
-      try checkStatus(arena.submit { mln_runtime_get_event_mask(
+      try checkStatus { diagnostic in arena.submit { mln_runtime_get_event_mask(
         handle.raw,
-        &value0
-      ) })
+        &value0,
+        diagnostic
+      ) } }
       return RuntimeEventMask(rawValue: value0)
     }
   }
@@ -167,7 +178,11 @@ public extension RuntimeHandle {
     var future: NativeFuture<Void>?
     try handle.closeOnce { live in
       future = try NativeCompletion
-        .startUnit { mln_runtime_release(live.raw, $0) }
+        .startUnit { completion, diagnostic in mln_runtime_release(
+          live.raw,
+          completion,
+          diagnostic
+        ) }
     }
     return future
   }
@@ -190,11 +205,12 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_runtime_run_ambient_cache_operation(
             handle.raw,
             bindingArg0.nativeValue(),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -215,10 +231,11 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena.submit { mln_runtime_set_event_mask(
+      try checkStatus { diagnostic in arena.submit { mln_runtime_set_event_mask(
         handle.raw,
-        bindingArg0.nativeValue()
-      ) })
+        bindingArg0.nativeValue(),
+        diagnostic
+      ) } }
       return ()
     }
   }
@@ -241,11 +258,12 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           try arena.submit { try mln_runtime_set_http_header_transform(
             handle.raw,
             arena.store(bindingArg0.nativeValue(arena: arena)),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -267,11 +285,12 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_runtime_set_maximum_ambient_cache_size(
             handle.raw,
             bindingArg0,
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -293,11 +312,12 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           try arena.submit { try mln_runtime_set_resource_provider(
             handle.raw,
             arena.store(bindingArg0.nativeValue(arena: arena)),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -321,11 +341,12 @@ public extension RuntimeHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           try arena.submit { try mln_runtime_set_resource_transform(
             handle.raw,
             arena.store(bindingArg0.nativeValue(arena: arena)),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }

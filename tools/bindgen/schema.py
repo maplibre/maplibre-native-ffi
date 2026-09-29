@@ -139,6 +139,10 @@ def has_completion(function: Function) -> bool:
     return any(is_completion(parameter.type) for parameter in function.parameters)
 
 
+def has_diagnostic(function: Function) -> bool:
+    return function.diagnostic
+
+
 def metadata_errors(
     metadata: dict[str, str], allowed: frozenset[str], context: str
 ) -> list[str]:
@@ -346,6 +350,15 @@ def validate(api: Api) -> None:
         execution = metadata.get("execution")
         if execution is None:
             errors.append(f"{context}: missing execution metadata")
+        returns_status = function.return_type.declaration == "mln_status"
+        if function.diagnostic != (
+            returns_status and "callback_adapter" not in metadata
+        ):
+            errors.append(
+                f"{context}: a status-returning function other than a callback "
+                "implementation takes a final mln_diagnostic* parameter, and no other "
+                "function does"
+            )
         completion = has_completion(function)
         if completion:
             if function.return_type.declaration != "mln_status":

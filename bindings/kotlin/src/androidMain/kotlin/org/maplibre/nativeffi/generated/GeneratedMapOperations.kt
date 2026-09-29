@@ -9,7 +9,7 @@ import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 public actual abstract class GeneratedMapOperations internal actual constructor() {
@@ -17,7 +17,7 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
 
   internal abstract fun bindingMapHandle(): Long
 
-  internal abstract fun bindingCloseMap(call: (Long) -> Int)
+  internal abstract fun bindingCloseMap(call: (Long) -> Unit)
 
   internal abstract fun bindingRetireMap(call: (Long) -> Deferred<Unit>): Deferred<Unit>
 
@@ -34,13 +34,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_color_relief_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.stringView(arena, (beforeLayerId ?: "")),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_color_relief_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.stringView(arena, (beforeLayerId ?: "")),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -61,7 +64,7 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         )
         CompletionBridge.command { completion ->
           PointerScope().use { arena ->
-            val status =
+            NativeDiagnostics.check { diagnostic ->
               MaplibreNativeC.mln_map_add_custom_geometry_source(
                 bindingMapHandle(),
                 GeneratedValues.stringView(arena, sourceId),
@@ -71,9 +74,10 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
                   registrations,
                 ),
                 completion,
+                diagnostic,
               )
-            if (status == 0) registrations.accept(bindingCallbacks)
-            status
+            }
+            registrations.accept(bindingCallbacks)
           }
         }
       }
@@ -95,7 +99,7 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         )
         CompletionBridge.command { completion ->
           PointerScope().use { arena ->
-            val status =
+            NativeDiagnostics.check { diagnostic ->
               MaplibreNativeC.mln_map_add_custom_mvt_vector_source(
                 bindingMapHandle(),
                 GeneratedValues.stringView(arena, sourceId),
@@ -105,9 +109,10 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
                   registrations,
                 ),
                 completion,
+                diagnostic,
               )
-            if (status == 0) registrations.accept(bindingCallbacks)
-            status
+            }
+            registrations.accept(bindingCallbacks)
           }
         }
       }
@@ -128,12 +133,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_geojson_source_data(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            data.bindingGeojsonSourceDataHandle(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_geojson_source_data(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              data.bindingGeojsonSourceDataHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -154,14 +162,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_geojson_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.stringView(arena, url),
-            if (options == null) null
-            else GeneratedValues.writeGeojsonSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_geojson_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.stringView(arena, url),
+              if (options == null) null
+              else GeneratedValues.writeGeojsonSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -182,13 +193,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_hillshade_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.stringView(arena, (beforeLayerId ?: "")),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_hillshade_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.stringView(arena, (beforeLayerId ?: "")),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -209,14 +223,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_image_source_image(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeLatLngArray(arena, coordinates),
-            coordinates.size.toLong(),
-            GeneratedValues.writePremultipliedRgba8Image(arena, image),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_image_source_image(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeLatLngArray(arena, coordinates),
+              coordinates.size.toLong(),
+              GeneratedValues.writePremultipliedRgba8Image(arena, image),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -237,14 +254,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_image_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeLatLngArray(arena, coordinates),
-            coordinates.size.toLong(),
-            GeneratedValues.stringView(arena, url),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_image_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeLatLngArray(arena, coordinates),
+              coordinates.size.toLong(),
+              GeneratedValues.stringView(arena, url),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -264,12 +284,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_location_indicator_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            GeneratedValues.stringView(arena, (beforeLayerId ?: "")),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_location_indicator_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              GeneratedValues.stringView(arena, (beforeLayerId ?: "")),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -290,15 +313,18 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_raster_dem_source_tiles(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeBufferViewArray(arena, tiles),
-            tiles.size.toLong(),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_raster_dem_source_tiles(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeBufferViewArray(arena, tiles),
+              tiles.size.toLong(),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -319,14 +345,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_raster_dem_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.stringView(arena, url),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_raster_dem_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.stringView(arena, url),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -347,15 +376,18 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_raster_source_tiles(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeBufferViewArray(arena, tiles),
-            tiles.size.toLong(),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_raster_source_tiles(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeBufferViewArray(arena, tiles),
+              tiles.size.toLong(),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -376,14 +408,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_raster_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.stringView(arena, url),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_raster_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.stringView(arena, url),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -403,12 +438,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_style_layer_json(
-            bindingMapHandle(),
-            GeneratedValues.byteView(arena, layerJson),
-            GeneratedValues.stringView(arena, (beforeLayerId ?: "")),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_style_layer_json(
+              bindingMapHandle(),
+              GeneratedValues.byteView(arena, layerJson),
+              GeneratedValues.stringView(arena, (beforeLayerId ?: "")),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -428,12 +466,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_style_source_json(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.byteView(arena, sourceJson),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_style_source_json(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.byteView(arena, sourceJson),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -454,15 +495,18 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_vector_source_tiles(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeBufferViewArray(arena, tiles),
-            tiles.size.toLong(),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_vector_source_tiles(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeBufferViewArray(arena, tiles),
+              tiles.size.toLong(),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -483,14 +527,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_add_vector_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.stringView(arena, url),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_add_vector_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.stringView(arena, url),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -507,11 +554,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_apply_camera_delta(
-            bindingMapHandle(),
-            GeneratedValues.writeCameraDelta(arena, delta),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_apply_camera_delta(
+              bindingMapHandle(),
+              GeneratedValues.writeCameraDelta(arena, delta),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -535,13 +585,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_camera_for_geometry(
-              bindingMapHandle(),
-              GeneratedValues.byteView(arena, geometry),
-              if (fitOptions == null) null
-              else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_camera_for_geometry(
+                bindingMapHandle(),
+                GeneratedValues.byteView(arena, geometry),
+                if (fitOptions == null) null
+                else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -566,13 +619,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_camera_for_lat_lng_bounds(
-              bindingMapHandle(),
-              GeneratedValues.writeLatLngBounds(arena, bounds),
-              if (fitOptions == null) null
-              else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_camera_for_lat_lng_bounds(
+                bindingMapHandle(),
+                GeneratedValues.writeLatLngBounds(arena, bounds),
+                if (fitOptions == null) null
+                else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -597,14 +653,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_camera_for_lat_lngs(
-              bindingMapHandle(),
-              GeneratedValues.writeLatLngArray(arena, coordinates),
-              coordinates.size.toLong(),
-              if (fitOptions == null) null
-              else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_camera_for_lat_lngs(
+                bindingMapHandle(),
+                GeneratedValues.writeLatLngArray(arena, coordinates),
+                coordinates.size.toLong(),
+                if (fitOptions == null) null
+                else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -628,7 +687,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_camera_query(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_camera_query(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -647,9 +708,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         val out0 = MaplibreNativeC.mln_camera_options()
         out0.size(out0.sizeof())
         val out1 = LongPointer(1L)
-        BindingStatus.check(
-          MaplibreNativeC.mln_map_camera_snapshot_get(bindingMapHandle(), out0, out1)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_map_camera_snapshot_get(bindingMapHandle(), out0, out1, diagnostic)
+        }
         MapCameraSnapshotGetResult(
           camera = GeneratedValues.readCameraOptions(out0),
           generation = out1.get().toULong(),
@@ -669,7 +730,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_cancel_transitions(bindingMapHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_cancel_transitions(bindingMapHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -692,11 +755,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_copy_layer_source_id(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_copy_layer_source_id(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -720,11 +786,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_copy_layer_source_layer(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_copy_layer_source_layer(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -752,11 +821,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_copy_style_image_premultiplied_rgba8(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, imageId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_copy_style_image_premultiplied_rgba8(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, imageId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -782,11 +854,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_copy_style_image_stretches(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, imageId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_copy_style_image_stretches(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, imageId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -814,11 +889,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_copy_style_source_attribution(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, sourceId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_copy_style_source_attribution(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, sourceId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -846,11 +924,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_copy_style_source_url(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, sourceId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_copy_style_source_url(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, sourceId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -867,7 +948,11 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           owner.toLong(),
           "mln_map_dispose",
         )
-        PointerScope().use { arena -> MaplibreNativeC.mln_map_dispose(owner) }
+        PointerScope().use { arena ->
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_dispose(owner, diagnostic)
+          }
+        }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)
@@ -883,7 +968,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_dump_debug_logs(bindingMapHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_dump_debug_logs(bindingMapHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -902,11 +989,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { result -> GeneratedValues.readBytes(MaplibreNativeC.mln_buffer_view(result.value())) },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_feature_state(
-              bindingMapHandle(),
-              GeneratedValues.writeFeatureStateSelector(arena, selector),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_feature_state(
+                bindingMapHandle(),
+                GeneratedValues.writeFeatureStateSelector(arena, selector),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -926,7 +1016,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { result -> GeneratedValues.readBytes(MaplibreNativeC.mln_buffer_view(result.value())) },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_global_state(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_global_state(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -953,11 +1045,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_image_source_coordinates(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, sourceId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_image_source_coordinates(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, sourceId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -985,11 +1080,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_layer_filter(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_layer_filter(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1017,12 +1115,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_layer_property(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId),
-              GeneratedValues.stringView(arena, propertyName),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_layer_property(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId),
+                GeneratedValues.stringView(arena, propertyName),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1048,11 +1149,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_style_image_info(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, imageId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_style_image_info(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, imageId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1078,11 +1182,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_style_layer_info(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_style_layer_info(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1110,11 +1217,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_style_layer_json(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_style_layer_json(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1142,11 +1252,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_style_light_property(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, propertyName),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_style_light_property(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, propertyName),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1172,11 +1285,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_style_source_info(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, sourceId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_style_source_info(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, sourceId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1202,11 +1318,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_style_source_tile_urls(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, sourceId),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_style_source_tile_urls(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, sourceId),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1230,7 +1349,13 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_get_style_transition_options(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_get_style_transition_options(
+                bindingMapHandle(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1251,12 +1376,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_invalidate_custom_geometry_source_region(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeLatLngBounds(arena, bounds),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_invalidate_custom_geometry_source_region(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeLatLngBounds(arena, bounds),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1276,12 +1404,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_invalidate_custom_geometry_source_tile(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeCanonicalTileId(arena, tileId),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_invalidate_custom_geometry_source_tile(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeCanonicalTileId(arena, tileId),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1301,12 +1432,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_invalidate_custom_mvt_vector_source_tile(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeCanonicalTileId(arena, tileId),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_invalidate_custom_mvt_vector_source_tile(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeCanonicalTileId(arena, tileId),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1327,11 +1461,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_lat_lng_bounds_for_camera(
-              bindingMapHandle(),
-              GeneratedValues.writeCameraOptions(arena, camera),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_lat_lng_bounds_for_camera(
+                bindingMapHandle(),
+                GeneratedValues.writeCameraOptions(arena, camera),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1353,11 +1490,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_lat_lng_bounds_for_camera_unwrapped(
-              bindingMapHandle(),
-              GeneratedValues.writeCameraOptions(arena, camera),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_lat_lng_bounds_for_camera_unwrapped(
+                bindingMapHandle(),
+                GeneratedValues.writeCameraOptions(arena, camera),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1377,11 +1517,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { result -> GeneratedValues.readLatLng(MaplibreNativeC.mln_lat_lng(result.value())) },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_lat_lng_for_pixel(
-              bindingMapHandle(),
-              GeneratedValues.writeScreenPoint(arena, point),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_lat_lng_for_pixel(
+                bindingMapHandle(),
+                GeneratedValues.writeScreenPoint(arena, point),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1401,11 +1544,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { result -> GeneratedValues.readLatLng(MaplibreNativeC.mln_lat_lng(result.value())) },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_lat_lng_for_pixel_unwrapped(
-              bindingMapHandle(),
-              GeneratedValues.writeScreenPoint(arena, point),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_lat_lng_for_pixel_unwrapped(
+                bindingMapHandle(),
+                GeneratedValues.writeScreenPoint(arena, point),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1430,12 +1576,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_lat_lngs_for_pixels(
-              bindingMapHandle(),
-              GeneratedValues.writeScreenPointArray(arena, points),
-              points.size.toLong(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_lat_lngs_for_pixels(
+                bindingMapHandle(),
+                GeneratedValues.writeScreenPointArray(arena, points),
+                points.size.toLong(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1460,12 +1609,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_lat_lngs_for_pixels_unwrapped(
-              bindingMapHandle(),
-              GeneratedValues.writeScreenPointArray(arena, points),
-              points.size.toLong(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_lat_lngs_for_pixels_unwrapped(
+                bindingMapHandle(),
+                GeneratedValues.writeScreenPointArray(arena, points),
+                points.size.toLong(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1490,7 +1642,13 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_list_style_layer_ids(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_list_style_layer_ids(
+                bindingMapHandle(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1515,7 +1673,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_list_style_layers(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_list_style_layers(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -1540,7 +1700,13 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_list_style_source_ids(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_list_style_source_ids(
+                bindingMapHandle(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1560,7 +1726,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { result -> GeneratedValues.readBytes(MaplibreNativeC.mln_buffer_view(result.value())) },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_loaded_style_json(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_loaded_style_json(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -1580,11 +1748,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { result -> DoublePointer(result.value()).get() },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_meters_per_pixel_at_latitude(
-              bindingMapHandle(),
-              latitude,
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_meters_per_pixel_at_latitude(
+                bindingMapHandle(),
+                latitude,
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1605,12 +1776,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_move_style_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            GeneratedValues.stringView(arena, (beforeLayerId ?: "")),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_move_style_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              GeneratedValues.stringView(arena, (beforeLayerId ?: "")),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1631,11 +1805,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_pixel_for_lat_lng(
-              bindingMapHandle(),
-              GeneratedValues.writeLatLng(arena, coordinate),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_pixel_for_lat_lng(
+                bindingMapHandle(),
+                GeneratedValues.writeLatLng(arena, coordinate),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1660,12 +1837,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_pixels_for_lat_lngs(
-              bindingMapHandle(),
-              GeneratedValues.writeLatLngArray(arena, coordinates),
-              coordinates.size.toLong(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_pixels_for_lat_lngs(
+                bindingMapHandle(),
+                GeneratedValues.writeLatLngArray(arena, coordinates),
+                coordinates.size.toLong(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1688,7 +1868,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { result -> GeneratedOwnerDisposal.mapProjection(LongPointer(result.value()).get()) },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_projection_create(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_projection_create(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -1706,7 +1888,11 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           "mln_map_release",
         )
         CompletionBridge.unitChecked { completion ->
-          PointerScope().use { arena -> MaplibreNativeC.mln_map_release(owner, completion) }
+          PointerScope().use { arena ->
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_release(owner, completion, diagnostic)
+            }
+          }
         }
       }
     } finally {
@@ -1725,11 +1911,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_remove_feature_state(
-            bindingMapHandle(),
-            GeneratedValues.writeFeatureStateSelector(arena, selector),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_remove_feature_state(
+              bindingMapHandle(),
+              GeneratedValues.writeFeatureStateSelector(arena, selector),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1746,11 +1935,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_remove_style_image(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, imageId),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_remove_style_image(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, imageId),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1767,11 +1959,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_remove_style_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_remove_style_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1788,11 +1983,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_remove_style_source(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_remove_style_source(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1809,7 +2007,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_request_repaint(bindingMapHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_request_repaint(bindingMapHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -1826,7 +2026,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.unit { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_request_still_image(bindingMapHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_request_still_image(bindingMapHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -1843,11 +2045,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_resize(
-            bindingMapHandle(),
-            GeneratedValues.writeLogicalExtent(arena, extent),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_resize(
+              bindingMapHandle(),
+              GeneratedValues.writeLogicalExtent(arena, extent),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1864,11 +2069,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_bounds(
-            bindingMapHandle(),
-            GeneratedValues.writeBoundOptions(arena, options),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_bounds(
+              bindingMapHandle(),
+              GeneratedValues.writeBoundOptions(arena, options),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1889,13 +2097,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_custom_geometry_source_tile_data(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeCanonicalTileId(arena, tileId),
-            GeneratedValues.byteView(arena, data),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_custom_geometry_source_tile_data(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeCanonicalTileId(arena, tileId),
+              GeneratedValues.byteView(arena, data),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1916,13 +2127,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_custom_mvt_vector_source_tile_data(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeCanonicalTileId(arena, tileId),
-            GeneratedValues.byteView(arena, data),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_custom_mvt_vector_source_tile_data(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeCanonicalTileId(arena, tileId),
+              GeneratedValues.byteView(arena, data),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1943,13 +2157,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_custom_mvt_vector_source_tile_error(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeCanonicalTileId(arena, tileId),
-            GeneratedValues.stringView(arena, message),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_custom_mvt_vector_source_tile_error(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeCanonicalTileId(arena, tileId),
+              GeneratedValues.stringView(arena, message),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1966,11 +2183,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_debug_options(
-            bindingMapHandle(),
-            options.rawValue.toInt(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_debug_options(
+              bindingMapHandle(),
+              options.rawValue.toInt(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1987,11 +2207,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_event_mask(
-            bindingMapHandle(),
-            mask.rawValue.toLong(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_event_mask(
+              bindingMapHandle(),
+              mask.rawValue.toLong(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2011,12 +2234,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_feature_state(
-            bindingMapHandle(),
-            GeneratedValues.writeFeatureStateSelector(arena, selector),
-            GeneratedValues.byteView(arena, state),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_feature_state(
+              bindingMapHandle(),
+              GeneratedValues.writeFeatureStateSelector(arena, selector),
+              GeneratedValues.byteView(arena, state),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2033,11 +2259,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_free_camera_options(
-            bindingMapHandle(),
-            GeneratedValues.writeFreeCameraOptions(arena, options),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_free_camera_options(
+              bindingMapHandle(),
+              GeneratedValues.writeFreeCameraOptions(arena, options),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2057,12 +2286,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_geojson_source_data(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            data.bindingGeojsonSourceDataHandle(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_geojson_source_data(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              data.bindingGeojsonSourceDataHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2082,12 +2314,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_geojson_source_synchronous_tiling(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            enabled,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_geojson_source_synchronous_tiling(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              enabled,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2107,12 +2342,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_geojson_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.stringView(arena, url),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_geojson_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.stringView(arena, url),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2132,12 +2370,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_global_state_property(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, propertyName),
-            GeneratedValues.byteView(arena, valueValue),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_global_state_property(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, propertyName),
+              GeneratedValues.byteView(arena, valueValue),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2157,13 +2398,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_image_source_coordinates(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writeLatLngArray(arena, coordinates),
-            coordinates.size.toLong(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_image_source_coordinates(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writeLatLngArray(arena, coordinates),
+              coordinates.size.toLong(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2183,12 +2427,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_image_source_image(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.writePremultipliedRgba8Image(arena, image),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_image_source_image(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.writePremultipliedRgba8Image(arena, image),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2205,12 +2452,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_image_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            GeneratedValues.stringView(arena, url),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_image_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              GeneratedValues.stringView(arena, url),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2230,12 +2480,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_layer_filter(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            if (filter == null) null else GeneratedValues.byteView(arena, filter!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_layer_filter(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              if (filter == null) null else GeneratedValues.byteView(arena, filter!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2252,12 +2505,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_layer_max_zoom(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            maxZoom,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_layer_max_zoom(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              maxZoom,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2274,12 +2530,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_layer_min_zoom(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            minZoom,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_layer_min_zoom(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              minZoom,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2300,13 +2559,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_layer_property(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            GeneratedValues.stringView(arena, propertyName),
-            GeneratedValues.byteView(arena, valueValue),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_layer_property(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              GeneratedValues.stringView(arena, propertyName),
+              GeneratedValues.byteView(arena, valueValue),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2326,12 +2588,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_layer_source_id(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            GeneratedValues.stringView(arena, sourceId),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_layer_source_id(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              GeneratedValues.stringView(arena, sourceId),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2351,12 +2616,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_layer_source_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            GeneratedValues.stringView(arena, (sourceLayer ?: "")),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_layer_source_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              GeneratedValues.stringView(arena, (sourceLayer ?: "")),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2376,12 +2644,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_layer_visibility(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            visibility.rawValue.toInt(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_layer_visibility(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              visibility.rawValue.toInt(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2401,12 +2672,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_location_indicator_accuracy_radius(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            radius,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_location_indicator_accuracy_radius(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              radius,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2426,12 +2700,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_location_indicator_bearing(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            bearing,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_location_indicator_bearing(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              bearing,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2452,13 +2729,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_location_indicator_image_name(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            imageKind.rawValue.toInt(),
-            GeneratedValues.stringView(arena, imageId),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_location_indicator_image_name(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              imageKind.rawValue.toInt(),
+              GeneratedValues.stringView(arena, imageId),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2479,13 +2759,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_location_indicator_location(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId),
-            GeneratedValues.writeLatLng(arena, coordinate),
-            altitude,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_location_indicator_location(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId),
+              GeneratedValues.writeLatLng(arena, coordinate),
+              altitude,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2502,11 +2785,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_projection_mode(
-            bindingMapHandle(),
-            GeneratedValues.writeProjectionMode(arena, mode),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_projection_mode(
+              bindingMapHandle(),
+              GeneratedValues.writeProjectionMode(arena, mode),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2523,11 +2809,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_rendering_stats_view_enabled(
-            bindingMapHandle(),
-            enabled,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_rendering_stats_view_enabled(
+              bindingMapHandle(),
+              enabled,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2548,13 +2837,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_style_image(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, imageId),
-            GeneratedValues.writePremultipliedRgba8Image(arena, image),
-            if (options == null) null else GeneratedValues.writeStyleImageOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_style_image(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, imageId),
+              GeneratedValues.writePremultipliedRgba8Image(arena, image),
+              if (options == null) null
+              else GeneratedValues.writeStyleImageOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2571,11 +2864,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_style_json(
-            bindingMapHandle(),
-            GeneratedValues.byteView(arena, json),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_style_json(
+              bindingMapHandle(),
+              GeneratedValues.byteView(arena, json),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2592,11 +2888,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_style_light_json(
-            bindingMapHandle(),
-            GeneratedValues.byteView(arena, lightJson),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_style_light_json(
+              bindingMapHandle(),
+              GeneratedValues.byteView(arena, lightJson),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2616,12 +2915,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_style_light_property(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, propertyName),
-            GeneratedValues.byteView(arena, valueValue),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_style_light_property(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, propertyName),
+              GeneratedValues.byteView(arena, valueValue),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2641,12 +2943,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_style_source_volatile(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId),
-            isVolatile,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_style_source_volatile(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId),
+              isVolatile,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2665,11 +2970,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_style_transition_options(
-            bindingMapHandle(),
-            GeneratedValues.writeStyleTransitionOptions(arena, options),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_style_transition_options(
+              bindingMapHandle(),
+              GeneratedValues.writeStyleTransitionOptions(arena, options),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2686,11 +2994,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_style_url(
-            bindingMapHandle(),
-            GeneratedValues.cString(arena, url),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_style_url(
+              bindingMapHandle(),
+              GeneratedValues.cString(arena, url),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2707,11 +3018,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_tile_options(
-            bindingMapHandle(),
-            GeneratedValues.writeMapTileOptions(arena, options),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_tile_options(
+              bindingMapHandle(),
+              GeneratedValues.writeMapTileOptions(arena, options),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2728,11 +3042,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_set_viewport_options(
-            bindingMapHandle(),
-            GeneratedValues.writeMapViewportOptions(arena, options),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_set_viewport_options(
+              bindingMapHandle(),
+              GeneratedValues.writeMapViewportOptions(arena, options),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2750,7 +3067,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return PointerScope().use { arena ->
         val output = MaplibreNativeC.mln_map_snapshot()
         output.size(output.sizeof())
-        BindingStatus.check(MaplibreNativeC.mln_map_snapshot_get(bindingMapHandle(), output))
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_map_snapshot_get(bindingMapHandle(), output, diagnostic)
+        }
         GeneratedValues.readMapSnapshot(output)
       }
     } finally {
@@ -2769,7 +3088,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { result -> GeneratedValues.readString(MaplibreNativeC.mln_buffer_view(result.value())) },
         { completion ->
           PointerScope().use { arena ->
-            MaplibreNativeC.mln_map_style_url(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              MaplibreNativeC.mln_map_style_url(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -2787,11 +3108,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       )
       return CompletionBridge.command { completion ->
         PointerScope().use { arena ->
-          MaplibreNativeC.mln_map_update_camera(
-            bindingMapHandle(),
-            GeneratedValues.writeCameraUpdate(arena, update),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MaplibreNativeC.mln_map_update_camera(
+              bindingMapHandle(),
+              GeneratedValues.writeCameraUpdate(arena, update),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2815,13 +3139,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_metal_borrowed_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeMetalBorrowedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_metal_borrowed_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeMetalBorrowedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -2873,13 +3200,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_metal_owned_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeMetalOwnedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_metal_owned_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeMetalOwnedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -2931,13 +3261,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_metal_surface_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeMetalSurfaceDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_metal_surface_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeMetalSurfaceDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -2989,13 +3322,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_opengl_borrowed_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeOpenglBorrowedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_opengl_borrowed_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeOpenglBorrowedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3047,13 +3383,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_opengl_owned_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeOpenglOwnedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_opengl_owned_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeOpenglOwnedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3105,13 +3444,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_opengl_surface_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeOpenglSurfaceDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_opengl_surface_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeOpenglSurfaceDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3163,13 +3505,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_vulkan_borrowed_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeVulkanBorrowedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_vulkan_borrowed_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeVulkanBorrowedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3221,13 +3566,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_vulkan_owned_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeVulkanOwnedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_vulkan_owned_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeVulkanOwnedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3279,13 +3627,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_vulkan_surface_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeVulkanSurfaceDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_vulkan_surface_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeVulkanSurfaceDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3337,13 +3688,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_webgpu_borrowed_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeWebgpuBorrowedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_webgpu_borrowed_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeWebgpuBorrowedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3395,13 +3749,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_webgpu_owned_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeWebgpuOwnedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_webgpu_owned_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeWebgpuOwnedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3453,13 +3810,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
           PointerScope().use { arena ->
             val output = LongPointer(1L).put(0L)
             val ready = CompletionBridge.unitChecked { completion ->
-              MaplibreNativeC.mln_webgpu_surface_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeWebgpuSurfaceDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                MaplibreNativeC.mln_webgpu_surface_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeWebgpuSurfaceDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =

@@ -30,6 +30,7 @@ pub const UNKNOWN_PROVIDER_DECISION: u32 = u32::MAX;
 pub type CompleteRequestFn = unsafe extern "C" fn(
     sys::mln_resource_request_handle,
     *const sys::mln_resource_response,
+    *mut sys::mln_diagnostic,
 ) -> sys::mln_status;
 pub type ReleaseRequestFn = unsafe extern "C" fn(sys::mln_resource_request_handle);
 
@@ -123,7 +124,7 @@ impl ResourceRequestHandleState {
         let native = response.to_native(&mut arena)?;
         self.complete_with(|handle| {
             // SAFETY: complete_with reserves this handle and native owns the input storage.
-            crate::check(unsafe { (self.fns.complete)(handle, &native) })
+            crate::check(|diagnostic| unsafe { (self.fns.complete)(handle, &native, diagnostic) })
         })
     }
 
@@ -389,6 +390,7 @@ mod tests {
     unsafe extern "C" fn fake_complete(
         _handle: sys::mln_resource_request_handle,
         _response: *const sys::mln_resource_response,
+        _diagnostic: *mut sys::mln_diagnostic,
     ) -> sys::mln_status {
         COMPLETE_COUNT.fetch_add(1, Ordering::SeqCst);
         COMPLETE_STATUS.load(Ordering::SeqCst)

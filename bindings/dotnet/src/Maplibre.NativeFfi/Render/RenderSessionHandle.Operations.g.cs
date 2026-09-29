@@ -41,9 +41,9 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
             .Unwrap();
         state = new NativeHandleState<MlnRenderSession>(
             handle,
-            static live => NativeMethods.mln_render_session_destroy(live),
+            static (live, diagnostic) => NativeMethods.mln_render_session_destroy(live, diagnostic),
             nameof(RenderSessionHandle),
-            static live => NativeMethods.mln_render_session_dispose(live),
+            static (live, diagnostic) => NativeMethods.mln_render_session_dispose(live, diagnostic),
             retainedParent: parent
         );
     }
@@ -63,7 +63,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         catch
         {
             if (owner is null)
-                NativeMethods.mln_render_session_dispose(handle);
+                NativeMethods.mln_render_session_dispose(handle, null);
             else
                 owner.state.Retire();
             throw;
@@ -99,13 +99,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                 {
                     var nativeDescriptor = NativeMetalBorrowedTextureDescriptor(descriptor);
                     return NativeMethods.mln_metal_borrowed_texture_set_target(
                         Handle,
                         &nativeDescriptor,
-                        completion
+                        completion,
+                        diagnostic
                     );
                 },
                 result => true
@@ -125,13 +126,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                 {
                     var nativeDescriptor = NativeMetalSurfaceDescriptor(descriptor);
                     return NativeMethods.mln_metal_surface_set_target(
                         Handle,
                         &nativeDescriptor,
-                        completion
+                        completion,
+                        diagnostic
                     );
                 },
                 result => true
@@ -151,13 +153,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
             "mln_opengl_borrowed_texture_set_target"
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeDescriptor = NativeOpenglBorrowedTextureDescriptor(descriptor, scope);
                 return NativeMethods.mln_opengl_borrowed_texture_set_target(
                     Handle,
                     &nativeDescriptor,
-                    completion
+                    completion,
+                    diagnostic
                 );
             },
             result => true
@@ -178,13 +181,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
             "mln_opengl_surface_set_target"
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeDescriptor = NativeOpenglSurfaceDescriptor(descriptor, scope);
                 return NativeMethods.mln_opengl_surface_set_target(
                     Handle,
                     &nativeDescriptor,
-                    completion
+                    completion,
+                    diagnostic
                 );
             },
             result => true
@@ -205,7 +209,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         {
             size = (uint)sizeof(mln_render_abandon_result),
         };
-        NativeStatus.Check(NativeMethods.mln_render_session_abandon(read.Handle, &outResult));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_render_session_abandon(
+                read.Handle,
+                &outResult,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return CopyRenderAbandonResult(outResult);
     }
 
@@ -217,7 +229,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
             "mln_render_session_acquire_frame"
         );
         MlnAcquiredFrame outFrame = default;
-        NativeStatus.Check(NativeMethods.mln_render_session_acquire_frame(Handle, &outFrame));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_render_session_acquire_frame(
+                Handle,
+                &outFrame,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return AcquiredFrameHandle.Adopt(this, outFrame);
     }
 
@@ -230,7 +250,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_render_session_barrier(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_render_session_barrier(Handle, completion, diagnostic),
                 result => true
             )
             .WaitAsync(cancellationToken);
@@ -245,7 +266,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_render_session_clear_data(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_render_session_clear_data(Handle, completion, diagnostic),
                 result => true
             )
             .WaitAsync(cancellationToken);
@@ -269,7 +291,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_render_session_detach(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_render_session_detach(Handle, completion, diagnostic),
                 result => true
             )
             .WaitAsync(cancellationToken);
@@ -283,7 +306,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
             "mln_render_session_drain_frame_results"
         );
         MlnRenderFrameBatch outBatch = default;
-        NativeStatus.Check(NativeMethods.mln_render_session_drain_frame_results(Handle, &outBatch));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_render_session_drain_frame_results(
+                Handle,
+                &outBatch,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return RenderFrameBatchHandle.Adopt(outBatch);
     }
 
@@ -296,7 +327,12 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_render_session_dump_debug_logs(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_render_session_dump_debug_logs(
+                        Handle,
+                        completion,
+                        diagnostic
+                    ),
                 result => true
             )
             .WaitAsync(cancellationToken);
@@ -314,8 +350,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         {
             size = (uint)sizeof(mln_render_session_capabilities),
         };
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_render_session_get_capabilities(read.Handle, &outCapabilities)
+            NativeMethods.mln_render_session_get_capabilities(
+                read.Handle,
+                &outCapabilities,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return CopyRenderSessionCapabilities(outCapabilities);
     }
@@ -332,8 +374,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         {
             size = (uint)sizeof(mln_render_session_snapshot),
         };
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_render_session_get_snapshot(read.Handle, &outSnapshot)
+            NativeMethods.mln_render_session_get_snapshot(
+                read.Handle,
+                &outSnapshot,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return CopyRenderSessionSnapshot(outSnapshot);
     }
@@ -346,8 +394,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
             "mln_render_session_projection_create"
         );
         MlnMapProjection outProjection = default;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_render_session_projection_create(Handle, &outProjection)
+            NativeMethods.mln_render_session_projection_create(
+                Handle,
+                &outProjection,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return MapProjectionHandle.Adopt(outProjection);
     }
@@ -375,7 +429,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
             nameof(extensionField)
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeArguments = arguments is null
                     ? default(mln_buffer_view)
@@ -387,7 +441,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
                     nativeExtension.Value,
                     nativeExtensionField.Value,
                     arguments is null ? null : &nativeArguments,
-                    completion
+                    completion,
+                    diagnostic
                 );
             },
             result =>
@@ -413,7 +468,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
             "mln_render_session_query_rendered_features"
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeGeometry = NativeRenderedQueryGeometry(geometry, scope);
                 var nativeOptions = options is null
@@ -423,7 +478,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
                     Handle,
                     &nativeGeometry,
                     options is null ? null : &nativeOptions,
-                    completion
+                    completion,
+                    diagnostic
                 );
             },
             result =>
@@ -453,7 +509,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeOptions = options is null
                     ? default(mln_source_feature_query_options)
@@ -462,7 +518,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
                     Handle,
                     nativeSourceId.Value,
                     options is null ? null : &nativeOptions,
-                    completion
+                    completion,
+                    diagnostic
                 );
             },
             result =>
@@ -487,8 +544,12 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
-                    NativeMethods.mln_render_session_reduce_memory_use(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_render_session_reduce_memory_use(
+                        Handle,
+                        completion,
+                        diagnostic
+                    ),
                 result => true
             )
             .WaitAsync(cancellationToken);
@@ -502,7 +563,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
             "mln_render_session_request_frame"
         );
         var nativeDemand = NativeFrameDemand(demand);
-        NativeStatus.Check(NativeMethods.mln_render_session_request_frame(Handle, &nativeDemand));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_render_session_request_frame(
+                Handle,
+                &nativeDemand,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
     }
 
     public Task<CommandCompletion> ResizeAsync(
@@ -516,11 +585,18 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
             "mln_render_session_resize"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-            {
-                var nativeExtent = NativeRenderTargetExtent(extent);
-                return NativeMethods.mln_render_session_resize(Handle, &nativeExtent, completion);
-            })
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                {
+                    var nativeExtent = NativeRenderTargetExtent(extent);
+                    return NativeMethods.mln_render_session_resize(
+                        Handle,
+                        &nativeExtent,
+                        completion,
+                        diagnostic
+                    );
+                }
+            )
             .WaitAsync(cancellationToken);
     }
 
@@ -533,12 +609,15 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
             "mln_render_session_service_driver_work"
         );
         nuint outServiced = default;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_render_session_service_driver_work(
                 read.Handle,
                 checked((nuint)maxWork),
-                &outServiced
-            )
+                &outServiced,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return (ulong)outServiced;
     }
@@ -554,8 +633,12 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
-                    NativeMethods.mln_texture_read_premultiplied_rgba8(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_texture_read_premultiplied_rgba8(
+                        Handle,
+                        completion,
+                        diagnostic
+                    ),
                 result =>
                     CopyTextureReadbackResult(
                         NativeCompletion.Value<mln_texture_readback_result>(result)
@@ -576,13 +659,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                 {
                     var nativeDescriptor = NativeVulkanBorrowedTextureDescriptor(descriptor);
                     return NativeMethods.mln_vulkan_borrowed_texture_set_target(
                         Handle,
                         &nativeDescriptor,
-                        completion
+                        completion,
+                        diagnostic
                     );
                 },
                 result => true
@@ -602,13 +686,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                 {
                     var nativeDescriptor = NativeVulkanSurfaceDescriptor(descriptor);
                     return NativeMethods.mln_vulkan_surface_set_target(
                         Handle,
                         &nativeDescriptor,
-                        completion
+                        completion,
+                        diagnostic
                     );
                 },
                 result => true
@@ -628,13 +713,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                 {
                     var nativeDescriptor = NativeWebgpuBorrowedTextureDescriptor(descriptor);
                     return NativeMethods.mln_webgpu_borrowed_texture_set_target(
                         Handle,
                         &nativeDescriptor,
-                        completion
+                        completion,
+                        diagnostic
                     );
                 },
                 result => true
@@ -654,13 +740,14 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                 {
                     var nativeDescriptor = NativeWebgpuSurfaceDescriptor(descriptor);
                     return NativeMethods.mln_webgpu_surface_set_target(
                         Handle,
                         &nativeDescriptor,
-                        completion
+                        completion,
+                        diagnostic
                     );
                 },
                 result => true

@@ -24,7 +24,7 @@ internal constructor(
     return handle
   }
 
-  internal override fun bindingCloseMap(call: (Long) -> Int) {
+  internal override fun bindingCloseMap(call: (Long) -> Unit) {
     core.closeOnce({ call(handle) })
   }
 

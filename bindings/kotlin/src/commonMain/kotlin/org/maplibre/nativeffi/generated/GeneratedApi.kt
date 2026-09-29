@@ -122,8 +122,6 @@ public expect object GeneratedApi {
 
   public fun textureImageInfoDefault(): TextureImageInfo
 
-  public fun threadLastErrorMessage(): String
-
   public fun vulkanBorrowedTextureDescriptorDefault(): VulkanBorrowedTextureDescriptor
 
   public fun vulkanOwnedTextureDescriptorDefault(): VulkanOwnedTextureDescriptor

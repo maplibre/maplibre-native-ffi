@@ -230,7 +230,7 @@ fn submit_python_future_with<S, C>(
     discard: Option<unsafe fn(&sys::mln_completion_result)>,
 ) -> PyResult<Py<PyAny>>
 where
-    S: FnOnce(*const sys::mln_completion) -> sys::mln_status,
+    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
     C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
 {
     let future = new_python_future(py)?;
@@ -247,20 +247,17 @@ where
         user_data: bridge.cast(),
         release_user_data: Some(release_python_future),
     };
-    let status = submit(&completion);
-    if status != sys::MLN_STATUS_OK {
+    if let Err(error) = maplibre_core::check(|diagnostic| submit(&completion, diagnostic)) {
         // SAFETY: rejected submissions retain no callback state.
         drop(unsafe { Box::from_raw(bridge) });
-        return maplibre_core::check(status)
-            .map(|()| unreachable!())
-            .map_err(map_error);
+        return Err(map_error(error));
     }
     Ok(future)
 }
 
 fn submit_python_future<S, C>(py: Python<'_>, submit: S, convert: C) -> PyResult<Py<PyAny>>
 where
-    S: FnOnce(*const sys::mln_completion) -> sys::mln_status,
+    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
     C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
 {
     submit_python_future_with(py, submit, convert, false, None)
@@ -273,7 +270,7 @@ fn submit_python_owned_future<S, C>(
     discard: unsafe fn(&sys::mln_completion_result),
 ) -> PyResult<Py<PyAny>>
 where
-    S: FnOnce(*const sys::mln_completion) -> sys::mln_status,
+    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
     C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
 {
     submit_python_future_with(py, submit, convert, false, Some(discard))
@@ -281,7 +278,7 @@ where
 
 fn submit_python_command_future<S>(py: Python<'_>, submit: S) -> PyResult<Py<PyAny>>
 where
-    S: FnOnce(*const sys::mln_completion) -> sys::mln_status,
+    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
 {
     submit_python_future_with(py, submit, py_command, true, None)
 }

@@ -69,9 +69,9 @@ def operation_contract(plan: OperationPlan) -> str | None:
             or name in KEYWORDS["dotnet"]
             or name
             in (
-                LOCALS
+                LOCALS | {"diagnostic"}
                 if execution == "query"
-                else {"completion", "arena", "cancellationToken"}
+                else {"completion", "arena", "cancellationToken", "diagnostic"}
             )
             or name in seen
         ):
@@ -161,6 +161,38 @@ def string_copy(value: str, optional: bool) -> str:
     return f"{value}.size == 0 ? null : {copied}" if optional else copied
 
 
+# Status checks read the message from this stack buffer, which the module skips
+# zeroing because native writes it before returning.
+DIAGNOSTIC_LOCAL = "        mln_diagnostic diagnostic;"
+
+
+def native_call(function: Function, arguments: str, diagnostic: str) -> str:
+    """Calls a C function, passing diagnostic when it takes one."""
+    if function.diagnostic:
+        arguments = f"{arguments}, {diagnostic}" if arguments else diagnostic
+    return f"NativeMethods.{function.name}({arguments})"
+
+
+def checked_call(function: Function, arguments: str) -> str:
+    """Checks a synchronous call against the DIAGNOSTIC_LOCAL it reports into."""
+    if not function.diagnostic:
+        raise Unsupported(f"{function.name} returns a status without a diagnostic")
+    call = native_call(function, arguments, "NativeDiagnostic.Prepare(&diagnostic)")
+    return f"NativeStatus.Check({call}, &diagnostic);"
+
+
+def submit_callback(
+    function: Function, arguments: str, call_locals: list[str] | None = None
+) -> str:
+    """Wraps a completion-taking call as a NativeCompletion submission."""
+    call = native_call(function, arguments, "diagnostic")
+    if call_locals:
+        return (
+            f"(completion, diagnostic) => {{ {' '.join(call_locals)} return {call}; }}"
+        )
+    return f"(completion, diagnostic) => {call}"
+
+
 def operation_name(function: Function, receiver: str) -> str:
     suffix = function.name.removeprefix(receiver.removesuffix("_handle") + "_")
     # A collection-returning .NET query names the collection directly.
@@ -239,12 +271,13 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 arguments.append(f"&native{pascal(name)}")
             else:
                 arguments.append(values.encode(value, name))
+        call = native_call(function, ", ".join(arguments), "diagnostic")
         return (
             owner_class,
             (
                 f"    public void Release({', '.join(declarations)})\n    {{\n"
                 f'        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(this, "{function.name}");\n'
-                f"        state.Release(live => {{ {' '.join(locals_)} return NativeMethods.{function.name}({', '.join(arguments)}); }});\n"
+                f"        state.Release((live, diagnostic) => {{ {' '.join(locals_)} return {call}; }});\n"
                 "    }\n"
             ),
             set(values.plans),
@@ -262,8 +295,8 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 "    public void Close() => CloseAsync().GetAwaiter().GetResult();\n\n"
                 f'    public Task CloseAsync()\n    {{\n        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(this, "{function.name}");\n        state.Close();\n        return teardown;\n    }}\n\n'
                 "    public ValueTask DisposeAsync() => new(CloseAsync());\n\n"
-                f"    private mln_status StartRelease({native_type} handle)\n    {{\n"
-                f"        teardown = NativeCompletion.SubmitUnit(completion => NativeMethods.{function.name}(handle, completion));\n"
+                f"    private mln_status StartRelease({native_type} handle, mln_diagnostic* _)\n    {{\n"
+                f"        teardown = NativeCompletion.SubmitUnit({submit_callback(function, 'handle, completion')});\n"
                 "        return mln_status.MLN_STATUS_OK;\n    }\n"
             ),
             set(),
@@ -625,11 +658,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
     if decision_completion:
         prologue.append("        using var claim = state.BeginClaim();")
     call = f"NativeMethods.{function.name}({', '.join(args)})"
-    callback = (
-        f"completion => {{ {' '.join(call_locals)} return {call}; }}"
-        if call_locals
-        else f"completion => {call}"
-    )
+    callback = submit_callback(function, ", ".join(args), call_locals)
     name = operation_name(function, factory or receiver)
     if plan.view:
         assert handle_plan and handle_plan.view_begin and handle_plan.view_end
@@ -640,13 +669,17 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         prologue.append("        ArgumentNullException.ThrowIfNull(callback);")
         prologue.append("        var viewScope = new NativeViewScope();")
         prologue.append("        void* token = null;")
+        prologue.append(DIAGNOSTIC_LOCAL)
         prologue.append(
-            f"        NativeStatus.Check(NativeMethods.{handle_plan.view_begin}(read.Handle, &token));"
+            "        "
+            + checked_call(
+                api.functions_by_name[handle_plan.view_begin], "read.Handle, &token"
+            )
         )
         body = prologue + [
             "        try",
             "        {",
-            f"            NativeStatus.Check({call});",
+            f"            {checked_call(function, ', '.join(args))}",
             f"            callback({copied});",
             "        }",
             "        finally",
@@ -678,13 +711,17 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             raise Unsupported("owned output parent requires another input owner")
         if plan.completion:
             pre = f"{native} native{pascal(local)} = default; "
-            callback = f"completion => {{ {pre}{' '.join(call_locals)} var status = {call}; if (status == mln_status.MLN_STATUS_OK) {local} = native{pascal(local)}; return status; }}"
+            call = native_call(function, ", ".join(args), "diagnostic")
+            callback = f"(completion, diagnostic) => {{ {pre}{' '.join(call_locals)} var status = {call}; if (status == mln_status.MLN_STATUS_OK) {local} = native{pascal(local)}; return status; }}"
             body = prologue + [
                 f"        var attachment = NativeCompletion.SubmitUnit({callback});"
             ]
             constructor = f"{result_type}.Adopt({parent}{local}, attachment)"
         else:
-            body = prologue + [f"        NativeStatus.Check({call});"]
+            body = prologue + [
+                DIAGNOSTIC_LOCAL,
+                f"        {checked_call(function, ', '.join(args))}",
+            ]
             constructor = f"{result_type}.Adopt({parent}{local})"
         if scoped:
             body += [
@@ -738,6 +775,8 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         if type_name(function.return_type) not in {"mln_status", "void"}:
             if plan.result is None:
                 raise Unsupported("direct return needs a resolved result")
+            if function.diagnostic:
+                raise Unsupported("direct return cannot report a diagnostic")
             values.supported(plan.result)
             result_type = values.public_type(plan.result)
             copied = values.copy(plan.result, "returned")
@@ -769,7 +808,10 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             )
         else:
             result_type, result = "void", None
-        body = prologue + [f"        NativeStatus.Check({call});"]
+        body = prologue + [
+            DIAGNOSTIC_LOCAL,
+            f"        {checked_call(function, ', '.join(args))}",
+        ]
         if scoped:
             accept = (
                 "scope.Accept(this.CallbackOwner);"
@@ -1025,14 +1067,14 @@ def emit(api: Api | BoundApi) -> Emission:
         destroy = (
             "StartRelease"
             if asynchronous_release
-            else f"static live => NativeMethods.{handle.release}(live)"
+            else f"static (live, diagnostic) => {native_call(release.function, 'live', 'diagnostic')}"
         )
         cleanup = handle.dispose or handle.release
         cleanup_function = api.functions_by_name[cleanup]
         dispose = (
-            f"static live => NativeMethods.{cleanup}(live)"
+            f"static (live, diagnostic) => {native_call(cleanup_function, 'live', 'diagnostic')}"
             if type_name(cleanup_function.return_type) == "mln_status"
-            else f"static live => {{ NativeMethods.{cleanup}(live); return mln_status.MLN_STATUS_OK; }}"
+            else f"static (live, _) => {{ NativeMethods.{cleanup}(live); return mln_status.MLN_STATUS_OK; }}"
         )
         if handle.release_inputs or (
             not asynchronous_release
@@ -1055,7 +1097,7 @@ def emit(api: Api | BoundApi) -> Emission:
         if immediate_completion:
             declarations += "        Completion = completion.ContinueWith(static (finished, retained) => { GC.KeepAlive(retained); return finished; }, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();\n"
         declarations += f"        state = new NativeHandleState<{native_type}>(handle, {destroy}, nameof({owner}), {dispose}{', pendingDecision' if decision_owner else ''}{', retainedParent: parent' if handle.parent else ''});\n    }}\n"
-        declarations += f"\n    internal static {owner} Adopt({parent}{native_type} handle{adopt_extra})\n    {{\n        {owner}? owner = null;\n        try\n        {{\n            owner = new {owner}({argument}handle{extra_argument});\n            return owner;\n        }}\n        catch\n        {{\n            if (owner is null) NativeMethods.{cleanup}(handle);\n            else owner.state.Retire();\n            throw;\n        }}\n    }}\n"
+        declarations += f"\n    internal static {owner} Adopt({parent}{native_type} handle{adopt_extra})\n    {{\n        {owner}? owner = null;\n        try\n        {{\n            owner = new {owner}({argument}handle{extra_argument});\n            return owner;\n        }}\n        catch\n        {{\n            if (owner is null) {native_call(cleanup_function, 'handle', 'null')};\n            else owner.state.Retire();\n            throw;\n        }}\n    }}\n"
         declarations += f"\n    internal {native_type} Handle => state.Handle;\n    internal NativeHandleState<{native_type}>.ReadScope Borrow() => state.Borrow();\n    internal global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackOwner CallbackOwner => state.CallbackOwner;\n    public bool IsClosed => state.IsClosed;\n"
         declarations += f'    public void Dispose() {{ global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(this, "{cleanup}"); state.Retire(); }}\n'
         if decision_owner:

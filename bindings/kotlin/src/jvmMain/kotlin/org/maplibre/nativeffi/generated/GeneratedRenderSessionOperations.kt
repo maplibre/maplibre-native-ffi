@@ -12,7 +12,7 @@ import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.loader.CompletionBridge
 import org.maplibre.nativeffi.internal.loader.NativeAccess
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 public actual abstract class GeneratedRenderSessionOperations internal actual constructor() {
@@ -20,7 +20,7 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
 
   internal abstract fun bindingRenderSessionHandle(): Long
 
-  internal abstract fun bindingCloseRenderSession(call: (Long) -> Int)
+  internal abstract fun bindingCloseRenderSession(call: (Long) -> Unit)
 
   public actual fun metalBorrowedTextureSetTarget(
     descriptor: MetalBorrowedTextureDescriptor
@@ -33,11 +33,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_metal_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeMetalBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_metal_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeMetalBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -54,11 +57,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_metal_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeMetalSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_metal_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeMetalSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -77,11 +83,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_opengl_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeOpenglBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_opengl_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeOpenglBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -98,11 +107,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_opengl_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeOpenglSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_opengl_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeOpenglSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -120,9 +132,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return Arena.ofConfined().use { arena ->
         val output = mln_render_abandon_result.allocate(arena)
         mln_render_abandon_result.size(output, mln_render_abandon_result.sizeof().toInt())
-        BindingStatus.check(
-          MapLibreNativeC.mln_render_session_abandon(bindingRenderSessionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MapLibreNativeC.mln_render_session_abandon(
+            bindingRenderSessionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         GeneratedValues.readRenderAbandonResult(output)
       }
     } finally {
@@ -139,9 +155,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return Arena.ofConfined().use { arena ->
         val output = arena.allocate(ValueLayout.JAVA_LONG)
-        BindingStatus.check(
-          MapLibreNativeC.mln_render_session_acquire_frame(bindingRenderSessionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MapLibreNativeC.mln_render_session_acquire_frame(
+            bindingRenderSessionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         adoptOwned(
           output.get(ValueLayout.JAVA_LONG, 0),
           { GeneratedOwnerDisposal.acquiredFrame(it) },
@@ -168,7 +188,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_render_session_barrier(bindingRenderSessionHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_render_session_barrier(
+              bindingRenderSessionHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -185,7 +211,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_render_session_clear_data(bindingRenderSessionHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_render_session_clear_data(
+              bindingRenderSessionHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -203,7 +235,11 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
           owner.toLong(),
           "mln_render_session_destroy",
         )
-        Arena.ofConfined().use { arena -> MapLibreNativeC.mln_render_session_destroy(owner) }
+        Arena.ofConfined().use { arena ->
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_render_session_destroy(owner, diagnostic)
+          }
+        }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)
@@ -219,7 +255,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_render_session_detach(bindingRenderSessionHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_render_session_detach(
+              bindingRenderSessionHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -237,7 +279,11 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
           owner.toLong(),
           "mln_render_session_dispose",
         )
-        Arena.ofConfined().use { arena -> MapLibreNativeC.mln_render_session_dispose(owner) }
+        Arena.ofConfined().use { arena ->
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_render_session_dispose(owner, diagnostic)
+          }
+        }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)
@@ -253,12 +299,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return Arena.ofConfined().use { arena ->
         val output = arena.allocate(ValueLayout.JAVA_LONG)
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_render_session_drain_frame_results(
             bindingRenderSessionHandle(),
             output,
+            diagnostic,
           )
-        )
+        }
         adoptOwned(
           output.get(ValueLayout.JAVA_LONG, 0),
           { GeneratedOwnerDisposal.renderFrameBatch(it) },
@@ -279,10 +326,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_render_session_dump_debug_logs(
-            bindingRenderSessionHandle(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_render_session_dump_debug_logs(
+              bindingRenderSessionHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -303,9 +353,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
           output,
           mln_render_session_capabilities.sizeof().toInt(),
         )
-        BindingStatus.check(
-          MapLibreNativeC.mln_render_session_get_capabilities(bindingRenderSessionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MapLibreNativeC.mln_render_session_get_capabilities(
+            bindingRenderSessionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         GeneratedValues.readRenderSessionCapabilities(output)
       }
     } finally {
@@ -323,9 +377,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return Arena.ofConfined().use { arena ->
         val output = mln_render_session_snapshot.allocate(arena)
         mln_render_session_snapshot.size(output, mln_render_session_snapshot.sizeof().toInt())
-        BindingStatus.check(
-          MapLibreNativeC.mln_render_session_get_snapshot(bindingRenderSessionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MapLibreNativeC.mln_render_session_get_snapshot(
+            bindingRenderSessionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         GeneratedValues.readRenderSessionSnapshot(output)
       }
     } finally {
@@ -342,9 +400,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return Arena.ofConfined().use { arena ->
         val output = arena.allocate(ValueLayout.JAVA_LONG)
-        BindingStatus.check(
-          MapLibreNativeC.mln_render_session_projection_create(bindingRenderSessionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MapLibreNativeC.mln_render_session_projection_create(
+            bindingRenderSessionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         adoptOwned(
           output.get(ValueLayout.JAVA_LONG, 0),
           { GeneratedOwnerDisposal.mapProjection(it) },
@@ -375,16 +437,19 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         },
         { completion ->
           Arena.ofConfined().use { arena ->
-            MapLibreNativeC.mln_render_session_query_feature_extensions(
-              bindingRenderSessionHandle(),
-              GeneratedValues.stringView(arena, sourceId),
-              GeneratedValues.byteView(arena, feature),
-              GeneratedValues.stringView(arena, extension),
-              GeneratedValues.stringView(arena, extensionField),
-              if (arguments == null) MemorySegment.NULL
-              else GeneratedValues.byteView(arena, arguments!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_render_session_query_feature_extensions(
+                bindingRenderSessionHandle(),
+                GeneratedValues.stringView(arena, sourceId),
+                GeneratedValues.byteView(arena, feature),
+                GeneratedValues.stringView(arena, extension),
+                GeneratedValues.stringView(arena, extensionField),
+                if (arguments == null) MemorySegment.NULL
+                else GeneratedValues.byteView(arena, arguments!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -412,13 +477,16 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         },
         { completion ->
           Arena.ofConfined().use { arena ->
-            MapLibreNativeC.mln_render_session_query_rendered_features(
-              bindingRenderSessionHandle(),
-              GeneratedValues.writeRenderedQueryGeometry(arena, geometry),
-              if (options == null) MemorySegment.NULL
-              else GeneratedValues.writeRenderedFeatureQueryOptions(arena, options!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_render_session_query_rendered_features(
+                bindingRenderSessionHandle(),
+                GeneratedValues.writeRenderedQueryGeometry(arena, geometry),
+                if (options == null) MemorySegment.NULL
+                else GeneratedValues.writeRenderedFeatureQueryOptions(arena, options!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -446,13 +514,16 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         },
         { completion ->
           Arena.ofConfined().use { arena ->
-            MapLibreNativeC.mln_render_session_query_source_features(
-              bindingRenderSessionHandle(),
-              GeneratedValues.stringView(arena, sourceId),
-              if (options == null) MemorySegment.NULL
-              else GeneratedValues.writeSourceFeatureQueryOptions(arena, options!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_render_session_query_source_features(
+                bindingRenderSessionHandle(),
+                GeneratedValues.stringView(arena, sourceId),
+                if (options == null) MemorySegment.NULL
+                else GeneratedValues.writeSourceFeatureQueryOptions(arena, options!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -470,10 +541,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_render_session_reduce_memory_use(
-            bindingRenderSessionHandle(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_render_session_reduce_memory_use(
+              bindingRenderSessionHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -489,12 +563,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         "mln_render_session_request_frame",
       )
       return Arena.ofConfined().use { arena ->
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_render_session_request_frame(
             bindingRenderSessionHandle(),
             GeneratedValues.writeFrameDemand(arena, demand),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {
@@ -511,11 +586,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.command { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_render_session_resize(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeRenderTargetExtent(arena, extent),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_render_session_resize(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeRenderTargetExtent(arena, extent),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -532,13 +610,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return Arena.ofConfined().use { arena ->
         val output = arena.allocate(ValueLayout.JAVA_LONG)
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_render_session_service_driver_work(
             bindingRenderSessionHandle(),
             maxWork.toLong(),
             output,
+            diagnostic,
           )
-        )
+        }
         output.get(ValueLayout.JAVA_LONG, 0).toULong()
       }
     } finally {
@@ -561,10 +640,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         },
         { completion ->
           Arena.ofConfined().use { arena ->
-            MapLibreNativeC.mln_texture_read_premultiplied_rgba8(
-              bindingRenderSessionHandle(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              MapLibreNativeC.mln_texture_read_premultiplied_rgba8(
+                bindingRenderSessionHandle(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -584,11 +666,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_vulkan_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeVulkanBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_vulkan_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeVulkanBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -605,11 +690,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_vulkan_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeVulkanSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_vulkan_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeVulkanSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -628,11 +716,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_webgpu_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeWebgpuBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_webgpu_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeWebgpuBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -649,11 +740,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return CompletionBridge.unit { completion ->
         Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_webgpu_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeWebgpuSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_webgpu_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeWebgpuSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {

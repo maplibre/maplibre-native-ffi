@@ -20,11 +20,14 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in arena.submit { mln_metal_surface_set_target(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          completion
-        ) } }
+        .startUnit { completion, diagnostic in
+          arena.submit { mln_metal_surface_set_target(
+            handle.raw,
+            arena.store(bindingArg0.nativeValue()),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -46,11 +49,12 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           try arena.submit { try mln_opengl_surface_set_target(
             handle.raw,
             arena.store(bindingArg0.nativeValue(arena: arena)),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -74,11 +78,14 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in arena.submit { mln_vulkan_surface_set_target(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          completion
-        ) } }
+        .startUnit { completion, diagnostic in
+          arena.submit { mln_vulkan_surface_set_target(
+            handle.raw,
+            arena.store(bindingArg0.nativeValue()),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -100,11 +107,14 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in arena.submit { mln_webgpu_surface_set_target(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          completion
-        ) } }
+        .startUnit { completion, diagnostic in
+          arena.submit { mln_webgpu_surface_set_target(
+            handle.raw,
+            arena.store(bindingArg0.nativeValue()),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }

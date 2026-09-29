@@ -12,7 +12,7 @@ static mln_map_projection create_projection(mln_map map) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_map_projection));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_create(map, &completion.descriptor)
+    MLN_STATUS_OK, mln_map_projection_create(map, &completion.descriptor, NULL)
   );
   mln_map_projection projection = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
@@ -26,7 +26,7 @@ static mln_map_projection create_projection(mln_map map) {
 static mln_camera_options read_camera(mln_map_projection projection) {
   mln_camera_options camera = mln_camera_options_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_get_camera(projection, &camera)
+    MLN_STATUS_OK, mln_map_projection_get_camera(projection, &camera, NULL)
   );
   return camera;
 }
@@ -36,12 +36,12 @@ static void projection_outlives_its_source_map_and_runtime(void) {
   mln_map map = mln_test_create_map(runtime);
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_create(map, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_create(map, NULL, NULL)
   );
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_map_projection));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_create(map, &completion.descriptor)
+    MLN_STATUS_OK, mln_map_projection_create(map, &completion.descriptor, NULL)
   );
   mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
@@ -56,28 +56,30 @@ static void projection_outlives_its_source_map_and_runtime(void) {
   const mln_camera_options source_camera = read_camera(projection);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, source_camera.latitude);
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_close(projection, NULL)
+  );
 
   // Every call with the retired handle reports an invalid argument.
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_close(projection)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_close(projection, NULL)
   );
   mln_camera_options camera = mln_camera_options_default();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_projection_get_camera(projection, &camera)
+    mln_map_projection_get_camera(projection, &camera, NULL)
   );
   camera.fields = MLN_CAMERA_OPTION_ZOOM;
   camera.zoom = 2.0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_projection_set_camera(projection, &camera)
+    mln_map_projection_set_camera(projection, &camera, NULL)
   );
   mln_screen_point point = {0};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_projection_pixel_for_lat_lng(
-      projection, (mln_lat_lng){.latitude = 0.0, .longitude = 0.0}, &point
+      projection, (mln_lat_lng){.latitude = 0.0, .longitude = 0.0}, &point, NULL
     )
   );
 }
@@ -95,7 +97,8 @@ static void creation_observes_earlier_map_camera_commands(void) {
   update.camera.zoom = 4.0;
   mln_test_completion completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_update_camera(map, &update, &completion.descriptor)
+    MLN_STATUS_OK,
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
   mln_test_completion_destroy(&completion);
@@ -108,7 +111,9 @@ static void creation_observes_earlier_map_camera_commands(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 34.0, camera.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 4.0, camera.zoom);
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_close(projection, NULL)
+  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -121,10 +126,11 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
   mln_camera_options too_small = {.size = sizeof(mln_camera_options) - 1};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_projection_get_camera(projection, &too_small)
+    mln_map_projection_get_camera(projection, &too_small, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_get_camera(projection, NULL)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_get_camera(projection, NULL, NULL)
   );
 
   mln_camera_options camera = mln_camera_options_default();
@@ -133,7 +139,7 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
   camera.longitude = 40.0;
   camera.zoom = 6.0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_set_camera(projection, &camera)
+    MLN_STATUS_OK, mln_map_projection_set_camera(projection, &camera, NULL)
   );
   const mln_camera_options committed = read_camera(projection);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 20.0, committed.latitude);
@@ -147,13 +153,14 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
     MLN_STATUS_OK,
     mln_map_projection_pixel_for_lat_lng(
       projection, (mln_lat_lng){.latitude = 20.0, .longitude = 40.0},
-      &center_pixel
+      &center_pixel, NULL
     )
   );
   mln_lat_lng round_trip = {0};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_projection_lat_lng_for_pixel(projection, center_pixel, &round_trip)
+    MLN_STATUS_OK, mln_map_projection_lat_lng_for_pixel(
+                     projection, center_pixel, &round_trip, NULL
+                   )
   );
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 20.0, round_trip.latitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 40.0, round_trip.longitude);
@@ -161,8 +168,9 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
   const mln_lat_lng origin = {.latitude = 0.0, .longitude = 0.0};
   mln_screen_point origin_before_fit = {0};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_projection_pixel_for_lat_lng(projection, origin, &origin_before_fit)
+    MLN_STATUS_OK, mln_map_projection_pixel_for_lat_lng(
+                     projection, origin, &origin_before_fit, NULL
+                   )
   );
 
   const mln_lat_lng coordinates[] = {
@@ -171,7 +179,7 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
   };
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_projection_set_visible_coordinates(
-                     projection, coordinates, 2, (mln_edge_insets){0}
+                     projection, coordinates, 2, (mln_edge_insets){0}, NULL
                    )
   );
   const mln_camera_options fitted = read_camera(projection);
@@ -179,14 +187,17 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, fitted.longitude);
   mln_screen_point origin_after_fit = {0};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_projection_pixel_for_lat_lng(projection, origin, &origin_after_fit)
+    MLN_STATUS_OK, mln_map_projection_pixel_for_lat_lng(
+                     projection, origin, &origin_after_fit, NULL
+                   )
   );
   // The committed fit moved the camera, so the same coordinate lands on a
   // different pixel than it did before the fit.
   TEST_ASSERT_TRUE(origin_after_fit.x != origin_before_fit.x);
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_close(projection, NULL)
+  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -205,12 +216,12 @@ static void unwrapped_conversion_preserves_world_copies(void) {
   camera.longitude = 179.0;
   camera.zoom = 0.0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_set_camera(projection, &camera)
+    MLN_STATUS_OK, mln_map_projection_set_camera(projection, &camera, NULL)
   );
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_lat_lng_for_pixel_unwrapped(
-                                   projection, (mln_screen_point){0}, NULL
+                                   projection, (mln_screen_point){0}, NULL, NULL
                                  )
   );
 
@@ -221,7 +232,7 @@ static void unwrapped_conversion_preserves_world_copies(void) {
   mln_lat_lng wrapped = {0};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_projection_lat_lng_for_pixel(projection, right, &wrapped)
+    mln_map_projection_lat_lng_for_pixel(projection, right, &wrapped, NULL)
   );
   TEST_ASSERT_TRUE(wrapped.longitude >= -180.0);
   TEST_ASSERT_TRUE(wrapped.longitude <= 180.0);
@@ -229,7 +240,7 @@ static void unwrapped_conversion_preserves_world_copies(void) {
   mln_lat_lng unwrapped = {0};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_projection_lat_lng_for_pixel_unwrapped(
-                     projection, right, &unwrapped
+                     projection, right, &unwrapped, NULL
                    )
   );
   TEST_ASSERT_TRUE(unwrapped.longitude > 180.0);
@@ -238,7 +249,9 @@ static void unwrapped_conversion_preserves_world_copies(void) {
     1e-9, wrapped.longitude, unwrapped.longitude - 360.0
   );
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_close(projection, NULL)
+  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -262,24 +275,25 @@ static void projection_foreign_thread(void* argument) {
   camera.longitude = 25.0;
   camera.zoom = 3.0;
   probe->set_camera_status =
-    mln_map_projection_set_camera(probe->projection, &camera);
+    mln_map_projection_set_camera(probe->projection, &camera, NULL);
 
   camera = mln_camera_options_default();
   probe->get_camera_status =
-    mln_map_projection_get_camera(probe->projection, &camera);
+    mln_map_projection_get_camera(probe->projection, &camera, NULL);
   probe->observed_zoom = camera.zoom;
 
   mln_screen_point pixel = {0};
   probe->pixel_status = mln_map_projection_pixel_for_lat_lng(
     probe->projection, (mln_lat_lng){.latitude = 15.0, .longitude = 25.0},
-    &pixel
+    &pixel, NULL
   );
   mln_lat_lng coordinate = {0};
-  probe->coordinate_status =
-    mln_map_projection_lat_lng_for_pixel(probe->projection, pixel, &coordinate);
+  probe->coordinate_status = mln_map_projection_lat_lng_for_pixel(
+    probe->projection, pixel, &coordinate, NULL
+  );
   probe->round_trip_latitude = coordinate.latitude;
 
-  probe->close_status = mln_map_projection_close(probe->projection);
+  probe->close_status = mln_map_projection_close(probe->projection, NULL);
 }
 
 static void projection_handles_are_callable_from_foreign_threads(void) {

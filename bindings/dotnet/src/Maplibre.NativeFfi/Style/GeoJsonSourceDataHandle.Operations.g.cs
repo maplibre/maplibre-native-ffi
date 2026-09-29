@@ -27,13 +27,13 @@ public sealed unsafe partial class GeoJsonSourceDataHandle : IDisposable
         nativeId = handle.Value;
         state = new NativeHandleState<MlnGeoJsonSourceData>(
             handle,
-            static live =>
+            static (live, _) =>
             {
                 NativeMethods.mln_geojson_source_data_destroy(live);
                 return mln_status.MLN_STATUS_OK;
             },
             nameof(GeoJsonSourceDataHandle),
-            static live =>
+            static (live, _) =>
             {
                 NativeMethods.mln_geojson_source_data_destroy(live);
                 return mln_status.MLN_STATUS_OK;
@@ -89,12 +89,15 @@ public sealed unsafe partial class GeoJsonSourceDataHandle : IDisposable
             ? default(mln_geojson_source_options)
             : NativeGeojsonSourceOptions(options, scope);
         MlnGeoJsonSourceData outData = default;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_geojson_source_data_create(
                 nativeData.Value,
                 options is null ? null : &nativeOptions,
-                &outData
-            )
+                &outData,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         var owner = GeoJsonSourceDataHandle.Adopt(outData);
         scope.Accept();

@@ -19,10 +19,13 @@ public extension Maplibre {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_lat_lng()
-      try checkStatus(arena.submit { mln_lat_lng_for_projected_meters(
-        bindingArg0.nativeValue(),
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_lat_lng_for_projected_meters(
+          bindingArg0.nativeValue(),
+          &value0,
+          diagnostic
+        ) }
+      }
       return LatLng(raw: value0)
     }
   }
@@ -42,10 +45,13 @@ public extension Maplibre {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_projected_meters()
-      try checkStatus(arena.submit { mln_projected_meters_for_lat_lng(
-        bindingArg0.nativeValue(),
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_projected_meters_for_lat_lng(
+          bindingArg0.nativeValue(),
+          &value0,
+          diagnostic
+        ) }
+      }
       return ProjectedMeters(raw: value0)
     }
   }

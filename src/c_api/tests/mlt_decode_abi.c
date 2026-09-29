@@ -45,7 +45,7 @@ static uint32_t serve_recorded_tile(
     .bytes = state->bytes,
     .byte_count = state->byte_count,
   };
-  mln_resource_request_complete(handle, &response);
+  mln_resource_request_complete(handle, &response, NULL);
   mln_resource_request_release(handle);
   atomic_fetch_add(&state->served, 1);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
@@ -68,14 +68,14 @@ static bool wait_for_frame_result(
       size_t serviced = 0;
       if (
         mln_render_session_service_driver_work(
-          fixture->session, SIZE_MAX, &serviced
+          fixture->session, SIZE_MAX, &serviced, NULL
         ) != MLN_STATUS_OK
       ) {
         return false;
       }
     }
     const mln_status status =
-      mln_render_session_drain_frame_results(fixture->session, out_batch);
+      mln_render_session_drain_frame_results(fixture->session, out_batch, NULL);
     if (status == MLN_STATUS_OK) {
       return true;
     }
@@ -110,7 +110,8 @@ static size_t query_admin_feature_count(
     mln_frame_demand demand = mln_frame_demand_default();
     demand.flags = 0;
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_session_request_frame(fixture->session, &demand)
+      MLN_STATUS_OK,
+      mln_render_session_request_frame(fixture->session, &demand, NULL)
     );
 
     // Frame-result readiness is the documented completion signal for a demand.
@@ -121,14 +122,15 @@ static size_t query_admin_feature_count(
     size_t frame_result_count = 0;
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
-      mln_render_frame_batch_count(frame_batch, &frame_result_count)
+      mln_render_frame_batch_count(frame_batch, &frame_result_count, NULL)
     );
     TEST_ASSERT_EQUAL_size_t(1, frame_result_count);
     mln_render_frame_result frame_result = {
       .size = sizeof(mln_render_frame_result)
     };
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_frame_batch_get(frame_batch, 0, &frame_result)
+      MLN_STATUS_OK,
+      mln_render_frame_batch_get(frame_batch, 0, &frame_result, NULL)
     );
     mln_render_frame_batch_release(frame_batch);
 
@@ -136,10 +138,10 @@ static size_t query_admin_feature_count(
       mln_acquired_frame frame = MLN_HANDLE_NULL;
       TEST_ASSERT_EQUAL_INT(
         MLN_STATUS_OK,
-        mln_render_session_acquire_frame(fixture->session, &frame)
+        mln_render_session_acquire_frame(fixture->session, &frame, NULL)
       );
       TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_acquired_frame_release(&frame, NULL)
+        MLN_STATUS_OK, mln_acquired_frame_release(&frame, NULL, NULL)
       );
     }
 
@@ -147,7 +149,7 @@ static size_t query_admin_feature_count(
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_query_source_features(
                        fixture->session, MLN_BUFFER_LITERAL("mlt-source"),
-                       &options, &query.descriptor
+                       &options, &query.descriptor, NULL
                      )
     );
     const mln_status query_status =
@@ -196,7 +198,7 @@ static size_t decode_recorded_tile(
   mln_test_completion provider_completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_set_resource_provider(
-                     runtime, &provider, &provider_completion.descriptor
+                     runtime, &provider, &provider_completion.descriptor, NULL
                    )
   );
   TEST_ASSERT_EQUAL_INT(
@@ -225,8 +227,9 @@ static size_t decode_recorded_tile(
   mln_test_destroy_map(map);
   mln_test_completion clear_completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_runtime_clear_resource_provider(runtime, &clear_completion.descriptor)
+    MLN_STATUS_OK, mln_runtime_clear_resource_provider(
+                     runtime, &clear_completion.descriptor, NULL
+                   )
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_completion_finish(&clear_completion)

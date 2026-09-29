@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from ..model import ModelError
+from .go import native_call
 from .go_values import field, name, public
 
 
@@ -217,9 +218,7 @@ def direct_operation(plan, values):
     setup = ["arena := &bindingArena{}; defer arena.close()"]
     receiver = next((p for p in plan.inputs if p.name == plan.receiver), None)
     identity = "receiver.state.issued" if receiver else "0"
-    setup.append(
-        f"admitted := bindingAdmission(C.binding_operation_{plan.name}, {identity}); defer admitted()"
-    )
+    setup.append(f"bindingAdmission(C.binding_operation_{plan.name}, {identity})")
     setup.append(
         f"var context unsafe.Pointer; if callback != nil {{ context = arena.register({typename}{{{name(registration.callback)}: callback}}, {identity}) }}"
     )
@@ -255,8 +254,10 @@ def direct_operation(plan, values):
         accept = f"if !bool(rejected) {{ {accept} }}"
     elif plan.outputs:
         raise ModelError([f"{plan.name}: unsupported direct callback outputs"])
-    call = f"C.{plan.name}({', '.join(args[p.name] for p in plan.function.parameters)})"
-    setup.append(f"bindingCheck(func() int32 {{ return int32({call}) }})")
+    call = native_call(plan.function, *(args[p.name] for p in plan.function.parameters))
+    setup.append(
+        f"bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {{ return int32({call}) }})"
+    )
     setup.append(accept)
     setup.append(f"return {returned}")
     body = f"bindingCall(func() {result} {{ {'; '.join(setup)} }})"

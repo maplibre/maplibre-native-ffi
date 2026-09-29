@@ -6,10 +6,11 @@ package maplibre
 import "C"
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-
-	internalstatus "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/status"
+	"sync"
+	"unsafe"
 )
 
 var (
@@ -53,12 +54,12 @@ func newBindingError(kind error, diagnostic string) *Error {
 	return &Error{kind: kind, diagnostic: diagnostic}
 }
 
-func newStatusError(failure *internalstatus.NativeError) *Error {
+func newStatusError(status int32, diagnostic string) *Error {
 	return &Error{
-		kind:       kindForStatus(failure.Status),
-		rawStatus:  int32(failure.Status),
+		kind:       kindForStatus(status),
+		rawStatus:  status,
 		hasStatus:  true,
-		diagnostic: failure.Diagnostic,
+		diagnostic: diagnostic,
 	}
 }
 
@@ -98,16 +99,30 @@ func (e *Error) Diagnostic() string {
 	return e.diagnostic
 }
 
-func checkNative[S ~int32](call func() S) error {
-	failure := internalstatus.CheckCall(call, threadLastErrorMessage)
-	if failure == nil {
+// Native writes a call's diagnostic at call exit, and checkNative copies the
+// message before returning the diagnostic to the pool, so calls reuse
+// diagnostics instead of allocating a message buffer each. A diagnostic holds
+// no Go pointers, so cgo permits passing it to native.
+var diagnosticPool = sync.Pool{New: func() any { return new(C.mln_diagnostic) }}
+
+// checkNative runs a status-returning call with a diagnostic and converts a
+// failure status into an *Error that carries the call's diagnostic.
+func checkNative(call func(*C.mln_diagnostic) int32) error {
+	diagnostic := diagnosticPool.Get().(*C.mln_diagnostic)
+	defer diagnosticPool.Put(diagnostic)
+	diagnostic.size = C.uint32_t(unsafe.Sizeof(*diagnostic))
+	// A call without a diagnostic parameter leaves the message untouched, so
+	// clear any message a previous call left behind.
+	diagnostic.message[0] = 0
+	status := call(diagnostic)
+	if status == int32(C.MLN_STATUS_OK) {
 		return nil
 	}
-	return newStatusError(failure)
-}
-
-func threadLastErrorMessage() string {
-	return C.GoString(C.mln_thread_last_error_message())
+	message := unsafe.Slice((*byte)(unsafe.Pointer(&diagnostic.message[0])), len(diagnostic.message))
+	if end := bytes.IndexByte(message, 0); end >= 0 {
+		message = message[:end]
+	}
+	return newStatusError(status, string(message))
 }
 
 func kindForStatus(status int32) error {

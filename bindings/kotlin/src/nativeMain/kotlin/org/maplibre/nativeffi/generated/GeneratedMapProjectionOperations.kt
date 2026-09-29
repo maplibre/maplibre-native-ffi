@@ -5,13 +5,13 @@ import kotlinx.cinterop.*
 import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 @OptIn(ExperimentalForeignApi::class)
 public actual abstract class GeneratedMapProjectionOperations internal actual constructor() {
   internal abstract fun bindingMapProjectionHandle(): ULong
 
-  internal abstract fun bindingCloseMapProjection(call: (ULong) -> Int)
+  internal abstract fun bindingCloseMapProjection(call: (ULong) -> Unit)
 
   public actual fun close(): Unit {
     try {
@@ -25,7 +25,7 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
         )
         memScoped {
           val arena = this
-          mln_map_projection_close(owner)
+          NativeDiagnostics.check { diagnostic -> mln_map_projection_close(owner, diagnostic) }
         }
       }
     } finally {
@@ -43,7 +43,9 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
         val arena = this
         val output = arena.alloc<mln_camera_options>()
         output.size = sizeOf<mln_camera_options>().toUInt()
-        BindingStatus.check(mln_map_projection_get_camera(bindingMapProjectionHandle(), output.ptr))
+        NativeDiagnostics.check { diagnostic ->
+          mln_map_projection_get_camera(bindingMapProjectionHandle(), output.ptr, diagnostic)
+        }
         GeneratedValues.readCameraOptions(output)
       }
     } finally {
@@ -60,13 +62,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       return memScoped {
         val arena = this
         val output = arena.alloc<mln_lat_lng>()
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           mln_map_projection_lat_lng_for_pixel(
             bindingMapProjectionHandle(),
             GeneratedValues.writeScreenPoint(arena, point).pointed.readValue(),
             output.ptr,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readLatLng(output)
       }
     } finally {
@@ -83,13 +86,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       return memScoped {
         val arena = this
         val output = arena.alloc<mln_lat_lng>()
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           mln_map_projection_lat_lng_for_pixel_unwrapped(
             bindingMapProjectionHandle(),
             GeneratedValues.writeScreenPoint(arena, point).pointed.readValue(),
             output.ptr,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readLatLng(output)
       }
     } finally {
@@ -106,13 +110,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       return memScoped {
         val arena = this
         val output = arena.alloc<DoubleVar>()
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           mln_map_projection_meters_per_pixel_at_latitude(
             bindingMapProjectionHandle(),
             latitude,
             output.ptr,
+            diagnostic,
           )
-        )
+        }
         output.value
       }
     } finally {
@@ -129,13 +134,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       return memScoped {
         val arena = this
         val output = arena.alloc<mln_screen_point>()
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           mln_map_projection_pixel_for_lat_lng(
             bindingMapProjectionHandle(),
             GeneratedValues.writeLatLng(arena, coordinate).pointed.readValue(),
             output.ptr,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readScreenPoint(output)
       }
     } finally {
@@ -151,12 +157,13 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       )
       return memScoped {
         val arena = this
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           mln_map_projection_set_camera(
             bindingMapProjectionHandle(),
             GeneratedValues.writeCameraOptions(arena, camera),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {
@@ -172,14 +179,15 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       )
       return memScoped {
         val arena = this
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           mln_map_projection_set_visible_coordinates(
             bindingMapProjectionHandle(),
             GeneratedValues.writeLatLngArray(arena, coordinates),
             coordinates.size.convert(),
             GeneratedValues.writeEdgeInsets(arena, padding).pointed.readValue(),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {
@@ -195,13 +203,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       )
       return memScoped {
         val arena = this
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           mln_map_projection_set_visible_geometry(
             bindingMapProjectionHandle(),
             GeneratedValues.byteView(arena, geometry).pointed.readValue(),
             GeneratedValues.writeEdgeInsets(arena, padding).pointed.readValue(),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {

@@ -8,12 +8,12 @@ import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.loader.NativeAccess
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 public actual abstract class GeneratedRenderFrameBatchOperations internal actual constructor() {
   internal abstract fun bindingRenderFrameBatchHandle(): Long
 
-  internal abstract fun bindingCloseRenderFrameBatch(call: (Long) -> Int)
+  internal abstract fun bindingCloseRenderFrameBatch(call: (Long) -> Unit)
 
   public actual fun count(): ULong {
     try {
@@ -24,9 +24,13 @@ public actual abstract class GeneratedRenderFrameBatchOperations internal actual
       )
       return Arena.ofConfined().use { arena ->
         val output = arena.allocate(ValueLayout.JAVA_LONG)
-        BindingStatus.check(
-          MapLibreNativeC.mln_render_frame_batch_count(bindingRenderFrameBatchHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MapLibreNativeC.mln_render_frame_batch_count(
+            bindingRenderFrameBatchHandle(),
+            output,
+            diagnostic,
+          )
+        }
         output.get(ValueLayout.JAVA_LONG, 0).toULong()
       }
     } finally {
@@ -44,13 +48,14 @@ public actual abstract class GeneratedRenderFrameBatchOperations internal actual
       return Arena.ofConfined().use { arena ->
         val output = mln_render_frame_result.allocate(arena)
         mln_render_frame_result.size(output, mln_render_frame_result.sizeof().toInt())
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_render_frame_batch_get(
             bindingRenderFrameBatchHandle(),
             indexValue.toLong(),
             output,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readRenderFrameResult(output)
       }
     } finally {
@@ -68,10 +73,7 @@ public actual abstract class GeneratedRenderFrameBatchOperations internal actual
           owner.toLong(),
           "mln_render_frame_batch_release",
         )
-        Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_render_frame_batch_release(owner)
-          0
-        }
+        Arena.ofConfined().use { arena -> MapLibreNativeC.mln_render_frame_batch_release(owner) }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)

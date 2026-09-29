@@ -28,6 +28,6 @@ mln_status start_read_selected(
     .callback = read_selected,
     .user_data = selected,
   };
-  return mln_map_get_feature_state(map, selector, &completion);
+  return mln_map_get_feature_state(map, selector, &completion, NULL);
   // #endregion get
 }

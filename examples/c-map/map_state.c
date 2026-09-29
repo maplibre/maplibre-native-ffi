@@ -68,9 +68,11 @@ static app_error create_runtime(
     .callback = callback,
     .user_data = user_data,
   };
-  const mln_status status = mln_runtime_create(&options, &state->runtime);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status =
+    mln_runtime_create(&options, &state->runtime, &diagnostic);
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("runtime create failed", status);
+    diagnostics_log_status("runtime create failed", status, &diagnostic);
     return APP_ERROR_RUNTIME_CREATE_FAILED;
   }
   return APP_OK;
@@ -91,16 +93,18 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
     .callback = complete_map_create,
     .user_data = &result,
   };
-  mln_status status = mln_map_create(state->runtime, &options, &completion);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  mln_status status =
+    mln_map_create(state->runtime, &options, &completion, &diagnostic);
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("map create start failed", status);
+    diagnostics_log_status("map create start failed", status, &diagnostic);
     return APP_ERROR_MAP_CREATE_FAILED;
   }
   while (!atomic_load_explicit(&result.completed, memory_order_acquire)) {
     yield_to_runtime();
   }
   if (result.status != MLN_STATUS_OK || result.map == MLN_HANDLE_NULL) {
-    diagnostics_log_status("map create failed", result.status);
+    diagnostics_log_status("map create failed", result.status, NULL);
     return APP_ERROR_MAP_CREATE_FAILED;
   }
   state->map = result.map;
@@ -110,21 +114,22 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
 static app_error configure_map(map_state* state) {
   // The render loop re-arms from the frame result's repaint flag, so the map
   // only has to report updates that arrive between frames.
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_status status = mln_map_set_event_mask(
     state->map, MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE,
-    map_state_discarded_completion()
+    map_state_discarded_completion(), &diagnostic
   );
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("event mask select failed", status);
+    diagnostics_log_status("event mask select failed", status, &diagnostic);
     return APP_ERROR_EVENT_MASK_FAILED;
   }
 
   status = mln_map_set_style_url(
     state->map, "https://tiles.openfreemap.org/styles/bright",
-    map_state_discarded_completion()
+    map_state_discarded_completion(), &diagnostic
   );
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("style load failed", status);
+    diagnostics_log_status("style load failed", status, &diagnostic);
     return APP_ERROR_STYLE_LOAD_FAILED;
   }
 
@@ -179,9 +184,11 @@ void map_state_deinit(map_state* state) {
     .user_data = &teardown,
   };
   if (state->map != MLN_HANDLE_NULL) {
-    const mln_status status = mln_map_release(state->map, &completion);
+    mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+    const mln_status status =
+      mln_map_release(state->map, &completion, &diagnostic);
     if (status != MLN_STATUS_OK)
-      diagnostics_log_status("map release failed", status);
+      diagnostics_log_status("map release failed", status, &diagnostic);
     else
       while (!atomic_load_explicit(&teardown.completed, memory_order_acquire))
         yield_to_runtime();
@@ -189,9 +196,11 @@ void map_state_deinit(map_state* state) {
   }
   if (state->runtime != MLN_HANDLE_NULL) {
     atomic_store_explicit(&teardown.completed, false, memory_order_release);
-    const mln_status status = mln_runtime_release(state->runtime, &completion);
+    mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+    const mln_status status =
+      mln_runtime_release(state->runtime, &completion, &diagnostic);
     if (status != MLN_STATUS_OK) {
-      diagnostics_log_status("runtime release failed", status);
+      diagnostics_log_status("runtime release failed", status, &diagnostic);
     } else {
       // Waiting for the completion keeps process exit ordered after native
       // teardown.
@@ -214,21 +223,26 @@ app_error map_state_update_camera(
     update.animation = *animation;
   }
   update.gesture_phase = gesture_phase;
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status = mln_map_update_camera(
-    state->map, &update, map_state_discarded_completion()
+    state->map, &update, map_state_discarded_completion(), &diagnostic
   );
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("camera command failed", status);
+    diagnostics_log_status("camera command failed", status, &diagnostic);
     return APP_ERROR_CAMERA_COMMAND_FAILED;
   }
   return APP_OK;
 }
 
 app_error map_state_cancel_transitions(map_state* state) {
-  const mln_status status =
-    mln_map_cancel_transitions(state->map, map_state_discarded_completion());
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status = mln_map_cancel_transitions(
+    state->map, map_state_discarded_completion(), &diagnostic
+  );
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("camera transition cancel failed", status);
+    diagnostics_log_status(
+      "camera transition cancel failed", status, &diagnostic
+    );
     return APP_ERROR_CAMERA_COMMAND_FAILED;
   }
   return APP_OK;
@@ -237,18 +251,20 @@ app_error map_state_cancel_transitions(map_state* state) {
 app_error map_state_drain_events(map_state* state, bool* out_render_update) {
   *out_render_update = false;
   mln_event_batch batch = MLN_HANDLE_NULL;
-  mln_status status = mln_runtime_drain_events(state->runtime, &batch);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  mln_status status =
+    mln_runtime_drain_events(state->runtime, &batch, &diagnostic);
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("event drain failed", status);
+    diagnostics_log_status("event drain failed", status, &diagnostic);
     return APP_ERROR_EVENT_DRAIN_FAILED;
   }
   mln_runtime_event_batch_view view = {
     .size = sizeof(mln_runtime_event_batch_view),
   };
-  status = mln_event_batch_get(batch, &view);
+  status = mln_event_batch_get(batch, &view, &diagnostic);
   if (status != MLN_STATUS_OK) {
     mln_event_batch_release(batch);
-    diagnostics_log_status("event batch read failed", status);
+    diagnostics_log_status("event batch read failed", status, &diagnostic);
     return APP_ERROR_EVENT_DRAIN_FAILED;
   }
   for (size_t index = 0; index < view.event_count; index += 1) {

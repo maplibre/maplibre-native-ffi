@@ -23,7 +23,11 @@ public extension BufferHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_buffer_view()
-      try checkStatus(arena.submit { mln_buffer_get(handle.raw, &value0) })
+      try checkStatus { diagnostic in arena.submit { mln_buffer_get(
+        handle.raw,
+        &value0,
+        diagnostic
+      ) } }
       return try NativeString.copyData(data: value0.data, size: value0.size)
     }
   }

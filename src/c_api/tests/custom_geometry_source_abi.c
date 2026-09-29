@@ -63,7 +63,7 @@ static void a_style_replacement_releases_a_dropped_source_unsubscribed(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_add_custom_geometry_source(
-      map, MLN_BUFFER_LITERAL(source_id), &options, &command.descriptor
+      map, MLN_BUFFER_LITERAL(source_id), &options, &command.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&command));
@@ -92,16 +92,17 @@ static void an_explicit_removal_releases_once(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_add_custom_geometry_source(
-      map, MLN_BUFFER_LITERAL(source_id), &options, &add.descriptor
+      map, MLN_BUFFER_LITERAL(source_id), &options, &add.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&add));
 
   mln_test_completion removal = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_remove_style_source(
-                     map, MLN_BUFFER_LITERAL(source_id), &removal.descriptor
-                   )
+    MLN_STATUS_OK,
+    mln_map_remove_style_source(
+      map, MLN_BUFFER_LITERAL(source_id), &removal.descriptor, NULL
+    )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&removal));
   TEST_ASSERT_EQUAL_UINT32(
@@ -133,7 +134,7 @@ static void accepted_adds_release_their_callback_state(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_add_custom_geometry_source(
-      map, MLN_BUFFER_LITERAL(source_id), &options, &rejected.descriptor
+      map, MLN_BUFFER_LITERAL(source_id), &options, &rejected.descriptor, NULL
     )
   );
   rejected.descriptor.release_user_data(rejected.descriptor.user_data);
@@ -144,7 +145,7 @@ static void accepted_adds_release_their_callback_state(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_add_custom_geometry_source(
-      map, MLN_BUFFER_LITERAL(source_id), &options, &first.descriptor
+      map, MLN_BUFFER_LITERAL(source_id), &options, &first.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&first));
@@ -154,7 +155,7 @@ static void accepted_adds_release_their_callback_state(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_add_custom_geometry_source(
-      map, MLN_BUFFER_LITERAL(source_id), &options, &duplicate.descriptor
+      map, MLN_BUFFER_LITERAL(source_id), &options, &duplicate.descriptor, NULL
     )
   );
   TEST_ASSERT_NOT_EQUAL(MLN_STATUS_OK, mln_test_completion_settle(&duplicate));

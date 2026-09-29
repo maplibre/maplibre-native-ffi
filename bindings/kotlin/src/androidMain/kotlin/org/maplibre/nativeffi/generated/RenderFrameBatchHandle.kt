@@ -22,7 +22,7 @@ internal constructor(
     return handle
   }
 
-  internal override fun bindingCloseRenderFrameBatch(call: (Long) -> Int) {
+  internal override fun bindingCloseRenderFrameBatch(call: (Long) -> Unit) {
     core.closeOnce({ call(handle) })
   }
 

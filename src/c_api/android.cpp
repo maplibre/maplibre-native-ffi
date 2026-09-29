@@ -13,9 +13,10 @@ extern "C" auto mlnffi_rust_android_init_tls_verifier(
 extern "C" auto mlnffi_rust_android_error_free(char* error) -> void;
 #endif
 
-auto mln_android_init(void* jni_env, void* jni_class, void* context) noexcept
-  -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+auto mln_android_init(
+  void* jni_env, void* jni_class, void* context, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     // JavaCPP static native methods pass the declaring class between JNIEnv*
     // and the Java arguments. Keep the C ABI compatible with that call shape.
     (void)jni_class;

@@ -17,10 +17,13 @@ public extension ResourceRequestHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0 = false
-      try checkStatus(arena.submit { mln_resource_request_cancelled(
-        handle.raw,
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_resource_request_cancelled(
+          handle.raw,
+          &value0,
+          diagnostic
+        ) }
+      }
       return value0
     }
   }
@@ -42,10 +45,13 @@ public extension ResourceRequestHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena.submit { try mln_resource_request_complete(
-        handle.raw,
-        arena.store(bindingArg0.nativeValue(arena: arena))
-      ) })
+      try checkStatus { diagnostic in
+        try arena.submit { try mln_resource_request_complete(
+          handle.raw,
+          arena.store(bindingArg0.nativeValue(arena: arena)),
+          diagnostic
+        ) }
+      }
       claim.accept()
       return ()
     }
@@ -82,13 +88,14 @@ public extension ResourceRequestHandle {
         value: callback
       ))
       var rejected = false
-      try checkStatus(mln_resource_request_set_cancel_callback(
+      try checkStatus { diagnostic in mln_resource_request_set_cancel_callback(
         access.handle.raw,
         invokeMlnResourceRequestSetCancelCallback,
         token,
         releaseGeneratedCallback,
-        &rejected
-      ))
+        &rejected,
+        diagnostic
+      ) }
       if !rejected { arena.accept() }
       return rejected
     }
@@ -129,8 +136,12 @@ public extension ResourceRequestHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena
-        .submit { mln_resource_request_wait_until_retired(handle.raw) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_resource_request_wait_until_retired(
+          handle.raw,
+          diagnostic
+        ) }
+      }
       return ()
     }
   }

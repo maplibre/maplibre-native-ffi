@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
-public sealed class NativeStatusTests
+public sealed unsafe class NativeStatusTests
 {
     [BindingSpecTest("")]
     [Theory]
@@ -57,11 +57,10 @@ public sealed class NativeStatusTests
         Type expectedExceptionType
     )
     {
-        using var diagnostics = NativeStatus.UseDiagnosticProviderForTest(() =>
-            "mapped diagnostic"
+        var error = Assert.Throws(
+            expectedExceptionType,
+            () => NativeStatus.Check(rawStatus, "mapped diagnostic")
         );
-
-        var error = Assert.Throws(expectedExceptionType, () => NativeStatus.Check(rawStatus));
         var maplibreError = Assert.IsAssignableFrom<MaplibreException>(error);
 
         Assert.Equal(expectedStatus, maplibreError.Status);
@@ -71,13 +70,21 @@ public sealed class NativeStatusTests
 
     [BindingSpecTest("", "")]
     [Fact]
-    public void NativeInvalidStatusMapsToExceptionWithCopiedDiagnostic()
+    public void NativeInvalidStatusMapsToExceptionWithCallDiagnostic()
     {
         NativeLibraryLoader.EnsureLoaded();
 
         var error = Assert.Throws<InvalidArgumentException>(() =>
-            NativeStatus.Check(NativeMethods.mln_network_status_set(999_999))
-        );
+        {
+            mln_diagnostic diagnostic;
+            NativeStatus.Check(
+                NativeMethods.mln_network_status_set(
+                    999_999,
+                    NativeDiagnostic.Prepare(&diagnostic)
+                ),
+                &diagnostic
+            );
+        });
 
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
         Assert.Equal((int)mln_status.MLN_STATUS_INVALID_ARGUMENT, error.RawStatus);
@@ -88,31 +95,12 @@ public sealed class NativeStatusTests
     [Fact]
     public void UnknownNativeStatusPreservesRawStatus()
     {
-        using var diagnostics = NativeStatus.UseDiagnosticProviderForTest(() => "future status");
-
-        var error = Assert.Throws<MaplibreException>(() => NativeStatus.Check(-12_345));
+        var error = Assert.Throws<MaplibreException>(() =>
+            NativeStatus.Check(-12_345, "future status")
+        );
 
         Assert.Equal(MaplibreStatus.Unknown, error.Status);
         Assert.Equal(-12_345, error.RawStatus);
         Assert.Equal("future status", error.Diagnostic);
-    }
-
-    [BindingSpecTest("")]
-    [Fact]
-    public void DiagnosticIsCopiedBeforeLaterFailureChangesThreadLocalMessage()
-    {
-        var nextDiagnostic = "first diagnostic";
-        using var diagnostics = NativeStatus.UseDiagnosticProviderForTest(() => nextDiagnostic);
-
-        var first = Assert.Throws<NativeErrorException>(() =>
-            NativeStatus.Check(mln_status.MLN_STATUS_NATIVE_ERROR)
-        );
-
-        nextDiagnostic = "second diagnostic";
-        Assert.Throws<UnsupportedFeatureException>(() =>
-            NativeStatus.Check(mln_status.MLN_STATUS_UNSUPPORTED)
-        );
-
-        Assert.Equal("first diagnostic", first.Diagnostic);
     }
 }

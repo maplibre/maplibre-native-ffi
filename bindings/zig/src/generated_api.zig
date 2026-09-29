@@ -16,13 +16,6 @@ const completion = @import("completion.zig");
 const status = @import("status.zig");
 const diagnostics = @import("diagnostics.zig");
 
-fn submit(comptime T: type, diagnostic_store: ?*diagnostics.DiagnosticStore, comptime copy: *const fn (*const c.mln_completion_result) status.Error!T, comptime start: anytype, arguments: anytype) status.Error!completion.Future(T) {
-    return completion.submit(T, diagnostic_store, copy, arguments, struct {
-        fn call(args: @TypeOf(arguments), descriptor: *const c.mln_completion) c.mln_status {
-            return @call(.auto, start, args ++ .{descriptor});
-        }
-    }.call);
-}
 const OwnerCopyContext = struct {
     parent: ?owner.Anchor,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
@@ -30,20 +23,6 @@ const OwnerCopyContext = struct {
         if (self.parent) |parent| parent.release();
     }
 };
-fn submitContext(comptime T: type, comptime Context: type, diagnostic_store: ?*diagnostics.DiagnosticStore, comptime copy: *const fn (*const c.mln_completion_result, *Context) status.Error!T, context: Context, comptime start: anytype, arguments: anytype) status.Error!completion.Future(T) {
-    return completion.submitWithCopyContext(T, Context, diagnostic_store, copy, context, arguments, struct {
-        fn call(args: @TypeOf(arguments), descriptor: *const c.mln_completion) c.mln_status {
-            return @call(.auto, start, args ++ .{descriptor});
-        }
-    }.call);
-}
-fn submitAllocated(comptime T: type, diagnostic_store: ?*diagnostics.DiagnosticStore, allocator: std.mem.Allocator, comptime copy: *const fn (*const c.mln_completion_result, *std.mem.Allocator) status.Error!T, comptime start: anytype, arguments: anytype) status.Error!completion.Future(T) {
-    return completion.submitWithCopyContext(T, std.mem.Allocator, diagnostic_store, copy, allocator, arguments, struct {
-        fn call(args: @TypeOf(arguments), descriptor: *const c.mln_completion) c.mln_status {
-            return @call(.auto, start, args ++ .{descriptor});
-        }
-    }.call);
-}
 
 /// A copied native value and the allocator that frees it. Move it rather than
 /// copy it: deinit on two copies releases the value twice.
@@ -95,7 +74,7 @@ fn copyView(allocator: std.mem.Allocator, raw: c.mln_buffer_view) status.Error![
 
 pub const AcquiredFrame = owner.Handle("mln_acquired_frame", struct {
     fn dispose(raw: u64) status.Error!void {
-        try status.checkStatus(c.mln_acquired_frame_dispose(raw), null);
+        try status.call(c.mln_acquired_frame_dispose, .{raw}, null);
     }
 }.dispose);
 pub const Buffer = owner.Handle("mln_buffer", struct {
@@ -115,12 +94,12 @@ pub const GeojsonSourceData = owner.Handle("mln_geojson_source_data", struct {
 }.dispose);
 pub const Map = owner.Handle("mln_map", struct {
     fn dispose(raw: u64) status.Error!void {
-        try status.checkStatus(c.mln_map_dispose(raw), null);
+        try status.call(c.mln_map_dispose, .{raw}, null);
     }
 }.dispose);
 pub const MapProjection = owner.Handle("mln_map_projection", struct {
     fn dispose(raw: u64) status.Error!void {
-        try status.checkStatus(c.mln_map_projection_close(raw), null);
+        try status.call(c.mln_map_projection_close, .{raw}, null);
     }
 }.dispose);
 pub const RenderFrameBatch = owner.Handle("mln_render_frame_batch", struct {
@@ -130,7 +109,7 @@ pub const RenderFrameBatch = owner.Handle("mln_render_frame_batch", struct {
 }.dispose);
 pub const RenderSession = owner.Handle("mln_render_session", struct {
     fn dispose(raw: u64) status.Error!void {
-        try status.checkStatus(c.mln_render_session_dispose(raw), null);
+        try status.call(c.mln_render_session_dispose, .{raw}, null);
     }
 }.dispose);
 pub const ResourceRequestHandle = owner.Handle("mln_resource_request_handle", struct {
@@ -140,7 +119,7 @@ pub const ResourceRequestHandle = owner.Handle("mln_resource_request_handle", st
 }.dispose);
 pub const Runtime = owner.Handle("mln_runtime", struct {
     fn dispose(raw: u64) status.Error!void {
-        try status.checkStatus(c.mln_runtime_dispose(raw), null);
+        try status.call(c.mln_runtime_dispose, .{raw}, null);
     }
 }.dispose);
 pub const AmbientCacheOperation = enum(u32) {
@@ -5930,7 +5909,7 @@ pub fn acquiredFrameDispose(frame: AcquiredFrame) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.checkStatus(c.mln_acquired_frame_dispose(binding_arg_0_native), binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_acquired_frame_dispose, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
     }
     roots.accept();
     binding_arg_0_lease.commit();
@@ -5941,11 +5920,11 @@ pub fn acquiredFrameGetMetalTexture(comptime Result: type, handle: AcquiredFrame
     const lease = try handle.lease();
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.checkStatus(c.mln_adapter_acquired_frame_view_begin(lease.native, &token), lease.diagnostic_store);
+    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, lease.diagnostic_store);
     defer c.mln_adapter_acquired_frame_view_end(token);
     var raw: c.mln_metal_owned_texture_frame = std.mem.zeroes(c.mln_metal_owned_texture_frame);
     raw.size = @sizeOf(c.mln_metal_owned_texture_frame);
-    try status.checkStatus(c.mln_acquired_frame_get_metal_texture(lease.native, &raw), lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_metal_texture, .{ lease.native, &raw }, lease.diagnostic_store);
     return use(context, MetalOwnedTextureFrame.fromNative(raw));
 }
 
@@ -5954,11 +5933,11 @@ pub fn acquiredFrameGetOpenglTexture(comptime Result: type, handle: AcquiredFram
     const lease = try handle.lease();
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.checkStatus(c.mln_adapter_acquired_frame_view_begin(lease.native, &token), lease.diagnostic_store);
+    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, lease.diagnostic_store);
     defer c.mln_adapter_acquired_frame_view_end(token);
     var raw: c.mln_opengl_owned_texture_frame = std.mem.zeroes(c.mln_opengl_owned_texture_frame);
     raw.size = @sizeOf(c.mln_opengl_owned_texture_frame);
-    try status.checkStatus(c.mln_acquired_frame_get_opengl_texture(lease.native, &raw), lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_opengl_texture, .{ lease.native, &raw }, lease.diagnostic_store);
     return use(context, OpenglOwnedTextureFrame.fromNative(raw));
 }
 
@@ -5967,11 +5946,11 @@ pub fn acquiredFrameGetProducerSync(comptime Result: type, handle: AcquiredFrame
     const lease = try handle.lease();
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.checkStatus(c.mln_adapter_acquired_frame_view_begin(lease.native, &token), lease.diagnostic_store);
+    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, lease.diagnostic_store);
     defer c.mln_adapter_acquired_frame_view_end(token);
     var raw: c.mln_gpu_sync = std.mem.zeroes(c.mln_gpu_sync);
     raw.size = @sizeOf(c.mln_gpu_sync);
-    try status.checkStatus(c.mln_acquired_frame_get_producer_sync(lease.native, &raw), lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_producer_sync, .{ lease.native, &raw }, lease.diagnostic_store);
     return use(context, GpuSync.fromNative(raw));
 }
 
@@ -5985,7 +5964,7 @@ pub fn acquiredFrameGetResult(frame: AcquiredFrame) status.Error!RenderFrameResu
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_render_frame_result = std.mem.zeroes(c.mln_render_frame_result);
     binding_arg_1.size = @sizeOf(c.mln_render_frame_result);
-    try status.checkStatus(c.mln_acquired_frame_get_result(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_result, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return RenderFrameResult.fromNative(binding_arg_1);
 }
@@ -5995,11 +5974,11 @@ pub fn acquiredFrameGetVulkanTexture(comptime Result: type, handle: AcquiredFram
     const lease = try handle.lease();
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.checkStatus(c.mln_adapter_acquired_frame_view_begin(lease.native, &token), lease.diagnostic_store);
+    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, lease.diagnostic_store);
     defer c.mln_adapter_acquired_frame_view_end(token);
     var raw: c.mln_vulkan_owned_texture_frame = std.mem.zeroes(c.mln_vulkan_owned_texture_frame);
     raw.size = @sizeOf(c.mln_vulkan_owned_texture_frame);
-    try status.checkStatus(c.mln_acquired_frame_get_vulkan_texture(lease.native, &raw), lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_vulkan_texture, .{ lease.native, &raw }, lease.diagnostic_store);
     return use(context, VulkanOwnedTextureFrame.fromNative(raw));
 }
 
@@ -6008,11 +5987,11 @@ pub fn acquiredFrameGetWebgpuTexture(comptime Result: type, handle: AcquiredFram
     const lease = try handle.lease();
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.checkStatus(c.mln_adapter_acquired_frame_view_begin(lease.native, &token), lease.diagnostic_store);
+    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, lease.diagnostic_store);
     defer c.mln_adapter_acquired_frame_view_end(token);
     var raw: c.mln_webgpu_owned_texture_frame = std.mem.zeroes(c.mln_webgpu_owned_texture_frame);
     raw.size = @sizeOf(c.mln_webgpu_owned_texture_frame);
-    try status.checkStatus(c.mln_acquired_frame_get_webgpu_texture(lease.native, &raw), lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_webgpu_texture, .{ lease.native, &raw }, lease.diagnostic_store);
     return use(context, WebgpuOwnedTextureFrame.fromNative(raw));
 }
 
@@ -6030,13 +6009,13 @@ pub fn acquiredFrameRelease(allocator: std.mem.Allocator, frame: AcquiredFrame, 
     errdefer binding_arg_0_lease.rollback();
     var binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.checkStatus(c.mln_acquired_frame_release(&binding_arg_0_native, try store(input_allocator, binding_arg_1.toNative())), binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_acquired_frame_release, .{ &binding_arg_0_native, try store(input_allocator, binding_arg_1.toNative()) }, binding_arg_0_lease.diagnostic_store);
     }
     roots.accept();
     binding_arg_0_lease.commit();
 }
 
-pub fn androidInit(jni_env: ?*anyopaque, jni_class: ?*anyopaque, context: ?*anyopaque) status.Error!void {
+pub fn androidInit(jni_env: ?*anyopaque, jni_class: ?*anyopaque, context: ?*anyopaque, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
     const binding_arg_0 = jni_env;
     const binding_arg_1 = jni_class;
     const binding_arg_2 = context;
@@ -6044,7 +6023,7 @@ pub fn androidInit(jni_env: ?*anyopaque, jni_class: ?*anyopaque, context: ?*anyo
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.checkStatus(c.mln_android_init(@as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[0].type.?, binding_arg_0), @as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[1].type.?, binding_arg_1), @as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[2].type.?, binding_arg_2)), null);
+    try status.call(c.mln_android_init, .{ @as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[0].type.?, binding_arg_0), @as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[1].type.?, binding_arg_1), @as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[2].type.?, binding_arg_2) }, diagnostic_store);
     roots.accept();
 }
 
@@ -6093,7 +6072,7 @@ pub fn bufferGet(allocator: std.mem.Allocator, buffer: Buffer) status.Error!Owne
     const binding_arg_0_lease = try binding_arg_0.borrow();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_buffer_view = std.mem.zeroes(c.mln_buffer_view);
-    try status.checkStatus(c.mln_buffer_get(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_buffer_get, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     var arena = std.heap.ArenaAllocator.init(allocator);
     errdefer arena.deinit();
@@ -6190,7 +6169,7 @@ pub fn eventBatchGet(allocator: std.mem.Allocator, batch: EventBatch) status.Err
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_runtime_event_batch_view = std.mem.zeroes(c.mln_runtime_event_batch_view);
     binding_arg_1.size = @sizeOf(c.mln_runtime_event_batch_view);
-    try status.checkStatus(c.mln_event_batch_get(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_event_batch_get, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     var arena = std.heap.ArenaAllocator.init(allocator);
     errdefer arena.deinit();
@@ -6235,7 +6214,7 @@ pub fn freeCameraOptionsDefault() status.Error!FreeCameraOptions {
     return FreeCameraOptions.fromNative(raw_result);
 }
 
-pub fn geojsonSourceDataCreate(allocator: std.mem.Allocator, data: []const u8, options: ?GeojsonSourceOptions) status.Error!GeojsonSourceData {
+pub fn geojsonSourceDataCreate(allocator: std.mem.Allocator, data: []const u8, options: ?GeojsonSourceOptions, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!GeojsonSourceData {
     const binding_arg_0 = data;
     const binding_arg_1 = options;
     var input_arena = std.heap.ArenaAllocator.init(allocator);
@@ -6246,9 +6225,9 @@ pub fn geojsonSourceDataCreate(allocator: std.mem.Allocator, data: []const u8, o
     const roots = &root_storage;
     defer roots.deinit();
     var binding_arg_2: c.mln_geojson_source_data = std.mem.zeroes(c.mln_geojson_source_data);
-    try status.checkStatus(c.mln_geojson_source_data_create(@as(@typeInfo(@TypeOf(c.mln_geojson_source_data_create)).@"fn".params[0].type.?, view(binding_arg_0)), if (binding_arg_1) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null, &binding_arg_2), null);
+    try status.call(c.mln_geojson_source_data_create, .{ @as(@typeInfo(@TypeOf(c.mln_geojson_source_data_create)).@"fn".params[0].type.?, view(binding_arg_0)), if (binding_arg_1) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null, &binding_arg_2 }, diagnostic_store);
     roots.accept();
-    return try GeojsonSourceData.adopt(binding_arg_2, null, null);
+    return try GeojsonSourceData.adopt(binding_arg_2, null, diagnostic_store);
 }
 
 pub fn geojsonSourceDataDestroy(data: GeojsonSourceData) status.Error!void {
@@ -6291,7 +6270,7 @@ pub fn gpuSyncDefault() status.Error!GpuSync {
     return GpuSync.fromNative(raw_result);
 }
 
-pub fn httpHeaderTransformResponseSet(response: HttpHeaderTransformResponse, name: []const u8, value: []const u8) status.Error!void {
+pub fn httpHeaderTransformResponseSet(response: HttpHeaderTransformResponse, name: []const u8, value: []const u8, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
     const binding_arg_0 = response;
     const binding_arg_1 = name;
     const binding_arg_3 = value;
@@ -6299,38 +6278,38 @@ pub fn httpHeaderTransformResponseSet(response: HttpHeaderTransformResponse, nam
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.checkStatus(c.mln_http_header_transform_response_set(binding_arg_0.native, @as(@typeInfo(@TypeOf(c.mln_http_header_transform_response_set)).@"fn".params[1].type.?, @ptrCast(binding_arg_1.ptr)), binding_arg_1.len, @as(@typeInfo(@TypeOf(c.mln_http_header_transform_response_set)).@"fn".params[3].type.?, @ptrCast(binding_arg_3.ptr)), binding_arg_3.len), null);
+    try status.call(c.mln_http_header_transform_response_set, .{ binding_arg_0.native, @as(@typeInfo(@TypeOf(c.mln_http_header_transform_response_set)).@"fn".params[1].type.?, @ptrCast(binding_arg_1.ptr)), binding_arg_1.len, @as(@typeInfo(@TypeOf(c.mln_http_header_transform_response_set)).@"fn".params[3].type.?, @ptrCast(binding_arg_3.ptr)), binding_arg_3.len }, diagnostic_store);
     roots.accept();
 }
 
-pub fn latLngForProjectedMeters(meters: ProjectedMeters) status.Error!LatLng {
+pub fn latLngForProjectedMeters(meters: ProjectedMeters, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!LatLng {
     const binding_arg_0 = meters;
     try callback.check("mln_lat_lng_for_projected_meters", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
     var binding_arg_1: c.mln_lat_lng = std.mem.zeroes(c.mln_lat_lng);
-    try status.checkStatus(c.mln_lat_lng_for_projected_meters(@as(@typeInfo(@TypeOf(c.mln_lat_lng_for_projected_meters)).@"fn".params[0].type.?, binding_arg_0.toNative()), &binding_arg_1), null);
+    try status.call(c.mln_lat_lng_for_projected_meters, .{ @as(@typeInfo(@TypeOf(c.mln_lat_lng_for_projected_meters)).@"fn".params[0].type.?, binding_arg_0.toNative()), &binding_arg_1 }, diagnostic_store);
     roots.accept();
     return LatLng.fromNative(binding_arg_1);
 }
 
-pub fn logClearCallback() status.Error!void {
+pub fn logClearCallback(diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
     try callback.check("mln_log_clear_callback", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.checkStatus(c.mln_log_clear_callback(), null);
+    try status.call(c.mln_log_clear_callback, .{}, diagnostic_store);
     roots.accept();
 }
 
-pub fn logSetAsyncSeverityMask(mask: LogSeverityMask) status.Error!void {
+pub fn logSetAsyncSeverityMask(mask: LogSeverityMask, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
     const binding_arg_0 = mask;
     try callback.check("mln_log_set_async_severity_mask", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.checkStatus(c.mln_log_set_async_severity_mask(@as(@typeInfo(@TypeOf(c.mln_log_set_async_severity_mask)).@"fn".params[0].type.?, binding_arg_0.toNative())), null);
+    try status.call(c.mln_log_set_async_severity_mask, .{@as(@typeInfo(@TypeOf(c.mln_log_set_async_severity_mask)).@"fn".params[0].type.?, binding_arg_0.toNative())}, diagnostic_store);
     roots.accept();
 }
 
@@ -6361,7 +6340,7 @@ pub const LogCallback = struct {
         };
     }
 };
-pub fn logSetCallback(callback_input: ?LogCallback) status.Error!void {
+pub fn logSetCallback(callback_input: ?LogCallback, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
     const binding_arg_0 = callback_input;
     try callback.check("mln_log_set_callback", 0);
     var roots: callback.Roots = .{};
@@ -6370,7 +6349,7 @@ pub fn logSetCallback(callback_input: ?LogCallback) status.Error!void {
     if (binding_arg_0) |value| {
         if (value.call != null) context = try roots.retain(LogCallback, value);
     }
-    try status.checkStatus(c.mln_log_set_callback(if (context != null) LogCallback.callTrampoline else null, context, if (context != null) callback.Registration(LogCallback).releaseNative else null), null);
+    try status.call(c.mln_log_set_callback, .{ if (context != null) &LogCallback.callTrampoline else null, context, if (context != null) &callback.Registration(LogCallback).releaseNative else null }, diagnostic_store);
     roots.accept();
 }
 
@@ -6386,7 +6365,7 @@ pub fn mapAddColorReliefLayer(map: Map, layer_id: []const u8, source_id: []const
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_color_relief_layer)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_color_relief_layer)).@"fn".params[2].type.?, view(binding_arg_2)), @as(@typeInfo(@TypeOf(c.mln_map_add_color_relief_layer)).@"fn".params[3].type.?, if (binding_arg_3) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_color_relief_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_color_relief_layer, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6405,7 +6384,7 @@ pub fn mapAddCustomGeometrySource(allocator: std.mem.Allocator, map: Map, source
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_custom_geometry_source)).@"fn".params[1].type.?, view(binding_arg_1)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_custom_geometry_source, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_custom_geometry_source, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6424,7 +6403,7 @@ pub fn mapAddCustomMvtVectorSource(allocator: std.mem.Allocator, map: Map, sourc
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_custom_mvt_vector_source)).@"fn".params[1].type.?, view(binding_arg_1)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_custom_mvt_vector_source, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_custom_mvt_vector_source, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6442,7 +6421,7 @@ pub fn mapAddGeojsonSourceData(map: Map, source_id: []const u8, data: GeojsonSou
     const binding_arg_2_lease = try binding_arg_2.lease();
     defer binding_arg_2_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_geojson_source_data)).@"fn".params[1].type.?, view(binding_arg_1)), binding_arg_2_lease.native };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_geojson_source_data, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_geojson_source_data, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6462,7 +6441,7 @@ pub fn mapAddGeojsonSourceUrl(allocator: std.mem.Allocator, map: Map, source_id:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_geojson_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_geojson_source_url)).@"fn".params[2].type.?, view(binding_arg_2)), if (binding_arg_3) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_geojson_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_geojson_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6479,7 +6458,7 @@ pub fn mapAddHillshadeLayer(map: Map, layer_id: []const u8, source_id: []const u
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_hillshade_layer)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_hillshade_layer)).@"fn".params[2].type.?, view(binding_arg_2)), @as(@typeInfo(@TypeOf(c.mln_map_add_hillshade_layer)).@"fn".params[3].type.?, if (binding_arg_3) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_hillshade_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_hillshade_layer, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6503,7 +6482,7 @@ pub fn mapAddImageSourceImage(allocator: std.mem.Allocator, map: Map, source_id:
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_2.len, try store(input_allocator, try binding_arg_4.toNative(input_allocator, roots)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_image_source_image, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_image_source_image, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6527,7 +6506,7 @@ pub fn mapAddImageSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: [
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_2.len, @as(@typeInfo(@TypeOf(c.mln_map_add_image_source_url)).@"fn".params[4].type.?, view(binding_arg_4)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_image_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_image_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6543,7 +6522,7 @@ pub fn mapAddLocationIndicatorLayer(map: Map, layer_id: []const u8, before_layer
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_location_indicator_layer)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_location_indicator_layer)).@"fn".params[2].type.?, if (binding_arg_2) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_location_indicator_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_location_indicator_layer, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6567,7 +6546,7 @@ pub fn mapAddRasterDemSourceTiles(allocator: std.mem.Allocator, map: Map, source
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = view(array_item_0);
         break :blk items.ptr;
     }), binding_arg_2.len, if (binding_arg_4) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_dem_source_tiles, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_dem_source_tiles, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6587,7 +6566,7 @@ pub fn mapAddRasterDemSourceUrl(allocator: std.mem.Allocator, map: Map, source_i
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_raster_dem_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_raster_dem_source_url)).@"fn".params[2].type.?, view(binding_arg_2)), if (binding_arg_3) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_dem_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_dem_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6611,7 +6590,7 @@ pub fn mapAddRasterSourceTiles(allocator: std.mem.Allocator, map: Map, source_id
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = view(array_item_0);
         break :blk items.ptr;
     }), binding_arg_2.len, if (binding_arg_4) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_source_tiles, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_source_tiles, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6631,7 +6610,7 @@ pub fn mapAddRasterSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_raster_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_raster_source_url)).@"fn".params[2].type.?, view(binding_arg_2)), if (binding_arg_3) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6647,7 +6626,7 @@ pub fn mapAddStyleLayerJson(map: Map, layer_json: []const u8, before_layer_id: ?
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_style_layer_json)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_style_layer_json)).@"fn".params[2].type.?, if (binding_arg_2) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_style_layer_json, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_style_layer_json, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6663,7 +6642,7 @@ pub fn mapAddStyleSourceJson(map: Map, source_id: []const u8, source_json: []con
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_style_source_json)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_style_source_json)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_style_source_json, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_style_source_json, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6687,7 +6666,7 @@ pub fn mapAddVectorSourceTiles(allocator: std.mem.Allocator, map: Map, source_id
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = view(array_item_0);
         break :blk items.ptr;
     }), binding_arg_2.len, if (binding_arg_4) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_vector_source_tiles, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_vector_source_tiles, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6707,7 +6686,7 @@ pub fn mapAddVectorSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_vector_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_vector_source_url)).@"fn".params[2].type.?, view(binding_arg_2)), if (binding_arg_3) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_vector_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_vector_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6725,7 +6704,7 @@ pub fn mapApplyCameraDelta(allocator: std.mem.Allocator, map: Map, delta: Camera
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_apply_camera_delta, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_apply_camera_delta, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6744,7 +6723,7 @@ pub fn mapCameraForGeometry(allocator: std.mem.Allocator, map: Map, geometry: []
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_camera_for_geometry)).@"fn".params[1].type.?, view(binding_arg_1)), if (binding_arg_2) |array_item_0| try store(input_allocator, array_item_0.toNative()) else null };
-    const readiness = try submit(CameraOptions, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(CameraOptions, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!CameraOptions {
             const raw_value = try completion.value(c.mln_camera_options)(result);
             return CameraOptions.fromNative(raw_value);
@@ -6768,7 +6747,7 @@ pub fn mapCameraForLatLngBounds(allocator: std.mem.Allocator, map: Map, bounds: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_camera_for_lat_lng_bounds)).@"fn".params[1].type.?, binding_arg_1.toNative()), if (binding_arg_2) |array_item_0| try store(input_allocator, array_item_0.toNative()) else null };
-    const readiness = try submit(CameraOptions, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(CameraOptions, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!CameraOptions {
             const raw_value = try completion.value(c.mln_camera_options)(result);
             return CameraOptions.fromNative(raw_value);
@@ -6796,7 +6775,7 @@ pub fn mapCameraForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: 
         for (binding_arg_1, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_1.len, if (binding_arg_3) |array_item_0| try store(input_allocator, array_item_0.toNative()) else null };
-    const readiness = try submit(CameraOptions, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(CameraOptions, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!CameraOptions {
             const raw_value = try completion.value(c.mln_camera_options)(result);
             return CameraOptions.fromNative(raw_value);
@@ -6815,7 +6794,7 @@ pub fn mapCameraQuery(map: Map) status.Error!completion.Future(CameraQueryResult
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(CameraQueryResult, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(CameraQueryResult, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!CameraQueryResult {
             const raw_value = try completion.value(c.mln_camera_query_result)(result);
             return CameraQueryResult.fromNative(raw_value);
@@ -6836,7 +6815,7 @@ pub fn mapCameraSnapshotGet(map: Map) status.Error!struct { camera: CameraOption
     var binding_arg_1: c.mln_camera_options = std.mem.zeroes(c.mln_camera_options);
     binding_arg_1.size = @sizeOf(c.mln_camera_options);
     var binding_arg_2: u64 = std.mem.zeroes(u64);
-    try status.checkStatus(c.mln_map_camera_snapshot_get(binding_arg_0_lease.native, &binding_arg_1, &binding_arg_2), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_camera_snapshot_get, .{ binding_arg_0_lease.native, &binding_arg_1, &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return .{ .camera = CameraOptions.fromNative(binding_arg_1), .generation = binding_arg_2 };
 }
@@ -6850,7 +6829,7 @@ pub fn mapCancelTransitions(map: Map) status.Error!completion.Future(completion.
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_cancel_transitions, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_cancel_transitions, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6865,7 +6844,7 @@ pub fn mapCopyLayerSourceId(allocator: std.mem.Allocator, map: Map, layer_id: []
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_layer_source_id)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             if (raw_value.size == 0) return null;
@@ -6875,7 +6854,7 @@ pub fn mapCopyLayerSourceId(allocator: std.mem.Allocator, map: Map, layer_id: []
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_copy_layer_source_id, native_arguments);
+    }.copy, allocator, c.mln_map_copy_layer_source_id, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6890,7 +6869,7 @@ pub fn mapCopyLayerSourceLayer(allocator: std.mem.Allocator, map: Map, layer_id:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_layer_source_layer)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             if (raw_value.size == 0) return null;
@@ -6900,7 +6879,7 @@ pub fn mapCopyLayerSourceLayer(allocator: std.mem.Allocator, map: Map, layer_id:
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_copy_layer_source_layer, native_arguments);
+    }.copy, allocator, c.mln_map_copy_layer_source_layer, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6915,7 +6894,7 @@ pub fn mapCopyStyleImagePremultipliedRgba8(allocator: std.mem.Allocator, map: Ma
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_style_image_premultiplied_rgba8)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -6925,7 +6904,7 @@ pub fn mapCopyStyleImagePremultipliedRgba8(allocator: std.mem.Allocator, map: Ma
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_copy_style_image_premultiplied_rgba8, native_arguments);
+    }.copy, allocator, c.mln_map_copy_style_image_premultiplied_rgba8, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6940,7 +6919,7 @@ pub fn mapCopyStyleImageStretches(allocator: std.mem.Allocator, map: Map, image_
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_style_image_stretches)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue(StyleImageStretchesResult), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleImageStretchesResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(StyleImageStretchesResult) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_style_image_stretches_result)(result);
@@ -6950,7 +6929,7 @@ pub fn mapCopyStyleImageStretches(allocator: std.mem.Allocator, map: Map, image_
             const copied_value = try StyleImageStretchesResult.fromNative(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_copy_style_image_stretches, native_arguments);
+    }.copy, allocator, c.mln_map_copy_style_image_stretches, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6965,7 +6944,7 @@ pub fn mapCopyStyleSourceAttribution(allocator: std.mem.Allocator, map: Map, sou
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_style_source_attribution)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -6975,7 +6954,7 @@ pub fn mapCopyStyleSourceAttribution(allocator: std.mem.Allocator, map: Map, sou
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_copy_style_source_attribution, native_arguments);
+    }.copy, allocator, c.mln_map_copy_style_source_attribution, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -6990,7 +6969,7 @@ pub fn mapCopyStyleSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_style_source_url)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -7000,7 +6979,7 @@ pub fn mapCopyStyleSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: 
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_copy_style_source_url, native_arguments);
+    }.copy, allocator, c.mln_map_copy_style_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7019,7 +6998,7 @@ pub fn mapCreate(allocator: std.mem.Allocator, runtime: Runtime, options: MapOpt
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
     const result_context = OwnerCopyContext{ .parent = if (@as(?owner.Anchor, binding_arg_0_lease.anchor())) |anchor| anchor.retain() else null, .diagnostic_store = binding_arg_0_lease.diagnostic_store };
-    const readiness = try submitContext(Map, OwnerCopyContext, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(Map, OwnerCopyContext, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(raw: *const c.mln_completion_result, context: *OwnerCopyContext) status.Error!Map {
             return Map.adopt(try completion.value(c.mln_map)(raw), context.parent, context.diagnostic_store);
         }
@@ -7038,7 +7017,7 @@ pub fn mapDispose(map: Map) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.checkStatus(c.mln_map_dispose(binding_arg_0_native), binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_map_dispose, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
     }
     roots.accept();
     binding_arg_0_lease.commit();
@@ -7053,7 +7032,7 @@ pub fn mapDumpDebugLogs(map: Map) status.Error!completion.Future(completion.Comm
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_dump_debug_logs, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_dump_debug_logs, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7071,7 +7050,7 @@ pub fn mapGetFeatureState(allocator: std.mem.Allocator, map: Map, selector: Feat
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try submitAllocated(OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -7080,7 +7059,7 @@ pub fn mapGetFeatureState(allocator: std.mem.Allocator, map: Map, selector: Feat
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_get_feature_state, native_arguments);
+    }.copy, allocator, c.mln_map_get_feature_state, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7094,7 +7073,7 @@ pub fn mapGetGlobalState(allocator: std.mem.Allocator, map: Map) status.Error!co
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submitAllocated(OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -7103,7 +7082,7 @@ pub fn mapGetGlobalState(allocator: std.mem.Allocator, map: Map) status.Error!co
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_get_global_state, native_arguments);
+    }.copy, allocator, c.mln_map_get_global_state, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7118,7 +7097,7 @@ pub fn mapGetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, sour
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_image_source_coordinates)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue([]const LatLng), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const LatLng), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const LatLng) {
             if (result.value == null) return null;
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -7131,7 +7110,7 @@ pub fn mapGetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, sour
             };
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_get_image_source_coordinates, native_arguments);
+    }.copy, allocator, c.mln_map_get_image_source_coordinates, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7146,7 +7125,7 @@ pub fn mapGetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []con
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_layer_filter)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -7156,7 +7135,7 @@ pub fn mapGetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []con
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_get_layer_filter, native_arguments);
+    }.copy, allocator, c.mln_map_get_layer_filter, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7172,7 +7151,7 @@ pub fn mapGetLayerProperty(allocator: std.mem.Allocator, map: Map, layer_id: []c
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_layer_property)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_get_layer_property)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try submitAllocated(?OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -7182,7 +7161,7 @@ pub fn mapGetLayerProperty(allocator: std.mem.Allocator, map: Map, layer_id: []c
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_get_layer_property, native_arguments);
+    }.copy, allocator, c.mln_map_get_layer_property, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7197,7 +7176,7 @@ pub fn mapGetStyleImageInfo(allocator: std.mem.Allocator, map: Map, image_id: []
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_image_info)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue(StyleImageResult), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleImageResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(StyleImageResult) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_style_image_result)(result);
@@ -7207,7 +7186,7 @@ pub fn mapGetStyleImageInfo(allocator: std.mem.Allocator, map: Map, image_id: []
             const copied_value = try StyleImageResult.fromNative(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_get_style_image_info, native_arguments);
+    }.copy, allocator, c.mln_map_get_style_image_info, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7222,7 +7201,7 @@ pub fn mapGetStyleLayerInfo(allocator: std.mem.Allocator, map: Map, layer_id: []
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_layer_info)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue(StyleLayerResult), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleLayerResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(StyleLayerResult) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_style_layer_result)(result);
@@ -7232,7 +7211,7 @@ pub fn mapGetStyleLayerInfo(allocator: std.mem.Allocator, map: Map, layer_id: []
             const copied_value = try StyleLayerResult.fromNative(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_get_style_layer_info, native_arguments);
+    }.copy, allocator, c.mln_map_get_style_layer_info, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7247,7 +7226,7 @@ pub fn mapGetStyleLayerJson(allocator: std.mem.Allocator, map: Map, layer_id: []
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_layer_json)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -7257,7 +7236,7 @@ pub fn mapGetStyleLayerJson(allocator: std.mem.Allocator, map: Map, layer_id: []
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_get_style_layer_json, native_arguments);
+    }.copy, allocator, c.mln_map_get_style_layer_json, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7272,7 +7251,7 @@ pub fn mapGetStyleLightProperty(allocator: std.mem.Allocator, map: Map, property
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_light_property)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -7282,7 +7261,7 @@ pub fn mapGetStyleLightProperty(allocator: std.mem.Allocator, map: Map, property
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_get_style_light_property, native_arguments);
+    }.copy, allocator, c.mln_map_get_style_light_property, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7297,7 +7276,7 @@ pub fn mapGetStyleSourceInfo(allocator: std.mem.Allocator, map: Map, source_id: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_source_info)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue(StyleSourceResult), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleSourceResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(StyleSourceResult) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_style_source_result)(result);
@@ -7307,7 +7286,7 @@ pub fn mapGetStyleSourceInfo(allocator: std.mem.Allocator, map: Map, source_id: 
             const copied_value = try StyleSourceResult.fromNative(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_get_style_source_info, native_arguments);
+    }.copy, allocator, c.mln_map_get_style_source_info, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7322,7 +7301,7 @@ pub fn mapGetStyleSourceTileUrls(allocator: std.mem.Allocator, map: Map, source_
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_source_tile_urls)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submitAllocated(?OwnedValue(StyleSourceTileUrlsResult), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleSourceTileUrlsResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(StyleSourceTileUrlsResult) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_style_source_tile_urls_result)(result);
@@ -7332,7 +7311,7 @@ pub fn mapGetStyleSourceTileUrls(allocator: std.mem.Allocator, map: Map, source_
             const copied_value = try StyleSourceTileUrlsResult.fromNative(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_get_style_source_tile_urls, native_arguments);
+    }.copy, allocator, c.mln_map_get_style_source_tile_urls, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7346,7 +7325,7 @@ pub fn mapGetStyleTransitionOptions(map: Map) status.Error!completion.Future(Sty
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(StyleTransitionOptions, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(StyleTransitionOptions, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!StyleTransitionOptions {
             const raw_value = try completion.value(c.mln_style_transition_options)(result);
             return StyleTransitionOptions.fromNative(raw_value);
@@ -7367,7 +7346,7 @@ pub fn mapInvalidateCustomGeometrySourceRegion(map: Map, source_id: []const u8, 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_geometry_source_region)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_geometry_source_region)).@"fn".params[2].type.?, binding_arg_2.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_invalidate_custom_geometry_source_region, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_invalidate_custom_geometry_source_region, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7383,7 +7362,7 @@ pub fn mapInvalidateCustomGeometrySourceTile(map: Map, source_id: []const u8, ti
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_geometry_source_tile)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_geometry_source_tile)).@"fn".params[2].type.?, binding_arg_2.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_invalidate_custom_geometry_source_tile, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_invalidate_custom_geometry_source_tile, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7399,7 +7378,7 @@ pub fn mapInvalidateCustomMvtVectorSourceTile(map: Map, source_id: []const u8, t
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_mvt_vector_source_tile)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_mvt_vector_source_tile)).@"fn".params[2].type.?, binding_arg_2.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_invalidate_custom_mvt_vector_source_tile, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_invalidate_custom_mvt_vector_source_tile, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7417,7 +7396,7 @@ pub fn mapLatLngBoundsForCamera(allocator: std.mem.Allocator, map: Map, camera: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(LatLngBounds, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(LatLngBounds, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!LatLngBounds {
             const raw_value = try completion.value(c.mln_lat_lng_bounds)(result);
             return LatLngBounds.fromNative(raw_value);
@@ -7440,7 +7419,7 @@ pub fn mapLatLngBoundsForCameraUnwrapped(allocator: std.mem.Allocator, map: Map,
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(LatLngBounds, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(LatLngBounds, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!LatLngBounds {
             const raw_value = try completion.value(c.mln_lat_lng_bounds)(result);
             return LatLngBounds.fromNative(raw_value);
@@ -7460,7 +7439,7 @@ pub fn mapLatLngForPixel(map: Map, point: ScreenPoint) status.Error!completion.F
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_lat_lng_for_pixel)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try submit(LatLng, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(LatLng, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!LatLng {
             const raw_value = try completion.value(c.mln_lat_lng)(result);
             return LatLng.fromNative(raw_value);
@@ -7480,7 +7459,7 @@ pub fn mapLatLngForPixelUnwrapped(map: Map, point: ScreenPoint) status.Error!com
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_lat_lng_for_pixel_unwrapped)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try submit(LatLng, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(LatLng, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!LatLng {
             const raw_value = try completion.value(c.mln_lat_lng)(result);
             return LatLng.fromNative(raw_value);
@@ -7507,7 +7486,7 @@ pub fn mapLatLngsForPixels(allocator: std.mem.Allocator, map: Map, points: []con
         for (binding_arg_1, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_1.len };
-    const readiness = try submitAllocated(OwnedValue([]const LatLng), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const LatLng), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const LatLng) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7519,7 +7498,7 @@ pub fn mapLatLngsForPixels(allocator: std.mem.Allocator, map: Map, points: []con
             };
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_lat_lngs_for_pixels, native_arguments);
+    }.copy, allocator, c.mln_map_lat_lngs_for_pixels, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7541,7 +7520,7 @@ pub fn mapLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, map: Map, poin
         for (binding_arg_1, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_1.len };
-    const readiness = try submitAllocated(OwnedValue([]const LatLng), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const LatLng), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const LatLng) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7553,7 +7532,7 @@ pub fn mapLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, map: Map, poin
             };
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_lat_lngs_for_pixels_unwrapped, native_arguments);
+    }.copy, allocator, c.mln_map_lat_lngs_for_pixels_unwrapped, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7567,7 +7546,7 @@ pub fn mapListStyleLayerIds(allocator: std.mem.Allocator, map: Map) status.Error
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submitAllocated(OwnedValue([]const []const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const []const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const []const u8) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7579,7 +7558,7 @@ pub fn mapListStyleLayerIds(allocator: std.mem.Allocator, map: Map) status.Error
             };
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_list_style_layer_ids, native_arguments);
+    }.copy, allocator, c.mln_map_list_style_layer_ids, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7593,7 +7572,7 @@ pub fn mapListStyleLayers(allocator: std.mem.Allocator, map: Map) status.Error!c
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submitAllocated(OwnedValue([]const StyleLayerEntry), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const StyleLayerEntry), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const StyleLayerEntry) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7605,7 +7584,7 @@ pub fn mapListStyleLayers(allocator: std.mem.Allocator, map: Map) status.Error!c
             };
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_list_style_layers, native_arguments);
+    }.copy, allocator, c.mln_map_list_style_layers, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7619,7 +7598,7 @@ pub fn mapListStyleSourceIds(allocator: std.mem.Allocator, map: Map) status.Erro
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submitAllocated(OwnedValue([]const []const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const []const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const []const u8) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7631,7 +7610,7 @@ pub fn mapListStyleSourceIds(allocator: std.mem.Allocator, map: Map) status.Erro
             };
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_list_style_source_ids, native_arguments);
+    }.copy, allocator, c.mln_map_list_style_source_ids, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7645,7 +7624,7 @@ pub fn mapLoadedStyleJson(allocator: std.mem.Allocator, map: Map) status.Error!c
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submitAllocated(OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -7654,7 +7633,7 @@ pub fn mapLoadedStyleJson(allocator: std.mem.Allocator, map: Map) status.Error!c
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_loaded_style_json, native_arguments);
+    }.copy, allocator, c.mln_map_loaded_style_json, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7669,7 +7648,7 @@ pub fn mapMetersPerPixelAtLatitude(map: Map, latitude: f64) status.Error!complet
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_meters_per_pixel_at_latitude)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try submit(f64, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(f64, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!f64 {
             const raw_value = try completion.value(f64)(result);
             return raw_value;
@@ -7690,7 +7669,7 @@ pub fn mapMoveStyleLayer(map: Map, layer_id: []const u8, before_layer_id: ?[]con
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_move_style_layer)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_move_style_layer)).@"fn".params[2].type.?, if (binding_arg_2) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_move_style_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_move_style_layer, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7715,7 +7694,7 @@ pub fn mapPixelForLatLng(map: Map, coordinate: LatLng) status.Error!completion.F
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_pixel_for_lat_lng)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try submit(ScreenPoint, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(ScreenPoint, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!ScreenPoint {
             const raw_value = try completion.value(c.mln_screen_point)(result);
             return ScreenPoint.fromNative(raw_value);
@@ -7742,7 +7721,7 @@ pub fn mapPixelsForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: 
         for (binding_arg_1, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_1.len };
-    const readiness = try submitAllocated(OwnedValue([]const ScreenPoint), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const ScreenPoint), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const ScreenPoint) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7754,7 +7733,7 @@ pub fn mapPixelsForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: 
             };
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_pixels_for_lat_lngs, native_arguments);
+    }.copy, allocator, c.mln_map_pixels_for_lat_lngs, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7769,7 +7748,7 @@ pub fn mapProjectionClose(projection: MapProjection) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.checkStatus(c.mln_map_projection_close(binding_arg_0_native), binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_map_projection_close, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
     }
     roots.accept();
     binding_arg_0_lease.commit();
@@ -7785,7 +7764,7 @@ pub fn mapProjectionCreate(map: Map) status.Error!completion.Future(MapProjectio
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
     const result_context = OwnerCopyContext{ .parent = if (@as(?owner.Anchor, null)) |anchor| anchor.retain() else null, .diagnostic_store = binding_arg_0_lease.diagnostic_store };
-    const readiness = try submitContext(MapProjection, OwnerCopyContext, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(MapProjection, OwnerCopyContext, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(raw: *const c.mln_completion_result, context: *OwnerCopyContext) status.Error!MapProjection {
             return MapProjection.adopt(try completion.value(c.mln_map_projection)(raw), context.parent, context.diagnostic_store);
         }
@@ -7804,7 +7783,7 @@ pub fn mapProjectionGetCamera(projection: MapProjection) status.Error!CameraOpti
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_camera_options = std.mem.zeroes(c.mln_camera_options);
     binding_arg_1.size = @sizeOf(c.mln_camera_options);
-    try status.checkStatus(c.mln_map_projection_get_camera(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_get_camera, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return CameraOptions.fromNative(binding_arg_1);
 }
@@ -7819,7 +7798,7 @@ pub fn mapProjectionLatLngForPixel(projection: MapProjection, point: ScreenPoint
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_2: c.mln_lat_lng = std.mem.zeroes(c.mln_lat_lng);
-    try status.checkStatus(c.mln_map_projection_lat_lng_for_pixel(binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_lat_lng_for_pixel)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_lat_lng_for_pixel, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_lat_lng_for_pixel)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return LatLng.fromNative(binding_arg_2);
 }
@@ -7834,7 +7813,7 @@ pub fn mapProjectionLatLngForPixelUnwrapped(projection: MapProjection, point: Sc
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_2: c.mln_lat_lng = std.mem.zeroes(c.mln_lat_lng);
-    try status.checkStatus(c.mln_map_projection_lat_lng_for_pixel_unwrapped(binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_lat_lng_for_pixel_unwrapped)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_lat_lng_for_pixel_unwrapped, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_lat_lng_for_pixel_unwrapped)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return LatLng.fromNative(binding_arg_2);
 }
@@ -7849,7 +7828,7 @@ pub fn mapProjectionMetersPerPixelAtLatitude(projection: MapProjection, latitude
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_2: f64 = std.mem.zeroes(f64);
-    try status.checkStatus(c.mln_map_projection_meters_per_pixel_at_latitude(binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_meters_per_pixel_at_latitude)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_meters_per_pixel_at_latitude, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_meters_per_pixel_at_latitude)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return binding_arg_2;
 }
@@ -7864,7 +7843,7 @@ pub fn mapProjectionPixelForLatLng(projection: MapProjection, coordinate: LatLng
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_2: c.mln_screen_point = std.mem.zeroes(c.mln_screen_point);
-    try status.checkStatus(c.mln_map_projection_pixel_for_lat_lng(binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_pixel_for_lat_lng)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_pixel_for_lat_lng, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_pixel_for_lat_lng)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return ScreenPoint.fromNative(binding_arg_2);
 }
@@ -7881,7 +7860,7 @@ pub fn mapProjectionSetCamera(allocator: std.mem.Allocator, projection: MapProje
     defer roots.deinit();
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
-    try status.checkStatus(c.mln_map_projection_set_camera(binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative())), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_set_camera, .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
 }
 
@@ -7898,11 +7877,11 @@ pub fn mapProjectionSetVisibleCoordinates(allocator: std.mem.Allocator, projecti
     defer roots.deinit();
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
-    try status.checkStatus(c.mln_map_projection_set_visible_coordinates(binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_coordinates)).@"fn".params[1].type.?, blk: {
+    try status.call(c.mln_map_projection_set_visible_coordinates, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_coordinates)).@"fn".params[1].type.?, blk: {
         const items = try input_allocator.alloc(c.mln_lat_lng, binding_arg_1.len);
         for (binding_arg_1, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
-    }), binding_arg_1.len, @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_coordinates)).@"fn".params[3].type.?, binding_arg_3.toNative())), binding_arg_0_lease.diagnostic_store);
+    }), binding_arg_1.len, @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_coordinates)).@"fn".params[3].type.?, binding_arg_3.toNative()) }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
 }
 
@@ -7916,7 +7895,7 @@ pub fn mapProjectionSetVisibleGeometry(projection: MapProjection, geometry: []co
     defer roots.deinit();
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
-    try status.checkStatus(c.mln_map_projection_set_visible_geometry(binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_geometry)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_geometry)).@"fn".params[2].type.?, binding_arg_2.toNative())), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_set_visible_geometry, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_geometry)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_geometry)).@"fn".params[2].type.?, binding_arg_2.toNative()) }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
 }
 
@@ -7930,7 +7909,7 @@ pub fn mapRelease(map: Map) status.Error!completion.Future(void) {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     const native_arguments = .{binding_arg_0_native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_map_release, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_map_release, native_arguments);
     roots.accept();
     binding_arg_0_lease.commit();
     return readiness;
@@ -7949,7 +7928,7 @@ pub fn mapRemoveFeatureState(allocator: std.mem.Allocator, map: Map, selector: F
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_feature_state, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_feature_state, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7964,7 +7943,7 @@ pub fn mapRemoveStyleImage(map: Map, image_id: []const u8) status.Error!completi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_remove_style_image)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_style_image, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_style_image, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7979,7 +7958,7 @@ pub fn mapRemoveStyleLayer(map: Map, layer_id: []const u8) status.Error!completi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_remove_style_layer)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_style_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_style_layer, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7994,7 +7973,7 @@ pub fn mapRemoveStyleSource(map: Map, source_id: []const u8) status.Error!comple
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_remove_style_source)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_style_source, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_style_source, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8008,7 +7987,7 @@ pub fn mapRequestRepaint(map: Map) status.Error!completion.Future(completion.Com
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_request_repaint, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_request_repaint, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8022,7 +8001,7 @@ pub fn mapRequestStillImage(map: Map) status.Error!completion.Future(void) {
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_map_request_still_image, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_map_request_still_image, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8037,7 +8016,7 @@ pub fn mapResize(map: Map, extent: LogicalExtent) status.Error!completion.Future
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_resize)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_resize, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_resize, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8055,7 +8034,7 @@ pub fn mapSetBounds(allocator: std.mem.Allocator, map: Map, options: BoundOption
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_bounds, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_bounds, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8072,7 +8051,7 @@ pub fn mapSetCustomGeometrySourceTileData(map: Map, source_id: []const u8, tile_
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_custom_geometry_source_tile_data)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_geometry_source_tile_data)).@"fn".params[2].type.?, binding_arg_2.toNative()), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_geometry_source_tile_data)).@"fn".params[3].type.?, view(binding_arg_3)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_custom_geometry_source_tile_data, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_custom_geometry_source_tile_data, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8089,7 +8068,7 @@ pub fn mapSetCustomMvtVectorSourceTileData(map: Map, source_id: []const u8, tile
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_data)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_data)).@"fn".params[2].type.?, binding_arg_2.toNative()), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_data)).@"fn".params[3].type.?, view(binding_arg_3)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_custom_mvt_vector_source_tile_data, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_custom_mvt_vector_source_tile_data, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8106,7 +8085,7 @@ pub fn mapSetCustomMvtVectorSourceTileError(map: Map, source_id: []const u8, til
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_error)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_error)).@"fn".params[2].type.?, binding_arg_2.toNative()), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_error)).@"fn".params[3].type.?, view(binding_arg_3)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_custom_mvt_vector_source_tile_error, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_custom_mvt_vector_source_tile_error, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8121,7 +8100,7 @@ pub fn mapSetDebugOptions(map: Map, options: MapDebugOption) status.Error!comple
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_debug_options)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_debug_options, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_debug_options, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8136,7 +8115,7 @@ pub fn mapSetEventMask(map: Map, mask: RuntimeEventMask) status.Error!completion
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_event_mask)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_event_mask, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_event_mask, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8155,7 +8134,7 @@ pub fn mapSetFeatureState(allocator: std.mem.Allocator, map: Map, selector: Feat
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), @as(@typeInfo(@TypeOf(c.mln_map_set_feature_state)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_feature_state, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_feature_state, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8173,7 +8152,7 @@ pub fn mapSetFreeCameraOptions(allocator: std.mem.Allocator, map: Map, options: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_free_camera_options, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_free_camera_options, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8191,7 +8170,7 @@ pub fn mapSetGeojsonSourceData(map: Map, source_id: []const u8, data: GeojsonSou
     const binding_arg_2_lease = try binding_arg_2.lease();
     defer binding_arg_2_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_geojson_source_data)).@"fn".params[1].type.?, view(binding_arg_1)), binding_arg_2_lease.native };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_geojson_source_data, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_geojson_source_data, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8207,7 +8186,7 @@ pub fn mapSetGeojsonSourceSynchronousTiling(map: Map, source_id: []const u8, ena
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_geojson_source_synchronous_tiling)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_geojson_source_synchronous_tiling)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_geojson_source_synchronous_tiling, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_geojson_source_synchronous_tiling, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8223,7 +8202,7 @@ pub fn mapSetGeojsonSourceUrl(map: Map, source_id: []const u8, url: []const u8) 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_geojson_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_geojson_source_url)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_geojson_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_geojson_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8239,7 +8218,7 @@ pub fn mapSetGlobalStateProperty(map: Map, property_name: []const u8, value: []c
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_global_state_property)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_global_state_property)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_global_state_property, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_global_state_property, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8262,7 +8241,7 @@ pub fn mapSetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, sour
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_2.len };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_image_source_coordinates, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_image_source_coordinates, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8281,7 +8260,7 @@ pub fn mapSetImageSourceImage(allocator: std.mem.Allocator, map: Map, source_id:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_image_source_image)).@"fn".params[1].type.?, view(binding_arg_1)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_image_source_image, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_image_source_image, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8297,7 +8276,7 @@ pub fn mapSetImageSourceUrl(map: Map, source_id: []const u8, url: []const u8) st
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_image_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_image_source_url)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_image_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_image_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8316,7 +8295,7 @@ pub fn mapSetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []con
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_filter)).@"fn".params[1].type.?, view(binding_arg_1)), if (binding_arg_2) |array_item_0| try store(input_allocator, view(array_item_0)) else null };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_filter, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_filter, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8332,7 +8311,7 @@ pub fn mapSetLayerMaxZoom(map: Map, layer_id: []const u8, max_zoom: f64) status.
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_max_zoom)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_max_zoom)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_max_zoom, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_max_zoom, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8348,7 +8327,7 @@ pub fn mapSetLayerMinZoom(map: Map, layer_id: []const u8, min_zoom: f64) status.
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_min_zoom)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_min_zoom)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_min_zoom, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_min_zoom, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8365,7 +8344,7 @@ pub fn mapSetLayerProperty(map: Map, layer_id: []const u8, property_name: []cons
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_property)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_property)).@"fn".params[2].type.?, view(binding_arg_2)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_property)).@"fn".params[3].type.?, view(binding_arg_3)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_property, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_property, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8381,7 +8360,7 @@ pub fn mapSetLayerSourceId(map: Map, layer_id: []const u8, source_id: []const u8
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_source_id)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_source_id)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_source_id, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_source_id, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8397,7 +8376,7 @@ pub fn mapSetLayerSourceLayer(map: Map, layer_id: []const u8, source_layer: ?[]c
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_source_layer)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_source_layer)).@"fn".params[2].type.?, if (binding_arg_2) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_source_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_source_layer, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8413,7 +8392,7 @@ pub fn mapSetLayerVisibility(map: Map, layer_id: []const u8, visibility: StyleLa
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_visibility)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_visibility)).@"fn".params[2].type.?, binding_arg_2.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_visibility, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_visibility, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8429,7 +8408,7 @@ pub fn mapSetLocationIndicatorAccuracyRadius(map: Map, layer_id: []const u8, rad
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_accuracy_radius)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_accuracy_radius)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_accuracy_radius, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_accuracy_radius, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8445,7 +8424,7 @@ pub fn mapSetLocationIndicatorBearing(map: Map, layer_id: []const u8, bearing: f
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_bearing)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_bearing)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_bearing, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_bearing, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8462,7 +8441,7 @@ pub fn mapSetLocationIndicatorImageName(map: Map, layer_id: []const u8, image_ki
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_image_name)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_image_name)).@"fn".params[2].type.?, binding_arg_2.toNative()), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_image_name)).@"fn".params[3].type.?, view(binding_arg_3)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_image_name, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_image_name, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8479,7 +8458,7 @@ pub fn mapSetLocationIndicatorLocation(map: Map, layer_id: []const u8, coordinat
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_location)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_location)).@"fn".params[2].type.?, binding_arg_2.toNative()), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_location)).@"fn".params[3].type.?, binding_arg_3) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_location, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_location, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8497,7 +8476,7 @@ pub fn mapSetProjectionMode(allocator: std.mem.Allocator, map: Map, mode: Projec
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_projection_mode, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_projection_mode, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8512,7 +8491,7 @@ pub fn mapSetRenderingStatsViewEnabled(map: Map, enabled: bool) status.Error!com
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_rendering_stats_view_enabled)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_rendering_stats_view_enabled, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_rendering_stats_view_enabled, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8532,7 +8511,7 @@ pub fn mapSetStyleImage(allocator: std.mem.Allocator, map: Map, image_id: []cons
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_image)).@"fn".params[1].type.?, view(binding_arg_1)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), if (binding_arg_3) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_image, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_image, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8547,7 +8526,7 @@ pub fn mapSetStyleJson(map: Map, json: []const u8) status.Error!completion.Futur
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_json)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_json, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_json, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8562,7 +8541,7 @@ pub fn mapSetStyleLightJson(map: Map, light_json: []const u8) status.Error!compl
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_light_json)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_light_json, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_light_json, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8578,7 +8557,7 @@ pub fn mapSetStyleLightProperty(map: Map, property_name: []const u8, value: []co
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_light_property)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_style_light_property)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_light_property, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_light_property, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8594,7 +8573,7 @@ pub fn mapSetStyleSourceVolatile(map: Map, source_id: []const u8, is_volatile: b
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_source_volatile)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_style_source_volatile)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_source_volatile, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_source_volatile, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8612,7 +8591,7 @@ pub fn mapSetStyleTransitionOptions(allocator: std.mem.Allocator, map: Map, opti
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_transition_options, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_transition_options, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8630,7 +8609,7 @@ pub fn mapSetStyleUrl(allocator: std.mem.Allocator, map: Map, url: []const u8) s
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_url)).@"fn".params[1].type.?, try cString(input_allocator, binding_arg_1)) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_url, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8648,7 +8627,7 @@ pub fn mapSetTileOptions(allocator: std.mem.Allocator, map: Map, options: MapTil
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_tile_options, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_tile_options, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8666,7 +8645,7 @@ pub fn mapSetViewportOptions(allocator: std.mem.Allocator, map: Map, options: Ma
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_viewport_options, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_viewport_options, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8681,7 +8660,7 @@ pub fn mapSnapshotGet(map: Map) status.Error!MapSnapshot {
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_map_snapshot = std.mem.zeroes(c.mln_map_snapshot);
     binding_arg_1.size = @sizeOf(c.mln_map_snapshot);
-    try status.checkStatus(c.mln_map_snapshot_get(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_snapshot_get, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return MapSnapshot.fromNative(binding_arg_1);
 }
@@ -8695,7 +8674,7 @@ pub fn mapStyleUrl(allocator: std.mem.Allocator, map: Map) status.Error!completi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submitAllocated(OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -8704,7 +8683,7 @@ pub fn mapStyleUrl(allocator: std.mem.Allocator, map: Map) status.Error!completi
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_map_style_url, native_arguments);
+    }.copy, allocator, c.mln_map_style_url, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8732,7 +8711,7 @@ pub fn mapUpdateCamera(allocator: std.mem.Allocator, map: Map, update: CameraUpd
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_update_camera, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_update_camera, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8762,7 +8741,7 @@ pub fn metalBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descri
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_borrowed_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_borrowed_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -8791,7 +8770,7 @@ pub fn metalBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: Rend
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_borrowed_texture_set_target, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_borrowed_texture_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8811,7 +8790,7 @@ pub fn metalOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descripto
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_owned_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_owned_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -8842,7 +8821,7 @@ pub fn metalSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: Me
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_surface_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_surface_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -8871,29 +8850,29 @@ pub fn metalSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSessio
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_surface_set_target, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_surface_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn networkStatusGet() status.Error!NetworkStatus {
+pub fn networkStatusGet(diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!NetworkStatus {
     try callback.check("mln_network_status_get", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
     var binding_arg_0: c.mln_network_status = std.mem.zeroes(c.mln_network_status);
-    try status.checkStatus(c.mln_network_status_get(&binding_arg_0), null);
+    try status.call(c.mln_network_status_get, .{&binding_arg_0}, diagnostic_store);
     roots.accept();
     return NetworkStatus.fromNative(binding_arg_0);
 }
 
-pub fn networkStatusSet(status_input: NetworkStatus) status.Error!void {
+pub fn networkStatusSet(status_input: NetworkStatus, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
     const binding_arg_0 = status_input;
     try callback.check("mln_network_status_set", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.checkStatus(c.mln_network_status_set(@as(@typeInfo(@TypeOf(c.mln_network_status_set)).@"fn".params[0].type.?, binding_arg_0.toNative())), null);
+    try status.call(c.mln_network_status_set, .{@as(@typeInfo(@TypeOf(c.mln_network_status_set)).@"fn".params[0].type.?, binding_arg_0.toNative())}, diagnostic_store);
     roots.accept();
 }
 
@@ -8912,7 +8891,7 @@ pub fn openglBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descr
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_borrowed_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_borrowed_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -8945,7 +8924,7 @@ pub fn openglBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: Ren
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_borrowed_texture_set_target, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_borrowed_texture_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8965,7 +8944,7 @@ pub fn openglOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descript
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_owned_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_owned_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -9010,7 +8989,7 @@ pub fn openglSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: O
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_surface_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_surface_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -9043,7 +9022,7 @@ pub fn openglSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSessi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_surface_set_target, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_surface_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9072,14 +9051,14 @@ pub fn premultipliedRgba8ImageDefault(allocator: std.mem.Allocator) status.Error
     return .{ .arena = arena, .value = copied_value };
 }
 
-pub fn projectedMetersForLatLng(coordinate: LatLng) status.Error!ProjectedMeters {
+pub fn projectedMetersForLatLng(coordinate: LatLng, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!ProjectedMeters {
     const binding_arg_0 = coordinate;
     try callback.check("mln_projected_meters_for_lat_lng", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
     var binding_arg_1: c.mln_projected_meters = std.mem.zeroes(c.mln_projected_meters);
-    try status.checkStatus(c.mln_projected_meters_for_lat_lng(@as(@typeInfo(@TypeOf(c.mln_projected_meters_for_lat_lng)).@"fn".params[0].type.?, binding_arg_0.toNative()), &binding_arg_1), null);
+    try status.call(c.mln_projected_meters_for_lat_lng, .{ @as(@typeInfo(@TypeOf(c.mln_projected_meters_for_lat_lng)).@"fn".params[0].type.?, binding_arg_0.toNative()), &binding_arg_1 }, diagnostic_store);
     roots.accept();
     return ProjectedMeters.fromNative(binding_arg_1);
 }
@@ -9103,7 +9082,7 @@ pub fn renderFrameBatchCount(batch: RenderFrameBatch) status.Error!usize {
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: usize = std.mem.zeroes(usize);
-    try status.checkStatus(c.mln_render_frame_batch_count(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_frame_batch_count, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return binding_arg_1;
 }
@@ -9119,7 +9098,7 @@ pub fn renderFrameBatchGet(batch: RenderFrameBatch, index: usize) status.Error!R
     defer binding_arg_0_lease.release();
     var binding_arg_2: c.mln_render_frame_result = std.mem.zeroes(c.mln_render_frame_result);
     binding_arg_2.size = @sizeOf(c.mln_render_frame_result);
-    try status.checkStatus(c.mln_render_frame_batch_get(binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_frame_batch_get)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_frame_batch_get, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_frame_batch_get)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return RenderFrameResult.fromNative(binding_arg_2);
 }
@@ -9150,7 +9129,7 @@ pub fn renderSessionAbandon(session: RenderSession) status.Error!RenderAbandonRe
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_render_abandon_result = std.mem.zeroes(c.mln_render_abandon_result);
     binding_arg_1.size = @sizeOf(c.mln_render_abandon_result);
-    try status.checkStatus(c.mln_render_session_abandon(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_abandon, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return RenderAbandonResult.fromNative(binding_arg_1);
 }
@@ -9164,7 +9143,7 @@ pub fn renderSessionAcquireFrame(session: RenderSession) status.Error!AcquiredFr
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_acquired_frame = std.mem.zeroes(c.mln_acquired_frame);
-    try status.checkStatus(c.mln_render_session_acquire_frame(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_acquire_frame, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return try AcquiredFrame.adopt(binding_arg_1, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store);
 }
@@ -9192,7 +9171,7 @@ pub fn renderSessionBarrier(session: RenderSession) status.Error!completion.Futu
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_barrier, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_barrier, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9206,7 +9185,7 @@ pub fn renderSessionClearData(session: RenderSession) status.Error!completion.Fu
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_clear_data, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_clear_data, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9221,7 +9200,7 @@ pub fn renderSessionDestroy(session: RenderSession) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.checkStatus(c.mln_render_session_destroy(binding_arg_0_native), binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_render_session_destroy, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
     }
     roots.accept();
     binding_arg_0_lease.commit();
@@ -9236,7 +9215,7 @@ pub fn renderSessionDetach(session: RenderSession) status.Error!completion.Futur
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_detach, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_detach, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9251,7 +9230,7 @@ pub fn renderSessionDispose(session: RenderSession) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.checkStatus(c.mln_render_session_dispose(binding_arg_0_native), binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_render_session_dispose, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
     }
     roots.accept();
     binding_arg_0_lease.commit();
@@ -9266,7 +9245,7 @@ pub fn renderSessionDrainFrameResults(session: RenderSession) status.Error!Rende
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_render_frame_batch = std.mem.zeroes(c.mln_render_frame_batch);
-    try status.checkStatus(c.mln_render_session_drain_frame_results(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_drain_frame_results, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return try RenderFrameBatch.adopt(binding_arg_1, null, binding_arg_0_lease.diagnostic_store);
 }
@@ -9280,7 +9259,7 @@ pub fn renderSessionDumpDebugLogs(session: RenderSession) status.Error!completio
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_dump_debug_logs, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_dump_debug_logs, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9295,7 +9274,7 @@ pub fn renderSessionGetCapabilities(session: RenderSession) status.Error!RenderS
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_render_session_capabilities = std.mem.zeroes(c.mln_render_session_capabilities);
     binding_arg_1.size = @sizeOf(c.mln_render_session_capabilities);
-    try status.checkStatus(c.mln_render_session_get_capabilities(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_get_capabilities, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return RenderSessionCapabilities.fromNative(binding_arg_1);
 }
@@ -9310,7 +9289,7 @@ pub fn renderSessionGetSnapshot(session: RenderSession) status.Error!RenderSessi
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_render_session_snapshot = std.mem.zeroes(c.mln_render_session_snapshot);
     binding_arg_1.size = @sizeOf(c.mln_render_session_snapshot);
-    try status.checkStatus(c.mln_render_session_get_snapshot(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_get_snapshot, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return RenderSessionSnapshot.fromNative(binding_arg_1);
 }
@@ -9324,7 +9303,7 @@ pub fn renderSessionProjectionCreate(session: RenderSession) status.Error!MapPro
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_map_projection = std.mem.zeroes(c.mln_map_projection);
-    try status.checkStatus(c.mln_render_session_projection_create(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_projection_create, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return try MapProjection.adopt(binding_arg_1, null, binding_arg_0_lease.diagnostic_store);
 }
@@ -9346,7 +9325,7 @@ pub fn renderSessionQueryFeatureExtensions(allocator: std.mem.Allocator, session
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_session_query_feature_extensions)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_render_session_query_feature_extensions)).@"fn".params[2].type.?, view(binding_arg_2)), @as(@typeInfo(@TypeOf(c.mln_render_session_query_feature_extensions)).@"fn".params[3].type.?, view(binding_arg_3)), @as(@typeInfo(@TypeOf(c.mln_render_session_query_feature_extensions)).@"fn".params[4].type.?, view(binding_arg_4)), if (binding_arg_5) |array_item_0| try store(input_allocator, view(array_item_0)) else null };
-    const readiness = try submitAllocated(OwnedValue([]const u8), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -9355,7 +9334,7 @@ pub fn renderSessionQueryFeatureExtensions(allocator: std.mem.Allocator, session
             const copied_value = try copyView(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_render_session_query_feature_extensions, native_arguments);
+    }.copy, allocator, c.mln_render_session_query_feature_extensions, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9374,7 +9353,7 @@ pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), if (binding_arg_2) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try submitAllocated(OwnedValue([]const QueriedFeature), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const QueriedFeature), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const QueriedFeature) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -9386,7 +9365,7 @@ pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session:
             };
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_render_session_query_rendered_features, native_arguments);
+    }.copy, allocator, c.mln_render_session_query_rendered_features, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9405,7 +9384,7 @@ pub fn renderSessionQuerySourceFeatures(allocator: std.mem.Allocator, session: R
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_session_query_source_features)).@"fn".params[1].type.?, view(binding_arg_1)), if (binding_arg_2) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try submitAllocated(OwnedValue([]const QueriedFeature), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const QueriedFeature), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const QueriedFeature) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -9417,7 +9396,7 @@ pub fn renderSessionQuerySourceFeatures(allocator: std.mem.Allocator, session: R
             };
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_render_session_query_source_features, native_arguments);
+    }.copy, allocator, c.mln_render_session_query_source_features, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9431,7 +9410,7 @@ pub fn renderSessionReduceMemoryUse(session: RenderSession) status.Error!complet
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_reduce_memory_use, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_reduce_memory_use, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9448,7 +9427,7 @@ pub fn renderSessionRequestFrame(allocator: std.mem.Allocator, session: RenderSe
     defer roots.deinit();
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
-    try status.checkStatus(c.mln_render_session_request_frame(binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative())), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_request_frame, .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
 }
 
@@ -9465,7 +9444,7 @@ pub fn renderSessionResize(allocator: std.mem.Allocator, session: RenderSession,
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_render_session_resize, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_render_session_resize, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9480,12 +9459,12 @@ pub fn renderSessionServiceDriverWork(session: RenderSession, max_work: usize) s
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_2: usize = std.mem.zeroes(usize);
-    try status.checkStatus(c.mln_render_session_service_driver_work(binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_session_service_driver_work)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_service_driver_work, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_session_service_driver_work)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return binding_arg_2;
 }
 
-pub fn renderTargetExtentPhysicalSize(allocator: std.mem.Allocator, extent: RenderTargetExtent) status.Error!struct { width: u32, height: u32 } {
+pub fn renderTargetExtentPhysicalSize(allocator: std.mem.Allocator, extent: RenderTargetExtent, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!struct { width: u32, height: u32 } {
     const binding_arg_0 = extent;
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
@@ -9496,7 +9475,7 @@ pub fn renderTargetExtentPhysicalSize(allocator: std.mem.Allocator, extent: Rend
     defer roots.deinit();
     var binding_arg_1: u32 = std.mem.zeroes(u32);
     var binding_arg_2: u32 = std.mem.zeroes(u32);
-    try status.checkStatus(c.mln_render_target_extent_physical_size(try store(input_allocator, binding_arg_0.toNative()), &binding_arg_1, &binding_arg_2), null);
+    try status.call(c.mln_render_target_extent_physical_size, .{ try store(input_allocator, binding_arg_0.toNative()), &binding_arg_1, &binding_arg_2 }, diagnostic_store);
     roots.accept();
     return .{ .width = binding_arg_1, .height = binding_arg_2 };
 }
@@ -9576,7 +9555,7 @@ pub fn resourceRequestCancelled(handle: ResourceRequestHandle) status.Error!bool
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: bool = std.mem.zeroes(bool);
-    try status.checkStatus(c.mln_resource_request_cancelled(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_resource_request_cancelled, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return binding_arg_1;
 }
@@ -9593,7 +9572,7 @@ pub fn resourceRequestComplete(allocator: std.mem.Allocator, handle: ResourceReq
     defer roots.deinit();
     const binding_arg_0_lease = try binding_arg_0.beginComplete();
     errdefer binding_arg_0_lease.finishComplete(false);
-    try status.checkStatus(c.mln_resource_request_complete(binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots))), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_resource_request_complete, .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) }, binding_arg_0_lease.diagnostic_store);
     binding_arg_0_lease.finishComplete(true);
     roots.accept();
 }
@@ -9651,30 +9630,30 @@ pub fn resourceRequestSetCancelCallback(handle: ResourceRequestHandle, callback_
         if (retained.call != null) context = try roots.retain(ResourceRequestCancelCallback, retained);
     }
     var rejected: bool = false;
-    try status.checkStatus(c.mln_resource_request_set_cancel_callback(lease.native, if (context != null) ResourceRequestCancelCallback.callTrampoline else null, context, if (context != null) callback.Registration(ResourceRequestCancelCallback).releaseNative else null, &rejected), lease.diagnostic_store);
+    try status.call(c.mln_resource_request_set_cancel_callback, .{ lease.native, if (context != null) &ResourceRequestCancelCallback.callTrampoline else null, context, if (context != null) &callback.Registration(ResourceRequestCancelCallback).releaseNative else null, &rejected }, lease.diagnostic_store);
     if (rejected) return true;
     roots.accept();
     return false;
 }
 
-pub fn resourceRequestWaitUntilRetired(handle: ResourceRequestHandle) status.Error!void {
+pub fn resourceRequestWaitUntilRetired(handle: ResourceRequestHandle, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
     const binding_arg_0 = handle;
     try callback.check("mln_resource_request_wait_until_retired", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.checkStatus(c.mln_resource_request_wait_until_retired(binding_arg_0.raw), null);
+    try status.call(c.mln_resource_request_wait_until_retired, .{binding_arg_0.raw}, diagnostic_store);
     roots.accept();
 }
 
-pub fn resourceTransformResponseSetUrl(response: ResourceTransformResponse, url: []const u8) status.Error!void {
+pub fn resourceTransformResponseSetUrl(response: ResourceTransformResponse, url: []const u8, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
     const binding_arg_0 = response;
     const binding_arg_1 = url;
     try callback.checkScoped("mln_resource_transform_response_set_url", @intFromPtr(binding_arg_0.native));
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.checkStatus(c.mln_resource_transform_response_set_url(binding_arg_0.native, @as(@typeInfo(@TypeOf(c.mln_resource_transform_response_set_url)).@"fn".params[1].type.?, @ptrCast(binding_arg_1.ptr)), binding_arg_1.len), null);
+    try status.call(c.mln_resource_transform_response_set_url, .{ binding_arg_0.native, @as(@typeInfo(@TypeOf(c.mln_resource_transform_response_set_url)).@"fn".params[1].type.?, @ptrCast(binding_arg_1.ptr)), binding_arg_1.len }, diagnostic_store);
     roots.accept();
 }
 
@@ -9687,7 +9666,7 @@ pub fn runtimeBarrier(runtime: Runtime) status.Error!completion.Future(void) {
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_barrier, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_barrier, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9701,7 +9680,7 @@ pub fn runtimeClearHttpHeaderTransform(runtime: Runtime) status.Error!completion
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_clear_http_header_transform, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_clear_http_header_transform, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9715,7 +9694,7 @@ pub fn runtimeClearResourceProvider(runtime: Runtime) status.Error!completion.Fu
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_clear_resource_provider, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_clear_resource_provider, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9729,12 +9708,12 @@ pub fn runtimeClearResourceTransform(runtime: Runtime) status.Error!completion.F
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_clear_resource_transform, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_clear_resource_transform, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeCreate(allocator: std.mem.Allocator, options: RuntimeOptions) status.Error!Runtime {
+pub fn runtimeCreate(allocator: std.mem.Allocator, options: RuntimeOptions, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!Runtime {
     const binding_arg_0 = options;
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
@@ -9744,9 +9723,9 @@ pub fn runtimeCreate(allocator: std.mem.Allocator, options: RuntimeOptions) stat
     const roots = &root_storage;
     defer roots.deinit();
     var binding_arg_1: c.mln_runtime = std.mem.zeroes(c.mln_runtime);
-    try status.checkStatus(c.mln_runtime_create(try store(input_allocator, try binding_arg_0.toNative(input_allocator, roots)), &binding_arg_1), null);
+    try status.call(c.mln_runtime_create, .{ try store(input_allocator, try binding_arg_0.toNative(input_allocator, roots)), &binding_arg_1 }, diagnostic_store);
     roots.accept();
-    return try Runtime.adopt(binding_arg_1, null, null);
+    return try Runtime.adopt(binding_arg_1, null, diagnostic_store);
 }
 
 pub fn runtimeDispose(runtime: Runtime) status.Error!void {
@@ -9759,7 +9738,7 @@ pub fn runtimeDispose(runtime: Runtime) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.checkStatus(c.mln_runtime_dispose(binding_arg_0_native), binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_runtime_dispose, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
     }
     roots.accept();
     binding_arg_0_lease.commit();
@@ -9774,7 +9753,7 @@ pub fn runtimeDrainEvents(runtime: Runtime) status.Error!EventBatch {
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_event_batch = std.mem.zeroes(c.mln_event_batch);
-    try status.checkStatus(c.mln_runtime_drain_events(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_runtime_drain_events, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return try EventBatch.adopt(binding_arg_1, null, binding_arg_0_lease.diagnostic_store);
 }
@@ -9788,7 +9767,7 @@ pub fn runtimeGetEventMask(runtime: Runtime) status.Error!RuntimeEventMask {
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_runtime_event_mask = std.mem.zeroes(c.mln_runtime_event_mask);
-    try status.checkStatus(c.mln_runtime_get_event_mask(binding_arg_0_lease.native, &binding_arg_1), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_runtime_get_event_mask, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
     return RuntimeEventMask.fromNative(binding_arg_1);
 }
@@ -9807,7 +9786,7 @@ pub fn runtimeOfflineRegionCreate(allocator: std.mem.Allocator, runtime: Runtime
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_create)).@"fn".params[2].type.?, @ptrCast(binding_arg_2.ptr)), binding_arg_2.len };
-    const readiness = try submitAllocated(OwnedValue(OfflineRegionInfo), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue(OfflineRegionInfo), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue(OfflineRegionInfo) {
             const raw_value = try completion.value(c.mln_offline_region_info)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -9816,7 +9795,7 @@ pub fn runtimeOfflineRegionCreate(allocator: std.mem.Allocator, runtime: Runtime
             const copied_value = try OfflineRegionInfo.fromNative(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_runtime_offline_region_create, native_arguments);
+    }.copy, allocator, c.mln_runtime_offline_region_create, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9831,7 +9810,7 @@ pub fn runtimeOfflineRegionDelete(runtime: Runtime, region_id: i64) status.Error
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_delete)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_delete, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_delete, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9846,7 +9825,7 @@ pub fn runtimeOfflineRegionGet(allocator: std.mem.Allocator, runtime: Runtime, r
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_get)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try submitAllocated(?OwnedValue(OfflineRegionInfo), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(OfflineRegionInfo), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(OfflineRegionInfo) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_offline_region_info)(result);
@@ -9856,7 +9835,7 @@ pub fn runtimeOfflineRegionGet(allocator: std.mem.Allocator, runtime: Runtime, r
             const copied_value = try OfflineRegionInfo.fromNative(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_runtime_offline_region_get, native_arguments);
+    }.copy, allocator, c.mln_runtime_offline_region_get, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9871,7 +9850,7 @@ pub fn runtimeOfflineRegionGetStatus(runtime: Runtime, region_id: i64) status.Er
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_get_status)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try submit(OfflineRegionStatus, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(OfflineRegionStatus, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!OfflineRegionStatus {
             const raw_value = try completion.value(c.mln_offline_region_status)(result);
             return OfflineRegionStatus.fromNative(raw_value);
@@ -9891,7 +9870,7 @@ pub fn runtimeOfflineRegionInvalidate(runtime: Runtime, region_id: i64) status.E
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_invalidate)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_invalidate, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_invalidate, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9907,7 +9886,7 @@ pub fn runtimeOfflineRegionSetDownloadState(runtime: Runtime, region_id: i64, st
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_set_download_state)).@"fn".params[1].type.?, binding_arg_1), @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_set_download_state)).@"fn".params[2].type.?, binding_arg_2.toNative()) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_set_download_state, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_set_download_state, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9923,7 +9902,7 @@ pub fn runtimeOfflineRegionSetObserved(runtime: Runtime, region_id: i64, observe
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_set_observed)).@"fn".params[1].type.?, binding_arg_1), @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_set_observed)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_set_observed, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_set_observed, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9939,7 +9918,7 @@ pub fn runtimeOfflineRegionUpdateMetadata(allocator: std.mem.Allocator, runtime:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_update_metadata)).@"fn".params[1].type.?, binding_arg_1), @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_update_metadata)).@"fn".params[2].type.?, @ptrCast(binding_arg_2.ptr)), binding_arg_2.len };
-    const readiness = try submitAllocated(OwnedValue(OfflineRegionInfo), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue(OfflineRegionInfo), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue(OfflineRegionInfo) {
             const raw_value = try completion.value(c.mln_offline_region_info)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -9948,7 +9927,7 @@ pub fn runtimeOfflineRegionUpdateMetadata(allocator: std.mem.Allocator, runtime:
             const copied_value = try OfflineRegionInfo.fromNative(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_runtime_offline_region_update_metadata, native_arguments);
+    }.copy, allocator, c.mln_runtime_offline_region_update_metadata, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9962,7 +9941,7 @@ pub fn runtimeOfflineRegionsList(allocator: std.mem.Allocator, runtime: Runtime)
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submitAllocated(OwnedValue([]const OfflineRegionInfo), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const OfflineRegionInfo), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const OfflineRegionInfo) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -9974,7 +9953,7 @@ pub fn runtimeOfflineRegionsList(allocator: std.mem.Allocator, runtime: Runtime)
             };
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_runtime_offline_regions_list, native_arguments);
+    }.copy, allocator, c.mln_runtime_offline_regions_list, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9992,7 +9971,7 @@ pub fn runtimeOfflineRegionsMergeDatabase(allocator: std.mem.Allocator, runtime:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_regions_merge_database)).@"fn".params[1].type.?, try cString(input_allocator, binding_arg_1)) };
-    const readiness = try submitAllocated(OwnedValue([]const OfflineRegionInfo), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const OfflineRegionInfo), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const OfflineRegionInfo) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -10004,7 +9983,7 @@ pub fn runtimeOfflineRegionsMergeDatabase(allocator: std.mem.Allocator, runtime:
             };
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_runtime_offline_regions_merge_database, native_arguments);
+    }.copy, allocator, c.mln_runtime_offline_regions_merge_database, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -10033,7 +10012,7 @@ pub fn runtimeRelease(runtime: Runtime) status.Error!completion.Future(void) {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     const native_arguments = .{binding_arg_0_native};
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_release, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_release, native_arguments);
     roots.accept();
     binding_arg_0_lease.commit();
     return readiness;
@@ -10049,7 +10028,7 @@ pub fn runtimeRunAmbientCacheOperation(runtime: Runtime, operation: AmbientCache
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_run_ambient_cache_operation)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_run_ambient_cache_operation, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_run_ambient_cache_operation, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -10063,7 +10042,7 @@ pub fn runtimeSetEventMask(runtime: Runtime, mask: RuntimeEventMask) status.Erro
     defer roots.deinit();
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
-    try status.checkStatus(c.mln_runtime_set_event_mask(binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_set_event_mask)).@"fn".params[1].type.?, binding_arg_1.toNative())), binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_runtime_set_event_mask, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_set_event_mask)).@"fn".params[1].type.?, binding_arg_1.toNative()) }, binding_arg_0_lease.diagnostic_store);
     roots.accept();
 }
 
@@ -10080,7 +10059,7 @@ pub fn runtimeSetHttpHeaderTransform(allocator: std.mem.Allocator, runtime: Runt
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_http_header_transform, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_http_header_transform, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -10095,7 +10074,7 @@ pub fn runtimeSetMaximumAmbientCacheSize(runtime: Runtime, size: u64) status.Err
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_set_maximum_ambient_cache_size)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_maximum_ambient_cache_size, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_maximum_ambient_cache_size, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -10113,7 +10092,7 @@ pub fn runtimeSetResourceProvider(allocator: std.mem.Allocator, runtime: Runtime
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_resource_provider, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_resource_provider, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -10131,7 +10110,7 @@ pub fn runtimeSetResourceTransform(allocator: std.mem.Allocator, runtime: Runtim
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_resource_transform, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_resource_transform, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -10227,7 +10206,7 @@ pub fn textureReadPremultipliedRgba8(allocator: std.mem.Allocator, session: Rend
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try submitAllocated(OwnedValue(TextureReadbackResult), binding_arg_0_lease.diagnostic_store, allocator, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue(TextureReadbackResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue(TextureReadbackResult) {
             const raw_value = try completion.value(c.mln_texture_readback_result)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -10236,23 +10215,9 @@ pub fn textureReadPremultipliedRgba8(allocator: std.mem.Allocator, session: Rend
             const copied_value = try TextureReadbackResult.fromNative(copy_allocator, raw_value);
             return .{ .arena = arena, .value = copied_value };
         }
-    }.copy, c.mln_texture_read_premultiplied_rgba8, native_arguments);
+    }.copy, allocator, c.mln_texture_read_premultiplied_rgba8, native_arguments);
     roots.accept();
     return readiness;
-}
-
-pub fn threadLastErrorMessage(allocator: std.mem.Allocator) status.Error!OwnedValue([]const u8) {
-    try callback.check("mln_thread_last_error_message", 0);
-    var root_storage: callback.Roots = .{};
-    const roots = &root_storage;
-    defer roots.deinit();
-    const raw_result = c.mln_thread_last_error_message();
-    roots.accept();
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    errdefer arena.deinit();
-    const output_allocator = arena.allocator();
-    const copied_value = try output_allocator.dupe(u8, std.mem.span(raw_result orelse return error.NativeError));
-    return .{ .arena = arena, .value = copied_value };
 }
 
 pub fn vulkanBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
@@ -10270,7 +10235,7 @@ pub fn vulkanBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descr
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_borrowed_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_borrowed_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -10299,7 +10264,7 @@ pub fn vulkanBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: Ren
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_borrowed_texture_set_target, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_borrowed_texture_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -10319,7 +10284,7 @@ pub fn vulkanOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descript
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_owned_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_owned_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -10350,7 +10315,7 @@ pub fn vulkanSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: V
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_surface_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_surface_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -10379,7 +10344,7 @@ pub fn vulkanSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSessi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_surface_set_target, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_surface_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -10399,7 +10364,7 @@ pub fn webgpuBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descr
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_borrowed_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_borrowed_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -10428,7 +10393,7 @@ pub fn webgpuBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: Ren
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_borrowed_texture_set_target, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_borrowed_texture_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -10448,7 +10413,7 @@ pub fn webgpuOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descript
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_owned_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_owned_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -10479,7 +10444,7 @@ pub fn webgpuSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: W
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_surface_attach, native_arguments);
+    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_surface_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
     return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
@@ -10508,7 +10473,7 @@ pub fn webgpuSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSessi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_surface_set_target, native_arguments);
+    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_surface_set_target, native_arguments);
     roots.accept();
     return readiness;
 }

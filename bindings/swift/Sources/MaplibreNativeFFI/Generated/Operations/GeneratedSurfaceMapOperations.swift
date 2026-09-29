@@ -21,13 +21,14 @@ public extension MapHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_render_session = 0
       let future = try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           try arena.submit { try mln_metal_surface_attach(
             handle.raw,
             arena.store(bindingArg0.nativeValue()),
             arena.store(bindingArg1.nativeValue(arena: arena)),
             &value0,
-            completion
+            completion,
+            diagnostic
           ) }
         }
       let owner = try RenderSessionHandle(adopting: value0, parent: self)
@@ -60,13 +61,14 @@ public extension MapHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_render_session = 0
       let future = try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           try arena.submit { try mln_opengl_surface_attach(
             handle.raw,
             arena.store(bindingArg0.nativeValue(arena: arena)),
             arena.store(bindingArg1.nativeValue(arena: arena)),
             &value0,
-            completion
+            completion,
+            diagnostic
           ) }
         }
       let owner = try RenderSessionHandle(adopting: value0, parent: self)
@@ -99,13 +101,14 @@ public extension MapHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_render_session = 0
       let future = try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           try arena.submit { try mln_vulkan_surface_attach(
             handle.raw,
             arena.store(bindingArg0.nativeValue()),
             arena.store(bindingArg1.nativeValue(arena: arena)),
             &value0,
-            completion
+            completion,
+            diagnostic
           ) }
         }
       let owner = try RenderSessionHandle(adopting: value0, parent: self)
@@ -138,13 +141,14 @@ public extension MapHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_render_session = 0
       let future = try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           try arena.submit { try mln_webgpu_surface_attach(
             handle.raw,
             arena.store(bindingArg0.nativeValue()),
             arena.store(bindingArg1.nativeValue(arena: arena)),
             &value0,
-            completion
+            completion,
+            diagnostic
           ) }
         }
       let owner = try RenderSessionHandle(adopting: value0, parent: self)

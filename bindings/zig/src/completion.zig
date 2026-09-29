@@ -174,8 +174,8 @@ pub fn submit(
     comptime T: type,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     comptime copy: *const fn (*const c.mln_completion_result) status.Error!T,
-    context: anytype,
     comptime start: anytype,
+    arguments: anytype,
 ) status.Error!Future(T) {
     const FutureType = Future(T);
     const state = try std.heap.smp_allocator.create(FutureType.State);
@@ -186,7 +186,7 @@ pub fn submit(
             }
         }.copyResult,
     };
-    return finishSubmission(T, state, diagnostic_store, context, start);
+    return finishSubmission(T, state, diagnostic_store, start, arguments);
 }
 
 pub fn submitWithCopyContext(
@@ -195,8 +195,8 @@ pub fn submitWithCopyContext(
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     comptime copy: *const fn (*const c.mln_completion_result, *CopyContext) status.Error!T,
     copy_context: CopyContext,
-    context: anytype,
     comptime start: anytype,
+    arguments: anytype,
 ) status.Error!Future(T) {
     const FutureType = Future(T);
     const owned_copy_context = std.heap.smp_allocator.create(CopyContext) catch |err| {
@@ -226,20 +226,20 @@ pub fn submitWithCopyContext(
             }
         }.release,
     };
-    return finishSubmission(T, state, diagnostic_store, context, start);
+    return finishSubmission(T, state, diagnostic_store, start, arguments);
 }
 
 fn finishSubmission(
     comptime T: type,
     state: *Future(T).State,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
-    context: anytype,
     comptime start: anytype,
+    arguments: anytype,
 ) status.Error!Future(T) {
     const FutureType = Future(T);
     var future = FutureType{ .state = state };
     const completion_descriptor = FutureType.descriptor(state);
-    status.checkStatus(start(context, &completion_descriptor), diagnostic_store) catch |err| {
+    status.call(start, arguments ++ .{&completion_descriptor}, diagnostic_store) catch |err| {
         state.release();
         future.deinit();
         return err;

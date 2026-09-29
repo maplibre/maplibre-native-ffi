@@ -11,8 +11,8 @@ pub unsafe fn android_init(
 ) -> Result<()> {
     // SAFETY: input storage lives through submission; callback values are copied before return.
     maplibre_core::callback::check("mln_android_init", 0)?;
-    maplibre_core::check(unsafe {
-        sys::mln_android_init(binding_arg_0, binding_arg_1, binding_arg_2)
+    maplibre_core::check(|diagnostic| unsafe {
+        sys::mln_android_init(binding_arg_0, binding_arg_1, binding_arg_2, diagnostic)
     })?;
     Ok(())
 }
@@ -130,13 +130,14 @@ pub fn geojson_source_data_create(
         .map(|value| value.to_native(&mut arena))
         .transpose()?;
     let mut binding_arg_2 = sys::mln_geojson_source_data(0);
-    maplibre_core::check(unsafe {
+    maplibre_core::check(|diagnostic| unsafe {
         sys::mln_geojson_source_data_create(
             binding_arg_0,
             binding_arg_1
                 .as_ref()
                 .map_or(std::ptr::null(), |value| value),
             &mut binding_arg_2,
+            diagnostic,
         )
     })?;
     Ok(crate::GeojsonSourceDataHandle::from_native(binding_arg_2)?)
@@ -166,8 +167,12 @@ pub fn lat_lng_for_projected_meters(
     maplibre_core::callback::check("mln_lat_lng_for_projected_meters", 0)?;
     let mut binding_arg_1: sys::mln_lat_lng =
         maplibre_core::generated::LatLng::default().to_native();
-    maplibre_core::check(unsafe {
-        sys::mln_lat_lng_for_projected_meters(binding_arg_0.to_native(), &mut binding_arg_1)
+    maplibre_core::check(|diagnostic| unsafe {
+        sys::mln_lat_lng_for_projected_meters(
+            binding_arg_0.to_native(),
+            &mut binding_arg_1,
+            diagnostic,
+        )
     })?;
     Ok(maplibre_core::generated::LatLng::from_native(binding_arg_1))
 }
@@ -176,7 +181,7 @@ pub fn lat_lng_for_projected_meters(
 pub fn log_clear_callback() -> Result<()> {
     // SAFETY: input storage lives through submission; callback values are copied before return.
     maplibre_core::callback::check("mln_log_clear_callback", 0)?;
-    maplibre_core::check(unsafe { sys::mln_log_clear_callback() })?;
+    maplibre_core::check(|diagnostic| unsafe { sys::mln_log_clear_callback(diagnostic) })?;
     Ok(())
 }
 
@@ -186,8 +191,8 @@ pub fn log_set_async_severity_mask(
 ) -> Result<()> {
     // SAFETY: input storage lives through submission; callback values are copied before return.
     maplibre_core::callback::check("mln_log_set_async_severity_mask", 0)?;
-    maplibre_core::check(unsafe {
-        sys::mln_log_set_async_severity_mask(binding_arg_0.to_native())
+    maplibre_core::check(|diagnostic| unsafe {
+        sys::mln_log_set_async_severity_mask(binding_arg_0.to_native(), diagnostic)
     })?;
     Ok(())
 }
@@ -201,11 +206,12 @@ pub fn log_set_callback(
     let mut arena = maplibre_core::input::InputArena::default();
     let binding_registration_0 =
         maplibre_core::generated::log_callback_registration(binding_arg_0, &mut arena);
-    maplibre_core::check(unsafe {
+    maplibre_core::check(|diagnostic| unsafe {
         sys::mln_log_set_callback(
             binding_registration_0.0,
             binding_registration_0.1,
             binding_registration_0.2,
+            diagnostic,
         )
     })?;
     arena.accept_registrations();
@@ -270,7 +276,9 @@ pub fn network_status_get() -> Result<maplibre_core::generated::NetworkStatus> {
     // SAFETY: input storage lives through submission; callback values are copied before return.
     maplibre_core::callback::check("mln_network_status_get", 0)?;
     let mut binding_arg_0: u32 = Default::default();
-    maplibre_core::check(unsafe { sys::mln_network_status_get(&mut binding_arg_0) })?;
+    maplibre_core::check(|diagnostic| unsafe {
+        sys::mln_network_status_get(&mut binding_arg_0, diagnostic)
+    })?;
     Ok(maplibre_core::generated::NetworkStatus::from_native(
         binding_arg_0,
     ))
@@ -280,7 +288,9 @@ pub fn network_status_get() -> Result<maplibre_core::generated::NetworkStatus> {
 pub fn network_status_set(binding_arg_0: maplibre_core::generated::NetworkStatus) -> Result<()> {
     // SAFETY: input storage lives through submission; callback values are copied before return.
     maplibre_core::callback::check("mln_network_status_set", 0)?;
-    maplibre_core::check(unsafe { sys::mln_network_status_set(binding_arg_0.to_native()) })?;
+    maplibre_core::check(|diagnostic| unsafe {
+        sys::mln_network_status_set(binding_arg_0.to_native(), diagnostic)
+    })?;
     Ok(())
 }
 
@@ -346,8 +356,12 @@ pub fn projected_meters_for_lat_lng(
     maplibre_core::callback::check("mln_projected_meters_for_lat_lng", 0)?;
     let mut binding_arg_1: sys::mln_projected_meters =
         maplibre_core::generated::ProjectedMeters::default().to_native();
-    maplibre_core::check(unsafe {
-        sys::mln_projected_meters_for_lat_lng(binding_arg_0.to_native(), &mut binding_arg_1)
+    maplibre_core::check(|diagnostic| unsafe {
+        sys::mln_projected_meters_for_lat_lng(
+            binding_arg_0.to_native(),
+            &mut binding_arg_1,
+            diagnostic,
+        )
     })?;
     Ok(maplibre_core::generated::ProjectedMeters::from_native(
         binding_arg_1,
@@ -380,11 +394,12 @@ pub fn render_target_extent_physical_size(
     let binding_arg_0 = binding_arg_0.to_native();
     let mut binding_arg_1: u32 = Default::default();
     let mut binding_arg_2: u32 = Default::default();
-    maplibre_core::check(unsafe {
+    maplibre_core::check(|diagnostic| unsafe {
         sys::mln_render_target_extent_physical_size(
             &binding_arg_0,
             &mut binding_arg_1,
             &mut binding_arg_2,
+            diagnostic,
         )
     })?;
     Ok((binding_arg_1, binding_arg_2))
@@ -449,7 +464,9 @@ pub fn runtime_create(
     let mut arena = maplibre_core::input::InputArena::default();
     let binding_arg_0 = binding_arg_0.to_native(&mut arena)?;
     let mut binding_arg_1 = sys::mln_runtime(0);
-    maplibre_core::check(unsafe { sys::mln_runtime_create(&binding_arg_0, &mut binding_arg_1) })?;
+    maplibre_core::check(|diagnostic| unsafe {
+        sys::mln_runtime_create(&binding_arg_0, &mut binding_arg_1, diagnostic)
+    })?;
     arena.accept_registrations();
     Ok(crate::RuntimeHandle::from_native(binding_arg_1)?)
 }
@@ -523,14 +540,6 @@ pub fn texture_image_info_default() -> Result<maplibre_core::generated::TextureI
     Ok(maplibre_core::generated::TextureImageInfo::from_native(
         value,
     ))
-}
-
-/// Calls `mln_thread_last_error_message` using its header execution and ownership contract.
-pub fn thread_last_error_message() -> Result<String> {
-    // SAFETY: input storage lives through submission; callback values are copied before return.
-    maplibre_core::callback::check("mln_thread_last_error_message", 0)?;
-    let value = unsafe { sys::mln_thread_last_error_message() };
-    Ok(unsafe { maplibre_core::string::copy_c_string(value) }?)
 }
 
 /// Calls `mln_vulkan_borrowed_texture_descriptor_default` using its header execution and ownership contract.

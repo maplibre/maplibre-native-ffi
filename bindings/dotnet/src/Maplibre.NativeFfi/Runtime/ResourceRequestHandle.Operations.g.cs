@@ -27,13 +27,13 @@ public sealed unsafe partial class ResourceRequestHandle : IDisposable
         nativeId = handle.Value;
         state = new NativeHandleState<MlnResourceRequest>(
             handle,
-            static live =>
+            static (live, _) =>
             {
                 NativeMethods.mln_resource_request_release(live);
                 return mln_status.MLN_STATUS_OK;
             },
             nameof(ResourceRequestHandle),
-            static live =>
+            static (live, _) =>
             {
                 NativeMethods.mln_resource_request_release(live);
                 return mln_status.MLN_STATUS_OK;
@@ -91,8 +91,14 @@ public sealed unsafe partial class ResourceRequestHandle : IDisposable
             "mln_resource_request_cancelled"
         );
         bool outCancelled = default;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_resource_request_cancelled(read.Handle, &outCancelled)
+            NativeMethods.mln_resource_request_cancelled(
+                read.Handle,
+                &outCancelled,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return outCancelled;
     }
@@ -107,7 +113,15 @@ public sealed unsafe partial class ResourceRequestHandle : IDisposable
         );
         var nativeResponse = NativeResourceResponse(response, scope);
         using var claim = state.BeginClaim();
-        NativeStatus.Check(NativeMethods.mln_resource_request_complete(Handle, &nativeResponse));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_resource_request_complete(
+                Handle,
+                &nativeResponse,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         scope.Accept();
         claim.Accept();
     }
@@ -136,14 +150,17 @@ public sealed unsafe partial class ResourceRequestHandle : IDisposable
                 new global::Maplibre.NativeFfi.Internal.Callback.NativeOwnedCallback(callback, this)
             );
         bool outCancelled = default;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_resource_request_set_cancel_callback(
                 read.Handle,
                 callback is null ? null : &InvokeResourceRequestCancelCallback,
                 rootCallback,
                 &global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackRoot.Release,
-                &outCancelled
-            )
+                &outCancelled,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         if (!outCancelled)
             scope.Accept(this.CallbackOwner);
@@ -157,8 +174,13 @@ public sealed unsafe partial class ResourceRequestHandle : IDisposable
             this,
             "mln_resource_request_wait_until_retired"
         );
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_resource_request_wait_until_retired(state.IssuedHandle)
+            NativeMethods.mln_resource_request_wait_until_retired(
+                state.IssuedHandle,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
     }
 }

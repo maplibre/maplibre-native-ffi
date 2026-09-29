@@ -16,10 +16,13 @@ import org.maplibre.nativeffi.internal.c.mln_completion
 import org.maplibre.nativeffi.internal.c.mln_completion_callback
 import org.maplibre.nativeffi.internal.c.mln_completion_release
 import org.maplibre.nativeffi.internal.c.mln_completion_result
-import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
-/** Bridges one native completion into an eager Kotlin [Deferred]. */
+/**
+ * Bridges one native completion into an eager Kotlin [Deferred].
+ *
+ * Each submission call throws the mapped status error when native rejects it synchronously.
+ */
 internal object CompletionBridge {
   private class State<T>(
     val id: Long,
@@ -43,14 +46,14 @@ internal object CompletionBridge {
       Arena.global(),
     )
 
-  fun <T> submit(convert: (MemorySegment) -> T, call: (MemorySegment) -> Int): Deferred<T> =
+  fun <T> submit(convert: (MemorySegment) -> T, call: (MemorySegment) -> Unit): Deferred<T> =
     submitInternal(convert, false, false, call)
 
   fun <T> submitOwned(
     convert: (MemorySegment) -> T,
     closeDropped: (T) -> Unit,
     disposeUnadopted: (MemorySegment) -> Unit,
-    call: (MemorySegment) -> Int,
+    call: (MemorySegment) -> Unit,
   ): Deferred<T> =
     submitInternal(
       { result -> adoptOwned(result, disposeUnadopted, convert) },
@@ -64,7 +67,7 @@ internal object CompletionBridge {
     convert: (MemorySegment) -> T,
     rejectSynchronously: Boolean,
     acceptErrorStatus: Boolean,
-    call: (MemorySegment) -> Int,
+    call: (MemorySegment) -> Unit,
     closeDropped: (T) -> Unit = {},
   ): Deferred<T> {
     val state = State(nextId.getAndIncrement(), convert, acceptErrorStatus, closeDropped)
@@ -76,7 +79,7 @@ internal object CompletionBridge {
         mln_completion.callback(descriptor, callback)
         mln_completion.user_data(descriptor, MemorySegment.ofAddress(state.id))
         mln_completion.release_user_data(descriptor, release)
-        Status.check(call(descriptor))
+        call(descriptor)
       }
     } catch (failure: Throwable) {
       states.remove(state.id, state)
@@ -86,7 +89,7 @@ internal object CompletionBridge {
     return state.result
   }
 
-  fun command(call: (MemorySegment) -> Int): Deferred<CommandCompletion> =
+  fun command(call: (MemorySegment) -> Unit): Deferred<CommandCompletion> =
     submitInternal(
       convert = ::commandCompletion,
       rejectSynchronously = false,
@@ -95,7 +98,7 @@ internal object CompletionBridge {
     )
 
   /** Submits an ordered command and throws instead of deferring a synchronous rejection. */
-  fun commandChecked(call: (MemorySegment) -> Int): Deferred<CommandCompletion> =
+  fun commandChecked(call: (MemorySegment) -> Unit): Deferred<CommandCompletion> =
     submitInternal(
       convert = ::commandCompletion,
       rejectSynchronously = true,
@@ -111,9 +114,9 @@ internal object CompletionBridge {
       diagnostic(result),
     )
 
-  fun unit(call: (MemorySegment) -> Int): Deferred<Unit> = submit(convert = { _ -> }, call = call)
+  fun unit(call: (MemorySegment) -> Unit): Deferred<Unit> = submit(convert = { _ -> }, call = call)
 
-  fun unitChecked(call: (MemorySegment) -> Int): Deferred<Unit> =
+  fun unitChecked(call: (MemorySegment) -> Unit): Deferred<Unit> =
     submitInternal(
       convert = { _ -> },
       rejectSynchronously = true,

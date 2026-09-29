@@ -6,11 +6,9 @@
  * MLN_STATUS_WRONG_THREAD for mismatches. Functions without an explicit
  * graphics-thread requirement may be called from any thread.
  *
- * Status-returning functions clear thread-local diagnostics on entry. After a
- * synchronous failure status is returned, read
- * mln_thread_last_error_message() on the same thread before making another C
- * API call. Asynchronous native failures are reported through completions or
- * repeated event streams.
+ * Status-returning functions report a synchronous failure's message through
+ * their last parameter, a nullable mln_diagnostic*. Asynchronous native
+ * failures are reported through completions or repeated event streams.
  *
  * This header targets C23.
  */
@@ -22,7 +20,6 @@
 #include "maplibre_native_c/base.h"            // IWYU pragma: export
 #include "maplibre_native_c/camera.h"          // IWYU pragma: export
 #include "maplibre_native_c/completion.h"      // IWYU pragma: export
-#include "maplibre_native_c/diagnostics.h"     // IWYU pragma: export
 #include "maplibre_native_c/logging.h"         // IWYU pragma: export
 #include "maplibre_native_c/map.h"             // IWYU pragma: export
 #include "maplibre_native_c/projection.h"      // IWYU pragma: export

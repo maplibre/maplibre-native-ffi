@@ -7,63 +7,15 @@ import org.bytedeco.javacpp.annotation.Platform;
 import org.bytedeco.javacpp.annotation.Properties;
 import org.bytedeco.javacpp.annotation.Raw;
 
-/** Android-only JavaCPP helpers for JNI context and borrowed arrays. */
-@Properties(
-    inherit = MaplibreNativeCConfig.class,
-    value = @Platform(include = {"android_image_bridge.h", "plugin_bridge.h", "camera_bridge.h"}))
+/** Android-only JavaCPP helpers for JNI context and the plugin registration entry point. */
+@Properties(inherit = MaplibreNativeCConfig.class, value = @Platform(include = "plugin_bridge.h"))
 public final class AndroidNativeBridge {
   private AndroidNativeBridge() {}
-
-  @Name("mln_android_map_get_camera")
-  public static native @Cast("mln_status") int mapGetCamera(
-      @Cast("mln_map") long map, double[] out, @Cast("uint64_t*") long[] generation);
-
-  @Name("mln_android_projection_get_camera")
-  public static native @Cast("mln_status") int projectionGetCamera(
-      @Cast("mln_map_projection") long projection, double[] out);
-
-  @Name("mln_android_projection_pixel_for_lat_lng")
-  public static native @Cast("mln_status") int projectionPixelForLatLng(
-      @Cast("mln_map_projection") long projection, double latitude, double longitude, double[] out);
-
-  @Name("mln_android_projection_lat_lng_for_pixel")
-  public static native @Cast("mln_status") int projectionLatLngForPixel(
-      @Cast("mln_map_projection") long projection,
-      double x,
-      double y,
-      boolean unwrapped,
-      double[] out);
 
   @Name("mln_android_plugin_register_function_v1")
   public static native @Cast("uintptr_t") long pluginRegisterFunctionV1();
 
   @Name("mln_android_init")
-  public static native @Cast("mln_status") int initialize(@Raw(withEnv = true) Object context);
-
-  @Name("mln_android_set_style_image")
-  public static native @Cast("mln_status") int setStyleImage(
-      @Cast("mln_map") long map,
-      @Cast("const mln_buffer_view*") Pointer imageId,
-      @Cast("const mln_premultiplied_rgba8_image*") Pointer image,
-      @Cast("const uint8_t*") byte[] pixels,
-      @Cast("const mln_style_image_options*") Pointer options,
-      @Cast("const mln_completion*") Pointer completion);
-
-  @Name("mln_android_add_image_source_image")
-  public static native @Cast("mln_status") int addImageSourceImage(
-      @Cast("mln_map") long map,
-      @Cast("const mln_buffer_view*") Pointer sourceId,
-      @Cast("const mln_lat_lng*") Pointer coordinates,
-      @Cast("size_t") long coordinateCount,
-      @Cast("const mln_premultiplied_rgba8_image*") Pointer image,
-      @Cast("const uint8_t*") byte[] pixels,
-      @Cast("const mln_completion*") Pointer completion);
-
-  @Name("mln_android_set_image_source_image")
-  public static native @Cast("mln_status") int setImageSourceImage(
-      @Cast("mln_map") long map,
-      @Cast("const mln_buffer_view*") Pointer sourceId,
-      @Cast("const mln_premultiplied_rgba8_image*") Pointer image,
-      @Cast("const uint8_t*") byte[] pixels,
-      @Cast("const mln_completion*") Pointer completion);
+  public static native @Cast("mln_status") int initialize(
+      @Raw(withEnv = true) Object context, @Cast("mln_diagnostic*") Pointer diagnostic);
 }

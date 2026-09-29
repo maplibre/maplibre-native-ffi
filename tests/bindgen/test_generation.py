@@ -15,6 +15,7 @@ PRELUDE = """
 #define BIND(x) __attribute__((annotate("mln:" x)))
 typedef unsigned long long mln_map;
 typedef int mln_status;
+typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
 typedef struct mln_completion { void *state; } mln_completion;
 typedef struct mln_buffer_view { const void *data; unsigned long size; } mln_buffer_view;
 """
@@ -53,7 +54,7 @@ typedef int64_t mln_offset;
 typedef size_t mln_count;
 typedef enum mln_flags : uint64_t { MLN_FLAGS_HIGH = 0x100000000ULL } mln_flags;
 typedef struct mln_values { mln_counter_alias counter; mln_offset offset; mln_count count; mln_flags flags; } mln_values;
-BIND("execution=immediate") mln_status mln_roundtrip(mln_values input, mln_values *out_value BIND("direction=out"));
+BIND("execution=immediate") mln_status mln_roundtrip(mln_values input, mln_values *out_value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         before = self.parse(source.replace("UNDERLYING", "long"))
         after = self.parse(source.replace("UNDERLYING", "long long"))
@@ -70,16 +71,16 @@ BIND("execution=immediate") mln_status mln_roundtrip(mln_values input, mln_value
                 original = self.parse(
                     """
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
-mln_status mln_map_test_scale(mln_map map, double latitude, const mln_completion *completion);
+mln_status mln_map_test_scale(mln_map map, double latitude, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """,
                     owned_map=True,
                 )
                 renamed = self.parse(
                     """
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
-mln_status mln_map_new_scale(mln_map map, float latitude, const mln_completion *completion);
+mln_status mln_map_new_scale(mln_map map, float latitude, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 BIND("receiver=map;execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_new_command(mln_map map, bool enabled, const mln_completion *completion);
+mln_status mln_map_new_command(mln_map map, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """,
                     owned_map=True,
                 )
@@ -100,7 +101,7 @@ mln_status mln_map_new_command(mln_map map, bool enabled, const mln_completion *
 typedef unsigned long long mln_widget BIND("kind=handle;release=mln_widget_close;dispose=mln_widget_close;parent=none");
 BIND("execution=immediate") void mln_widget_close(mln_widget widget);
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
-mln_status mln_widget_scale(mln_widget widget, const mln_completion *completion);
+mln_status mln_widget_scale(mln_widget widget, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):
@@ -116,7 +117,7 @@ typedef struct mln_new_entry {
   unsigned long count;
 } mln_new_entry;
 BIND("execution=query;result=mln_new_entry;shape=array;ownership=borrowed")
-mln_status mln_map_new_entries(mln_map map, const mln_completion *completion);
+mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):
@@ -128,9 +129,9 @@ mln_status mln_map_new_entries(mln_map map, const mln_completion *completion);
     def test_every_declaration_is_generated_or_has_a_reason(self):
         api = self.parse("""
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
-mln_status mln_map_scalar(mln_map map, const mln_completion *completion);
+mln_status mln_map_scalar(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_span(mln_map map, const double *values, unsigned count, const mln_completion *completion);
+mln_status mln_map_span(mln_map map, const double *values, unsigned count, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 BIND("execution=immediate")
 void mln_global_hook(void (*callback)(void *), void *context);
 """)
@@ -150,7 +151,7 @@ void mln_global_hook(void (*callback)(void *), void *context);
         api = self.parse("""
 typedef union mln_variant { double number; bool flag; } mln_variant;
 BIND("execution=query;result=mln_variant;shape=array;ownership=borrowed")
-mln_status mln_map_variants(mln_map map, const mln_completion *completion);
+mln_status mln_map_variants(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):
@@ -165,7 +166,7 @@ mln_status mln_map_variants(mln_map map, const mln_completion *completion);
         ):
             api = self.parse(f"""
 BIND("execution=command;result=void;shape=none;ownership=value{contract}")
-mln_status mln_map_consume({receiver}, const mln_completion *completion);
+mln_status mln_map_consume({receiver}, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
             for emitter in EMITTERS:
                 with self.subTest(emitter=emitter.__name__, contract=contract):
@@ -186,7 +187,7 @@ typedef struct mln_nullable_entry {
   mln_buffer_view title BIND("encoding=utf8;nullable=true");
 } mln_nullable_entry;
 BIND("execution=query;result=mln_nullable_entry;shape=array;ownership=borrowed")
-mln_status mln_map_nullable_entries(mln_map map, const mln_completion *completion);
+mln_status mln_map_nullable_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):
@@ -203,7 +204,7 @@ mln_status mln_map_nullable_entries(mln_map map, const mln_completion *completio
 typedef unsigned int uint32_t;
 typedef struct mln_bit_entry { uint32_t flags : 3; } mln_bit_entry;
 BIND("execution=query;result=mln_bit_entry;shape=array;ownership=borrowed")
-mln_status mln_map_bit_entries(mln_map map, const mln_completion *completion);
+mln_status mln_map_bit_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):
@@ -217,7 +218,7 @@ mln_status mln_map_bit_entries(mln_map map, const mln_completion *completion);
 BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_map_store_view(mln_map map,
   mln_buffer_view view BIND("encoding=utf8;lifetime=owner"),
-  const mln_completion *completion);
+  const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:
             with self.subTest(emitter=emitter.__name__):

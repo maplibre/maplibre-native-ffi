@@ -19,7 +19,6 @@ from ._generated_operations import (
     rendered_query_geometry_point,
     runtime_create,
     supported_render_backend_mask,
-    thread_last_error_message,
 )
 from ._generated_owners import (
     AcquiredFrameHandle,
@@ -461,5 +460,4 @@ __all__ = [
     "rendered_query_geometry_point",
     "runtime_create",
     "supported_render_backend_mask",
-    "thread_last_error_message",
 ]

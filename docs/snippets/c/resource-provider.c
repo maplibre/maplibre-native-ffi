@@ -37,7 +37,7 @@ static uint32_t serve_bundled_asset(
     .byte_count = size,
   };
   // The C API copies these bytes before the call returns.
-  mln_resource_request_complete(handle, &response);
+  mln_resource_request_complete(handle, &response, NULL);
   mln_resource_request_release(handle);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
   // #endregion complete
@@ -63,7 +63,7 @@ void watch_for_cancellation(
   bool already_cancelled = false;
   if (
     mln_resource_request_set_cancel_callback(
-      handle, abort_pending_fetch, fetch, NULL, &already_cancelled
+      handle, abort_pending_fetch, fetch, NULL, &already_cancelled, NULL
     ) == MLN_STATUS_OK &&
     already_cancelled
   ) {
@@ -81,6 +81,8 @@ mln_status install_provider(
     .callback = serve_bundled_asset,
     .user_data = store,
   };
-  return mln_runtime_set_resource_provider(runtime, &provider, completion);
+  return mln_runtime_set_resource_provider(
+    runtime, &provider, completion, NULL
+  );
 }
 // #endregion install

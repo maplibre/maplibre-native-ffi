@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 public actual object GeneratedApi {
   public actual fun androidInit(
@@ -18,13 +18,14 @@ public actual object GeneratedApi {
     NativeAccess.ensureLoaded()
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(null, "mln_android_init")
     return PointerScope().use { arena ->
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         MaplibreNativeC.mln_android_init(
           org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer(jniEnv.address),
           org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer(jniClass.address),
           org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer(context.address),
+          diagnostic,
         )
-      )
+      }
       Unit
     }
   }
@@ -169,14 +170,15 @@ public actual object GeneratedApi {
     )
     return PointerScope().use { arena ->
       val output = LongPointer(1L).put(0L)
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         MaplibreNativeC.mln_geojson_source_data_create(
           GeneratedValues.byteView(arena, data),
           if (options == null) null
           else GeneratedValues.writeGeojsonSourceOptions(arena, options!!),
           output,
+          diagnostic,
         )
-      )
+      }
       adoptOwned(
         output.get(),
         { GeneratedOwnerDisposal.geojsonSourceData(it) },
@@ -218,7 +220,7 @@ public actual object GeneratedApi {
         response.bindingAddress,
         "mln_http_header_transform_response_set",
       )
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         MaplibreNativeC.mln_http_header_transform_response_set(
           MaplibreNativeC.mln_http_header_transform_response(
             org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer(
@@ -229,8 +231,9 @@ public actual object GeneratedApi {
           name.encodeToByteArray().size.toLong(),
           GeneratedValues.rawBytes(arena, valueValue.encodeToByteArray()),
           valueValue.encodeToByteArray().size.toLong(),
+          diagnostic,
         )
-      )
+      }
     }
   }
 
@@ -242,12 +245,13 @@ public actual object GeneratedApi {
     )
     return PointerScope().use { arena ->
       val output = MaplibreNativeC.mln_lat_lng()
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         MaplibreNativeC.mln_lat_lng_for_projected_meters(
           GeneratedValues.writeProjectedMeters(arena, meters),
           output,
+          diagnostic,
         )
-      )
+      }
       GeneratedValues.readLatLng(output)
     }
   }
@@ -256,7 +260,7 @@ public actual object GeneratedApi {
     NativeAccess.ensureLoaded()
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(null, "mln_log_clear_callback")
     return PointerScope().use { arena ->
-      BindingStatus.check(MaplibreNativeC.mln_log_clear_callback())
+      NativeDiagnostics.check { diagnostic -> MaplibreNativeC.mln_log_clear_callback(diagnostic) }
       Unit
     }
   }
@@ -268,7 +272,9 @@ public actual object GeneratedApi {
       "mln_log_set_async_severity_mask",
     )
     return PointerScope().use { arena ->
-      BindingStatus.check(MaplibreNativeC.mln_log_set_async_severity_mask(mask.rawValue.toInt()))
+      NativeDiagnostics.check { diagnostic ->
+        MaplibreNativeC.mln_log_set_async_severity_mask(mask.rawValue.toInt(), diagnostic)
+      }
       Unit
     }
   }
@@ -278,13 +284,14 @@ public actual object GeneratedApi {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(null, "mln_log_set_callback")
     org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope().use { registrations ->
       val token = registrations.register(GeneratedLogCallbackRegistration(callback))
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         MaplibreNativeC.mln_log_set_callback(
           GeneratedDirectCallbacks.LogCallbackStub,
           org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer(token),
           GeneratedDirectCallbacks.LogCallbackReleaseStub,
+          diagnostic,
         )
-      )
+      }
       registrations.accept(org.maplibre.nativeffi.internal.callback.CallbackOwner.global)
     }
   }
@@ -366,7 +373,9 @@ public actual object GeneratedApi {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(null, "mln_network_status_get")
     return PointerScope().use { arena ->
       val output = IntPointer(1L)
-      BindingStatus.check(MaplibreNativeC.mln_network_status_get(output))
+      NativeDiagnostics.check { diagnostic ->
+        MaplibreNativeC.mln_network_status_get(output, diagnostic)
+      }
       NetworkStatus(output.get().toUInt())
     }
   }
@@ -375,7 +384,9 @@ public actual object GeneratedApi {
     NativeAccess.ensureLoaded()
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(null, "mln_network_status_set")
     return PointerScope().use { arena ->
-      BindingStatus.check(MaplibreNativeC.mln_network_status_set(status.rawValue.toInt()))
+      NativeDiagnostics.check { diagnostic ->
+        MaplibreNativeC.mln_network_status_set(status.rawValue.toInt(), diagnostic)
+      }
       Unit
     }
   }
@@ -460,12 +471,13 @@ public actual object GeneratedApi {
     )
     return PointerScope().use { arena ->
       val output = MaplibreNativeC.mln_projected_meters()
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         MaplibreNativeC.mln_projected_meters_for_lat_lng(
           GeneratedValues.writeLatLng(arena, coordinate),
           output,
+          diagnostic,
         )
-      )
+      }
       GeneratedValues.readProjectedMeters(output)
     }
   }
@@ -504,13 +516,14 @@ public actual object GeneratedApi {
       )
       val out0 = IntPointer(1L)
       val out1 = IntPointer(1L)
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         MaplibreNativeC.mln_render_target_extent_physical_size(
           GeneratedValues.writeRenderTargetExtent(arena, extent),
           out0,
           out1,
+          diagnostic,
         )
-      )
+      }
       RenderTargetExtentPhysicalSizeResult(
         width = out0.get().toUInt(),
         height = out1.get().toUInt(),
@@ -586,7 +599,7 @@ public actual object GeneratedApi {
         response.bindingAddress,
         "mln_resource_transform_response_set_url",
       )
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         MaplibreNativeC.mln_resource_transform_response_set_url(
           MaplibreNativeC.mln_resource_transform_response(
             org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer(
@@ -595,8 +608,9 @@ public actual object GeneratedApi {
           ),
           GeneratedValues.rawBytes(arena, url.encodeToByteArray()),
           url.encodeToByteArray().size.toLong(),
+          diagnostic,
         )
-      )
+      }
     }
   }
 
@@ -610,12 +624,13 @@ public actual object GeneratedApi {
       try {
         PointerScope().use { arena ->
           val output = LongPointer(1L).put(0L)
-          BindingStatus.check(
+          NativeDiagnostics.check { diagnostic ->
             MaplibreNativeC.mln_runtime_create(
               GeneratedValues.writeRuntimeOptions(arena, options, registrations),
               output,
+              diagnostic,
             )
-          )
+          }
           run {
             val owner =
               adoptOwned(
@@ -735,18 +750,6 @@ public actual object GeneratedApi {
     return PointerScope().use { arena ->
       val nativeResult = MaplibreNativeC.mln_texture_image_info_default()
       GeneratedValues.readTextureImageInfo(nativeResult)
-    }
-  }
-
-  public actual fun threadLastErrorMessage(): String {
-    NativeAccess.ensureLoaded()
-    org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(
-      null,
-      "mln_thread_last_error_message",
-    )
-    return PointerScope().use { arena ->
-      val nativeResult = MaplibreNativeC.mln_thread_last_error_message()
-      nativeResult.string
     }
   }
 

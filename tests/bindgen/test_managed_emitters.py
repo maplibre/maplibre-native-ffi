@@ -15,6 +15,7 @@ PRELUDE = """
 #define BIND(x) __attribute__((annotate("mln:" x)))
 typedef unsigned long long mln_map;
 typedef int mln_status;
+typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
 typedef struct mln_completion { void *state; } mln_completion;
 typedef struct mln_buffer_view { const void *data; unsigned long size; } mln_buffer_view;
 """
@@ -39,11 +40,11 @@ class ManagedEmitterTests(unittest.TestCase):
         api = self.parse("""
 typedef unsigned long long mln_measurement BIND("kind=handle;release=mln_measurement_close;dispose=mln_measurement_close;parent=none");
 BIND("execution=immediate")
-mln_status mln_measurement_create(mln_measurement *out_owner BIND("direction=out;ownership=owned"));
+mln_status mln_measurement_create(mln_measurement *out_owner BIND("direction=out;ownership=owned"), mln_diagnostic *out_diagnostic);
 BIND("execution=immediate")
 void mln_measurement_close(mln_measurement owner);
 BIND("execution=immediate")
-mln_status mln_measurement_read(mln_measurement owner, double *out_value BIND("direction=out"));
+mln_status mln_measurement_read(mln_measurement owner, double *out_value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
         emitted = dotnet.emit(api)
         self.assertEqual(emitted.unsupported, {})
@@ -52,7 +53,8 @@ mln_status mln_measurement_read(mln_measurement owner, double *out_value BIND("d
         self.assertIn("NativeMethods.mln_measurement_close(live)", source)
         self.assertIn("using var read = state.Borrow();", source)
         self.assertIn(
-            "NativeMethods.mln_measurement_read(read.Handle, &outValue)", source
+            "NativeMethods.mln_measurement_read(read.Handle, &outValue, NativeDiagnostic.Prepare(&diagnostic))",
+            source,
         )
         self.assertIn("MlnMeasurement", emitted.files["Internal/C/Handles.g.cs"])
 
@@ -61,7 +63,7 @@ mln_status mln_measurement_read(mln_measurement owner, double *out_value BIND("d
             """
 typedef unsigned long long mln_measurement_handle BIND("kind=handle;release=mln_measurement_destroy;dispose=mln_measurement_destroy;parent=mln_map");
 BIND("execution=immediate")
-mln_status mln_map_measure(mln_map map, mln_measurement_handle *out_owner BIND("direction=out;ownership=owned"));
+mln_status mln_map_measure(mln_map map, mln_measurement_handle *out_owner BIND("direction=out;ownership=owned"), mln_diagnostic *out_diagnostic);
 BIND("execution=immediate")
 void mln_measurement_destroy(mln_measurement_handle owner);
 """,
@@ -94,7 +96,7 @@ void mln_measurement_destroy(mln_measurement_handle owner);
 typedef void (*mln_release)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
 typedef void (*mln_watch)(void *context BIND("kind=context;lifetime=owner")) BIND("reentry=protocol;reentry_owner=registration;reentry_calls=mln_map_close;thread=native;failure=contain");
 BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=done")
-mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("kind=context;ownership=borrowed"), mln_release release, _Bool *done BIND("direction=out"));
+mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("kind=context;ownership=borrowed"), mln_release release, _Bool *done BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """,
             map_handle=True,
         )
@@ -112,7 +114,7 @@ mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("ki
             operation,
         )
         self.assertIn(
-            "MapLibreNativeC.mln_map_watch(raw, GeneratedDirectCallbacks.WatchStub, MemorySegment.ofAddress(token), GeneratedDirectCallbacks.WatchReleaseStub, out)",
+            "MapLibreNativeC.mln_map_watch(raw, GeneratedDirectCallbacks.WatchStub, MemorySegment.ofAddress(token), GeneratedDirectCallbacks.WatchReleaseStub, out, diagnostic)",
             operation,
         )
         # Native keeps nothing it reports through the condition, so the scope frees that root.
@@ -145,7 +147,7 @@ mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("ki
             parameter = "completion" if name == "completion_value" else name
             source = f"""
 BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_run(mln_map map, double {parameter}, const mln_completion *done);
+mln_status mln_map_run(mln_map map, double {parameter}, const mln_completion *done, mln_diagnostic *out_diagnostic);
 """
             api = self.parse(source)
             for emitter in (dotnet,):
@@ -163,16 +165,18 @@ mln_status mln_map_run(mln_map map, double {parameter}, const mln_completion *do
             dart_source = self.dart_map(source)
             self.assertIn(f"double {parameter}Value", dart_source)
             self.assertIn(
-                "raw.mln_map_run(_handle.raw, " + parameter + "Value, completion)",
+                "raw.mln_map_run(_handle.raw, "
+                + parameter
+                + "Value, completion, nativeDiagnostic)",
                 dart_source,
             )
 
     def test_public_method_name_collisions_are_rejected(self):
         header = """
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
-mln_status mln_map_read_scale(mln_map map, const mln_completion *completion);
+mln_status mln_map_read_scale(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
-mln_status mln_map_readScale(mln_map map, const mln_completion *completion);
+mln_status mln_map_readScale(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
         api = self.parse(header)
         self.assertEqual(dotnet.coverage(api)["generated"], [])
@@ -188,7 +192,7 @@ typedef unsigned long long mln_measurement BIND("kind=handle;release=mln_measure
 BIND("execution=immediate")
 void mln_measurement_close(mln_measurement owner);
 BIND("receiver=measurement;execution=command;result=void;shape=none;ownership=value")
-mln_status mln_measurement_change(mln_measurement measurement, const mln_completion *completion);
+mln_status mln_measurement_change(mln_measurement measurement, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         self.assertIn("mln_measurement_change", dart.coverage(api)["generated"])
         source = dart.generate(api)
@@ -200,7 +204,7 @@ mln_status mln_measurement_change(mln_measurement measurement, const mln_complet
 typedef void (*mln_notice_release)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
 typedef unsigned (*mln_notice_callback)(void *context BIND("kind=context;lifetime=owner"), int code, const char *text BIND("length=nul;encoding=utf8;lifetime=call")) BIND("thread=native;failure=0;deferred=1");
 BIND("execution=immediate;registration=callback;user_data=context;release_callback=release")
-mln_status mln_notice_set_callback(mln_notice_callback callback, void *context BIND("kind=context;ownership=borrowed"), mln_notice_release release);
+mln_status mln_notice_set_callback(mln_notice_callback callback, void *context BIND("kind=context;ownership=borrowed"), mln_notice_release release, mln_diagnostic *out_diagnostic);
 """
         api = self.parse(source)
         self.assertIn("mln_notice_set_callback", dart.coverage(api)["generated"])
@@ -227,7 +231,7 @@ void mln_measurement_close(mln_measurement owner);
 BIND("execution=immediate")
 void mln_sample_close(mln_sample_handle sample);
 BIND("receiver=measurement;execution=immediate")
-mln_status mln_measurement_take_sample(mln_measurement measurement, mln_sample_handle *out_sample BIND("direction=out;ownership=owned"));
+mln_status mln_measurement_take_sample(mln_measurement measurement, mln_sample_handle *out_sample BIND("direction=out;ownership=owned"), mln_diagnostic *out_diagnostic);
 """)
         self.assertEqual(dart.coverage(api)["unsupported"], {})
         source = dart.generate(api)
@@ -241,7 +245,7 @@ mln_status mln_measurement_take_sample(mln_measurement measurement, mln_sample_h
     def test_reserved_method_identifiers_are_rejected(self):
         source = """
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
-mln_status mln_map_class(mln_map map, const mln_completion *completion);
+mln_status mln_map_class(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
         self.assertIn("fun `class`()", self.kotlin_map(source, "commonMain"))
         self.assertIn("classValue()", self.dart_map(source))
@@ -251,7 +255,7 @@ mln_status mln_map_class(mln_map map, const mln_completion *completion);
 BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_map_set_label(mln_map map,
   mln_buffer_view text BIND("encoding=utf8;lifetime=call;nullable=true"),
-  const mln_completion *completion);
+  const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
         api = self.parse(header)
         for emitter in (dotnet,):
@@ -268,7 +272,7 @@ mln_status mln_map_set_label(mln_map map,
         for absence in ("nullable=true", "optional=empty"):
             api = self.parse(f"""
 BIND("execution=query;result=mln_buffer_view;shape=array;ownership=borrowed;encoding=utf8;{absence}")
-mln_status mln_map_labels(mln_map map, const mln_completion *completion);
+mln_status mln_map_labels(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
             for emitter in (dotnet,):
                 with self.subTest(absence=absence, emitter=emitter.__name__):
@@ -276,7 +280,7 @@ mln_status mln_map_labels(mln_map map, const mln_completion *completion);
 
         header = """
 BIND("execution=query;result=mln_buffer_view;shape=array;ownership=borrowed;encoding=utf8;nullable=true")
-mln_status mln_map_labels(mln_map map, const mln_completion *completion);
+mln_status mln_map_labels(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
         nullable = self.parse(header)
         kotlin_source = self.kotlin_map(header)
@@ -290,7 +294,7 @@ mln_status mln_map_labels(mln_map map, const mln_completion *completion);
     def test_binary_optional_result_requires_empty_conversion(self):
         header = """
 BIND("execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;encoding=bytes;optional=empty")
-mln_status mln_map_bytes(mln_map map, const mln_completion *completion);
+mln_status mln_map_bytes(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
         api = self.parse(header)
         for emitter in (dotnet,):
@@ -302,9 +306,9 @@ mln_status mln_map_bytes(mln_map map, const mln_completion *completion);
         api = self.parse("""
 typedef struct mln_metric { double event; } mln_metric;
 BIND("execution=query;result=mln_metric;shape=value;ownership=borrowed")
-mln_status mln_map_metric(mln_map map, const mln_completion *completion);
+mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_set_metric(mln_map map, mln_metric metric, const mln_completion *completion);
+mln_status mln_map_set_metric(mln_map map, mln_metric metric, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         output = dotnet.generate(api)
         self.assertIn("Metrics/Metric.g.cs", output)
@@ -319,14 +323,14 @@ mln_status mln_map_set_metric(mln_map map, mln_metric metric, const mln_completi
         api = self.parse("""
 typedef struct mln_metric { double some_value; double someValue; } mln_metric;
 BIND("execution=query;result=mln_metric;shape=value;ownership=borrowed")
-mln_status mln_map_metric(mln_map map, const mln_completion *completion);
+mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         self.assertEqual(dotnet.coverage(api)["generated"], [])
 
     def test_dotnet_boolean_output_uses_blittable_pointer(self):
         api = self.parse("""
 BIND("execution=immediate")
-mln_status mln_map_ready(mln_map map, bool *ready BIND("direction=out"));
+mln_status mln_map_ready(mln_map map, bool *ready BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
         emitted = dotnet.emit(api)
         self.assertEqual(emitted.functions, ("mln_map_ready",))
@@ -338,7 +342,7 @@ mln_status mln_map_ready(mln_map map, bool *ready BIND("direction=out"));
         api = self.parse("""
 BIND("execution=immediate")
 mln_status mln_map_samples(mln_map map, unsigned count,
-  double *samples BIND("direction=out;length=count"));
+  double *samples BIND("direction=out;length=count"), mln_diagnostic *out_diagnostic);
 """)
         for emitter in (dotnet, dart, kotlin):
             self.assertEqual(emitter.coverage(api)["generated"], [])
@@ -349,7 +353,7 @@ typedef struct mln_coordinate { double latitude; double longitude; } mln_coordin
 BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_map_move(mln_map map,
   const mln_coordinate *coordinates BIND("length=1"), unsigned count,
-  const mln_completion *completion);
+  const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
         self.assertIn("mln_map_move", dotnet.coverage(self.parse(source))["generated"])
         counted = self.parse(source.replace('BIND("length=1")', 'BIND("length=count")'))
@@ -364,7 +368,7 @@ mln_status mln_map_move(mln_map map,
         source = """
 typedef struct mln_metric { double value; } mln_metric;
 BIND("execution=query;result=mln_metric;shape=value;ownership=borrowed")
-mln_status mln_map_metric(mln_map map, const mln_completion *completion);
+mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
         self.assertIn(
             "mln_map_metric", dotnet.coverage(self.parse(source))["generated"]
@@ -379,7 +383,7 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion);
 typedef enum mln_mode : unsigned { MLN_MODE_X = 0, MLN_MODE_x = 1 } mln_mode;
 typedef struct mln_metric { unsigned mode BIND("enum=mln_mode"); } mln_metric;
 BIND("execution=query;result=mln_metric;shape=value;ownership=borrowed")
-mln_status mln_map_metric(mln_map map, const mln_completion *completion);
+mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         self.assertNotIn("mln_map_metric", dotnet.coverage(api)["generated"])
 
@@ -407,7 +411,7 @@ typedef struct mln_snapshot {
 } mln_snapshot;
 BIND("execution=immediate") mln_camera mln_camera_default(void);
 BIND("execution=query;result=mln_snapshot;shape=value;ownership=borrowed")
-mln_status mln_map_snapshot(mln_map map, const mln_completion *completion);
+mln_status mln_map_snapshot(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         values = Values(api)
         values.record("mln_snapshot")

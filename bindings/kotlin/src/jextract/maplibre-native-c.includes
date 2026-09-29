@@ -29,6 +29,7 @@
 --include-typedef mln_resource_request_handle
 --include-typedef mln_runtime
 --include-struct mln_buffer_view
+--include-struct mln_diagnostic
 --include-function mln_c_version
 --include-function mln_supported_render_backend_mask
 # include/maplibre_native_c/callback_adapter.h
@@ -79,8 +80,6 @@
 --include-typedef mln_completion_release
 --include-struct mln_completion
 --include-struct mln_completion_result
-# include/maplibre_native_c/diagnostics.h
---include-function mln_thread_last_error_message
 # include/maplibre_native_c/logging.h
 --include-constant MLN_LOG_EVENT_ANDROID
 --include-constant MLN_LOG_EVENT_CRASH

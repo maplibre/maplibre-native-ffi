@@ -25,6 +25,8 @@ def consumed(plan, owner, values):
                 f"Swift: {function.name}: release inputs require scoped ownership conversion"
             ]
         )
+    from .swift import checked, native_call
+
     if len(plan.inputs) != 1:
         from .swift import camel, identifier
         from .swift_dynamic_values import encode
@@ -47,7 +49,7 @@ def consumed(plan, owner, values):
       defer {{ withExtendedLifetime(arena) {{}} }}
       try handle.closeOnce {{ live in
         var raw = live.raw
-        try checkStatus({function.name}({", ".join(args)}))
+        {checked(native_call(function, *args))}
       }}
     }}
   }}
@@ -68,7 +70,7 @@ def consumed(plan, owner, values):
     try NativeCallbackGuard.check(owner: self, operation: "{function.name}")
     var future: NativeFuture<Void>?
     try handle.closeOnce {{ live in
-      future = try NativeCompletion.startUnit {{ {function.name}(live.raw, $0) }}
+      future = try NativeCompletion.startUnit {{ completion, diagnostic in {native_call(function, "live.raw", "completion")} }}
     }}
     return future
   }}
@@ -77,8 +79,8 @@ def consumed(plan, owner, values):
             None,
         )
     value = function.return_type.kind == "void"
-    call = f"{function.name}(live.raw)"
-    statement = call if value else f"try checkStatus({call})"
+    call = native_call(function, "live.raw")
+    statement = call if value else checked(call)
     return (
         f'''public extension {owner} {{
   func {method}() throws {{
@@ -128,7 +130,8 @@ def owner_declarations(bound):
         raw = "Native" + owner
         cleanup = handle.dispose or handle.release
         function = bound.source.functions_by_name[cleanup]
-        expression = f"{cleanup}(raw)"
+        # Abandoned disposal has no caller to report a diagnostic to.
+        expression = f"{cleanup}(raw{', nil' if function.diagnostic else ''})"
         body = (
             f"{expression}; return true"
             if function.return_type.kind == "void"

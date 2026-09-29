@@ -147,7 +147,8 @@ MLN_API mln_status mln_metal_surface_attach(
   const mln_metal_surface_descriptor* descriptor MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -182,7 +183,8 @@ MLN_API mln_status mln_vulkan_surface_attach(
   const mln_vulkan_surface_descriptor* descriptor MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -220,7 +222,8 @@ MLN_API mln_status mln_opengl_surface_attach(
   const mln_opengl_surface_descriptor* descriptor MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -256,7 +259,8 @@ MLN_API mln_status mln_webgpu_surface_attach(
   const mln_webgpu_surface_descriptor* descriptor MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -285,7 +289,8 @@ MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_metal_surface_set_target(
   mln_render_session session,
   const mln_metal_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -316,7 +321,8 @@ MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_vulkan_surface_set_target(
   mln_render_session session,
   const mln_vulkan_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -345,7 +351,8 @@ MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_opengl_surface_set_target(
   mln_render_session session,
   const mln_opengl_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -374,7 +381,8 @@ MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_webgpu_surface_set_target(
   mln_render_session session,
   const mln_webgpu_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

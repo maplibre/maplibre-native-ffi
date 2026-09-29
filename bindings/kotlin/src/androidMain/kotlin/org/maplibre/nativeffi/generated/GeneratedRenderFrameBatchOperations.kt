@@ -6,12 +6,12 @@ import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 public actual abstract class GeneratedRenderFrameBatchOperations internal actual constructor() {
   internal abstract fun bindingRenderFrameBatchHandle(): Long
 
-  internal abstract fun bindingCloseRenderFrameBatch(call: (Long) -> Int)
+  internal abstract fun bindingCloseRenderFrameBatch(call: (Long) -> Unit)
 
   public actual fun count(): ULong {
     try {
@@ -22,9 +22,13 @@ public actual abstract class GeneratedRenderFrameBatchOperations internal actual
       )
       return PointerScope().use { arena ->
         val output = SizeTPointer(1L)
-        BindingStatus.check(
-          MaplibreNativeC.mln_render_frame_batch_count(bindingRenderFrameBatchHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MaplibreNativeC.mln_render_frame_batch_count(
+            bindingRenderFrameBatchHandle(),
+            output,
+            diagnostic,
+          )
+        }
         output.get().toULong()
       }
     } finally {
@@ -42,13 +46,14 @@ public actual abstract class GeneratedRenderFrameBatchOperations internal actual
       return PointerScope().use { arena ->
         val output = MaplibreNativeC.mln_render_frame_result()
         output.size(output.sizeof())
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MaplibreNativeC.mln_render_frame_batch_get(
             bindingRenderFrameBatchHandle(),
             indexValue.toLong(),
             output,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readRenderFrameResult(output)
       }
     } finally {
@@ -66,10 +71,7 @@ public actual abstract class GeneratedRenderFrameBatchOperations internal actual
           owner.toLong(),
           "mln_render_frame_batch_release",
         )
-        PointerScope().use { arena ->
-          MaplibreNativeC.mln_render_frame_batch_release(owner)
-          0
-        }
+        PointerScope().use { arena -> MaplibreNativeC.mln_render_frame_batch_release(owner) }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)

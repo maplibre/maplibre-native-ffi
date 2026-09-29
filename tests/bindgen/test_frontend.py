@@ -13,6 +13,7 @@ PRELUDE = """
 typedef unsigned long long mln_map;
 typedef unsigned long long mln_runtime;
 typedef int mln_status;
+typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
 typedef struct mln_completion { void *state; } mln_completion;
 """
 
@@ -33,10 +34,10 @@ class FrontendTests(unittest.TestCase):
             (root / "public.h").write_text(
                 "#pragma once\n"
                 + PRELUDE
-                + 'BIND("execution=immediate") mln_status public_operation(void);\n'
+                + 'BIND("execution=immediate") mln_status public_operation(mln_diagnostic *out_diagnostic);\n'
             )
             (root / "runtime.h").write_text(
-                '#include "public.h"\ntypedef enum runtime_kind { RUNTIME_COPY = 1 } runtime_kind;\nBIND("execution=immediate") mln_status runtime_operation(void);\n'
+                '#include "public.h"\ntypedef enum runtime_kind { RUNTIME_COPY = 1 } runtime_kind;\nBIND("execution=immediate") mln_status runtime_operation(mln_diagnostic *out_diagnostic);\n'
             )
             api = parse_headers(root)
             self.assertEqual(api.runtime_exports, ("runtime_operation",))
@@ -47,7 +48,7 @@ class FrontendTests(unittest.TestCase):
             )
             self.assertEqual(len(api.functions), 2)
             (root / "orphan.h").write_text(
-                '#pragma once\n#include "public.h"\nBIND("execution=immediate") mln_status omitted_operation(void);\n'
+                '#pragma once\n#include "public.h"\nBIND("execution=immediate") mln_status omitted_operation(mln_diagnostic *out_diagnostic);\n'
             )
             with self.assertRaisesRegex(
                 ModelError, "outside all interface entrypoints"
@@ -76,7 +77,7 @@ typedef struct mln_value {
 } mln_value;
 BIND("execution=immediate")
 mln_status mln_read(mln_runtime runtime, const mln_map *map,
-                   double *out_value BIND("direction=out"));
+                   double *out_value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
         function = api.functions_by_name["mln_read"]
         self.assertEqual(function.parameters[0].type.declaration, "mln_runtime")
@@ -158,19 +159,19 @@ BIND("execution=immediate") mln_options mln_options_default(void);
             validate(
                 self.parse("""
 BIND("execution=query")
-mln_status mln_query(mln_map map, const mln_completion *completion);
+mln_status mln_query(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
             )
         api = self.parse("""
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
-mln_status mln_query(mln_map map, const mln_completion *completion);
+mln_status mln_query(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         validate(api)
 
     def test_metadata_typos_and_const_output_are_rejected(self):
         api = self.parse("""
 BIND("execution=immediate;ownershp=borrowed")
-mln_status mln_read(const double *value BIND("direction=out"));
+mln_status mln_read(const double *value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
         with self.assertRaises(ModelError) as raised:
             validate(api)
@@ -181,11 +182,11 @@ mln_status mln_read(const double *value BIND("direction=out"));
         validate(
             self.parse("""
 BIND("execution=immediate")
-mln_status mln_completion_create(mln_completion *out_completion BIND("direction=out"));
+mln_status mln_completion_create(mln_completion *out_completion BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("execution=immediate")
 void mln_completion_reject(mln_completion *completion);
 BIND("execution=operation;result=void;shape=none;ownership=value")
-mln_status mln_barrier(const mln_completion *completion);
+mln_status mln_barrier(const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         )
 
@@ -194,13 +195,13 @@ mln_status mln_barrier(const mln_completion *completion);
             ModelError, "duplicate binding metadata 'execution'"
         ):
             self.parse("""
-BIND("execution=immediate;execution=query") mln_status mln_duplicate(void);
+BIND("execution=immediate;execution=query") mln_status mln_duplicate(mln_diagnostic *out_diagnostic);
 """)
 
     def test_erased_results_reject_unsafe_ownership_and_absence_contracts(self):
         api = self.parse("""
 BIND("execution=query;result=double;shape=value;ownership=owned;encoding=utf8;nullable=true;optional=empty")
-mln_status mln_unsafe_result(mln_map map, const mln_completion *completion);
+mln_status mln_unsafe_result(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         with self.assertRaises(ModelError) as raised:
             validate(api)
@@ -213,7 +214,7 @@ mln_status mln_unsafe_result(mln_map map, const mln_completion *completion);
         api = self.parse("""
 BIND("execution=immediate")
 mln_status mln_bad_span(const double *items BIND("length=missing"),
-                        double number BIND("encoding=utf8"));
+                        double number BIND("encoding=utf8"), mln_diagnostic *out_diagnostic);
 """)
         with self.assertRaises(ModelError) as raised:
             validate(api)
@@ -249,8 +250,32 @@ typedef struct mln_record {
                 self.parse("""
 typedef struct mln_opaque mln_opaque;
 BIND("execution=query;result=mln_opaque;shape=value;ownership=borrowed")
-mln_status mln_invalid_value(mln_map map, const mln_completion *completion);
+mln_status mln_invalid_value(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
+            )
+
+    def test_status_functions_report_through_a_final_diagnostic(self):
+        api = self.parse("""
+BIND("execution=immediate") mln_status mln_resize(mln_map map, double scale, mln_diagnostic *out_diagnostic);
+""")
+        (function,) = api.functions
+        self.assertTrue(function.diagnostic)
+        self.assertEqual(
+            [parameter.name for parameter in function.parameters], ["map", "scale"]
+        )
+        validate(api)
+        for declaration in (
+            "mln_status mln_resize(mln_map map, double scale);",
+            "void mln_resize(mln_map map, mln_diagnostic *out_diagnostic);",
+        ):
+            with (
+                self.subTest(declaration=declaration),
+                self.assertRaisesRegex(ModelError, "final mln_diagnostic"),
+            ):
+                validate(self.parse(f'BIND("execution=immediate") {declaration}\n'))
+        with self.assertRaisesRegex(ModelError, "must be the last parameter"):
+            self.parse(
+                'BIND("execution=immediate") mln_status mln_resize(mln_diagnostic *out_diagnostic, mln_map map);\n'
             )
 
     def test_variadic_functions_require_an_explicit_backend_design(self):

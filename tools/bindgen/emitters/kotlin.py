@@ -6,7 +6,7 @@ from tools.bindgen.model import Api
 from tools.bindgen.semantic import BoundApi
 
 from . import kotlin_callbacks, kotlin_ir, kotlin_owners
-from .kotlin_values import Unsupported, Values, generated_owners
+from .kotlin_values import Unsupported, Values, generated_owners, native_call
 from .kotlin_values import name as value_name
 
 
@@ -50,7 +50,9 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         common = platform == "commonMain"
         source = "// Generated from handle disposal relationships. Do not edit.\npackage org.maplibre.nativeffi.generated\n\n"
         if not common:
-            source += "import org.maplibre.nativeffi.internal.status.Status\n"
+            source += (
+                "import org.maplibre.nativeffi.internal.status.NativeDiagnostics\n"
+            )
             if platform == "nativeMain":
                 source += "import kotlinx.cinterop.*\nimport org.maplibre.nativeffi.internal.c.*\n\n@OptIn(ExperimentalForeignApi::class)\n"
             elif platform == "jvmMain":
@@ -80,12 +82,9 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                     else ""
                 )
                 argument = "handle.toULong()" if platform == "nativeMain" else "handle"
-                call = prefix + handle.dispose + "(" + argument + ")"
-                function = next(
-                    f for f in bound.source.functions if f.name == handle.dispose
+                call = native_call(
+                    bound.source.functions_by_name[handle.dispose], prefix, [argument]
                 )
-                if function.return_type.spelling != "void":
-                    call = "Status.check(" + call + ")"
                 source += (
                     f' {{ org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(handle, "{handle.dispose}"); '
                     + call
@@ -103,7 +102,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
             "kotlinx.coroutines.Deferred",
             "org.maplibre.nativeffi.runtime.CommandCompletion",
             "org.maplibre.nativeffi.generated.*",
-            "org.maplibre.nativeffi.internal.status.Status as BindingStatus",
+            "org.maplibre.nativeffi.internal.status.NativeDiagnostics",
             "org.maplibre.nativeffi.internal.async.adoptOwned",
             "org.maplibre.nativeffi.internal.callback.*",
         ]
@@ -196,11 +195,11 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
                     if needs.read:
                         source += f"  internal abstract fun <T> bindingRead{family}(block: ({raw}) -> T): T\n"
                     if needs.decision:
-                        source += f"  internal abstract fun bindingComplete{family}(call: ({raw}) -> Int)\n"
+                        source += f"  internal abstract fun bindingComplete{family}(call: ({raw}) -> Unit)\n"
                     if needs.issued:
                         source += f"  internal abstract fun bindingIssued{family}Handle(): {raw}\n"
                     if needs.close:
-                        source += f"  internal abstract fun bindingClose{family}(call: ({raw}) -> Int)\n"
+                        source += f"  internal abstract fun bindingClose{family}(call: ({raw}) -> Unit)\n"
                     if needs.retire:
                         source += f"  internal abstract fun bindingRetire{family}(call: ({raw}) -> Deferred<Unit>): Deferred<Unit>\n"
             else:

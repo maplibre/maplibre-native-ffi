@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ffi';
 
+import '../c/maplibre_native_c.dart';
 import '../c/maplibre_native_c.g.dart' as raw;
 import '../status/status.dart';
 import '../../error/maplibre_exception.dart';
@@ -55,13 +56,14 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   }
 
   /// Releases the native handle with [destroy] exactly once after success.
-  void close(int Function(H) destroy, String Function() diagnostic) {
+  ///
+  /// [destroy] returns the status of a call that wrote [nativeDiagnostic].
+  void close(int Function(H) destroy) {
     if (_closed) {
       return;
     }
 
-    final status = destroy(_handle);
-    checkNativeStatus(status, diagnostic);
+    checkNativeCall(destroy(_handle));
     _closed = true;
     _detachOwnerFinalizer();
   }

@@ -160,21 +160,21 @@ static mln_map_options map_options_with_event_mask(uint64_t mask) {
 static void a_drain_rejects_a_nonnull_output_or_a_stale_runtime(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, NULL, NULL)
   );
   mln_event_batch batch = UINT64_C(1);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, &batch)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, &batch, NULL)
   );
 
   mln_test_destroy_runtime(runtime);
   batch = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, &batch)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, &batch, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_ALL)
+    mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
   );
 }
 
@@ -189,10 +189,11 @@ typedef struct foreign_thread_probe {
 static void call_event_api_from_a_foreign_thread(void* argument) {
   foreign_thread_probe* probe = argument;
   mln_event_batch batch = MLN_HANDLE_NULL;
-  probe->drain_status = mln_runtime_drain_events(probe->runtime, &batch);
+  probe->drain_status = mln_runtime_drain_events(probe->runtime, &batch, NULL);
   mln_event_batch_release(batch);
-  probe->runtime_mask_status =
-    mln_runtime_set_event_mask(probe->runtime, MLN_RUNTIME_EVENT_MASK_ALL);
+  probe->runtime_mask_status = mln_runtime_set_event_mask(
+    probe->runtime, MLN_RUNTIME_EVENT_MASK_ALL, NULL
+  );
   probe->map_mask_status =
     mln_test_map_set_event_mask(probe->map, MLN_RUNTIME_EVENT_MASK_ALL);
 }
@@ -222,7 +223,7 @@ static void both_mask_setters_reject_unknown_bits_and_keep_foreign_ones(void) {
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_event_mask(runtime, unknown_mask_bit)
+    mln_runtime_set_event_mask(runtime, unknown_mask_bit, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -231,7 +232,7 @@ static void both_mask_setters_reject_unknown_bits_and_keep_foreign_ones(void) {
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_ALL)
+    mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL)
@@ -239,7 +240,7 @@ static void both_mask_setters_reject_unknown_bits_and_keep_foreign_ones(void) {
 
   uint64_t runtime_mask = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_get_event_mask(runtime, &runtime_mask)
+    MLN_STATUS_OK, mln_runtime_get_event_mask(runtime, &runtime_mask, NULL)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, runtime_mask);
   uint64_t map_mask = 0;
@@ -251,25 +252,26 @@ static void both_mask_setters_reject_unknown_bits_and_keep_foreign_ones(void) {
   // One in-group bit for the other source kind, which each setter accepts and
   // reports back unchanged.
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED)
+    MLN_STATUS_OK, mln_runtime_set_event_mask(
+                     runtime, MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, NULL
+                   )
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_get_event_mask(runtime, &runtime_mask)
+    MLN_STATUS_OK, mln_runtime_get_event_mask(runtime, &runtime_mask, NULL)
   );
   TEST_ASSERT_EQUAL_UINT64(
     MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, runtime_mask
   );
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_get_event_mask(runtime, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_get_event_mask(runtime, NULL, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_snapshot_get(map, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_snapshot_get(map, NULL, NULL)
   );
   mln_map_snapshot undersized = {.size = sizeof(mln_map_snapshot) - 1};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_snapshot_get(map, &undersized)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_snapshot_get(map, &undersized, NULL)
   );
 
   mln_test_destroy_map(map);
@@ -282,7 +284,7 @@ static void a_fresh_map_and_runtime_select_every_event_type(void) {
 
   uint64_t runtime_mask = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_get_event_mask(runtime, &runtime_mask)
+    MLN_STATUS_OK, mln_runtime_get_event_mask(runtime, &runtime_mask, NULL)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, runtime_mask);
   uint64_t map_mask = 0;
@@ -306,7 +308,7 @@ static void runtime_options_reject_unknown_flags(void) {
   mln_runtime bad_runtime = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_create(&runtime_options, &bad_runtime)
+    mln_runtime_create(&runtime_options, &bad_runtime, NULL)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, bad_runtime);
 }
@@ -321,7 +323,7 @@ static void options_reject_unknown_event_mask_bits(void) {
   mln_runtime bad_runtime = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_create(&runtime_options, &bad_runtime)
+    mln_runtime_create(&runtime_options, &bad_runtime, NULL)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, bad_runtime);
 
@@ -418,7 +420,7 @@ static void a_suppressed_producer_leaves_the_queue_empty(void) {
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_NONE)
+    mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_NONE, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   TEST_ASSERT_EQUAL_size_t(0, mln_test_drain_all(runtime));
@@ -438,12 +440,14 @@ static void an_owned_batch_remains_stable_across_later_drains(void) {
 
   mln_event_batch first = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &first)
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &first, NULL)
   );
   mln_runtime_event_batch_view first_view = {
     .size = sizeof(mln_runtime_event_batch_view)
   };
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_event_batch_get(first, &first_view));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_event_batch_get(first, &first_view, NULL)
+  );
   TEST_ASSERT_EQUAL_UINT32(sizeof(mln_runtime_event), first_view.event_size);
   TEST_ASSERT_GREATER_THAN_size_t(1, first_view.event_count);
   const size_t first_count = first_view.event_count;
@@ -451,13 +455,13 @@ static void an_owned_batch_remains_stable_across_later_drains(void) {
 
   mln_event_batch second = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &second)
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &second, NULL)
   );
   mln_runtime_event_batch_view second_view = {
     .size = sizeof(mln_runtime_event_batch_view)
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_event_batch_get(second, &second_view)
+    MLN_STATUS_OK, mln_event_batch_get(second, &second_view, NULL)
   );
   TEST_ASSERT_EQUAL_size_t(0, second_view.event_count);
   TEST_ASSERT_EQUAL_size_t(first_count, first_view.event_count);
@@ -479,12 +483,12 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
 
   mln_event_batch batch = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &batch)
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &batch, NULL)
   );
   mln_runtime_event_batch_view view = {
     .size = sizeof(mln_runtime_event_batch_view)
   };
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_event_batch_get(batch, &view));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_event_batch_get(batch, &view, NULL));
   TEST_ASSERT_GREATER_THAN_size_t(0, view.event_count);
 
   size_t map_sourced = 0;
@@ -526,7 +530,8 @@ static void one_batch_reports_events_in_queue_order(void) {
   update.animation = animation;
   mln_test_completion completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_update_camera(map, &update, &completion.descriptor)
+    MLN_STATUS_OK,
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
   mln_test_completion_destroy(&completion);
@@ -564,7 +569,7 @@ static void a_released_event_batch_names_no_batch(void) {
 
   mln_event_batch batch = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &batch)
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &batch, NULL)
   );
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
   mln_event_batch_release(batch);
@@ -575,11 +580,12 @@ static void a_released_event_batch_names_no_batch(void) {
     .size = sizeof(mln_runtime_event_batch_view), .event_count = 99
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_event_batch_get(batch, &view)
+    MLN_STATUS_INVALID_ARGUMENT, mln_event_batch_get(batch, &view, NULL)
   );
   TEST_ASSERT_EQUAL_size_t(99, view.event_count);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_event_batch_get(MLN_HANDLE_NULL, &view)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_event_batch_get(MLN_HANDLE_NULL, &view, NULL)
   );
   TEST_ASSERT_EQUAL_size_t(99, view.event_count);
 
@@ -630,7 +636,8 @@ static void submit_camera_update(
   update.animation = animation;
   mln_test_completion completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_update_camera(map, &update, &completion.descriptor)
+    MLN_STATUS_OK,
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
   mln_test_completion_destroy(&completion);

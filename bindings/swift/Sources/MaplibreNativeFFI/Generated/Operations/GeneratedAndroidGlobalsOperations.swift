@@ -16,11 +16,12 @@ public extension Maplibre {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena.submit { mln_android_init(
+      try checkStatus { diagnostic in arena.submit { mln_android_init(
         bindingArg0.unsafeMutableRawPointer,
         bindingArg1.unsafeMutableRawPointer,
-        bindingArg2.unsafeMutableRawPointer
-      ) })
+        bindingArg2.unsafeMutableRawPointer,
+        diagnostic
+      ) } }
       return ()
     }
   }

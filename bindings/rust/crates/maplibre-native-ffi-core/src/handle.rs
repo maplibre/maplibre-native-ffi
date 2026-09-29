@@ -89,11 +89,12 @@ impl NativeViewScope {
         begin: unsafe extern "C" fn(
             T,
             *mut *mut std::ffi::c_void,
+            *mut maplibre_native_ffi_sys::mln_diagnostic,
         ) -> maplibre_native_ffi_sys::mln_status,
         end: unsafe extern "C" fn(*mut std::ffi::c_void),
     ) -> crate::Result<Self> {
         let mut token = std::ptr::null_mut();
-        crate::check(unsafe { begin(handle, &mut token) })?;
+        crate::check(|diagnostic| unsafe { begin(handle, &mut token, diagnostic) })?;
         Ok(Self { token, end })
     }
 }

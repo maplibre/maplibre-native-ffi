@@ -30,11 +30,11 @@ internal constructor(
       block(handle)
     }
 
-  internal override fun bindingCompleteResourceRequestHandle(call: (Long) -> Int) {
+  internal override fun bindingCompleteResourceRequestHandle(call: (Long) -> Unit) {
     state.complete { call(handle) }
   }
 
-  internal override fun bindingCloseResourceRequestHandle(call: (Long) -> Int) {
+  internal override fun bindingCloseResourceRequestHandle(call: (Long) -> Unit) {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(
       handle,
       "mln_resource_request_release",

@@ -14,6 +14,7 @@ HEADER = """
 #define BIND(x) __attribute__((annotate("mln:" x)))
 typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_close;dispose=mln_map_close;parent=none");
 typedef int mln_status;
+typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
 BIND("execution=immediate") void mln_map_close(mln_map map);
 typedef struct mln_completion { void *state; } mln_completion;
 typedef struct mln_sample_point { unsigned int x; unsigned int y; } mln_sample_point;
@@ -26,7 +27,7 @@ typedef struct mln_sample_options {
   mln_sample_release release;
 } mln_sample_options BIND("kind=callback_registration;user_data=context;release=release");
 BIND("receiver=map;execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_observe_sample(mln_map map, const mln_sample_options *options BIND("length=1"), const mln_completion *completion);
+mln_status mln_map_observe_sample(mln_map map, const mln_sample_options *options BIND("length=1"), const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
 
 
@@ -35,11 +36,12 @@ DIRECT_HEADER = """
 #define BIND(x) __attribute__((annotate("mln:" x)))
 typedef unsigned long long mln_ticket BIND("kind=handle;release=mln_ticket_release;dispose=mln_ticket_release;parent=none");
 typedef int mln_status;
+typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
 BIND("execution=immediate") void mln_ticket_release(mln_ticket ticket);
 typedef void (*mln_ticket_cancel)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
 typedef void (*mln_runtime_callback_release)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
 BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=declined")
-mln_status mln_ticket_on_cancel(mln_ticket ticket, mln_ticket_cancel callback, void *context BIND("kind=context;ownership=borrowed"), mln_runtime_callback_release release, bool *declined BIND("direction=out"));
+mln_status mln_ticket_on_cancel(mln_ticket ticket, mln_ticket_cancel callback, void *context BIND("kind=context;ownership=borrowed"), mln_runtime_callback_release release, bool *declined BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
 
 

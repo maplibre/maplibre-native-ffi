@@ -365,7 +365,11 @@ impl GeneratedReadScope {
     fn with_native<T, S>(
         py: Python<'_>,
         state: Arc<Mutex<S>>,
-        begin: unsafe extern "C" fn(T, *mut *mut c_void) -> sys::mln_status,
+        begin: unsafe extern "C" fn(
+            T,
+            *mut *mut c_void,
+            *mut sys::mln_diagnostic,
+        ) -> sys::mln_status,
         end: unsafe extern "C" fn(*mut c_void),
     ) -> PyResult<Self>
     where
@@ -380,8 +384,10 @@ impl GeneratedReadScope {
             .live_handle()
             .ok_or_else(|| invalid_state_error("borrowed view owner is closed"))?;
         let mut token = ptr::null_mut();
-        maplibre_core::check(unsafe { generated_native_call(py, || begin(handle, &mut token)) })
-            .map_err(map_error)?;
+        maplibre_core::check(|diagnostic| unsafe {
+            generated_native_call(py, || begin(handle, &mut token, diagnostic))
+        })
+        .map_err(map_error)?;
         let mut lease = scope.lease.lock().unwrap_or_else(|p| p.into_inner());
         let owner = lease.take();
         *lease = Some(Box::new((

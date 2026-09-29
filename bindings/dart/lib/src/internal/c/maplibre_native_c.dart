@@ -1,24 +1,60 @@
+import 'dart:convert';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
 import '../../error/maplibre_exception.dart';
+import '../status/status.dart';
 import 'maplibre_native_c.g.dart' as generated;
 
 /// C ABI contract version supported by this generated binding.
 const int expectedCAbiVersion = 0;
 
-/// Copies the current thread-local native diagnostic message.
+/// The diagnostic that every status-returning call made from this isolate
+/// fills.
 ///
-/// Native code sets it on every non-OK synchronous return, and leaves it empty
-/// when the call reported no diagnostic.
-String threadLastErrorMessage() {
-  final pointer = generated.mln_thread_last_error_message();
-  if (pointer == nullptr) {
-    return '';
+/// Native code writes the message as the call returns, and the binding reads
+/// it before making another call, so one buffer serves each isolate, including
+/// calls made from reentrant synchronous callbacks. A finalizer frees it once
+/// the isolate is gone.
+Pointer<generated.mln_diagnostic> get nativeDiagnostic => _diagnostic.pointer;
+
+final _diagnostic = _NativeDiagnostic();
+
+final class _NativeDiagnostic implements Finalizable {
+  _NativeDiagnostic() : pointer = calloc<generated.mln_diagnostic>() {
+    pointer.ref.size = sizeOf<generated.mln_diagnostic>();
+    _finalizer.attach(this, pointer.cast());
   }
-  return pointer.cast<Utf8>().toDartString();
+
+  static final _finalizer = NativeFinalizer(calloc.nativeFree);
+
+  final Pointer<generated.mln_diagnostic> pointer;
 }
+
+/// Copies the message of the last status-returning call from this isolate.
+String nativeDiagnosticMessage() {
+  final message = _diagnostic.pointer.ref.message;
+  final bytes = <int>[];
+  for (
+    var index = 0;
+    index < generated.MLN_DIAGNOSTIC_MESSAGE_CAPACITY;
+    index++
+  ) {
+    final byte = message[index] & 0xff;
+    if (byte == 0) {
+      break;
+    }
+    bytes.add(byte);
+  }
+  // Truncation can split a multibyte sequence.
+  return utf8.decode(bytes, allowMalformed: true);
+}
+
+/// Throws the public exception for a failed status-returning call, carrying
+/// the message that call wrote to [nativeDiagnostic].
+void checkNativeCall(int status) =>
+    checkNativeStatus(status, nativeDiagnosticMessage);
 
 bool _abiVersionChecked = false;
 

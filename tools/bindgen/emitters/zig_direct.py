@@ -2,7 +2,7 @@
 
 from ..model import ModelError
 from ..semantic import FieldPlan, RegistrationPlan, ValuePlan
-from .zig import camel, identifier, pascal
+from .zig import camel, identifier, pascal, status_call
 from .zig_callbacks import parts
 
 
@@ -81,21 +81,27 @@ def operation(plan, values):
             args.append("lease.native")
         elif p.name == registration.callback:
             args.append(
-                f"if (context != null) {name}.{identifier('callTrampoline')} else null"
+                f"if (context != null) &{name}.{identifier('callTrampoline')} else null"
             )
         elif p.name == registration.user_data:
             args.append("context")
         elif p.name == registration.release_callback:
             args.append(
-                f"if (context != null) callback.Registration({name}).releaseNative else null"
+                f"if (context != null) &callback.Registration({name}).releaseNative else null"
             )
         elif p.name == registration.accepted_unless:
             setup.append("var rejected: bool = false;")
             args.append("&rejected")
         else:
             raise ModelError([f"{plan.name}: unsupported direct callback parameter"])
+    if not receiver_name:
+        signature.append("diagnostic_store: ?*diagnostics.DiagnosticStore")
     setup.append(
-        f"try status.checkStatus(c.{plan.name}({', '.join(args)}), {'lease.diagnostic_store' if receiver_name else 'null'});"
+        status_call(
+            plan.function,
+            args,
+            "lease.diagnostic_store" if receiver_name else "diagnostic_store",
+        )
     )
     if registration.accepted_unless:
         # A rejected registration stores nothing, so the caller keeps its

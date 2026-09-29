@@ -2,7 +2,7 @@
 
 from tools.bindgen.names import camel
 
-from .kotlin_values import name
+from .kotlin_values import name, native_call
 
 
 def operation(plan, values, platform):
@@ -60,9 +60,7 @@ def operation(plan, values, platform):
     )
     if plan.completion:
         arguments.append("completion")
-    native = prefix + plan.name + "(" + ", ".join(arguments) + ")"
-    if plan.function.return_type.spelling == "void":
-        native += "; 0"
+    native = native_call(plan.function, prefix, arguments)
     arena = (
         "Arena.ofConfined().use { arena -> "
         if platform == "jvmMain"

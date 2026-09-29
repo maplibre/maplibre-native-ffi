@@ -145,75 +145,75 @@ namespace Maplibre.NativeFfi.Internal.C
     internal static unsafe partial class NativeMethods
     {
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_projection_create([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_map_projection *")] MlnMapProjection* out_projection);
+        public static extern mln_status mln_render_session_projection_create([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_map_projection *")] MlnMapProjection* out_projection, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_frame_demand mln_frame_demand_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_get_capabilities([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_render_session_capabilities* out_capabilities);
+        public static extern mln_status mln_render_session_get_capabilities([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_render_session_capabilities* out_capabilities, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_get_snapshot([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_render_session_snapshot* out_snapshot);
+        public static extern mln_status mln_render_session_get_snapshot([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_render_session_snapshot* out_snapshot, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_request_frame([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_frame_demand *")] mln_frame_demand* demand);
+        public static extern mln_status mln_render_session_request_frame([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_frame_demand *")] mln_frame_demand* demand, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_drain_frame_results([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_render_frame_batch *")] MlnRenderFrameBatch* out_batch);
+        public static extern mln_status mln_render_session_drain_frame_results([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_render_frame_batch *")] MlnRenderFrameBatch* out_batch, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_frame_batch_count([NativeTypeName("mln_render_frame_batch")] MlnRenderFrameBatch batch, [NativeTypeName("size_t *")] nuint* out_count);
+        public static extern mln_status mln_render_frame_batch_count([NativeTypeName("mln_render_frame_batch")] MlnRenderFrameBatch batch, [NativeTypeName("size_t *")] nuint* out_count, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_frame_batch_get([NativeTypeName("mln_render_frame_batch")] MlnRenderFrameBatch batch, [NativeTypeName("size_t")] nuint index, mln_render_frame_result* out_result);
+        public static extern mln_status mln_render_frame_batch_get([NativeTypeName("mln_render_frame_batch")] MlnRenderFrameBatch batch, [NativeTypeName("size_t")] nuint index, mln_render_frame_result* out_result, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void mln_render_frame_batch_release([NativeTypeName("mln_render_frame_batch")] MlnRenderFrameBatch batch);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_acquire_frame([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_acquired_frame *")] MlnAcquiredFrame* out_frame);
+        public static extern mln_status mln_render_session_acquire_frame([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_acquired_frame *")] MlnAcquiredFrame* out_frame, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_acquired_frame_get_result([NativeTypeName("mln_acquired_frame")] MlnAcquiredFrame frame, mln_render_frame_result* out_result);
+        public static extern mln_status mln_acquired_frame_get_result([NativeTypeName("mln_acquired_frame")] MlnAcquiredFrame frame, mln_render_frame_result* out_result, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_acquired_frame_get_producer_sync([NativeTypeName("mln_acquired_frame")] MlnAcquiredFrame frame, mln_gpu_sync* out_sync);
+        public static extern mln_status mln_acquired_frame_get_producer_sync([NativeTypeName("mln_acquired_frame")] MlnAcquiredFrame frame, mln_gpu_sync* out_sync, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_acquired_frame_release([NativeTypeName("mln_acquired_frame *")] MlnAcquiredFrame* frame, [NativeTypeName("const mln_gpu_sync *")] mln_gpu_sync* consumer_completion);
+        public static extern mln_status mln_acquired_frame_release([NativeTypeName("mln_acquired_frame *")] MlnAcquiredFrame* frame, [NativeTypeName("const mln_gpu_sync *")] mln_gpu_sync* consumer_completion, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_resize([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_render_target_extent *")] mln_render_target_extent* extent, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+        public static extern mln_status mln_render_session_resize([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_render_target_extent *")] mln_render_target_extent* extent, [NativeTypeName("const mln_completion *")] mln_completion* completion, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_barrier([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+        public static extern mln_status mln_render_session_barrier([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_reduce_memory_use([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+        public static extern mln_status mln_render_session_reduce_memory_use([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_clear_data([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+        public static extern mln_status mln_render_session_clear_data([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_dump_debug_logs([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+        public static extern mln_status mln_render_session_dump_debug_logs([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_service_driver_work([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("size_t")] nuint max_work, [NativeTypeName("size_t *")] nuint* out_serviced);
+        public static extern mln_status mln_render_session_service_driver_work([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("size_t")] nuint max_work, [NativeTypeName("size_t *")] nuint* out_serviced, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_detach([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+        public static extern mln_status mln_render_session_detach([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_abandon([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_render_abandon_result* out_result);
+        public static extern mln_status mln_render_session_abandon([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_render_abandon_result* out_result, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_destroy([NativeTypeName("mln_render_session")] MlnRenderSession session);
+        public static extern mln_status mln_render_session_destroy([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_dispose([NativeTypeName("mln_render_session")] MlnRenderSession session);
+        public static extern mln_status mln_render_session_dispose([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_acquired_frame_dispose([NativeTypeName("mln_acquired_frame")] MlnAcquiredFrame frame);
+        public static extern mln_status mln_acquired_frame_dispose([NativeTypeName("mln_acquired_frame")] MlnAcquiredFrame frame, mln_diagnostic* out_diagnostic);
     }
 }

@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from .python_values import public_name, rust_field, scalar_type
+from .rust import native_call
 
 
 def plain_fields(plan):
@@ -305,7 +306,9 @@ def direct_operation(plan, values):
         registration.user_data: "context",
         registration.release_callback: "release",
     }
-    call = ", ".join(arguments[p.name] for p in plan.function.parameters)
+    call = native_call(
+        plan.function, [arguments[p.name] for p in plan.function.parameters]
+    )
     native = f'''#[pyfunction]
 fn {name}(py: Python<'_>, callback: &Bound<'_, PyAny>) -> PyResult<()> {{
     generated_check_reentry()?;
@@ -314,8 +317,7 @@ fn {name}(py: Python<'_>, callback: &Bound<'_, PyAny>) -> PyResult<()> {{
     let context = if enabled {{ storage.register_callbacks(vec![callback.getattr("_invoke_{registration.callback}")?.unbind()]) }} else {{ std::ptr::null_mut() }};
     let native_callback: sys::{parameter.value.native} = if enabled {{ Some(generated_callback_{descriptor.native}_{registration.callback}) }} else {{ None }};
     let release = if enabled {{ Some({"generated_release_callbacks_no_reentry" if values.api.callbacks[next(p.value.native for p in plan.inputs if p.name == registration.release_callback)].reentry == "forbid" else "generated_release_callbacks"} as unsafe extern "C" fn(*mut c_void)) }} else {{ None }};
-    let status = unsafe {{ generated_native_call(py, || sys::{plan.name}({call})) }};
-    maplibre_core::check(status).map_err(map_error)?;
+    maplibre_core::check(|diagnostic| unsafe {{ generated_native_call(py, || {call}) }}).map_err(map_error)?;
     storage.accept_callbacks();
     Ok(())
 }}

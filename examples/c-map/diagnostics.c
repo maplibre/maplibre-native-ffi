@@ -15,11 +15,12 @@ static const char* severity_label(uint32_t severity) {
   }
 }
 
-void diagnostics_log_status(const char* message, mln_status status) {
+void diagnostics_log_status(
+  const char* message, mln_status status, const mln_diagnostic* diagnostic
+) {
   fprintf(stderr, "%s: status %d\n", message, (int)status);
-  const char* diagnostic = mln_thread_last_error_message();
-  if (diagnostic != nullptr && diagnostic[0] != '\0') {
-    fprintf(stderr, "native diagnostic: %s\n", diagnostic);
+  if (diagnostic != nullptr && diagnostic->message[0] != '\0') {
+    fprintf(stderr, "native diagnostic: %s\n", diagnostic->message);
   }
 }
 

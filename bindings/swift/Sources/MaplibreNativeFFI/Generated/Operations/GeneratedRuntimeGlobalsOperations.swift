@@ -15,13 +15,16 @@ public extension HttpHeaderTransformResponse {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena.submit { try mln_http_header_transform_response_set(
-        nativePointer,
-        arena.view(bindingArg0).data?.assumingMemoryBound(to: CChar.self),
-        NativeInputArena.count(bindingArg0.count),
-        arena.view(bindingArg2).data?.assumingMemoryBound(to: CChar.self),
-        NativeInputArena.count(bindingArg2.count)
-      ) })
+      try checkStatus { diagnostic in
+        try arena.submit { try mln_http_header_transform_response_set(
+          nativePointer,
+          arena.view(bindingArg0).data?.assumingMemoryBound(to: CChar.self),
+          NativeInputArena.count(bindingArg0.count),
+          arena.view(bindingArg2).data?.assumingMemoryBound(to: CChar.self),
+          NativeInputArena.count(bindingArg2.count),
+          diagnostic
+        ) }
+      }
       return ()
     }
   }
@@ -39,7 +42,10 @@ public extension Maplibre {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0: UInt32 = 0
-      try checkStatus(arena.submit { mln_network_status_get(&value0) })
+      try checkStatus { diagnostic in arena.submit { mln_network_status_get(
+        &value0,
+        diagnostic
+      ) } }
       return NetworkStatus(rawValue: value0)
     }
   }
@@ -57,8 +63,10 @@ public extension Maplibre {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena
-        .submit { mln_network_status_set(bindingArg0.nativeValue()) })
+      try checkStatus { diagnostic in arena.submit { mln_network_status_set(
+        bindingArg0.nativeValue(),
+        diagnostic
+      ) } }
       return ()
     }
   }
@@ -76,12 +84,14 @@ public extension ResourceTransformResponse {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena
-        .submit { try mln_resource_transform_response_set_url(
+      try checkStatus { diagnostic in
+        try arena.submit { try mln_resource_transform_response_set_url(
           nativePointer,
           arena.view(bindingArg0).data?.assumingMemoryBound(to: CChar.self),
-          NativeInputArena.count(bindingArg0.count)
-        ) })
+          NativeInputArena.count(bindingArg0.count),
+          diagnostic
+        ) }
+      }
       return ()
     }
   }
@@ -98,10 +108,11 @@ public extension Maplibre {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_runtime = 0
-      try checkStatus(arena.submit { try mln_runtime_create(
+      try checkStatus { diagnostic in try arena.submit { try mln_runtime_create(
         arena.store(bindingArg0.nativeValue(arena: arena)),
-        &value0
-      ) })
+        &value0,
+        diagnostic
+      ) } }
       return try RuntimeHandle(adopting: value0)
     }
   }

@@ -13,7 +13,6 @@ import org.bytedeco.javacpp.tools.InfoMapper;
             cinclude = {
               "maplibre_native_c/binding.h",
               "maplibre_native_c/base.h",
-              "maplibre_native_c/diagnostics.h",
               "maplibre_native_c/logging.h",
               "maplibre_native_c/android.h",
               "maplibre_native_c/completion.h",

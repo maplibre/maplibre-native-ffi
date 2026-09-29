@@ -22,7 +22,7 @@ internal constructor(
     return handle
   }
 
-  internal override fun bindingCloseRuntime(call: (Long) -> Int) {
+  internal override fun bindingCloseRuntime(call: (Long) -> Unit) {
     core.closeOnce({ call(handle) })
   }
 

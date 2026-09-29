@@ -2,7 +2,7 @@
 package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 internal actual object GeneratedOwnerDisposal {
   actual fun acquiredFrame(handle: Long) {
@@ -10,7 +10,9 @@ internal actual object GeneratedOwnerDisposal {
       handle,
       "mln_acquired_frame_dispose",
     )
-    Status.check(MaplibreNativeC.mln_acquired_frame_dispose(handle))
+    NativeDiagnostics.check { diagnostic ->
+      MaplibreNativeC.mln_acquired_frame_dispose(handle, diagnostic)
+    }
   }
 
   actual fun buffer(handle: Long) {
@@ -36,7 +38,7 @@ internal actual object GeneratedOwnerDisposal {
 
   actual fun map(handle: Long) {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(handle, "mln_map_dispose")
-    Status.check(MaplibreNativeC.mln_map_dispose(handle))
+    NativeDiagnostics.check { diagnostic -> MaplibreNativeC.mln_map_dispose(handle, diagnostic) }
   }
 
   actual fun mapProjection(handle: Long) {
@@ -44,7 +46,9 @@ internal actual object GeneratedOwnerDisposal {
       handle,
       "mln_map_projection_close",
     )
-    Status.check(MaplibreNativeC.mln_map_projection_close(handle))
+    NativeDiagnostics.check { diagnostic ->
+      MaplibreNativeC.mln_map_projection_close(handle, diagnostic)
+    }
   }
 
   actual fun renderFrameBatch(handle: Long) {
@@ -60,7 +64,9 @@ internal actual object GeneratedOwnerDisposal {
       handle,
       "mln_render_session_dispose",
     )
-    Status.check(MaplibreNativeC.mln_render_session_dispose(handle))
+    NativeDiagnostics.check { diagnostic ->
+      MaplibreNativeC.mln_render_session_dispose(handle, diagnostic)
+    }
   }
 
   actual fun resourceRequestHandle(handle: Long) {
@@ -73,6 +79,8 @@ internal actual object GeneratedOwnerDisposal {
 
   actual fun runtime(handle: Long) {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(handle, "mln_runtime_dispose")
-    Status.check(MaplibreNativeC.mln_runtime_dispose(handle))
+    NativeDiagnostics.check { diagnostic ->
+      MaplibreNativeC.mln_runtime_dispose(handle, diagnostic)
+    }
   }
 }

@@ -12,10 +12,12 @@ static void runtime_creation_returns_a_runtime(void) {
   const mln_runtime_options options = mln_runtime_options_default();
 
   mln_runtime runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, NULL)
+  );
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&options, &runtime)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&options, &runtime, NULL)
   );
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_close(runtime));
@@ -26,12 +28,12 @@ static void close_preflight_leaves_a_runtime_with_a_live_child_open(void) {
   mln_map map = mln_test_create_map(runtime);
   const mln_completion discard = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_runtime_release(runtime, &discard)
+    MLN_STATUS_INVALID_STATE, mln_runtime_release(runtime, &discard, NULL)
   );
 
   uint64_t mask = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_get_event_mask(runtime, &mask)
+    MLN_STATUS_OK, mln_runtime_get_event_mask(runtime, &mask, NULL)
   );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -60,7 +62,8 @@ static void a_barrier_completes_after_preceding_work(void) {
   );
   const bool operation_entered = wait_for_entry(&entered);
   mln_test_completion barrier = mln_test_completion_default(0);
-  const mln_status accepted = mln_runtime_barrier(runtime, &barrier.descriptor);
+  const mln_status accepted =
+    mln_runtime_barrier(runtime, &barrier.descriptor, NULL);
   const bool completed_early = mln_test_completion_wait(&barrier, 100);
   mln_test_complete_runtime_operation(pending_operation);
   const mln_status operation_terminal = mln_test_completion_settle(&operation);
@@ -76,10 +79,12 @@ static void a_barrier_completes_after_preceding_work(void) {
 static void runtime_release_waits_for_retired_map_cleanup(void) {
   const mln_runtime_options options = mln_runtime_options_default();
   mln_runtime runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, NULL)
+  );
   mln_test_completion create_map = mln_test_completion_default(sizeof(mln_map));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_create(runtime, NULL, &create_map.descriptor)
+    MLN_STATUS_OK, mln_map_create(runtime, NULL, &create_map.descriptor, NULL)
   );
   mln_map map = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
@@ -94,12 +99,13 @@ static void runtime_release_waits_for_retired_map_cleanup(void) {
     MLN_STATUS_OK, mln_test_block_map_cleanup(map, &entered, &release)
   );
   mln_test_completion map_close = mln_test_completion_default(0);
-  const mln_status map_accepted = mln_map_release(map, &map_close.descriptor);
+  const mln_status map_accepted =
+    mln_map_release(map, &map_close.descriptor, NULL);
   const bool cleanup_entered = wait_for_entry(&entered);
   const bool map_completed = mln_test_completion_wait(&map_close, 100);
   mln_test_completion runtime_close = mln_test_completion_default(0);
   const mln_status runtime_accepted =
-    mln_runtime_release(runtime, &runtime_close.descriptor);
+    mln_runtime_release(runtime, &runtime_close.descriptor, NULL);
   const bool runtime_completed_early =
     mln_test_completion_wait(&runtime_close, 100);
   atomic_store(&release, true);
@@ -124,11 +130,12 @@ typedef struct creator_thread_probe {
 static void create_on_temporary_thread(void* argument) {
   creator_thread_probe* probe = argument;
   const mln_runtime_options options = mln_runtime_options_default();
-  probe->status = mln_runtime_create(&options, &probe->runtime);
+  probe->status = mln_runtime_create(&options, &probe->runtime, NULL);
   if (probe->status != MLN_STATUS_OK) return;
 
   mln_test_completion create_map = mln_test_completion_default(sizeof(mln_map));
-  probe->status = mln_map_create(probe->runtime, NULL, &create_map.descriptor);
+  probe->status =
+    mln_map_create(probe->runtime, NULL, &create_map.descriptor, NULL);
   if (probe->status == MLN_STATUS_OK) {
     probe->status = mln_test_completion_finish_value(
       &create_map, &probe->map, sizeof(probe->map)
@@ -152,7 +159,7 @@ static void runtime_and_map_outlive_the_creating_host_thread(void) {
   const mln_logical_extent extent = {320, 240, 1.0};
   mln_test_completion resize = mln_test_completion_default(0);
   mln_status resize_status =
-    mln_map_resize(probe.map, extent, &resize.descriptor);
+    mln_map_resize(probe.map, extent, &resize.descriptor, NULL);
   if (resize_status == MLN_STATUS_OK) {
     resize_status = mln_test_completion_settle(&resize);
   } else {
@@ -161,7 +168,8 @@ static void runtime_and_map_outlive_the_creating_host_thread(void) {
   }
   const mln_status barrier_status = mln_test_runtime_barrier(probe.runtime);
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  const mln_status snapshot_status = mln_map_snapshot_get(probe.map, &snapshot);
+  const mln_status snapshot_status =
+    mln_map_snapshot_get(probe.map, &snapshot, NULL);
   const mln_status map_close_status = mln_test_map_close(probe.map);
   const mln_status runtime_close_status = mln_test_runtime_close(probe.runtime);
 
@@ -182,14 +190,18 @@ typedef struct close_probe {
 static mln_runtime create_untracked_runtime(void) {
   const mln_runtime_options options = mln_runtime_options_default();
   mln_runtime runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, NULL)
+  );
   return runtime;
 }
 
 static void close_from_foreign_thread(void* argument) {
   close_probe* probe = argument;
   const mln_completion discard = mln_test_discard_completion();
-  atomic_store(&probe->status, mln_runtime_release(probe->runtime, &discard));
+  atomic_store(
+    &probe->status, mln_runtime_release(probe->runtime, &discard, NULL)
+  );
 }
 
 static void accepted_close_is_any_thread_and_retires_the_handle(void) {
@@ -205,7 +217,8 @@ static void accepted_close_is_any_thread_and_retires_the_handle(void) {
 
   uint64_t mask = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_get_event_mask(runtime, &mask)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_get_event_mask(runtime, &mask, NULL)
   );
 }
 
@@ -223,18 +236,21 @@ static void disposal_waits_for_children_and_retires_callback_state(void) {
   options.event_wake.user_data = &released;
   options.event_wake.release_user_data = disposal_release;
   mln_runtime runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, NULL)
+  );
   mln_map map = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_map_create_status(runtime, NULL, &map)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_dispose(runtime));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_dispose(runtime, NULL));
   uint64_t mask = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_get_event_mask(runtime, &mask)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_get_event_mask(runtime, &mask, NULL)
   );
   TEST_ASSERT_FALSE(atomic_load(&released));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_dispose(map));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_dispose(map, NULL));
   TEST_ASSERT_TRUE(wait_for_entry(&released));
 }
 

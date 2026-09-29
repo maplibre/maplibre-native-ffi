@@ -10,7 +10,10 @@ public extension AcquiredFrameHandle {
       operation: "mln_acquired_frame_dispose"
     )
     try mapNativeFailure { try handle.closeOnce { live in
-      try checkStatus(mln_acquired_frame_dispose(live.raw))
+      try checkStatus { diagnostic in mln_acquired_frame_dispose(
+        live.raw,
+        diagnostic
+      ) }
     } }
   }
 }
@@ -27,18 +30,20 @@ public extension AcquiredFrameHandle {
       let access = try handle.borrow()
       defer { access.end(); withExtendedLifetime(self) {} }
       var token: UnsafeMutableRawPointer?
-      try checkStatus(mln_adapter_acquired_frame_view_begin(
+      try checkStatus { diagnostic in mln_adapter_acquired_frame_view_begin(
         access.handle.raw,
-        &token
-      ))
+        &token,
+        diagnostic
+      ) }
       let scope = NativeViewScope()
       defer { scope.expire(); mln_adapter_acquired_frame_view_end(token) }
       var raw = mln_gpu_sync_default()
       raw.size = UInt32(MemoryLayout<mln_gpu_sync>.size)
-      try checkStatus(mln_acquired_frame_get_producer_sync(
+      try checkStatus { diagnostic in mln_acquired_frame_get_producer_sync(
         access.handle.raw,
-        &raw
-      ))
+        &raw,
+        diagnostic
+      ) }
       return try body(GpuSyncView(GpuSync(raw: raw), scope: scope))
     }
   }
@@ -59,10 +64,13 @@ public extension AcquiredFrameHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_render_frame_result()
       value0.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
-      try checkStatus(arena.submit { mln_acquired_frame_get_result(
-        handle.raw,
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_acquired_frame_get_result(
+          handle.raw,
+          &value0,
+          diagnostic
+        ) }
+      }
       return RenderFrameResult(raw: value0)
     }
   }
@@ -79,10 +87,11 @@ public extension AcquiredFrameHandle {
       defer { withExtendedLifetime(arena) {} }
       try handle.closeOnce { live in
         var raw = live.raw
-        try checkStatus(mln_acquired_frame_release(
+        try checkStatus { diagnostic in mln_acquired_frame_release(
           &raw,
-          arena.store(consumerCompletion.nativeValue())
-        ))
+          arena.store(consumerCompletion.nativeValue()),
+          diagnostic
+        ) }
       }
     }
   }

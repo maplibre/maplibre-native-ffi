@@ -68,7 +68,15 @@ public sealed unsafe class NativeHandleIdentityTests
         var error = Assert.Throws<InvalidArgumentException>(() =>
         {
             ulong mask = 0;
-            NativeStatus.Check(NativeMethods.mln_runtime_get_event_mask(wrongKind, &mask));
+            mln_diagnostic diagnostic;
+            NativeStatus.Check(
+                NativeMethods.mln_runtime_get_event_mask(
+                    wrongKind,
+                    &mask,
+                    NativeDiagnostic.Prepare(&diagnostic)
+                ),
+                &diagnostic
+            );
         });
 
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
@@ -100,7 +108,15 @@ public sealed unsafe class NativeHandleIdentityTests
     private static mln_map_snapshot GetSnapshot(MlnMap map)
     {
         var snapshot = new mln_map_snapshot { size = (uint)sizeof(mln_map_snapshot) };
-        NativeStatus.Check(NativeMethods.mln_map_snapshot_get(map, &snapshot));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_map_snapshot_get(
+                map,
+                &snapshot,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return snapshot;
     }
 }

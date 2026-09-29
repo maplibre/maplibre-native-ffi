@@ -7,21 +7,23 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 
 /** Converts C ABI status values to Kotlin exceptions. */
 internal object Status {
-  /** Returns normally for OK and throws the mapped Kotlin exception otherwise. */
-  fun check(nativeStatusCode: Int) {
-    if (nativeStatusCode == MaplibreStatus.OK.nativeCode) {
-      return
+  /**
+   * Returns normally for OK and throws the mapped Kotlin exception otherwise, reading the call's
+   * [diagnostic] only on failure.
+   */
+  inline fun check(nativeStatusCode: Int, diagnostic: () -> String) {
+    if (nativeStatusCode != MaplibreStatus.OK.nativeCode) {
+      throw exception(nativeStatusCode, diagnostic())
     }
-
-    throw exception(nativeStatusCode)
   }
 
-  /** Builds the mapped Kotlin exception and copies the current thread diagnostic immediately. */
-  fun exception(nativeStatusCode: Int): MaplibreException {
-    val status = MaplibreStatus.fromNative(nativeStatusCode)
-    val diagnostic = currentDiagnostic()
-    return MaplibreException.forStatus(status, nativeStatusCode, diagnostic)
-  }
+  /** Builds the mapped Kotlin exception for a failed status and its call's diagnostic. */
+  fun exception(nativeStatusCode: Int, diagnostic: String): MaplibreException =
+    MaplibreException.forStatus(
+      MaplibreStatus.fromNative(nativeStatusCode),
+      nativeStatusCode,
+      diagnostic,
+    )
 
   /** Creates the binding-owned error for using an already closed handle. */
   fun released(typeName: String): InvalidStateException =
@@ -31,7 +33,7 @@ internal object Status {
   fun invalidState(diagnostic: String): InvalidStateException =
     InvalidStateException(MaplibreStatus.INVALID_STATE.nativeCode, diagnostic)
 
-  /** Creates a binding-owned invalid-argument error without reading stale C diagnostics. */
+  /** Creates a binding-owned invalid-argument error. */
   fun invalidArgument(diagnostic: String): InvalidArgumentException =
     InvalidArgumentException(MaplibreStatus.INVALID_ARGUMENT.nativeCode, diagnostic)
 
@@ -39,12 +41,4 @@ internal object Status {
   inline fun requireArgument(condition: Boolean, diagnostic: () -> String) {
     if (!condition) throw invalidArgument(diagnostic())
   }
-
-  /** Copies the current C thread-local diagnostic into a Kotlin-owned string. */
-  fun currentDiagnostic(): String = NativeDiagnostics.currentDiagnostic()
-}
-
-/** Platform bridge for copying the native thread-local diagnostic. */
-internal expect object NativeDiagnostics {
-  fun currentDiagnostic(): String
 }

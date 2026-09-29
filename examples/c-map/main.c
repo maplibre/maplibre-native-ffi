@@ -218,7 +218,7 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  mln_log_set_callback(diagnostics_log_record, nullptr, nullptr);
+  mln_log_set_callback(diagnostics_log_record, nullptr, nullptr, NULL);
   int exit_code = EXIT_FAILURE;
   render_target_apply_sdl_hints();
   if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -293,6 +293,6 @@ out_window:
 out_sdl:
   SDL_Quit();
 out_log_callback:
-  mln_log_clear_callback();
+  mln_log_clear_callback(NULL);
   return exit_code;
 }

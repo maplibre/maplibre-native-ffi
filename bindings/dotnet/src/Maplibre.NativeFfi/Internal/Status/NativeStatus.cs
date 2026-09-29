@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 
@@ -6,22 +5,15 @@ namespace Maplibre.NativeFfi.Internal.Status;
 
 internal static unsafe class NativeStatus
 {
-    [ThreadStatic]
-    private static Func<string>? diagnosticProviderForTest;
-
-    internal static void Check(mln_status status)
+    /// <summary>
+    /// Throws for a failed status, with the message the call wrote to diagnostic.
+    /// </summary>
+    internal static void Check(mln_status status, mln_diagnostic* diagnostic)
     {
-        Check((int)status);
-    }
-
-    internal static void Check(int rawStatus)
-    {
-        if (rawStatus == (int)MaplibreStatus.Ok)
+        if (status != mln_status.MLN_STATUS_OK)
         {
-            return;
+            throw CreateException((int)status, NativeDiagnostic.Message(diagnostic));
         }
-
-        throw CreateException(rawStatus, CaptureDiagnostic());
     }
 
     internal static void Check(int rawStatus, string diagnostic)
@@ -71,13 +63,6 @@ internal static unsafe class NativeStatus
         };
     }
 
-    internal static IDisposable UseDiagnosticProviderForTest(Func<string> provider)
-    {
-        var previous = diagnosticProviderForTest;
-        diagnosticProviderForTest = provider;
-        return new RestoreDiagnosticProvider(previous);
-    }
-
     internal static MaplibreStatus StatusFromRaw(int rawStatus) =>
         rawStatus switch
         {
@@ -94,37 +79,4 @@ internal static unsafe class NativeStatus
             -10 => MaplibreStatus.NotFound,
             _ => MaplibreStatus.Unknown,
         };
-
-    private static string CaptureDiagnostic()
-    {
-        if (diagnosticProviderForTest is { } provider)
-        {
-            return provider();
-        }
-
-        return CaptureNativeDiagnostic();
-    }
-
-    private static string CaptureNativeDiagnostic()
-    {
-        try
-        {
-            var message = NativeMethods.mln_thread_last_error_message();
-            return message is null
-                ? string.Empty
-                : Marshal.PtrToStringUTF8((nint)message) ?? string.Empty;
-        }
-        catch (DllNotFoundException)
-        {
-            return string.Empty;
-        }
-    }
-
-    private sealed class RestoreDiagnosticProvider(Func<string>? previous) : IDisposable
-    {
-        public void Dispose()
-        {
-            diagnosticProviderForTest = previous;
-        }
-    }
 }

@@ -271,12 +271,12 @@ test "standalone projection remains usable on another thread" {
 
 test "projected meters convert to and from lat lng" {
     const origin = maplibre.LatLng{ .latitude = 0.0, .longitude = 0.0 };
-    const origin_meters = try maplibre.projectedMetersForLatLng(origin);
+    const origin_meters = try maplibre.projectedMetersForLatLng(origin, null);
     try testing.expectApproxEqAbs(@as(f64, 0.0), origin_meters.northing, 0.000001);
     try testing.expectApproxEqAbs(@as(f64, 0.0), origin_meters.easting, 0.000001);
 
-    const meters = try maplibre.projectedMetersForLatLng(center);
-    const roundtrip = try maplibre.latLngForProjectedMeters(meters);
+    const meters = try maplibre.projectedMetersForLatLng(center, null);
+    const roundtrip = try maplibre.latLngForProjectedMeters(meters, null);
     try expectLatLngApprox(center, roundtrip);
 }
 
@@ -312,11 +312,11 @@ test "projection free helpers preserve native diagnostics" {
 
     try testing.expectError(
         error.InvalidArgument,
-        maplibre.projectedMetersForLatLng(.{ .latitude = std.math.inf(f64), .longitude = 0.0 }),
+        maplibre.projectedMetersForLatLng(.{ .latitude = std.math.inf(f64), .longitude = 0.0 }, &diagnostics),
     );
-    var message = try maplibre.threadLastErrorMessage(testing.allocator);
-    defer message.deinit();
-    try testing.expect(message.value.len > 0);
+    const diagnostic = diagnostics.get().?;
+    try testing.expectEqual(@as(?i32, -1), diagnostic.raw_status);
+    try testing.expect(diagnostic.message.len > 0);
 
-    try testing.expectError(error.InvalidArgument, maplibre.latLngForProjectedMeters(.{ .northing = std.math.nan(f64), .easting = 0.0 }));
+    try testing.expectError(error.InvalidArgument, maplibre.latLngForProjectedMeters(.{ .northing = std.math.nan(f64), .easting = 0.0 }, null));
 }

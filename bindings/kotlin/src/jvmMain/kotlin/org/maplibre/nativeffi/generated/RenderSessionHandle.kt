@@ -24,7 +24,7 @@ internal constructor(
     return handle
   }
 
-  internal override fun bindingCloseRenderSession(call: (Long) -> Int) {
+  internal override fun bindingCloseRenderSession(call: (Long) -> Unit) {
     core.closeOnce({ call(handle) })
   }
 

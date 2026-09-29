@@ -46,12 +46,12 @@ namespace Maplibre.NativeFfi.Internal.C
     internal static unsafe partial class NativeMethods
     {
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_log_set_callback([NativeTypeName("mln_log_callback")] delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, uint> callback, void* user_data, [NativeTypeName("mln_log_callback_release")] delegate* unmanaged[Cdecl]<void*, void> release_user_data);
+        public static extern mln_status mln_log_set_callback([NativeTypeName("mln_log_callback")] delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, uint> callback, void* user_data, [NativeTypeName("mln_log_callback_release")] delegate* unmanaged[Cdecl]<void*, void> release_user_data, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_log_clear_callback();
+        public static extern mln_status mln_log_clear_callback(mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_log_set_async_severity_mask([NativeTypeName("uint32_t")] uint mask);
+        public static extern mln_status mln_log_set_async_severity_mask([NativeTypeName("uint32_t")] uint mask, mln_diagnostic* out_diagnostic);
     }
 }

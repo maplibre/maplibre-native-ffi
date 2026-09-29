@@ -52,11 +52,14 @@ public extension Maplibre {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_geojson_source_data = 0
-      try checkStatus(arena.submit { try mln_geojson_source_data_create(
-        arena.view(bindingArg0),
-        bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        try arena.submit { try mln_geojson_source_data_create(
+          arena.view(bindingArg0),
+          bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
+          &value0,
+          diagnostic
+        ) }
+      }
       return try GeojsonSourceDataHandle(adopting: value0)
     }
   }

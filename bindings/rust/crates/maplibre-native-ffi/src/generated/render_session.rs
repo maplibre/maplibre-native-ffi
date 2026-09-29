@@ -74,8 +74,13 @@ impl RenderSessionHandle {
         maplibre_core::callback::check("mln_metal_borrowed_texture_set_target", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_metal_borrowed_texture_set_target(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_metal_borrowed_texture_set_target(
+                    native,
+                    &binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             crate::completion::unit,
         )
@@ -93,8 +98,8 @@ impl RenderSessionHandle {
         maplibre_core::callback::check("mln_metal_surface_set_target", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_metal_surface_set_target(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_metal_surface_set_target(native, &binding_arg_1, completion, diagnostic)
             },
             crate::completion::unit,
         )
@@ -113,8 +118,13 @@ impl RenderSessionHandle {
         let mut arena = maplibre_core::input::InputArena::default();
         let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_opengl_borrowed_texture_set_target(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_opengl_borrowed_texture_set_target(
+                    native,
+                    &binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             crate::completion::unit,
         )
@@ -133,8 +143,8 @@ impl RenderSessionHandle {
         let mut arena = maplibre_core::input::InputArena::default();
         let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_opengl_surface_set_target(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_opengl_surface_set_target(native, &binding_arg_1, completion, diagnostic)
             },
             crate::completion::unit,
         )
@@ -147,8 +157,8 @@ impl RenderSessionHandle {
         maplibre_core::callback::check("mln_render_session_abandon", native.0)?;
         let mut binding_arg_1: sys::mln_render_abandon_result =
             maplibre_core::generated::RenderAbandonResult::default().to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_abandon(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_render_session_abandon(native, &mut binding_arg_1, diagnostic)
         })?;
         Ok(maplibre_core::generated::RenderAbandonResult::from_native(
             binding_arg_1,
@@ -162,8 +172,8 @@ impl RenderSessionHandle {
         maplibre_core::callback::check("mln_render_session_acquire_frame", native.0)?;
         let binding_parent = std::sync::Arc::clone(&self.inner);
         let mut binding_arg_1 = sys::mln_acquired_frame(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_acquire_frame(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_render_session_acquire_frame(native, &mut binding_arg_1, diagnostic)
         })?;
         Ok(crate::AcquiredFrameHandle::from_native(
             binding_arg_1,
@@ -177,7 +187,9 @@ impl RenderSessionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_render_session_barrier", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_render_session_barrier(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_render_session_barrier(native, completion, diagnostic)
+            },
             crate::completion::unit,
         )
     }
@@ -188,7 +200,9 @@ impl RenderSessionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_render_session_clear_data", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_render_session_clear_data(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_render_session_clear_data(native, completion, diagnostic)
+            },
             crate::completion::unit,
         )
     }
@@ -197,7 +211,9 @@ impl RenderSessionHandle {
     pub fn destroy(&self) -> Result<()> {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let result = self.inner.handle.close_with(|native| {
-            maplibre_core::check(unsafe { sys::mln_render_session_destroy(native) })?;
+            maplibre_core::check(|diagnostic| unsafe {
+                sys::mln_render_session_destroy(native, diagnostic)
+            })?;
             Ok(())
         })?;
         Ok(result.unwrap_or_else(|| Default::default()))
@@ -209,7 +225,9 @@ impl RenderSessionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_render_session_detach", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_render_session_detach(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_render_session_detach(native, completion, diagnostic)
+            },
             crate::completion::unit,
         )
     }
@@ -218,7 +236,9 @@ impl RenderSessionHandle {
     pub fn dispose(&self) -> Result<()> {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let result = self.inner.handle.close_with(|native| {
-            maplibre_core::check(unsafe { sys::mln_render_session_dispose(native) })?;
+            maplibre_core::check(|diagnostic| unsafe {
+                sys::mln_render_session_dispose(native, diagnostic)
+            })?;
             Ok(())
         })?;
         Ok(result.unwrap_or_else(|| Default::default()))
@@ -230,8 +250,8 @@ impl RenderSessionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_render_session_drain_frame_results", native.0)?;
         let mut binding_arg_1 = sys::mln_render_frame_batch(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_drain_frame_results(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_render_session_drain_frame_results(native, &mut binding_arg_1, diagnostic)
         })?;
         Ok(crate::RenderFrameBatchHandle::from_native(binding_arg_1)?)
     }
@@ -242,7 +262,9 @@ impl RenderSessionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_render_session_dump_debug_logs", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_render_session_dump_debug_logs(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_render_session_dump_debug_logs(native, completion, diagnostic)
+            },
             crate::completion::unit,
         )
     }
@@ -254,8 +276,8 @@ impl RenderSessionHandle {
         maplibre_core::callback::check("mln_render_session_get_capabilities", native.0)?;
         let mut binding_arg_1: sys::mln_render_session_capabilities =
             maplibre_core::generated::RenderSessionCapabilities::default().to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_get_capabilities(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_render_session_get_capabilities(native, &mut binding_arg_1, diagnostic)
         })?;
         Ok(maplibre_core::generated::RenderSessionCapabilities::from_native(binding_arg_1))
     }
@@ -267,8 +289,8 @@ impl RenderSessionHandle {
         maplibre_core::callback::check("mln_render_session_get_snapshot", native.0)?;
         let mut binding_arg_1: sys::mln_render_session_snapshot =
             maplibre_core::generated::RenderSessionSnapshot::default().to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_get_snapshot(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_render_session_get_snapshot(native, &mut binding_arg_1, diagnostic)
         })?;
         Ok(maplibre_core::generated::RenderSessionSnapshot::from_native(binding_arg_1))
     }
@@ -279,8 +301,8 @@ impl RenderSessionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_render_session_projection_create", native.0)?;
         let mut binding_arg_1 = sys::mln_map_projection(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_projection_create(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_render_session_projection_create(native, &mut binding_arg_1, diagnostic)
         })?;
         Ok(crate::MapProjectionHandle::from_native(binding_arg_1)?)
     }
@@ -322,7 +344,7 @@ impl RenderSessionHandle {
             })
             .transpose()?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_render_session_query_feature_extensions(
                     native,
                     binding_arg_1,
@@ -333,6 +355,7 @@ impl RenderSessionHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -357,7 +380,7 @@ impl RenderSessionHandle {
             .map(|value| value.to_native(&mut arena))
             .transpose()?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_render_session_query_rendered_features(
                     native,
                     &binding_arg_1,
@@ -365,6 +388,7 @@ impl RenderSessionHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -400,7 +424,7 @@ impl RenderSessionHandle {
             .map(|value| value.to_native(&mut arena))
             .transpose()?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_render_session_query_source_features(
                     native,
                     binding_arg_1,
@@ -408,6 +432,7 @@ impl RenderSessionHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -431,7 +456,9 @@ impl RenderSessionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_render_session_reduce_memory_use", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_render_session_reduce_memory_use(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_render_session_reduce_memory_use(native, completion, diagnostic)
+            },
             crate::completion::unit,
         )
     }
@@ -445,8 +472,8 @@ impl RenderSessionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_render_session_request_frame", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_request_frame(native, &binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_render_session_request_frame(native, &binding_arg_1, diagnostic)
         })?;
         Ok(())
     }
@@ -460,8 +487,8 @@ impl RenderSessionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_render_session_resize", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion| unsafe {
-            sys::mln_render_session_resize(native, &binding_arg_1, completion)
+        crate::completion::submit_command(|completion, diagnostic| unsafe {
+            sys::mln_render_session_resize(native, &binding_arg_1, completion, diagnostic)
         })
     }
 
@@ -471,8 +498,13 @@ impl RenderSessionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_render_session_service_driver_work", native.0)?;
         let mut binding_arg_2: usize = Default::default();
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_service_driver_work(native, binding_arg_1, &mut binding_arg_2)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_render_session_service_driver_work(
+                native,
+                binding_arg_1,
+                &mut binding_arg_2,
+                diagnostic,
+            )
         })?;
         Ok(binding_arg_2)
     }
@@ -485,7 +517,9 @@ impl RenderSessionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_texture_read_premultiplied_rgba8", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_texture_read_premultiplied_rgba8(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_texture_read_premultiplied_rgba8(native, completion, diagnostic)
+            },
             |result| {
                 let value =
                     crate::completion::copy_value::<sys::mln_texture_readback_result>(result)?;
@@ -506,8 +540,13 @@ impl RenderSessionHandle {
         maplibre_core::callback::check("mln_vulkan_borrowed_texture_set_target", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_vulkan_borrowed_texture_set_target(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_vulkan_borrowed_texture_set_target(
+                    native,
+                    &binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             crate::completion::unit,
         )
@@ -525,8 +564,8 @@ impl RenderSessionHandle {
         maplibre_core::callback::check("mln_vulkan_surface_set_target", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_vulkan_surface_set_target(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_vulkan_surface_set_target(native, &binding_arg_1, completion, diagnostic)
             },
             crate::completion::unit,
         )
@@ -544,8 +583,13 @@ impl RenderSessionHandle {
         maplibre_core::callback::check("mln_webgpu_borrowed_texture_set_target", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_webgpu_borrowed_texture_set_target(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_webgpu_borrowed_texture_set_target(
+                    native,
+                    &binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             crate::completion::unit,
         )
@@ -563,8 +607,8 @@ impl RenderSessionHandle {
         maplibre_core::callback::check("mln_webgpu_surface_set_target", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_webgpu_surface_set_target(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_webgpu_surface_set_target(native, &binding_arg_1, completion, diagnostic)
             },
             crate::completion::unit,
         )

@@ -10,8 +10,6 @@ import (
 	"runtime/cgo"
 	"sync"
 	"unsafe"
-
-	internalstatus "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/status"
 )
 
 // CommandCompletion describes the terminal outcome of an ordered map command.
@@ -111,19 +109,19 @@ func (bridge *completionBridge[T]) complete(raw *C.mln_completion_result) {
 	if raw == nil {
 		result.err = newBindingError(ErrInvalidState, "native completion returned nil")
 	} else if raw.status != C.MLN_STATUS_OK && !bridge.deliversStatus {
-		result.err = newStatusError(&internalstatus.NativeError{Status: int32(raw.status), Diagnostic: bindingString(raw.diagnostic.data, uint64(raw.diagnostic.size))})
+		result.err = newStatusError(int32(raw.status), bindingString(raw.diagnostic.data, uint64(raw.diagnostic.size)))
 	} else {
 		result.value, result.err = bridge.convert(raw)
 	}
 }
 
-func startCompletion[T any](start func(*C.mln_completion) int32, convert func(*C.mln_completion_result) (T, error)) (*Future[T], error) {
+func startCompletion[T any](start func(*C.mln_completion, *C.mln_diagnostic) int32, convert func(*C.mln_completion_result) (T, error)) (*Future[T], error) {
 	state := &futureState[T]{ready: make(chan struct{})}
 	_, deliversStatus := any(*new(T)).(CommandCompletion)
 	bridge := &completionBridge[T]{state: state, deliversStatus: deliversStatus, convert: convert}
 	handle := cgo.NewHandle(completionReceiver(bridge))
 	completion := C.mln_go_make_completion_from_handle(C.uintptr_t(handle))
-	if err := checkNative(func() int32 { return start(&completion) }); err != nil {
+	if err := checkNative(func(diagnostic *C.mln_diagnostic) int32 { return start(&completion, diagnostic) }); err != nil {
 		handle.Delete()
 		return nil, err
 	}

@@ -41,7 +41,7 @@ static mln_status set_resource_provider_committed(
   mln_test_completion completion = mln_test_completion_default(0);
   return commit(
     mln_runtime_set_resource_provider(
-      runtime, provider, &completion.descriptor
+      runtime, provider, &completion.descriptor, NULL
     ),
     &completion
   );
@@ -50,7 +50,7 @@ static mln_status set_resource_provider_committed(
 static mln_status clear_resource_provider_committed(mln_runtime runtime) {
   mln_test_completion completion = mln_test_completion_default(0);
   return commit(
-    mln_runtime_clear_resource_provider(runtime, &completion.descriptor),
+    mln_runtime_clear_resource_provider(runtime, &completion.descriptor, NULL),
     &completion
   );
 }
@@ -61,7 +61,7 @@ static mln_status set_resource_transform_committed(
   mln_test_completion completion = mln_test_completion_default(0);
   return commit(
     mln_runtime_set_resource_transform(
-      runtime, transform, &completion.descriptor
+      runtime, transform, &completion.descriptor, NULL
     ),
     &completion
   );
@@ -70,7 +70,7 @@ static mln_status set_resource_transform_committed(
 static mln_status clear_resource_transform_committed(mln_runtime runtime) {
   mln_test_completion completion = mln_test_completion_default(0);
   return commit(
-    mln_runtime_clear_resource_transform(runtime, &completion.descriptor),
+    mln_runtime_clear_resource_transform(runtime, &completion.descriptor, NULL),
     &completion
   );
 }
@@ -81,7 +81,7 @@ static mln_status set_http_header_transform_committed(
   mln_test_completion completion = mln_test_completion_default(0);
   return commit(
     mln_runtime_set_http_header_transform(
-      runtime, transform, &completion.descriptor
+      runtime, transform, &completion.descriptor, NULL
     ),
     &completion
   );
@@ -90,7 +90,9 @@ static mln_status set_http_header_transform_committed(
 static mln_status clear_http_header_transform_committed(mln_runtime runtime) {
   mln_test_completion completion = mln_test_completion_default(0);
   return commit(
-    mln_runtime_clear_http_header_transform(runtime, &completion.descriptor),
+    mln_runtime_clear_http_header_transform(
+      runtime, &completion.descriptor, NULL
+    ),
     &completion
   );
 }
@@ -173,7 +175,7 @@ static bool create_and_activate_offline_region(
   mln_test_completion creation =
     mln_test_completion_default(sizeof(mln_offline_region_info));
   const mln_status submission = mln_runtime_offline_region_create(
-    runtime, definition, metadata, sizeof(metadata), &creation.descriptor
+    runtime, definition, metadata, sizeof(metadata), &creation.descriptor, NULL
   );
   if (submission != MLN_STATUS_OK) {
     mln_test_completion_reject(&creation);
@@ -197,7 +199,7 @@ static bool create_and_activate_offline_region(
   mln_completion download = mln_test_discard_completion();
   if (
     mln_runtime_offline_region_set_download_state(
-      runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &download
+      runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &download, NULL
     ) != MLN_STATUS_OK
   ) {
     return false;
@@ -240,8 +242,9 @@ static void resource_provider_registration_releases_owned_state(void) {
 
   mln_completion rejected = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_resource_provider(MLN_HANDLE_NULL, &provider, &rejected)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_set_resource_provider(
+                                   MLN_HANDLE_NULL, &provider, &rejected, NULL
+                                 )
   );
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&release_count));
 
@@ -288,7 +291,8 @@ static uint32_t inline_release_resource_provider(
   };
   (void)request;
   atomic_store(
-    &state->completion_status, mln_resource_request_complete(handle, &response)
+    &state->completion_status,
+    mln_resource_request_complete(handle, &response, NULL)
   );
   mln_resource_request_release(handle);
   atomic_store(&state->callback_finished, true);
@@ -327,23 +331,23 @@ static void custom_provider_request_handles_reject_raw_null_handles(void) {
   bool cancelled = false;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_resource_request_cancelled(MLN_HANDLE_NULL, &cancelled)
+    mln_resource_request_cancelled(MLN_HANDLE_NULL, &cancelled, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_resource_request_complete(MLN_HANDLE_NULL, &response)
+    mln_resource_request_complete(MLN_HANDLE_NULL, &response, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_resource_request_set_cancel_callback(
-      MLN_HANDLE_NULL, ignore_cancel, NULL, NULL, &cancelled
+      MLN_HANDLE_NULL, ignore_cancel, NULL, NULL, &cancelled, NULL
     )
   );
 }
 
 static void network_status_get_rejects_raw_null_output(void) {
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_network_status_get(NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_network_status_get(NULL, NULL)
   );
 }
 
@@ -353,7 +357,7 @@ static void ambient_cache_operations_validate_raw_operation_values(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_runtime_run_ambient_cache_operation(
-      runtime, (mln_ambient_cache_operation)999, &completion
+      runtime, (mln_ambient_cache_operation)999, &completion, NULL
     )
   );
   mln_test_destroy_runtime(runtime);
@@ -363,7 +367,7 @@ static void set_maximum_ambient_cache_size_rejects_raw_null_output(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_maximum_ambient_cache_size(runtime, 1024, NULL)
+    mln_runtime_set_maximum_ambient_cache_size(runtime, 1024, NULL, NULL)
   );
   mln_test_destroy_runtime(runtime);
 }
@@ -376,7 +380,7 @@ static void offline_regions_reject_raw_invalid_descriptors(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_runtime_offline_region_create(
-      runtime, NULL, metadata, sizeof(metadata), &completion
+      runtime, NULL, metadata, sizeof(metadata), &completion, NULL
     )
   );
 
@@ -384,7 +388,7 @@ static void offline_regions_reject_raw_invalid_descriptors(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_runtime_offline_region_create(
-      runtime, &definition, metadata, sizeof(metadata), &completion
+      runtime, &definition, metadata, sizeof(metadata), &completion, NULL
     )
   );
 
@@ -393,7 +397,7 @@ static void offline_regions_reject_raw_invalid_descriptors(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_runtime_offline_region_create(
-      runtime, &definition, metadata, sizeof(metadata), &completion
+      runtime, &definition, metadata, sizeof(metadata), &completion, NULL
     )
   );
 
@@ -405,7 +409,7 @@ static void offline_regions_reject_raw_invalid_descriptors(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_runtime_offline_region_create(
-      runtime, &definition, metadata, sizeof(metadata), &completion
+      runtime, &definition, metadata, sizeof(metadata), &completion, NULL
     )
   );
 
@@ -414,7 +418,7 @@ static void offline_regions_reject_raw_invalid_descriptors(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_runtime_offline_region_create(
-      runtime, &definition, metadata, sizeof(metadata), &completion
+      runtime, &definition, metadata, sizeof(metadata), &completion, NULL
     )
   );
   mln_test_destroy_runtime(runtime);
@@ -425,7 +429,7 @@ static void offline_database_merge_rejects_raw_null_path(void) {
   mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_offline_regions_merge_database(runtime, NULL, &completion)
+    mln_runtime_offline_regions_merge_database(runtime, NULL, &completion, NULL)
   );
   mln_test_destroy_runtime(runtime);
 }
@@ -437,15 +441,14 @@ static void offline_database_merge_rejects_a_missing_file(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_offline_regions_merge_database(
-                                   runtime, missing_path, &completion
-                                 )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_offline_regions_merge_database(
+      runtime, missing_path, &completion, MLN_TEST_DIAGNOSTIC
+    )
   );
   // The rejection happens on the calling thread, so its diagnostic is readable
   // here rather than through the completion.
-  TEST_ASSERT_NOT_NULL(
-    strstr(mln_thread_last_error_message(), "readable database file")
-  );
+  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "readable database file"));
   FILE* unexpected = fopen(missing_path, "rb");
   TEST_ASSERT_NULL_MESSAGE(
     unexpected, "The rejected merge created its missing side database."
@@ -465,12 +468,13 @@ static void offline_database_merge_rejects_sqlite_pseudo_paths(void) {
        ++index) {
     mln_completion completion = mln_test_discard_completion();
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_INVALID_ARGUMENT, mln_runtime_offline_regions_merge_database(
-                                     runtime, pseudo_paths[index], &completion
-                                   )
+      MLN_STATUS_INVALID_ARGUMENT,
+      mln_runtime_offline_regions_merge_database(
+        runtime, pseudo_paths[index], &completion, MLN_TEST_DIAGNOSTIC
+      )
     );
     TEST_ASSERT_NOT_NULL(
-      strstr(mln_thread_last_error_message(), "readable database file")
+      strstr(mln_test_last_error(), "readable database file")
     );
   }
 
@@ -489,7 +493,7 @@ static void offline_database_merge_reports_a_corrupt_side_database(void) {
   // reaches the completion instead.
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_offline_regions_merge_database(
-                     runtime, fixture_path, &merge.descriptor
+                     runtime, fixture_path, &merge.descriptor, NULL
                    )
   );
   TEST_ASSERT_TRUE(mln_test_completion_wait(&merge, -1));
@@ -519,8 +523,9 @@ static void submit_offline_list(void* argument) {
     mln_test_sleep_millisecond();
   }
   atomic_store(
-    &probe->offline_status,
-    mln_runtime_offline_regions_list(probe->runtime, &probe->list->descriptor)
+    &probe->offline_status, mln_runtime_offline_regions_list(
+                              probe->runtime, &probe->list->descriptor, NULL
+                            )
   );
   atomic_store(&probe->offline_accepted, true);
 }
@@ -538,7 +543,8 @@ static void occupy_until_offline_accepted(
   }
   const mln_completion discard = mln_test_discard_completion();
   atomic_store(
-    &probe->reentrant_status, mln_runtime_barrier(probe->runtime, &discard)
+    &probe->reentrant_status,
+    mln_runtime_barrier(probe->runtime, &discard, NULL)
   );
   atomic_store(&probe->finished, true);
 }
@@ -563,7 +569,7 @@ static void offline_submission_never_waits_for_the_runtime_worker(void) {
     .release_user_data = NULL,
   };
   const mln_status accepted =
-    mln_runtime_clear_resource_provider(runtime, &occupied);
+    mln_runtime_clear_resource_provider(runtime, &occupied, NULL);
   if (accepted != MLN_STATUS_OK) {
     // The completion will never run, so release the waiting thread by hand.
     atomic_store(&probe.entered, true);
@@ -606,7 +612,8 @@ static void offline_operations_report_a_missing_region(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     offline_completion_status(
-      mln_runtime_offline_region_get(runtime, missing, &get.descriptor), &get
+      mln_runtime_offline_region_get(runtime, missing, &get.descriptor, NULL),
+      &get
     )
   );
   TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&get));
@@ -617,7 +624,7 @@ static void offline_operations_report_a_missing_region(void) {
     MLN_STATUS_NOT_FOUND,
     offline_completion_status(
       mln_runtime_offline_region_update_metadata(
-        runtime, missing, metadata, sizeof(metadata), &update.descriptor
+        runtime, missing, metadata, sizeof(metadata), &update.descriptor, NULL
       ),
       &update
     )
@@ -628,7 +635,7 @@ static void offline_operations_report_a_missing_region(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_NOT_FOUND, offline_completion_status(
                             mln_runtime_offline_region_get_status(
-                              runtime, missing, &region_status.descriptor
+                              runtime, missing, &region_status.descriptor, NULL
                             ),
                             &region_status
                           )
@@ -639,7 +646,7 @@ static void offline_operations_report_a_missing_region(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_NOT_FOUND, offline_completion_status(
                             mln_runtime_offline_region_set_observed(
-                              runtime, missing, true, &observed.descriptor
+                              runtime, missing, true, &observed.descriptor, NULL
                             ),
                             &observed
                           )
@@ -652,7 +659,7 @@ static void offline_operations_report_a_missing_region(void) {
     offline_completion_status(
       mln_runtime_offline_region_set_download_state(
         runtime, missing, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
-        &download.descriptor
+        &download.descriptor, NULL
       ),
       &download
     )
@@ -663,7 +670,7 @@ static void offline_operations_report_a_missing_region(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_NOT_FOUND, offline_completion_status(
                             mln_runtime_offline_region_invalidate(
-                              runtime, missing, &invalidate.descriptor
+                              runtime, missing, &invalidate.descriptor, NULL
                             ),
                             &invalidate
                           )
@@ -672,11 +679,12 @@ static void offline_operations_report_a_missing_region(void) {
 
   mln_test_completion removal = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_NOT_FOUND,
-    offline_completion_status(
-      mln_runtime_offline_region_delete(runtime, missing, &removal.descriptor),
-      &removal
-    )
+    MLN_STATUS_NOT_FOUND, offline_completion_status(
+                            mln_runtime_offline_region_delete(
+                              runtime, missing, &removal.descriptor, NULL
+                            ),
+                            &removal
+                          )
   );
   mln_test_completion_destroy(&removal);
 
@@ -762,28 +770,30 @@ static void http_header_transform_rejects_raw_invalid_inputs(void) {
     .size = sizeof(mln_http_header_transform_response),
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE,
-    mln_http_header_transform_response_set(&response, "X-Test", 6, "value", 5)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_http_header_transform_response_set(&response, "Bad Name", 8, "value", 5)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_http_header_transform_response_set(
-      &response, "Authorization", 13, "bad\r\nvalue", 10
-    )
+    MLN_STATUS_INVALID_STATE, mln_http_header_transform_response_set(
+                                &response, "X-Test", 6, "value", 5, NULL
+                              )
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_http_header_transform_response_set(
-                                   &response, "Range", 5, "bytes=0-1", 9
+                                   &response, "Bad Name", 8, "value", 5, NULL
                                  )
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_http_header_transform_response_set(
-      &response, "Authorization", 13, invalid_utf8, sizeof(invalid_utf8)
+      &response, "Authorization", 13, "bad\r\nvalue", 10, NULL
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_http_header_transform_response_set(
+                                   &response, "Range", 5, "bytes=0-1", 9, NULL
+                                 )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_http_header_transform_response_set(
+      &response, "Authorization", 13, invalid_utf8, sizeof(invalid_utf8), NULL
     )
   );
   mln_test_destroy_runtime(runtime);
@@ -856,7 +866,7 @@ static void other_runtime_entry(void* argument) {
   teardown_probe* probe = argument;
   mln_runtime runtime = MLN_HANDLE_NULL;
   const mln_runtime_options options = mln_runtime_options_default();
-  const mln_status create_status = mln_runtime_create(&options, &runtime);
+  const mln_status create_status = mln_runtime_create(&options, &runtime, NULL);
   if (create_status != MLN_STATUS_OK) {
     atomic_store(&probe->other_runtime_status, create_status);
     atomic_store(&probe->other_runtime_call_done, true);
@@ -1005,7 +1015,7 @@ static void lookup_other_runtime_entry(void* argument) {
   lookup_probe* probe = argument;
   mln_runtime runtime = MLN_HANDLE_NULL;
   const mln_runtime_options options = mln_runtime_options_default();
-  const mln_status create_status = mln_runtime_create(&options, &runtime);
+  const mln_status create_status = mln_runtime_create(&options, &runtime, NULL);
   if (create_status != MLN_STATUS_OK) {
     atomic_store(&probe->other_runtime_status, create_status);
     atomic_store(&probe->other_runtime_call_done, true);
@@ -1149,7 +1159,7 @@ static void submit_provider_from_thread(void* user_data) {
   cross_thread_provider_submission* submission = user_data;
   submission->status = mln_runtime_set_resource_provider(
     submission->runtime, &submission->provider,
-    &submission->completion.descriptor
+    &submission->completion.descriptor, NULL
   );
 }
 
@@ -1514,7 +1524,7 @@ static uint32_t cancel_probe_resource_provider(
     atomic_store(
       &probe->register_status,
       mln_resource_request_set_cancel_callback(
-        handle, count_cancel, probe, count_cancel_release, &cancelled
+        handle, count_cancel, probe, count_cancel_release, &cancelled, NULL
       )
     );
     atomic_store(&probe->register_reported_cancelled, cancelled);
@@ -1527,7 +1537,7 @@ static uint32_t cancel_probe_resource_provider(
       .bytes = inline_style_json,
       .byte_count = sizeof(inline_style_json) - 1,
     };
-    (void)mln_resource_request_complete(handle, &response);
+    (void)mln_resource_request_complete(handle, &response, NULL);
   }
   atomic_store(&probe->provider_entered, true);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
@@ -1593,19 +1603,21 @@ static void cancel_callback_runs_when_map_discards_request(void) {
 
   bool cancelled = false;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled)
+    MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled, NULL)
   );
   TEST_ASSERT_TRUE(cancelled);
   const mln_resource_response response = style_response();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_resource_request_complete(handle, &response)
+    MLN_STATUS_INVALID_STATE,
+    mln_resource_request_complete(handle, &response, NULL)
   );
 
   cancelled = false;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_resource_request_set_cancel_callback(
-                                handle, count_cancel, &probe, NULL, &cancelled
-                              )
+    MLN_STATUS_INVALID_STATE,
+    mln_resource_request_set_cancel_callback(
+      handle, count_cancel, &probe, NULL, &cancelled, NULL
+    )
   );
   TEST_ASSERT_FALSE(cancelled);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
@@ -1614,7 +1626,7 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_resource_request_set_cancel_callback(
-      handle, count_cancel, &probe, NULL, &cancelled
+      handle, count_cancel, &probe, NULL, &cancelled, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
@@ -1636,7 +1648,7 @@ static void late_cancel_callback_registration_reports_cancelled(void) {
   for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
        attempt += 1) {
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled)
+      MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled, NULL)
     );
     if (cancelled) {
       break;
@@ -1649,7 +1661,7 @@ static void late_cancel_callback_registration_reports_cancelled(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_resource_request_set_cancel_callback(
-      handle, count_cancel, &probe, count_cancel_release, &cancelled
+      handle, count_cancel, &probe, count_cancel_release, &cancelled, NULL
     )
   );
   TEST_ASSERT_TRUE(cancelled);
@@ -1676,13 +1688,13 @@ static void cancel_callback_may_release_the_request(void) {
   );
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_wait_until_retired(handle)
+    MLN_STATUS_OK, mln_resource_request_wait_until_retired(handle, NULL)
   );
   bool cancelled = false;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_resource_request_set_cancel_callback(
-      handle, count_cancel, &probe, NULL, &cancelled
+      handle, count_cancel, &probe, NULL, &cancelled, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
@@ -1705,7 +1717,7 @@ static void cancel_callback_skips_a_completed_request(void) {
   TEST_ASSERT_FALSE(wait_for_cancel_count(&probe, 1, 200));
   bool cancelled = true;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled)
+    MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled, NULL)
   );
   TEST_ASSERT_FALSE(cancelled);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.release_count));
@@ -1744,12 +1756,12 @@ static void block_in_cancel(void* user_data) {
     bool cancelled = false;
     atomic_store(
       &probe->status_after_self_release,
-      mln_resource_request_cancelled(handle, &cancelled)
+      mln_resource_request_cancelled(handle, &cancelled, NULL)
     );
     const mln_resource_response response = style_response();
     atomic_store(
       &probe->complete_status_after_self_release,
-      mln_resource_request_complete(handle, &response)
+      mln_resource_request_complete(handle, &response, NULL)
     );
   }
   atomic_store(&probe->callback_entered, true);
@@ -1773,7 +1785,7 @@ static uint32_t blocking_cancel_resource_provider(
   atomic_store(
     &probe->base.register_status,
     mln_resource_request_set_cancel_callback(
-      handle, block_in_cancel, probe, NULL, &cancelled
+      handle, block_in_cancel, probe, NULL, &cancelled, NULL
     )
   );
   atomic_store(&probe->base.register_reported_cancelled, cancelled);
@@ -1811,8 +1823,9 @@ static void run_release_waits_for_in_flight_cancel_callback(
   atomic_store(&probe->release_started, true);
   if (atomic_load(&probe->waiter_drains_instead_of_releasing)) {
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_resource_request_wait_until_retired(atomic_load(&probe->base.handle))
+      MLN_STATUS_OK, mln_resource_request_wait_until_retired(
+                       atomic_load(&probe->base.handle), NULL
+                     )
     );
   } else {
     mln_resource_request_release(atomic_load(&probe->base.handle));
@@ -1842,7 +1855,9 @@ static void run_release_waits_for_in_flight_cancel_callback(
   bool cancelled = false;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_resource_request_cancelled(atomic_load(&probe->base.handle), &cancelled)
+    mln_resource_request_cancelled(
+      atomic_load(&probe->base.handle), &cancelled, NULL
+    )
   );
   mln_test_destroy_runtime(runtime);
 }

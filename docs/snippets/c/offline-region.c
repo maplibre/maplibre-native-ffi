@@ -27,13 +27,13 @@ static void region_created(
   // #endregion region-id
 
   (void)mln_runtime_offline_region_set_observed(
-    download->runtime, info->id, true, &download->observe_completion
+    download->runtime, info->id, true, &download->observe_completion, NULL
   );
 
   // #region download
   (void)mln_runtime_offline_region_set_download_state(
     download->runtime, info->id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
-    &download->download_completion
+    &download->download_completion, NULL
   );
   // #endregion download
 }
@@ -44,7 +44,7 @@ mln_status download_region(
   const mln_completion* download_completion
 ) {
   (void)mln_runtime_set_event_mask(
-    runtime, MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED
+    runtime, MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED, NULL
   );
 
   // #region define
@@ -80,7 +80,7 @@ mln_status download_region(
   // #region create
   return mln_runtime_offline_region_create(
     runtime, &definition, (const uint8_t*)metadata, strlen(metadata),
-    &completion
+    &completion, NULL
   );
   // #endregion create
 }

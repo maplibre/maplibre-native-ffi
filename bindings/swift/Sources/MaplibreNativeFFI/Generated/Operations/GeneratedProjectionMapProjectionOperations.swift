@@ -10,7 +10,10 @@ public extension MapProjectionHandle {
       operation: "mln_map_projection_close"
     )
     try mapNativeFailure { try handle.closeOnce { live in
-      try checkStatus(mln_map_projection_close(live.raw))
+      try checkStatus { diagnostic in mln_map_projection_close(
+        live.raw,
+        diagnostic
+      ) }
     } }
   }
 }
@@ -29,10 +32,13 @@ public extension MapProjectionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0: mln_camera_options = mln_camera_options_default()
-      try checkStatus(arena.submit { mln_map_projection_get_camera(
-        handle.raw,
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_map_projection_get_camera(
+          handle.raw,
+          &value0,
+          diagnostic
+        ) }
+      }
       return CameraOptions(raw: value0)
     }
   }
@@ -52,11 +58,14 @@ public extension MapProjectionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_lat_lng()
-      try checkStatus(arena.submit { mln_map_projection_lat_lng_for_pixel(
-        handle.raw,
-        bindingArg0.nativeValue(),
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_map_projection_lat_lng_for_pixel(
+          handle.raw,
+          bindingArg0.nativeValue(),
+          &value0,
+          diagnostic
+        ) }
+      }
       return LatLng(raw: value0)
     }
   }
@@ -78,12 +87,14 @@ public extension MapProjectionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_lat_lng()
-      try checkStatus(arena
-        .submit { mln_map_projection_lat_lng_for_pixel_unwrapped(
+      try checkStatus { diagnostic in
+        arena.submit { mln_map_projection_lat_lng_for_pixel_unwrapped(
           handle.raw,
           bindingArg0.nativeValue(),
-          &value0
-        ) })
+          &value0,
+          diagnostic
+        ) }
+      }
       return LatLng(raw: value0)
     }
   }
@@ -103,12 +114,14 @@ public extension MapProjectionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0: Double = 0
-      try checkStatus(arena
-        .submit { mln_map_projection_meters_per_pixel_at_latitude(
+      try checkStatus { diagnostic in
+        arena.submit { mln_map_projection_meters_per_pixel_at_latitude(
           handle.raw,
           bindingArg0,
-          &value0
-        ) })
+          &value0,
+          diagnostic
+        ) }
+      }
       return value0
     }
   }
@@ -128,11 +141,14 @@ public extension MapProjectionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_screen_point()
-      try checkStatus(arena.submit { mln_map_projection_pixel_for_lat_lng(
-        handle.raw,
-        bindingArg0.nativeValue(),
-        &value0
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_map_projection_pixel_for_lat_lng(
+          handle.raw,
+          bindingArg0.nativeValue(),
+          &value0,
+          diagnostic
+        ) }
+      }
       return ScreenPoint(raw: value0)
     }
   }
@@ -152,10 +168,13 @@ public extension MapProjectionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena.submit { mln_map_projection_set_camera(
-        handle.raw,
-        arena.store(bindingArg0.nativeValue())
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_map_projection_set_camera(
+          handle.raw,
+          arena.store(bindingArg0.nativeValue()),
+          diagnostic
+        ) }
+      }
       return ()
     }
   }
@@ -178,13 +197,15 @@ public extension MapProjectionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena
-        .submit { try mln_map_projection_set_visible_coordinates(
+      try checkStatus { diagnostic in
+        try arena.submit { try mln_map_projection_set_visible_coordinates(
           handle.raw,
           arena.array(bindingArg0.map { $0.nativeValue() }),
           NativeInputArena.count(bindingArg0.count),
-          bindingArg2.nativeValue()
-        ) })
+          bindingArg2.nativeValue(),
+          diagnostic
+        ) }
+      }
       return ()
     }
   }
@@ -207,11 +228,14 @@ public extension MapProjectionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena.submit { mln_map_projection_set_visible_geometry(
-        handle.raw,
-        arena.view(bindingArg0),
-        bindingArg1.nativeValue()
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_map_projection_set_visible_geometry(
+          handle.raw,
+          arena.view(bindingArg0),
+          bindingArg1.nativeValue(),
+          diagnostic
+        ) }
+      }
       return ()
     }
   }

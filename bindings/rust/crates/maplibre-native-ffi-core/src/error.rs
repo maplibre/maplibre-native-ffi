@@ -1,6 +1,5 @@
-use std::ffi::CStr;
 use std::fmt;
-use std::os::raw::c_char;
+use std::mem::MaybeUninit;
 
 use maplibre_native_ffi_sys as sys;
 
@@ -37,10 +36,6 @@ impl Error {
             raw_status,
             diagnostic: diagnostic.into(),
         }
-    }
-
-    pub fn from_status(status: i32) -> Self {
-        Self::from_status_and_diagnostic(status, capture_thread_diagnostic())
     }
 
     pub fn from_status_and_diagnostic(status: i32, diagnostic: impl Into<String>) -> Self {
@@ -83,18 +78,27 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-pub fn check(status: i32) -> Result<()> {
-    if status == sys::MLN_STATUS_OK {
-        Ok(())
-    } else {
-        Err(Error::from_status(status))
+/// Calls a status-returning C function with a diagnostic for its final
+/// `out_diagnostic` parameter, and converts a failed status and that diagnostic
+/// into an error.
+pub fn check(call: impl FnOnce(*mut sys::mln_diagnostic) -> sys::mln_status) -> Result<()> {
+    let mut diagnostic = MaybeUninit::<sys::mln_diagnostic>::uninit();
+    let raw = diagnostic.as_mut_ptr();
+    // SAFETY: raw points to storage for one mln_diagnostic. Native writes the
+    // message, so only the size and an empty message are initialized here;
+    // the empty message covers a call that fails without reaching native.
+    unsafe {
+        (&raw mut (*raw).size).write(std::mem::size_of::<sys::mln_diagnostic>() as u32);
+        (&raw mut (*raw).message).cast::<u8>().write(0);
     }
-}
-
-pub fn capture_thread_diagnostic() -> String {
-    // SAFETY: The returned thread-local string stays valid until the next
-    // diagnostic-writing C API call on this thread; this copies it immediately.
-    unsafe { copy_c_string_lossy(sys::mln_thread_last_error_message()) }
+    let status = call(raw);
+    if status == sys::MLN_STATUS_OK {
+        return Ok(());
+    }
+    // SAFETY: the message is null-terminated, either by native or above.
+    Err(Error::from_status_and_diagnostic(status, unsafe {
+        diagnostic_message(raw)
+    }))
 }
 
 pub fn kind_for_status(status: i32) -> ErrorKind {
@@ -113,16 +117,19 @@ pub fn kind_for_status(status: i32) -> ErrorKind {
     }
 }
 
-unsafe fn copy_c_string_lossy(ptr: *const c_char) -> String {
-    if ptr.is_null() {
-        return String::new();
+/// Copies a diagnostic's message, which is initialized through its null byte.
+unsafe fn diagnostic_message(diagnostic: *const sys::mln_diagnostic) -> String {
+    // SAFETY: the caller promises the diagnostic outlives this call.
+    let message = unsafe { &raw const (*diagnostic).message }.cast::<u8>();
+    let capacity = sys::MLN_DIAGNOSTIC_MESSAGE_CAPACITY as usize;
+    let mut length = 0;
+    // SAFETY: the caller promises a null byte within the message capacity, and
+    // every byte before it is initialized.
+    while length < capacity && unsafe { message.add(length).read() } != 0 {
+        length += 1;
     }
-
-    // SAFETY: The caller promises that ptr is either null or points to a valid
-    // NUL-terminated C string for the duration of this call.
-    unsafe { CStr::from_ptr(ptr) }
-        .to_string_lossy()
-        .into_owned()
+    // SAFETY: the first length bytes are initialized, as read above.
+    String::from_utf8_lossy(unsafe { std::slice::from_raw_parts(message, length) }).into_owned()
 }
 
 #[cfg(test)]
@@ -130,7 +137,6 @@ mod tests {
     use super::*;
 
     #[test]
-
     fn maps_unknown_status_without_losing_raw_status() {
         let error = Error::from_status_and_diagnostic(-123_456, "future status");
 
@@ -141,23 +147,11 @@ mod tests {
 
     #[test]
     fn invalid_native_calls_capture_status_and_diagnostic() {
-        let error = check(unsafe { sys::mln_network_status_set(999_999) }).unwrap_err();
+        let error = check(|diagnostic| unsafe { sys::mln_network_status_set(999_999, diagnostic) })
+            .unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::InvalidArgument);
         assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
         assert!(error.diagnostic().contains("network status"));
-    }
-
-    #[test]
-    fn diagnostic_is_copied_before_later_c_calls_replace_it() {
-        let error = check(unsafe { sys::mln_network_status_set(999_999) }).unwrap_err();
-        let copied = error.diagnostic().to_owned();
-        let mut status = 0;
-
-        check(unsafe { sys::mln_network_status_get(&mut status) }).unwrap();
-        let current_diagnostic = capture_thread_diagnostic();
-
-        assert_eq!(error.diagnostic(), copied);
-        assert_ne!(current_diagnostic, copied);
     }
 }

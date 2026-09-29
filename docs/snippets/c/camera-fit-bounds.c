@@ -15,7 +15,7 @@ static void fitted(void* user_data, const mln_completion_result* result) {
   mln_camera_update update = mln_camera_update_default();
   update.mode = MLN_CAMERA_UPDATE_MODE_FLY;
   update.camera = *(const mln_camera_options*)result->value;
-  mln_map_update_camera(state->map, &update, &state->fly_completion);
+  mln_map_update_camera(state->map, &update, &state->fly_completion, NULL);
   // #endregion fit
 }
 
@@ -37,5 +37,7 @@ mln_status fly_to_bounds(
     .callback = fitted,
     .user_data = state,
   };
-  return mln_map_camera_for_lat_lng_bounds(map, bounds, &fit, &fit_completion);
+  return mln_map_camera_for_lat_lng_bounds(
+    map, bounds, &fit, &fit_completion, NULL
+  );
 }

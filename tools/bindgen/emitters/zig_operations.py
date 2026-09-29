@@ -1,6 +1,6 @@
 """Lower resolved operations through the shared Zig owner and completion runtimes."""
 
-from .zig import camel, failure, identifier
+from .zig import camel, failure, identifier, status_call
 from .zig_dynamic_values import decode, dynamic, encode
 
 
@@ -200,11 +200,13 @@ def operation(plan, api, values):
     ]
     body = []
     receiver_lease = leases.get(plan.receiver)
-    diagnostic = (
-        receiver_lease + ".diagnostic_store"
-        if receiver_lease and plan.receiver_access != "issued"
-        else "null"
-    )
+    # Handle calls report into the receiver's store; other status calls take one.
+    diagnostic = "null"
+    if receiver_lease and plan.receiver_access != "issued":
+        diagnostic = receiver_lease + ".diagnostic_store"
+    elif function.diagnostic:
+        diagnostic = "diagnostic_store"
+        declarations.append("diagnostic_store: ?*diagnostics.DiagnosticStore")
     close_commit = [f"{receiver_lease}.commit();"] if plan.consumes else []
 
     def parent_anchor(owner):
@@ -220,14 +222,16 @@ def operation(plan, api, values):
         return decode(values, value, local)
 
     if completion:
+        if not function.diagnostic:
+            raise failure(function, "completion start requires a diagnostic parameter")
         body.append("const native_arguments = .{ " + ", ".join(arguments) + " };")
         result = plan.result
         if plan.execution == "command":
             public, copier = "completion.CommandCompletion", "completion.command"
-            submit = f"submit({public}, {diagnostic}, {copier}, c.{plan.name}, native_arguments)"
+            submit = f"completion.submit({public}, {diagnostic}, {copier}, c.{plan.name}, native_arguments)"
         elif result is None:
             public = "void"
-            submit = f"submit(void, {diagnostic}, completion.unit, c.{plan.name}, native_arguments)"
+            submit = f"completion.submit(void, {diagnostic}, completion.unit, c.{plan.name}, native_arguments)"
         elif completion.result_owner:
             values.add(result)
             public = values.public(result)
@@ -236,7 +240,7 @@ def operation(plan, api, values):
                 f"const result_context = OwnerCopyContext{{ .parent = if (@as(?owner.Anchor, {parent})) |anchor| anchor.retain() else null, .diagnostic_store = {diagnostic} }};"
             )
             copier = f"struct {{ fn copy(raw: *const c.mln_completion_result, context: *OwnerCopyContext) status.Error!{public} {{ return {public}.adopt(try completion.value(c.{result.native})(raw), context.parent, context.diagnostic_store); }} }}.copy"
-            submit = f"submitContext({public}, OwnerCopyContext, {diagnostic}, {copier}, result_context, c.{plan.name}, native_arguments)"
+            submit = f"completion.submitWithCopyContext({public}, OwnerCopyContext, {diagnostic}, {copier}, result_context, c.{plan.name}, native_arguments)"
         else:
             values.add(result)
             public = values.public(result)
@@ -277,10 +281,10 @@ def operation(plan, api, values):
             if is_dynamic:
                 copied = f"{raw_setup} {empty_check} var arena = std.heap.ArenaAllocator.init(target.*); errdefer arena.deinit(); const copy_allocator = arena.allocator(); const copied_value = {expression.replace('allocator', 'copy_allocator')}; return .{{ .arena = arena, .value = copied_value }};"
                 copier = f"struct {{ fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!{public} {{ {null_check} {copied} }} }}.copy"
-                submit = f"submitAllocated({public}, {diagnostic}, allocator, {copier}, c.{plan.name}, native_arguments)"
+                submit = f"completion.submitWithCopyContext({public}, std.mem.Allocator, {diagnostic}, {copier}, allocator, c.{plan.name}, native_arguments)"
             else:
                 copier = f"struct {{ fn copy(result: *const c.mln_completion_result) status.Error!{public} {{ {null_check} {raw_setup} return {expression}; }} }}.copy"
-                submit = f"submit({public}, {diagnostic}, {copier}, c.{plan.name}, native_arguments)"
+                submit = f"completion.submit({public}, {diagnostic}, {copier}, c.{plan.name}, native_arguments)"
         return_type = f"completion.Future({public})"
         body.append(
             f"var readiness = try {submit};"
@@ -334,7 +338,7 @@ def operation(plan, api, values):
             native_call = (
                 f"{call};"
                 if function.return_type.kind == "void"
-                else f"try status.checkStatus({call}, {diagnostic});"
+                else status_call(function, arguments, diagnostic)
             )
             body.append(
                 f"if (!{receiver_lease}.deferred) {{ {native_call} }}"
@@ -407,6 +411,13 @@ def operation(plan, api, values):
 
 def view_operation(plan, values):
     view = plan.view
+    functions = values.bound.source.functions_by_name
+    begin = status_call(
+        functions[view.owner.view_begin],
+        ["lease.native", "&token"],
+        "lease.diagnostic_store",
+    )
+    get = status_call(plan.function, ["lease.native", "&raw"], "lease.diagnostic_store")
     value = plan.outputs[0].value.element
     values.add(value)
     handle_type = values.public(
@@ -418,11 +429,11 @@ def view_operation(plan, values):
     const lease = try handle.lease();
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.checkStatus(c.{view.owner.view_begin}(lease.native, &token), lease.diagnostic_store);
+    {begin}
     defer c.{view.owner.view_end}(token);
     var raw: c.{value.native} = std.mem.zeroes(c.{value.native});
     raw.size = @sizeOf(c.{value.native});
-    try status.checkStatus(c.{plan.name}(lease.native, &raw), lease.diagnostic_store);
+    {get}
     return use(context, {typ}.fromNative(raw));
 }}
 '''

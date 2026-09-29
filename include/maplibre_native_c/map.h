@@ -575,7 +575,9 @@ MLN_API mln_status mln_runtime_offline_region_create(
   const mln_offline_region_definition* definition MLN_BINDING("length=1"),
   const uint8_t* metadata
     MLN_BINDING("length=metadata_size;encoding=bytes;ownership=borrowed"),
-  size_t metadata_size, const mln_completion* completion MLN_BINDING("length=1")
+  size_t metadata_size,
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -604,7 +606,8 @@ MLN_BINDING(
 )
 MLN_API mln_status mln_runtime_offline_region_get(
   mln_runtime runtime, mln_offline_region_id region_id,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -630,7 +633,8 @@ MLN_BINDING(
   "borrowed"
 )
 MLN_API mln_status mln_runtime_offline_regions_list(
-  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1")
+  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -675,7 +679,8 @@ MLN_API mln_status mln_runtime_offline_regions_merge_database(
   mln_runtime runtime,
   const char* side_database_path
     MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -706,7 +711,9 @@ MLN_API mln_status mln_runtime_offline_region_update_metadata(
   mln_runtime runtime, mln_offline_region_id region_id,
   const uint8_t* metadata
     MLN_BINDING("length=metadata_size;encoding=bytes;ownership=borrowed"),
-  size_t metadata_size, const mln_completion* completion MLN_BINDING("length=1")
+  size_t metadata_size,
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -733,7 +740,8 @@ MLN_BINDING(
 )
 MLN_API mln_status mln_runtime_offline_region_get_status(
   mln_runtime runtime, mln_offline_region_id region_id,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -758,7 +766,8 @@ MLN_API mln_status mln_runtime_offline_region_get_status(
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_offline_region_set_observed(
   mln_runtime runtime, mln_offline_region_id region_id, bool observed,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -784,7 +793,8 @@ MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_offline_region_set_download_state(
   mln_runtime runtime, mln_offline_region_id region_id,
   uint32_t state MLN_BINDING("enum=mln_offline_region_download_state"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -807,7 +817,8 @@ MLN_API mln_status mln_runtime_offline_region_set_download_state(
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_offline_region_invalidate(
   mln_runtime runtime, mln_offline_region_id region_id,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -830,7 +841,8 @@ MLN_API mln_status mln_runtime_offline_region_invalidate(
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_runtime_offline_region_delete(
   mln_runtime runtime, mln_offline_region_id region_id,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -982,7 +994,8 @@ MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
 MLN_BINDING("execution=lifecycle;result=mln_map;shape=value;ownership=owned")
 MLN_API mln_status mln_map_create(
   mln_runtime runtime, const mln_map_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -996,7 +1009,8 @@ MLN_API mln_status mln_map_create(
  */
 MLN_BINDING("execution=snapshot")
 MLN_API mln_status mln_map_snapshot_get(
-  mln_map map, mln_map_snapshot* out_snapshot MLN_BINDING("direction=out")
+  mln_map map, mln_map_snapshot* out_snapshot MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1025,7 +1039,8 @@ MLN_API mln_status mln_map_snapshot_get(
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_resize(
   mln_map map, mln_logical_extent extent,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1051,7 +1066,8 @@ MLN_API mln_status mln_map_resize(
  */
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_request_repaint(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1079,7 +1095,8 @@ MLN_API mln_status mln_map_set_feature_state(
   mln_map map,
   const mln_feature_state_selector* selector MLN_BINDING("length=1"),
   mln_buffer_view state MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1107,7 +1124,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_get_feature_state(
   mln_map map,
   const mln_feature_state_selector* selector MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1131,7 +1149,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_remove_feature_state(
   mln_map map,
   const mln_feature_state_selector* selector MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1160,7 +1179,8 @@ MLN_API mln_status mln_map_remove_feature_state(
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_request_still_image(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1182,7 +1202,8 @@ MLN_API mln_status mln_map_request_still_image(
  */
 MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_release(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1201,7 +1222,8 @@ MLN_API mln_status mln_map_release(
  * - MLN_STATUS_INVALID_STATE when the map is already closing.
  */
 MLN_BINDING("execution=immediate")
-MLN_API mln_status mln_map_dispose(mln_map map) MLN_NOEXCEPT;
+MLN_API mln_status
+mln_map_dispose(mln_map map, mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
 
 /**
  * Queues a style URL command.
@@ -1222,7 +1244,8 @@ MLN_API mln_status mln_map_set_style_url(
   mln_map map,
   const char* url
     MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1242,7 +1265,8 @@ MLN_API mln_status mln_map_set_style_url(
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_style_json(
   mln_map map, mln_buffer_view json MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1265,7 +1289,8 @@ MLN_BINDING(
   "encoding=json"
 )
 MLN_API mln_status mln_map_loaded_style_json(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1288,7 +1313,8 @@ MLN_BINDING(
   "encoding=utf8"
 )
 MLN_API mln_status mln_map_style_url(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1339,7 +1365,8 @@ MLN_API mln_status mln_map_style_url(
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_event_mask(
   mln_map map, uint64_t mask MLN_BINDING("enum=mln_runtime_event_mask"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

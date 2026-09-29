@@ -8,7 +8,7 @@ import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 @OptIn(ExperimentalForeignApi::class)
 public actual abstract class GeneratedRuntimeOperations internal actual constructor() {
@@ -16,7 +16,7 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
 
   internal abstract fun bindingRuntimeHandle(): ULong
 
-  internal abstract fun bindingCloseRuntime(call: (ULong) -> Int)
+  internal abstract fun bindingCloseRuntime(call: (ULong) -> Unit)
 
   internal abstract fun bindingRetireRuntime(call: (ULong) -> Deferred<Unit>): Deferred<Unit>
 
@@ -44,11 +44,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         { completion ->
           memScoped {
             val arena = this
-            mln_map_create(
-              bindingRuntimeHandle(),
-              GeneratedValues.writeMapOptions(arena, options),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_create(
+                bindingRuntimeHandle(),
+                GeneratedValues.writeMapOptions(arena, options),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -66,7 +69,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_runtime_barrier(bindingRuntimeHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_runtime_barrier(bindingRuntimeHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -83,7 +88,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_runtime_clear_http_header_transform(bindingRuntimeHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_runtime_clear_http_header_transform(bindingRuntimeHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -100,7 +107,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_runtime_clear_resource_provider(bindingRuntimeHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_runtime_clear_resource_provider(bindingRuntimeHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -117,7 +126,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_runtime_clear_resource_transform(bindingRuntimeHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_runtime_clear_resource_transform(bindingRuntimeHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -137,7 +148,7 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         )
         memScoped {
           val arena = this
-          mln_runtime_dispose(owner)
+          NativeDiagnostics.check { diagnostic -> mln_runtime_dispose(owner, diagnostic) }
         }
       }
     } finally {
@@ -154,7 +165,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return memScoped {
         val arena = this
         val output = arena.alloc<ULongVar>().also { it.value = 0uL }
-        BindingStatus.check(mln_runtime_drain_events(bindingRuntimeHandle(), output.ptr))
+        NativeDiagnostics.check { diagnostic ->
+          mln_runtime_drain_events(bindingRuntimeHandle(), output.ptr, diagnostic)
+        }
         adoptOwned(
           output.value,
           { GeneratedOwnerDisposal.eventBatch(it.toLong()) },
@@ -175,7 +188,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return memScoped {
         val arena = this
         val output = arena.alloc<ULongVar>()
-        BindingStatus.check(mln_runtime_get_event_mask(bindingRuntimeHandle(), output.ptr))
+        NativeDiagnostics.check { diagnostic ->
+          mln_runtime_get_event_mask(bindingRuntimeHandle(), output.ptr, diagnostic)
+        }
         RuntimeEventMask(output.value)
       }
     } finally {
@@ -201,13 +216,16 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         { completion ->
           memScoped {
             val arena = this
-            mln_runtime_offline_region_create(
-              bindingRuntimeHandle(),
-              GeneratedValues.writeOfflineRegionDefinition(arena, definition),
-              GeneratedValues.rawBytes(arena, metadata).reinterpret(),
-              metadata.size.convert(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_runtime_offline_region_create(
+                bindingRuntimeHandle(),
+                GeneratedValues.writeOfflineRegionDefinition(arena, definition),
+                GeneratedValues.rawBytes(arena, metadata).reinterpret(),
+                metadata.size.convert(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -225,7 +243,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_runtime_offline_region_delete(bindingRuntimeHandle(), regionId, completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_runtime_offline_region_delete(
+              bindingRuntimeHandle(),
+              regionId,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -250,7 +275,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         { completion ->
           memScoped {
             val arena = this
-            mln_runtime_offline_region_get(bindingRuntimeHandle(), regionId, completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_runtime_offline_region_get(
+                bindingRuntimeHandle(),
+                regionId,
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -274,7 +306,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         { completion ->
           memScoped {
             val arena = this
-            mln_runtime_offline_region_get_status(bindingRuntimeHandle(), regionId, completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_runtime_offline_region_get_status(
+                bindingRuntimeHandle(),
+                regionId,
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -292,7 +331,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_runtime_offline_region_invalidate(bindingRuntimeHandle(), regionId, completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_runtime_offline_region_invalidate(
+              bindingRuntimeHandle(),
+              regionId,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -312,12 +358,15 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_runtime_offline_region_set_download_state(
-            bindingRuntimeHandle(),
-            regionId,
-            state.rawValue,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_runtime_offline_region_set_download_state(
+              bindingRuntimeHandle(),
+              regionId,
+              state.rawValue,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -334,12 +383,15 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_runtime_offline_region_set_observed(
-            bindingRuntimeHandle(),
-            regionId,
-            observed,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_runtime_offline_region_set_observed(
+              bindingRuntimeHandle(),
+              regionId,
+              observed,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -365,13 +417,16 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         { completion ->
           memScoped {
             val arena = this
-            mln_runtime_offline_region_update_metadata(
-              bindingRuntimeHandle(),
-              regionId,
-              GeneratedValues.rawBytes(arena, metadata).reinterpret(),
-              metadata.size.convert(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_runtime_offline_region_update_metadata(
+                bindingRuntimeHandle(),
+                regionId,
+                GeneratedValues.rawBytes(arena, metadata).reinterpret(),
+                metadata.size.convert(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -396,7 +451,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         { completion ->
           memScoped {
             val arena = this
-            mln_runtime_offline_regions_list(bindingRuntimeHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_runtime_offline_regions_list(bindingRuntimeHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -423,11 +480,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         { completion ->
           memScoped {
             val arena = this
-            mln_runtime_offline_regions_merge_database(
-              bindingRuntimeHandle(),
-              GeneratedValues.cString(arena, sideDatabasePath),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_runtime_offline_regions_merge_database(
+                bindingRuntimeHandle(),
+                GeneratedValues.cString(arena, sideDatabasePath),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -449,7 +509,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         CompletionBridge.unitChecked { completion ->
           memScoped {
             val arena = this
-            mln_runtime_release(owner, completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_runtime_release(owner, completion, diagnostic)
+            }
           }
         }
       }
@@ -467,11 +529,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_runtime_run_ambient_cache_operation(
-            bindingRuntimeHandle(),
-            operation.rawValue,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_runtime_run_ambient_cache_operation(
+              bindingRuntimeHandle(),
+              operation.rawValue,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -487,7 +552,9 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       )
       return memScoped {
         val arena = this
-        BindingStatus.check(mln_runtime_set_event_mask(bindingRuntimeHandle(), mask.rawValue))
+        NativeDiagnostics.check { diagnostic ->
+          mln_runtime_set_event_mask(bindingRuntimeHandle(), mask.rawValue, diagnostic)
+        }
         Unit
       }
     } finally {
@@ -506,14 +573,15 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         CompletionBridge.unit { completion ->
           memScoped {
             val arena = this
-            val status =
+            NativeDiagnostics.check { diagnostic ->
               mln_runtime_set_http_header_transform(
                 bindingRuntimeHandle(),
                 GeneratedCallbacks.prepareHttpHeaderTransform(arena, transform, registrations),
                 completion,
+                diagnostic,
               )
-            if (status == 0) registrations.accept(bindingCallbacks)
-            status
+            }
+            registrations.accept(bindingCallbacks)
           }
         }
       }
@@ -531,7 +599,14 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_runtime_set_maximum_ambient_cache_size(bindingRuntimeHandle(), size, completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_runtime_set_maximum_ambient_cache_size(
+              bindingRuntimeHandle(),
+              size,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -550,14 +625,15 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         CompletionBridge.unit { completion ->
           memScoped {
             val arena = this
-            val status =
+            NativeDiagnostics.check { diagnostic ->
               mln_runtime_set_resource_provider(
                 bindingRuntimeHandle(),
                 GeneratedCallbacks.prepareResourceProvider(arena, provider, registrations),
                 completion,
+                diagnostic,
               )
-            if (status == 0) registrations.accept(bindingCallbacks)
-            status
+            }
+            registrations.accept(bindingCallbacks)
           }
         }
       }
@@ -577,14 +653,15 @@ public actual abstract class GeneratedRuntimeOperations internal actual construc
         CompletionBridge.unit { completion ->
           memScoped {
             val arena = this
-            val status =
+            NativeDiagnostics.check { diagnostic ->
               mln_runtime_set_resource_transform(
                 bindingRuntimeHandle(),
                 GeneratedCallbacks.prepareResourceTransform(arena, transform, registrations),
                 completion,
+                diagnostic,
               )
-            if (status == 0) registrations.accept(bindingCallbacks)
-            status
+            }
+            registrations.accept(bindingCallbacks)
           }
         }
       }

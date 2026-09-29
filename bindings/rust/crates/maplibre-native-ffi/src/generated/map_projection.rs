@@ -58,7 +58,9 @@ impl MapProjectionHandle {
     pub fn close(&self) -> Result<()> {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let result = self.inner.handle.close_with(|native| {
-            maplibre_core::check(unsafe { sys::mln_map_projection_close(native) })?;
+            maplibre_core::check(|diagnostic| unsafe {
+                sys::mln_map_projection_close(native, diagnostic)
+            })?;
             Ok(())
         })?;
         Ok(result.unwrap_or_else(|| Default::default()))
@@ -71,8 +73,8 @@ impl MapProjectionHandle {
         maplibre_core::callback::check("mln_map_projection_get_camera", native.0)?;
         let mut binding_arg_1: sys::mln_camera_options =
             maplibre_core::generated::CameraOptions::default().to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_get_camera(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_map_projection_get_camera(native, &mut binding_arg_1, diagnostic)
         })?;
         Ok(maplibre_core::generated::CameraOptions::from_native(
             binding_arg_1,
@@ -89,11 +91,12 @@ impl MapProjectionHandle {
         maplibre_core::callback::check("mln_map_projection_lat_lng_for_pixel", native.0)?;
         let mut binding_arg_2: sys::mln_lat_lng =
             maplibre_core::generated::LatLng::default().to_native();
-        maplibre_core::check(unsafe {
+        maplibre_core::check(|diagnostic| unsafe {
             sys::mln_map_projection_lat_lng_for_pixel(
                 native,
                 binding_arg_1.to_native(),
                 &mut binding_arg_2,
+                diagnostic,
             )
         })?;
         Ok(maplibre_core::generated::LatLng::from_native(binding_arg_2))
@@ -109,11 +112,12 @@ impl MapProjectionHandle {
         maplibre_core::callback::check("mln_map_projection_lat_lng_for_pixel_unwrapped", native.0)?;
         let mut binding_arg_2: sys::mln_lat_lng =
             maplibre_core::generated::LatLng::default().to_native();
-        maplibre_core::check(unsafe {
+        maplibre_core::check(|diagnostic| unsafe {
             sys::mln_map_projection_lat_lng_for_pixel_unwrapped(
                 native,
                 binding_arg_1.to_native(),
                 &mut binding_arg_2,
+                diagnostic,
             )
         })?;
         Ok(maplibre_core::generated::LatLng::from_native(binding_arg_2))
@@ -128,11 +132,12 @@ impl MapProjectionHandle {
             native.0,
         )?;
         let mut binding_arg_2: f64 = Default::default();
-        maplibre_core::check(unsafe {
+        maplibre_core::check(|diagnostic| unsafe {
             sys::mln_map_projection_meters_per_pixel_at_latitude(
                 native,
                 binding_arg_1,
                 &mut binding_arg_2,
+                diagnostic,
             )
         })?;
         Ok(binding_arg_2)
@@ -148,11 +153,12 @@ impl MapProjectionHandle {
         maplibre_core::callback::check("mln_map_projection_pixel_for_lat_lng", native.0)?;
         let mut binding_arg_2: sys::mln_screen_point =
             maplibre_core::generated::ScreenPoint::default().to_native();
-        maplibre_core::check(unsafe {
+        maplibre_core::check(|diagnostic| unsafe {
             sys::mln_map_projection_pixel_for_lat_lng(
                 native,
                 binding_arg_1.to_native(),
                 &mut binding_arg_2,
+                diagnostic,
             )
         })?;
         Ok(maplibre_core::generated::ScreenPoint::from_native(
@@ -169,8 +175,8 @@ impl MapProjectionHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_map_projection_set_camera", native.0)?;
         let binding_arg_1 = binding_arg_1.to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_set_camera(native, &binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_map_projection_set_camera(native, &binding_arg_1, diagnostic)
         })?;
         Ok(())
     }
@@ -192,12 +198,13 @@ impl MapProjectionHandle {
             .len()
             .try_into()
             .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        maplibre_core::check(unsafe {
+        maplibre_core::check(|diagnostic| unsafe {
             sys::mln_map_projection_set_visible_coordinates(
                 native,
                 binding_arg_1.as_ptr(),
                 binding_arg_2,
                 binding_arg_3.to_native(),
+                diagnostic,
             )
         })?;
         Ok(())
@@ -216,11 +223,12 @@ impl MapProjectionHandle {
             data: (binding_arg_1).as_ptr().cast(),
             size: (binding_arg_1).len(),
         };
-        maplibre_core::check(unsafe {
+        maplibre_core::check(|diagnostic| unsafe {
             sys::mln_map_projection_set_visible_geometry(
                 native,
                 binding_arg_1,
                 binding_arg_2.to_native(),
+                diagnostic,
             )
         })?;
         Ok(())

@@ -1635,8 +1635,3 @@ def runtime_create(options: RuntimeOptions | None = None) -> RuntimeHandle:
 def supported_render_backend_mask() -> RenderBackendFlag:
     """Call mln_supported_render_backend_mask."""
     return RenderBackendFlag(_native.supported_render_backend_mask())
-
-
-def thread_last_error_message() -> str:
-    """Call mln_thread_last_error_message."""
-    return _native.thread_last_error_message()

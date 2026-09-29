@@ -66,11 +66,14 @@ public extension Maplibre {
       defer { withExtendedLifetime(arena) {} }
       var value0: UInt32 = 0
       var value1: UInt32 = 0
-      try checkStatus(arena.submit { mln_render_target_extent_physical_size(
-        arena.store(bindingArg0.nativeValue()),
-        &value0,
-        &value1
-      ) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_render_target_extent_physical_size(
+          arena.store(bindingArg0.nativeValue()),
+          &value0,
+          &value1,
+          diagnostic
+        ) }
+      }
       return (value0, value1)
     }
   }

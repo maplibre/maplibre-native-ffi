@@ -94,7 +94,7 @@ static mln_status attach_owned_texture(still_image_job* job) {
     .user_data = job,
   };
   return mln_opengl_owned_texture_attach(
-    job->map, &descriptor, &options, &job->session, &completion
+    job->map, &descriptor, &options, &job->session, &completion, NULL
   );
   // #endregion attach
 }
@@ -123,7 +123,7 @@ mln_status start_still_image(still_image_job* job) {
     .callback = map_created,
     .user_data = job,
   };
-  return mln_map_create(job->runtime, &options, &completion);
+  return mln_map_create(job->runtime, &options, &completion, NULL);
   // #endregion create
 }
 
@@ -150,7 +150,7 @@ static void readback_finished(
 static void request_frame(still_image_job* job) {
   mln_frame_demand demand = mln_frame_demand_default();
   demand.token = 1;
-  job->status = mln_render_session_request_frame(job->session, &demand);
+  job->status = mln_render_session_request_frame(job->session, &demand, NULL);
   job->frame_pending = job->status == MLN_STATUS_OK;
 }
 
@@ -171,14 +171,14 @@ void advance_still_image(still_image_job* job) {
       .size = sizeof(mln_completion),
       .callback = ignore_completion,
     };
-    job->status = mln_map_set_style_url(job->map, job->style_url, &style);
+    job->status = mln_map_set_style_url(job->map, job->style_url, &style, NULL);
     if (job->status == MLN_STATUS_OK) {
       const mln_completion still = {
         .size = sizeof(mln_completion),
         .callback = still_image_finished,
         .user_data = job,
       };
-      job->status = mln_map_request_still_image(job->map, &still);
+      job->status = mln_map_request_still_image(job->map, &still, NULL);
     }
     if (job->status != MLN_STATUS_OK) {
       job->finished(job->user_data, job);
@@ -193,15 +193,16 @@ void advance_still_image(still_image_job* job) {
   ) {
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
     if (
-      mln_render_session_drain_frame_results(job->session, &batch) ==
+      mln_render_session_drain_frame_results(job->session, &batch, NULL) ==
       MLN_STATUS_OK
     ) {
       size_t count = 0;
-      (void)mln_render_frame_batch_count(batch, &count);
+      (void)mln_render_frame_batch_count(batch, &count, NULL);
       for (size_t index = 0; index < count; ++index) {
         mln_render_frame_result frame = {.size = sizeof(frame)};
         if (
-          mln_render_frame_batch_get(batch, index, &frame) == MLN_STATUS_OK &&
+          mln_render_frame_batch_get(batch, index, &frame, NULL) ==
+            MLN_STATUS_OK &&
           frame.token == 1
         ) {
           job->frame_pending = false;
@@ -224,7 +225,8 @@ void advance_still_image(still_image_job* job) {
       .callback = readback_finished,
       .user_data = job,
     };
-    job->status = mln_texture_read_premultiplied_rgba8(job->session, &readback);
+    job->status =
+      mln_texture_read_premultiplied_rgba8(job->session, &readback, NULL);
     if (job->status != MLN_STATUS_OK) job->finished(job->user_data, job);
   }
   // #endregion start-readback

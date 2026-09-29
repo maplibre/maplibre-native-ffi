@@ -8,7 +8,7 @@ import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.runtime.CommandCompletion
 import platform.posix.size_t
 import platform.posix.size_tVar
@@ -19,7 +19,7 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
 
   internal abstract fun bindingRenderSessionHandle(): ULong
 
-  internal abstract fun bindingCloseRenderSession(call: (ULong) -> Int)
+  internal abstract fun bindingCloseRenderSession(call: (ULong) -> Unit)
 
   public actual fun metalBorrowedTextureSetTarget(
     descriptor: MetalBorrowedTextureDescriptor
@@ -32,11 +32,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_metal_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeMetalBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_metal_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeMetalBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -53,11 +56,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_metal_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeMetalSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_metal_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeMetalSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -76,11 +82,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_opengl_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeOpenglBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_opengl_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeOpenglBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -97,11 +106,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_opengl_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeOpenglSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_opengl_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeOpenglSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -119,7 +131,9 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         val arena = this
         val output = arena.alloc<mln_render_abandon_result>()
         output.size = sizeOf<mln_render_abandon_result>().toUInt()
-        BindingStatus.check(mln_render_session_abandon(bindingRenderSessionHandle(), output.ptr))
+        NativeDiagnostics.check { diagnostic ->
+          mln_render_session_abandon(bindingRenderSessionHandle(), output.ptr, diagnostic)
+        }
         GeneratedValues.readRenderAbandonResult(output)
       }
     } finally {
@@ -136,9 +150,9 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return memScoped {
         val arena = this
         val output = arena.alloc<ULongVar>().also { it.value = 0uL }
-        BindingStatus.check(
-          mln_render_session_acquire_frame(bindingRenderSessionHandle(), output.ptr)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_render_session_acquire_frame(bindingRenderSessionHandle(), output.ptr, diagnostic)
+        }
         adoptOwned(
           output.value,
           { GeneratedOwnerDisposal.acquiredFrame(it.toLong()) },
@@ -165,7 +179,9 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_render_session_barrier(bindingRenderSessionHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_render_session_barrier(bindingRenderSessionHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -182,7 +198,9 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_render_session_clear_data(bindingRenderSessionHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_render_session_clear_data(bindingRenderSessionHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -202,7 +220,7 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         )
         memScoped {
           val arena = this
-          mln_render_session_destroy(owner)
+          NativeDiagnostics.check { diagnostic -> mln_render_session_destroy(owner, diagnostic) }
         }
       }
     } finally {
@@ -219,7 +237,9 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_render_session_detach(bindingRenderSessionHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_render_session_detach(bindingRenderSessionHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -239,7 +259,7 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         )
         memScoped {
           val arena = this
-          mln_render_session_dispose(owner)
+          NativeDiagnostics.check { diagnostic -> mln_render_session_dispose(owner, diagnostic) }
         }
       }
     } finally {
@@ -256,9 +276,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return memScoped {
         val arena = this
         val output = arena.alloc<ULongVar>().also { it.value = 0uL }
-        BindingStatus.check(
-          mln_render_session_drain_frame_results(bindingRenderSessionHandle(), output.ptr)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_render_session_drain_frame_results(
+            bindingRenderSessionHandle(),
+            output.ptr,
+            diagnostic,
+          )
+        }
         adoptOwned(
           output.value,
           { GeneratedOwnerDisposal.renderFrameBatch(it.toLong()) },
@@ -279,7 +303,9 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_render_session_dump_debug_logs(bindingRenderSessionHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_render_session_dump_debug_logs(bindingRenderSessionHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -297,9 +323,9 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         val arena = this
         val output = arena.alloc<mln_render_session_capabilities>()
         output.size = sizeOf<mln_render_session_capabilities>().toUInt()
-        BindingStatus.check(
-          mln_render_session_get_capabilities(bindingRenderSessionHandle(), output.ptr)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_render_session_get_capabilities(bindingRenderSessionHandle(), output.ptr, diagnostic)
+        }
         GeneratedValues.readRenderSessionCapabilities(output)
       }
     } finally {
@@ -317,9 +343,9 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         val arena = this
         val output = arena.alloc<mln_render_session_snapshot>()
         output.size = sizeOf<mln_render_session_snapshot>().toUInt()
-        BindingStatus.check(
-          mln_render_session_get_snapshot(bindingRenderSessionHandle(), output.ptr)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_render_session_get_snapshot(bindingRenderSessionHandle(), output.ptr, diagnostic)
+        }
         GeneratedValues.readRenderSessionSnapshot(output)
       }
     } finally {
@@ -336,9 +362,9 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return memScoped {
         val arena = this
         val output = arena.alloc<ULongVar>().also { it.value = 0uL }
-        BindingStatus.check(
-          mln_render_session_projection_create(bindingRenderSessionHandle(), output.ptr)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          mln_render_session_projection_create(bindingRenderSessionHandle(), output.ptr, diagnostic)
+        }
         adoptOwned(
           output.value,
           { GeneratedOwnerDisposal.mapProjection(it.toLong()) },
@@ -369,15 +395,18 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         { completion ->
           memScoped {
             val arena = this
-            mln_render_session_query_feature_extensions(
-              bindingRenderSessionHandle(),
-              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-              GeneratedValues.byteView(arena, feature).pointed.readValue(),
-              GeneratedValues.stringView(arena, extension).pointed.readValue(),
-              GeneratedValues.stringView(arena, extensionField).pointed.readValue(),
-              if (arguments == null) null else GeneratedValues.byteView(arena, arguments!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_render_session_query_feature_extensions(
+                bindingRenderSessionHandle(),
+                GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+                GeneratedValues.byteView(arena, feature).pointed.readValue(),
+                GeneratedValues.stringView(arena, extension).pointed.readValue(),
+                GeneratedValues.stringView(arena, extensionField).pointed.readValue(),
+                if (arguments == null) null else GeneratedValues.byteView(arena, arguments!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -405,13 +434,16 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         { completion ->
           memScoped {
             val arena = this
-            mln_render_session_query_rendered_features(
-              bindingRenderSessionHandle(),
-              GeneratedValues.writeRenderedQueryGeometry(arena, geometry),
-              if (options == null) null
-              else GeneratedValues.writeRenderedFeatureQueryOptions(arena, options!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_render_session_query_rendered_features(
+                bindingRenderSessionHandle(),
+                GeneratedValues.writeRenderedQueryGeometry(arena, geometry),
+                if (options == null) null
+                else GeneratedValues.writeRenderedFeatureQueryOptions(arena, options!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -439,13 +471,16 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         { completion ->
           memScoped {
             val arena = this
-            mln_render_session_query_source_features(
-              bindingRenderSessionHandle(),
-              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-              if (options == null) null
-              else GeneratedValues.writeSourceFeatureQueryOptions(arena, options!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_render_session_query_source_features(
+                bindingRenderSessionHandle(),
+                GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+                if (options == null) null
+                else GeneratedValues.writeSourceFeatureQueryOptions(arena, options!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -463,7 +498,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_render_session_reduce_memory_use(bindingRenderSessionHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_render_session_reduce_memory_use(
+              bindingRenderSessionHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -479,12 +520,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       )
       return memScoped {
         val arena = this
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           mln_render_session_request_frame(
             bindingRenderSessionHandle(),
             GeneratedValues.writeFrameDemand(arena, demand),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {
@@ -501,11 +543,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_render_session_resize(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeRenderTargetExtent(arena, extent),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_render_session_resize(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeRenderTargetExtent(arena, extent),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -522,13 +567,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return memScoped {
         val arena = this
         val output = arena.alloc<size_tVar>()
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           mln_render_session_service_driver_work(
             bindingRenderSessionHandle(),
             maxWork.convert<size_t>(),
             output.ptr,
+            diagnostic,
           )
-        )
+        }
         output.value.toULong()
       }
     } finally {
@@ -551,7 +597,13 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
         { completion ->
           memScoped {
             val arena = this
-            mln_texture_read_premultiplied_rgba8(bindingRenderSessionHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_texture_read_premultiplied_rgba8(
+                bindingRenderSessionHandle(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -571,11 +623,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_vulkan_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeVulkanBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_vulkan_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeVulkanBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -592,11 +647,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_vulkan_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeVulkanSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_vulkan_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeVulkanSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -615,11 +673,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_webgpu_borrowed_texture_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeWebgpuBorrowedTextureDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_webgpu_borrowed_texture_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeWebgpuBorrowedTextureDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -636,11 +697,14 @@ public actual abstract class GeneratedRenderSessionOperations internal actual co
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_webgpu_surface_set_target(
-            bindingRenderSessionHandle(),
-            GeneratedValues.writeWebgpuSurfaceDescriptor(arena, descriptor),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_webgpu_surface_set_target(
+              bindingRenderSessionHandle(),
+              GeneratedValues.writeWebgpuSurfaceDescriptor(arena, descriptor),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {

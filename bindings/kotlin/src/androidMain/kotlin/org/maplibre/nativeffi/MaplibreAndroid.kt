@@ -2,7 +2,7 @@ package org.maplibre.nativeffi
 
 import android.content.Context
 import org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge
-import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 /** Android-only platform integration entry points. */
 public object MaplibreAndroid {
@@ -15,6 +15,6 @@ public object MaplibreAndroid {
    */
   public fun initialize(context: Context) {
     NativeAccess.ensureLoaded()
-    Status.check(AndroidNativeBridge.initialize(context))
+    NativeDiagnostics.check { diagnostic -> AndroidNativeBridge.initialize(context, diagnostic) }
   }
 }

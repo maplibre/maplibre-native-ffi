@@ -421,7 +421,8 @@ MLN_API mln_status mln_metal_owned_texture_attach(
   const mln_metal_owned_texture_descriptor* descriptor MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -459,7 +460,8 @@ MLN_API mln_status mln_metal_borrowed_texture_attach(
     MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -495,7 +497,8 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
   const mln_vulkan_owned_texture_descriptor* descriptor MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -533,7 +536,8 @@ MLN_API mln_status mln_vulkan_borrowed_texture_attach(
     MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -577,7 +581,8 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
   const mln_opengl_owned_texture_descriptor* descriptor MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -617,7 +622,8 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
     MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -653,7 +659,8 @@ MLN_API mln_status mln_webgpu_owned_texture_attach(
   const mln_webgpu_owned_texture_descriptor* descriptor MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -693,7 +700,8 @@ MLN_API mln_status mln_webgpu_borrowed_texture_attach(
     MLN_BINDING("length=1"),
   const mln_render_session_attach_options* options MLN_BINDING("length=1"),
   mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -725,7 +733,8 @@ MLN_API mln_status mln_metal_borrowed_texture_set_target(
   mln_render_session session,
   const mln_metal_borrowed_texture_descriptor* descriptor
     MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -757,7 +766,8 @@ MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
   mln_render_session session,
   const mln_vulkan_borrowed_texture_descriptor* descriptor
     MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -788,7 +798,8 @@ MLN_API mln_status mln_opengl_borrowed_texture_set_target(
   mln_render_session session,
   const mln_opengl_borrowed_texture_descriptor* descriptor
     MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -820,7 +831,8 @@ MLN_API mln_status mln_webgpu_borrowed_texture_set_target(
   mln_render_session session,
   const mln_webgpu_borrowed_texture_descriptor* descriptor
     MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -852,7 +864,8 @@ MLN_BINDING(
 )
 MLN_API mln_status mln_texture_read_premultiplied_rgba8(
   mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -873,7 +886,8 @@ MLN_API mln_status mln_texture_read_premultiplied_rgba8(
 MLN_BINDING("execution=immediate;view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_metal_texture(
   mln_acquired_frame frame,
-  mln_metal_owned_texture_frame* out_frame MLN_BINDING("direction=out")
+  mln_metal_owned_texture_frame* out_frame MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -894,7 +908,8 @@ MLN_API mln_status mln_acquired_frame_get_metal_texture(
 MLN_BINDING("execution=immediate;view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
   mln_acquired_frame frame,
-  mln_vulkan_owned_texture_frame* out_frame MLN_BINDING("direction=out")
+  mln_vulkan_owned_texture_frame* out_frame MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -915,7 +930,8 @@ MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
 MLN_BINDING("execution=immediate;view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_opengl_texture(
   mln_acquired_frame frame,
-  mln_opengl_owned_texture_frame* out_frame MLN_BINDING("direction=out")
+  mln_opengl_owned_texture_frame* out_frame MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -936,7 +952,8 @@ MLN_API mln_status mln_acquired_frame_get_opengl_texture(
 MLN_BINDING("execution=immediate;view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_webgpu_texture(
   mln_acquired_frame frame,
-  mln_webgpu_owned_texture_frame* out_frame MLN_BINDING("direction=out")
+  mln_webgpu_owned_texture_frame* out_frame MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

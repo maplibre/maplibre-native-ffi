@@ -139,10 +139,10 @@ internal class HandleStateCore(
     return claim
   }
 
-  fun closeOnce(destroy: () -> Int, afterSuccess: () -> Unit = {}) {
+  fun closeOnce(destroy: () -> Unit, afterSuccess: () -> Unit = {}) {
     if (!beginClose()) return
     try {
-      Status.check(destroy())
+      destroy()
     } catch (error: Throwable) {
       abortClose()
       throw error

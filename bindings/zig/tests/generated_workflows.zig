@@ -11,7 +11,7 @@ const test_style = "{\"version\":8,\"sources\":{},\"layers\":[]}";
 test "generated owners preserve rejected release and copied event snapshots" {
     var options = try g.runtimeOptionsDefault(testing.allocator);
     defer options.deinit();
-    var runtime = try g.runtimeCreate(testing.allocator, options.value);
+    var runtime = try g.runtimeCreate(testing.allocator, options.value, null);
     defer runtime.deinit();
     var map = try resolve(try g.mapCreate(testing.allocator, runtime, try g.mapOptionsDefault()));
     defer map.deinit();
@@ -60,7 +60,7 @@ const ProviderProbe = struct {
 test "generated provider inline completion and close retain decision ownership" {
     var options = try g.runtimeOptionsDefault(testing.allocator);
     defer options.deinit();
-    var runtime = try g.runtimeCreate(testing.allocator, options.value);
+    var runtime = try g.runtimeCreate(testing.allocator, options.value, null);
     defer runtime.deinit();
     var map = try resolve(try g.mapCreate(testing.allocator, runtime, try g.mapOptionsDefault()));
     defer map.deinit();

@@ -52,7 +52,8 @@ MLN_API mln_status mln_map_set_global_state_property(
   mln_map map,
   mln_buffer_view property_name MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view value MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
  * Queries the global-state JSON object, including style defaults.
@@ -69,7 +70,8 @@ MLN_BINDING(
   "encoding=json"
 )
 MLN_API mln_status mln_map_get_global_state(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 typedef uint64_t mln_geojson_source_data MLN_BINDING(
@@ -843,7 +845,8 @@ MLN_API mln_status mln_map_add_style_source_json(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view source_json MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -867,7 +870,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_remove_style_source(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -891,7 +895,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_get_style_source_info(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -917,7 +922,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_style_source_volatile(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  bool is_volatile, const mln_completion* completion MLN_BINDING("length=1")
+  bool is_volatile, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -940,7 +946,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_copy_style_source_attribution(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -963,7 +970,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_copy_style_source_url(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -988,7 +996,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_get_style_source_tile_urls(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1008,7 +1017,8 @@ MLN_BINDING(
   "encoding=utf8"
 )
 MLN_API mln_status mln_map_list_style_source_ids(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1036,7 +1046,8 @@ MLN_API mln_status mln_map_add_geojson_source_url(
   mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
   const mln_geojson_source_options* options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1050,7 +1061,7 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  *
  * When options enable clustering, the data must be a feature collection whose
  * every feature carries point geometry. Data that does not is rejected, and
- * the thread-local diagnostic names the constraint.
+ * the diagnostic names the constraint.
  *
  * This entry point is callable from any thread and touches no runtime or map,
  * so a host prepares data on a worker thread and installs it on the map owner
@@ -1075,7 +1086,9 @@ MLN_API mln_status mln_geojson_source_data_create(
   mln_buffer_view data MLN_BINDING("encoding=bytes;lifetime=call"),
   const mln_geojson_source_options* options
     MLN_BINDING("length=1;nullable=true"),
-  mln_geojson_source_data* out_data MLN_BINDING("direction=out;ownership=owned")
+  mln_geojson_source_data* out_data
+    MLN_BINDING("direction=out;ownership=owned"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1114,7 +1127,8 @@ MLN_API mln_status mln_map_add_geojson_source_data(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_geojson_source_data data,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1139,7 +1153,8 @@ MLN_API mln_status mln_map_set_geojson_source_url(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1175,7 +1190,8 @@ MLN_API mln_status mln_map_set_geojson_source_data(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_geojson_source_data data,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1203,7 +1219,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  bool enabled, const mln_completion* completion MLN_BINDING("length=1")
+  bool enabled, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1231,7 +1248,8 @@ MLN_API mln_status mln_map_add_vector_source_url(
   mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
   const mln_style_tile_source_options* options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1261,7 +1279,8 @@ MLN_API mln_status mln_map_add_vector_source_tiles(
   size_t tile_count,
   const mln_style_tile_source_options* options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1288,7 +1307,8 @@ MLN_API mln_status mln_map_add_raster_source_url(
   mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
   const mln_style_tile_source_options* options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1318,7 +1338,8 @@ MLN_API mln_status mln_map_add_raster_source_tiles(
   size_t tile_count,
   const mln_style_tile_source_options* options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1346,7 +1367,8 @@ MLN_API mln_status mln_map_add_raster_dem_source_url(
   mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
   const mln_style_tile_source_options* options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1376,7 +1398,8 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
   size_t tile_count,
   const mln_style_tile_source_options* options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1422,7 +1445,8 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   const mln_custom_geometry_source_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1450,7 +1474,8 @@ MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_canonical_tile_id tile_id,
   mln_buffer_view data MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1473,7 +1498,8 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_canonical_tile_id tile_id,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1496,7 +1522,8 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_lat_lng_bounds bounds,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1545,7 +1572,8 @@ MLN_API mln_status mln_map_add_custom_mvt_vector_source(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   const mln_custom_mvt_vector_source_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1578,7 +1606,8 @@ MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_data(
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_canonical_tile_id tile_id,
   mln_buffer_view data MLN_BINDING("encoding=bytes;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1610,7 +1639,8 @@ MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_error(
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_canonical_tile_id tile_id,
   mln_buffer_view message MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1633,7 +1663,8 @@ MLN_API mln_status mln_map_invalidate_custom_mvt_vector_source_tile(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_canonical_tile_id tile_id,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1660,7 +1691,8 @@ MLN_API mln_status mln_map_set_style_image(
   mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
   const mln_premultiplied_rgba8_image* image MLN_BINDING("length=1"),
   const mln_style_image_options* options MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1683,7 +1715,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_remove_style_image(
   mln_map map,
   mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1707,7 +1740,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_get_style_image_info(
   mln_map map,
   mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1730,7 +1764,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8(
   mln_map map,
   mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1753,7 +1788,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_copy_style_image_stretches(
   mln_map map,
   mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1786,7 +1822,8 @@ MLN_API mln_status mln_map_add_image_source_url(
     MLN_BINDING("length=coordinate_count;ownership=borrowed"),
   size_t coordinate_count,
   mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1820,7 +1857,8 @@ MLN_API mln_status mln_map_add_image_source_image(
     MLN_BINDING("length=coordinate_count;ownership=borrowed"),
   size_t coordinate_count,
   const mln_premultiplied_rgba8_image* image MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1845,7 +1883,8 @@ MLN_API mln_status mln_map_set_image_source_url(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1868,7 +1907,8 @@ MLN_API mln_status mln_map_set_image_source_image(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   const mln_premultiplied_rgba8_image* image MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1897,7 +1937,8 @@ MLN_API mln_status mln_map_set_image_source_coordinates(
   const mln_lat_lng* coordinates
     MLN_BINDING("length=coordinate_count;ownership=borrowed"),
   size_t coordinate_count,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1921,7 +1962,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_get_image_source_coordinates(
   mln_map map,
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1952,7 +1994,8 @@ MLN_API mln_status mln_map_add_hillshade_layer(
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view before_layer_id
     MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1984,7 +2027,8 @@ MLN_API mln_status mln_map_add_color_relief_layer(
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view before_layer_id
     MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2012,7 +2056,8 @@ MLN_API mln_status mln_map_add_location_indicator_layer(
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view before_layer_id
     MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2040,7 +2085,8 @@ MLN_API mln_status mln_map_set_location_indicator_location(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_lat_lng coordinate, double altitude,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2062,7 +2108,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_location_indicator_bearing(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  double bearing, const mln_completion* completion MLN_BINDING("length=1")
+  double bearing, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2085,7 +2132,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_location_indicator_accuracy_radius(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  double radius, const mln_completion* completion MLN_BINDING("length=1")
+  double radius, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2113,7 +2161,8 @@ MLN_API mln_status mln_map_set_location_indicator_image_name(
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
   uint32_t image_kind MLN_BINDING("enum=mln_location_indicator_image_kind"),
   mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2148,7 +2197,8 @@ MLN_API mln_status mln_map_add_style_layer_json(
   mln_buffer_view layer_json MLN_BINDING("encoding=json;lifetime=call"),
   mln_buffer_view before_layer_id
     MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2171,7 +2221,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_remove_style_layer(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2194,7 +2245,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_get_style_layer_info(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2214,7 +2266,8 @@ MLN_BINDING(
   "encoding=utf8"
 )
 MLN_API mln_status mln_map_list_style_layer_ids(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2233,7 +2286,8 @@ MLN_BINDING(
   "execution=query;result=mln_style_layer_entry;shape=array;ownership=borrowed"
 )
 MLN_API mln_status mln_map_list_style_layers(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2259,7 +2313,8 @@ MLN_API mln_status mln_map_move_style_layer(
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view before_layer_id
     MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2282,7 +2337,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_get_style_layer_json(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2305,7 +2361,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_style_light_json(
   mln_map map,
   mln_buffer_view light_json MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2332,7 +2389,8 @@ MLN_API mln_status mln_map_set_style_light_property(
   mln_map map,
   mln_buffer_view property_name MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view value MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2355,7 +2413,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_get_style_light_property(
   mln_map map,
   mln_buffer_view property_name MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2386,7 +2445,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_style_transition_options(
   mln_map map,
   const mln_style_transition_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2417,7 +2477,8 @@ MLN_BINDING(
   "borrowed"
 )
 MLN_API mln_status mln_map_get_style_transition_options(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2447,7 +2508,8 @@ MLN_API mln_status mln_map_set_layer_property(
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view property_name MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view value MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2474,7 +2536,8 @@ MLN_API mln_status mln_map_get_layer_property(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view property_name MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2502,7 +2565,8 @@ MLN_API mln_status mln_map_set_layer_filter(
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
   const mln_buffer_view* filter
     MLN_BINDING("length=1;encoding=json;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2528,7 +2592,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_get_layer_filter(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2557,7 +2622,8 @@ MLN_API mln_status mln_map_set_layer_source_layer(
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view source_layer
     MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2583,7 +2649,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_copy_layer_source_layer(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2612,7 +2679,8 @@ MLN_API mln_status mln_map_set_layer_source_id(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
   mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2638,7 +2706,8 @@ MLN_BINDING(
 MLN_API mln_status mln_map_copy_layer_source_id(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2661,7 +2730,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_layer_min_zoom(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  double min_zoom, const mln_completion* completion MLN_BINDING("length=1")
+  double min_zoom, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2684,7 +2754,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_layer_max_zoom(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  double max_zoom, const mln_completion* completion MLN_BINDING("length=1")
+  double max_zoom, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2708,7 +2779,8 @@ MLN_API mln_status mln_map_set_layer_visibility(
   mln_map map,
   mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
   uint32_t visibility MLN_BINDING("enum=mln_style_layer_visibility"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

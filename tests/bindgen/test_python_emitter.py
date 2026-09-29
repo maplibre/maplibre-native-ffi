@@ -16,6 +16,7 @@ PRELUDE = """
 #define BIND(x) __attribute__((annotate("mln:" x)))
 typedef unsigned long long mln_map;
 typedef int mln_status;
+typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
 typedef struct mln_completion { void *state; } mln_completion;
 typedef struct mln_buffer_view { const void *data; unsigned long size; } mln_buffer_view;
 """
@@ -59,7 +60,7 @@ typedef struct mln_new_entry {
   double class;
 } mln_new_entry;
 BIND("execution=query;result=mln_new_entry;shape=array;ownership=borrowed")
-mln_status mln_map_new_entries(mln_map map, const mln_completion *completion);
+mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         self.assertEqual(python.coverage(api)["generated"], ["mln_map_new_entries"])
         _, values = self.materialize(api)
@@ -79,7 +80,7 @@ mln_status mln_map_new_entries(mln_map map, const mln_completion *completion);
 BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_map_match(mln_map map, double self, double input_self, double py,
                        mln_buffer_view title BIND("encoding=utf8"), double title_view,
-                       const mln_completion *completion);
+                       const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         files, _ = self.materialize(api)
         self.assertEqual(python.coverage(api)["generated"], ["mln_map_match"])
@@ -90,7 +91,7 @@ mln_status mln_map_match(mln_map map, double self, double input_self, double py,
         )
         native = files["src/generated_operations.rs"]
         self.assertIn(
-            "sys::mln_map_match(map, input_self_, input_self, input_py, title_value, title_view, completion)",
+            "sys::mln_map_match(map, input_self_, input_self, input_py, title_value, title_view, completion, diagnostic)",
             native,
         )
 
@@ -98,7 +99,7 @@ mln_status mln_map_match(mln_map map, double self, double input_self, double py,
         api = self.parse("""
 typedef struct mln_entry { double class; double class_; } mln_entry;
 BIND("execution=query;result=mln_entry;shape=value;ownership=borrowed")
-mln_status mln_map_entry(mln_map map, const mln_completion *completion);
+mln_status mln_map_entry(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         result = python.coverage(api)
         self.assertEqual(result["generated"], [])
@@ -107,8 +108,8 @@ mln_status mln_map_entry(mln_map map, const mln_completion *completion);
     def test_operations_cannot_take_owner_member_names(self):
         api = self.parse("""
 typedef unsigned long long mln_host BIND("kind=handle;release=mln_host_destroy;parent=none");
-BIND("execution=immediate") mln_status mln_host_destroy(mln_host host);
-BIND("execution=immediate") mln_status mln_host_closed(mln_host host, bool *out BIND("direction=out"));
+BIND("execution=immediate") mln_status mln_host_destroy(mln_host host, mln_diagnostic *out_diagnostic);
+BIND("execution=immediate") mln_status mln_host_closed(mln_host host, bool *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
         result = python.coverage(api)
         # The release alone becomes close.
@@ -127,7 +128,7 @@ typedef struct mln_event {
   mln_event_payload payload BIND("tag=kind");
 } mln_event;
 BIND("execution=query;result=mln_event;shape=value;ownership=borrowed")
-mln_status mln_map_event(mln_map map, const mln_completion *completion);
+mln_status mln_map_event(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         _, values = self.materialize(api)
         event = values.Event._from_native(
@@ -152,15 +153,15 @@ typedef struct mln_ticket_provider {
   void *user_data BIND("kind=context;ownership=borrowed");
   release_context release;
 } mln_ticket_provider BIND("kind=callback_registration;user_data=user_data;release=release");
-BIND("execution=immediate") mln_status mln_host_destroy(mln_host host);
+BIND("execution=immediate") mln_status mln_host_destroy(mln_host host, mln_diagnostic *out_diagnostic);
 BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_host_set_provider(mln_host host, const mln_ticket_provider *provider BIND("length=1"), const mln_completion *completion);
-BIND("execution=immediate") mln_status mln_ticket_answer(mln_ticket ticket, unsigned response);
-BIND("execution=immediate") mln_status mln_ticket_cancelled(mln_ticket ticket, bool *result BIND("direction=out"));
+mln_status mln_host_set_provider(mln_host host, const mln_ticket_provider *provider BIND("length=1"), const mln_completion *completion, mln_diagnostic *out_diagnostic);
+BIND("execution=immediate") mln_status mln_ticket_answer(mln_ticket ticket, unsigned response, mln_diagnostic *out_diagnostic);
+BIND("execution=immediate") mln_status mln_ticket_cancelled(mln_ticket ticket, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled") mln_status mln_ticket_on_cancel(
-  mln_ticket ticket, cancel callback, void *context BIND("kind=context"), release_context release, bool *cancelled BIND("direction=out"));
+  mln_ticket ticket, cancel callback, void *context BIND("kind=context"), release_context release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("execution=immediate") void mln_ticket_release(mln_ticket ticket);
-BIND("execution=immediate") mln_status mln_ticket_await(mln_ticket ticket BIND("handle_access=issued"));
+BIND("execution=immediate") mln_status mln_ticket_await(mln_ticket ticket BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """)
         self.assertEqual(python.coverage(api)["unsupported"], {})
         files, values = self.materialize(api)

@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from .kotlin_values import Unsupported, identifier, name, owner_class
+from .kotlin_values import Unsupported, identifier, name, native_call, owner_class
 
 ROOTS = "org.maplibre.nativeffi.internal.callback.CallbackRoots"
 SCOPE = "org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope"
@@ -561,13 +561,13 @@ def operation(plan, values, platform):
                     if platform == "androidMain"
                     else "out.value"
                 )
-                body = f"val out = {output}; BindingStatus.check({prefix}{plan.name}({', '.join(arguments)})); {read}"
+                body = f"val out = {output}; {native_call(plan.function, prefix, arguments)}; {read}"
             else:
-                body = f"{prefix}{plan.name}({', '.join(arguments)})"
+                body = native_call(plan.function, prefix, arguments)
         else:
             scoped = parameter_name(plan.scoped_receiver)
             start = arena
-            body = f'{scoped}.bindingScope.ensureActive(); org.maplibre.nativeffi.internal.callback.CallbackAdmission.check({scoped}.bindingAddress, "{plan.name}"); BindingStatus.check({prefix}{plan.name}({", ".join(arguments)}))'
+            body = f'{scoped}.bindingScope.ensureActive(); org.maplibre.nativeffi.internal.callback.CallbackAdmission.check({scoped}.bindingAddress, "{plan.name}"); {native_call(plan.function, prefix, arguments)}'
         checks = admission(plan) + "; " if decision else ""
         loaded = (
             "NativeAccess.ensureLoaded(); "
@@ -608,8 +608,8 @@ def operation(plan, values, platform):
         else "memScoped { val arena = this;"
     )
     bridge = "command" if result == "CommandCompletion" else "unit"
-    call = prefix + plan.name + "(" + ", ".join(arguments) + ")"
-    return f'  public actual fun {method}({params}): Deferred<{result}> = {SCOPE}().use {{ registrations ->\n    {ADMISSION}.check(binding{name(receiver.value.native)}Handle().toLong(), "{plan.name}")\n    CompletionBridge.{bridge} {{ completion -> {arena}\n      val status = {call}\n      if (status == 0) registrations.accept(bindingCallbacks)\n      status\n    }} }}\n  }}\n'
+    call = native_call(plan.function, prefix, arguments)
+    return f'  public actual fun {method}({params}): Deferred<{result}> = {SCOPE}().use {{ registrations ->\n    {ADMISSION}.check(binding{name(receiver.value.native)}Handle().toLong(), "{plan.name}")\n    CompletionBridge.{bridge} {{ completion -> {arena}\n      {call}\n      registrations.accept(bindingCallbacks)\n    }} }}\n  }}\n'
 
 
 def direct_conversions(values, platform):
@@ -760,7 +760,7 @@ def direct_operation(plan, values, platform):
                 )
             else:
                 arguments.append("out.ptr" if platform == "nativeMain" else "out")
-        return f"BindingStatus.check({prefix}{plan.name}({', '.join(arguments)}))"
+        return native_call(plan.function, prefix, arguments)
 
     owner = (
         "bindingCallbacks"

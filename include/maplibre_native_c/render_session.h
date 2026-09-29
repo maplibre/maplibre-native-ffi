@@ -33,8 +33,10 @@ extern "C" {
  */
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_projection_create(
-  mln_render_session session, mln_map_projection* out_projection
-                                MLN_BINDING("direction=out;ownership=owned")
+  mln_render_session session,
+  mln_map_projection* out_projection
+    MLN_BINDING("direction=out;ownership=owned"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Terminal disposition of one accepted frame demand. */
@@ -166,7 +168,9 @@ MLN_API mln_frame_demand mln_frame_demand_default(void) MLN_NOEXCEPT;
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_get_capabilities(
   mln_render_session session,
-  mln_render_session_capabilities* out_capabilities MLN_BINDING("direction=out")
+  mln_render_session_capabilities* out_capabilities
+    MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -181,7 +185,8 @@ MLN_API mln_status mln_render_session_get_capabilities(
 MLN_BINDING("execution=snapshot")
 MLN_API mln_status mln_render_session_get_snapshot(
   mln_render_session session,
-  mln_render_session_snapshot* out_snapshot MLN_BINDING("direction=out")
+  mln_render_session_snapshot* out_snapshot MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -202,7 +207,8 @@ MLN_API mln_status mln_render_session_get_snapshot(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_request_frame(
   mln_render_session session,
-  const mln_frame_demand* demand MLN_BINDING("length=1")
+  const mln_frame_demand* demand MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -221,7 +227,9 @@ MLN_API mln_status mln_render_session_request_frame(
 MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_render_session_drain_frame_results(
   mln_render_session session,
-  mln_render_frame_batch* out_batch MLN_BINDING("direction=out;ownership=owned")
+  mln_render_frame_batch* out_batch
+    MLN_BINDING("direction=out;ownership=owned"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -234,7 +242,8 @@ MLN_API mln_status mln_render_session_drain_frame_results(
  */
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_frame_batch_count(
-  mln_render_frame_batch batch, size_t* out_count MLN_BINDING("direction=out")
+  mln_render_frame_batch batch, size_t* out_count MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -249,7 +258,8 @@ MLN_API mln_status mln_render_frame_batch_count(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_frame_batch_get(
   mln_render_frame_batch batch, size_t index,
-  mln_render_frame_result* out_result MLN_BINDING("direction=out")
+  mln_render_frame_result* out_result MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Releases a frame-result batch. */
@@ -277,7 +287,8 @@ MLN_API void mln_render_frame_batch_release(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_acquire_frame(
   mln_render_session session,
-  mln_acquired_frame* out_frame MLN_BINDING("direction=out;ownership=owned")
+  mln_acquired_frame* out_frame MLN_BINDING("direction=out;ownership=owned"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -293,7 +304,8 @@ MLN_API mln_status mln_render_session_acquire_frame(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_acquired_frame_get_result(
   mln_acquired_frame frame,
-  mln_render_frame_result* out_result MLN_BINDING("direction=out")
+  mln_render_frame_result* out_result MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -308,7 +320,8 @@ MLN_API mln_status mln_acquired_frame_get_result(
  */
 MLN_BINDING("execution=immediate;view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_producer_sync(
-  mln_acquired_frame frame, mln_gpu_sync* out_sync MLN_BINDING("direction=out")
+  mln_acquired_frame frame, mln_gpu_sync* out_sync MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -334,7 +347,8 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_acquired_frame_release(
   mln_acquired_frame* frame MLN_BINDING("direction=inout;consumes=success"),
-  const mln_gpu_sync* consumer_completion MLN_BINDING("length=1")
+  const mln_gpu_sync* consumer_completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -367,7 +381,8 @@ MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_render_session_resize(
   mln_render_session session,
   const mln_render_target_extent* extent MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -389,7 +404,8 @@ MLN_API mln_status mln_render_session_resize(
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_render_session_barrier(
   mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -410,7 +426,8 @@ MLN_API mln_status mln_render_session_barrier(
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_render_session_reduce_memory_use(
   mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -431,7 +448,8 @@ MLN_API mln_status mln_render_session_reduce_memory_use(
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_render_session_clear_data(
   mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -452,7 +470,8 @@ MLN_API mln_status mln_render_session_clear_data(
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_render_session_dump_debug_logs(
   mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -478,7 +497,8 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
 MLN_BINDING("execution=render_driver")
 MLN_API mln_status mln_render_session_service_driver_work(
   mln_render_session session, size_t max_work,
-  size_t* out_serviced MLN_BINDING("direction=out")
+  size_t* out_serviced MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -505,7 +525,8 @@ MLN_API mln_status mln_render_session_service_driver_work(
 MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_render_session_detach(
   mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -531,7 +552,8 @@ MLN_API mln_status mln_render_session_detach(
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_abandon(
   mln_render_session session,
-  mln_render_abandon_result* out_result MLN_BINDING("direction=out")
+  mln_render_abandon_result* out_result MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -550,8 +572,9 @@ MLN_API mln_status mln_render_session_abandon(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING("execution=immediate")
-MLN_API mln_status
-mln_render_session_destroy(mln_render_session session) MLN_NOEXCEPT;
+MLN_API mln_status mln_render_session_destroy(
+  mln_render_session session, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
 
 /**
  * Consumes a session and schedules CPU-side abandonment and destruction.
@@ -567,8 +590,9 @@ mln_render_session_destroy(mln_render_session session) MLN_NOEXCEPT;
  * handle that is null or already consumed.
  */
 MLN_BINDING("execution=immediate")
-MLN_API mln_status
-mln_render_session_dispose(mln_render_session session) MLN_NOEXCEPT;
+MLN_API mln_status mln_render_session_dispose(
+  mln_render_session session, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
 
 /**
  * Consumes an acquired frame and schedules abandonment of its session.
@@ -583,8 +607,9 @@ mln_render_session_dispose(mln_render_session session) MLN_NOEXCEPT;
  * invalid handle, or MLN_STATUS_INVALID_STATE for a frame already consumed.
  */
 MLN_BINDING("execution=immediate")
-MLN_API mln_status
-mln_acquired_frame_dispose(mln_acquired_frame frame) MLN_NOEXCEPT;
+MLN_API mln_status mln_acquired_frame_dispose(
+  mln_acquired_frame frame, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

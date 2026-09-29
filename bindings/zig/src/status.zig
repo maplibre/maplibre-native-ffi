@@ -2,7 +2,6 @@ const std = @import("std");
 
 const c = @import("c.zig").raw;
 const diagnostics = @import("diagnostics.zig");
-const sync = @import("sync.zig");
 
 pub const expected_c_abi_version: u32 = 0;
 
@@ -30,13 +29,21 @@ pub const BindingError = NativeStatusError || error{
 
 pub const Error = BindingError || std.mem.Allocator.Error;
 
-pub fn checkStatus(status: c.mln_status, diagnostic_store: ?*diagnostics.DiagnosticStore) Error!void {
-    const raw_status: i32 = status;
+/// Calls a status-returning native function with `arguments` and a trailing
+/// diagnostic, and converts its status. A failure copies the raw status and
+/// the native message into `diagnostic_store`.
+pub fn call(
+    comptime function: anytype,
+    arguments: anytype,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+) Error!void {
+    var diagnostic: c.mln_diagnostic = undefined;
+    diagnostic.size = @sizeOf(c.mln_diagnostic);
+    // Without a store the message has nowhere to go, so native skips it.
+    const out_diagnostic: [*c]c.mln_diagnostic = if (diagnostic_store != null) &diagnostic else null;
+    const raw_status: i32 = @call(.auto, function, arguments ++ .{out_diagnostic});
     if (raw_status == c.MLN_STATUS_OK) return;
-
-    const message = copyThreadLastErrorMessage(diagnostic_store, raw_status);
-    if (message) |err| return err;
-
+    if (diagnostic_store) |store| try store.set(raw_status, std.mem.sliceTo(&diagnostic.message, 0));
     return nativeStatusError(raw_status);
 }
 
@@ -69,16 +76,6 @@ pub fn setBindingDiagnostic(
     if (diagnostic_store) |store| try store.set(null, message);
 }
 
-fn copyThreadLastErrorMessage(
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-    raw_status: i32,
-) ?std.mem.Allocator.Error {
-    const store = diagnostic_store orelse return null;
-    const message = std.mem.span(c.mln_thread_last_error_message());
-    store.set(raw_status, message) catch |err| return err;
-    return null;
-}
-
 /// Converts a raw native status into this binding's error set without touching
 /// diagnostics: void for MLN_STATUS_OK, the mapped error otherwise.
 pub fn errorFromRawStatus(raw_status: i32) NativeStatusError!void {
@@ -102,55 +99,22 @@ fn nativeStatusError(raw_status: i32) NativeStatusError {
     };
 }
 
-// Signals that a native runtime finished tearing down, so this test's raw C
-// calls do not outlive the library state they used.
-const TeardownSignal = struct {
-    finished: sync.Latch = .{},
-
-    fn descriptor(self: *TeardownSignal) c.mln_completion {
-        return .{
-            .size = @sizeOf(c.mln_completion),
-            .callback = callback,
-            .user_data = self,
-            .release_user_data = null,
-        };
-    }
-
-    fn callback(user_data: ?*anyopaque, _: [*c]const c.mln_completion_result) callconv(.c) void {
-        const self: *TeardownSignal = @ptrCast(@alignCast(user_data orelse return));
-        self.finished.set();
-    }
-
-    fn wait(self: *TeardownSignal) void {
-        self.finished.wait();
-    }
-};
-
-test "diagnostic store copies thread-local native message" {
+test "call copies the native diagnostic of a failed call" {
     var store = diagnostics.DiagnosticStore.init(std.testing.allocator);
     defer store.deinit();
 
-    var rejected_signal = TeardownSignal{};
-    const rejected_descriptor = rejected_signal.descriptor();
-    try std.testing.expectError(
-        error.InvalidArgument,
-        checkStatus(c.mln_runtime_release(0, &rejected_descriptor), &store),
-    );
-    const first = store.get().?;
-    try std.testing.expectEqual(@as(?i32, c.MLN_STATUS_INVALID_ARGUMENT), first.raw_status);
-    try std.testing.expect(first.message.len > 0);
-    const copied = try std.testing.allocator.dupe(u8, first.message);
-    defer std.testing.allocator.free(copied);
-
-    const options = c.mln_runtime_options_default();
-    var runtime: c.mln_runtime = 0;
-    try checkStatus(c.mln_runtime_create(&options, &runtime), null);
-    var signal = TeardownSignal{};
-    const descriptor = signal.descriptor();
-    try checkStatus(c.mln_runtime_release(runtime, &descriptor), null);
-    signal.wait();
-
-    try std.testing.expectEqualStrings(copied, store.get().?.message);
+    const descriptor = c.mln_completion{
+        .size = @sizeOf(c.mln_completion),
+        .callback = struct {
+            fn callback(_: ?*anyopaque, _: [*c]const c.mln_completion_result) callconv(.c) void {}
+        }.callback,
+        .user_data = null,
+        .release_user_data = null,
+    };
+    try std.testing.expectError(error.InvalidArgument, call(c.mln_runtime_release, .{ 0, &descriptor }, &store));
+    const diagnostic = store.get().?;
+    try std.testing.expectEqual(@as(?i32, c.MLN_STATUS_INVALID_ARGUMENT), diagnostic.raw_status);
+    try std.testing.expect(diagnostic.message.len > 0);
 }
 
 test "unknown status preserves raw status" {
@@ -158,8 +122,13 @@ test "unknown status preserves raw status" {
     defer store.deinit();
 
     const unknown_raw_status: i32 = -9999;
-    const unknown_status: c.mln_status = unknown_raw_status;
-    try std.testing.expectError(error.UnknownStatus, checkStatus(unknown_status, &store));
+    const unknown = struct {
+        fn function(out_diagnostic: [*c]c.mln_diagnostic) callconv(.c) c.mln_status {
+            out_diagnostic[0].message[0] = 0;
+            return unknown_raw_status;
+        }
+    }.function;
+    try std.testing.expectError(error.UnknownStatus, call(unknown, .{}, &store));
     try std.testing.expectEqual(@as(?i32, unknown_raw_status), store.get().?.raw_status);
 }
 

@@ -10,7 +10,7 @@ import org.maplibre.nativeffi.internal.callback.*
 public actual abstract class GeneratedGeojsonSourceDataOperations internal actual constructor() {
   internal abstract fun bindingGeojsonSourceDataHandle(): ULong
 
-  internal abstract fun bindingCloseGeojsonSourceData(call: (ULong) -> Int)
+  internal abstract fun bindingCloseGeojsonSourceData(call: (ULong) -> Unit)
 
   public actual fun destroy(): Unit {
     try {
@@ -25,7 +25,6 @@ public actual abstract class GeneratedGeojsonSourceDataOperations internal actua
         memScoped {
           val arena = this
           mln_geojson_source_data_destroy(owner)
-          0
         }
       }
     } finally {

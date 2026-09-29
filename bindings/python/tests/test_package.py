@@ -140,30 +140,7 @@ def test_unknown_network_status_setter_raises_invalid_argument() -> None:
 
     assert raised.value.status == mln.Status.INVALID_ARGUMENT
     assert raised.value.native_status_code == -1
-    assert "invalid" in raised.value.diagnostic
-
-
-def test_native_status_conversion_preserves_status_and_diagnostic() -> None:
-    with pytest.raises(mln.InvalidArgumentError) as raised:
-        mln.network_status_set(999_001)
-
-    error = raised.value
-    copied = error.diagnostic
-
-    with pytest.raises(mln.InvalidArgumentError) as later:
-        mln.projected_meters_for_lat_lng(mln.LatLng(1000.0, 0.0))
-
-    assert error.status == mln.Status.INVALID_ARGUMENT
-    assert error.native_status_code == mln.Status.INVALID_ARGUMENT.native_code
-    assert "network status" in error.diagnostic
-    assert error.diagnostic == copied
-    assert later.value.diagnostic != copied
-
-
-def _native_invalid_network_status_error() -> mln.InvalidArgumentError:
-    with pytest.raises(mln.InvalidArgumentError) as raised:
-        mln.network_status_set(999_001)
-    return raised.value
+    assert "network status" in raised.value.diagnostic
 
 
 def test_public_type_hints_are_resolvable():
@@ -400,14 +377,12 @@ def test_still_image_request_rejects_continuous_map_mode() -> None:
 def test_map_create_from_closed_runtime_reports_invalid_state() -> None:
     runtime = mln.runtime_create()
     runtime.close()
-    stale = _native_invalid_network_status_error().diagnostic
 
     with pytest.raises(mln.InvalidStateError) as raised:
         runtime.map_create().result(timeout=5)
 
     assert raised.value.native_status_code is None
     assert raised.value.diagnostic == "handle is closed"
-    assert raised.value.diagnostic != stale
 
 
 def test_map_debug_and_status_options_round_trip_the_snapshot() -> None:
@@ -445,16 +420,13 @@ def test_style_url_rejects_embedded_nul_before_native_call() -> None:
     with (
         mln.runtime_create() as runtime,
         runtime.map_create().result(timeout=5) as map_handle,
+        pytest.raises(mln.InvalidArgumentError) as raised,
     ):
-        stale = _native_invalid_network_status_error().diagnostic
-
-        with pytest.raises(mln.InvalidArgumentError) as raised:
-            map_handle.set_style_url("bad\0url")
+        map_handle.set_style_url("bad\0url")
 
     assert raised.value.status == mln.Status.INVALID_ARGUMENT
     assert raised.value.native_status_code is None
     assert "embedded NUL" in raised.value.diagnostic
-    assert raised.value.diagnostic != stale
 
 
 def _point_collection(*names: str) -> bytes:

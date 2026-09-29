@@ -247,7 +247,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_render_session_attach_options mln_render_session_attach_options_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_target_extent_physical_size([NativeTypeName("const mln_render_target_extent *")] mln_render_target_extent* extent, [NativeTypeName("uint32_t *")] uint* out_width, [NativeTypeName("uint32_t *")] uint* out_height);
+        public static extern mln_status mln_render_target_extent_physical_size([NativeTypeName("const mln_render_target_extent *")] mln_render_target_extent* extent, [NativeTypeName("uint32_t *")] uint* out_width, [NativeTypeName("uint32_t *")] uint* out_height, mln_diagnostic* out_diagnostic);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("uint32_t")]

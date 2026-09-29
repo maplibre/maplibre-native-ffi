@@ -8,12 +8,12 @@ import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.loader.NativeAccess
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 public actual abstract class GeneratedMapProjectionOperations internal actual constructor() {
   internal abstract fun bindingMapProjectionHandle(): Long
 
-  internal abstract fun bindingCloseMapProjection(call: (Long) -> Int)
+  internal abstract fun bindingCloseMapProjection(call: (Long) -> Unit)
 
   public actual fun close(): Unit {
     try {
@@ -25,7 +25,11 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
           owner.toLong(),
           "mln_map_projection_close",
         )
-        Arena.ofConfined().use { arena -> MapLibreNativeC.mln_map_projection_close(owner) }
+        Arena.ofConfined().use { arena ->
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_map_projection_close(owner, diagnostic)
+          }
+        }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)
@@ -42,9 +46,13 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       return Arena.ofConfined().use { arena ->
         val output = mln_camera_options.allocate(arena)
         mln_camera_options.size(output, mln_camera_options.sizeof().toInt())
-        BindingStatus.check(
-          MapLibreNativeC.mln_map_projection_get_camera(bindingMapProjectionHandle(), output)
-        )
+        NativeDiagnostics.check { diagnostic ->
+          MapLibreNativeC.mln_map_projection_get_camera(
+            bindingMapProjectionHandle(),
+            output,
+            diagnostic,
+          )
+        }
         GeneratedValues.readCameraOptions(output)
       }
     } finally {
@@ -61,13 +69,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       )
       return Arena.ofConfined().use { arena ->
         val output = mln_lat_lng.allocate(arena)
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_map_projection_lat_lng_for_pixel(
             bindingMapProjectionHandle(),
             GeneratedValues.writeScreenPoint(arena, point),
             output,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readLatLng(output)
       }
     } finally {
@@ -84,13 +93,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       )
       return Arena.ofConfined().use { arena ->
         val output = mln_lat_lng.allocate(arena)
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_map_projection_lat_lng_for_pixel_unwrapped(
             bindingMapProjectionHandle(),
             GeneratedValues.writeScreenPoint(arena, point),
             output,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readLatLng(output)
       }
     } finally {
@@ -107,13 +117,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       )
       return Arena.ofConfined().use { arena ->
         val output = arena.allocate(ValueLayout.JAVA_DOUBLE)
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_map_projection_meters_per_pixel_at_latitude(
             bindingMapProjectionHandle(),
             latitude,
             output,
+            diagnostic,
           )
-        )
+        }
         output.get(ValueLayout.JAVA_DOUBLE, 0)
       }
     } finally {
@@ -130,13 +141,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
       )
       return Arena.ofConfined().use { arena ->
         val output = mln_screen_point.allocate(arena)
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_map_projection_pixel_for_lat_lng(
             bindingMapProjectionHandle(),
             GeneratedValues.writeLatLng(arena, coordinate),
             output,
+            diagnostic,
           )
-        )
+        }
         GeneratedValues.readScreenPoint(output)
       }
     } finally {
@@ -152,12 +164,13 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
         "mln_map_projection_set_camera",
       )
       return Arena.ofConfined().use { arena ->
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_map_projection_set_camera(
             bindingMapProjectionHandle(),
             GeneratedValues.writeCameraOptions(arena, camera),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {
@@ -173,14 +186,15 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
         "mln_map_projection_set_visible_coordinates",
       )
       return Arena.ofConfined().use { arena ->
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_map_projection_set_visible_coordinates(
             bindingMapProjectionHandle(),
             GeneratedValues.writeLatLngArray(arena, coordinates),
             coordinates.size.toLong(),
             GeneratedValues.writeEdgeInsets(arena, padding),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {
@@ -196,13 +210,14 @@ public actual abstract class GeneratedMapProjectionOperations internal actual co
         "mln_map_projection_set_visible_geometry",
       )
       return Arena.ofConfined().use { arena ->
-        BindingStatus.check(
+        NativeDiagnostics.check { diagnostic ->
           MapLibreNativeC.mln_map_projection_set_visible_geometry(
             bindingMapProjectionHandle(),
             GeneratedValues.byteView(arena, geometry),
             GeneratedValues.writeEdgeInsets(arena, padding),
+            diagnostic,
           )
-        )
+        }
         Unit
       }
     } finally {

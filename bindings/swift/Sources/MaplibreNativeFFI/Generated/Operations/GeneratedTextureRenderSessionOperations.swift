@@ -20,11 +20,12 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_metal_borrowed_texture_set_target(
             handle.raw,
             arena.store(bindingArg0.nativeValue()),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -48,11 +49,12 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           try arena.submit { try mln_opengl_borrowed_texture_set_target(
             handle.raw,
             arena.store(bindingArg0.nativeValue(arena: arena)),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -74,10 +76,11 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in
+        .start({ completion, diagnostic in
           arena.submit { mln_texture_read_premultiplied_rgba8(
             handle.raw,
-            completion
+            completion,
+            diagnostic
           ) } }) { result in try TextureReadbackResult(
           raw: NativeCompletion.value(
             result,
@@ -105,11 +108,12 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_vulkan_borrowed_texture_set_target(
             handle.raw,
             arena.store(bindingArg0.nativeValue()),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -133,11 +137,12 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in
+        .startUnit { completion, diagnostic in
           arena.submit { mln_webgpu_borrowed_texture_set_target(
             handle.raw,
             arena.store(bindingArg0.nativeValue()),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }

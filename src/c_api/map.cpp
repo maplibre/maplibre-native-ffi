@@ -26,55 +26,59 @@ auto mln_map_options_default(void) noexcept -> mln_map_options {
 
 auto mln_map_create(
   mln_runtime runtime, const mln_map_options* options,
-  const mln_completion* completion
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::create_map_start(runtime, options, completion);
   });
 }
 
-auto mln_map_release(mln_map map, const mln_completion* completion) noexcept
-  -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+auto mln_map_release(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::release_map(map, completion);
   });
 }
 
-auto mln_map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot) noexcept
-  -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+auto mln_map_snapshot_get(
+  mln_map map, mln_map_snapshot* out_snapshot, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::map_snapshot_get(map, out_snapshot);
   });
 }
 
 auto mln_map_resize(
-  mln_map map, mln_logical_extent extent, const mln_completion* completion
+  mln_map map, mln_logical_extent extent, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::map_resize(map, extent, completion);
   });
 }
 
 auto mln_map_request_repaint(
-  mln_map map, const mln_completion* completion
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::map_request_repaint(map, completion);
   });
 }
 
 auto mln_map_request_still_image(
-  mln_map map, const mln_completion* completion
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::map_request_still_image_start(map, completion);
   });
 }
 
 auto mln_map_set_event_mask(
-  mln_map map, uint64_t mask, const mln_completion* completion
+  mln_map map, uint64_t mask, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::map_set_event_mask(map, mask, completion);
   });
 }
@@ -121,9 +125,10 @@ struct OwnedFeatureStateSelector {
 
 auto mln_map_set_feature_state(
   mln_map map, const mln_feature_state_selector* selector,
-  mln_buffer_view state, const mln_completion* completion
+  mln_buffer_view state, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     const auto selector_status =
       mln::core::validate_feature_state_selector(selector, true);
     if (selector_status != MLN_STATUS_OK) {
@@ -162,18 +167,18 @@ auto mln_map_set_feature_state(
 
 auto mln_map_get_feature_state(
   mln_map map, const mln_feature_state_selector* selector,
-  const mln_completion* completion
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     return mln::core::map_get_feature_state_start(map, selector, completion);
   });
 }
 
 auto mln_map_remove_feature_state(
   mln_map map, const mln_feature_state_selector* selector,
-  const mln_completion* completion
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     const auto selector_status =
       mln::core::validate_feature_state_selector(selector, false);
     if (selector_status != MLN_STATUS_OK) {
@@ -192,8 +197,10 @@ auto mln_map_remove_feature_state(
   });
 }
 
-extern "C" MLN_API auto mln_map_dispose(mln_map map) noexcept -> mln_status {
-  return mln::c_api::status_boundary<false>([&]() {
+extern "C" MLN_API auto mln_map_dispose(
+  mln_map map, mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary<false>(out_diagnostic, [&]() {
     return mln::core::dispose_map(map);
   });
 }

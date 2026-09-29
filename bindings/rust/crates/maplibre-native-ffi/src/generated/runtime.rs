@@ -64,7 +64,9 @@ impl RuntimeHandle {
         let binding_parent = std::sync::Arc::clone(&self.inner);
         let binding_arg_1 = binding_arg_1.to_native();
         crate::completion::submit(
-            |completion| unsafe { sys::mln_map_create(native, &binding_arg_1, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_map_create(native, &binding_arg_1, completion, diagnostic)
+            },
             move |result| {
                 let value = crate::completion::copy_value::<sys::mln_map>(result)?;
                 crate::MapHandle::from_native(value, binding_parent)
@@ -78,7 +80,9 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_barrier", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_runtime_barrier(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_barrier(native, completion, diagnostic)
+            },
             crate::completion::unit,
         )
     }
@@ -89,8 +93,8 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_clear_http_header_transform", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_clear_http_header_transform(native, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_clear_http_header_transform(native, completion, diagnostic)
             },
             crate::completion::unit,
         )
@@ -102,7 +106,9 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_clear_resource_provider", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_runtime_clear_resource_provider(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_clear_resource_provider(native, completion, diagnostic)
+            },
             crate::completion::unit,
         )
     }
@@ -113,7 +119,9 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_clear_resource_transform", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_runtime_clear_resource_transform(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_clear_resource_transform(native, completion, diagnostic)
+            },
             crate::completion::unit,
         )
     }
@@ -122,7 +130,9 @@ impl RuntimeHandle {
     pub fn dispose(&self) -> Result<()> {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let result = self.inner.handle.close_with(|native| {
-            maplibre_core::check(unsafe { sys::mln_runtime_dispose(native) })?;
+            maplibre_core::check(|diagnostic| unsafe {
+                sys::mln_runtime_dispose(native, diagnostic)
+            })?;
             Ok(())
         })?;
         Ok(result.unwrap_or_else(|| Default::default()))
@@ -134,7 +144,9 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_drain_events", native.0)?;
         let mut binding_arg_1 = sys::mln_event_batch(0);
-        maplibre_core::check(unsafe { sys::mln_runtime_drain_events(native, &mut binding_arg_1) })?;
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_runtime_drain_events(native, &mut binding_arg_1, diagnostic)
+        })?;
         Ok(crate::EventBatchHandle::from_native(binding_arg_1)?)
     }
 
@@ -144,8 +156,8 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_get_event_mask", native.0)?;
         let mut binding_arg_1: u64 = Default::default();
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_get_event_mask(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_runtime_get_event_mask(native, &mut binding_arg_1, diagnostic)
         })?;
         Ok(maplibre_core::generated::RuntimeEventMask::from_native(
             binding_arg_1,
@@ -169,13 +181,14 @@ impl RuntimeHandle {
             .try_into()
             .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_runtime_offline_region_create(
                     native,
                     &binding_arg_1,
                     binding_arg_2_native,
                     binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -191,8 +204,13 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_offline_region_delete", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_offline_region_delete(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_offline_region_delete(
+                    native,
+                    binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             crate::completion::unit,
         )
@@ -207,8 +225,8 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_offline_region_get", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_offline_region_get(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_offline_region_get(native, binding_arg_1, completion, diagnostic)
             },
             |result| {
                 crate::completion::optional_value::<sys::mln_offline_region_info>(result)?
@@ -231,8 +249,13 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_offline_region_get_status", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_offline_region_get_status(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_offline_region_get_status(
+                    native,
+                    binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             |result| {
                 let value =
@@ -250,8 +273,13 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_offline_region_invalidate", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_offline_region_invalidate(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_offline_region_invalidate(
+                    native,
+                    binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             crate::completion::unit,
         )
@@ -267,12 +295,13 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_offline_region_set_download_state", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_runtime_offline_region_set_download_state(
                     native,
                     binding_arg_1,
                     binding_arg_2.to_native(),
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -289,12 +318,13 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_offline_region_set_observed", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_runtime_offline_region_set_observed(
                     native,
                     binding_arg_1,
                     binding_arg_2,
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -316,13 +346,14 @@ impl RuntimeHandle {
             .try_into()
             .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_runtime_offline_region_update_metadata(
                     native,
                     binding_arg_1,
                     binding_arg_2_native,
                     binding_arg_3,
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -340,7 +371,9 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_offline_regions_list", native.0)?;
         crate::completion::submit(
-            |completion| unsafe { sys::mln_runtime_offline_regions_list(native, completion) },
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_offline_regions_list(native, completion, diagnostic)
+            },
             |result| {
                 crate::completion::copy_slice::<sys::mln_offline_region_info>(result)?
                     .into_iter()
@@ -364,11 +397,12 @@ impl RuntimeHandle {
         maplibre_core::callback::check("mln_runtime_offline_regions_merge_database", native.0)?;
         let binding_arg_1 = maplibre_core::string::c_string(binding_arg_1)?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_runtime_offline_regions_merge_database(
                     native,
                     binding_arg_1.as_ptr(),
                     completion,
+                    diagnostic,
                 )
             },
             |result| {
@@ -389,7 +423,9 @@ impl RuntimeHandle {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let result = self.inner.handle.close_with(|native| {
             crate::completion::submit(
-                |completion| unsafe { sys::mln_runtime_release(native, completion) },
+                |completion, diagnostic| unsafe {
+                    sys::mln_runtime_release(native, completion, diagnostic)
+                },
                 crate::completion::unit,
             )
         })?;
@@ -405,11 +441,12 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_run_ambient_cache_operation", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 sys::mln_runtime_run_ambient_cache_operation(
                     native,
                     binding_arg_1.to_native(),
                     completion,
+                    diagnostic,
                 )
             },
             crate::completion::unit,
@@ -424,8 +461,8 @@ impl RuntimeHandle {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_set_event_mask", native.0)?;
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_set_event_mask(native, binding_arg_1.to_native())
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_runtime_set_event_mask(native, binding_arg_1.to_native(), diagnostic)
         })?;
         Ok(())
     }
@@ -441,8 +478,13 @@ impl RuntimeHandle {
         let mut arena = maplibre_core::input::InputArena::default();
         let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
         let submitted = crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_set_http_header_transform(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_set_http_header_transform(
+                    native,
+                    &binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             crate::completion::unit,
         );
@@ -458,8 +500,13 @@ impl RuntimeHandle {
         let native = self.inner.native()?;
         maplibre_core::callback::check("mln_runtime_set_maximum_ambient_cache_size", native.0)?;
         crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_set_maximum_ambient_cache_size(native, binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_set_maximum_ambient_cache_size(
+                    native,
+                    binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             crate::completion::unit,
         )
@@ -476,8 +523,13 @@ impl RuntimeHandle {
         let mut arena = maplibre_core::input::InputArena::default();
         let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
         let submitted = crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_set_resource_provider(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_set_resource_provider(
+                    native,
+                    &binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             crate::completion::unit,
         );
@@ -498,8 +550,13 @@ impl RuntimeHandle {
         let mut arena = maplibre_core::input::InputArena::default();
         let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
         let submitted = crate::completion::submit(
-            |completion| unsafe {
-                sys::mln_runtime_set_resource_transform(native, &binding_arg_1, completion)
+            |completion, diagnostic| unsafe {
+                sys::mln_runtime_set_resource_transform(
+                    native,
+                    &binding_arg_1,
+                    completion,
+                    diagnostic,
+                )
             },
             crate::completion::unit,
         );

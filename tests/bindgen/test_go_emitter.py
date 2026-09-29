@@ -24,6 +24,7 @@ class GoEmitterTests(unittest.TestCase):
 #include <stdlib.h>
 #define BIND(x) __attribute__((annotate("mln:" x)))
 typedef int mln_status;
+typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
 typedef struct mln_buffer_view { const void *data; size_t size; } mln_buffer_view;
 typedef struct mln_probe_point { double type; SCALAR gain; } mln_probe_point;
 typedef struct mln_probe_options {
@@ -36,10 +37,10 @@ typedef struct mln_probe_options {
   uint32_t right_count BIND("kind=count");
 } mln_probe_options;
 BIND("execution=immediate")
-static inline mln_status mln_probe_roundtrip(mln_probe_options input, mln_probe_options *out BIND("direction=out")) { *out = input; return 0; }
+static inline mln_status mln_probe_roundtrip(mln_probe_options input, mln_probe_options *out BIND("direction=out"), mln_diagnostic *out_diagnostic) { *out = input; return 0; }
 typedef struct mln_probe_text_result { mln_buffer_view text BIND("encoding=utf8;nullable=true"); } mln_probe_text_result;
 BIND("execution=immediate")
-static inline mln_status mln_probe_nullable_text(const char *text BIND("length=text_size;encoding=utf8;nullable=true;ownership=borrowed"), uint16_t text_size BIND("kind=count"), mln_probe_text_result *out BIND("direction=out")) { out->text = (mln_buffer_view){text, text_size}; return 0; }
+static inline mln_status mln_probe_nullable_text(const char *text BIND("length=text_size;encoding=utf8;nullable=true;ownership=borrowed"), uint16_t text_size BIND("kind=count"), mln_probe_text_result *out BIND("direction=out"), mln_diagnostic *out_diagnostic) { out->text = (mln_buffer_view){text, text_size}; return 0; }
 #endif
 """.replace("SCALAR", scalar)
                 (include / "api.h").write_text(header)
@@ -71,7 +72,9 @@ static inline mln_status mln_probe_nullable_text(const char *text BIND("length=t
                 (root / "go.mod").write_text("module fixture\n\ngo 1.24\n")
                 (root / "runtime.go").write_text("""package maplibre
 /*
+#cgo CFLAGS: -I${SRCDIR}/include
 #include <stdlib.h>
+#include "api.h"
 */
 import "C"
 import "unsafe"
@@ -84,8 +87,8 @@ func (a *bindingArena) array(count int,size uintptr) unsafe.Pointer { return a.a
 func (a *bindingArena) close() { for _, p := range a.pointers { C.free(p) } }
 func (a *bindingArena) fail(message string) { panic(message) }
 func bindingCall[T any](f func() T) (T,error) { return f(),nil }
-func bindingCheck(f func() int32) { if f()!=0 { panic("native failure") } }
-func bindingAdmission(_ uint32,_ uint64) func() { return func(){} }
+func bindingCheck(f func(*C.mln_diagnostic) int32) { if f(nil)!=0 { panic("native failure") } }
+func bindingAdmission(_ uint32,_ uint64) {}
 func bindingCount[T ~uint16 | ~uint32](n int) T { if uint64(T(n)) != uint64(n) { panic("overflow") }; return T(n) }
 func bindingCountLike[T ~uint16 | ~uint32](_ T,n int) T { if uint64(T(n)) != uint64(n) { panic("overflow") }; return T(n) }
 func bindingLength(n uint64) int { return int(n) }
@@ -139,6 +142,7 @@ func TestRoundtrip(t *testing.T) {
             (include / "api.h").write_text("""
 #define BIND(x) __attribute__((annotate("mln:" x)))
 typedef int mln_status;
+typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
 typedef unsigned long long mln_forest BIND("kind=handle;release=mln_forest_close;dispose=mln_forest_close;parent=none");
 typedef unsigned long long mln_seed BIND("kind=handle;release=mln_seed_close;dispose=mln_seed_close;parent=none");
 typedef unsigned long long mln_tree BIND("kind=handle;release=mln_tree_close;dispose=mln_tree_close;parent=mln_forest");
@@ -146,7 +150,7 @@ BIND("execution=immediate") void mln_forest_close(mln_forest forest);
 BIND("execution=immediate") void mln_seed_close(mln_seed seed);
 BIND("execution=immediate") void mln_tree_close(mln_tree tree);
 BIND("execution=immediate")
-mln_status mln_seed_plant(mln_seed seed, mln_forest forest, mln_tree *out_tree BIND("direction=out;ownership=owned"));
+mln_status mln_seed_plant(mln_seed seed, mln_forest forest, mln_tree *out_tree BIND("direction=out;ownership=owned"), mln_diagnostic *out_diagnostic);
 """)
             api = parse_headers(include)
             validate(api)
@@ -161,12 +165,13 @@ mln_status mln_seed_plant(mln_seed seed, mln_forest forest, mln_tree *out_tree B
 #include <stdbool.h>
 #define BIND(x) __attribute__((annotate("mln:" x)))
 typedef int mln_status;
+typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
 typedef unsigned long long mln_ticket BIND("kind=handle;release=mln_ticket_release;parent=none");
 typedef void (*release_context)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
 typedef void (*cancel)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
 BIND("execution=immediate") void mln_ticket_release(mln_ticket ticket);
 BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled")
-mln_status mln_ticket_on_cancel(mln_ticket ticket, cancel callback, void *context BIND("kind=context"), release_context release, bool *cancelled BIND("direction=out"));
+mln_status mln_ticket_on_cancel(mln_ticket ticket, cancel callback, void *context BIND("kind=context"), release_context release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
             api = parse_headers(include)
             validate(api)
@@ -176,7 +181,7 @@ mln_status mln_ticket_on_cancel(mln_ticket ticket, cancel callback, void *contex
             source,
         )
         self.assertIn(
-            "C.mln_ticket_on_cancel(C.mln_ticket(raw), nativeCallback, context, nativeRelease, &rejected)",
+            "C.mln_ticket_on_cancel(C.mln_ticket(raw), nativeCallback, context, nativeRelease, &rejected, diagnostic)",
             source,
         )
         self.assertIn(

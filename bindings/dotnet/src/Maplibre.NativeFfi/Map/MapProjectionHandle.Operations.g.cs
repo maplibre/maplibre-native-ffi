@@ -27,9 +27,9 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable
         nativeId = handle.Value;
         state = new NativeHandleState<MlnMapProjection>(
             handle,
-            static live => NativeMethods.mln_map_projection_close(live),
+            static (live, diagnostic) => NativeMethods.mln_map_projection_close(live, diagnostic),
             nameof(MapProjectionHandle),
-            static live => NativeMethods.mln_map_projection_close(live)
+            static (live, diagnostic) => NativeMethods.mln_map_projection_close(live, diagnostic)
         );
     }
 
@@ -44,7 +44,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable
         catch
         {
             if (owner is null)
-                NativeMethods.mln_map_projection_close(handle);
+                NativeMethods.mln_map_projection_close(handle, null);
             else
                 owner.state.Retire();
             throw;
@@ -86,7 +86,15 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable
             "mln_map_projection_get_camera"
         );
         var outCamera = new mln_camera_options { size = (uint)sizeof(mln_camera_options) };
-        NativeStatus.Check(NativeMethods.mln_map_projection_get_camera(read.Handle, &outCamera));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_map_projection_get_camera(
+                read.Handle,
+                &outCamera,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return CopyCameraOptions(outCamera);
     }
 
@@ -99,12 +107,15 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable
             "mln_map_projection_lat_lng_for_pixel"
         );
         var outCoordinate = default(mln_lat_lng);
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_map_projection_lat_lng_for_pixel(
                 read.Handle,
                 NativeScreenPoint(point),
-                &outCoordinate
-            )
+                &outCoordinate,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return CopyLatLng(outCoordinate);
     }
@@ -118,12 +129,15 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable
             "mln_map_projection_lat_lng_for_pixel_unwrapped"
         );
         var outCoordinate = default(mln_lat_lng);
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_map_projection_lat_lng_for_pixel_unwrapped(
                 read.Handle,
                 NativeScreenPoint(point),
-                &outCoordinate
-            )
+                &outCoordinate,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return CopyLatLng(outCoordinate);
     }
@@ -137,12 +151,15 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable
             "mln_map_projection_meters_per_pixel_at_latitude"
         );
         double outMetersPerPixel = default;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_map_projection_meters_per_pixel_at_latitude(
                 read.Handle,
                 latitude,
-                &outMetersPerPixel
-            )
+                &outMetersPerPixel,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return outMetersPerPixel;
     }
@@ -156,12 +173,15 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable
             "mln_map_projection_pixel_for_lat_lng"
         );
         var outPoint = default(mln_screen_point);
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_map_projection_pixel_for_lat_lng(
                 read.Handle,
                 NativeLatLng(coordinate),
-                &outPoint
-            )
+                &outPoint,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return CopyScreenPoint(outPoint);
     }
@@ -174,7 +194,15 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable
             "mln_map_projection_set_camera"
         );
         var nativeCamera = NativeCameraOptions(camera);
-        NativeStatus.Check(NativeMethods.mln_map_projection_set_camera(Handle, &nativeCamera));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_map_projection_set_camera(
+                Handle,
+                &nativeCamera,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
     }
 
     public void SetVisibleCoordinates(LatLng[] coordinates, EdgeInsets padding)
@@ -185,13 +213,16 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable
             this,
             "mln_map_projection_set_visible_coordinates"
         );
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_map_projection_set_visible_coordinates(
                 Handle,
                 scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
                 checked((nuint)coordinates.Length),
-                NativeEdgeInsets(padding)
-            )
+                NativeEdgeInsets(padding),
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         scope.Accept();
     }
@@ -204,12 +235,15 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable
             "mln_map_projection_set_visible_geometry"
         );
         using var nativeGeometry = NativeStringView.From(geometry, nameof(geometry));
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
             NativeMethods.mln_map_projection_set_visible_geometry(
                 Handle,
                 nativeGeometry.Value,
-                NativeEdgeInsets(padding)
-            )
+                NativeEdgeInsets(padding),
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
     }
 }

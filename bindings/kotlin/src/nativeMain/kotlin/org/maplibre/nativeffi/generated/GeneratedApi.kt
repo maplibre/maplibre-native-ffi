@@ -6,7 +6,7 @@ import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 @OptIn(ExperimentalForeignApi::class)
 public actual object GeneratedApi {
@@ -18,13 +18,14 @@ public actual object GeneratedApi {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(null, "mln_android_init")
     return memScoped {
       val arena = this
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         mln_android_init(
           (jniEnv.address).toCPointer<ByteVar>(),
           (jniClass.address).toCPointer<ByteVar>(),
           (context.address).toCPointer<ByteVar>(),
+          diagnostic,
         )
-      )
+      }
       Unit
     }
   }
@@ -170,14 +171,15 @@ public actual object GeneratedApi {
     return memScoped {
       val arena = this
       val output = arena.alloc<ULongVar>().also { it.value = 0uL }
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         mln_geojson_source_data_create(
           GeneratedValues.byteView(arena, data).pointed.readValue(),
           if (options == null) null
           else GeneratedValues.writeGeojsonSourceOptions(arena, options!!),
           output.ptr,
+          diagnostic,
         )
-      )
+      }
       adoptOwned(
         output.value,
         { GeneratedOwnerDisposal.geojsonSourceData(it.toLong()) },
@@ -219,7 +221,7 @@ public actual object GeneratedApi {
         response.bindingAddress,
         "mln_http_header_transform_response_set",
       )
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         mln_http_header_transform_response_set(
           (response.bindingAddress.also { response.bindingScope.ensureActive() }).toCPointer<
             mln_http_header_transform_response
@@ -228,8 +230,9 @@ public actual object GeneratedApi {
           name.encodeToByteArray().size.convert(),
           GeneratedValues.rawBytes(arena, valueValue.encodeToByteArray()),
           valueValue.encodeToByteArray().size.convert(),
+          diagnostic,
         )
-      )
+      }
     }
   }
 
@@ -241,12 +244,13 @@ public actual object GeneratedApi {
     return memScoped {
       val arena = this
       val output = arena.alloc<mln_lat_lng>()
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         mln_lat_lng_for_projected_meters(
           GeneratedValues.writeProjectedMeters(arena, meters).pointed.readValue(),
           output.ptr,
+          diagnostic,
         )
-      )
+      }
       GeneratedValues.readLatLng(output)
     }
   }
@@ -255,7 +259,7 @@ public actual object GeneratedApi {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(null, "mln_log_clear_callback")
     return memScoped {
       val arena = this
-      BindingStatus.check(mln_log_clear_callback())
+      NativeDiagnostics.check { diagnostic -> mln_log_clear_callback(diagnostic) }
       Unit
     }
   }
@@ -267,7 +271,9 @@ public actual object GeneratedApi {
     )
     return memScoped {
       val arena = this
-      BindingStatus.check(mln_log_set_async_severity_mask(mask.rawValue))
+      NativeDiagnostics.check { diagnostic ->
+        mln_log_set_async_severity_mask(mask.rawValue, diagnostic)
+      }
       Unit
     }
   }
@@ -276,13 +282,14 @@ public actual object GeneratedApi {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(null, "mln_log_set_callback")
     org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope().use { registrations ->
       val token = registrations.register(GeneratedLogCallbackRegistration(callback))
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         mln_log_set_callback(
           GeneratedDirectCallbacks.LogCallbackStub,
           token.toCPointer<ByteVar>(),
           GeneratedDirectCallbacks.LogCallbackReleaseStub,
+          diagnostic,
         )
-      )
+      }
       registrations.accept(org.maplibre.nativeffi.internal.callback.CallbackOwner.global)
     }
   }
@@ -364,7 +371,7 @@ public actual object GeneratedApi {
     return memScoped {
       val arena = this
       val output = arena.alloc<UIntVar>()
-      BindingStatus.check(mln_network_status_get(output.ptr))
+      NativeDiagnostics.check { diagnostic -> mln_network_status_get(output.ptr, diagnostic) }
       NetworkStatus(output.value)
     }
   }
@@ -373,7 +380,7 @@ public actual object GeneratedApi {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(null, "mln_network_status_set")
     return memScoped {
       val arena = this
-      BindingStatus.check(mln_network_status_set(status.rawValue))
+      NativeDiagnostics.check { diagnostic -> mln_network_status_set(status.rawValue, diagnostic) }
       Unit
     }
   }
@@ -460,12 +467,13 @@ public actual object GeneratedApi {
     return memScoped {
       val arena = this
       val output = arena.alloc<mln_projected_meters>()
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         mln_projected_meters_for_lat_lng(
           GeneratedValues.writeLatLng(arena, coordinate).pointed.readValue(),
           output.ptr,
+          diagnostic,
         )
-      )
+      }
       GeneratedValues.readProjectedMeters(output)
     }
   }
@@ -504,13 +512,14 @@ public actual object GeneratedApi {
     )
     val out0 = arena.alloc<UIntVar>()
     val out1 = arena.alloc<UIntVar>()
-    BindingStatus.check(
+    NativeDiagnostics.check { diagnostic ->
       mln_render_target_extent_physical_size(
         GeneratedValues.writeRenderTargetExtent(arena, extent),
         out0.ptr,
         out1.ptr,
+        diagnostic,
       )
-    )
+    }
     RenderTargetExtentPhysicalSizeResult(width = out0.value, height = out1.value)
   }
 
@@ -585,15 +594,16 @@ public actual object GeneratedApi {
         response.bindingAddress,
         "mln_resource_transform_response_set_url",
       )
-      BindingStatus.check(
+      NativeDiagnostics.check { diagnostic ->
         mln_resource_transform_response_set_url(
           (response.bindingAddress.also { response.bindingScope.ensureActive() }).toCPointer<
             mln_resource_transform_response
           >()!!,
           GeneratedValues.rawBytes(arena, url.encodeToByteArray()),
           url.encodeToByteArray().size.convert(),
+          diagnostic,
         )
-      )
+      }
     }
   }
 
@@ -608,12 +618,13 @@ public actual object GeneratedApi {
         memScoped {
           val arena = this
           val output = arena.alloc<ULongVar>().also { it.value = 0uL }
-          BindingStatus.check(
+          NativeDiagnostics.check { diagnostic ->
             mln_runtime_create(
               GeneratedValues.writeRuntimeOptions(arena, options, registrations),
               output.ptr,
+              diagnostic,
             )
-          )
+          }
           run {
             val owner =
               adoptOwned(
@@ -733,18 +744,6 @@ public actual object GeneratedApi {
       val arena = this
       val nativeResult = mln_texture_image_info_default()
       nativeResult.useContents { GeneratedValues.readTextureImageInfo(this) }
-    }
-  }
-
-  public actual fun threadLastErrorMessage(): String {
-    org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(
-      null,
-      "mln_thread_last_error_message",
-    )
-    return memScoped {
-      val arena = this
-      val nativeResult = mln_thread_last_error_message()
-      nativeResult!!.toKString()
     }
   }
 

@@ -440,13 +440,13 @@ public sealed class ResourceProviderTests
 
     [BindingSpecTest("")]
     [Fact]
-    public void DecisionStatePreservesAcceptedAndInFlightCompletionButRollsBackRejection()
+    public unsafe void DecisionStatePreservesAcceptedAndInFlightCompletionButRollsBackRejection()
     {
         var released = 0;
         NativeHandleState<MlnResourceRequest> Create() =>
             new(
                 SyntheticHandles.ResourceRequest(1),
-                _ =>
+                (_, _) =>
                 {
                     released++;
                     return mln_status.MLN_STATUS_OK;

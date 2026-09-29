@@ -8,6 +8,8 @@ import '../c/maplibre_native_c.g.dart' as raw;
 import '../memory/memory.dart';
 import '../status/status.dart';
 
+/// Submits an operation and returns the status of the native call, which
+/// writes its message to [nativeDiagnostic].
 typedef NativeCompletionStart = int Function(Pointer<raw.mln_completion>);
 typedef NativeCompletionDecoder<T> = T Function(raw.mln_completion_result);
 
@@ -118,7 +120,7 @@ Future<T> startNativeCompletion<T>({
   try {
     withNativeArena((arena) {
       final completion = arena<raw.mln_completion>();
-      checkNativeStatus(
+      checkNativeCall(
         raw.mln_adapter_dart_completion_create(
           copyKind,
           elementSize,
@@ -128,19 +130,16 @@ Future<T> startNativeCompletion<T>({
               .nativePort,
           token,
           completion,
+          nativeDiagnostic,
         ),
-        threadLastErrorMessage,
       );
       var rejected = false;
       try {
         final status = start(completion);
         if (status != nativeStatusOk) {
-          // The rejection clears the thread-local diagnostic, so read the
-          // submission's message before rejecting.
-          final diagnostic = threadLastErrorMessage();
           raw.mln_adapter_completion_reject(completion);
           rejected = true;
-          checkNativeStatus(status, () => diagnostic);
+          checkNativeCall(status);
         }
       } catch (_) {
         if (!rejected) raw.mln_adapter_completion_reject(completion);

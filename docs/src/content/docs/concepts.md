@@ -167,8 +167,10 @@ copied source ID that remains meaningful after the source handle closes.
 
 The status returned by an immediate call reports validation or inspection
 failure. The status returned by a one-shot submission reports whether native
-code accepted and copied it. Its completion reports an asynchronous application
-failure and a borrowed diagnostic that the binding copies before returning.
+code accepted and copied it. Either call writes its failure message into the
+caller's `mln_diagnostic`, the last parameter of every status-returning
+function. A submission's completion reports an asynchronous application failure
+and a borrowed diagnostic that the binding copies before returning.
 
 Each binding surfaces these channels in its own idiom: an exception, a result
 type, an asynchronous result, or an event stream. Render-driver calls continue

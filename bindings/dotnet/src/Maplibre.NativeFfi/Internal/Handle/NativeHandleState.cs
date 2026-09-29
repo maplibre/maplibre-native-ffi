@@ -5,7 +5,7 @@ using Maplibre.NativeFfi.Internal.Status;
 
 namespace Maplibre.NativeFfi.Internal.Pointer;
 
-internal delegate mln_status StatusDestroy<T>(T handle)
+internal unsafe delegate mln_status StatusDestroy<T>(T handle, mln_diagnostic* diagnostic)
     where T : unmanaged, IMlnHandle;
 
 /// <summary>
@@ -101,7 +101,7 @@ internal sealed unsafe class NativeHandleState<T>
             {
                 if (
                     disposeAbandoned is not null
-                    && disposeAbandoned(handle) == mln_status.MLN_STATUS_OK
+                    && disposeAbandoned(handle, null) == mln_status.MLN_STATUS_OK
                 )
                 {
                     closed = true;
@@ -243,10 +243,11 @@ internal sealed unsafe class NativeHandleState<T>
                 return;
             }
         }
+        mln_diagnostic diagnostic;
         mln_status status;
         try
         {
-            status = release(handle);
+            status = release(handle, NativeDiagnostic.Prepare(&diagnostic));
         }
         catch
         {
@@ -257,7 +258,7 @@ internal sealed unsafe class NativeHandleState<T>
         if (status != mln_status.MLN_STATUS_OK)
         {
             EndFailedRelease();
-            NativeStatus.Check(status);
+            NativeStatus.Check(status, &diagnostic);
         }
 
         EndSuccessfulRelease();

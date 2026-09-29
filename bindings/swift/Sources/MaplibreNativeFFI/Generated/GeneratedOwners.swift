@@ -4,10 +4,11 @@ internal import CMaplibreNativeC
 import Foundation
 
 struct NativeAcquiredFrameHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_acquired_frame_dispose(raw) == MLN_STATUS_OK
+  let raw: UInt64; func disposeAbandoned() -> Bool {
+    mln_acquired_frame_dispose(
+      raw,
+      nil
+    ) == MLN_STATUS_OK
   }
 }
 
@@ -130,8 +131,10 @@ public final class GeojsonSourceDataHandle: @unchecked Sendable {
 
 struct NativeMapHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned() -> Bool {
-    mln_map_dispose(raw) ==
-      MLN_STATUS_OK
+    mln_map_dispose(
+      raw,
+      nil
+    ) == MLN_STATUS_OK
   }
 }
 
@@ -159,10 +162,11 @@ public final class MapHandle: @unchecked Sendable {
 }
 
 struct NativeMapProjectionHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_map_projection_close(raw) == MLN_STATUS_OK
+  let raw: UInt64; func disposeAbandoned() -> Bool {
+    mln_map_projection_close(
+      raw,
+      nil
+    ) == MLN_STATUS_OK
   }
 }
 
@@ -221,10 +225,11 @@ public final class RenderFrameBatchHandle: @unchecked Sendable {
 }
 
 struct NativeRenderSessionHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_render_session_dispose(raw) == MLN_STATUS_OK
+  let raw: UInt64; func disposeAbandoned() -> Bool {
+    mln_render_session_dispose(
+      raw,
+      nil
+    ) == MLN_STATUS_OK
   }
 }
 
@@ -289,8 +294,10 @@ public final class ResourceRequestHandle: @unchecked Sendable {
 
 struct NativeRuntimeHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned() -> Bool {
-    mln_runtime_dispose(raw) ==
-      MLN_STATUS_OK
+    mln_runtime_dispose(
+      raw,
+      nil
+    ) == MLN_STATUS_OK
   }
 }
 

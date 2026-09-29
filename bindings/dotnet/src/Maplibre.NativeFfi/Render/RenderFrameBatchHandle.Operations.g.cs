@@ -27,13 +27,13 @@ public sealed unsafe partial class RenderFrameBatchHandle : IDisposable
         nativeId = handle.Value;
         state = new NativeHandleState<MlnRenderFrameBatch>(
             handle,
-            static live =>
+            static (live, _) =>
             {
                 NativeMethods.mln_render_frame_batch_release(live);
                 return mln_status.MLN_STATUS_OK;
             },
             nameof(RenderFrameBatchHandle),
-            static live =>
+            static (live, _) =>
             {
                 NativeMethods.mln_render_frame_batch_release(live);
                 return mln_status.MLN_STATUS_OK;
@@ -85,7 +85,15 @@ public sealed unsafe partial class RenderFrameBatchHandle : IDisposable
             "mln_render_frame_batch_count"
         );
         nuint outCount = default;
-        NativeStatus.Check(NativeMethods.mln_render_frame_batch_count(read.Handle, &outCount));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_render_frame_batch_count(
+                read.Handle,
+                &outCount,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return (ulong)outCount;
     }
 
@@ -101,8 +109,15 @@ public sealed unsafe partial class RenderFrameBatchHandle : IDisposable
         {
             size = (uint)sizeof(mln_render_frame_result),
         };
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_render_frame_batch_get(read.Handle, checked((nuint)index), &outResult)
+            NativeMethods.mln_render_frame_batch_get(
+                read.Handle,
+                checked((nuint)index),
+                &outResult,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return CopyRenderFrameResult(outResult);
     }

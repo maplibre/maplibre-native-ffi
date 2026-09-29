@@ -5756,7 +5756,7 @@ fn _default_webgpu_surface_descriptor(py: Python<'_>) -> PyResult<Py<PyAny>> {
 unsafe extern "C" fn generated_dispose_mln_acquired_frame(
     handle: sys::mln_acquired_frame,
 ) -> sys::mln_status {
-    unsafe { sys::mln_acquired_frame_dispose(handle) }
+    unsafe { sys::mln_acquired_frame_dispose(handle, std::ptr::null_mut()) }
 }
 
 unsafe extern "C" fn generated_dispose_mln_event_batch(
@@ -5774,13 +5774,13 @@ unsafe extern "C" fn generated_dispose_mln_geojson_source_data(
 }
 
 unsafe extern "C" fn generated_dispose_mln_map(handle: sys::mln_map) -> sys::mln_status {
-    unsafe { sys::mln_map_dispose(handle) }
+    unsafe { sys::mln_map_dispose(handle, std::ptr::null_mut()) }
 }
 
 unsafe extern "C" fn generated_dispose_mln_map_projection(
     handle: sys::mln_map_projection,
 ) -> sys::mln_status {
-    unsafe { sys::mln_map_projection_close(handle) }
+    unsafe { sys::mln_map_projection_close(handle, std::ptr::null_mut()) }
 }
 
 unsafe extern "C" fn generated_dispose_mln_render_frame_batch(
@@ -5793,11 +5793,11 @@ unsafe extern "C" fn generated_dispose_mln_render_frame_batch(
 unsafe extern "C" fn generated_dispose_mln_render_session(
     handle: sys::mln_render_session,
 ) -> sys::mln_status {
-    unsafe { sys::mln_render_session_dispose(handle) }
+    unsafe { sys::mln_render_session_dispose(handle, std::ptr::null_mut()) }
 }
 
 unsafe extern "C" fn generated_dispose_mln_runtime(handle: sys::mln_runtime) -> sys::mln_status {
-    unsafe { sys::mln_runtime_dispose(handle) }
+    unsafe { sys::mln_runtime_dispose(handle, std::ptr::null_mut()) }
 }
 
 #[pymethods]
@@ -5817,12 +5817,12 @@ impl AcquiredFrameHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_frame: sys::mln_metal_owned_texture_frame = unsafe { std::mem::zeroed() };
         out_frame.size = std::mem::size_of::<sys::mln_metal_owned_texture_frame>() as _;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_acquired_frame_get_metal_texture(handle, &mut out_frame)
+                sys::mln_acquired_frame_get_metal_texture(handle, &mut out_frame, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_metal_owned_texture_frame(
             py, &out_frame,
         )?)
@@ -5842,12 +5842,12 @@ impl AcquiredFrameHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_frame: sys::mln_opengl_owned_texture_frame = unsafe { std::mem::zeroed() };
         out_frame.size = std::mem::size_of::<sys::mln_opengl_owned_texture_frame>() as _;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_acquired_frame_get_opengl_texture(handle, &mut out_frame)
+                sys::mln_acquired_frame_get_opengl_texture(handle, &mut out_frame, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_opengl_owned_texture_frame(
             py, &out_frame,
         )?)
@@ -5867,12 +5867,12 @@ impl AcquiredFrameHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_sync: sys::mln_gpu_sync = unsafe { sys::mln_gpu_sync_default() };
         out_sync.size = std::mem::size_of::<sys::mln_gpu_sync>() as _;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_acquired_frame_get_producer_sync(handle, &mut out_sync)
+                sys::mln_acquired_frame_get_producer_sync(handle, &mut out_sync, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_gpu_sync(py, &out_sync)?)
     }
     #[pyo3(signature = ())]
@@ -5890,12 +5890,12 @@ impl AcquiredFrameHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_result: sys::mln_render_frame_result = unsafe { std::mem::zeroed() };
         out_result.size = std::mem::size_of::<sys::mln_render_frame_result>() as _;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_acquired_frame_get_result(handle, &mut out_result)
+                sys::mln_acquired_frame_get_result(handle, &mut out_result, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_render_frame_result(py, &out_result)?)
     }
     #[pyo3(signature = ())]
@@ -5913,12 +5913,12 @@ impl AcquiredFrameHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_frame: sys::mln_vulkan_owned_texture_frame = unsafe { std::mem::zeroed() };
         out_frame.size = std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as _;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_acquired_frame_get_vulkan_texture(handle, &mut out_frame)
+                sys::mln_acquired_frame_get_vulkan_texture(handle, &mut out_frame, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_vulkan_owned_texture_frame(
             py, &out_frame,
         )?)
@@ -5938,12 +5938,12 @@ impl AcquiredFrameHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_frame: sys::mln_webgpu_owned_texture_frame = unsafe { std::mem::zeroed() };
         out_frame.size = std::mem::size_of::<sys::mln_webgpu_owned_texture_frame>() as _;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_acquired_frame_get_webgpu_texture(handle, &mut out_frame)
+                sys::mln_acquired_frame_get_webgpu_texture(handle, &mut out_frame, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_webgpu_owned_texture_frame(
             py, &out_frame,
         )?)
@@ -5972,12 +5972,12 @@ impl AcquiredFrameHandle {
             return Ok(py.None());
         };
         let mut handle = reservation.handle();
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_acquired_frame_release(&mut handle, &consumer_completion_value)
+                sys::mln_acquired_frame_release(&mut handle, &consumer_completion_value, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         reservation.commit();
         Ok(py.None())
     }
@@ -6014,9 +6014,12 @@ impl BufferHandle {
         let read = GeneratedReadReservation::new(&self.state)?;
         let handle = read.handle;
         let mut out_view: sys::mln_buffer_view = unsafe { std::mem::zeroed() };
-        let result =
-            unsafe { generated_native_call(py, || sys::mln_buffer_get(handle, &mut out_view)) };
-        maplibre_core::check(result).map_err(map_error)?;
+        let result = maplibre_core::check(|diagnostic| unsafe {
+            generated_native_call(py, || {
+                sys::mln_buffer_get(handle, &mut out_view, diagnostic)
+            })
+        });
+        result.map_err(map_error)?;
         Ok(PyBytes::new(py, unsafe {
             generated_slice(out_view.data.cast::<u8>(), out_view.size)?
         })
@@ -6040,10 +6043,12 @@ impl EventBatchHandle {
         let handle = read.handle;
         let mut out_view: sys::mln_runtime_event_batch_view = unsafe { std::mem::zeroed() };
         out_view.size = std::mem::size_of::<sys::mln_runtime_event_batch_view>() as _;
-        let result = unsafe {
-            generated_native_call(py, || sys::mln_event_batch_get(handle, &mut out_view))
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        let result = maplibre_core::check(|diagnostic| unsafe {
+            generated_native_call(py, || {
+                sys::mln_event_batch_get(handle, &mut out_view, diagnostic)
+            })
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_runtime_event_batch_view(py, &out_view)?)
     }
     #[pyo3(signature = ())]
@@ -6101,7 +6106,7 @@ impl HttpHeaderTransformResponseScope {
         let value_view = storage.buffer(value.clone(), true)?;
         let handle =
             self.scope.pointer(self.native)? as *mut sys::mln_http_header_transform_response;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_http_header_transform_response_set(
                     handle,
@@ -6109,10 +6114,11 @@ impl HttpHeaderTransformResponseScope {
                     name_view.size,
                     value_view.data.cast(),
                     value_view.size,
+                    diagnostic,
                 )
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(py.None())
     }
 }
@@ -6143,7 +6149,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_color_relief_layer(
                     handle,
@@ -6151,6 +6157,7 @@ impl MapHandle {
                     source_id_value,
                     before_layer_id_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6181,13 +6188,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        let future = submit_python_command_future(py, |completion| unsafe {
+        let future = submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_custom_geometry_source(
                     handle,
                     source_id_value,
                     &options_value,
                     completion,
+                    diagnostic,
                 )
             })
         })?;
@@ -6221,13 +6229,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        let future = submit_python_command_future(py, |completion| unsafe {
+        let future = submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_custom_mvt_vector_source(
                     handle,
                     source_id_value,
                     &options_value,
                     completion,
+                    diagnostic,
                 )
             })
         })?;
@@ -6259,13 +6268,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_geojson_source_data(
                     handle,
                     source_id_value,
                     data_handle,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6302,7 +6312,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_geojson_source_url(
                     handle,
@@ -6312,6 +6322,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6340,7 +6351,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_hillshade_layer(
                     handle,
@@ -6348,6 +6359,7 @@ impl MapHandle {
                     source_id_value,
                     before_layer_id_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6384,7 +6396,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_image_source_image(
                     handle,
@@ -6393,6 +6405,7 @@ impl MapHandle {
                     coordinates_values.len(),
                     &image_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6424,7 +6437,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_image_source_url(
                     handle,
@@ -6433,6 +6446,7 @@ impl MapHandle {
                     coordinates_values.len(),
                     url_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6459,13 +6473,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_location_indicator_layer(
                     handle,
                     layer_id_value,
                     before_layer_id_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6506,7 +6521,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_raster_dem_source_tiles(
                     handle,
@@ -6517,6 +6532,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6553,7 +6569,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_raster_dem_source_url(
                     handle,
@@ -6563,6 +6579,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6603,7 +6620,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_raster_source_tiles(
                     handle,
@@ -6614,6 +6631,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6650,7 +6668,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_raster_source_url(
                     handle,
@@ -6660,6 +6678,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6686,13 +6705,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_style_layer_json(
                     handle,
                     layer_json_value,
                     before_layer_id_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6718,13 +6738,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_style_source_json(
                     handle,
                     source_id_value,
                     source_json_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6765,7 +6786,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_vector_source_tiles(
                     handle,
@@ -6776,6 +6797,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6812,7 +6834,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_add_vector_source_url(
                     handle,
@@ -6822,6 +6844,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -6850,9 +6873,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_apply_camera_delta(handle, &delta_value, completion)
+                sys::mln_map_apply_camera_delta(handle, &delta_value, completion, diagnostic)
             })
         })
     }
@@ -6888,7 +6911,7 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_map_camera_for_geometry(
                         handle,
@@ -6897,6 +6920,7 @@ impl MapHandle {
                             .as_ref()
                             .map_or(std::ptr::null(), |value| value),
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -6938,7 +6962,7 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_map_camera_for_lat_lng_bounds(
                         handle,
@@ -6947,6 +6971,7 @@ impl MapHandle {
                             .as_ref()
                             .map_or(std::ptr::null(), |value| value),
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -6992,7 +7017,7 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_map_camera_for_lat_lngs(
                         handle,
@@ -7002,6 +7027,7 @@ impl MapHandle {
                             .as_ref()
                             .map_or(std::ptr::null(), |value| value),
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -7026,8 +7052,10 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_map_camera_query(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_map_camera_query(handle, completion, diagnostic)
+                })
             },
             |py, result| {
                 let value = completion_value::<sys::mln_camera_query_result>(result)?;
@@ -7051,12 +7079,17 @@ impl MapHandle {
         let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
         out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
         let mut out_generation: u64 = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_camera_snapshot_get(handle, &mut out_camera, &mut out_generation)
+                sys::mln_map_camera_snapshot_get(
+                    handle,
+                    &mut out_camera,
+                    &mut out_generation,
+                    diagnostic,
+                )
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         let dict = PyDict::new(py);
         dict.set_item(
             "camera",
@@ -7081,8 +7114,10 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
-            generated_native_call(py, || sys::mln_map_cancel_transitions(handle, completion))
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
+            generated_native_call(py, || {
+                sys::mln_map_cancel_transitions(handle, completion, diagnostic)
+            })
         })
     }
     #[pyo3(signature = (layer_id))]
@@ -7106,9 +7141,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_copy_layer_source_id(handle, layer_id_value, completion)
+                    sys::mln_map_copy_layer_source_id(
+                        handle,
+                        layer_id_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7145,9 +7185,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_copy_layer_source_layer(handle, layer_id_value, completion)
+                    sys::mln_map_copy_layer_source_layer(
+                        handle,
+                        layer_id_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7184,12 +7229,13 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_map_copy_style_image_premultiplied_rgba8(
                         handle,
                         image_id_value,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -7231,9 +7277,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_copy_style_image_stretches(handle, image_id_value, completion)
+                    sys::mln_map_copy_style_image_stretches(
+                        handle,
+                        image_id_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7266,9 +7317,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_copy_style_source_attribution(handle, source_id_value, completion)
+                    sys::mln_map_copy_style_source_attribution(
+                        handle,
+                        source_id_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7308,9 +7364,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_copy_style_source_url(handle, source_id_value, completion)
+                    sys::mln_map_copy_style_source_url(
+                        handle,
+                        source_id_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7342,8 +7403,10 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
-            generated_native_call(py, || sys::mln_map_dump_debug_logs(handle, completion))
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
+            generated_native_call(py, || {
+                sys::mln_map_dump_debug_logs(handle, completion, diagnostic)
+            })
         })
     }
     #[pyo3(signature = (selector))]
@@ -7368,9 +7431,9 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_get_feature_state(handle, &selector_value, completion)
+                    sys::mln_map_get_feature_state(handle, &selector_value, completion, diagnostic)
                 })
             },
             |py, result| {
@@ -7398,8 +7461,10 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_map_get_global_state(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_map_get_global_state(handle, completion, diagnostic)
+                })
             },
             |py, result| {
                 let value = completion_value::<sys::mln_buffer_view>(result)?;
@@ -7432,9 +7497,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_get_image_source_coordinates(handle, source_id_value, completion)
+                    sys::mln_map_get_image_source_coordinates(
+                        handle,
+                        source_id_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7466,9 +7536,9 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_get_layer_filter(handle, layer_id_value, completion)
+                    sys::mln_map_get_layer_filter(handle, layer_id_value, completion, diagnostic)
                 })
             },
             |py, result| {
@@ -7511,13 +7581,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_map_get_layer_property(
                         handle,
                         layer_id_value,
                         property_name_value,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -7559,9 +7630,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_get_style_image_info(handle, image_id_value, completion)
+                    sys::mln_map_get_style_image_info(
+                        handle,
+                        image_id_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7594,9 +7670,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_get_style_layer_info(handle, layer_id_value, completion)
+                    sys::mln_map_get_style_layer_info(
+                        handle,
+                        layer_id_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7629,9 +7710,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_get_style_layer_json(handle, layer_id_value, completion)
+                    sys::mln_map_get_style_layer_json(
+                        handle,
+                        layer_id_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7672,9 +7758,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_get_style_light_property(handle, property_name_value, completion)
+                    sys::mln_map_get_style_light_property(
+                        handle,
+                        property_name_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7715,9 +7806,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_get_style_source_info(handle, source_id_value, completion)
+                    sys::mln_map_get_style_source_info(
+                        handle,
+                        source_id_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7750,9 +7846,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_get_style_source_tile_urls(handle, source_id_value, completion)
+                    sys::mln_map_get_style_source_tile_urls(
+                        handle,
+                        source_id_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7781,9 +7882,9 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_get_style_transition_options(handle, completion)
+                    sys::mln_map_get_style_transition_options(handle, completion, diagnostic)
                 })
             },
             |py, result| {
@@ -7813,13 +7914,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_invalidate_custom_geometry_source_region(
                     handle,
                     source_id_value,
                     bounds_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -7845,13 +7947,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_invalidate_custom_geometry_source_tile(
                     handle,
                     source_id_value,
                     tile_id_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -7877,13 +7980,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_invalidate_custom_mvt_vector_source_tile(
                     handle,
                     source_id_value,
                     tile_id_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -7914,9 +8018,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_lat_lng_bounds_for_camera(handle, &camera_value, completion)
+                    sys::mln_map_lat_lng_bounds_for_camera(
+                        handle,
+                        &camera_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -7951,12 +8060,13 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_map_lat_lng_bounds_for_camera_unwrapped(
                         handle,
                         &camera_value,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -7983,9 +8093,9 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_lat_lng_for_pixel(handle, point_value, completion)
+                    sys::mln_map_lat_lng_for_pixel(handle, point_value, completion, diagnostic)
                 })
             },
             |py, result| {
@@ -8015,9 +8125,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_lat_lng_for_pixel_unwrapped(handle, point_value, completion)
+                    sys::mln_map_lat_lng_for_pixel_unwrapped(
+                        handle,
+                        point_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -8051,13 +8166,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_map_lat_lngs_for_pixels(
                         handle,
                         points_values.as_ptr(),
                         points_values.len(),
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -8095,13 +8211,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_map_lat_lngs_for_pixels_unwrapped(
                         handle,
                         points_values.as_ptr(),
                         points_values.len(),
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -8129,8 +8246,10 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_map_list_style_layer_ids(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_map_list_style_layer_ids(handle, completion, diagnostic)
+                })
             },
             |py, result| {
                 let list = PyList::empty(py);
@@ -8161,8 +8280,10 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_map_list_style_layers(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_map_list_style_layers(handle, completion, diagnostic)
+                })
             },
             |py, result| {
                 let list = PyList::empty(py);
@@ -8188,9 +8309,9 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_list_style_source_ids(handle, completion)
+                    sys::mln_map_list_style_source_ids(handle, completion, diagnostic)
                 })
             },
             |py, result| {
@@ -8222,8 +8343,10 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_map_loaded_style_json(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_map_loaded_style_json(handle, completion, diagnostic)
+                })
             },
             |py, result| {
                 let value = completion_value::<sys::mln_buffer_view>(result)?;
@@ -8250,9 +8373,11 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_meters_per_pixel_at_latitude(handle, latitude, completion)
+                    sys::mln_map_meters_per_pixel_at_latitude(
+                        handle, latitude, completion, diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -8283,13 +8408,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_move_style_layer(
                     handle,
                     layer_id_value,
                     before_layer_id_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -8315,9 +8441,9 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_pixel_for_lat_lng(handle, coordinate_value, completion)
+                    sys::mln_map_pixel_for_lat_lng(handle, coordinate_value, completion, diagnostic)
                 })
             },
             |py, result| {
@@ -8351,13 +8477,14 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_map_pixels_for_lat_lngs(
                         handle,
                         coordinates_values.as_ptr(),
                         coordinates_values.len(),
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -8385,8 +8512,10 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_owned_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_map_projection_create(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_map_projection_create(handle, completion, diagnostic)
+                })
             },
             |py, result| {
                 let raw = completion_value::<sys::mln_map_projection>(result)?;
@@ -8427,8 +8556,8 @@ impl MapHandle {
         let handle = reservation.handle();
         let future = submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_map_release(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || sys::mln_map_release(handle, completion, diagnostic))
             },
             py_none,
         )?;
@@ -8455,9 +8584,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_remove_feature_state(handle, &selector_value, completion)
+                sys::mln_map_remove_feature_state(handle, &selector_value, completion, diagnostic)
             })
         })
     }
@@ -8480,9 +8609,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_remove_style_image(handle, image_id_value, completion)
+                sys::mln_map_remove_style_image(handle, image_id_value, completion, diagnostic)
             })
         })
     }
@@ -8505,9 +8634,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_remove_style_layer(handle, layer_id_value, completion)
+                sys::mln_map_remove_style_layer(handle, layer_id_value, completion, diagnostic)
             })
         })
     }
@@ -8530,9 +8659,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_remove_style_source(handle, source_id_value, completion)
+                sys::mln_map_remove_style_source(handle, source_id_value, completion, diagnostic)
             })
         })
     }
@@ -8549,8 +8678,10 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
-            generated_native_call(py, || sys::mln_map_request_repaint(handle, completion))
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
+            generated_native_call(py, || {
+                sys::mln_map_request_repaint(handle, completion, diagnostic)
+            })
         })
     }
     #[pyo3(signature = ())]
@@ -8568,8 +8699,10 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_map_request_still_image(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_map_request_still_image(handle, completion, diagnostic)
+                })
             },
             py_none,
         )
@@ -8589,8 +8722,10 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
-            generated_native_call(py, || sys::mln_map_resize(handle, extent_value, completion))
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
+            generated_native_call(py, || {
+                sys::mln_map_resize(handle, extent_value, completion, diagnostic)
+            })
         })
     }
     #[pyo3(signature = (options=None))]
@@ -8613,9 +8748,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_bounds(handle, &options_value, completion)
+                sys::mln_map_set_bounds(handle, &options_value, completion, diagnostic)
             })
         })
     }
@@ -8642,7 +8777,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_custom_geometry_source_tile_data(
                     handle,
@@ -8650,6 +8785,7 @@ impl MapHandle {
                     tile_id_value,
                     data_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -8677,7 +8813,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_custom_mvt_vector_source_tile_data(
                     handle,
@@ -8685,6 +8821,7 @@ impl MapHandle {
                     tile_id_value,
                     data_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -8712,7 +8849,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_custom_mvt_vector_source_tile_error(
                     handle,
@@ -8720,6 +8857,7 @@ impl MapHandle {
                     tile_id_value,
                     message_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -8741,9 +8879,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_debug_options(handle, options, completion)
+                sys::mln_map_set_debug_options(handle, options, completion, diagnostic)
             })
         })
     }
@@ -8764,8 +8902,10 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
-            generated_native_call(py, || sys::mln_map_set_event_mask(handle, mask, completion))
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
+            generated_native_call(py, || {
+                sys::mln_map_set_event_mask(handle, mask, completion, diagnostic)
+            })
         })
     }
     #[pyo3(signature = (selector, input_state))]
@@ -8790,13 +8930,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_feature_state(
                     handle,
                     &selector_value,
                     input_state_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -8825,9 +8966,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_free_camera_options(handle, &options_value, completion)
+                sys::mln_map_set_free_camera_options(handle, &options_value, completion, diagnostic)
             })
         })
     }
@@ -8855,13 +8996,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_geojson_source_data(
                     handle,
                     source_id_value,
                     data_handle,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -8886,13 +9028,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_geojson_source_synchronous_tiling(
                     handle,
                     source_id_value,
                     enabled,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -8918,9 +9061,15 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_geojson_source_url(handle, source_id_value, url_value, completion)
+                sys::mln_map_set_geojson_source_url(
+                    handle,
+                    source_id_value,
+                    url_value,
+                    completion,
+                    diagnostic,
+                )
             })
         })
     }
@@ -8945,13 +9094,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_global_state_property(
                     handle,
                     property_name_value,
                     value_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -8981,7 +9131,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_image_source_coordinates(
                     handle,
@@ -8989,6 +9139,7 @@ impl MapHandle {
                     coordinates_values.as_ptr(),
                     coordinates_values.len(),
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9019,13 +9170,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_image_source_image(
                     handle,
                     source_id_value,
                     &image_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9051,9 +9203,15 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_image_source_url(handle, source_id_value, url_value, completion)
+                sys::mln_map_set_image_source_url(
+                    handle,
+                    source_id_value,
+                    url_value,
+                    completion,
+                    diagnostic,
+                )
             })
         })
     }
@@ -9083,7 +9241,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_layer_filter(
                     handle,
@@ -9092,6 +9250,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9116,9 +9275,15 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_layer_max_zoom(handle, layer_id_value, max_zoom, completion)
+                sys::mln_map_set_layer_max_zoom(
+                    handle,
+                    layer_id_value,
+                    max_zoom,
+                    completion,
+                    diagnostic,
+                )
             })
         })
     }
@@ -9142,9 +9307,15 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_layer_min_zoom(handle, layer_id_value, min_zoom, completion)
+                sys::mln_map_set_layer_min_zoom(
+                    handle,
+                    layer_id_value,
+                    min_zoom,
+                    completion,
+                    diagnostic,
+                )
             })
         })
     }
@@ -9171,7 +9342,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_layer_property(
                     handle,
@@ -9179,6 +9350,7 @@ impl MapHandle {
                     property_name_value,
                     value_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9204,13 +9376,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_layer_source_id(
                     handle,
                     layer_id_value,
                     source_id_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9237,13 +9410,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_layer_source_layer(
                     handle,
                     layer_id_value,
                     source_layer_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9268,9 +9442,15 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_layer_visibility(handle, layer_id_value, visibility, completion)
+                sys::mln_map_set_layer_visibility(
+                    handle,
+                    layer_id_value,
+                    visibility,
+                    completion,
+                    diagnostic,
+                )
             })
         })
     }
@@ -9294,13 +9474,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_location_indicator_accuracy_radius(
                     handle,
                     layer_id_value,
                     radius,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9325,13 +9506,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_location_indicator_bearing(
                     handle,
                     layer_id_value,
                     bearing,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9358,7 +9540,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_location_indicator_image_name(
                     handle,
@@ -9366,6 +9548,7 @@ impl MapHandle {
                     image_kind,
                     image_id_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9392,7 +9575,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_location_indicator_location(
                     handle,
@@ -9400,6 +9583,7 @@ impl MapHandle {
                     coordinate_value,
                     altitude,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9428,9 +9612,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_projection_mode(handle, &mode_value, completion)
+                sys::mln_map_set_projection_mode(handle, &mode_value, completion, diagnostic)
             })
         })
     }
@@ -9451,9 +9635,11 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_rendering_stats_view_enabled(handle, enabled, completion)
+                sys::mln_map_set_rendering_stats_view_enabled(
+                    handle, enabled, completion, diagnostic,
+                )
             })
         })
     }
@@ -9494,7 +9680,7 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_style_image(
                     handle,
@@ -9504,6 +9690,7 @@ impl MapHandle {
                         .as_ref()
                         .map_or(std::ptr::null(), |value| value),
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9523,9 +9710,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_style_json(handle, json_value, completion)
+                sys::mln_map_set_style_json(handle, json_value, completion, diagnostic)
             })
         })
     }
@@ -9548,9 +9735,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_style_light_json(handle, light_json_value, completion)
+                sys::mln_map_set_style_light_json(handle, light_json_value, completion, diagnostic)
             })
         })
     }
@@ -9575,13 +9762,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_style_light_property(
                     handle,
                     property_name_value,
                     value_value,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9606,13 +9794,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_set_style_source_volatile(
                     handle,
                     source_id_value,
                     is_volatile,
                     completion,
+                    diagnostic,
                 )
             })
         })
@@ -9641,9 +9830,14 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_style_transition_options(handle, &options_value, completion)
+                sys::mln_map_set_style_transition_options(
+                    handle,
+                    &options_value,
+                    completion,
+                    diagnostic,
+                )
             })
         })
     }
@@ -9662,9 +9856,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_style_url(handle, url_value, completion)
+                sys::mln_map_set_style_url(handle, url_value, completion, diagnostic)
             })
         })
     }
@@ -9692,9 +9886,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_tile_options(handle, &options_value, completion)
+                sys::mln_map_set_tile_options(handle, &options_value, completion, diagnostic)
             })
         })
     }
@@ -9722,9 +9916,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_set_viewport_options(handle, &options_value, completion)
+                sys::mln_map_set_viewport_options(handle, &options_value, completion, diagnostic)
             })
         })
     }
@@ -9743,10 +9937,12 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_snapshot: sys::mln_map_snapshot = unsafe { std::mem::zeroed() };
         out_snapshot.size = std::mem::size_of::<sys::mln_map_snapshot>() as _;
-        let result = unsafe {
-            generated_native_call(py, || sys::mln_map_snapshot_get(handle, &mut out_snapshot))
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        let result = maplibre_core::check(|diagnostic| unsafe {
+            generated_native_call(py, || {
+                sys::mln_map_snapshot_get(handle, &mut out_snapshot, diagnostic)
+            })
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_map_snapshot(py, &out_snapshot)?)
     }
     #[pyo3(signature = ())]
@@ -9764,8 +9960,10 @@ impl MapHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_map_style_url(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_map_style_url(handle, completion, diagnostic)
+                })
             },
             |py, result| {
                 let value = completion_value::<sys::mln_buffer_view>(result)?;
@@ -9800,9 +9998,9 @@ impl MapHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_update_camera(handle, &update_value, completion)
+                sys::mln_map_update_camera(handle, &update_value, completion, diagnostic)
             })
         })
     }
@@ -9840,7 +10038,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_metal_borrowed_texture_attach(
                         handle,
@@ -9848,6 +10046,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -9911,7 +10110,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_metal_owned_texture_attach(
                         handle,
@@ -9919,6 +10118,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -9982,7 +10182,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_metal_surface_attach(
                         handle,
@@ -9990,6 +10190,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -10053,7 +10254,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_opengl_borrowed_texture_attach(
                         handle,
@@ -10061,6 +10262,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -10124,7 +10326,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_opengl_owned_texture_attach(
                         handle,
@@ -10132,6 +10334,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -10195,7 +10398,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_opengl_surface_attach(
                         handle,
@@ -10203,6 +10406,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -10266,7 +10470,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_vulkan_borrowed_texture_attach(
                         handle,
@@ -10274,6 +10478,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -10337,7 +10542,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_vulkan_owned_texture_attach(
                         handle,
@@ -10345,6 +10550,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -10408,7 +10614,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_vulkan_surface_attach(
                         handle,
@@ -10416,6 +10622,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -10479,7 +10686,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_webgpu_borrowed_texture_attach(
                         handle,
@@ -10487,6 +10694,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -10550,7 +10758,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_webgpu_owned_texture_attach(
                         handle,
@@ -10558,6 +10766,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -10621,7 +10830,7 @@ impl MapHandle {
         let mut out_session: sys::mln_render_session = unsafe { std::mem::zeroed() };
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_webgpu_surface_attach(
                         handle,
@@ -10629,6 +10838,7 @@ impl MapHandle {
                         &options_value,
                         &mut out_session,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -10675,8 +10885,10 @@ impl MapProjectionHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        let result = unsafe { generated_native_call(py, || sys::mln_map_projection_close(handle)) };
-        maplibre_core::check(result).map_err(map_error)?;
+        let result = maplibre_core::check(|diagnostic| unsafe {
+            generated_native_call(py, || sys::mln_map_projection_close(handle, diagnostic))
+        });
+        result.map_err(map_error)?;
         reservation.commit();
         Ok(py.None())
     }
@@ -10695,12 +10907,12 @@ impl MapProjectionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
         out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_projection_get_camera(handle, &mut out_camera)
+                sys::mln_map_projection_get_camera(handle, &mut out_camera, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_camera_options(py, &out_camera)?)
     }
     #[pyo3(signature = (point))]
@@ -10719,12 +10931,17 @@ impl MapProjectionHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_coordinate: sys::mln_lat_lng = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_projection_lat_lng_for_pixel(handle, point_value, &mut out_coordinate)
+                sys::mln_map_projection_lat_lng_for_pixel(
+                    handle,
+                    point_value,
+                    &mut out_coordinate,
+                    diagnostic,
+                )
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_lat_lng(py, &out_coordinate)?)
     }
     #[pyo3(signature = (point))]
@@ -10747,16 +10964,17 @@ impl MapProjectionHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_coordinate: sys::mln_lat_lng = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_projection_lat_lng_for_pixel_unwrapped(
                     handle,
                     point_value,
                     &mut out_coordinate,
+                    diagnostic,
                 )
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_lat_lng(py, &out_coordinate)?)
     }
     #[pyo3(signature = (latitude))]
@@ -10773,16 +10991,17 @@ impl MapProjectionHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_meters_per_pixel: f64 = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_projection_meters_per_pixel_at_latitude(
                     handle,
                     latitude,
                     &mut out_meters_per_pixel,
+                    diagnostic,
                 )
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(pyo3::BoundObject::unbind((out_meters_per_pixel).into_pyobject(py)?).into_any())
     }
     #[pyo3(signature = (coordinate))]
@@ -10805,12 +11024,17 @@ impl MapProjectionHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_point: sys::mln_screen_point = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_projection_pixel_for_lat_lng(handle, coordinate_value, &mut out_point)
+                sys::mln_map_projection_pixel_for_lat_lng(
+                    handle,
+                    coordinate_value,
+                    &mut out_point,
+                    diagnostic,
+                )
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_screen_point(py, &out_point)?)
     }
     #[pyo3(signature = (camera=None))]
@@ -10833,12 +11057,12 @@ impl MapProjectionHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_projection_set_camera(handle, &camera_value)
+                sys::mln_map_projection_set_camera(handle, &camera_value, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(py.None())
     }
     #[pyo3(signature = (coordinates, padding))]
@@ -10866,17 +11090,18 @@ impl MapProjectionHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_map_projection_set_visible_coordinates(
                     handle,
                     coordinates_values.as_ptr(),
                     coordinates_values.len(),
                     padding_value,
+                    diagnostic,
                 )
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(py.None())
     }
     #[pyo3(signature = (geometry, padding))]
@@ -10900,12 +11125,17 @@ impl MapProjectionHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_map_projection_set_visible_geometry(handle, geometry_value, padding_value)
+                sys::mln_map_projection_set_visible_geometry(
+                    handle,
+                    geometry_value,
+                    padding_value,
+                    diagnostic,
+                )
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(py.None())
     }
 }
@@ -10926,12 +11156,12 @@ impl RenderFrameBatchHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_count: usize = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_render_frame_batch_count(handle, &mut out_count)
+                sys::mln_render_frame_batch_count(handle, &mut out_count, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(pyo3::BoundObject::unbind((out_count).into_pyobject(py)?).into_any())
     }
     #[pyo3(signature = (index))]
@@ -10949,12 +11179,12 @@ impl RenderFrameBatchHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_result: sys::mln_render_frame_result = unsafe { std::mem::zeroed() };
         out_result.size = std::mem::size_of::<sys::mln_render_frame_result>() as _;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_render_frame_batch_get(handle, index, &mut out_result)
+                sys::mln_render_frame_batch_get(handle, index, &mut out_result, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_render_frame_result(py, &out_result)?)
     }
     #[pyo3(signature = ())]
@@ -11004,12 +11234,13 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_metal_borrowed_texture_set_target(
                         handle,
                         &descriptor_value,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -11042,9 +11273,14 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_metal_surface_set_target(handle, &descriptor_value, completion)
+                    sys::mln_metal_surface_set_target(
+                        handle,
+                        &descriptor_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             py_none,
@@ -11076,12 +11312,13 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_opengl_borrowed_texture_set_target(
                         handle,
                         &descriptor_value,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -11114,9 +11351,14 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_opengl_surface_set_target(handle, &descriptor_value, completion)
+                    sys::mln_opengl_surface_set_target(
+                        handle,
+                        &descriptor_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             py_none,
@@ -11137,12 +11379,12 @@ impl RenderSessionHandle {
         let handle = reservation.handle();
         let mut out_result: sys::mln_render_abandon_result = unsafe { std::mem::zeroed() };
         out_result.size = std::mem::size_of::<sys::mln_render_abandon_result>() as _;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_render_session_abandon(handle, &mut out_result)
+                sys::mln_render_session_abandon(handle, &mut out_result, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         self.state().views_valid = false;
         Ok(generated_copy_mln_render_abandon_result(py, &out_result)?)
     }
@@ -11160,12 +11402,12 @@ impl RenderSessionHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_frame: sys::mln_acquired_frame = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_render_session_acquire_frame(handle, &mut out_frame)
+                sys::mln_render_session_acquire_frame(handle, &mut out_frame, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Py::new(
             py,
             AcquiredFrameHandle {
@@ -11193,8 +11435,10 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_render_session_barrier(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_render_session_barrier(handle, completion, diagnostic)
+                })
             },
             py_none,
         )
@@ -11214,9 +11458,9 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_render_session_clear_data(handle, completion)
+                    sys::mln_render_session_clear_data(handle, completion, diagnostic)
                 })
             },
             py_none,
@@ -11235,9 +11479,10 @@ impl RenderSessionHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        let result =
-            unsafe { generated_native_call(py, || sys::mln_render_session_destroy(handle)) };
-        maplibre_core::check(result).map_err(map_error)?;
+        let result = maplibre_core::check(|diagnostic| unsafe {
+            generated_native_call(py, || sys::mln_render_session_destroy(handle, diagnostic))
+        });
+        result.map_err(map_error)?;
         reservation.commit();
         Ok(py.None())
     }
@@ -11256,8 +11501,10 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_render_session_detach(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_render_session_detach(handle, completion, diagnostic)
+                })
             },
             py_none,
         )
@@ -11276,12 +11523,12 @@ impl RenderSessionHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_batch: sys::mln_render_frame_batch = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_render_session_drain_frame_results(handle, &mut out_batch)
+                sys::mln_render_session_drain_frame_results(handle, &mut out_batch, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Py::new(
             py,
             RenderFrameBatchHandle {
@@ -11309,9 +11556,9 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_render_session_dump_debug_logs(handle, completion)
+                    sys::mln_render_session_dump_debug_logs(handle, completion, diagnostic)
                 })
             },
             py_none,
@@ -11333,12 +11580,12 @@ impl RenderSessionHandle {
         let mut out_capabilities: sys::mln_render_session_capabilities =
             unsafe { std::mem::zeroed() };
         out_capabilities.size = std::mem::size_of::<sys::mln_render_session_capabilities>() as _;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_render_session_get_capabilities(handle, &mut out_capabilities)
+                sys::mln_render_session_get_capabilities(handle, &mut out_capabilities, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_render_session_capabilities(
             py,
             &out_capabilities,
@@ -11359,12 +11606,12 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_snapshot: sys::mln_render_session_snapshot = unsafe { std::mem::zeroed() };
         out_snapshot.size = std::mem::size_of::<sys::mln_render_session_snapshot>() as _;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_render_session_get_snapshot(handle, &mut out_snapshot)
+                sys::mln_render_session_get_snapshot(handle, &mut out_snapshot, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(generated_copy_mln_render_session_snapshot(
             py,
             &out_snapshot,
@@ -11384,12 +11631,12 @@ impl RenderSessionHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_render_session_projection_create(handle, &mut out_projection)
+                sys::mln_render_session_projection_create(handle, &mut out_projection, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Py::new(
             py,
             MapProjectionHandle {
@@ -11436,7 +11683,7 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_render_session_query_feature_extensions(
                         handle,
@@ -11448,6 +11695,7 @@ impl RenderSessionHandle {
                             .as_ref()
                             .map_or(std::ptr::null(), |value| value),
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -11494,7 +11742,7 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_render_session_query_rendered_features(
                         handle,
@@ -11503,6 +11751,7 @@ impl RenderSessionHandle {
                             .as_ref()
                             .map_or(std::ptr::null(), |value| value),
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -11547,7 +11796,7 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_render_session_query_source_features(
                         handle,
@@ -11556,6 +11805,7 @@ impl RenderSessionHandle {
                             .as_ref()
                             .map_or(std::ptr::null(), |value| value),
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -11583,9 +11833,9 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_render_session_reduce_memory_use(handle, completion)
+                    sys::mln_render_session_reduce_memory_use(handle, completion, diagnostic)
                 })
             },
             py_none,
@@ -11615,12 +11865,12 @@ impl RenderSessionHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_render_session_request_frame(handle, &demand_value)
+                sys::mln_render_session_request_frame(handle, &demand_value, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(py.None())
     }
     #[pyo3(signature = (extent))]
@@ -11638,9 +11888,9 @@ impl RenderSessionHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        submit_python_command_future(py, |completion| unsafe {
+        submit_python_command_future(py, |completion, diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_render_session_resize(handle, &extent_value, completion)
+                sys::mln_render_session_resize(handle, &extent_value, completion, diagnostic)
             })
         })
     }
@@ -11658,12 +11908,17 @@ impl RenderSessionHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_serviced: usize = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_render_session_service_driver_work(handle, max_work, &mut out_serviced)
+                sys::mln_render_session_service_driver_work(
+                    handle,
+                    max_work,
+                    &mut out_serviced,
+                    diagnostic,
+                )
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(pyo3::BoundObject::unbind((out_serviced).into_pyobject(py)?).into_any())
     }
     #[pyo3(signature = ())]
@@ -11681,9 +11936,9 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_texture_read_premultiplied_rgba8(handle, completion)
+                    sys::mln_texture_read_premultiplied_rgba8(handle, completion, diagnostic)
                 })
             },
             |py, result| {
@@ -11718,12 +11973,13 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_vulkan_borrowed_texture_set_target(
                         handle,
                         &descriptor_value,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -11756,9 +12012,14 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_vulkan_surface_set_target(handle, &descriptor_value, completion)
+                    sys::mln_vulkan_surface_set_target(
+                        handle,
+                        &descriptor_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             py_none,
@@ -11790,12 +12051,13 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_webgpu_borrowed_texture_set_target(
                         handle,
                         &descriptor_value,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -11828,9 +12090,14 @@ impl RenderSessionHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_webgpu_surface_set_target(handle, &descriptor_value, completion)
+                    sys::mln_webgpu_surface_set_target(
+                        handle,
+                        &descriptor_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             py_none,
@@ -11848,12 +12115,12 @@ impl ResourceRequestHandle {
         )?;
         let handle = self.state.native_for_call().map_err(map_error)?;
         let mut out_cancelled: bool = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_resource_request_cancelled(handle, &mut out_cancelled)
+                sys::mln_resource_request_cancelled(handle, &mut out_cancelled, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(pyo3::BoundObject::unbind((out_cancelled).into_pyobject(py)?).into_any())
     }
     #[pyo3(signature = (response))]
@@ -11867,10 +12134,9 @@ impl ResourceRequestHandle {
         let result = unsafe {
             generated_native_call(py, || {
                 self.state.complete_with(|handle| {
-                    maplibre_core::check(sys::mln_resource_request_complete(
-                        handle,
-                        &response_value,
-                    ))
+                    maplibre_core::check(|diagnostic| {
+                        sys::mln_resource_request_complete(handle, &response_value, diagnostic)
+                    })
                 })
             })
         };
@@ -11918,10 +12184,12 @@ impl ResourceRequestHandle {
             maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle()),
         )?;
         let handle = self.state.issued_handle();
-        let result = unsafe {
-            generated_native_call(py, || sys::mln_resource_request_wait_until_retired(handle))
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        let result = maplibre_core::check(|diagnostic| unsafe {
+            generated_native_call(py, || {
+                sys::mln_resource_request_wait_until_retired(handle, diagnostic)
+            })
+        });
+        result.map_err(map_error)?;
         Ok(py.None())
     }
 }
@@ -11937,16 +12205,17 @@ impl ResourceTransformResponseScope {
         )?;
         let url_view = storage.buffer(url.clone(), true)?;
         let handle = self.scope.pointer(self.native)? as *mut sys::mln_resource_transform_response;
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
                 sys::mln_resource_transform_response_set_url(
                     handle,
                     url_view.data.cast(),
                     url_view.size,
+                    diagnostic,
                 )
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(py.None())
     }
 }
@@ -11975,9 +12244,9 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_owned_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_map_create(handle, &options_value, completion)
+                    sys::mln_map_create(handle, &options_value, completion, diagnostic)
                 })
             },
             |py, result| {
@@ -12017,8 +12286,10 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_runtime_barrier(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_runtime_barrier(handle, completion, diagnostic)
+                })
             },
             py_none,
         )
@@ -12038,9 +12309,9 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_clear_http_header_transform(handle, completion)
+                    sys::mln_runtime_clear_http_header_transform(handle, completion, diagnostic)
                 })
             },
             py_none,
@@ -12061,9 +12332,9 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_clear_resource_provider(handle, completion)
+                    sys::mln_runtime_clear_resource_provider(handle, completion, diagnostic)
                 })
             },
             py_none,
@@ -12084,9 +12355,9 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_clear_resource_transform(handle, completion)
+                    sys::mln_runtime_clear_resource_transform(handle, completion, diagnostic)
                 })
             },
             py_none,
@@ -12106,10 +12377,12 @@ impl RuntimeHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_batch: sys::mln_event_batch = unsafe { std::mem::zeroed() };
-        let result = unsafe {
-            generated_native_call(py, || sys::mln_runtime_drain_events(handle, &mut out_batch))
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        let result = maplibre_core::check(|diagnostic| unsafe {
+            generated_native_call(py, || {
+                sys::mln_runtime_drain_events(handle, &mut out_batch, diagnostic)
+            })
+        });
+        result.map_err(map_error)?;
         Py::new(
             py,
             EventBatchHandle {
@@ -12136,12 +12409,12 @@ impl RuntimeHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let mut out_mask: sys::mln_runtime_event_mask = unsafe { std::mem::zeroed() };
-        let result = unsafe {
+        let result = maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || {
-                sys::mln_runtime_get_event_mask(handle, &mut out_mask)
+                sys::mln_runtime_get_event_mask(handle, &mut out_mask, diagnostic)
             })
-        };
-        maplibre_core::check(result).map_err(map_error)?;
+        });
+        result.map_err(map_error)?;
         Ok(pyo3::BoundObject::unbind((out_mask).into_pyobject(py)?).into_any())
     }
     #[pyo3(signature = (definition, metadata))]
@@ -12168,7 +12441,7 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_runtime_offline_region_create(
                         handle,
@@ -12176,6 +12449,7 @@ impl RuntimeHandle {
                         metadata_view.data.cast(),
                         metadata_view.size,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -12200,9 +12474,11 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_offline_region_delete(handle, region_id, completion)
+                    sys::mln_runtime_offline_region_delete(
+                        handle, region_id, completion, diagnostic,
+                    )
                 })
             },
             py_none,
@@ -12223,9 +12499,9 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_offline_region_get(handle, region_id, completion)
+                    sys::mln_runtime_offline_region_get(handle, region_id, completion, diagnostic)
                 })
             },
             |py, result| {
@@ -12252,9 +12528,11 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_offline_region_get_status(handle, region_id, completion)
+                    sys::mln_runtime_offline_region_get_status(
+                        handle, region_id, completion, diagnostic,
+                    )
                 })
             },
             |py, result| {
@@ -12278,9 +12556,11 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_offline_region_invalidate(handle, region_id, completion)
+                    sys::mln_runtime_offline_region_invalidate(
+                        handle, region_id, completion, diagnostic,
+                    )
                 })
             },
             py_none,
@@ -12306,13 +12586,14 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_runtime_offline_region_set_download_state(
                         handle,
                         region_id,
                         input_state,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -12339,10 +12620,10 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_runtime_offline_region_set_observed(
-                        handle, region_id, observed, completion,
+                        handle, region_id, observed, completion, diagnostic,
                     )
                 })
             },
@@ -12371,7 +12652,7 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_runtime_offline_region_update_metadata(
                         handle,
@@ -12379,6 +12660,7 @@ impl RuntimeHandle {
                         metadata_view.data.cast(),
                         metadata_view.size,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -12403,9 +12685,9 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_offline_regions_list(handle, completion)
+                    sys::mln_runtime_offline_regions_list(handle, completion, diagnostic)
                 })
             },
             |py, result| {
@@ -12438,12 +12720,13 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
                     sys::mln_runtime_offline_regions_merge_database(
                         handle,
                         side_database_path_value,
                         completion,
+                        diagnostic,
                     )
                 })
             },
@@ -12471,8 +12754,10 @@ impl RuntimeHandle {
         let handle = reservation.handle();
         let future = submit_python_future(
             py,
-            |completion| unsafe {
-                generated_native_call(py, || sys::mln_runtime_release(handle, completion))
+            |completion, diagnostic| unsafe {
+                generated_native_call(py, || {
+                    sys::mln_runtime_release(handle, completion, diagnostic)
+                })
             },
             py_none,
         )?;
@@ -12498,9 +12783,11 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_run_ambient_cache_operation(handle, operation, completion)
+                    sys::mln_runtime_run_ambient_cache_operation(
+                        handle, operation, completion, diagnostic,
+                    )
                 })
             },
             py_none,
@@ -12523,9 +12810,12 @@ impl RuntimeHandle {
             .state()
             .live_handle()
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
-        let result =
-            unsafe { generated_native_call(py, || sys::mln_runtime_set_event_mask(handle, mask)) };
-        maplibre_core::check(result).map_err(map_error)?;
+        let result = maplibre_core::check(|diagnostic| unsafe {
+            generated_native_call(py, || {
+                sys::mln_runtime_set_event_mask(handle, mask, diagnostic)
+            })
+        });
+        result.map_err(map_error)?;
         Ok(py.None())
     }
     #[pyo3(signature = (transform))]
@@ -12550,9 +12840,14 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_set_http_header_transform(handle, &transform_value, completion)
+                    sys::mln_runtime_set_http_header_transform(
+                        handle,
+                        &transform_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             py_none,
@@ -12576,9 +12871,11 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_set_maximum_ambient_cache_size(handle, size, completion)
+                    sys::mln_runtime_set_maximum_ambient_cache_size(
+                        handle, size, completion, diagnostic,
+                    )
                 })
             },
             py_none,
@@ -12605,9 +12902,14 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_set_resource_provider(handle, &provider_value, completion)
+                    sys::mln_runtime_set_resource_provider(
+                        handle,
+                        &provider_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             py_none,
@@ -12637,9 +12939,14 @@ impl RuntimeHandle {
             .ok_or_else(|| invalid_state_error("handle is closed"))?;
         let future = submit_python_future(
             py,
-            |completion| unsafe {
+            |completion, diagnostic| unsafe {
                 generated_native_call(py, || {
-                    sys::mln_runtime_set_resource_transform(handle, &transform_value, completion)
+                    sys::mln_runtime_set_resource_transform(
+                        handle,
+                        &transform_value,
+                        completion,
+                        diagnostic,
+                    )
                 })
             },
             py_none,
@@ -13017,12 +13324,12 @@ fn android_init(
     let jni_env_value = jni_env.clone().extract::<usize>()? as _;
     let jni_class_value = jni_class.clone().extract::<usize>()? as _;
     let context_value = context.clone().extract::<usize>()? as _;
-    let result = unsafe {
+    let result = maplibre_core::check(|diagnostic| unsafe {
         generated_native_call(py, || {
-            sys::mln_android_init(jni_env_value, jni_class_value, context_value)
+            sys::mln_android_init(jni_env_value, jni_class_value, context_value, diagnostic)
         })
-    };
-    maplibre_core::check(result).map_err(map_error)?;
+    });
+    result.map_err(map_error)?;
     Ok(py.None())
 }
 
@@ -13055,7 +13362,7 @@ fn geojson_source_data_create(
         })
     };
     let mut out_data: sys::mln_geojson_source_data = unsafe { std::mem::zeroed() };
-    let result = unsafe {
+    let result = maplibre_core::check(|diagnostic| unsafe {
         generated_native_call(py, || {
             sys::mln_geojson_source_data_create(
                 data_value,
@@ -13063,10 +13370,11 @@ fn geojson_source_data_create(
                     .as_ref()
                     .map_or(std::ptr::null(), |value| value),
                 &mut out_data,
+                diagnostic,
             )
         })
-    };
-    maplibre_core::check(result).map_err(map_error)?;
+    });
+    result.map_err(map_error)?;
     Py::new(
         py,
         GeojsonSourceDataHandle {
@@ -13087,12 +13395,12 @@ fn lat_lng_for_projected_meters(py: Python<'_>, meters: &Bound<'_, PyAny>) -> Py
     generated_check_operation("mln_lat_lng_for_projected_meters", 0)?;
     let meters_value = generated_input_mln_projected_meters(&meters.clone(), storage)?;
     let mut out_coordinate: sys::mln_lat_lng = unsafe { std::mem::zeroed() };
-    let result = unsafe {
+    let result = maplibre_core::check(|diagnostic| unsafe {
         generated_native_call(py, || {
-            sys::mln_lat_lng_for_projected_meters(meters_value, &mut out_coordinate)
+            sys::mln_lat_lng_for_projected_meters(meters_value, &mut out_coordinate, diagnostic)
         })
-    };
-    maplibre_core::check(result).map_err(map_error)?;
+    });
+    result.map_err(map_error)?;
     Ok(generated_copy_mln_lat_lng(py, &out_coordinate)?)
 }
 
@@ -13100,8 +13408,10 @@ fn lat_lng_for_projected_meters(py: Python<'_>, meters: &Bound<'_, PyAny>) -> Py
 #[pyo3(signature = ())]
 fn log_clear_callback(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_check_operation("mln_log_clear_callback", 0)?;
-    let result = unsafe { generated_native_call(py, || sys::mln_log_clear_callback()) };
-    maplibre_core::check(result).map_err(map_error)?;
+    let result = maplibre_core::check(|diagnostic| unsafe {
+        generated_native_call(py, || sys::mln_log_clear_callback(diagnostic))
+    });
+    result.map_err(map_error)?;
     Ok(py.None())
 }
 
@@ -13112,9 +13422,12 @@ fn log_set_async_severity_mask(
     mask: sys::mln_log_severity_mask,
 ) -> PyResult<Py<PyAny>> {
     generated_check_operation("mln_log_set_async_severity_mask", 0)?;
-    let result =
-        unsafe { generated_native_call(py, || sys::mln_log_set_async_severity_mask(mask)) };
-    maplibre_core::check(result).map_err(map_error)?;
+    let result = maplibre_core::check(|diagnostic| unsafe {
+        generated_native_call(py, || {
+            sys::mln_log_set_async_severity_mask(mask, diagnostic)
+        })
+    });
+    result.map_err(map_error)?;
     Ok(py.None())
 }
 
@@ -13138,12 +13451,12 @@ fn log_set_callback(py: Python<'_>, callback: &Bound<'_, PyAny>) -> PyResult<()>
     } else {
         None
     };
-    let status = unsafe {
+    maplibre_core::check(|diagnostic| unsafe {
         generated_native_call(py, || {
-            sys::mln_log_set_callback(native_callback, context, release)
+            sys::mln_log_set_callback(native_callback, context, release, diagnostic)
         })
-    };
-    maplibre_core::check(status).map_err(map_error)?;
+    })
+    .map_err(map_error)?;
     storage.accept_callbacks();
     Ok(())
 }
@@ -13153,9 +13466,12 @@ fn log_set_callback(py: Python<'_>, callback: &Bound<'_, PyAny>) -> PyResult<()>
 fn network_status_get(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_check_operation("mln_network_status_get", 0)?;
     let mut out_status: sys::mln_network_status = unsafe { std::mem::zeroed() };
-    let result =
-        unsafe { generated_native_call(py, || sys::mln_network_status_get(&mut out_status)) };
-    maplibre_core::check(result).map_err(map_error)?;
+    let result = maplibre_core::check(|diagnostic| unsafe {
+        generated_native_call(py, || {
+            sys::mln_network_status_get(&mut out_status, diagnostic)
+        })
+    });
+    result.map_err(map_error)?;
     Ok(pyo3::BoundObject::unbind((out_status).into_pyobject(py)?).into_any())
 }
 
@@ -13166,8 +13482,10 @@ fn network_status_set(
     input_status: sys::mln_network_status,
 ) -> PyResult<Py<PyAny>> {
     generated_check_operation("mln_network_status_set", 0)?;
-    let result = unsafe { generated_native_call(py, || sys::mln_network_status_set(input_status)) };
-    maplibre_core::check(result).map_err(map_error)?;
+    let result = maplibre_core::check(|diagnostic| unsafe {
+        generated_native_call(py, || sys::mln_network_status_set(input_status, diagnostic))
+    });
+    result.map_err(map_error)?;
     Ok(py.None())
 }
 
@@ -13202,12 +13520,12 @@ fn projected_meters_for_lat_lng(
     generated_check_operation("mln_projected_meters_for_lat_lng", 0)?;
     let coordinate_value = generated_input_mln_lat_lng(&coordinate.clone(), storage)?;
     let mut out_meters: sys::mln_projected_meters = unsafe { std::mem::zeroed() };
-    let result = unsafe {
+    let result = maplibre_core::check(|diagnostic| unsafe {
         generated_native_call(py, || {
-            sys::mln_projected_meters_for_lat_lng(coordinate_value, &mut out_meters)
+            sys::mln_projected_meters_for_lat_lng(coordinate_value, &mut out_meters, diagnostic)
         })
-    };
-    maplibre_core::check(result).map_err(map_error)?;
+    });
+    result.map_err(map_error)?;
     Ok(generated_copy_mln_projected_meters(py, &out_meters)?)
 }
 
@@ -13222,16 +13540,17 @@ fn render_target_extent_physical_size(
     let extent_value = generated_input_mln_render_target_extent(&extent.clone(), storage)?;
     let mut out_width: u32 = unsafe { std::mem::zeroed() };
     let mut out_height: u32 = unsafe { std::mem::zeroed() };
-    let result = unsafe {
+    let result = maplibre_core::check(|diagnostic| unsafe {
         generated_native_call(py, || {
             sys::mln_render_target_extent_physical_size(
                 &extent_value,
                 &mut out_width,
                 &mut out_height,
+                diagnostic,
             )
         })
-    };
-    maplibre_core::check(result).map_err(map_error)?;
+    });
+    result.map_err(map_error)?;
     let dict = PyDict::new(py);
     dict.set_item(
         "width",
@@ -13307,12 +13626,12 @@ fn runtime_create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult
         generated_input_mln_runtime_options(&options.clone(), storage)?
     };
     let mut out_runtime: sys::mln_runtime = unsafe { std::mem::zeroed() };
-    let result = unsafe {
+    let result = maplibre_core::check(|diagnostic| unsafe {
         generated_native_call(py, || {
-            sys::mln_runtime_create(&options_value, &mut out_runtime)
+            sys::mln_runtime_create(&options_value, &mut out_runtime, diagnostic)
         })
-    };
-    maplibre_core::check(result).map_err(map_error)?;
+    });
+    result.map_err(map_error)?;
     let callback_roots = storage.accept_callbacks();
     Py::new(
         py,
@@ -13334,24 +13653,6 @@ fn supported_render_backend_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_check_operation("mln_supported_render_backend_mask", 0)?;
     let result = unsafe { generated_native_call(py, || sys::mln_supported_render_backend_mask()) };
     Ok(pyo3::BoundObject::unbind((result).into_pyobject(py)?).into_any())
-}
-
-#[pyfunction]
-#[pyo3(signature = ())]
-fn thread_last_error_message(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_operation("mln_thread_last_error_message", 0)?;
-    let result = unsafe { generated_native_call(py, || sys::mln_thread_last_error_message()) };
-    Ok({
-        if result.is_null() {
-            return Err(native_error("null native string"));
-        }
-        unsafe { std::ffi::CStr::from_ptr(result) }
-            .to_str()
-            .map_err(|_| native_error("native string is not UTF-8"))?
-            .into_pyobject(py)?
-            .into_any()
-            .unbind()
-    })
 }
 
 fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -13487,7 +13788,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(rendered_query_geometry_point, module)?)?;
     module.add_function(wrap_pyfunction!(runtime_create, module)?)?;
     module.add_function(wrap_pyfunction!(supported_render_backend_mask, module)?)?;
-    module.add_function(wrap_pyfunction!(thread_last_error_message, module)?)?;
     Ok(())
 }
 

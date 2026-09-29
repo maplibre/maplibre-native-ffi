@@ -1,4 +1,6 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Text;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Pointer;
@@ -21,7 +23,7 @@ public sealed unsafe class NativeHandleStateTests
         var destroyed = 0;
         var state = new NativeHandleState<MlnRuntime>(
             SyntheticHandles.Runtime(1234),
-            _ =>
+            (_, _) =>
             {
                 Interlocked.Increment(ref destroyed);
                 return mln_status.MLN_STATUS_OK;
@@ -86,6 +88,7 @@ public sealed unsafe class NativeHandleStateTests
         var error = Assert.Throws<InvalidStateException>(state.Close);
 
         Assert.Equal(MaplibreStatus.InvalidState, error.Status);
+        Assert.Equal("destroy rejected", error.Diagnostic);
         Assert.False(state.IsClosed);
         Assert.Equal(1, destroyCount);
 
@@ -208,7 +211,7 @@ public sealed unsafe class NativeHandleStateTests
 
         internal int Count => Volatile.Read(ref count);
 
-        internal mln_status Destroy(MlnRuntime handle)
+        internal mln_status Destroy(MlnRuntime handle, mln_diagnostic* diagnostic)
         {
             Assert.False(handle.IsNull);
             Interlocked.Increment(ref count);
@@ -228,10 +231,18 @@ public sealed unsafe class NativeHandleStateTests
         }
     }
 
-    private static mln_status Destroy(MlnRuntime handle)
+    private static mln_status Destroy(MlnRuntime handle, mln_diagnostic* diagnostic)
     {
         Assert.False(handle.IsNull);
         destroyCount++;
+        // Native writes the diagnostic on every return, so the fake does too.
+        Span<sbyte> buffer = diagnostic->message;
+        var message = MemoryMarshal.AsBytes(buffer);
+        var length = Encoding.UTF8.GetBytes(
+            destroyStatus == mln_status.MLN_STATUS_OK ? "" : "destroy rejected",
+            message
+        );
+        message[length] = 0;
         return destroyStatus;
     }
 }

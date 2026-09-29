@@ -24,11 +24,11 @@ fn recordLog(context: ?*anyopaque, severity: maplibre.LogSeverity, event: maplib
 
 test "log callback receives and consumes native logs" {
     var state = LogState{};
-    try maplibre.logSetAsyncSeverityMask(.{});
-    try maplibre.logSetCallback(.{ .call = recordLog, .context = &state });
+    try maplibre.logSetAsyncSeverityMask(.{}, null);
+    try maplibre.logSetCallback(.{ .call = recordLog, .context = &state }, null);
     defer {
-        maplibre.logClearCallback() catch @panic("log callback clear failed");
-        maplibre.logSetAsyncSeverityMask(.{ .info = true, .warning = true, .@"error" = true }) catch @panic("log severity restore failed");
+        maplibre.logClearCallback(null) catch @panic("log callback clear failed");
+        maplibre.logSetAsyncSeverityMask(.{ .info = true, .warning = true, .@"error" = true }, null) catch @panic("log severity restore failed");
     }
 
     var runtime = try support.createRuntime(.{});
@@ -50,10 +50,10 @@ test "log callback receives and consumes native logs" {
 
 test "log callback can be cleared" {
     var state = LogState{};
-    try maplibre.logSetAsyncSeverityMask(.{});
-    defer maplibre.logSetAsyncSeverityMask(.{ .info = true, .warning = true, .@"error" = true }) catch @panic("log severity restore failed");
-    try maplibre.logSetCallback(.{ .call = recordLog, .context = &state });
-    try maplibre.logClearCallback();
+    try maplibre.logSetAsyncSeverityMask(.{}, null);
+    defer maplibre.logSetAsyncSeverityMask(.{ .info = true, .warning = true, .@"error" = true }, null) catch @panic("log severity restore failed");
+    try maplibre.logSetCallback(.{ .call = recordLog, .context = &state }, null);
+    try maplibre.logClearCallback(null);
 
     var runtime = try support.createRuntime(.{});
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
@@ -73,13 +73,13 @@ test "log callback can be cleared" {
 test "log callback replacement invokes only the replacement" {
     var first_state = LogState{};
     var replacement_state = LogState{};
-    try maplibre.logSetAsyncSeverityMask(.{});
+    try maplibre.logSetAsyncSeverityMask(.{}, null);
     defer {
-        maplibre.logClearCallback() catch @panic("log callback clear failed");
-        maplibre.logSetAsyncSeverityMask(.{ .info = true, .warning = true, .@"error" = true }) catch @panic("log severity restore failed");
+        maplibre.logClearCallback(null) catch @panic("log callback clear failed");
+        maplibre.logSetAsyncSeverityMask(.{ .info = true, .warning = true, .@"error" = true }, null) catch @panic("log severity restore failed");
     }
-    try maplibre.logSetCallback(.{ .call = recordLog, .context = &first_state });
-    try maplibre.logSetCallback(.{ .call = recordLog, .context = &replacement_state });
+    try maplibre.logSetCallback(.{ .call = recordLog, .context = &first_state }, null);
+    try maplibre.logSetCallback(.{ .call = recordLog, .context = &replacement_state }, null);
 
     var runtime = try support.createRuntime(.{});
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");

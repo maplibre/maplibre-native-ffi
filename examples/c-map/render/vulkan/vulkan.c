@@ -411,10 +411,14 @@ static void release_pending_frame(render_target* target) {
     return;
   }
   mln_gpu_sync sync = mln_gpu_sync_default();
-  const mln_status status =
-    mln_acquired_frame_release(&target->as.owned.pending_frame, &sync);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status = mln_acquired_frame_release(
+    &target->as.owned.pending_frame, &sync, &diagnostic
+  );
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("Vulkan texture release failed", status);
+    diagnostics_log_status(
+      "Vulkan texture release failed", status, &diagnostic
+    );
   }
   target->as.owned.has_pending_frame = false;
 }
@@ -460,7 +464,8 @@ app_error render_target_attach(
       descriptor.context =
         vulkan_context_descriptor(&target->as.owned.compositor.context);
       status = mln_vulkan_owned_texture_attach(
-        map, &descriptor, &options, &session, completion
+        map, &descriptor, &options, &session, completion,
+        &target->session.diagnostic
       );
       break;
     }
@@ -468,7 +473,8 @@ app_error render_target_attach(
       const mln_vulkan_borrowed_texture_descriptor descriptor =
         borrowed_image_descriptor(target, current_viewport);
       status = mln_vulkan_borrowed_texture_attach(
-        map, &descriptor, &options, &session, completion
+        map, &descriptor, &options, &session, completion,
+        &target->session.diagnostic
       );
       break;
     }
@@ -481,7 +487,8 @@ app_error render_target_attach(
       descriptor.surface =
         vulkan_surface_to_abi(target->as.surface.context.surface);
       status = mln_vulkan_surface_attach(
-        map, &descriptor, &options, &session, completion
+        map, &descriptor, &options, &session, completion,
+        &target->session.diagnostic
       );
       break;
     }
@@ -551,7 +558,8 @@ static app_error resize_borrowed(
     render_session_begin_submission(
       &target->session, APP_ERROR_TEXTURE_RESIZE_FAILED,
       "Vulkan borrowed texture set target failed"
-    )
+    ),
+    &target->session.diagnostic
   );
   if (status != MLN_STATUS_OK) {
     target->as.borrowed.image = previous;
@@ -625,14 +633,18 @@ static app_error render_update_owned(
   }
 
   mln_acquired_frame acquired = MLN_HANDLE_NULL;
-  mln_status status =
-    mln_render_session_acquire_frame(target->session.handle, &acquired);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  mln_status status = mln_render_session_acquire_frame(
+    target->session.handle, &acquired, &diagnostic
+  );
   if (status == MLN_STATUS_NOT_READY) {
     out_outcome->rendered = false;
     return APP_OK;
   }
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("Vulkan texture acquire failed", status);
+    diagnostics_log_status(
+      "Vulkan texture acquire failed", status, &diagnostic
+    );
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
   app_error error = render_session_require_cpu_complete_producer(
@@ -640,9 +652,12 @@ static app_error render_update_owned(
   );
   mln_vulkan_owned_texture_frame frame = {.size = sizeof(frame)};
   if (error == APP_OK) {
-    status = mln_acquired_frame_get_vulkan_texture(acquired, &frame);
+    status =
+      mln_acquired_frame_get_vulkan_texture(acquired, &frame, &diagnostic);
     if (status != MLN_STATUS_OK) {
-      diagnostics_log_status("Vulkan texture access failed", status);
+      diagnostics_log_status(
+        "Vulkan texture access failed", status, &diagnostic
+      );
       error = APP_ERROR_BACKEND_DRAW_FAILED;
     }
   }
@@ -655,9 +670,11 @@ static app_error render_update_owned(
   }
   if (error != APP_OK || !presented) {
     mln_gpu_sync sync = mln_gpu_sync_default();
-    status = mln_acquired_frame_release(&acquired, &sync);
+    status = mln_acquired_frame_release(&acquired, &sync, &diagnostic);
     if (status != MLN_STATUS_OK)
-      diagnostics_log_status("Vulkan texture release failed", status);
+      diagnostics_log_status(
+        "Vulkan texture release failed", status, &diagnostic
+      );
     out_outcome->rendered = false;
     return error;
   }

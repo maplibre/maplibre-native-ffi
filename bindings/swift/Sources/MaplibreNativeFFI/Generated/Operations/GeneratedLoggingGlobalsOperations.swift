@@ -15,7 +15,9 @@ public extension Maplibre {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena.submit { mln_log_clear_callback() })
+      try checkStatus { diagnostic in
+        arena.submit { mln_log_clear_callback(diagnostic) }
+      }
       return ()
     }
   }
@@ -33,8 +35,12 @@ public extension Maplibre {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
 
-      try checkStatus(arena
-        .submit { mln_log_set_async_severity_mask(bindingArg0.nativeValue()) })
+      try checkStatus { diagnostic in
+        arena.submit { mln_log_set_async_severity_mask(
+          bindingArg0.nativeValue(),
+          diagnostic
+        ) }
+      }
       return ()
     }
   }
@@ -52,11 +58,12 @@ public extension Maplibre {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       let token = callback.map { arena.callback($0) }
-      try checkStatus(arena.submit { mln_log_set_callback(
+      try checkStatus { diagnostic in arena.submit { mln_log_set_callback(
         callback == nil ? nil : invokeMlnLogSetCallback,
         token,
-        releaseGeneratedCallback
-      ) })
+        releaseGeneratedCallback,
+        diagnostic
+      ) } }
     }
   }
 }

@@ -13,7 +13,10 @@ public readonly record struct CommandCompletion(
     string Diagnostic
 );
 
-internal unsafe delegate mln_status CompletionSubmit(mln_completion* completion);
+internal unsafe delegate mln_status CompletionSubmit(
+    mln_completion* completion,
+    mln_diagnostic* diagnostic
+);
 internal unsafe delegate T CompletionConverter<T>(mln_completion_result* result);
 
 internal static unsafe class NativeCompletion
@@ -71,10 +74,11 @@ internal static unsafe class NativeCompletion
             user_data = (void*)GCHandle.ToIntPtr(root),
             release_user_data = &Release,
         };
+        mln_diagnostic diagnostic;
         mln_status status;
         try
         {
-            status = submit(&completion);
+            status = submit(&completion, NativeDiagnostic.Prepare(&diagnostic));
         }
         catch
         {
@@ -84,7 +88,7 @@ internal static unsafe class NativeCompletion
         if (status != mln_status.MLN_STATUS_OK)
         {
             root.Free();
-            NativeStatus.Check(status);
+            NativeStatus.Check(status, &diagnostic);
         }
         return state.Task;
     }

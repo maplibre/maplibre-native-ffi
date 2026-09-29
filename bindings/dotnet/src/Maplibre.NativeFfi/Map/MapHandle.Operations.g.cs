@@ -30,7 +30,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             handle,
             StartRelease,
             nameof(MapHandle),
-            static live => NativeMethods.mln_map_dispose(live),
+            static (live, diagnostic) => NativeMethods.mln_map_dispose(live, diagnostic),
             retainedParent: parent
         );
     }
@@ -46,7 +46,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         catch
         {
             if (owner is null)
-                NativeMethods.mln_map_dispose(handle);
+                NativeMethods.mln_map_dispose(handle, null);
             else
                 owner.state.Retire();
             throw;
@@ -86,14 +86,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_add_color_relief_layer(
-                    Handle,
-                    nativeLayerId.Value,
-                    nativeSourceId.Value,
-                    nativeBeforeLayerId.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_color_relief_layer(
+                        Handle,
+                        nativeLayerId.Value,
+                        nativeSourceId.Value,
+                        nativeBeforeLayerId.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -111,16 +113,19 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_add_custom_geometry_source"
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeOptions = NativeCustomGeometrySourceOptions(options, scope);
-            return NativeMethods.mln_map_add_custom_geometry_source(
-                Handle,
-                nativeSourceId.Value,
-                &nativeOptions,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeOptions = NativeCustomGeometrySourceOptions(options, scope);
+                return NativeMethods.mln_map_add_custom_geometry_source(
+                    Handle,
+                    nativeSourceId.Value,
+                    &nativeOptions,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept(this.CallbackOwner);
         return operation.WaitAsync(cancellationToken);
     }
@@ -138,16 +143,19 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_add_custom_mvt_vector_source"
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeOptions = NativeCustomMvtVectorSourceOptions(options, scope);
-            return NativeMethods.mln_map_add_custom_mvt_vector_source(
-                Handle,
-                nativeSourceId.Value,
-                &nativeOptions,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeOptions = NativeCustomMvtVectorSourceOptions(options, scope);
+                return NativeMethods.mln_map_add_custom_mvt_vector_source(
+                    Handle,
+                    nativeSourceId.Value,
+                    &nativeOptions,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept(this.CallbackOwner);
         return operation.WaitAsync(cancellationToken);
     }
@@ -168,13 +176,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var useData = data.Borrow();
         var handleData = useData.Handle;
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_add_geojson_source_data(
-                    Handle,
-                    nativeSourceId.Value,
-                    handleData,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_geojson_source_data(
+                        Handle,
+                        nativeSourceId.Value,
+                        handleData,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -194,19 +204,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeOptions = options is null
-                ? default(mln_geojson_source_options)
-                : NativeGeojsonSourceOptions(options, scope);
-            return NativeMethods.mln_map_add_geojson_source_url(
-                Handle,
-                nativeSourceId.Value,
-                nativeUrl.Value,
-                options is null ? null : &nativeOptions,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeOptions = options is null
+                    ? default(mln_geojson_source_options)
+                    : NativeGeojsonSourceOptions(options, scope);
+                return NativeMethods.mln_map_add_geojson_source_url(
+                    Handle,
+                    nativeSourceId.Value,
+                    nativeUrl.Value,
+                    options is null ? null : &nativeOptions,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -227,14 +240,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_add_hillshade_layer(
-                    Handle,
-                    nativeLayerId.Value,
-                    nativeSourceId.Value,
-                    nativeBeforeLayerId.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_hillshade_layer(
+                        Handle,
+                        nativeLayerId.Value,
+                        nativeSourceId.Value,
+                        nativeBeforeLayerId.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -253,18 +268,21 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_add_image_source_image"
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeImage = NativePremultipliedRgba8Image(image, scope);
-            return NativeMethods.mln_map_add_image_source_image(
-                Handle,
-                nativeSourceId.Value,
-                scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
-                checked((nuint)coordinates.Length),
-                &nativeImage,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeImage = NativePremultipliedRgba8Image(image, scope);
+                return NativeMethods.mln_map_add_image_source_image(
+                    Handle,
+                    nativeSourceId.Value,
+                    scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
+                    checked((nuint)coordinates.Length),
+                    &nativeImage,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -284,15 +302,17 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-            NativeMethods.mln_map_add_image_source_url(
-                Handle,
-                nativeSourceId.Value,
-                scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
-                checked((nuint)coordinates.Length),
-                nativeUrl.Value,
-                completion
-            )
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_add_image_source_url(
+                    Handle,
+                    nativeSourceId.Value,
+                    scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
+                    checked((nuint)coordinates.Length),
+                    nativeUrl.Value,
+                    completion,
+                    diagnostic
+                )
         );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
@@ -312,13 +332,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_add_location_indicator_layer(
-                    Handle,
-                    nativeLayerId.Value,
-                    nativeBeforeLayerId.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_location_indicator_layer(
+                        Handle,
+                        nativeLayerId.Value,
+                        nativeBeforeLayerId.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -337,20 +359,23 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_add_raster_dem_source_tiles"
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeOptions = options is null
-                ? default(mln_style_tile_source_options)
-                : NativeStyleTileSourceOptions(options, scope);
-            return NativeMethods.mln_map_add_raster_dem_source_tiles(
-                Handle,
-                nativeSourceId.Value,
-                scope.Array<mln_buffer_view, string>(tiles, item => scope.Utf8(item)),
-                checked((nuint)tiles.Length),
-                options is null ? null : &nativeOptions,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeOptions = options is null
+                    ? default(mln_style_tile_source_options)
+                    : NativeStyleTileSourceOptions(options, scope);
+                return NativeMethods.mln_map_add_raster_dem_source_tiles(
+                    Handle,
+                    nativeSourceId.Value,
+                    scope.Array<mln_buffer_view, string>(tiles, item => scope.Utf8(item)),
+                    checked((nuint)tiles.Length),
+                    options is null ? null : &nativeOptions,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -370,19 +395,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeOptions = options is null
-                ? default(mln_style_tile_source_options)
-                : NativeStyleTileSourceOptions(options, scope);
-            return NativeMethods.mln_map_add_raster_dem_source_url(
-                Handle,
-                nativeSourceId.Value,
-                nativeUrl.Value,
-                options is null ? null : &nativeOptions,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeOptions = options is null
+                    ? default(mln_style_tile_source_options)
+                    : NativeStyleTileSourceOptions(options, scope);
+                return NativeMethods.mln_map_add_raster_dem_source_url(
+                    Handle,
+                    nativeSourceId.Value,
+                    nativeUrl.Value,
+                    options is null ? null : &nativeOptions,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -401,20 +429,23 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_add_raster_source_tiles"
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeOptions = options is null
-                ? default(mln_style_tile_source_options)
-                : NativeStyleTileSourceOptions(options, scope);
-            return NativeMethods.mln_map_add_raster_source_tiles(
-                Handle,
-                nativeSourceId.Value,
-                scope.Array<mln_buffer_view, string>(tiles, item => scope.Utf8(item)),
-                checked((nuint)tiles.Length),
-                options is null ? null : &nativeOptions,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeOptions = options is null
+                    ? default(mln_style_tile_source_options)
+                    : NativeStyleTileSourceOptions(options, scope);
+                return NativeMethods.mln_map_add_raster_source_tiles(
+                    Handle,
+                    nativeSourceId.Value,
+                    scope.Array<mln_buffer_view, string>(tiles, item => scope.Utf8(item)),
+                    checked((nuint)tiles.Length),
+                    options is null ? null : &nativeOptions,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -434,19 +465,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeOptions = options is null
-                ? default(mln_style_tile_source_options)
-                : NativeStyleTileSourceOptions(options, scope);
-            return NativeMethods.mln_map_add_raster_source_url(
-                Handle,
-                nativeSourceId.Value,
-                nativeUrl.Value,
-                options is null ? null : &nativeOptions,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeOptions = options is null
+                    ? default(mln_style_tile_source_options)
+                    : NativeStyleTileSourceOptions(options, scope);
+                return NativeMethods.mln_map_add_raster_source_url(
+                    Handle,
+                    nativeSourceId.Value,
+                    nativeUrl.Value,
+                    options is null ? null : &nativeOptions,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -465,13 +499,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeLayerJson = NativeStringView.From(layerJson, nameof(layerJson));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_add_style_layer_json(
-                    Handle,
-                    nativeLayerJson.Value,
-                    nativeBeforeLayerId.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_style_layer_json(
+                        Handle,
+                        nativeLayerJson.Value,
+                        nativeBeforeLayerId.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -490,13 +526,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeSourceJson = NativeStringView.From(sourceJson, nameof(sourceJson));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_add_style_source_json(
-                    Handle,
-                    nativeSourceId.Value,
-                    nativeSourceJson.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_add_style_source_json(
+                        Handle,
+                        nativeSourceId.Value,
+                        nativeSourceJson.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -515,20 +553,23 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_add_vector_source_tiles"
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeOptions = options is null
-                ? default(mln_style_tile_source_options)
-                : NativeStyleTileSourceOptions(options, scope);
-            return NativeMethods.mln_map_add_vector_source_tiles(
-                Handle,
-                nativeSourceId.Value,
-                scope.Array<mln_buffer_view, string>(tiles, item => scope.Utf8(item)),
-                checked((nuint)tiles.Length),
-                options is null ? null : &nativeOptions,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeOptions = options is null
+                    ? default(mln_style_tile_source_options)
+                    : NativeStyleTileSourceOptions(options, scope);
+                return NativeMethods.mln_map_add_vector_source_tiles(
+                    Handle,
+                    nativeSourceId.Value,
+                    scope.Array<mln_buffer_view, string>(tiles, item => scope.Utf8(item)),
+                    checked((nuint)tiles.Length),
+                    options is null ? null : &nativeOptions,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -548,19 +589,22 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeOptions = options is null
-                ? default(mln_style_tile_source_options)
-                : NativeStyleTileSourceOptions(options, scope);
-            return NativeMethods.mln_map_add_vector_source_url(
-                Handle,
-                nativeSourceId.Value,
-                nativeUrl.Value,
-                options is null ? null : &nativeOptions,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeOptions = options is null
+                    ? default(mln_style_tile_source_options)
+                    : NativeStyleTileSourceOptions(options, scope);
+                return NativeMethods.mln_map_add_vector_source_url(
+                    Handle,
+                    nativeSourceId.Value,
+                    nativeUrl.Value,
+                    options is null ? null : &nativeOptions,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -576,11 +620,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_apply_camera_delta"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-            {
-                var nativeDelta = NativeCameraDelta(delta);
-                return NativeMethods.mln_map_apply_camera_delta(Handle, &nativeDelta, completion);
-            })
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                {
+                    var nativeDelta = NativeCameraDelta(delta);
+                    return NativeMethods.mln_map_apply_camera_delta(
+                        Handle,
+                        &nativeDelta,
+                        completion,
+                        diagnostic
+                    );
+                }
+            )
             .WaitAsync(cancellationToken);
     }
 
@@ -598,7 +649,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeGeometry = NativeStringView.From(geometry, nameof(geometry));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                 {
                     var nativeFitOptions = fitOptions is null
                         ? default(mln_camera_fit_options)
@@ -607,7 +658,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
                         Handle,
                         nativeGeometry.Value,
                         fitOptions is null ? null : &nativeFitOptions,
-                        completion
+                        completion,
+                        diagnostic
                     );
                 },
                 result => CopyCameraOptions(NativeCompletion.Value<mln_camera_options>(result))
@@ -628,7 +680,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                 {
                     var nativeFitOptions = fitOptions is null
                         ? default(mln_camera_fit_options)
@@ -637,7 +689,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
                         Handle,
                         NativeLatLngBounds(bounds),
                         fitOptions is null ? null : &nativeFitOptions,
-                        completion
+                        completion,
+                        diagnostic
                     );
                 },
                 result => CopyCameraOptions(NativeCompletion.Value<mln_camera_options>(result))
@@ -658,7 +711,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_camera_for_lat_lngs"
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeFitOptions = fitOptions is null
                     ? default(mln_camera_fit_options)
@@ -668,7 +721,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
                     scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
                     checked((nuint)coordinates.Length),
                     fitOptions is null ? null : &nativeFitOptions,
-                    completion
+                    completion,
+                    diagnostic
                 );
             },
             result => CopyCameraOptions(NativeCompletion.Value<mln_camera_options>(result))
@@ -686,7 +740,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_map_camera_query(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_camera_query(Handle, completion, diagnostic),
                 result =>
                     CopyCameraQueryResult(NativeCompletion.Value<mln_camera_query_result>(result))
             )
@@ -703,8 +758,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         var outCamera = new mln_camera_options { size = (uint)sizeof(mln_camera_options) };
         ulong outGeneration = default;
+        mln_diagnostic diagnostic;
         NativeStatus.Check(
-            NativeMethods.mln_map_camera_snapshot_get(read.Handle, &outCamera, &outGeneration)
+            NativeMethods.mln_map_camera_snapshot_get(
+                read.Handle,
+                &outCamera,
+                &outGeneration,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
         );
         return (CopyCameraOptions(outCamera), outGeneration);
     }
@@ -719,8 +781,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_cancel_transitions"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_cancel_transitions(Handle, completion)
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_cancel_transitions(Handle, completion, diagnostic)
             )
             .WaitAsync(cancellationToken);
     }
@@ -738,11 +801,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_copy_layer_source_id(
                         Handle,
                         nativeLayerId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                 {
@@ -770,11 +834,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_copy_layer_source_layer(
                         Handle,
                         nativeLayerId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                 {
@@ -802,11 +867,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_copy_style_image_premultiplied_rgba8(
                         Handle,
                         nativeImageId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                 {
@@ -832,11 +898,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_copy_style_image_stretches(
                         Handle,
                         nativeImageId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                     result->value_count == 0
@@ -861,11 +928,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_copy_style_source_attribution(
                         Handle,
                         nativeSourceId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                 {
@@ -891,11 +959,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_copy_style_source_url(
                         Handle,
                         nativeSourceId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                 {
@@ -916,7 +985,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_dump_debug_logs"
         );
         return NativeCompletion
-            .SubmitCommand(completion => NativeMethods.mln_map_dump_debug_logs(Handle, completion))
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_dump_debug_logs(Handle, completion, diagnostic)
+            )
             .WaitAsync(cancellationToken);
     }
 
@@ -932,10 +1004,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_get_feature_state"
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
             {
                 var nativeSelector = NativeFeatureStateSelector(selector, scope);
-                return NativeMethods.mln_map_get_feature_state(Handle, &nativeSelector, completion);
+                return NativeMethods.mln_map_get_feature_state(
+                    Handle,
+                    &nativeSelector,
+                    completion,
+                    diagnostic
+                );
             },
             result =>
             {
@@ -956,7 +1033,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_map_get_global_state(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_get_global_state(Handle, completion, diagnostic),
                 result =>
                 {
                     var value = NativeCompletion.Value<mln_buffer_view>(result);
@@ -979,11 +1057,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_get_image_source_coordinates(
                         Handle,
                         nativeSourceId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                 {
@@ -1012,8 +1091,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
             .Submit(
-                completion =>
-                    NativeMethods.mln_map_get_layer_filter(Handle, nativeLayerId.Value, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_get_layer_filter(
+                        Handle,
+                        nativeLayerId.Value,
+                        completion,
+                        diagnostic
+                    ),
                 result =>
                 {
                     if (result->value_count == 0)
@@ -1040,12 +1124,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_get_layer_property(
                         Handle,
                         nativeLayerId.Value,
                         nativePropertyName.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                 {
@@ -1071,11 +1156,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_get_style_image_info(
                         Handle,
                         nativeImageId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                     result->value_count == 0
@@ -1100,11 +1186,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_get_style_layer_info(
                         Handle,
                         nativeLayerId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                     result->value_count == 0
@@ -1129,11 +1216,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_get_style_layer_json(
                         Handle,
                         nativeLayerId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                 {
@@ -1159,11 +1247,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_get_style_light_property(
                         Handle,
                         nativePropertyName.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                 {
@@ -1189,11 +1278,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_get_style_source_info(
                         Handle,
                         nativeSourceId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                     result->value_count == 0
@@ -1218,11 +1308,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_get_style_source_tile_urls(
                         Handle,
                         nativeSourceId.Value,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result =>
                     result->value_count == 0
@@ -1245,8 +1336,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
-                    NativeMethods.mln_map_get_style_transition_options(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_get_style_transition_options(
+                        Handle,
+                        completion,
+                        diagnostic
+                    ),
                 result =>
                     CopyStyleTransitionOptions(
                         NativeCompletion.Value<mln_style_transition_options>(result)
@@ -1268,13 +1363,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_invalidate_custom_geometry_source_region(
-                    Handle,
-                    nativeSourceId.Value,
-                    NativeLatLngBounds(bounds),
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_invalidate_custom_geometry_source_region(
+                        Handle,
+                        nativeSourceId.Value,
+                        NativeLatLngBounds(bounds),
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1292,13 +1389,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_invalidate_custom_geometry_source_tile(
-                    Handle,
-                    nativeSourceId.Value,
-                    NativeCanonicalTileId(tileId),
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_invalidate_custom_geometry_source_tile(
+                        Handle,
+                        nativeSourceId.Value,
+                        NativeCanonicalTileId(tileId),
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1316,13 +1415,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_invalidate_custom_mvt_vector_source_tile(
-                    Handle,
-                    nativeSourceId.Value,
-                    NativeCanonicalTileId(tileId),
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_invalidate_custom_mvt_vector_source_tile(
+                        Handle,
+                        nativeSourceId.Value,
+                        NativeCanonicalTileId(tileId),
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1339,13 +1440,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                 {
                     var nativeCamera = NativeCameraOptions(camera);
                     return NativeMethods.mln_map_lat_lng_bounds_for_camera(
                         Handle,
                         &nativeCamera,
-                        completion
+                        completion,
+                        diagnostic
                     );
                 },
                 result => CopyLatLngBounds(NativeCompletion.Value<mln_lat_lng_bounds>(result))
@@ -1365,13 +1467,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                 {
                     var nativeCamera = NativeCameraOptions(camera);
                     return NativeMethods.mln_map_lat_lng_bounds_for_camera_unwrapped(
                         Handle,
                         &nativeCamera,
-                        completion
+                        completion,
+                        diagnostic
                     );
                 },
                 result => CopyLatLngBounds(NativeCompletion.Value<mln_lat_lng_bounds>(result))
@@ -1391,11 +1494,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_lat_lng_for_pixel(
                         Handle,
                         NativeScreenPoint(point),
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result => CopyLatLng(NativeCompletion.Value<mln_lat_lng>(result))
             )
@@ -1414,11 +1518,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_lat_lng_for_pixel_unwrapped(
                         Handle,
                         NativeScreenPoint(point),
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result => CopyLatLng(NativeCompletion.Value<mln_lat_lng>(result))
             )
@@ -1437,7 +1542,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_lat_lngs_for_pixels"
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
                 NativeMethods.mln_map_lat_lngs_for_pixels(
                     Handle,
                     scope.Array<mln_screen_point, ScreenPoint>(
@@ -1445,7 +1550,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
                         item => NativeScreenPoint(item)
                     ),
                     checked((nuint)points.Length),
-                    completion
+                    completion,
+                    diagnostic
                 ),
             result =>
             {
@@ -1472,7 +1578,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_lat_lngs_for_pixels_unwrapped"
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
                 NativeMethods.mln_map_lat_lngs_for_pixels_unwrapped(
                     Handle,
                     scope.Array<mln_screen_point, ScreenPoint>(
@@ -1480,7 +1586,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
                         item => NativeScreenPoint(item)
                     ),
                     checked((nuint)points.Length),
-                    completion
+                    completion,
+                    diagnostic
                 ),
             result =>
             {
@@ -1504,7 +1611,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_map_list_style_layer_ids(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_list_style_layer_ids(Handle, completion, diagnostic),
                 result =>
                 {
                     var values = NativeCompletion.Values<mln_buffer_view>(result);
@@ -1529,7 +1637,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_map_list_style_layers(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_list_style_layers(Handle, completion, diagnostic),
                 result =>
                 {
                     var values = NativeCompletion.Values<mln_style_layer_entry>(result);
@@ -1551,7 +1660,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_map_list_style_source_ids(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_list_style_source_ids(Handle, completion, diagnostic),
                 result =>
                 {
                     var values = NativeCompletion.Values<mln_buffer_view>(result);
@@ -1576,7 +1686,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_map_loaded_style_json(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_loaded_style_json(Handle, completion, diagnostic),
                 result =>
                 {
                     var value = NativeCompletion.Value<mln_buffer_view>(result);
@@ -1598,11 +1709,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_meters_per_pixel_at_latitude(
                         Handle,
                         latitude,
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result => NativeCompletion.Value<double>(result)
             )
@@ -1623,13 +1735,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_move_style_layer(
-                    Handle,
-                    nativeLayerId.Value,
-                    nativeBeforeLayerId.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_move_style_layer(
+                        Handle,
+                        nativeLayerId.Value,
+                        nativeBeforeLayerId.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1646,11 +1760,12 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion =>
+                (completion, diagnostic) =>
                     NativeMethods.mln_map_pixel_for_lat_lng(
                         Handle,
                         NativeLatLng(coordinate),
-                        completion
+                        completion,
+                        diagnostic
                     ),
                 result => CopyScreenPoint(NativeCompletion.Value<mln_screen_point>(result))
             )
@@ -1669,12 +1784,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_pixels_for_lat_lngs"
         );
         var operation = NativeCompletion.Submit(
-            completion =>
+            (completion, diagnostic) =>
                 NativeMethods.mln_map_pixels_for_lat_lngs(
                     Handle,
                     scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
                     checked((nuint)coordinates.Length),
-                    completion
+                    completion,
+                    diagnostic
                 ),
             result =>
             {
@@ -1697,7 +1813,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_projection_create"
         );
         return NativeCompletion.Submit(
-            completion => NativeMethods.mln_map_projection_create(Handle, completion),
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_projection_create(Handle, completion, diagnostic),
             result => MapProjectionHandle.Adopt(NativeCompletion.Value<MlnMapProjection>(result))
         );
     }
@@ -1716,10 +1833,11 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
 
     public ValueTask DisposeAsync() => new(CloseAsync());
 
-    private mln_status StartRelease(MlnMap handle)
+    private mln_status StartRelease(MlnMap handle, mln_diagnostic* _)
     {
-        teardown = NativeCompletion.SubmitUnit(completion =>
-            NativeMethods.mln_map_release(handle, completion)
+        teardown = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_release(handle, completion, diagnostic)
         );
         return mln_status.MLN_STATUS_OK;
     }
@@ -1735,11 +1853,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             this,
             "mln_map_remove_feature_state"
         );
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeSelector = NativeFeatureStateSelector(selector, scope);
-            return NativeMethods.mln_map_remove_feature_state(Handle, &nativeSelector, completion);
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeSelector = NativeFeatureStateSelector(selector, scope);
+                return NativeMethods.mln_map_remove_feature_state(
+                    Handle,
+                    &nativeSelector,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -1756,8 +1881,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_remove_style_image(Handle, nativeImageId.Value, completion)
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_remove_style_image(
+                        Handle,
+                        nativeImageId.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1774,8 +1905,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_remove_style_layer(Handle, nativeLayerId.Value, completion)
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_remove_style_layer(
+                        Handle,
+                        nativeLayerId.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1792,8 +1929,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_remove_style_source(Handle, nativeSourceId.Value, completion)
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_remove_style_source(
+                        Handle,
+                        nativeSourceId.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1808,7 +1951,10 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_request_repaint"
         );
         return NativeCompletion
-            .SubmitCommand(completion => NativeMethods.mln_map_request_repaint(Handle, completion))
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_request_repaint(Handle, completion, diagnostic)
+            )
             .WaitAsync(cancellationToken);
     }
 
@@ -1821,7 +1967,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_map_request_still_image(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_request_still_image(Handle, completion, diagnostic),
                 result => true
             )
             .WaitAsync(cancellationToken);
@@ -1838,8 +1985,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_resize"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_resize(Handle, NativeLogicalExtent(extent), completion)
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_resize(
+                        Handle,
+                        NativeLogicalExtent(extent),
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1855,11 +2008,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_bounds"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-            {
-                var nativeOptions = NativeBoundOptions(options);
-                return NativeMethods.mln_map_set_bounds(Handle, &nativeOptions, completion);
-            })
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                {
+                    var nativeOptions = NativeBoundOptions(options);
+                    return NativeMethods.mln_map_set_bounds(
+                        Handle,
+                        &nativeOptions,
+                        completion,
+                        diagnostic
+                    );
+                }
+            )
             .WaitAsync(cancellationToken);
     }
 
@@ -1878,14 +2038,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeData = NativeStringView.From(data, nameof(data));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_custom_geometry_source_tile_data(
-                    Handle,
-                    nativeSourceId.Value,
-                    NativeCanonicalTileId(tileId),
-                    nativeData.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_custom_geometry_source_tile_data(
+                        Handle,
+                        nativeSourceId.Value,
+                        NativeCanonicalTileId(tileId),
+                        nativeData.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1905,14 +2067,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeData = NativeStringView.From(data, nameof(data));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
-                    Handle,
-                    nativeSourceId.Value,
-                    NativeCanonicalTileId(tileId),
-                    nativeData.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
+                        Handle,
+                        nativeSourceId.Value,
+                        NativeCanonicalTileId(tileId),
+                        nativeData.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1932,14 +2096,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeMessage = NativeStringView.From(message, nameof(message));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_custom_mvt_vector_source_tile_error(
-                    Handle,
-                    nativeSourceId.Value,
-                    NativeCanonicalTileId(tileId),
-                    nativeMessage.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_custom_mvt_vector_source_tile_error(
+                        Handle,
+                        nativeSourceId.Value,
+                        NativeCanonicalTileId(tileId),
+                        nativeMessage.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1955,8 +2121,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_debug_options"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_debug_options(Handle, (uint)options, completion)
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_debug_options(
+                        Handle,
+                        (uint)options,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1972,8 +2144,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_event_mask"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_event_mask(Handle, (ulong)mask, completion)
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_event_mask(
+                        Handle,
+                        (ulong)mask,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -1991,16 +2169,19 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_feature_state"
         );
         using var nativeState = NativeStringView.From(state, nameof(state));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeSelector = NativeFeatureStateSelector(selector, scope);
-            return NativeMethods.mln_map_set_feature_state(
-                Handle,
-                &nativeSelector,
-                nativeState.Value,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeSelector = NativeFeatureStateSelector(selector, scope);
+                return NativeMethods.mln_map_set_feature_state(
+                    Handle,
+                    &nativeSelector,
+                    nativeState.Value,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -2016,15 +2197,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_free_camera_options"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-            {
-                var nativeOptions = NativeFreeCameraOptions(options);
-                return NativeMethods.mln_map_set_free_camera_options(
-                    Handle,
-                    &nativeOptions,
-                    completion
-                );
-            })
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                {
+                    var nativeOptions = NativeFreeCameraOptions(options);
+                    return NativeMethods.mln_map_set_free_camera_options(
+                        Handle,
+                        &nativeOptions,
+                        completion,
+                        diagnostic
+                    );
+                }
+            )
             .WaitAsync(cancellationToken);
     }
 
@@ -2044,13 +2228,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var useData = data.Borrow();
         var handleData = useData.Handle;
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_geojson_source_data(
-                    Handle,
-                    nativeSourceId.Value,
-                    handleData,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_geojson_source_data(
+                        Handle,
+                        nativeSourceId.Value,
+                        handleData,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2068,13 +2254,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_geojson_source_synchronous_tiling(
-                    Handle,
-                    nativeSourceId.Value,
-                    (byte)(enabled ? 1 : 0),
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_geojson_source_synchronous_tiling(
+                        Handle,
+                        nativeSourceId.Value,
+                        (byte)(enabled ? 1 : 0),
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2093,13 +2281,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_geojson_source_url(
-                    Handle,
-                    nativeSourceId.Value,
-                    nativeUrl.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_geojson_source_url(
+                        Handle,
+                        nativeSourceId.Value,
+                        nativeUrl.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2118,13 +2308,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
         using var nativeValue = NativeStringView.From(value, nameof(value));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_global_state_property(
-                    Handle,
-                    nativePropertyName.Value,
-                    nativeValue.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_global_state_property(
+                        Handle,
+                        nativePropertyName.Value,
+                        nativeValue.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2142,14 +2334,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_image_source_coordinates"
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-            NativeMethods.mln_map_set_image_source_coordinates(
-                Handle,
-                nativeSourceId.Value,
-                scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
-                checked((nuint)coordinates.Length),
-                completion
-            )
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_set_image_source_coordinates(
+                    Handle,
+                    nativeSourceId.Value,
+                    scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
+                    checked((nuint)coordinates.Length),
+                    completion,
+                    diagnostic
+                )
         );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
@@ -2168,16 +2362,19 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_image_source_image"
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeImage = NativePremultipliedRgba8Image(image, scope);
-            return NativeMethods.mln_map_set_image_source_image(
-                Handle,
-                nativeSourceId.Value,
-                &nativeImage,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeImage = NativePremultipliedRgba8Image(image, scope);
+                return NativeMethods.mln_map_set_image_source_image(
+                    Handle,
+                    nativeSourceId.Value,
+                    &nativeImage,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -2196,13 +2393,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_image_source_url(
-                    Handle,
-                    nativeSourceId.Value,
-                    nativeUrl.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_image_source_url(
+                        Handle,
+                        nativeSourceId.Value,
+                        nativeUrl.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2220,16 +2419,19 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_layer_filter"
         );
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeFilter = filter is null ? default(mln_buffer_view) : scope.Buffer(filter);
-            return NativeMethods.mln_map_set_layer_filter(
-                Handle,
-                nativeLayerId.Value,
-                filter is null ? null : &nativeFilter,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeFilter = filter is null ? default(mln_buffer_view) : scope.Buffer(filter);
+                return NativeMethods.mln_map_set_layer_filter(
+                    Handle,
+                    nativeLayerId.Value,
+                    filter is null ? null : &nativeFilter,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -2247,13 +2449,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_layer_max_zoom(
-                    Handle,
-                    nativeLayerId.Value,
-                    maxZoom,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_layer_max_zoom(
+                        Handle,
+                        nativeLayerId.Value,
+                        maxZoom,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2271,13 +2475,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_layer_min_zoom(
-                    Handle,
-                    nativeLayerId.Value,
-                    minZoom,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_layer_min_zoom(
+                        Handle,
+                        nativeLayerId.Value,
+                        minZoom,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2298,14 +2504,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
         using var nativeValue = NativeStringView.From(value, nameof(value));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_layer_property(
-                    Handle,
-                    nativeLayerId.Value,
-                    nativePropertyName.Value,
-                    nativeValue.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_layer_property(
+                        Handle,
+                        nativeLayerId.Value,
+                        nativePropertyName.Value,
+                        nativeValue.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2324,13 +2532,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_layer_source_id(
-                    Handle,
-                    nativeLayerId.Value,
-                    nativeSourceId.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_layer_source_id(
+                        Handle,
+                        nativeLayerId.Value,
+                        nativeSourceId.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2349,13 +2559,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeSourceLayer = NativeStringView.From(sourceLayer, nameof(sourceLayer));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_layer_source_layer(
-                    Handle,
-                    nativeLayerId.Value,
-                    nativeSourceLayer.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_layer_source_layer(
+                        Handle,
+                        nativeLayerId.Value,
+                        nativeSourceLayer.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2373,13 +2585,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_layer_visibility(
-                    Handle,
-                    nativeLayerId.Value,
-                    (uint)visibility,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_layer_visibility(
+                        Handle,
+                        nativeLayerId.Value,
+                        (uint)visibility,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2397,13 +2611,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_location_indicator_accuracy_radius(
-                    Handle,
-                    nativeLayerId.Value,
-                    radius,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_location_indicator_accuracy_radius(
+                        Handle,
+                        nativeLayerId.Value,
+                        radius,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2421,13 +2637,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_location_indicator_bearing(
-                    Handle,
-                    nativeLayerId.Value,
-                    bearing,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_location_indicator_bearing(
+                        Handle,
+                        nativeLayerId.Value,
+                        bearing,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2447,14 +2665,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_location_indicator_image_name(
-                    Handle,
-                    nativeLayerId.Value,
-                    (uint)imageKind,
-                    nativeImageId.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_location_indicator_image_name(
+                        Handle,
+                        nativeLayerId.Value,
+                        (uint)imageKind,
+                        nativeImageId.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2473,14 +2693,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_location_indicator_location(
-                    Handle,
-                    nativeLayerId.Value,
-                    NativeLatLng(coordinate),
-                    altitude,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_location_indicator_location(
+                        Handle,
+                        nativeLayerId.Value,
+                        NativeLatLng(coordinate),
+                        altitude,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2496,11 +2718,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_projection_mode"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-            {
-                var nativeMode = NativeProjectionMode(mode);
-                return NativeMethods.mln_map_set_projection_mode(Handle, &nativeMode, completion);
-            })
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                {
+                    var nativeMode = NativeProjectionMode(mode);
+                    return NativeMethods.mln_map_set_projection_mode(
+                        Handle,
+                        &nativeMode,
+                        completion,
+                        diagnostic
+                    );
+                }
+            )
             .WaitAsync(cancellationToken);
     }
 
@@ -2515,12 +2744,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_rendering_stats_view_enabled"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_rendering_stats_view_enabled(
-                    Handle,
-                    (byte)(enabled ? 1 : 0),
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_rendering_stats_view_enabled(
+                        Handle,
+                        (byte)(enabled ? 1 : 0),
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2539,20 +2770,23 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_style_image"
         );
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
-        var operation = NativeCompletion.SubmitCommand(completion =>
-        {
-            var nativeImage = NativePremultipliedRgba8Image(image, scope);
-            var nativeOptions = options is null
-                ? default(mln_style_image_options)
-                : NativeStyleImageOptions(options, scope);
-            return NativeMethods.mln_map_set_style_image(
-                Handle,
-                nativeImageId.Value,
-                &nativeImage,
-                options is null ? null : &nativeOptions,
-                completion
-            );
-        });
+        var operation = NativeCompletion.SubmitCommand(
+            (completion, diagnostic) =>
+            {
+                var nativeImage = NativePremultipliedRgba8Image(image, scope);
+                var nativeOptions = options is null
+                    ? default(mln_style_image_options)
+                    : NativeStyleImageOptions(options, scope);
+                return NativeMethods.mln_map_set_style_image(
+                    Handle,
+                    nativeImageId.Value,
+                    &nativeImage,
+                    options is null ? null : &nativeOptions,
+                    completion,
+                    diagnostic
+                );
+            }
+        );
         scope.Accept();
         return operation.WaitAsync(cancellationToken);
     }
@@ -2569,8 +2803,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeJson = NativeStringView.From(json, nameof(json));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_style_json(Handle, nativeJson.Value, completion)
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_json(
+                        Handle,
+                        nativeJson.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2587,12 +2827,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeLightJson = NativeStringView.From(lightJson, nameof(lightJson));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_style_light_json(
-                    Handle,
-                    nativeLightJson.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_light_json(
+                        Handle,
+                        nativeLightJson.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2611,13 +2853,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
         using var nativeValue = NativeStringView.From(value, nameof(value));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_style_light_property(
-                    Handle,
-                    nativePropertyName.Value,
-                    nativeValue.Value,
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_light_property(
+                        Handle,
+                        nativePropertyName.Value,
+                        nativeValue.Value,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2635,13 +2879,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_style_source_volatile(
-                    Handle,
-                    nativeSourceId.Value,
-                    (byte)(isVolatile ? 1 : 0),
-                    completion
-                )
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_source_volatile(
+                        Handle,
+                        nativeSourceId.Value,
+                        (byte)(isVolatile ? 1 : 0),
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2657,15 +2903,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_style_transition_options"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-            {
-                var nativeOptions = NativeStyleTransitionOptions(options);
-                return NativeMethods.mln_map_set_style_transition_options(
-                    Handle,
-                    &nativeOptions,
-                    completion
-                );
-            })
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                {
+                    var nativeOptions = NativeStyleTransitionOptions(options);
+                    return NativeMethods.mln_map_set_style_transition_options(
+                        Handle,
+                        &nativeOptions,
+                        completion,
+                        diagnostic
+                    );
+                }
+            )
             .WaitAsync(cancellationToken);
     }
 
@@ -2682,8 +2931,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(url);
         using var nativeUrl = NativeUtf8String.FromNullableString(url, nameof(url));
         return NativeCompletion
-            .SubmitCommand(completion =>
-                NativeMethods.mln_map_set_style_url(Handle, nativeUrl.Pointer, completion)
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_set_style_url(
+                        Handle,
+                        nativeUrl.Pointer,
+                        completion,
+                        diagnostic
+                    )
             )
             .WaitAsync(cancellationToken);
     }
@@ -2699,11 +2954,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_tile_options"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-            {
-                var nativeOptions = NativeMapTileOptions(options);
-                return NativeMethods.mln_map_set_tile_options(Handle, &nativeOptions, completion);
-            })
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                {
+                    var nativeOptions = NativeMapTileOptions(options);
+                    return NativeMethods.mln_map_set_tile_options(
+                        Handle,
+                        &nativeOptions,
+                        completion,
+                        diagnostic
+                    );
+                }
+            )
             .WaitAsync(cancellationToken);
     }
 
@@ -2718,15 +2980,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_set_viewport_options"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-            {
-                var nativeOptions = NativeMapViewportOptions(options);
-                return NativeMethods.mln_map_set_viewport_options(
-                    Handle,
-                    &nativeOptions,
-                    completion
-                );
-            })
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                {
+                    var nativeOptions = NativeMapViewportOptions(options);
+                    return NativeMethods.mln_map_set_viewport_options(
+                        Handle,
+                        &nativeOptions,
+                        completion,
+                        diagnostic
+                    );
+                }
+            )
             .WaitAsync(cancellationToken);
     }
 
@@ -2739,7 +3004,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_snapshot_get"
         );
         var outSnapshot = new mln_map_snapshot { size = (uint)sizeof(mln_map_snapshot) };
-        NativeStatus.Check(NativeMethods.mln_map_snapshot_get(read.Handle, &outSnapshot));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_map_snapshot_get(
+                read.Handle,
+                &outSnapshot,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return CopyMapSnapshot(outSnapshot);
     }
 
@@ -2752,7 +3025,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
         );
         return NativeCompletion
             .Submit(
-                completion => NativeMethods.mln_map_style_url(Handle, completion),
+                (completion, diagnostic) =>
+                    NativeMethods.mln_map_style_url(Handle, completion, diagnostic),
                 result =>
                 {
                     var value = NativeCompletion.Value<mln_buffer_view>(result);
@@ -2773,11 +3047,18 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_map_update_camera"
         );
         return NativeCompletion
-            .SubmitCommand(completion =>
-            {
-                var nativeUpdate = NativeCameraUpdate(update);
-                return NativeMethods.mln_map_update_camera(Handle, &nativeUpdate, completion);
-            })
+            .SubmitCommand(
+                (completion, diagnostic) =>
+                {
+                    var nativeUpdate = NativeCameraUpdate(update);
+                    return NativeMethods.mln_map_update_camera(
+                        Handle,
+                        &nativeUpdate,
+                        completion,
+                        diagnostic
+                    );
+                }
+            )
             .WaitAsync(cancellationToken);
     }
 
@@ -2793,22 +3074,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_metal_borrowed_texture_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeMetalBorrowedTextureDescriptor(descriptor);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_metal_borrowed_texture_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeMetalBorrowedTextureDescriptor(descriptor);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_metal_borrowed_texture_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -2826,22 +3110,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_metal_owned_texture_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeMetalOwnedTextureDescriptor(descriptor);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_metal_owned_texture_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeMetalOwnedTextureDescriptor(descriptor);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_metal_owned_texture_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -2859,22 +3146,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_metal_surface_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeMetalSurfaceDescriptor(descriptor);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_metal_surface_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeMetalSurfaceDescriptor(descriptor);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_metal_surface_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -2892,22 +3182,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_opengl_borrowed_texture_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeOpenglBorrowedTextureDescriptor(descriptor, scope);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_opengl_borrowed_texture_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeOpenglBorrowedTextureDescriptor(descriptor, scope);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_opengl_borrowed_texture_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -2925,22 +3218,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_opengl_owned_texture_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeOpenglOwnedTextureDescriptor(descriptor, scope);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_opengl_owned_texture_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeOpenglOwnedTextureDescriptor(descriptor, scope);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_opengl_owned_texture_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -2958,22 +3254,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_opengl_surface_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeOpenglSurfaceDescriptor(descriptor, scope);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_opengl_surface_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeOpenglSurfaceDescriptor(descriptor, scope);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_opengl_surface_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -2991,22 +3290,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_vulkan_borrowed_texture_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeVulkanBorrowedTextureDescriptor(descriptor);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_vulkan_borrowed_texture_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeVulkanBorrowedTextureDescriptor(descriptor);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_vulkan_borrowed_texture_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -3024,22 +3326,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_vulkan_owned_texture_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeVulkanOwnedTextureDescriptor(descriptor);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_vulkan_owned_texture_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeVulkanOwnedTextureDescriptor(descriptor);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_vulkan_owned_texture_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -3057,22 +3362,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_vulkan_surface_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeVulkanSurfaceDescriptor(descriptor);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_vulkan_surface_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeVulkanSurfaceDescriptor(descriptor);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_vulkan_surface_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -3090,22 +3398,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_webgpu_borrowed_texture_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeWebgpuBorrowedTextureDescriptor(descriptor);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_webgpu_borrowed_texture_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeWebgpuBorrowedTextureDescriptor(descriptor);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_webgpu_borrowed_texture_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -3123,22 +3434,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_webgpu_owned_texture_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeWebgpuOwnedTextureDescriptor(descriptor);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_webgpu_owned_texture_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeWebgpuOwnedTextureDescriptor(descriptor);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_webgpu_owned_texture_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -3156,22 +3470,25 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
             "mln_webgpu_surface_attach"
         );
         MlnRenderSession outSession = default;
-        var attachment = NativeCompletion.SubmitUnit(completion =>
-        {
-            MlnRenderSession nativeOutSession = default;
-            var nativeDescriptor = NativeWebgpuSurfaceDescriptor(descriptor);
-            var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
-            var status = NativeMethods.mln_webgpu_surface_attach(
-                Handle,
-                &nativeDescriptor,
-                &nativeOptions,
-                &nativeOutSession,
-                completion
-            );
-            if (status == mln_status.MLN_STATUS_OK)
-                outSession = nativeOutSession;
-            return status;
-        });
+        var attachment = NativeCompletion.SubmitUnit(
+            (completion, diagnostic) =>
+            {
+                MlnRenderSession nativeOutSession = default;
+                var nativeDescriptor = NativeWebgpuSurfaceDescriptor(descriptor);
+                var nativeOptions = NativeRenderSessionAttachOptions(options, scope);
+                var status = NativeMethods.mln_webgpu_surface_attach(
+                    Handle,
+                    &nativeDescriptor,
+                    &nativeOptions,
+                    &nativeOutSession,
+                    completion,
+                    diagnostic
+                );
+                if (status == mln_status.MLN_STATUS_OK)
+                    outSession = nativeOutSession;
+                return status;
+            }
+        );
         var owner = RenderSessionHandle.Adopt(this, outSession, attachment);
         scope.Accept(owner.CallbackOwner);
         return owner;

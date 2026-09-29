@@ -7,9 +7,10 @@
 #include "util.h"
 
 static app_error completion_failure(
-  app_error error, const char* message, mln_status status
+  app_error error, const char* message, mln_status status,
+  const mln_diagnostic* diagnostic
 ) {
-  diagnostics_log_status(message, status);
+  diagnostics_log_status(message, status, diagnostic);
   return error;
 }
 
@@ -32,6 +33,7 @@ mln_completion* render_session_begin_submission(
       .user_data = &session->pending,
     },
   };
+  session->diagnostic = (mln_diagnostic){.size = sizeof(mln_diagnostic)};
   session->pending_error = error;
   session->pending_message = message;
   return &session->pending.descriptor;
@@ -40,7 +42,8 @@ mln_completion* render_session_begin_submission(
 app_error render_session_submitted(render_session* session, mln_status status) {
   if (status != MLN_STATUS_OK) {
     return completion_failure(
-      session->pending_error, session->pending_message, status
+      session->pending_error, session->pending_message, status,
+      &session->diagnostic
     );
   }
   session->pending_active = true;
@@ -53,12 +56,14 @@ app_error render_session_poll(render_session* session, bool* out_pending) {
     return APP_OK;
   }
   size_t serviced = 0;
-  const mln_status status =
-    mln_render_session_service_driver_work(session->handle, 0, &serviced);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status = mln_render_session_service_driver_work(
+    session->handle, 0, &serviced, &diagnostic
+  );
   if (status != MLN_STATUS_OK) {
     session->pending_active = false;
     return completion_failure(
-      session->pending_error, session->pending_message, status
+      session->pending_error, session->pending_message, status, &diagnostic
     );
   }
   if (!atomic_load_explicit(
@@ -70,7 +75,8 @@ app_error render_session_poll(render_session* session, bool* out_pending) {
   session->pending_active = false;
   if (session->pending.status != MLN_STATUS_OK) {
     return completion_failure(
-      session->pending_error, session->pending_message, session->pending.status
+      session->pending_error, session->pending_message, session->pending.status,
+      NULL
     );
   }
   return APP_OK;
@@ -99,19 +105,21 @@ void render_session_close(render_session* session) {
     bool abandon = render_session_await(session) != APP_OK;
     if (!abandon) {
       const mln_status status = mln_render_session_detach(
-        session->handle, render_session_begin_submission(
-                           session, APP_ERROR_BACKEND_SETUP_FAILED,
-                           "render session detach failed"
-                         )
+        session->handle,
+        render_session_begin_submission(
+          session, APP_ERROR_BACKEND_SETUP_FAILED,
+          "render session detach failed"
+        ),
+        &session->diagnostic
       );
       abandon = render_session_submitted(session, status) != APP_OK ||
                 render_session_await(session) != APP_OK;
     }
     if (abandon) {
       mln_render_abandon_result result = {.size = sizeof(result)};
-      (void)mln_render_session_abandon(session->handle, &result);
+      (void)mln_render_session_abandon(session->handle, &result, NULL);
     }
-    (void)mln_render_session_destroy(session->handle);
+    (void)mln_render_session_destroy(session->handle, NULL);
   }
   *session = (render_session){.handle = MLN_HANDLE_NULL};
 }
@@ -132,7 +140,8 @@ app_error render_session_resize(
       is_surface ? APP_ERROR_SURFACE_RESIZE_FAILED
                  : APP_ERROR_TEXTURE_RESIZE_FAILED,
       is_surface ? "surface resize failed" : "texture resize failed"
-    )
+    ),
+    &session->diagnostic
   );
   return render_session_submitted(session, status);
 }
@@ -145,13 +154,15 @@ app_error render_session_resize_map(
     .height = current_viewport.logical_height,
     .scale_factor = current_viewport.scale_factor,
   };
-  const mln_status status =
-    mln_map_resize(session->map, extent, map_state_discarded_completion());
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status = mln_map_resize(
+    session->map, extent, map_state_discarded_completion(), &diagnostic
+  );
   if (status != MLN_STATUS_OK) {
     return completion_failure(
       session->kind == RENDER_SESSION_SURFACE ? APP_ERROR_SURFACE_RESIZE_FAILED
                                               : APP_ERROR_TEXTURE_RESIZE_FAILED,
-      "map resize failed", status
+      "map resize failed", status, &diagnostic
     );
   }
   return APP_OK;
@@ -170,30 +181,40 @@ app_error render_session_render_update(
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags |= is_surface ? MLN_FRAME_DEMAND_PRESENT : 0;
   demand.token = ++session->next_frame_token;
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_status status =
-    mln_render_session_request_frame(session->handle, &demand);
+    mln_render_session_request_frame(session->handle, &demand, &diagnostic);
   if (status != MLN_STATUS_OK) {
-    return completion_failure(error, "frame demand failed", status);
+    return completion_failure(
+      error, "frame demand failed", status, &diagnostic
+    );
   }
   size_t serviced = 0;
-  status =
-    mln_render_session_service_driver_work(session->handle, 0, &serviced);
+  status = mln_render_session_service_driver_work(
+    session->handle, 0, &serviced, &diagnostic
+  );
   if (status != MLN_STATUS_OK) {
-    return completion_failure(error, "driver service failed", status);
+    return completion_failure(
+      error, "driver service failed", status, &diagnostic
+    );
   }
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  status = mln_render_session_drain_frame_results(session->handle, &batch);
+  status = mln_render_session_drain_frame_results(
+    session->handle, &batch, &diagnostic
+  );
   if (status == MLN_STATUS_NOT_READY) {
     return APP_OK;
   }
   if (status != MLN_STATUS_OK) {
-    return completion_failure(error, "frame result drain failed", status);
+    return completion_failure(
+      error, "frame result drain failed", status, &diagnostic
+    );
   }
   size_t count = 0;
-  status = mln_render_frame_batch_count(batch, &count);
+  status = mln_render_frame_batch_count(batch, &count, &diagnostic);
   for (size_t i = 0; status == MLN_STATUS_OK && i < count; ++i) {
     mln_render_frame_result result = {.size = sizeof(result)};
-    status = mln_render_frame_batch_get(batch, i, &result);
+    status = mln_render_frame_batch_get(batch, i, &result, &diagnostic);
     if (status == MLN_STATUS_OK && result.token == demand.token) {
       out_outcome->rendered = result.disposition == MLN_RENDER_RESULT_RENDERED;
       out_outcome->needs_repaint = result.needs_repaint;
@@ -201,7 +222,9 @@ app_error render_session_render_update(
   }
   mln_render_frame_batch_release(batch);
   if (status != MLN_STATUS_OK) {
-    return completion_failure(error, "frame result read failed", status);
+    return completion_failure(
+      error, "frame result read failed", status, &diagnostic
+    );
   }
   return APP_OK;
 }
@@ -210,9 +233,13 @@ app_error render_session_require_cpu_complete_producer(
   mln_acquired_frame frame, const char* message
 ) {
   mln_gpu_sync sync = mln_gpu_sync_default();
-  const mln_status status = mln_acquired_frame_get_producer_sync(frame, &sync);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status =
+    mln_acquired_frame_get_producer_sync(frame, &sync, &diagnostic);
   if (status != MLN_STATUS_OK) {
-    return completion_failure(APP_ERROR_BACKEND_DRAW_FAILED, message, status);
+    return completion_failure(
+      APP_ERROR_BACKEND_DRAW_FAILED, message, status, &diagnostic
+    );
   }
   if (sync.kind != MLN_GPU_SYNC_CPU_COMPLETE) {
     fprintf(

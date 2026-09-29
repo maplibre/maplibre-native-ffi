@@ -22,7 +22,7 @@ mln_status jump_downtown(mln_map map, const mln_completion* completion) {
   mln_camera_update update = mln_camera_update_default();
   update.mode = MLN_CAMERA_UPDATE_MODE_JUMP;
   update.camera = downtown();
-  return mln_map_update_camera(map, &update, completion);
+  return mln_map_update_camera(map, &update, completion, NULL);
 }
 // #endregion jump
 
@@ -40,13 +40,13 @@ mln_status ease_downtown(
   update.animation.easing =
     (mln_unit_bezier){.x1 = 0.25, .y1 = 0.1, .x2 = 0.25, .y2 = 1.0};
   update.animation.transition_id = transition_id;
-  return mln_map_update_camera(map, &update, completion);
+  return mln_map_update_camera(map, &update, completion, NULL);
   // #endregion ease
 }
 
 mln_status select_camera_events(mln_map map, const mln_completion* completion) {
   return mln_map_set_event_mask(
-    map, MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED, completion
+    map, MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED, completion, NULL
   );
 }
 

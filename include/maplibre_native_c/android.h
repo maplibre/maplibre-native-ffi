@@ -43,7 +43,8 @@ MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_android_init(
   void* jni_env MLN_BINDING("kind=native_pointer;ownership=borrowed"),
   void* jni_class MLN_BINDING("kind=native_pointer;ownership=borrowed"),
-  void* context MLN_BINDING("kind=native_pointer;ownership=borrowed")
+  void* context MLN_BINDING("kind=native_pointer;ownership=borrowed"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

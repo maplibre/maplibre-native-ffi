@@ -32,6 +32,8 @@ typedef struct render_session {
   /// resize, target replacement, or detach. The core copies the descriptor and
   /// runs it from the driver, so the storage outlives the submitting frame.
   render_completion pending;
+  /// The submission's synchronous diagnostic, reported with a non-OK status.
+  mln_diagnostic diagnostic;
   bool pending_active;
   app_error pending_error;
   const char* pending_message;
@@ -45,8 +47,9 @@ typedef struct render_frame_outcome {
 } render_frame_outcome;
 
 /// Arms the session's one completion slot, which at most one ordered
-/// submission uses at a time. Pass the returned descriptor to the C API, then
-/// report the status it returned to render_session_submitted().
+/// submission uses at a time. Pass the returned descriptor and the session's
+/// diagnostic to the C API, then report the status it returned to
+/// render_session_submitted().
 mln_completion* render_session_begin_submission(
   render_session* session, app_error error, const char* message
 );

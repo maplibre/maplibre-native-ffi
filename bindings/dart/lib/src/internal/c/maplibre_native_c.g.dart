@@ -15,90 +15,132 @@ library;
 
 import 'dart:ffi' as ffi;
 
-@ffi.Native<ffi.Int32 Function(mln_acquired_frame)>()
-external int mln_acquired_frame_dispose(int frame);
+@ffi.Native<
+  ffi.Int32 Function(mln_acquired_frame, ffi.Pointer<mln_diagnostic>)
+>()
+external int mln_acquired_frame_dispose(
+  int frame,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_acquired_frame,
     ffi.Pointer<mln_metal_owned_texture_frame>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_acquired_frame_get_metal_texture(
   int frame,
   ffi.Pointer<mln_metal_owned_texture_frame> out_frame,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_acquired_frame,
     ffi.Pointer<mln_opengl_owned_texture_frame>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_acquired_frame_get_opengl_texture(
   int frame,
   ffi.Pointer<mln_opengl_owned_texture_frame> out_frame,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_acquired_frame, ffi.Pointer<mln_gpu_sync>)>()
-external int mln_acquired_frame_get_producer_sync(
-  int frame,
-  ffi.Pointer<mln_gpu_sync> out_sync,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_acquired_frame, ffi.Pointer<mln_render_frame_result>)
+  ffi.Int32 Function(
+    mln_acquired_frame,
+    ffi.Pointer<mln_gpu_sync>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_acquired_frame_get_producer_sync(
+  int frame,
+  ffi.Pointer<mln_gpu_sync> out_sync,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_acquired_frame,
+    ffi.Pointer<mln_render_frame_result>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_acquired_frame_get_result(
   int frame,
   ffi.Pointer<mln_render_frame_result> out_result,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_acquired_frame,
     ffi.Pointer<mln_vulkan_owned_texture_frame>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_acquired_frame_get_vulkan_texture(
   int frame,
   ffi.Pointer<mln_vulkan_owned_texture_frame> out_frame,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_acquired_frame,
     ffi.Pointer<mln_webgpu_owned_texture_frame>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_acquired_frame_get_webgpu_texture(
   int frame,
   ffi.Pointer<mln_webgpu_owned_texture_frame> out_frame,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(ffi.Pointer<mln_acquired_frame>, ffi.Pointer<mln_gpu_sync>)
+  ffi.Int32 Function(
+    ffi.Pointer<mln_acquired_frame>,
+    ffi.Pointer<mln_gpu_sync>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_acquired_frame_release(
   ffi.Pointer<mln_acquired_frame> frame,
   ffi.Pointer<mln_gpu_sync> consumer_completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_acquired_frame, ffi.Pointer<ffi.Pointer<ffi.Void>>)
+  ffi.Int32 Function(
+    mln_acquired_frame,
+    ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_adapter_acquired_frame_view_begin(
   int frame,
   ffi.Pointer<ffi.Pointer<ffi.Void>> out_scope,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
 external void mln_adapter_acquired_frame_view_end(ffi.Pointer<ffi.Void> scope);
 
-@ffi.Native<ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Uint64)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Pointer<ffi.Void>,
+    ffi.Uint64,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_adapter_arena_adopt_handle(
   ffi.Pointer<ffi.Void> arena,
   int handle,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -106,12 +148,14 @@ external int mln_adapter_arena_adopt_handle(
     ffi.Pointer<ffi.Void>,
     mln_runtime_callback_release,
     ffi.Pointer<ffi.Void>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_adapter_arena_adopt_release(
   ffi.Pointer<ffi.Void> arena,
   mln_runtime_callback_release release,
   ffi.Pointer<ffi.Void> context,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -136,6 +180,7 @@ external void mln_adapter_arena_destroy(ffi.Pointer<ffi.Void> arena);
     mln_adapter_completion_listener,
     ffi.Pointer<ffi.Void>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_adapter_completion_create(
@@ -144,6 +189,7 @@ external int mln_adapter_completion_create(
   mln_adapter_completion_listener listener,
   ffi.Pointer<ffi.Void> user_data,
   ffi.Pointer<mln_completion> out_completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<ffi.Void Function(ffi.Pointer<mln_adapter_completion_record>)>()
@@ -195,6 +241,7 @@ external void mln_adapter_custom_mvt_vector_callbacks_retire(
     ffi.Int64,
     ffi.Int64,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_adapter_dart_completion_create(
@@ -204,6 +251,7 @@ external int mln_adapter_dart_completion_create(
   int port,
   int token,
   ffi.Pointer<mln_completion> out_completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -212,6 +260,7 @@ external int mln_adapter_dart_completion_create(
     ffi.Pointer<ffi.Void>,
     ffi.Int64,
     ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_adapter_dart_deferred_callback_create(
@@ -219,6 +268,7 @@ external int mln_adapter_dart_deferred_callback_create(
   ffi.Pointer<ffi.Void> post_cobject,
   int port,
   ffi.Pointer<ffi.Pointer<ffi.Void>> out_context,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Void>, ffi.Int64)>()
@@ -243,6 +293,7 @@ external void mln_adapter_dart_release(ffi.Pointer<ffi.Void> context);
     ffi.Pointer<ffi.Void>,
     ffi.Pointer<ffi.Void>,
     ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_adapter_dart_release_register(
@@ -251,15 +302,22 @@ external int mln_adapter_dart_release_register(
   ffi.Pointer<ffi.Void> context,
   ffi.Pointer<ffi.Void> arena,
   ffi.Pointer<ffi.Uint64> out_registration,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(ffi.Pointer<ffi.Void>, ffi.Int64, ffi.Pointer<mln_wake>)
+  ffi.Int32 Function(
+    ffi.Pointer<ffi.Void>,
+    ffi.Int64,
+    ffi.Pointer<mln_wake>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_adapter_dart_wake_create(
   ffi.Pointer<ffi.Void> post_cobject,
   int port,
   ffi.Pointer<mln_wake> out_wake,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<ffi.Void Function(ffi.Pointer<mln_adapter_deferred_call_record>)>()
@@ -278,6 +336,7 @@ external void mln_adapter_deferred_call_record_destroy(
     mln_adapter_deferred_call_listener,
     ffi.Pointer<ffi.Void>,
     ffi.Pointer<ffi.Pointer<ffi.Void>>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_adapter_deferred_callback_create(
@@ -285,6 +344,7 @@ external int mln_adapter_deferred_callback_create(
   mln_adapter_deferred_call_listener listener,
   ffi.Pointer<ffi.Void> listener_user_data,
   ffi.Pointer<ffi.Pointer<ffi.Void>> out_context,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<ffi.Pointer<ffi.Void> Function(ffi.Uint32)>()
@@ -312,10 +372,17 @@ external int mln_adapter_http_header_transform_callback(
   ffi.Pointer<mln_http_header_transform_response> out_response,
 );
 
-@ffi.Native<ffi.Int32 Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_adapter_http_header_validate(
   ffi.Pointer<ffi.Char> name,
   ffi.Pointer<ffi.Char> value,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
@@ -373,12 +440,14 @@ external int mln_adapter_routed_resource_provider_callback(
     ffi.Pointer<ffi.Void>,
     ffi.Pointer<ffi.Void>,
     ffi.Pointer<ffi.Void>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_android_init(
   ffi.Pointer<ffi.Void> jni_env,
   ffi.Pointer<ffi.Void> jni_class,
   ffi.Pointer<ffi.Void> context,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_animation_options Function()>()
@@ -390,8 +459,18 @@ external mln_bound_options mln_bound_options_default();
 @ffi.Native<ffi.Void Function(mln_buffer)>()
 external void mln_buffer_destroy(int buffer);
 
-@ffi.Native<ffi.Int32 Function(mln_buffer, ffi.Pointer<mln_buffer_view>)>()
-external int mln_buffer_get(int buffer, ffi.Pointer<mln_buffer_view> out_view);
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_buffer,
+    ffi.Pointer<mln_buffer_view>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_buffer_get(
+  int buffer,
+  ffi.Pointer<mln_buffer_view> out_view,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @ffi.Native<ffi.Uint32 Function()>()
 external int mln_c_version();
@@ -417,11 +496,16 @@ external mln_custom_mvt_vector_source_options
 mln_custom_mvt_vector_source_options_default();
 
 @ffi.Native<
-  ffi.Int32 Function(mln_event_batch, ffi.Pointer<mln_runtime_event_batch_view>)
+  ffi.Int32 Function(
+    mln_event_batch,
+    ffi.Pointer<mln_runtime_event_batch_view>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_event_batch_get(
   int batch,
   ffi.Pointer<mln_runtime_event_batch_view> out_view,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<ffi.Void Function(mln_event_batch)>()
@@ -438,12 +522,14 @@ external mln_free_camera_options mln_free_camera_options_default();
     mln_buffer_view,
     ffi.Pointer<mln_geojson_source_options>,
     ffi.Pointer<mln_geojson_source_data>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_geojson_source_data_create(
   mln_buffer_view data,
   ffi.Pointer<mln_geojson_source_options> options,
   ffi.Pointer<mln_geojson_source_data> out_data,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<ffi.Void Function(mln_geojson_source_data)>()
@@ -462,6 +548,7 @@ external mln_gpu_sync mln_gpu_sync_default();
     ffi.Size,
     ffi.Pointer<ffi.Char>,
     ffi.Size,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_http_header_transform_response_set(
@@ -470,33 +557,44 @@ external int mln_http_header_transform_response_set(
   int name_size,
   ffi.Pointer<ffi.Char> value,
   int value_size,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_projected_meters, ffi.Pointer<mln_lat_lng>)
+  ffi.Int32 Function(
+    mln_projected_meters,
+    ffi.Pointer<mln_lat_lng>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_lat_lng_for_projected_meters(
   mln_projected_meters meters,
   ffi.Pointer<mln_lat_lng> out_coordinate,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function()>()
-external int mln_log_clear_callback();
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<mln_diagnostic>)>()
+external int mln_log_clear_callback(ffi.Pointer<mln_diagnostic> out_diagnostic);
 
-@ffi.Native<ffi.Int32 Function(ffi.Uint32)>()
-external int mln_log_set_async_severity_mask(int mask);
+@ffi.Native<ffi.Int32 Function(ffi.Uint32, ffi.Pointer<mln_diagnostic>)>()
+external int mln_log_set_async_severity_mask(
+  int mask,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_log_callback,
     ffi.Pointer<ffi.Void>,
     mln_log_callback_release,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_log_set_callback(
   mln_log_callback callback,
   ffi.Pointer<ffi.Void> user_data,
   mln_log_callback_release release_user_data,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -506,6 +604,7 @@ external int mln_log_set_callback(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_color_relief_layer(
@@ -514,6 +613,7 @@ external int mln_map_add_color_relief_layer(
   mln_buffer_view source_id,
   mln_buffer_view before_layer_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -522,6 +622,7 @@ external int mln_map_add_color_relief_layer(
     mln_buffer_view,
     ffi.Pointer<mln_custom_geometry_source_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_custom_geometry_source(
@@ -529,6 +630,7 @@ external int mln_map_add_custom_geometry_source(
   mln_buffer_view source_id,
   ffi.Pointer<mln_custom_geometry_source_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -537,6 +639,7 @@ external int mln_map_add_custom_geometry_source(
     mln_buffer_view,
     ffi.Pointer<mln_custom_mvt_vector_source_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_custom_mvt_vector_source(
@@ -544,6 +647,7 @@ external int mln_map_add_custom_mvt_vector_source(
   mln_buffer_view source_id,
   ffi.Pointer<mln_custom_mvt_vector_source_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -552,6 +656,7 @@ external int mln_map_add_custom_mvt_vector_source(
     mln_buffer_view,
     mln_geojson_source_data,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_geojson_source_data(
@@ -559,6 +664,7 @@ external int mln_map_add_geojson_source_data(
   mln_buffer_view source_id,
   int data,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -568,6 +674,7 @@ external int mln_map_add_geojson_source_data(
     mln_buffer_view,
     ffi.Pointer<mln_geojson_source_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_geojson_source_url(
@@ -576,6 +683,7 @@ external int mln_map_add_geojson_source_url(
   mln_buffer_view url,
   ffi.Pointer<mln_geojson_source_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -585,6 +693,7 @@ external int mln_map_add_geojson_source_url(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_hillshade_layer(
@@ -593,6 +702,7 @@ external int mln_map_add_hillshade_layer(
   mln_buffer_view source_id,
   mln_buffer_view before_layer_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -603,6 +713,7 @@ external int mln_map_add_hillshade_layer(
     ffi.Size,
     ffi.Pointer<mln_premultiplied_rgba8_image>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_image_source_image(
@@ -612,6 +723,7 @@ external int mln_map_add_image_source_image(
   int coordinate_count,
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -622,6 +734,7 @@ external int mln_map_add_image_source_image(
     ffi.Size,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_image_source_url(
@@ -631,6 +744,7 @@ external int mln_map_add_image_source_url(
   int coordinate_count,
   mln_buffer_view url,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -639,6 +753,7 @@ external int mln_map_add_image_source_url(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_location_indicator_layer(
@@ -646,6 +761,7 @@ external int mln_map_add_location_indicator_layer(
   mln_buffer_view layer_id,
   mln_buffer_view before_layer_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -656,6 +772,7 @@ external int mln_map_add_location_indicator_layer(
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_raster_dem_source_tiles(
@@ -665,6 +782,7 @@ external int mln_map_add_raster_dem_source_tiles(
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -674,6 +792,7 @@ external int mln_map_add_raster_dem_source_tiles(
     mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_raster_dem_source_url(
@@ -682,6 +801,7 @@ external int mln_map_add_raster_dem_source_url(
   mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -692,6 +812,7 @@ external int mln_map_add_raster_dem_source_url(
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_raster_source_tiles(
@@ -701,6 +822,7 @@ external int mln_map_add_raster_source_tiles(
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -710,6 +832,7 @@ external int mln_map_add_raster_source_tiles(
     mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_raster_source_url(
@@ -718,6 +841,7 @@ external int mln_map_add_raster_source_url(
   mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -726,6 +850,7 @@ external int mln_map_add_raster_source_url(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_style_layer_json(
@@ -733,6 +858,7 @@ external int mln_map_add_style_layer_json(
   mln_buffer_view layer_json,
   mln_buffer_view before_layer_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -741,6 +867,7 @@ external int mln_map_add_style_layer_json(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_style_source_json(
@@ -748,6 +875,7 @@ external int mln_map_add_style_source_json(
   mln_buffer_view source_id,
   mln_buffer_view source_json,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -758,6 +886,7 @@ external int mln_map_add_style_source_json(
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_vector_source_tiles(
@@ -767,6 +896,7 @@ external int mln_map_add_vector_source_tiles(
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -776,6 +906,7 @@ external int mln_map_add_vector_source_tiles(
     mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_add_vector_source_url(
@@ -784,6 +915,7 @@ external int mln_map_add_vector_source_url(
   mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -791,12 +923,14 @@ external int mln_map_add_vector_source_url(
     mln_map,
     ffi.Pointer<mln_camera_delta>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_apply_camera_delta(
   int map,
   ffi.Pointer<mln_camera_delta> delta,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -805,6 +939,7 @@ external int mln_map_apply_camera_delta(
     mln_buffer_view,
     ffi.Pointer<mln_camera_fit_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_camera_for_geometry(
@@ -812,6 +947,7 @@ external int mln_map_camera_for_geometry(
   mln_buffer_view geometry,
   ffi.Pointer<mln_camera_fit_options> fit_options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -820,6 +956,7 @@ external int mln_map_camera_for_geometry(
     mln_lat_lng_bounds,
     ffi.Pointer<mln_camera_fit_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_camera_for_lat_lng_bounds(
@@ -827,6 +964,7 @@ external int mln_map_camera_for_lat_lng_bounds(
   mln_lat_lng_bounds bounds,
   ffi.Pointer<mln_camera_fit_options> fit_options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -836,6 +974,7 @@ external int mln_map_camera_for_lat_lng_bounds(
     ffi.Size,
     ffi.Pointer<mln_camera_fit_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_camera_for_lat_lngs(
@@ -844,12 +983,20 @@ external int mln_map_camera_for_lat_lngs(
   int coordinate_count,
   ffi.Pointer<mln_camera_fit_options> fit_options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_map_camera_query(
   int map,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -857,72 +1004,117 @@ external int mln_map_camera_query(
     mln_map,
     ffi.Pointer<mln_camera_options>,
     ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_camera_snapshot_get(
   int map,
   ffi.Pointer<mln_camera_options> out_camera,
   ffi.Pointer<ffi.Uint64> out_generation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
-external int mln_map_cancel_transitions(
-  int map,
-  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_cancel_transitions(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_copy_layer_source_id(
   int map,
   mln_buffer_view layer_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_copy_layer_source_layer(
   int map,
   mln_buffer_view layer_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_copy_style_image_premultiplied_rgba8(
   int map,
   mln_buffer_view image_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_copy_style_image_stretches(
   int map,
   mln_buffer_view image_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_copy_style_source_attribution(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_copy_style_source_url(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -930,21 +1122,33 @@ external int mln_map_copy_style_source_url(
     mln_runtime,
     ffi.Pointer<mln_map_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_create(
   int runtime,
   ffi.Pointer<mln_map_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map)>()
-external int mln_map_dispose(int map);
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_diagnostic>)>()
+external int mln_map_dispose(
+  int map,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_map_dump_debug_logs(
   int map,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -952,36 +1156,57 @@ external int mln_map_dump_debug_logs(
     mln_map,
     ffi.Pointer<mln_feature_state_selector>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_get_feature_state(
   int map,
   ffi.Pointer<mln_feature_state_selector> selector,
   ffi.Pointer<mln_completion> completion,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
-external int mln_map_get_global_state(
-  int map,
-  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_get_global_state(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_get_image_source_coordinates(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_get_layer_filter(
   int map,
   mln_buffer_view layer_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -990,6 +1215,7 @@ external int mln_map_get_layer_filter(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_get_layer_property(
@@ -997,66 +1223,110 @@ external int mln_map_get_layer_property(
   mln_buffer_view layer_id,
   mln_buffer_view property_name,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_get_style_image_info(
   int map,
   mln_buffer_view image_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_get_style_layer_info(
   int map,
   mln_buffer_view layer_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_get_style_layer_json(
   int map,
   mln_buffer_view layer_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_get_style_light_property(
   int map,
   mln_buffer_view property_name,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_get_style_source_info(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_get_style_source_tile_urls(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_map_get_style_transition_options(
   int map,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1065,6 +1335,7 @@ external int mln_map_get_style_transition_options(
     mln_buffer_view,
     mln_lat_lng_bounds,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_invalidate_custom_geometry_source_region(
@@ -1072,6 +1343,7 @@ external int mln_map_invalidate_custom_geometry_source_region(
   mln_buffer_view source_id,
   mln_lat_lng_bounds bounds,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1080,6 +1352,7 @@ external int mln_map_invalidate_custom_geometry_source_region(
     mln_buffer_view,
     mln_canonical_tile_id,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_invalidate_custom_geometry_source_tile(
@@ -1087,6 +1360,7 @@ external int mln_map_invalidate_custom_geometry_source_tile(
   mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1095,6 +1369,7 @@ external int mln_map_invalidate_custom_geometry_source_tile(
     mln_buffer_view,
     mln_canonical_tile_id,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_invalidate_custom_mvt_vector_source_tile(
@@ -1102,6 +1377,7 @@ external int mln_map_invalidate_custom_mvt_vector_source_tile(
   mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1109,12 +1385,14 @@ external int mln_map_invalidate_custom_mvt_vector_source_tile(
     mln_map,
     ffi.Pointer<mln_camera_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_lat_lng_bounds_for_camera(
   int map,
   ffi.Pointer<mln_camera_options> camera,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1122,30 +1400,44 @@ external int mln_map_lat_lng_bounds_for_camera(
     mln_map,
     ffi.Pointer<mln_camera_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_lat_lng_bounds_for_camera_unwrapped(
   int map,
   ffi.Pointer<mln_camera_options> camera,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_screen_point, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_screen_point,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_lat_lng_for_pixel(
   int map,
   mln_screen_point point,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_screen_point, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_screen_point,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_lat_lng_for_pixel_unwrapped(
   int map,
   mln_screen_point point,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1154,6 +1446,7 @@ external int mln_map_lat_lng_for_pixel_unwrapped(
     ffi.Pointer<mln_screen_point>,
     ffi.Size,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_lat_lngs_for_pixels(
@@ -1161,6 +1454,7 @@ external int mln_map_lat_lngs_for_pixels(
   ffi.Pointer<mln_screen_point> points,
   int point_count,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1169,6 +1463,7 @@ external int mln_map_lat_lngs_for_pixels(
     ffi.Pointer<mln_screen_point>,
     ffi.Size,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_lat_lngs_for_pixels_unwrapped(
@@ -1176,39 +1471,74 @@ external int mln_map_lat_lngs_for_pixels_unwrapped(
   ffi.Pointer<mln_screen_point> points,
   int point_count,
   ffi.Pointer<mln_completion> completion,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
-external int mln_map_list_style_layer_ids(
-  int map,
-  ffi.Pointer<mln_completion> completion,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
-external int mln_map_list_style_layers(
-  int map,
-  ffi.Pointer<mln_completion> completion,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
-external int mln_map_list_style_source_ids(
-  int map,
-  ffi.Pointer<mln_completion> completion,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
-external int mln_map_loaded_style_json(
-  int map,
-  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Double, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_list_style_layer_ids(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_list_style_layers(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_list_style_source_ids(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_loaded_style_json(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Double,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_meters_per_pixel_at_latitude(
   int map,
   double latitude,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1217,6 +1547,7 @@ external int mln_map_meters_per_pixel_at_latitude(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_move_style_layer(
@@ -1224,18 +1555,25 @@ external int mln_map_move_style_layer(
   mln_buffer_view layer_id,
   mln_buffer_view before_layer_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_map_options Function()>()
 external mln_map_options mln_map_options_default();
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_lat_lng, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_lat_lng,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_pixel_for_lat_lng(
   int map,
   mln_lat_lng coordinate,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1244,6 +1582,7 @@ external int mln_map_pixel_for_lat_lng(
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_pixels_for_lat_lngs(
@@ -1251,23 +1590,41 @@ external int mln_map_pixels_for_lat_lngs(
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   ffi.Pointer<mln_completion> completion,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map_projection)>()
-external int mln_map_projection_close(int projection);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
-external int mln_map_projection_create(
-  int map,
-  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map_projection, ffi.Pointer<mln_camera_options>)
+  ffi.Int32 Function(mln_map_projection, ffi.Pointer<mln_diagnostic>)
+>()
+external int mln_map_projection_close(
+  int projection,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_projection_create(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map_projection,
+    ffi.Pointer<mln_camera_options>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_projection_get_camera(
   int projection,
   ffi.Pointer<mln_camera_options> out_camera,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1275,12 +1632,14 @@ external int mln_map_projection_get_camera(
     mln_map_projection,
     mln_screen_point,
     ffi.Pointer<mln_lat_lng>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_projection_lat_lng_for_pixel(
   int projection,
   mln_screen_point point,
   ffi.Pointer<mln_lat_lng> out_coordinate,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1288,21 +1647,29 @@ external int mln_map_projection_lat_lng_for_pixel(
     mln_map_projection,
     mln_screen_point,
     ffi.Pointer<mln_lat_lng>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_projection_lat_lng_for_pixel_unwrapped(
   int projection,
   mln_screen_point point,
   ffi.Pointer<mln_lat_lng> out_coordinate,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map_projection, ffi.Double, ffi.Pointer<ffi.Double>)
+  ffi.Int32 Function(
+    mln_map_projection,
+    ffi.Double,
+    ffi.Pointer<ffi.Double>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_projection_meters_per_pixel_at_latitude(
   int projection,
   double latitude,
   ffi.Pointer<ffi.Double> out_meters_per_pixel,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1310,20 +1677,27 @@ external int mln_map_projection_meters_per_pixel_at_latitude(
     mln_map_projection,
     mln_lat_lng,
     ffi.Pointer<mln_screen_point>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_projection_pixel_for_lat_lng(
   int projection,
   mln_lat_lng coordinate,
   ffi.Pointer<mln_screen_point> out_point,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map_projection, ffi.Pointer<mln_camera_options>)
+  ffi.Int32 Function(
+    mln_map_projection,
+    ffi.Pointer<mln_camera_options>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_projection_set_camera(
   int projection,
   ffi.Pointer<mln_camera_options> camera,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1332,6 +1706,7 @@ external int mln_map_projection_set_camera(
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     mln_edge_insets,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_projection_set_visible_coordinates(
@@ -1339,79 +1714,136 @@ external int mln_map_projection_set_visible_coordinates(
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   mln_edge_insets padding,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map_projection, mln_buffer_view, mln_edge_insets)
+  ffi.Int32 Function(
+    mln_map_projection,
+    mln_buffer_view,
+    mln_edge_insets,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_projection_set_visible_geometry(
   int projection,
   mln_buffer_view geometry,
   mln_edge_insets padding,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
-external int mln_map_release(int map, ffi.Pointer<mln_completion> completion);
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_release(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_feature_state_selector>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_remove_feature_state(
   int map,
   ffi.Pointer<mln_feature_state_selector> selector,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_remove_style_image(
   int map,
   mln_buffer_view image_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_remove_style_layer(
   int map,
   mln_buffer_view layer_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_remove_style_source(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_completion> completion,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
-external int mln_map_request_repaint(
-  int map,
-  ffi.Pointer<mln_completion> completion,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
-external int mln_map_request_still_image(
-  int map,
-  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_logical_extent, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_request_repaint(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_request_still_image(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_logical_extent,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_resize(
   int map,
   mln_logical_extent extent,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1419,12 +1851,14 @@ external int mln_map_resize(
     mln_map,
     ffi.Pointer<mln_bound_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_bounds(
   int map,
   ffi.Pointer<mln_bound_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1434,6 +1868,7 @@ external int mln_map_set_bounds(
     mln_canonical_tile_id,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_custom_geometry_source_tile_data(
@@ -1442,6 +1877,7 @@ external int mln_map_set_custom_geometry_source_tile_data(
   mln_canonical_tile_id tile_id,
   mln_buffer_view data,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1451,6 +1887,7 @@ external int mln_map_set_custom_geometry_source_tile_data(
     mln_canonical_tile_id,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_custom_mvt_vector_source_tile_data(
@@ -1459,6 +1896,7 @@ external int mln_map_set_custom_mvt_vector_source_tile_data(
   mln_canonical_tile_id tile_id,
   mln_buffer_view data,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1468,6 +1906,7 @@ external int mln_map_set_custom_mvt_vector_source_tile_data(
     mln_canonical_tile_id,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_custom_mvt_vector_source_tile_error(
@@ -1476,24 +1915,37 @@ external int mln_map_set_custom_mvt_vector_source_tile_error(
   mln_canonical_tile_id tile_id,
   mln_buffer_view message,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Uint32, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Uint32,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_set_debug_options(
   int map,
   int options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Uint64, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Uint64,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_set_event_mask(
   int map,
   int mask,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1502,6 +1954,7 @@ external int mln_map_set_event_mask(
     ffi.Pointer<mln_feature_state_selector>,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_feature_state(
@@ -1509,6 +1962,7 @@ external int mln_map_set_feature_state(
   ffi.Pointer<mln_feature_state_selector> selector,
   mln_buffer_view state,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1516,12 +1970,14 @@ external int mln_map_set_feature_state(
     mln_map,
     ffi.Pointer<mln_free_camera_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_free_camera_options(
   int map,
   ffi.Pointer<mln_free_camera_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1530,6 +1986,7 @@ external int mln_map_set_free_camera_options(
     mln_buffer_view,
     mln_geojson_source_data,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_geojson_source_data(
@@ -1537,6 +1994,7 @@ external int mln_map_set_geojson_source_data(
   mln_buffer_view source_id,
   int data,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1545,6 +2003,7 @@ external int mln_map_set_geojson_source_data(
     mln_buffer_view,
     ffi.Bool,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_geojson_source_synchronous_tiling(
@@ -1552,6 +2011,7 @@ external int mln_map_set_geojson_source_synchronous_tiling(
   mln_buffer_view source_id,
   bool enabled,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1560,6 +2020,7 @@ external int mln_map_set_geojson_source_synchronous_tiling(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_geojson_source_url(
@@ -1567,6 +2028,7 @@ external int mln_map_set_geojson_source_url(
   mln_buffer_view source_id,
   mln_buffer_view url,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1575,6 +2037,7 @@ external int mln_map_set_geojson_source_url(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_global_state_property(
@@ -1582,6 +2045,7 @@ external int mln_map_set_global_state_property(
   mln_buffer_view property_name,
   mln_buffer_view value,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1591,6 +2055,7 @@ external int mln_map_set_global_state_property(
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_image_source_coordinates(
@@ -1599,6 +2064,7 @@ external int mln_map_set_image_source_coordinates(
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1607,6 +2073,7 @@ external int mln_map_set_image_source_coordinates(
     mln_buffer_view,
     ffi.Pointer<mln_premultiplied_rgba8_image>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_image_source_image(
@@ -1614,6 +2081,7 @@ external int mln_map_set_image_source_image(
   mln_buffer_view source_id,
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1622,6 +2090,7 @@ external int mln_map_set_image_source_image(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_image_source_url(
@@ -1629,6 +2098,7 @@ external int mln_map_set_image_source_url(
   mln_buffer_view source_id,
   mln_buffer_view url,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1637,6 +2107,7 @@ external int mln_map_set_image_source_url(
     mln_buffer_view,
     ffi.Pointer<mln_buffer_view>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_layer_filter(
@@ -1644,6 +2115,7 @@ external int mln_map_set_layer_filter(
   mln_buffer_view layer_id,
   ffi.Pointer<mln_buffer_view> filter,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1652,6 +2124,7 @@ external int mln_map_set_layer_filter(
     mln_buffer_view,
     ffi.Double,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_layer_max_zoom(
@@ -1659,6 +2132,7 @@ external int mln_map_set_layer_max_zoom(
   mln_buffer_view layer_id,
   double max_zoom,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1667,6 +2141,7 @@ external int mln_map_set_layer_max_zoom(
     mln_buffer_view,
     ffi.Double,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_layer_min_zoom(
@@ -1674,6 +2149,7 @@ external int mln_map_set_layer_min_zoom(
   mln_buffer_view layer_id,
   double min_zoom,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1683,6 +2159,7 @@ external int mln_map_set_layer_min_zoom(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_layer_property(
@@ -1691,6 +2168,7 @@ external int mln_map_set_layer_property(
   mln_buffer_view property_name,
   mln_buffer_view value,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1699,6 +2177,7 @@ external int mln_map_set_layer_property(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_layer_source_id(
@@ -1706,6 +2185,7 @@ external int mln_map_set_layer_source_id(
   mln_buffer_view layer_id,
   mln_buffer_view source_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1714,6 +2194,7 @@ external int mln_map_set_layer_source_id(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_layer_source_layer(
@@ -1721,6 +2202,7 @@ external int mln_map_set_layer_source_layer(
   mln_buffer_view layer_id,
   mln_buffer_view source_layer,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1729,6 +2211,7 @@ external int mln_map_set_layer_source_layer(
     mln_buffer_view,
     ffi.Uint32,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_layer_visibility(
@@ -1736,6 +2219,7 @@ external int mln_map_set_layer_visibility(
   mln_buffer_view layer_id,
   int visibility,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1744,6 +2228,7 @@ external int mln_map_set_layer_visibility(
     mln_buffer_view,
     ffi.Double,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_location_indicator_accuracy_radius(
@@ -1751,6 +2236,7 @@ external int mln_map_set_location_indicator_accuracy_radius(
   mln_buffer_view layer_id,
   double radius,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1759,6 +2245,7 @@ external int mln_map_set_location_indicator_accuracy_radius(
     mln_buffer_view,
     ffi.Double,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_location_indicator_bearing(
@@ -1766,6 +2253,7 @@ external int mln_map_set_location_indicator_bearing(
   mln_buffer_view layer_id,
   double bearing,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1775,6 +2263,7 @@ external int mln_map_set_location_indicator_bearing(
     ffi.Uint32,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_location_indicator_image_name(
@@ -1783,6 +2272,7 @@ external int mln_map_set_location_indicator_image_name(
   int image_kind,
   mln_buffer_view image_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1792,6 +2282,7 @@ external int mln_map_set_location_indicator_image_name(
     mln_lat_lng,
     ffi.Double,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_location_indicator_location(
@@ -1800,6 +2291,7 @@ external int mln_map_set_location_indicator_location(
   mln_lat_lng coordinate,
   double altitude,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1807,21 +2299,29 @@ external int mln_map_set_location_indicator_location(
     mln_map,
     ffi.Pointer<mln_projection_mode>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_projection_mode(
   int map,
   ffi.Pointer<mln_projection_mode> mode,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Bool, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Bool,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_set_rendering_stats_view_enabled(
   int map,
   bool enabled,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1831,6 +2331,7 @@ external int mln_map_set_rendering_stats_view_enabled(
     ffi.Pointer<mln_premultiplied_rgba8_image>,
     ffi.Pointer<mln_style_image_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_style_image(
@@ -1839,24 +2340,37 @@ external int mln_map_set_style_image(
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
   ffi.Pointer<mln_style_image_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_set_style_json(
   int map,
   mln_buffer_view json,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_map_set_style_light_json(
   int map,
   mln_buffer_view light_json,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1865,6 +2379,7 @@ external int mln_map_set_style_light_json(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_style_light_property(
@@ -1872,6 +2387,7 @@ external int mln_map_set_style_light_property(
   mln_buffer_view property_name,
   mln_buffer_view value,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1880,6 +2396,7 @@ external int mln_map_set_style_light_property(
     mln_buffer_view,
     ffi.Bool,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_style_source_volatile(
@@ -1887,6 +2404,7 @@ external int mln_map_set_style_source_volatile(
   mln_buffer_view source_id,
   bool is_volatile,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1894,12 +2412,14 @@ external int mln_map_set_style_source_volatile(
     mln_map,
     ffi.Pointer<mln_style_transition_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_style_transition_options(
   int map,
   ffi.Pointer<mln_style_transition_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1907,12 +2427,14 @@ external int mln_map_set_style_transition_options(
     mln_map,
     ffi.Pointer<ffi.Char>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_style_url(
   int map,
   ffi.Pointer<ffi.Char> url,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1920,12 +2442,14 @@ external int mln_map_set_style_url(
     mln_map,
     ffi.Pointer<mln_map_tile_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_tile_options(
   int map,
   ffi.Pointer<mln_map_tile_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -1933,22 +2457,41 @@ external int mln_map_set_tile_options(
     mln_map,
     ffi.Pointer<mln_map_viewport_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_set_viewport_options(
   int map,
   ffi.Pointer<mln_map_viewport_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_snapshot>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_map_snapshot>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_map_snapshot_get(
   int map,
   ffi.Pointer<mln_map_snapshot> out_snapshot,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
-external int mln_map_style_url(int map, ffi.Pointer<mln_completion> completion);
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_style_url(
+  int map,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @ffi.Native<mln_map_tile_options Function()>()
 external mln_map_tile_options mln_map_tile_options_default();
@@ -1958,12 +2501,14 @@ external mln_map_tile_options mln_map_tile_options_default();
     mln_map,
     ffi.Pointer<mln_camera_update>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_update_camera(
   int map,
   ffi.Pointer<mln_camera_update> update,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_map_viewport_options Function()>()
@@ -1976,6 +2521,7 @@ external mln_map_viewport_options mln_map_viewport_options_default();
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_metal_borrowed_texture_attach(
@@ -1984,6 +2530,7 @@ external int mln_metal_borrowed_texture_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_metal_borrowed_texture_descriptor Function()>()
@@ -1995,12 +2542,14 @@ mln_metal_borrowed_texture_descriptor_default();
     mln_render_session,
     ffi.Pointer<mln_metal_borrowed_texture_descriptor>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_metal_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2010,6 +2559,7 @@ external int mln_metal_borrowed_texture_set_target(
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_metal_owned_texture_attach(
@@ -2018,6 +2568,7 @@ external int mln_metal_owned_texture_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_metal_owned_texture_descriptor Function()>()
@@ -2031,6 +2582,7 @@ mln_metal_owned_texture_descriptor_default();
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_metal_surface_attach(
@@ -2039,6 +2591,7 @@ external int mln_metal_surface_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_metal_surface_descriptor Function()>()
@@ -2049,19 +2602,29 @@ external mln_metal_surface_descriptor mln_metal_surface_descriptor_default();
     mln_render_session,
     ffi.Pointer<mln_metal_surface_descriptor>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_metal_surface_set_target(
   int session,
   ffi.Pointer<mln_metal_surface_descriptor> descriptor,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(ffi.Pointer<ffi.Uint32>)>()
-external int mln_network_status_get(ffi.Pointer<ffi.Uint32> out_status);
+@ffi.Native<
+  ffi.Int32 Function(ffi.Pointer<ffi.Uint32>, ffi.Pointer<mln_diagnostic>)
+>()
+external int mln_network_status_get(
+  ffi.Pointer<ffi.Uint32> out_status,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
-@ffi.Native<ffi.Int32 Function(ffi.Uint32)>()
-external int mln_network_status_set(int status);
+@ffi.Native<ffi.Int32 Function(ffi.Uint32, ffi.Pointer<mln_diagnostic>)>()
+external int mln_network_status_set(
+  int status,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @ffi.Native<
   ffi.Int32 Function(
@@ -2070,6 +2633,7 @@ external int mln_network_status_set(int status);
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_opengl_borrowed_texture_attach(
@@ -2078,6 +2642,7 @@ external int mln_opengl_borrowed_texture_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_opengl_borrowed_texture_descriptor Function()>()
@@ -2089,12 +2654,14 @@ mln_opengl_borrowed_texture_descriptor_default();
     mln_render_session,
     ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_opengl_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2104,6 +2671,7 @@ external int mln_opengl_borrowed_texture_set_target(
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_opengl_owned_texture_attach(
@@ -2112,6 +2680,7 @@ external int mln_opengl_owned_texture_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_opengl_owned_texture_descriptor Function()>()
@@ -2128,6 +2697,7 @@ external int mln_opengl_supported_context_provider_mask();
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_opengl_surface_attach(
@@ -2136,6 +2706,7 @@ external int mln_opengl_surface_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_opengl_surface_descriptor Function()>()
@@ -2146,12 +2717,14 @@ external mln_opengl_surface_descriptor mln_opengl_surface_descriptor_default();
     mln_render_session,
     ffi.Pointer<mln_opengl_surface_descriptor>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_opengl_surface_set_target(
   int session,
   ffi.Pointer<mln_opengl_surface_descriptor> descriptor,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_plugin_register_function_v1 Function()>()
@@ -2161,20 +2734,32 @@ external mln_plugin_register_function_v1 mln_plugin_get_register_function_v1();
 external mln_premultiplied_rgba8_image mln_premultiplied_rgba8_image_default();
 
 @ffi.Native<
-  ffi.Int32 Function(mln_lat_lng, ffi.Pointer<mln_projected_meters>)
+  ffi.Int32 Function(
+    mln_lat_lng,
+    ffi.Pointer<mln_projected_meters>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_projected_meters_for_lat_lng(
   mln_lat_lng coordinate,
   ffi.Pointer<mln_projected_meters> out_meters,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_projection_mode Function()>()
 external mln_projection_mode mln_projection_mode_default();
 
-@ffi.Native<ffi.Int32 Function(mln_render_frame_batch, ffi.Pointer<ffi.Size>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_frame_batch,
+    ffi.Pointer<ffi.Size>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_render_frame_batch_count(
   int batch,
   ffi.Pointer<ffi.Size> out_count,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2182,31 +2767,43 @@ external int mln_render_frame_batch_count(
     mln_render_frame_batch,
     ffi.Size,
     ffi.Pointer<mln_render_frame_result>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_frame_batch_get(
   int batch,
   int index,
   ffi.Pointer<mln_render_frame_result> out_result,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<ffi.Void Function(mln_render_frame_batch)>()
 external void mln_render_frame_batch_release(int batch);
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_render_abandon_result>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_render_abandon_result>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_render_session_abandon(
   int session,
   ffi.Pointer<mln_render_abandon_result> out_result,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_acquired_frame>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_acquired_frame>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_render_session_acquire_frame(
   int session,
   ffi.Pointer<mln_acquired_frame> out_frame,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_render_session_attach_options Function()>()
@@ -2214,79 +2811,123 @@ external mln_render_session_attach_options
 mln_render_session_attach_options_default();
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_render_session_barrier(
   int session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_render_session_clear_data(
   int session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_render_session)>()
-external int mln_render_session_destroy(int session);
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_diagnostic>)
+>()
+external int mln_render_session_destroy(
+  int session,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_render_session_detach(
   int session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_render_session)>()
-external int mln_render_session_dispose(int session);
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_diagnostic>)
+>()
+external int mln_render_session_dispose(
+  int session,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_render_frame_batch>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_render_frame_batch>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_render_session_drain_frame_results(
   int session,
   ffi.Pointer<mln_render_frame_batch> out_batch,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_render_session_dump_debug_logs(
   int session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_render_session_capabilities>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_session_get_capabilities(
   int session,
   ffi.Pointer<mln_render_session_capabilities> out_capabilities,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_render_session_snapshot>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_session_get_snapshot(
   int session,
   ffi.Pointer<mln_render_session_snapshot> out_snapshot,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_map_projection>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_map_projection>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_render_session_projection_create(
   int session,
   ffi.Pointer<mln_map_projection> out_projection,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2298,6 +2939,7 @@ external int mln_render_session_projection_create(
     mln_buffer_view,
     ffi.Pointer<mln_buffer_view>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_session_query_feature_extensions(
@@ -2308,6 +2950,7 @@ external int mln_render_session_query_feature_extensions(
   mln_buffer_view extension_field,
   ffi.Pointer<mln_buffer_view> arguments,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2316,6 +2959,7 @@ external int mln_render_session_query_feature_extensions(
     ffi.Pointer<mln_rendered_query_geometry>,
     ffi.Pointer<mln_rendered_feature_query_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_session_query_rendered_features(
@@ -2323,6 +2967,7 @@ external int mln_render_session_query_rendered_features(
   ffi.Pointer<mln_rendered_query_geometry> geometry,
   ffi.Pointer<mln_rendered_feature_query_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2331,6 +2976,7 @@ external int mln_render_session_query_rendered_features(
     mln_buffer_view,
     ffi.Pointer<mln_source_feature_query_options>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_session_query_source_features(
@@ -2338,22 +2984,33 @@ external int mln_render_session_query_source_features(
   mln_buffer_view source_id,
   ffi.Pointer<mln_source_feature_query_options> options,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_render_session_reduce_memory_use(
   int session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_frame_demand>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_frame_demand>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_render_session_request_frame(
   int session,
   ffi.Pointer<mln_frame_demand> demand,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2361,21 +3018,29 @@ external int mln_render_session_request_frame(
     mln_render_session,
     ffi.Pointer<mln_render_target_extent>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_session_resize(
   int session,
   ffi.Pointer<mln_render_target_extent> extent,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Size, ffi.Pointer<ffi.Size>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Size,
+    ffi.Pointer<ffi.Size>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_render_session_service_driver_work(
   int session,
   int max_work,
   ffi.Pointer<ffi.Size> out_serviced,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2383,12 +3048,14 @@ external int mln_render_session_service_driver_work(
     ffi.Pointer<mln_render_target_extent>,
     ffi.Pointer<ffi.Uint32>,
     ffi.Pointer<ffi.Uint32>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_target_extent_physical_size(
   ffi.Pointer<mln_render_target_extent> extent,
   ffi.Pointer<ffi.Uint32> out_width,
   ffi.Pointer<ffi.Uint32> out_height,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_rendered_feature_query_options Function()>()
@@ -2414,22 +3081,29 @@ external mln_rendered_query_geometry mln_rendered_query_geometry_point(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_resource_request_handle, ffi.Pointer<ffi.Bool>)
+  ffi.Int32 Function(
+    mln_resource_request_handle,
+    ffi.Pointer<ffi.Bool>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_resource_request_cancelled(
   int handle,
   ffi.Pointer<ffi.Bool> out_cancelled,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_resource_request_handle,
     ffi.Pointer<mln_resource_response>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_resource_request_complete(
   int handle,
   ffi.Pointer<mln_resource_response> response,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<ffi.Void Function(mln_resource_request_handle)>()
@@ -2442,6 +3116,7 @@ external void mln_resource_request_release(int handle);
     ffi.Pointer<ffi.Void>,
     mln_runtime_callback_release,
     ffi.Pointer<ffi.Bool>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_resource_request_set_cancel_callback(
@@ -2450,69 +3125,127 @@ external int mln_resource_request_set_cancel_callback(
   ffi.Pointer<ffi.Void> user_data,
   mln_runtime_callback_release release_user_data,
   ffi.Pointer<ffi.Bool> out_cancelled,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_resource_request_handle)>()
-external int mln_resource_request_wait_until_retired(int handle);
+@ffi.Native<
+  ffi.Int32 Function(mln_resource_request_handle, ffi.Pointer<mln_diagnostic>)
+>()
+external int mln_resource_request_wait_until_retired(
+  int handle,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @ffi.Native<
   ffi.Int32 Function(
     ffi.Pointer<mln_resource_transform_response>,
     ffi.Pointer<ffi.Char>,
     ffi.Size,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_resource_transform_response_set_url(
   ffi.Pointer<mln_resource_transform_response> response,
   ffi.Pointer<ffi.Char> url,
   int url_size,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
-external int mln_runtime_barrier(
-  int runtime,
-  ffi.Pointer<mln_completion> completion,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
-external int mln_runtime_clear_http_header_transform(
-  int runtime,
-  ffi.Pointer<mln_completion> completion,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
-external int mln_runtime_clear_resource_provider(
-  int runtime,
-  ffi.Pointer<mln_completion> completion,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
-external int mln_runtime_clear_resource_transform(
-  int runtime,
-  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(ffi.Pointer<mln_runtime_options>, ffi.Pointer<mln_runtime>)
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_barrier(
+  int runtime,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_clear_http_header_transform(
+  int runtime,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_clear_resource_provider(
+  int runtime,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_clear_resource_transform(
+  int runtime,
+  ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Pointer<mln_runtime_options>,
+    ffi.Pointer<mln_runtime>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_runtime_create(
   ffi.Pointer<mln_runtime_options> options,
   ffi.Pointer<mln_runtime> out_runtime,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_runtime)>()
-external int mln_runtime_dispose(int runtime);
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_diagnostic>)>()
+external int mln_runtime_dispose(
+  int runtime,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_event_batch>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Pointer<mln_event_batch>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_runtime_drain_events(
   int runtime,
   ffi.Pointer<mln_event_batch> out_batch,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<ffi.Uint64>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_runtime_get_event_mask(
   int runtime,
   ffi.Pointer<ffi.Uint64> out_mask,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2522,6 +3255,7 @@ external int mln_runtime_get_event_mask(
     ffi.Pointer<ffi.Uint8>,
     ffi.Size,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_offline_region_create(
@@ -2530,6 +3264,7 @@ external int mln_runtime_offline_region_create(
   ffi.Pointer<ffi.Uint8> metadata,
   int metadata_size,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2537,12 +3272,14 @@ external int mln_runtime_offline_region_create(
     mln_runtime,
     mln_offline_region_id,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_offline_region_delete(
   int runtime,
   int region_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2550,12 +3287,14 @@ external int mln_runtime_offline_region_delete(
     mln_runtime,
     mln_offline_region_id,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_offline_region_get(
   int runtime,
   int region_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2563,12 +3302,14 @@ external int mln_runtime_offline_region_get(
     mln_runtime,
     mln_offline_region_id,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_offline_region_get_status(
   int runtime,
   int region_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2576,12 +3317,14 @@ external int mln_runtime_offline_region_get_status(
     mln_runtime,
     mln_offline_region_id,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_offline_region_invalidate(
   int runtime,
   int region_id,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2590,6 +3333,7 @@ external int mln_runtime_offline_region_invalidate(
     mln_offline_region_id,
     ffi.Uint32,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_offline_region_set_download_state(
@@ -2597,6 +3341,7 @@ external int mln_runtime_offline_region_set_download_state(
   int region_id,
   int state,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2605,6 +3350,7 @@ external int mln_runtime_offline_region_set_download_state(
     mln_offline_region_id,
     ffi.Bool,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_offline_region_set_observed(
@@ -2612,6 +3358,7 @@ external int mln_runtime_offline_region_set_observed(
   int region_id,
   bool observed,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2621,6 +3368,7 @@ external int mln_runtime_offline_region_set_observed(
     ffi.Pointer<ffi.Uint8>,
     ffi.Size,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_offline_region_update_metadata(
@@ -2629,12 +3377,20 @@ external int mln_runtime_offline_region_update_metadata(
   ffi.Pointer<ffi.Uint8> metadata,
   int metadata_size,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_runtime_offline_regions_list(
   int runtime,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2642,55 +3398,84 @@ external int mln_runtime_offline_regions_list(
     mln_runtime,
     ffi.Pointer<ffi.Char>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_offline_regions_merge_database(
   int runtime,
   ffi.Pointer<ffi.Char> side_database_path,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_runtime_options Function()>()
 external mln_runtime_options mln_runtime_options_default();
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_runtime_release(
   int runtime,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_runtime, ffi.Uint32, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Uint32,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_runtime_run_ambient_cache_operation(
   int runtime,
   int operation,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Uint64)>()
-external int mln_runtime_set_event_mask(int runtime, int mask);
+@ffi.Native<
+  ffi.Int32 Function(mln_runtime, ffi.Uint64, ffi.Pointer<mln_diagnostic>)
+>()
+external int mln_runtime_set_event_mask(
+  int runtime,
+  int mask,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     ffi.Pointer<mln_http_header_transform>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_set_http_header_transform(
   int runtime,
   ffi.Pointer<mln_http_header_transform> transform,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_runtime, ffi.Uint64, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Uint64,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_runtime_set_maximum_ambient_cache_size(
   int runtime,
   int size,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2698,12 +3483,14 @@ external int mln_runtime_set_maximum_ambient_cache_size(
     mln_runtime,
     ffi.Pointer<mln_resource_provider>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_set_resource_provider(
   int runtime,
   ffi.Pointer<mln_resource_provider> provider,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2711,12 +3498,14 @@ external int mln_runtime_set_resource_provider(
     mln_runtime,
     ffi.Pointer<mln_resource_transform>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_runtime_set_resource_transform(
   int runtime,
   ffi.Pointer<mln_resource_transform> transform,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_source_feature_query_options Function()>()
@@ -2742,15 +3531,17 @@ external int mln_supported_render_backend_mask();
 external mln_texture_image_info mln_texture_image_info_default();
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
+  )
 >()
 external int mln_texture_read_premultiplied_rgba8(
   int session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
-
-@ffi.Native<ffi.Pointer<ffi.Char> Function()>()
-external ffi.Pointer<ffi.Char> mln_thread_last_error_message();
 
 @ffi.Native<
   ffi.Int32 Function(
@@ -2759,6 +3550,7 @@ external ffi.Pointer<ffi.Char> mln_thread_last_error_message();
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_vulkan_borrowed_texture_attach(
@@ -2767,6 +3559,7 @@ external int mln_vulkan_borrowed_texture_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_vulkan_borrowed_texture_descriptor Function()>()
@@ -2778,12 +3571,14 @@ mln_vulkan_borrowed_texture_descriptor_default();
     mln_render_session,
     ffi.Pointer<mln_vulkan_borrowed_texture_descriptor>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_vulkan_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2793,6 +3588,7 @@ external int mln_vulkan_borrowed_texture_set_target(
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_vulkan_owned_texture_attach(
@@ -2801,6 +3597,7 @@ external int mln_vulkan_owned_texture_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_vulkan_owned_texture_descriptor Function()>()
@@ -2814,6 +3611,7 @@ mln_vulkan_owned_texture_descriptor_default();
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_vulkan_surface_attach(
@@ -2822,6 +3620,7 @@ external int mln_vulkan_surface_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_vulkan_surface_descriptor Function()>()
@@ -2832,12 +3631,14 @@ external mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default();
     mln_render_session,
     ffi.Pointer<mln_vulkan_surface_descriptor>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_vulkan_surface_set_target(
   int session,
   ffi.Pointer<mln_vulkan_surface_descriptor> descriptor,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2847,6 +3648,7 @@ external int mln_vulkan_surface_set_target(
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_webgpu_borrowed_texture_attach(
@@ -2855,6 +3657,7 @@ external int mln_webgpu_borrowed_texture_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_webgpu_borrowed_texture_descriptor Function()>()
@@ -2866,12 +3669,14 @@ mln_webgpu_borrowed_texture_descriptor_default();
     mln_render_session,
     ffi.Pointer<mln_webgpu_borrowed_texture_descriptor>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_webgpu_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<
@@ -2881,6 +3686,7 @@ external int mln_webgpu_borrowed_texture_set_target(
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_webgpu_owned_texture_attach(
@@ -2889,6 +3695,7 @@ external int mln_webgpu_owned_texture_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_webgpu_owned_texture_descriptor Function()>()
@@ -2902,6 +3709,7 @@ mln_webgpu_owned_texture_descriptor_default();
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_webgpu_surface_attach(
@@ -2910,6 +3718,7 @@ external int mln_webgpu_surface_attach(
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @ffi.Native<mln_webgpu_surface_descriptor Function()>()
@@ -2920,15 +3729,19 @@ external mln_webgpu_surface_descriptor mln_webgpu_surface_descriptor_default();
     mln_render_session,
     ffi.Pointer<mln_webgpu_surface_descriptor>,
     ffi.Pointer<mln_completion>,
+    ffi.Pointer<mln_diagnostic>,
   )
 >()
 external int mln_webgpu_surface_set_target(
   int session,
   ffi.Pointer<mln_webgpu_surface_descriptor> descriptor,
   ffi.Pointer<mln_completion> completion,
+  ffi.Pointer<mln_diagnostic> out_diagnostic,
 );
 
 const int MLN_ADAPTER_RESOURCE_KIND_ANY = 4294967295;
+
+const int MLN_DIAGNOSTIC_MESSAGE_CAPACITY = 4096;
 
 const int MLN_HANDLE_NULL = 0;
 
@@ -3748,6 +4561,14 @@ typedef Dartmln_custom_mvt_vector_source_tile_callbackFunction =
       ffi.Pointer<ffi.Void> user_data,
       mln_canonical_tile_id tile_id,
     );
+
+final class mln_diagnostic extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Array.multi([4096])
+  external ffi.Array<ffi.Char> message;
+}
 
 final class mln_edge_insets extends ffi.Struct {
   @ffi.Double()

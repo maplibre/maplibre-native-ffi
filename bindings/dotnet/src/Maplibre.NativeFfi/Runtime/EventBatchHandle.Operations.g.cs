@@ -27,13 +27,13 @@ public sealed unsafe partial class EventBatchHandle : IDisposable
         nativeId = handle.Value;
         state = new NativeHandleState<MlnEventBatch>(
             handle,
-            static live =>
+            static (live, _) =>
             {
                 NativeMethods.mln_event_batch_release(live);
                 return mln_status.MLN_STATUS_OK;
             },
             nameof(EventBatchHandle),
-            static live =>
+            static (live, _) =>
             {
                 NativeMethods.mln_event_batch_release(live);
                 return mln_status.MLN_STATUS_OK;
@@ -88,7 +88,15 @@ public sealed unsafe partial class EventBatchHandle : IDisposable
         {
             size = (uint)sizeof(mln_runtime_event_batch_view),
         };
-        NativeStatus.Check(NativeMethods.mln_event_batch_get(read.Handle, &outView));
+        mln_diagnostic diagnostic;
+        NativeStatus.Check(
+            NativeMethods.mln_event_batch_get(
+                read.Handle,
+                &outView,
+                NativeDiagnostic.Prepare(&diagnostic)
+            ),
+            &diagnostic
+        );
         return CopyRuntimeEventBatchView(outView);
     }
 

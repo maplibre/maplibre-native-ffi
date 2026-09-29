@@ -8,8 +8,11 @@ pub const Diagnostic = struct {
 
 /// Caller-owned storage for the latest native or binding diagnostic.
 ///
-/// Handles and helper functions borrow this store; callers keep it live for the
-/// operation or handle lifetime that uses it.
+/// A function without a handle receiver takes the store as its last argument.
+/// A handle keeps the store of the call that created it, passes it to the
+/// handles that it creates, and reports its own failed calls into it. Callers
+/// keep the store live for the handle lifetimes that use it. The store has no
+/// lock, so give each thread that makes failing calls its own store.
 pub const DiagnosticStore = struct {
     allocator: std.mem.Allocator,
     latest: ?Diagnostic = null,

@@ -139,6 +139,25 @@ def native_identifier(value: str) -> str:
     return value + "_" if value in BINDGEN_RESERVED else value
 
 
+def native_call(
+    function, arguments, prefix: str = "sys::", diagnostic: str = "diagnostic"
+) -> str:
+    """Calls a C function, passing `diagnostic` for its diagnostic parameter."""
+    if function.diagnostic:
+        arguments = [*arguments, diagnostic]
+    return f"{prefix}{function.name}({', '.join(arguments)})"
+
+
+def checked_call(
+    function, arguments, prefix: str = "sys::", runtime: str = "maplibre_core"
+) -> str:
+    """Checks a status-returning C call against the diagnostic the runtime lends it."""
+    if not function.diagnostic:
+        raise Unsupported(f"{function.name}: status return has no diagnostic")
+    call = native_call(function, arguments, prefix)
+    return f"{runtime}::check(|diagnostic| unsafe {{ {call} }})"
+
+
 def result_rule(
     api: Api, plan: OperationPlan, value_types
 ) -> tuple[str, str, set[str]]:
@@ -589,8 +608,14 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str, set
     ):
         raise Unsupported("method name is reserved by the handle runtime")
     method = identifier(method)
-    call = f"sys::{function.name}({', '.join(args)})"
+    call = native_call(function, args)
     if not plan.completion:
+        if function.return_type.kind == "void":
+            invoke = f"unsafe {{ {call} }};"
+        elif plan.result:
+            invoke = ""  # A value return replaces this body below.
+        else:
+            invoke = f"{checked_call(function, args)}?;"
         public = (
             outputs[0][0]
             if len(outputs) == 1
@@ -604,9 +629,7 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str, set
         body = [
             *([f"let native = {native_receiver};"] if receiver else []),
             *setup,
-            f"unsafe {{ {call} }};"
-            if function.return_type.kind == "void"
-            else f"maplibre_core::check(unsafe {{ {call} }})?;",
+            invoke,
             *(
                 ["arena.accept_registrations();"]
                 if plan.registrations or plan.direct_registrations
@@ -630,14 +653,12 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str, set
             if plan.result is not None:
                 raise Unsupported("command receipt cannot discard a value payload")
             public = "NativeFuture<crate::CommandCompletion>"
-            expression = (
-                f"crate::completion::submit_command(|completion| unsafe {{ {call} }})"
-            )
+            expression = f"crate::completion::submit_command(|completion, diagnostic| unsafe {{ {call} }})"
         else:
             result, converter, result_values = result_rule(api, plan, value_types)
             values.update(result_values)
             public = f"NativeFuture<{result}>"
-            expression = f"crate::completion::submit(|completion| unsafe {{ {call} }}, {converter})"
+            expression = f"crate::completion::submit(|completion, diagnostic| unsafe {{ {call} }}, {converter})"
         native_setup = [f"let native = {native_receiver};"] if receiver else []
         if outputs:
             public = "(" + ", ".join([*(item[0] for item in outputs), public]) + ")"
@@ -804,7 +825,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     assert not chunks, f"operations without an owner module: {sorted(chunks)}"
     files[f"{root}/mod.rs"] = marker + rust_owners.module_index(owners, modules)
     disposers = [
-        f"#[doc(hidden)]\npub unsafe fn {handle.native.removeprefix('mln_')}_dispose(native: maplibre_native_ffi_sys::{handle.native}) -> crate::Result<()> {{ crate::check(unsafe {{ maplibre_native_ffi_sys::{handle.dispose}(native) }}) }}\n"
+        f"#[doc(hidden)]\npub unsafe fn {handle.native.removeprefix('mln_')}_dispose(native: maplibre_native_ffi_sys::{handle.native}) -> crate::Result<()> {{ {checked_call(api.functions_by_name[handle.dispose], ['native'], 'maplibre_native_ffi_sys::', 'crate')} }}\n"
         for handle in bound.handles.values()
         if handle.dispose in bound.operations_by_name
         and bound.operations_by_name[handle.dispose].function.return_type.kind != "void"

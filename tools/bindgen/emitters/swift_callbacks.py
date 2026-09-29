@@ -1,7 +1,7 @@
 """Render Swift callback descriptors from registration metadata."""
 
 from ..model import ModelError
-from .swift import SCALARS, camel, identifier, name
+from .swift import SCALARS, camel, checked, identifier, name, native_call
 
 
 def contains_callback(value):
@@ -302,7 +302,7 @@ def direct_operation(plan, values):
         if optional
         else f"let token = arena.callback({value})"
     )
-    call = f"{function}({', '.join(arguments)})"
+    call = native_call(plan.function, *arguments)
     lines = [
         "let arena = NativeInputArena()",
         "defer { withExtendedLifetime(arena) {} }",
@@ -317,13 +317,13 @@ def direct_operation(plan, values):
         # A rejected registration stores nothing, so the arena releases it.
         lines += [
             "var rejected = false",
-            f"try checkStatus({call})",
+            checked(call),
             "if !rejected { arena.accept() }",
             "return rejected",
         ]
         result_type = " -> Bool"
     else:
-        lines.append(f"try checkStatus(arena.submit {{ {call} }})")
+        lines.append(checked(f"arena.submit {{ {call} }}"))
         result_type = ""
     parameter_type = f"({typ})?" if optional else f"@escaping {typ}"
     body = f"""  {"static " if optional else ""}func {method}(_ callback: {parameter_type}) throws{result_type} {{

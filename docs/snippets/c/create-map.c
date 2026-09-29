@@ -17,7 +17,7 @@ mln_status open_runtime(
   options.cache_path = cache_path;
   options.event_wake.callback = events_ready;
   options.event_wake.user_data = receiver;
-  return mln_runtime_create(&options, out_runtime);
+  return mln_runtime_create(&options, out_runtime, NULL);
   // #endregion runtime
 }
 
@@ -44,7 +44,7 @@ mln_status open_map(
     .callback = map_created,
     .user_data = out_map,
   };
-  return mln_map_create(runtime, &options, &completion);
+  return mln_map_create(runtime, &options, &completion, NULL);
   // #endregion map
 }
 
@@ -70,11 +70,11 @@ void close_map(mln_runtime runtime, mln_map map) {
     .size = sizeof(mln_completion),
     .callback = map_torn_down,
   };
-  (void)mln_map_release(map, &map_teardown);
+  (void)mln_map_release(map, &map_teardown, NULL);
   const mln_completion teardown = {
     .size = sizeof(mln_completion),
     .callback = runtime_torn_down,
   };
-  (void)mln_runtime_release(runtime, &teardown);
+  (void)mln_runtime_release(runtime, &teardown, NULL);
   // #endregion release
 }

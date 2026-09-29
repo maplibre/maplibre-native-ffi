@@ -7,7 +7,10 @@ public extension MapHandle {
   func dispose() throws {
     try NativeCallbackGuard.check(owner: self, operation: "mln_map_dispose")
     try mapNativeFailure { try handle.closeOnce { live in
-      try checkStatus(mln_map_dispose(live.raw))
+      try checkStatus { diagnostic in mln_map_dispose(
+        live.raw,
+        diagnostic
+      ) }
     } }
   }
 }
@@ -29,11 +32,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in try arena.submit { try mln_map_get_feature_state(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue(arena: arena)),
-          completion
-        ) } }) { result in try NativeCompletion.data(result) }
+        .start({ completion, diagnostic in
+          try arena.submit { try mln_map_get_feature_state(
+            handle.raw,
+            arena.store(bindingArg0.nativeValue(arena: arena)),
+            completion,
+            diagnostic
+          ) } }) { result in try NativeCompletion.data(result) }
     }
   }
 }
@@ -53,10 +58,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_loaded_style_json(
-          handle.raw,
-          completion
-        ) } }) { result in try NativeCompletion.data(result) }
+        .start({ completion, diagnostic in
+          arena.submit { mln_map_loaded_style_json(
+            handle.raw,
+            completion,
+            diagnostic
+          ) } }) { result in try NativeCompletion.data(result) }
     }
   }
 }
@@ -71,7 +78,12 @@ public extension MapHandle {
     try NativeCallbackGuard.check(owner: self, operation: "mln_map_release")
     var future: NativeFuture<Void>?
     try handle.closeOnce { live in
-      future = try NativeCompletion.startUnit { mln_map_release(live.raw, $0) }
+      future = try NativeCompletion
+        .startUnit { completion, diagnostic in mln_map_release(
+          live.raw,
+          completion,
+          diagnostic
+        ) }
     }
     return future
   }
@@ -97,11 +109,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_remove_feature_state(
             handle.raw,
             arena.store(bindingArg0.nativeValue(arena: arena)),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -124,10 +137,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_request_repaint(
-          handle.raw,
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_request_repaint(
+            handle.raw,
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -147,10 +163,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startUnit { completion in arena.submit { mln_map_request_still_image(
-          handle.raw,
-          completion
-        ) } }
+        .startUnit { completion, diagnostic in
+          arena.submit { mln_map_request_still_image(
+            handle.raw,
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -170,10 +189,11 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_resize(
+        .startCommand { completion, diagnostic in arena.submit { mln_map_resize(
           handle.raw,
           bindingArg0.nativeValue(),
-          completion
+          completion,
+          diagnostic
         ) } }
     }
   }
@@ -197,11 +217,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_set_event_mask(
-          handle.raw,
-          bindingArg0.nativeValue(),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_set_event_mask(
+            handle.raw,
+            bindingArg0.nativeValue(),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -225,12 +248,13 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_set_feature_state(
             handle.raw,
             arena.store(bindingArg0.nativeValue(arena: arena)),
             arena.view(bindingArg1),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -253,11 +277,14 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in arena.submit { mln_map_set_style_json(
-          handle.raw,
-          arena.view(bindingArg0),
-          completion
-        ) } }
+        .startCommand { completion, diagnostic in
+          arena.submit { mln_map_set_style_json(
+            handle.raw,
+            arena.view(bindingArg0),
+            completion,
+            diagnostic
+          ) }
+        }
     }
   }
 }
@@ -278,11 +305,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .startCommand { completion in
+        .startCommand { completion, diagnostic in
           try arena.submit { try mln_map_set_style_url(
             handle.raw,
             arena.cString(bindingArg0),
-            completion
+            completion,
+            diagnostic
           ) }
         }
     }
@@ -304,8 +332,11 @@ public extension MapHandle {
       defer { withExtendedLifetime(arena) {} }
       var value0 = mln_map_snapshot()
       value0.size = UInt32(MemoryLayout<mln_map_snapshot>.size)
-      try checkStatus(arena
-        .submit { mln_map_snapshot_get(handle.raw, &value0) })
+      try checkStatus { diagnostic in arena.submit { mln_map_snapshot_get(
+        handle.raw,
+        &value0,
+        diagnostic
+      ) } }
       return MapSnapshot(raw: value0)
     }
   }
@@ -323,9 +354,10 @@ public extension MapHandle {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try NativeCompletion
-        .start({ completion in arena.submit { mln_map_style_url(
+        .start({ completion, diagnostic in arena.submit { mln_map_style_url(
           handle.raw,
-          completion
+          completion,
+          diagnostic
         ) } }) { result in try NativeCompletion.string(result) }
     }
   }

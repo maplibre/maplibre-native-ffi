@@ -82,7 +82,8 @@ MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_debug_options(
   mln_map map, uint32_t options MLN_BINDING("enum=mln_map_debug_option"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
  * Submits a rendering-stats visibility command.
@@ -104,7 +105,8 @@ MLN_API mln_status mln_map_set_debug_options(
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
   mln_map map, bool enabled,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
  * Submits an ordered debug-log command.
@@ -121,7 +123,8 @@ MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
  */
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_dump_debug_logs(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
  * Submits a copied viewport-options command.
@@ -143,7 +146,8 @@ MLN_API mln_status mln_map_dump_debug_logs(
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_viewport_options(
   mln_map map, const mln_map_viewport_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
  * Submits a copied tile-options command.
@@ -165,7 +169,8 @@ MLN_API mln_status mln_map_set_viewport_options(
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_tile_options(
   mln_map map, const mln_map_tile_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -183,7 +188,8 @@ MLN_API mln_status mln_map_set_tile_options(
 MLN_BINDING("execution=snapshot")
 MLN_API mln_status mln_map_camera_snapshot_get(
   mln_map map, mln_camera_options* out_camera MLN_BINDING("direction=out"),
-  uint64_t* out_generation MLN_BINDING("direction=out")
+  uint64_t* out_generation MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -218,7 +224,8 @@ MLN_API mln_status mln_map_camera_snapshot_get(
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_update_camera(
   mln_map map, const mln_camera_update* update MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -241,7 +248,8 @@ MLN_API mln_status mln_map_update_camera(
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_apply_camera_delta(
   mln_map map, const mln_camera_delta* delta MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -264,7 +272,8 @@ MLN_API mln_status mln_map_apply_camera_delta(
  */
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_cancel_transitions(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -288,7 +297,8 @@ MLN_BINDING(
   "borrowed"
 )
 MLN_API mln_status mln_map_camera_query(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1")
+  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -316,7 +326,8 @@ MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
   mln_map map, mln_lat_lng_bounds bounds,
   const mln_camera_fit_options* fit_options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -347,7 +358,8 @@ MLN_API mln_status mln_map_camera_for_lat_lngs(
   size_t coordinate_count,
   const mln_camera_fit_options* fit_options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -375,7 +387,8 @@ MLN_API mln_status mln_map_camera_for_geometry(
   mln_buffer_view geometry MLN_BINDING("encoding=json;lifetime=call"),
   const mln_camera_fit_options* fit_options
     MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -402,7 +415,8 @@ MLN_BINDING(
 )
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
   mln_map map, const mln_camera_options* camera MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -429,7 +443,8 @@ MLN_BINDING(
 )
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
   mln_map map, const mln_camera_options* camera MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -452,7 +467,8 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_bounds(
   mln_map map, const mln_bound_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -475,7 +491,8 @@ MLN_API mln_status mln_map_set_bounds(
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_free_camera_options(
   mln_map map, const mln_free_camera_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -498,7 +515,8 @@ MLN_API mln_status mln_map_set_free_camera_options(
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_projection_mode(
   mln_map map, const mln_projection_mode* mode MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -523,7 +541,8 @@ MLN_BINDING(
 )
 MLN_API mln_status mln_map_pixel_for_lat_lng(
   mln_map map, mln_lat_lng coordinate,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -547,7 +566,8 @@ MLN_API mln_status mln_map_pixel_for_lat_lng(
 MLN_BINDING("execution=query;result=mln_lat_lng;shape=value;ownership=borrowed")
 MLN_API mln_status mln_map_lat_lng_for_pixel(
   mln_map map, mln_screen_point point,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -570,7 +590,8 @@ MLN_API mln_status mln_map_lat_lng_for_pixel(
 MLN_BINDING("execution=query;result=mln_lat_lng;shape=value;ownership=borrowed")
 MLN_API mln_status mln_map_lat_lng_for_pixel_unwrapped(
   mln_map map, mln_screen_point point,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -597,7 +618,8 @@ MLN_API mln_status mln_map_pixels_for_lat_lngs(
   const mln_lat_lng* coordinates
     MLN_BINDING("length=coordinate_count;ownership=borrowed"),
   size_t coordinate_count,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -622,7 +644,8 @@ MLN_API mln_status mln_map_lat_lngs_for_pixels(
   mln_map map,
   const mln_screen_point* points
     MLN_BINDING("length=point_count;ownership=borrowed"),
-  size_t point_count, const mln_completion* completion MLN_BINDING("length=1")
+  size_t point_count, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -648,7 +671,8 @@ MLN_API mln_status mln_map_lat_lngs_for_pixels_unwrapped(
   mln_map map,
   const mln_screen_point* points
     MLN_BINDING("length=point_count;ownership=borrowed"),
-  size_t point_count, const mln_completion* completion MLN_BINDING("length=1")
+  size_t point_count, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -667,7 +691,8 @@ MLN_API mln_status mln_map_lat_lngs_for_pixels_unwrapped(
 MLN_BINDING("execution=query;result=double;shape=value;ownership=borrowed")
 MLN_API mln_status mln_map_meters_per_pixel_at_latitude(
   mln_map map, double latitude,
-  const mln_completion* completion MLN_BINDING("length=1")
+  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

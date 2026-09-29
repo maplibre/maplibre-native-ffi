@@ -46,7 +46,7 @@ static void an_accepted_completion_runs_and_releases_exactly_once(void) {
 
   const mln_map_options options = mln_map_options_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_create(runtime, &options, &completion)
+    MLN_STATUS_OK, mln_map_create(runtime, &options, &completion, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.calls));
@@ -66,7 +66,7 @@ static void a_rejected_submission_leaves_callback_state_with_the_caller(void) {
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_create(MLN_HANDLE_NULL, &options, &completion)
+    mln_map_create(MLN_HANDLE_NULL, &options, &completion, NULL)
   );
   TEST_ASSERT_EQUAL_UINT32(0, atomic_load(&probe.calls));
   TEST_ASSERT_EQUAL_UINT32(0, atomic_load(&probe.releases));
@@ -92,7 +92,9 @@ static void runtime_events_wake_the_receiver_directly(void) {
   mln_runtime_options options = mln_runtime_options_default();
   options.event_wake = event_wake;
   mln_runtime runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, NULL)
+  );
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_map_set_style_json(map, mln_test_empty_style_json)

@@ -139,12 +139,12 @@ auto mln::capture::deliver_deferred(void* context, std::uint32_t kind, DeferredR
 }
 static unsigned completions = 0, releases = 0;
 static std::uint32_t completed_size = 1;
-extern "C" mln_status mln_resource_request_complete(mln_resource_request_handle, const mln_resource_response* response) noexcept {
+extern "C" mln_status mln_resource_request_complete(mln_resource_request_handle, const mln_resource_response* response, mln_diagnostic*) noexcept {
   ++completions; completed_size = response->size; return MLN_STATUS_OK;
 }
 extern "C" void mln_resource_request_release(mln_resource_request_handle) noexcept { ++releases; }
-extern "C" mln_status mln_map_dispose(mln_map) noexcept { return MLN_STATUS_OK; }
-extern "C" mln_status mln_map_projection_close(mln_map_projection) noexcept { return MLN_STATUS_OK; }
+extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
+extern "C" mln_status mln_map_projection_close(mln_map_projection, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
 
 int main() {
   int context = 0;
@@ -200,8 +200,8 @@ void* operator new(std::size_t size) {
 void operator delete(void* p) noexcept { std::free(p); }
 #include "c_api/callback_capture.hpp"
 static unsigned disposed = 0;
-extern "C" mln_status mln_map_dispose(mln_map) noexcept { ++disposed; return MLN_STATUS_OK; }
-extern "C" mln_status mln_map_projection_close(mln_map_projection) noexcept { ++disposed; return MLN_STATUS_OK; }
+extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { ++disposed; return MLN_STATUS_OK; }
+extern "C" mln_status mln_map_projection_close(mln_map_projection, mln_diagnostic*) noexcept { ++disposed; return MLN_STATUS_OK; }
 
 int main() {
   char url[] = "retained URL";
@@ -294,15 +294,15 @@ typedef struct mln_capture_fixture {
   const char* name MLN_BINDING("length=nul;encoding=utf8;mask=fields;bit=MLN_CAPTURE_FIXTURE_NAME");
 } mln_capture_fixture;
 MLN_BINDING("execution=query;result=mln_capture_fixture;shape=value;ownership=borrowed")
-MLN_API mln_status mln_map_capture_fixture(mln_map map, const mln_completion* completion) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_capture_fixture(mln_map map, const mln_completion* completion, mln_diagnostic *out_diagnostic) MLN_NOEXCEPT;
 """
 
 FIXTURE_TEST = r"""
 #include "capture_fixture.h"
 #include "c_api/callback_capture.hpp"
 #include <cassert>
-extern "C" mln_status mln_map_dispose(mln_map) noexcept { return MLN_STATUS_OK; }
-extern "C" mln_status mln_map_projection_close(mln_map_projection) noexcept { return MLN_STATUS_OK; }
+extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
+extern "C" mln_status mln_map_projection_close(mln_map_projection, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
 int main() {
   char bytes[] = "nested";
   mln_buffer_view view{bytes, 6};

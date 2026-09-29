@@ -63,6 +63,26 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_NOT_FOUND = -10,
 } mln_status;
 
+/** Capacity of mln_diagnostic.message, including the terminating null byte. */
+#define MLN_DIAGNOSTIC_MESSAGE_CAPACITY 4096
+
+/**
+ * The diagnostic message of one status-returning call.
+ *
+ * Every status-returning function, except the callback implementations in
+ * callback_adapter.h, takes a nullable mln_diagnostic* as its last parameter,
+ * out_diagnostic. The caller sets size to sizeof(mln_diagnostic). The function
+ * writes message as null-terminated UTF-8, empty when it returns MLN_STATUS_OK
+ * and describing the failure otherwise, truncated to fit. It writes no more
+ * than size bytes of the struct. A null out_diagnostic discards the message.
+ *
+ * Asynchronous failures carry their diagnostic in the completion instead.
+ */
+typedef struct mln_diagnostic {
+  uint32_t size;
+  char message[MLN_DIAGNOSTIC_MESSAGE_CAPACITY];
+} mln_diagnostic;
+
 /** Render backend support flags reported by this native library build. */
 typedef enum MLN_BINDING("kind=bitmask") mln_render_backend_flag : uint32_t {
   MLN_RENDER_BACKEND_FLAG_METAL = 1u << 0u,
@@ -88,7 +108,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_render_backend_flag : uint32_t {
  * released handle stays distinguishable from every later handle. Passing a
  * released id, an id of the wrong type, or a value this library never issued
  * reports MLN_STATUS_INVALID_ARGUMENT and leaves the call without effect;
- * mln_thread_last_error_message() distinguishes the cases. Handle values are
+ * the call's diagnostic distinguishes the cases. Handle values are
  * safe to copy, compare, hash, and move between threads, and carry no
  * ownership on their own.
  *
@@ -161,7 +181,8 @@ typedef struct mln_buffer_view {
  */
 MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_buffer_get(
-  mln_buffer buffer, mln_buffer_view* out_view MLN_BINDING("direction=out")
+  mln_buffer buffer, mln_buffer_view* out_view MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Destroys an owned buffer. A null handle is a no-op. */

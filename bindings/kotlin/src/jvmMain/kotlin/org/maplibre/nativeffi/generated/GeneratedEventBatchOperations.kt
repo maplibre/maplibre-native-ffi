@@ -7,14 +7,14 @@ import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.callback.*
 import org.maplibre.nativeffi.internal.loader.NativeAccess
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 public actual abstract class GeneratedEventBatchOperations internal actual constructor() {
   internal abstract fun bindingEventBatchHandle(): Long
 
   internal abstract fun <T> bindingReadEventBatch(block: (Long) -> T): T
 
-  internal abstract fun bindingCloseEventBatch(call: (Long) -> Int)
+  internal abstract fun bindingCloseEventBatch(call: (Long) -> Unit)
 
   public actual fun get(): RuntimeEventBatchView {
     try {
@@ -27,9 +27,9 @@ public actual abstract class GeneratedEventBatchOperations internal actual const
         Arena.ofConfined().use { arena ->
           val output = mln_runtime_event_batch_view.allocate(arena)
           mln_runtime_event_batch_view.size(output, mln_runtime_event_batch_view.sizeof().toInt())
-          BindingStatus.check(
-            MapLibreNativeC.mln_event_batch_get(bindingEventBatchHandle(), output)
-          )
+          NativeDiagnostics.check { diagnostic ->
+            MapLibreNativeC.mln_event_batch_get(bindingEventBatchHandle(), output, diagnostic)
+          }
           GeneratedValues.readRuntimeEventBatchView(output)
         }
       }
@@ -48,10 +48,7 @@ public actual abstract class GeneratedEventBatchOperations internal actual const
           owner.toLong(),
           "mln_event_batch_release",
         )
-        Arena.ofConfined().use { arena ->
-          MapLibreNativeC.mln_event_batch_release(owner)
-          0
-        }
+        Arena.ofConfined().use { arena -> MapLibreNativeC.mln_event_batch_release(owner) }
       }
     } finally {
       org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(this)

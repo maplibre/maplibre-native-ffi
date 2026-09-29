@@ -15,7 +15,9 @@ class SemanticTests(unittest.TestCase):
             root = Path(directory)
             (root / "api.h").write_text(
                 '#define BIND(x) __attribute__((annotate("mln:" x)))\n'
-                "typedef int mln_status;\n" + source
+                "typedef int mln_status;\n"
+                "typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;\n"
+                + source
             )
             return parse_headers(root)
 
@@ -33,7 +35,7 @@ typedef int64_t custom_signed;
 typedef size_t custom_count;
 typedef enum flags : uint64_t {{ FLAG_HIGH = 0x100000000ULL }} flags;
 typedef struct values {{ nested_unsigned id; custom_signed offset; custom_count count; flags mask; }} values;
-BIND("execution=immediate") mln_status read_values(values *out BIND("direction=out"));
+BIND("execution=immediate") mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """),
                     require_complete=True,
                 )
@@ -55,7 +57,7 @@ BIND("execution=immediate") mln_status read_values(values *out BIND("direction=o
 typedef enum category : unsigned { CATEGORY_A = 1 } category;
 typedef struct request { unsigned size BIND("kind=size;default=sizeof"); unsigned kind BIND("enum=category"); const char *url BIND("length=nul;encoding=utf8;ownership=borrowed;nullable=true"); } request;
 typedef struct queued { void *context BIND("kind=context"); unsigned kind; const char *url BIND("length=nul;encoding=utf8;ownership=borrowed;nullable=true"); } queued BIND("projection=request");
-BIND("execution=immediate") mln_status capture(queued *out BIND("direction=out"));
+BIND("execution=immediate") mln_status capture(queued *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         projection = model.values["queued"].projection
@@ -77,7 +79,7 @@ BIND("execution=immediate") mln_status capture(queued *out BIND("direction=out")
 typedef enum event_code : unsigned { CAMERA_CHANGED = 3 } event_code;
 typedef unsigned long owner BIND("kind=handle;release=release_owner;parent=none");
 BIND("execution=immediate") void release_owner(owner value);
-BIND("execution=immediate") mln_status await_owner(owner value BIND("handle_access=issued"));
+BIND("execution=immediate") mln_status await_owner(owner value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         self.assertEqual(
@@ -100,11 +102,11 @@ BIND("execution=immediate") mln_status await_owner(owner value BIND("handle_acce
         source = """
 typedef unsigned long owner BIND("kind=handle;release=release_owner;parent=none;view_begin=begin_view;view_end=end_view");
 BIND("execution=immediate") void release_owner(owner value);
-BIND("execution=immediate") mln_status begin_view(owner value, void **scope BIND("direction=out;kind=context"));
+BIND("execution=immediate") mln_status begin_view(owner value, void **scope BIND("direction=out;kind=context"), mln_diagnostic *out_diagnostic);
 BIND("execution=immediate") void end_view(void *scope BIND("kind=context"));
 typedef enum event_tag : int { NONE = 0, NUMBER = -1 } event_tag;
 typedef struct event { event_tag tag; union { double number BIND("variant=NUMBER"); } payload BIND("tag=tag;empty_variant=NONE"); } event;
-BIND("execution=immediate") mln_status read_event(event *value BIND("direction=out"));
+BIND("execution=immediate") mln_status read_event(event *value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         self.assertEqual(model.handles["owner"].view_begin, "begin_view")
@@ -138,7 +140,7 @@ typedef struct value {
     double number BIND("variant=NUMBER");
   } data BIND("tag=tag");
 } value;
-BIND("execution=immediate") mln_status read_value(value *out BIND("direction=out"));
+BIND("execution=immediate") mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         result = api.operations[0].outputs[0].value.element
@@ -177,7 +179,7 @@ typedef struct options {
   double longitude BIND("mask=fields;bit=CENTER");
   double zoom BIND("mask=fields;bit=ZOOM");
 } options;
-BIND("execution=immediate") mln_status write_options(const options *value BIND("length=1"));
+BIND("execution=immediate") mln_status write_options(const options *value BIND("length=1"), mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         value = api.operations[0].inputs[0].value.element
@@ -197,7 +199,7 @@ typedef struct range_value {
   unsigned start BIND("mask=has_range");
   unsigned end BIND("mask=has_range");
 } range_value;
-BIND("execution=immediate") mln_status write_range(const range_value *value BIND("length=1"));
+BIND("execution=immediate") mln_status write_range(const range_value *value BIND("length=1"), mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         value = api.operations[0].inputs[0].value.element
@@ -219,7 +221,7 @@ typedef void (*notify)(void *state BIND("kind=context;lifetime=owner")) BIND("th
 typedef void (*release)(void *state BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
 typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;user_data=state;release=retire");
 typedef struct settings { signals wake; } settings;
-BIND("execution=immediate") mln_status create(const settings *options BIND("length=1"));
+BIND("execution=immediate") mln_status create(const settings *options BIND("length=1"), mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -237,7 +239,7 @@ BIND("execution=immediate") mln_status create(const settings *options BIND("leng
 typedef struct reply { void *context BIND("kind=context;ownership=borrowed"); } reply BIND("kind=callback_response");
 typedef struct rules { int value; } rules;
 typedef void (*answer)(void *state BIND("kind=context"), reply *out BIND("direction=out;length=1")) BIND("failure=contain;thread=native;reentry=protocol;reentry_owner=out;reentry_calls=reply_set");
-BIND("execution=immediate") mln_status reply_set(reply *response BIND("length=1"), int value);
+BIND("execution=immediate") mln_status reply_set(reply *response BIND("length=1"), int value, mln_diagnostic *out_diagnostic);
 BIND("execution=immediate;callback_adapter=answer;context_type=rules;invokes=reply_set") void adapter(void *state BIND("kind=context"), reply *out BIND("direction=out"));
 """
         api = bind(self.parse(source), require_complete=True)
@@ -282,7 +284,7 @@ typedef struct batch {
  const char *bytes BIND("length=byte_count;encoding=bytes;ownership=borrowed");
  unsigned int byte_count BIND("kind=count");
 } batch;
-BIND("execution=immediate") mln_status capture(batch *out BIND("direction=out"));
+BIND("execution=immediate") mln_status capture(batch *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         value = next(f.value for f in api.values["batch"].fields if f.name == "items")
@@ -331,7 +333,7 @@ typedef void (*logger)(void *state BIND("kind=context")) BIND("failure=contain;t
     def test_counted_character_encoding_resolves_as_buffer(self):
         api = bind(
             self.parse("""
-BIND("execution=immediate") mln_status set_text(const char *value BIND("length=count;encoding=utf8;ownership=borrowed"), unsigned int count);
+BIND("execution=immediate") mln_status set_text(const char *value BIND("length=count;encoding=utf8;ownership=borrowed"), unsigned int count, mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -343,7 +345,7 @@ BIND("execution=immediate") mln_status set_text(const char *value BIND("length=c
             self.parse("""
 typedef unsigned char byte;
 typedef struct payload { const byte *bytes BIND("length=count;encoding=bytes;ownership=borrowed"); unsigned int count BIND("kind=count"); } payload;
-BIND("execution=immediate") mln_status capture(payload *out BIND("direction=out"));
+BIND("execution=immediate") mln_status capture(payload *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -354,7 +356,7 @@ BIND("execution=immediate") mln_status capture(payload *out BIND("direction=out"
         source = """
 typedef struct reply { void *context BIND("kind=context;ownership=borrowed"); } reply BIND("kind=callback_response");
 typedef void (*answer)(reply *out BIND("direction=out;length=1")) BIND("failure=ignore;thread=native");
-BIND("execution=immediate") mln_status reply_set(reply *response BIND("length=1;direction=inout"), int value);
+BIND("execution=immediate") mln_status reply_set(reply *response BIND("length=1;direction=inout"), int value, mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         response = api.values["reply"].response
@@ -376,10 +378,10 @@ BIND("execution=immediate") mln_status reply_set(reply *response BIND("length=1;
 typedef unsigned long long parent BIND("kind=handle;release=parent_close;dispose=parent_close;abandon=parent_abandon;parent=none");
 typedef unsigned long long child BIND("kind=handle;release=child_close;dispose=child_close;parent=parent");
 typedef struct view { void *texture BIND("kind=native_pointer;ownership=borrowed"); } view;
-BIND("execution=immediate") mln_status parent_close(parent value);
-BIND("execution=immediate") mln_status parent_abandon(parent value);
-BIND("execution=immediate") mln_status child_close(child value);
-BIND("execution=immediate;view_owner=owner") mln_status child_view(child owner, view *out BIND("direction=out"));
+BIND("execution=immediate") mln_status parent_close(parent value, mln_diagnostic *out_diagnostic);
+BIND("execution=immediate") mln_status parent_abandon(parent value, mln_diagnostic *out_diagnostic);
+BIND("execution=immediate") mln_status child_close(child value, mln_diagnostic *out_diagnostic);
+BIND("execution=immediate;view_owner=owner") mln_status child_view(child owner, view *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         view = api.operations_by_name["child_view"].view
@@ -396,7 +398,7 @@ BIND("execution=immediate;view_owner=owner") mln_status child_view(child owner, 
 
     def test_ambiguous_pointer_cannot_become_a_generated_operation(self):
         source = """
-BIND("execution=immediate") mln_status write_data(const double *values);
+BIND("execution=immediate") mln_status write_data(const double *values, mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source))
         self.assertFalse(model.operations)
@@ -408,7 +410,7 @@ BIND("execution=immediate") mln_status write_data(const double *values);
         source = """
 typedef struct coordinate { double latitude; double longitude; } coordinate;
 BIND("execution=immediate") mln_status project(
-  const coordinate *coordinates BIND("length=count"), unsigned count);
+  const coordinate *coordinates BIND("length=count"), unsigned count, mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         array = model.operations[0].inputs[0].value
@@ -431,7 +433,7 @@ BIND("execution=immediate") mln_status project(
             self.parse("""
 typedef enum flags : unsigned { FIRST = 1, SECOND = 2 } flags;
 BIND("execution=immediate") mln_status read_flags(
-  unsigned *out BIND("direction=out;enum=flags"));
+  unsigned *out BIND("direction=out;enum=flags"), mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -443,7 +445,7 @@ BIND("execution=immediate") mln_status read_flags(
         model = bind(
             self.parse("""
 BIND("execution=immediate") mln_status copy_values(
-  double *out BIND("direction=out;length=count"), unsigned count);
+  double *out BIND("direction=out;length=count"), unsigned count, mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -459,7 +461,7 @@ typedef struct registration {
   void *context BIND("kind=context");
   release release;
 } registration BIND("kind=callback_registration;user_data=context;release=release");
-BIND("execution=immediate") mln_status install(const registration *value BIND("length=1"));
+BIND("execution=immediate") mln_status install(const registration *value BIND("length=1"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         plan = model.operations[0].registrations[0]
@@ -501,7 +503,7 @@ BIND("execution=immediate") mln_status install(const registration *value BIND("l
         source = """
 typedef struct options { double zoom; } options BIND("default=make_options");
 BIND("execution=immediate") options make_options(void);
-BIND("execution=immediate") mln_status set_options(const options *value BIND("length=1"));
+BIND("execution=immediate") mln_status set_options(const options *value BIND("length=1"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         constructor = model.operations_by_name["make_options"]
@@ -532,12 +534,12 @@ BIND("execution=immediate") mln_status set_options(const options *value BIND("le
 typedef struct mln_completion { unsigned size; } mln_completion;
 typedef unsigned long root BIND("kind=handle;release=close_root;parent=none");
 typedef unsigned long child BIND("kind=handle;release=close_child;parent=root;abandon=abandon_child");
-BIND("execution=immediate") mln_status close_root(root value);
-BIND("execution=immediate") mln_status close_child(child value);
-BIND("execution=immediate") mln_status abandon_child(child value);
+BIND("execution=immediate") mln_status close_root(root value, mln_diagnostic *out_diagnostic);
+BIND("execution=immediate") mln_status close_child(child value, mln_diagnostic *out_diagnostic);
+BIND("execution=immediate") mln_status abandon_child(child value, mln_diagnostic *out_diagnostic);
 BIND("execution=lifecycle;result=void;shape=none;ownership=value") mln_status attach(
   root parent, child *owner BIND("direction=out;ownership=owned"),
-  const mln_completion *done BIND("length=1"));
+  const mln_completion *done BIND("length=1"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         operation = model.operations_by_name["attach"]
@@ -565,7 +567,7 @@ BIND("execution=lifecycle;result=void;shape=none;ownership=value") mln_status at
             bind(
                 self.parse(
                     source.replace(
-                        "abandon_child(child value)", "abandon_child(root value)"
+                        "abandon_child(child value,", "abandon_child(root value,"
                     )
                 ),
                 require_complete=True,
@@ -577,7 +579,7 @@ BIND("execution=lifecycle;result=void;shape=none;ownership=value") mln_status at
 typedef unsigned long frame BIND("kind=handle;release=release_frame;parent=none");
 typedef struct sync { unsigned kind; unsigned long object; } sync;
 BIND("execution=immediate") mln_status release_frame(
-  frame *value BIND("direction=inout;consumes=success"), const sync *consumer BIND("length=1"));
+  frame *value BIND("direction=inout;consumes=success"), const sync *consumer BIND("length=1"), mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -593,12 +595,12 @@ typedef unsigned long request BIND("kind=handle;release=release_request;parent=n
 typedef void (*cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
 typedef void (*release_cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
 typedef unsigned (*provider)(request ticket) BIND("thread=native;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
-BIND("execution=immediate") mln_status answer(request value, unsigned response);
-BIND("execution=immediate") mln_status is_cancelled(request value, bool *result BIND("direction=out"));
+BIND("execution=immediate") mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
+BIND("execution=immediate") mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
-  request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"));
+  request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("execution=immediate") void release_request(request value);
-BIND("execution=immediate") mln_status await_retirement(request value BIND("handle_access=issued"));
+BIND("execution=immediate") mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         decision = model.callbacks["provider"].decision
@@ -650,12 +652,12 @@ typedef void (*cancel)(void *context BIND("kind=context")) BIND("thread=native;f
 typedef void (*release_cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
 typedef unsigned (*provider)(void *context BIND("kind=context"), const char *url BIND("length=nul;encoding=utf8;lifetime=call"), request ticket) BIND("thread=native;enum=decision;failure=DELEGATE;deferred=CLAIM;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
 typedef unsigned (*logger)(void *context BIND("kind=context"), int code) BIND("thread=native;failure=0;deferred=1");
-BIND("execution=immediate") mln_status answer(request value, unsigned response);
-BIND("execution=immediate") mln_status is_cancelled(request value, bool *result BIND("direction=out"));
+BIND("execution=immediate") mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
+BIND("execution=immediate") mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
-  request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"));
+  request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
 BIND("execution=immediate") void release_request(request value);
-BIND("execution=immediate") mln_status await_retirement(request value BIND("handle_access=issued"));
+BIND("execution=immediate") mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         self.assertEqual(model.callbacks["provider"].deferred, "CLAIM")
@@ -692,7 +694,7 @@ BIND("execution=immediate") mln_status await_retirement(request value BIND("hand
 typedef struct mln_completion { unsigned size; } mln_completion;
 typedef struct entry { double value; } entry;
 BIND("execution=query;result=entry;shape=array;ownership=borrowed;nullable=true")
-mln_status query(const mln_completion *completion BIND("length=1"));
+mln_status query(const mln_completion *completion BIND("length=1"), mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -704,8 +706,8 @@ mln_status query(const mln_completion *completion BIND("length=1"));
     def test_disposal_support_requires_a_handle_consumer(self):
         source = """
 typedef unsigned long owner BIND("kind=handle;release=close_owner;dispose=discard_owner;parent=none");
-BIND("execution=immediate") mln_status close_owner(owner value);
-BIND("execution=immediate") mln_status discard_owner(owner value);
+BIND("execution=immediate") mln_status close_owner(owner value, mln_diagnostic *out_diagnostic);
+BIND("execution=immediate") mln_status discard_owner(owner value, mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         self.assertEqual(
@@ -716,7 +718,7 @@ BIND("execution=immediate") mln_status discard_owner(owner value);
             bind(
                 self.parse(
                     source.replace(
-                        "discard_owner(owner value)", "discard_owner(unsigned value)"
+                        "discard_owner(owner value,", "discard_owner(unsigned value,"
                     )
                 ),
                 require_complete=True,

@@ -44,9 +44,11 @@ static app_error submit_camera(
   );
 }
 
-static app_error camera_status(mln_status status) {
+static app_error camera_status(
+  mln_status status, const mln_diagnostic* diagnostic
+) {
   if (status == MLN_STATUS_OK) return APP_OK;
-  diagnostics_log_status("camera command failed", status);
+  diagnostics_log_status("camera command failed", status, diagnostic);
   return APP_ERROR_CAMERA_COMMAND_FAILED;
 }
 
@@ -57,9 +59,11 @@ static app_error pan(
   delta.offset = (mln_screen_point){.x = dx, .y = dy};
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
-  return camera_status(mln_map_apply_camera_delta(
-    state->map, &delta, map_state_discarded_completion()
-  ));
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status = mln_map_apply_camera_delta(
+    state->map, &delta, map_state_discarded_completion(), &diagnostic
+  );
+  return camera_status(status, &diagnostic);
 }
 
 static app_error zoom(
@@ -73,9 +77,11 @@ static app_error zoom(
   delta.anchor = anchor;
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
-  return camera_status(mln_map_apply_camera_delta(
-    state->map, &delta, map_state_discarded_completion()
-  ));
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status = mln_map_apply_camera_delta(
+    state->map, &delta, map_state_discarded_completion(), &diagnostic
+  );
+  return camera_status(status, &diagnostic);
 }
 
 static app_error adjust_orientation(
@@ -85,22 +91,23 @@ static app_error adjust_orientation(
   mln_camera_delta delta = mln_camera_delta_default();
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_status status = MLN_STATUS_OK;
   if (bearing_delta != 0.0) {
     delta.kind = MLN_CAMERA_DELTA_BEARING;
     delta.amount = bearing_delta;
     status = mln_map_apply_camera_delta(
-      state->map, &delta, map_state_discarded_completion()
+      state->map, &delta, map_state_discarded_completion(), &diagnostic
     );
   }
   if (status == MLN_STATUS_OK && pitch_delta != 0.0) {
     delta.kind = MLN_CAMERA_DELTA_PITCH;
     delta.amount = pitch_delta;
     status = mln_map_apply_camera_delta(
-      state->map, &delta, map_state_discarded_completion()
+      state->map, &delta, map_state_discarded_completion(), &diagnostic
     );
   }
-  return camera_status(status);
+  return camera_status(status, &diagnostic);
 }
 
 static drag_mode drag_mode_for_button(uint8_t button) {

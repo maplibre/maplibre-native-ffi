@@ -67,7 +67,9 @@ impl AcquiredFrameHandle {
     pub fn dispose(&self) -> Result<()> {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let result = self.inner.handle.close_with(|native| {
-            maplibre_core::check(unsafe { sys::mln_acquired_frame_dispose(native) })?;
+            maplibre_core::check(|diagnostic| unsafe {
+                sys::mln_acquired_frame_dispose(native, diagnostic)
+            })?;
             Ok(())
         })?;
         Ok(result.unwrap_or_else(|| Default::default()))
@@ -91,8 +93,8 @@ impl AcquiredFrameHandle {
         }?;
         let mut binding_arg_1: sys::mln_metal_owned_texture_frame =
             maplibre_core::generated::MetalOwnedTextureFrame::default().to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_acquired_frame_get_metal_texture(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_acquired_frame_get_metal_texture(native, &mut binding_arg_1, diagnostic)
         })?;
         let value = maplibre_core::generated::MetalOwnedTextureFrame::from_native(binding_arg_1);
         Ok(callback(&value))
@@ -116,8 +118,8 @@ impl AcquiredFrameHandle {
         }?;
         let mut binding_arg_1: sys::mln_opengl_owned_texture_frame =
             maplibre_core::generated::OpenglOwnedTextureFrame::default().to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_acquired_frame_get_opengl_texture(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_acquired_frame_get_opengl_texture(native, &mut binding_arg_1, diagnostic)
         })?;
         let value = maplibre_core::generated::OpenglOwnedTextureFrame::from_native(binding_arg_1);
         Ok(callback(&value))
@@ -141,8 +143,8 @@ impl AcquiredFrameHandle {
         }?;
         let mut binding_arg_1: sys::mln_gpu_sync =
             maplibre_core::generated::GpuSync::default().to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_acquired_frame_get_producer_sync(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_acquired_frame_get_producer_sync(native, &mut binding_arg_1, diagnostic)
         })?;
         let value = maplibre_core::generated::GpuSync::from_native(binding_arg_1);
         Ok(callback(&value))
@@ -155,8 +157,8 @@ impl AcquiredFrameHandle {
         maplibre_core::callback::check("mln_acquired_frame_get_result", native.0)?;
         let mut binding_arg_1: sys::mln_render_frame_result =
             maplibre_core::generated::RenderFrameResult::default().to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_acquired_frame_get_result(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_acquired_frame_get_result(native, &mut binding_arg_1, diagnostic)
         })?;
         Ok(maplibre_core::generated::RenderFrameResult::from_native(
             binding_arg_1,
@@ -181,8 +183,8 @@ impl AcquiredFrameHandle {
         }?;
         let mut binding_arg_1: sys::mln_vulkan_owned_texture_frame =
             maplibre_core::generated::VulkanOwnedTextureFrame::default().to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_acquired_frame_get_vulkan_texture(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_acquired_frame_get_vulkan_texture(native, &mut binding_arg_1, diagnostic)
         })?;
         let value = maplibre_core::generated::VulkanOwnedTextureFrame::from_native(binding_arg_1);
         Ok(callback(&value))
@@ -206,8 +208,8 @@ impl AcquiredFrameHandle {
         }?;
         let mut binding_arg_1: sys::mln_webgpu_owned_texture_frame =
             maplibre_core::generated::WebgpuOwnedTextureFrame::default().to_native();
-        maplibre_core::check(unsafe {
-            sys::mln_acquired_frame_get_webgpu_texture(native, &mut binding_arg_1)
+        maplibre_core::check(|diagnostic| unsafe {
+            sys::mln_acquired_frame_get_webgpu_texture(native, &mut binding_arg_1, diagnostic)
         })?;
         let value = maplibre_core::generated::WebgpuOwnedTextureFrame::from_native(binding_arg_1);
         Ok(callback(&value))
@@ -218,8 +220,8 @@ impl AcquiredFrameHandle {
         // SAFETY: input storage lives through submission; callback values are copied before return.
         let binding_arg_1 = binding_arg_1.to_native();
         let result = self.inner.handle.close_with(|mut native| {
-            maplibre_core::check(unsafe {
-                sys::mln_acquired_frame_release(&mut native, &binding_arg_1)
+            maplibre_core::check(|diagnostic| unsafe {
+                sys::mln_acquired_frame_release(&mut native, &binding_arg_1, diagnostic)
             })?;
             Ok(())
         })?;

@@ -175,13 +175,13 @@ def owner(bound, native, plans, platform):
             f"  internal override fun <T> bindingRead{family}(block: ({typ}) -> T): T = state.withLive {{ block(handle) }}"
         )
         body.append(
-            f"  internal override fun bindingComplete{family}(call: ({typ}) -> Int) {{ state.complete {{ call(handle) }} }}"
+            f"  internal override fun bindingComplete{family}(call: ({typ}) -> Unit) {{ state.complete {{ call(handle) }} }}"
         )
         if needs.close:
             # The release waits for in-flight calls and may run after this call
             # returns, so it takes the disposal path that unreachable cleanup uses.
             body.append(
-                f'  internal override fun bindingClose{family}(call: ({typ}) -> Int) {{ org.maplibre.nativeffi.internal.callback.CallbackAdmission.check({raw}, "{handle.release}"); state.close() }}'
+                f'  internal override fun bindingClose{family}(call: ({typ}) -> Unit) {{ org.maplibre.nativeffi.internal.callback.CallbackAdmission.check({raw}, "{handle.release}"); state.close() }}'
             )
         if needs.retire:
             raise ValueError(f"{native}: a decision owner cannot retire asynchronously")
@@ -211,7 +211,7 @@ def owner(bound, native, plans, platform):
             )
         if needs.close:
             body.append(
-                f"  internal override fun bindingClose{family}(call: ({typ}) -> Int) {{ core.closeOnce({{ call(handle) }}) }}"
+                f"  internal override fun bindingClose{family}(call: ({typ}) -> Unit) {{ core.closeOnce({{ call(handle) }}) }}"
             )
         if needs.retire:
             body.append(

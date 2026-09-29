@@ -3,7 +3,7 @@ package org.maplibre.nativeffi.generated
 
 import kotlinx.cinterop.*
 import org.maplibre.nativeffi.internal.c.*
-import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual object GeneratedOwnerDisposal {
@@ -12,7 +12,9 @@ internal actual object GeneratedOwnerDisposal {
       handle,
       "mln_acquired_frame_dispose",
     )
-    Status.check(mln_acquired_frame_dispose(handle.toULong()))
+    NativeDiagnostics.check { diagnostic ->
+      mln_acquired_frame_dispose(handle.toULong(), diagnostic)
+    }
   }
 
   actual fun buffer(handle: Long) {
@@ -38,7 +40,7 @@ internal actual object GeneratedOwnerDisposal {
 
   actual fun map(handle: Long) {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(handle, "mln_map_dispose")
-    Status.check(mln_map_dispose(handle.toULong()))
+    NativeDiagnostics.check { diagnostic -> mln_map_dispose(handle.toULong(), diagnostic) }
   }
 
   actual fun mapProjection(handle: Long) {
@@ -46,7 +48,7 @@ internal actual object GeneratedOwnerDisposal {
       handle,
       "mln_map_projection_close",
     )
-    Status.check(mln_map_projection_close(handle.toULong()))
+    NativeDiagnostics.check { diagnostic -> mln_map_projection_close(handle.toULong(), diagnostic) }
   }
 
   actual fun renderFrameBatch(handle: Long) {
@@ -62,7 +64,9 @@ internal actual object GeneratedOwnerDisposal {
       handle,
       "mln_render_session_dispose",
     )
-    Status.check(mln_render_session_dispose(handle.toULong()))
+    NativeDiagnostics.check { diagnostic ->
+      mln_render_session_dispose(handle.toULong(), diagnostic)
+    }
   }
 
   actual fun resourceRequestHandle(handle: Long) {
@@ -75,6 +79,6 @@ internal actual object GeneratedOwnerDisposal {
 
   actual fun runtime(handle: Long) {
     org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(handle, "mln_runtime_dispose")
-    Status.check(mln_runtime_dispose(handle.toULong()))
+    NativeDiagnostics.check { diagnostic -> mln_runtime_dispose(handle.toULong(), diagnostic) }
   }
 }

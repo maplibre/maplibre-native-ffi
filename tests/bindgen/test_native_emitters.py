@@ -19,6 +19,7 @@ class NativeEmitterTests(unittest.TestCase):
 typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release;parent=none");
 BIND("execution=immediate") void mln_map_release(mln_map map BIND("consumes=always"));
 typedef int mln_status;
+typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
 typedef struct mln_completion { void *state; } mln_completion;
 typedef struct mln_buffer_view { const void *data; unsigned long size; } mln_buffer_view;
 """
@@ -32,7 +33,7 @@ typedef struct mln_buffer_view { const void *data; unsigned long size; } mln_buf
         api = self.parse("""
 BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_map_defer(mln_map map, double defer, double self, double raw,
-                       double bindingArg0, const mln_completion *completion);
+                       double bindingArg0, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in (go, swift, zig):
             with self.subTest(emitter=emitter.__name__):
@@ -64,7 +65,7 @@ typedef struct mln_entry {
   mln_buffer_view defer BIND("encoding=utf8");
 } mln_entry;
 BIND("execution=query;result=mln_entry;shape=array;ownership=borrowed")
-mln_status mln_map_entries(mln_map map, const mln_completion *completion);
+mln_status mln_map_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         self.assertIn("raw._type", go.generate(api)["generated_api.go"])
         self.assertIn("raw._defer", go.generate(api)["generated_api.go"])
@@ -74,7 +75,7 @@ mln_status mln_map_entries(mln_map map, const mln_completion *completion);
     def test_runtime_method_collisions_have_explicit_coverage_failures(self):
         api = self.parse("""
 BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_close(mln_map map, const mln_completion *completion);
+mln_status mln_map_close(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in (go, swift):
             with self.subTest(emitter=emitter.__name__):
@@ -101,9 +102,9 @@ typedef struct mln_probe_options {
   double gain BIND("mask=fields;bit=MLN_PROBE_GAIN");
 } mln_probe_options;
 BIND("execution=query;result=mln_probe_options;shape=value;ownership=borrowed")
-mln_status mln_map_probe(mln_map map, const mln_completion *completion);
+mln_status mln_map_probe(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_set_probe(mln_map map, const mln_probe_options *options BIND("length=1"), const mln_completion *completion);
+mln_status mln_map_set_probe(mln_map map, const mln_probe_options *options BIND("length=1"), const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
         for emitter in (rust, swift, zig):
             sources = []
@@ -131,7 +132,7 @@ typedef struct mln_store_options {
   mln_buffer_view view BIND("encoding=utf8;lifetime=owner");
 } mln_store_options;
 BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_store(mln_map map, const mln_store_options *options BIND("length=1"), const mln_completion *completion);
+mln_status mln_map_store(mln_map map, const mln_store_options *options BIND("length=1"), const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         report = zig.coverage(api)
         self.assertIn("retained input requires", report["unsupported"]["mln_map_store"])

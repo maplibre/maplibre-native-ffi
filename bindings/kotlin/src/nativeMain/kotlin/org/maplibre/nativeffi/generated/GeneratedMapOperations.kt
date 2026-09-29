@@ -8,7 +8,7 @@ import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 @OptIn(ExperimentalForeignApi::class)
@@ -17,7 +17,7 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
 
   internal abstract fun bindingMapHandle(): ULong
 
-  internal abstract fun bindingCloseMap(call: (ULong) -> Int)
+  internal abstract fun bindingCloseMap(call: (ULong) -> Unit)
 
   internal abstract fun bindingRetireMap(call: (ULong) -> Deferred<Unit>): Deferred<Unit>
 
@@ -34,13 +34,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_color_relief_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.stringView(arena, (beforeLayerId ?: "")).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_color_relief_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.stringView(arena, (beforeLayerId ?: "")).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -62,7 +65,7 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         CompletionBridge.command { completion ->
           memScoped {
             val arena = this
-            val status =
+            NativeDiagnostics.check { diagnostic ->
               mln_map_add_custom_geometry_source(
                 bindingMapHandle(),
                 GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
@@ -72,9 +75,10 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
                   registrations,
                 ),
                 completion,
+                diagnostic,
               )
-            if (status == 0) registrations.accept(bindingCallbacks)
-            status
+            }
+            registrations.accept(bindingCallbacks)
           }
         }
       }
@@ -97,7 +101,7 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         CompletionBridge.command { completion ->
           memScoped {
             val arena = this
-            val status =
+            NativeDiagnostics.check { diagnostic ->
               mln_map_add_custom_mvt_vector_source(
                 bindingMapHandle(),
                 GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
@@ -107,9 +111,10 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
                   registrations,
                 ),
                 completion,
+                diagnostic,
               )
-            if (status == 0) registrations.accept(bindingCallbacks)
-            status
+            }
+            registrations.accept(bindingCallbacks)
           }
         }
       }
@@ -130,12 +135,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_geojson_source_data(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            data.bindingGeojsonSourceDataHandle(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_geojson_source_data(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              data.bindingGeojsonSourceDataHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -156,14 +164,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_geojson_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.stringView(arena, url).pointed.readValue(),
-            if (options == null) null
-            else GeneratedValues.writeGeojsonSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_geojson_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.stringView(arena, url).pointed.readValue(),
+              if (options == null) null
+              else GeneratedValues.writeGeojsonSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -184,13 +195,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_hillshade_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.stringView(arena, (beforeLayerId ?: "")).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_hillshade_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.stringView(arena, (beforeLayerId ?: "")).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -211,14 +225,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_image_source_image(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeLatLngArray(arena, coordinates),
-            coordinates.size.convert(),
-            GeneratedValues.writePremultipliedRgba8Image(arena, image),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_image_source_image(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeLatLngArray(arena, coordinates),
+              coordinates.size.convert(),
+              GeneratedValues.writePremultipliedRgba8Image(arena, image),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -239,14 +256,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_image_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeLatLngArray(arena, coordinates),
-            coordinates.size.convert(),
-            GeneratedValues.stringView(arena, url).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_image_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeLatLngArray(arena, coordinates),
+              coordinates.size.convert(),
+              GeneratedValues.stringView(arena, url).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -266,12 +286,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_location_indicator_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            GeneratedValues.stringView(arena, (beforeLayerId ?: "")).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_location_indicator_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              GeneratedValues.stringView(arena, (beforeLayerId ?: "")).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -292,15 +315,18 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_raster_dem_source_tiles(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeBufferViewArray(arena, tiles),
-            tiles.size.convert(),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_raster_dem_source_tiles(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeBufferViewArray(arena, tiles),
+              tiles.size.convert(),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -321,14 +347,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_raster_dem_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.stringView(arena, url).pointed.readValue(),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_raster_dem_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.stringView(arena, url).pointed.readValue(),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -349,15 +378,18 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_raster_source_tiles(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeBufferViewArray(arena, tiles),
-            tiles.size.convert(),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_raster_source_tiles(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeBufferViewArray(arena, tiles),
+              tiles.size.convert(),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -378,14 +410,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_raster_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.stringView(arena, url).pointed.readValue(),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_raster_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.stringView(arena, url).pointed.readValue(),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -405,12 +440,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_style_layer_json(
-            bindingMapHandle(),
-            GeneratedValues.byteView(arena, layerJson).pointed.readValue(),
-            GeneratedValues.stringView(arena, (beforeLayerId ?: "")).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_style_layer_json(
+              bindingMapHandle(),
+              GeneratedValues.byteView(arena, layerJson).pointed.readValue(),
+              GeneratedValues.stringView(arena, (beforeLayerId ?: "")).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -430,12 +468,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_style_source_json(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.byteView(arena, sourceJson).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_style_source_json(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.byteView(arena, sourceJson).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -456,15 +497,18 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_vector_source_tiles(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeBufferViewArray(arena, tiles),
-            tiles.size.convert(),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_vector_source_tiles(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeBufferViewArray(arena, tiles),
+              tiles.size.convert(),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -485,14 +529,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_add_vector_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.stringView(arena, url).pointed.readValue(),
-            if (options == null) null
-            else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_add_vector_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.stringView(arena, url).pointed.readValue(),
+              if (options == null) null
+              else GeneratedValues.writeStyleTileSourceOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -509,11 +556,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_apply_camera_delta(
-            bindingMapHandle(),
-            GeneratedValues.writeCameraDelta(arena, delta),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_apply_camera_delta(
+              bindingMapHandle(),
+              GeneratedValues.writeCameraDelta(arena, delta),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -539,13 +589,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_camera_for_geometry(
-              bindingMapHandle(),
-              GeneratedValues.byteView(arena, geometry).pointed.readValue(),
-              if (fitOptions == null) null
-              else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_camera_for_geometry(
+                bindingMapHandle(),
+                GeneratedValues.byteView(arena, geometry).pointed.readValue(),
+                if (fitOptions == null) null
+                else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -572,13 +625,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_camera_for_lat_lng_bounds(
-              bindingMapHandle(),
-              GeneratedValues.writeLatLngBounds(arena, bounds).pointed.readValue(),
-              if (fitOptions == null) null
-              else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_camera_for_lat_lng_bounds(
+                bindingMapHandle(),
+                GeneratedValues.writeLatLngBounds(arena, bounds).pointed.readValue(),
+                if (fitOptions == null) null
+                else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -605,14 +661,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_camera_for_lat_lngs(
-              bindingMapHandle(),
-              GeneratedValues.writeLatLngArray(arena, coordinates),
-              coordinates.size.convert(),
-              if (fitOptions == null) null
-              else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_camera_for_lat_lngs(
+                bindingMapHandle(),
+                GeneratedValues.writeLatLngArray(arena, coordinates),
+                coordinates.size.convert(),
+                if (fitOptions == null) null
+                else GeneratedValues.writeCameraFitOptions(arena, fitOptions!!),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -636,7 +695,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_camera_query(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_camera_query(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -656,7 +717,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         val out0 = arena.alloc<mln_camera_options>()
         out0.size = sizeOf<mln_camera_options>().toUInt()
         val out1 = arena.alloc<ULongVar>()
-        BindingStatus.check(mln_map_camera_snapshot_get(bindingMapHandle(), out0.ptr, out1.ptr))
+        NativeDiagnostics.check { diagnostic ->
+          mln_map_camera_snapshot_get(bindingMapHandle(), out0.ptr, out1.ptr, diagnostic)
+        }
         MapCameraSnapshotGetResult(
           camera = GeneratedValues.readCameraOptions(out0),
           generation = out1.value,
@@ -676,7 +739,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_cancel_transitions(bindingMapHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_cancel_transitions(bindingMapHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -698,11 +763,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_copy_layer_source_id(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_copy_layer_source_id(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -725,11 +793,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_copy_layer_source_layer(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_copy_layer_source_layer(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -754,11 +825,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_copy_style_image_premultiplied_rgba8(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, imageId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_copy_style_image_premultiplied_rgba8(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, imageId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -784,11 +858,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_copy_style_image_stretches(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, imageId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_copy_style_image_stretches(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, imageId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -815,11 +892,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_copy_style_source_attribution(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_copy_style_source_attribution(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -846,11 +926,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_copy_style_source_url(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_copy_style_source_url(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -869,7 +952,7 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         )
         memScoped {
           val arena = this
-          mln_map_dispose(owner)
+          NativeDiagnostics.check { diagnostic -> mln_map_dispose(owner, diagnostic) }
         }
       }
     } finally {
@@ -886,7 +969,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_dump_debug_logs(bindingMapHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_dump_debug_logs(bindingMapHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -907,11 +992,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_feature_state(
-              bindingMapHandle(),
-              GeneratedValues.writeFeatureStateSelector(arena, selector),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_feature_state(
+                bindingMapHandle(),
+                GeneratedValues.writeFeatureStateSelector(arena, selector),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -933,7 +1021,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_global_state(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_global_state(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -960,11 +1050,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_image_source_coordinates(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_image_source_coordinates(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -989,11 +1082,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_layer_filter(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_layer_filter(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1018,12 +1114,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_layer_property(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-              GeneratedValues.stringView(arena, propertyName).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_layer_property(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+                GeneratedValues.stringView(arena, propertyName).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1049,11 +1148,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_style_image_info(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, imageId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_style_image_info(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, imageId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1079,11 +1181,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_style_layer_info(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_style_layer_info(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1108,11 +1213,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_style_layer_json(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_style_layer_json(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1137,11 +1245,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_style_light_property(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, propertyName).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_style_light_property(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, propertyName).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1167,11 +1278,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_style_source_info(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_style_source_info(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1197,11 +1311,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_style_source_tile_urls(
-              bindingMapHandle(),
-              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_style_source_tile_urls(
+                bindingMapHandle(),
+                GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1225,7 +1342,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_get_style_transition_options(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_get_style_transition_options(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -1246,12 +1365,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_invalidate_custom_geometry_source_region(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeLatLngBounds(arena, bounds).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_invalidate_custom_geometry_source_region(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeLatLngBounds(arena, bounds).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1271,12 +1393,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_invalidate_custom_geometry_source_tile(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeCanonicalTileId(arena, tileId).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_invalidate_custom_geometry_source_tile(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeCanonicalTileId(arena, tileId).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1296,12 +1421,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_invalidate_custom_mvt_vector_source_tile(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeCanonicalTileId(arena, tileId).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_invalidate_custom_mvt_vector_source_tile(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeCanonicalTileId(arena, tileId).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1324,11 +1452,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_lat_lng_bounds_for_camera(
-              bindingMapHandle(),
-              GeneratedValues.writeCameraOptions(arena, camera),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_lat_lng_bounds_for_camera(
+                bindingMapHandle(),
+                GeneratedValues.writeCameraOptions(arena, camera),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1352,11 +1483,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_lat_lng_bounds_for_camera_unwrapped(
-              bindingMapHandle(),
-              GeneratedValues.writeCameraOptions(arena, camera),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_lat_lng_bounds_for_camera_unwrapped(
+                bindingMapHandle(),
+                GeneratedValues.writeCameraOptions(arena, camera),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1378,11 +1512,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_lat_lng_for_pixel(
-              bindingMapHandle(),
-              GeneratedValues.writeScreenPoint(arena, point).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_lat_lng_for_pixel(
+                bindingMapHandle(),
+                GeneratedValues.writeScreenPoint(arena, point).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1404,11 +1541,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_lat_lng_for_pixel_unwrapped(
-              bindingMapHandle(),
-              GeneratedValues.writeScreenPoint(arena, point).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_lat_lng_for_pixel_unwrapped(
+                bindingMapHandle(),
+                GeneratedValues.writeScreenPoint(arena, point).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1433,12 +1573,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_lat_lngs_for_pixels(
-              bindingMapHandle(),
-              GeneratedValues.writeScreenPointArray(arena, points),
-              points.size.convert(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_lat_lngs_for_pixels(
+                bindingMapHandle(),
+                GeneratedValues.writeScreenPointArray(arena, points),
+                points.size.convert(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1463,12 +1606,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_lat_lngs_for_pixels_unwrapped(
-              bindingMapHandle(),
-              GeneratedValues.writeScreenPointArray(arena, points),
-              points.size.convert(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_lat_lngs_for_pixels_unwrapped(
+                bindingMapHandle(),
+                GeneratedValues.writeScreenPointArray(arena, points),
+                points.size.convert(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1493,7 +1639,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_list_style_layer_ids(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_list_style_layer_ids(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -1518,7 +1666,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_list_style_layers(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_list_style_layers(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -1543,7 +1693,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_list_style_source_ids(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_list_style_source_ids(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -1565,7 +1717,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_loaded_style_json(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_loaded_style_json(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -1585,7 +1739,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_meters_per_pixel_at_latitude(bindingMapHandle(), latitude, completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_meters_per_pixel_at_latitude(
+                bindingMapHandle(),
+                latitude,
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1606,12 +1767,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_move_style_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            GeneratedValues.stringView(arena, (beforeLayerId ?: "")).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_move_style_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              GeneratedValues.stringView(arena, (beforeLayerId ?: "")).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1634,11 +1798,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_pixel_for_lat_lng(
-              bindingMapHandle(),
-              GeneratedValues.writeLatLng(arena, coordinate).pointed.readValue(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_pixel_for_lat_lng(
+                bindingMapHandle(),
+                GeneratedValues.writeLatLng(arena, coordinate).pointed.readValue(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1663,12 +1830,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_pixels_for_lat_lngs(
-              bindingMapHandle(),
-              GeneratedValues.writeLatLngArray(arena, coordinates),
-              coordinates.size.convert(),
-              completion,
-            )
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_pixels_for_lat_lngs(
+                bindingMapHandle(),
+                GeneratedValues.writeLatLngArray(arena, coordinates),
+                coordinates.size.convert(),
+                completion,
+                diagnostic,
+              )
+            }
           }
         },
       )
@@ -1697,7 +1867,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_projection_create(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_projection_create(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -1717,7 +1889,7 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         CompletionBridge.unitChecked { completion ->
           memScoped {
             val arena = this
-            mln_map_release(owner, completion)
+            NativeDiagnostics.check { diagnostic -> mln_map_release(owner, completion, diagnostic) }
           }
         }
       }
@@ -1737,11 +1909,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_remove_feature_state(
-            bindingMapHandle(),
-            GeneratedValues.writeFeatureStateSelector(arena, selector),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_remove_feature_state(
+              bindingMapHandle(),
+              GeneratedValues.writeFeatureStateSelector(arena, selector),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1758,11 +1933,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_remove_style_image(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, imageId).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_remove_style_image(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, imageId).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1779,11 +1957,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_remove_style_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_remove_style_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1800,11 +1981,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_remove_style_source(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_remove_style_source(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1821,7 +2005,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_request_repaint(bindingMapHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_request_repaint(bindingMapHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -1838,7 +2024,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.unit { completion ->
         memScoped {
           val arena = this
-          mln_map_request_still_image(bindingMapHandle(), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_request_still_image(bindingMapHandle(), completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -1855,11 +2043,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_resize(
-            bindingMapHandle(),
-            GeneratedValues.writeLogicalExtent(arena, extent).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_resize(
+              bindingMapHandle(),
+              GeneratedValues.writeLogicalExtent(arena, extent).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1876,11 +2067,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_bounds(
-            bindingMapHandle(),
-            GeneratedValues.writeBoundOptions(arena, options),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_bounds(
+              bindingMapHandle(),
+              GeneratedValues.writeBoundOptions(arena, options),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1901,13 +2095,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_custom_geometry_source_tile_data(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeCanonicalTileId(arena, tileId).pointed.readValue(),
-            GeneratedValues.byteView(arena, data).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_custom_geometry_source_tile_data(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeCanonicalTileId(arena, tileId).pointed.readValue(),
+              GeneratedValues.byteView(arena, data).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1928,13 +2125,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_custom_mvt_vector_source_tile_data(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeCanonicalTileId(arena, tileId).pointed.readValue(),
-            GeneratedValues.byteView(arena, data).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_custom_mvt_vector_source_tile_data(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeCanonicalTileId(arena, tileId).pointed.readValue(),
+              GeneratedValues.byteView(arena, data).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1955,13 +2155,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_custom_mvt_vector_source_tile_error(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeCanonicalTileId(arena, tileId).pointed.readValue(),
-            GeneratedValues.stringView(arena, message).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_custom_mvt_vector_source_tile_error(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeCanonicalTileId(arena, tileId).pointed.readValue(),
+              GeneratedValues.stringView(arena, message).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -1978,7 +2181,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_debug_options(bindingMapHandle(), options.rawValue, completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_debug_options(bindingMapHandle(), options.rawValue, completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -1995,7 +2200,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_event_mask(bindingMapHandle(), mask.rawValue, completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_event_mask(bindingMapHandle(), mask.rawValue, completion, diagnostic)
+          }
         }
       }
     } finally {
@@ -2015,12 +2222,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_feature_state(
-            bindingMapHandle(),
-            GeneratedValues.writeFeatureStateSelector(arena, selector),
-            GeneratedValues.byteView(arena, state).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_feature_state(
+              bindingMapHandle(),
+              GeneratedValues.writeFeatureStateSelector(arena, selector),
+              GeneratedValues.byteView(arena, state).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2037,11 +2247,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_free_camera_options(
-            bindingMapHandle(),
-            GeneratedValues.writeFreeCameraOptions(arena, options),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_free_camera_options(
+              bindingMapHandle(),
+              GeneratedValues.writeFreeCameraOptions(arena, options),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2061,12 +2274,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_geojson_source_data(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            data.bindingGeojsonSourceDataHandle(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_geojson_source_data(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              data.bindingGeojsonSourceDataHandle(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2086,12 +2302,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_geojson_source_synchronous_tiling(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            enabled,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_geojson_source_synchronous_tiling(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              enabled,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2111,12 +2330,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_geojson_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.stringView(arena, url).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_geojson_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.stringView(arena, url).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2136,12 +2358,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_global_state_property(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, propertyName).pointed.readValue(),
-            GeneratedValues.byteView(arena, valueValue).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_global_state_property(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, propertyName).pointed.readValue(),
+              GeneratedValues.byteView(arena, valueValue).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2161,13 +2386,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_image_source_coordinates(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writeLatLngArray(arena, coordinates),
-            coordinates.size.convert(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_image_source_coordinates(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writeLatLngArray(arena, coordinates),
+              coordinates.size.convert(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2187,12 +2415,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_image_source_image(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.writePremultipliedRgba8Image(arena, image),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_image_source_image(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.writePremultipliedRgba8Image(arena, image),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2209,12 +2440,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_image_source_url(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            GeneratedValues.stringView(arena, url).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_image_source_url(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              GeneratedValues.stringView(arena, url).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2234,12 +2468,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_layer_filter(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            if (filter == null) null else GeneratedValues.byteView(arena, filter!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_layer_filter(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              if (filter == null) null else GeneratedValues.byteView(arena, filter!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2256,12 +2493,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_layer_max_zoom(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            maxZoom,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_layer_max_zoom(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              maxZoom,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2278,12 +2518,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_layer_min_zoom(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            minZoom,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_layer_min_zoom(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              minZoom,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2304,13 +2547,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_layer_property(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            GeneratedValues.stringView(arena, propertyName).pointed.readValue(),
-            GeneratedValues.byteView(arena, valueValue).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_layer_property(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              GeneratedValues.stringView(arena, propertyName).pointed.readValue(),
+              GeneratedValues.byteView(arena, valueValue).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2330,12 +2576,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_layer_source_id(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_layer_source_id(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2355,12 +2604,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_layer_source_layer(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            GeneratedValues.stringView(arena, (sourceLayer ?: "")).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_layer_source_layer(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              GeneratedValues.stringView(arena, (sourceLayer ?: "")).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2380,12 +2632,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_layer_visibility(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            visibility.rawValue,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_layer_visibility(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              visibility.rawValue,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2405,12 +2660,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_location_indicator_accuracy_radius(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            radius,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_location_indicator_accuracy_radius(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              radius,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2430,12 +2688,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_location_indicator_bearing(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            bearing,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_location_indicator_bearing(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              bearing,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2456,13 +2717,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_location_indicator_image_name(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            imageKind.rawValue,
-            GeneratedValues.stringView(arena, imageId).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_location_indicator_image_name(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              imageKind.rawValue,
+              GeneratedValues.stringView(arena, imageId).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2483,13 +2747,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_location_indicator_location(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, layerId).pointed.readValue(),
-            GeneratedValues.writeLatLng(arena, coordinate).pointed.readValue(),
-            altitude,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_location_indicator_location(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, layerId).pointed.readValue(),
+              GeneratedValues.writeLatLng(arena, coordinate).pointed.readValue(),
+              altitude,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2506,11 +2773,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_projection_mode(
-            bindingMapHandle(),
-            GeneratedValues.writeProjectionMode(arena, mode),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_projection_mode(
+              bindingMapHandle(),
+              GeneratedValues.writeProjectionMode(arena, mode),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2527,7 +2797,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_rendering_stats_view_enabled(bindingMapHandle(), enabled, completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_rendering_stats_view_enabled(
+              bindingMapHandle(),
+              enabled,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2548,13 +2825,17 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_style_image(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, imageId).pointed.readValue(),
-            GeneratedValues.writePremultipliedRgba8Image(arena, image),
-            if (options == null) null else GeneratedValues.writeStyleImageOptions(arena, options!!),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_style_image(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, imageId).pointed.readValue(),
+              GeneratedValues.writePremultipliedRgba8Image(arena, image),
+              if (options == null) null
+              else GeneratedValues.writeStyleImageOptions(arena, options!!),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2571,11 +2852,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_style_json(
-            bindingMapHandle(),
-            GeneratedValues.byteView(arena, json).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_style_json(
+              bindingMapHandle(),
+              GeneratedValues.byteView(arena, json).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2592,11 +2876,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_style_light_json(
-            bindingMapHandle(),
-            GeneratedValues.byteView(arena, lightJson).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_style_light_json(
+              bindingMapHandle(),
+              GeneratedValues.byteView(arena, lightJson).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2616,12 +2903,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_style_light_property(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, propertyName).pointed.readValue(),
-            GeneratedValues.byteView(arena, valueValue).pointed.readValue(),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_style_light_property(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, propertyName).pointed.readValue(),
+              GeneratedValues.byteView(arena, valueValue).pointed.readValue(),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2641,12 +2931,15 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_style_source_volatile(
-            bindingMapHandle(),
-            GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
-            isVolatile,
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_style_source_volatile(
+              bindingMapHandle(),
+              GeneratedValues.stringView(arena, sourceId).pointed.readValue(),
+              isVolatile,
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2665,11 +2958,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_style_transition_options(
-            bindingMapHandle(),
-            GeneratedValues.writeStyleTransitionOptions(arena, options),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_style_transition_options(
+              bindingMapHandle(),
+              GeneratedValues.writeStyleTransitionOptions(arena, options),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2686,7 +2982,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_style_url(bindingMapHandle(), GeneratedValues.cString(arena, url), completion)
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_style_url(
+              bindingMapHandle(),
+              GeneratedValues.cString(arena, url),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2703,11 +3006,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_tile_options(
-            bindingMapHandle(),
-            GeneratedValues.writeMapTileOptions(arena, options),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_tile_options(
+              bindingMapHandle(),
+              GeneratedValues.writeMapTileOptions(arena, options),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2724,11 +3030,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_set_viewport_options(
-            bindingMapHandle(),
-            GeneratedValues.writeMapViewportOptions(arena, options),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_set_viewport_options(
+              bindingMapHandle(),
+              GeneratedValues.writeMapViewportOptions(arena, options),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2746,7 +3055,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         val arena = this
         val output = arena.alloc<mln_map_snapshot>()
         output.size = sizeOf<mln_map_snapshot>().toUInt()
-        BindingStatus.check(mln_map_snapshot_get(bindingMapHandle(), output.ptr))
+        NativeDiagnostics.check { diagnostic ->
+          mln_map_snapshot_get(bindingMapHandle(), output.ptr, diagnostic)
+        }
         GeneratedValues.readMapSnapshot(output)
       }
     } finally {
@@ -2767,7 +3078,9 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
         { completion ->
           memScoped {
             val arena = this
-            mln_map_style_url(bindingMapHandle(), completion)
+            NativeDiagnostics.check { diagnostic ->
+              mln_map_style_url(bindingMapHandle(), completion, diagnostic)
+            }
           }
         },
       )
@@ -2785,11 +3098,14 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
       return CompletionBridge.command { completion ->
         memScoped {
           val arena = this
-          mln_map_update_camera(
-            bindingMapHandle(),
-            GeneratedValues.writeCameraUpdate(arena, update),
-            completion,
-          )
+          NativeDiagnostics.check { diagnostic ->
+            mln_map_update_camera(
+              bindingMapHandle(),
+              GeneratedValues.writeCameraUpdate(arena, update),
+              completion,
+              diagnostic,
+            )
+          }
         }
       }
     } finally {
@@ -2813,13 +3129,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_metal_borrowed_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeMetalBorrowedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_metal_borrowed_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeMetalBorrowedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -2871,13 +3190,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_metal_owned_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeMetalOwnedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_metal_owned_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeMetalOwnedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -2929,13 +3251,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_metal_surface_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeMetalSurfaceDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_metal_surface_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeMetalSurfaceDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -2987,13 +3312,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_opengl_borrowed_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeOpenglBorrowedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_opengl_borrowed_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeOpenglBorrowedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3045,13 +3373,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_opengl_owned_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeOpenglOwnedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_opengl_owned_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeOpenglOwnedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3103,13 +3434,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_opengl_surface_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeOpenglSurfaceDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_opengl_surface_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeOpenglSurfaceDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3161,13 +3495,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_vulkan_borrowed_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeVulkanBorrowedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_vulkan_borrowed_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeVulkanBorrowedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3219,13 +3556,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_vulkan_owned_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeVulkanOwnedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_vulkan_owned_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeVulkanOwnedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3277,13 +3617,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_vulkan_surface_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeVulkanSurfaceDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_vulkan_surface_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeVulkanSurfaceDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3335,13 +3678,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_webgpu_borrowed_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeWebgpuBorrowedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_webgpu_borrowed_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeWebgpuBorrowedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3393,13 +3739,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_webgpu_owned_texture_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeWebgpuOwnedTextureDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_webgpu_owned_texture_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeWebgpuOwnedTextureDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =
@@ -3451,13 +3800,16 @@ public actual abstract class GeneratedMapOperations internal actual constructor(
             val arena = this
             val output = arena.alloc<ULongVar>().also { it.value = 0uL }
             val ready = CompletionBridge.unitChecked { completion ->
-              mln_webgpu_surface_attach(
-                bindingMapHandle(),
-                GeneratedValues.writeWebgpuSurfaceDescriptor(arena, descriptor),
-                GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
-                output.ptr,
-                completion,
-              )
+              NativeDiagnostics.check { diagnostic ->
+                mln_webgpu_surface_attach(
+                  bindingMapHandle(),
+                  GeneratedValues.writeWebgpuSurfaceDescriptor(arena, descriptor),
+                  GeneratedValues.writeRenderSessionAttachOptions(arena, options, registrations),
+                  output.ptr,
+                  completion,
+                  diagnostic,
+                )
+              }
             }
             run {
               val owner =

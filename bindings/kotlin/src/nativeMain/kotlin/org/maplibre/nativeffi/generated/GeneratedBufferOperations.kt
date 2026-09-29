@@ -5,7 +5,7 @@ import kotlinx.cinterop.*
 import org.maplibre.nativeffi.generated.*
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.callback.*
-import org.maplibre.nativeffi.internal.status.Status as BindingStatus
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 @OptIn(ExperimentalForeignApi::class)
 public actual abstract class GeneratedBufferOperations internal actual constructor() {
@@ -13,7 +13,7 @@ public actual abstract class GeneratedBufferOperations internal actual construct
 
   internal abstract fun <T> bindingReadBuffer(block: (ULong) -> T): T
 
-  internal abstract fun bindingCloseBuffer(call: (ULong) -> Int)
+  internal abstract fun bindingCloseBuffer(call: (ULong) -> Unit)
 
   public actual fun destroy(): Unit {
     try {
@@ -28,7 +28,6 @@ public actual abstract class GeneratedBufferOperations internal actual construct
         memScoped {
           val arena = this
           mln_buffer_destroy(owner)
-          0
         }
       }
     } finally {
@@ -46,7 +45,9 @@ public actual abstract class GeneratedBufferOperations internal actual construct
         memScoped {
           val arena = this
           val output = arena.alloc<mln_buffer_view>()
-          BindingStatus.check(mln_buffer_get(bindingBufferHandle(), output.ptr))
+          NativeDiagnostics.check { diagnostic ->
+            mln_buffer_get(bindingBufferHandle(), output.ptr, diagnostic)
+          }
           GeneratedValues.readBytes(output)
         }
       }

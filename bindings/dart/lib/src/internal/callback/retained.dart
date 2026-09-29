@@ -4,11 +4,7 @@ import 'dart:isolate';
 import 'package:ffi/ffi.dart';
 import '../c/maplibre_native_c.g.dart' as raw;
 import '../c/maplibre_native_c.dart';
-import '../status/status.dart';
 import '../memory/memory.dart';
-
-void checkStatus(int status) =>
-    checkNativeStatus(status, threadLastErrorMessage);
 
 final class _NativeArenaAllocator implements Allocator {
   _NativeArenaAllocator() : pointer = raw.mln_adapter_arena_create() {
@@ -53,8 +49,13 @@ final class NativeOwnedArena extends Arena {
   void adoptRelease(
     Pointer<NativeFunction<raw.mln_runtime_callback_releaseFunction>> release,
     Pointer<Void> context,
-  ) => checkStatus(
-    raw.mln_adapter_arena_adopt_release(_allocator.pointer, release, context),
+  ) => checkNativeCall(
+    raw.mln_adapter_arena_adopt_release(
+      _allocator.pointer,
+      release,
+      context,
+      nativeDiagnostic,
+    ),
   );
   @override
   void releaseAll({bool reuse = false}) {
@@ -89,13 +90,14 @@ final class NativeCallbackReleases {
       port.handler = _releasePortHandler(WeakReference(this), port);
       withNativeArena((temporary) {
         final registration = temporary<Uint64>();
-        checkStatus(
+        checkNativeCall(
           raw.mln_adapter_dart_release_register(
             NativeApi.postCObject.cast<Void>(),
             port.sendPort.nativePort,
             userData,
             arena?.take() ?? nullptr,
             registration,
+            nativeDiagnostic,
           ),
         );
         accepted = true;

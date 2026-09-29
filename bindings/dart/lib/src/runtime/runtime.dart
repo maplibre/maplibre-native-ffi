@@ -10,7 +10,8 @@ import '../error/maplibre_exception.dart';
 import '../log/log.dart';
 import '../internal/callback/completion.dart';
 import '../internal/callback/retained.dart';
-import '../internal/c/maplibre_native_c.dart' show ensureAbiVersion;
+import '../internal/c/maplibre_native_c.dart'
+    show checkNativeCall, ensureAbiVersion, nativeDiagnostic;
 import '../internal/c/maplibre_native_c.g.dart' as raw;
 import '../internal/lifecycle/lifecycle.dart';
 import '../internal/lifecycle/native_handles.dart';
@@ -89,6 +90,7 @@ final class _NativeCallbackPorts {
             NativeApi.postCObject.cast(),
             nativePort,
             context,
+            nativeDiagnostic,
           ),
         );
         return context.value;
@@ -244,4 +246,4 @@ final class NativeAdoptionFailure implements Exception {
   final void Function() retryCleanup;
 }
 
-void _check(int status) => checkNativeStatus(status, threadLastErrorMessage);
+void _check(int status) => checkNativeCall(status);

@@ -32,7 +32,7 @@ mln_status set_selected(
 
   // #region set
   // The start call parses or copies the bytes before returning.
-  return mln_map_set_feature_state(map, &selector, state, completion);
+  return mln_map_set_feature_state(map, &selector, state, completion, NULL);
   // #endregion set
 }
 
@@ -44,6 +44,6 @@ mln_status clear_selected(
   selector.fields |= MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
   selector.state_key = view("selected");
 
-  return mln_map_remove_feature_state(map, &selector, completion);
+  return mln_map_remove_feature_state(map, &selector, completion, NULL);
   // #endregion remove
 }

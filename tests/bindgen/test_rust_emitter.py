@@ -21,12 +21,13 @@ class RustEmitterTests(unittest.TestCase):
 typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release;parent=none");
 BIND("execution=immediate") void mln_map_release(mln_map map BIND("consumes=always"));
 typedef int mln_status;
+typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
 typedef struct mln_completion { void *state; } mln_completion;
 typedef struct mln_new_point { double type; double self; double str; } mln_new_point;
 BIND("execution=query;result=mln_new_point;shape=value;ownership=borrowed")
-mln_status mln_map_match(mln_map map, const mln_completion *completion);
+mln_status mln_map_match(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_move(mln_map map, mln_new_point native, mln_new_point arena, mln_new_point binding_arg_1, const mln_completion *completion);
+mln_status mln_map_move(mln_map map, mln_new_point native, mln_new_point arena, mln_new_point binding_arg_1, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
             api = parse_headers(headers)
             validate(api)
@@ -61,8 +62,8 @@ pub struct mln_new_point { pub type_: f64, pub self_: f64, pub str_: f64 }
 #[derive(Clone, Copy, Debug)]
 pub struct mln_map(pub u64);
 pub unsafe fn mln_map_release(_: mln_map) {}
-pub unsafe fn mln_map_match(_: mln_map, _: *const ()) -> i32 { 0 }
-pub unsafe fn mln_map_move(_: mln_map, _: mln_new_point, _: mln_new_point, _: mln_new_point, _: *const ()) -> i32 { 0 }
+pub unsafe fn mln_map_match(_: mln_map, _: *const (), _: *mut ()) -> i32 { 0 }
+pub unsafe fn mln_map_move(_: mln_map, _: mln_new_point, _: mln_new_point, _: mln_new_point, _: *const (), _: *mut ()) -> i32 { 0 }
 pub mod values {
     pub trait NativeValue: Sized {
         type Raw;
@@ -78,8 +79,8 @@ struct CommandCompletion;
 mod completion {
     pub fn copy_value<T>(_: ()) -> super::Result<T> { unimplemented!() }
     pub fn ready<T>(_: T) -> super::NativeFuture<T> { unimplemented!() }
-    pub fn submit<T>(_: impl Fn(*const ()) -> i32, _: impl Fn(()) -> super::Result<T>) -> super::Result<super::NativeFuture<T>> { unimplemented!() }
-    pub fn submit_command(_: impl Fn(*const ()) -> i32) -> super::Result<super::NativeFuture<super::CommandCompletion>> { unimplemented!() }
+    pub fn submit<T>(_: impl Fn(*const (), *mut ()) -> i32, _: impl Fn(()) -> super::Result<T>) -> super::Result<super::NativeFuture<T>> { unimplemented!() }
+    pub fn submit_command(_: impl Fn(*const (), *mut ()) -> i32) -> super::Result<super::NativeFuture<super::CommandCompletion>> { unimplemented!() }
 }
 mod callback { pub fn check(_: &str, _: u64) -> super::Result<()> { Ok(()) } }
 mod handle {

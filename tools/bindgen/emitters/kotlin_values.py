@@ -82,6 +82,22 @@ def owner_class(native):
     return "org.maplibre.nativeffi.generated." + owner_name(native)
 
 
+def native_call(function, prefix, arguments):
+    """Call a C function, throwing its diagnostic when it returns a failed status.
+
+    The call's value is Unit when it checks a status and the raw result otherwise.
+    """
+    if not function.diagnostic:
+        if "mln_status" in (
+            function.return_type.declaration,
+            function.return_type.spelling,
+        ):
+            raise Unsupported("status result requires a diagnostic parameter")
+        return f"{prefix}{function.name}({', '.join(arguments)})"
+    call = f"{prefix}{function.name}({', '.join([*arguments, 'diagnostic'])})"
+    return f"NativeDiagnostics.check {{ diagnostic -> {call} }}"
+
+
 from . import kotlin_callbacks
 
 

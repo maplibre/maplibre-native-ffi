@@ -68,6 +68,13 @@ mln_test_completion mln_test_completion_default(size_t value_size);
 mln_test_completion mln_test_completion_buffer_view(void);
 mln_test_completion mln_test_completion_readback(void);
 mln_completion mln_test_discard_completion(void);
+
+// The calling thread's diagnostic, which these helpers pass to every C API
+// call. Tests pass MLN_TEST_DIAGNOSTIC to direct calls whose message they read.
+mln_diagnostic* mln_test_diagnostic(void);
+#define MLN_TEST_DIAGNOSTIC mln_test_diagnostic()
+// The message the latest call that wrote the test diagnostic left behind.
+const char* mln_test_last_error(void);
 void mln_test_completion_destroy(mln_test_completion* completion);
 void mln_test_completion_reject(mln_test_completion* completion);
 // Waits for the completion to be delivered and reports whether it arrived. A
