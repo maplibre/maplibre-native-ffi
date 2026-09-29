@@ -951,8 +951,9 @@ auto submit_runtime_command(
     }
     auto lease = ControlLease{&runtime->control};
     const auto sequence = runtime->next_submission_sequence++;
+    auto superseded = uint64_t{0};
     if (latest_submission != nullptr) {
-      latest_submission->store(sequence);
+      superseded = latest_submission->exchange(sequence);
     }
     {
       const std::scoped_lock terminal_lock(runtime->terminal_mutex);
@@ -976,6 +977,12 @@ auto submit_runtime_command(
         }
       );
     } catch (...) {
+      // A rejected submission supersedes nothing, so the earlier accepted one
+      // stays latest unless a newer submission already replaced it.
+      if (latest_submission != nullptr) {
+        auto expected = sequence;
+        latest_submission->compare_exchange_strong(expected, superseded);
+      }
       finish_tracked_submission(runtime, sequence);
       completion->reject();
       set_thread_error("runtime command submission failed");
