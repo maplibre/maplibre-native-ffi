@@ -1226,6 +1226,73 @@ static void clearing_resource_provider_waits_for_in_flight_callback(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+typedef struct dropped_request_probe {
+  atomic_bool release_inline;
+  _Atomic mln_resource_request_handle handle;
+} dropped_request_probe;
+
+static uint32_t claim_and_drop_resource_provider(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) {
+  (void)request;
+  dropped_request_probe* probe = user_data;
+  atomic_store(&probe->handle, handle);
+  if (atomic_load(&probe->release_inline)) {
+    mln_resource_request_release(handle);
+  }
+  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+}
+
+static void expect_dropped_request_fails(bool release_inline) {
+  dropped_request_probe probe = {0};
+  atomic_store(&probe.release_inline, release_inline);
+  mln_runtime runtime = mln_test_create_runtime();
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = claim_and_drop_resource_provider,
+    .user_data = &probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
+  );
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_map_set_style_url(map, "custom://dropped-request-style.json")
+  );
+  if (!release_inline) {
+    for (size_t attempt = 0; atomic_load(&probe.handle) == MLN_HANDLE_NULL &&
+                             attempt < teardown_probe_wait_attempts;
+         attempt += 1) {
+      mln_test_sleep_millisecond();
+    }
+    TEST_ASSERT_NOT_EQUAL(MLN_HANDLE_NULL, atomic_load(&probe.handle));
+    mln_resource_request_release(atomic_load(&probe.handle));
+  }
+  char message[512];
+  TEST_ASSERT_TRUE(
+    wait_for_map_loading_failure(runtime, map, message, sizeof(message))
+  );
+  TEST_ASSERT_NOT_NULL(strstr(message, "released without a response"));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A provider that claims a request and releases it unanswered fails it, so the
+// load reports an error instead of waiting forever.
+static void releasing_a_claimed_request_without_a_response_fails_it(void) {
+  expect_dropped_request_fails(false);
+}
+
+// The same holds when the provider releases the handle inside its callback
+// before answering HANDLE.
+static void releasing_a_request_inside_its_callback_then_claiming_fails_it(
+  void
+) {
+  expect_dropped_request_fails(true);
+}
+
 static void unsupported_style_url_scheme_names_scheme_and_url(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -1832,6 +1899,8 @@ void run_resources_abi_tests(void) {
   RUN_TEST(resource_provider_command_copies_cross_thread_descriptor);
   RUN_TEST(clearing_resource_provider_waits_for_in_flight_callback);
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);
+  RUN_TEST(releasing_a_claimed_request_without_a_response_fails_it);
+  RUN_TEST(releasing_a_request_inside_its_callback_then_claiming_fails_it);
   RUN_TEST(unsupported_style_url_diagnostic_redacts_credentials);
   RUN_TEST(unsupported_style_url_names_declining_provider);
   RUN_TEST(resource_provider_defers_inline_release_until_callback_returns);

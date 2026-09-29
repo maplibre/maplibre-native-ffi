@@ -662,6 +662,7 @@ static void unadopted_deferred_request_fails_and_releases_once(void) {
   TEST_ASSERT_TRUE(wait_for_map_event(
     runtime, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, map, message, sizeof(message)
   ));
+  TEST_ASSERT_NOT_NULL(strstr(message, "released without a response"));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.records));
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, clear_provider_committed(runtime));

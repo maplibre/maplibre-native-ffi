@@ -839,7 +839,7 @@ typedef struct mln_resource_response {
  * - MLN_RESOURCE_PROVIDER_DECISION_HANDLE lets the provider complete the
  *   request through the handle inline or later.
  * - A callback that returns HANDLE may release the handle during the callback.
- *   The C API defers that release until the callback returns.
+ *   A request released without a response fails once the callback returns.
  * - Unknown decision values produce a provider error response. The C API
  *   releases the provided handle and does not pass the request through.
  * - The C API copies completion data, and mln_resource_request_complete() may
@@ -1072,7 +1072,10 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
  *
  * Release the handle exactly once after completing the request or deciding not
  * to complete it. A provider callback that returns
- * MLN_RESOURCE_PROVIDER_DECISION_HANDLE may release the handle inline. Passing
+ * MLN_RESOURCE_PROVIDER_DECISION_HANDLE may release the handle inline.
+ * Releasing a handled request that is neither completed nor cancelled fails it
+ * with an MLN_RESOURCE_ERROR_REASON_OTHER error, so MapLibre never waits on a
+ * request its provider dropped. Passing
  * MLN_HANDLE_NULL is a no-op, as is passing a handle this call already
  * released. A released handle reports MLN_STATUS_INVALID_ARGUMENT from every
  * other request entry point except wait_until_retired, including from a copy

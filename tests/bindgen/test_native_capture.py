@@ -174,7 +174,8 @@ int main() {
 
   assert(provider(&context, &request, 9) == MLN_RESOURCE_PROVIDER_DECISION_HANDLE);
   mln::capture::destroy_deferred(delivered);
-  assert(completions == 1 && completed_size == 0 && releases == 1);
+  // A discarded decision only releases its handle; native fails the request.
+  assert(completions == 0 && releases == 1);
 
   request.prior_data_size = 1;
   assert(provider(&context, &request, 9) == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH);

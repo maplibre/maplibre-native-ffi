@@ -754,9 +754,8 @@ inline auto deferred_function(std::uint32_t kind) noexcept -> void* {
       return nullptr;
   }
 }
-// Fails a decision whose record the host released without adopting its
-// handle. The zeroed response is malformed, and the decision's completion
-// function converts a malformed response to an error response.
+// Releases the decision handle of a record the host destroyed without
+// adopting it. Releasing a claimed, unanswered request fails it.
 inline auto deferred_discard(
   [[maybe_unused]] std::uint32_t kind, [[maybe_unused]] const void* copied
 ) noexcept -> void {
@@ -766,10 +765,6 @@ inline auto deferred_discard(
         *static_cast<const mln_adapter_resource_provider_callback_arguments*>(
           copied
         );
-      const auto response = mln_resource_response{};
-      static_cast<void>(
-        mln_resource_request_complete(arguments.handle, &response)
-      );
       mln_resource_request_release(arguments.handle);
       break;
     }

@@ -159,9 +159,8 @@ def _deferred(bound: BoundApi) -> tuple[list[str], list[str]]:
             "    default: return nullptr;",
             "  }",
             "}",
-            "// Fails a decision whose record the host released without adopting its",
-            "// handle. The zeroed response is malformed, and the decision's completion",
-            "// function converts a malformed response to an error response.",
+            "// Releases the decision handle of a record the host destroyed without",
+            "// adopting it. Releasing a claimed, unanswered request fails it.",
             "inline auto deferred_discard([[maybe_unused]] std::uint32_t kind, [[maybe_unused]] const void* copied) noexcept -> void {",
             "  switch (kind) {",
         ]
@@ -170,26 +169,12 @@ def _deferred(bound: BoundApi) -> tuple[list[str], list[str]]:
         decision = callback.decision
         if decision is None:
             continue
-        complete = source.functions_by_name[decision.complete]
-        response = (
-            complete.parameters[1].type.pointee
-            if len(complete.parameters) == 2
-            else None
-        )
-        if response is None or not response.declaration:
-            raise ModelError(
-                [
-                    f"{callback.native}: deferred decision completion requires one response record"
-                ]
-            )
         release = source.functions_by_name[decision.handle.release]
         release_call = f"{decision.handle.release}(arguments.{decision.parameter})"
         output.extend(
             [
                 f"    case {deferred_constant(callback.native)}: {{",
                 f"      const auto& arguments = *static_cast<const {arguments_record(callback.native)}*>(copied);",
-                f"      const auto response = {response.declaration}{{}};",
-                f"      static_cast<void>({decision.complete}(arguments.{decision.parameter}, &response));",
                 f"      static_cast<void>({release_call});"
                 if release.return_type.kind != "void"
                 else f"      {release_call};",

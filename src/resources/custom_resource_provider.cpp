@@ -36,6 +36,11 @@ struct ResourceRequestObject {
   bool cancelled = false;
   bool completed = false;
   bool retired = false;
+  // The provider callback is running, has claimed the request, or saw its
+  // handle released before it answered.
+  bool deciding = false;
+  bool claimed = false;
+  bool released_while_deciding = false;
   mln_resource_request_cancel_callback cancel_callback = nullptr;
   mln_runtime_callback_release cancel_release = nullptr;
   void* cancel_user_data = nullptr;
@@ -212,6 +217,26 @@ auto response_from_abi(const mln_resource_response& provider_response)
   return response;
 }
 
+// Answers a claimed request the host released without a response, so MapLibre
+// does not wait on it forever. The caller holds object.mutex.
+void fail_unanswered_locked(ResourceRequestObject& object) noexcept {
+  if (object.completed || object.cancelled) {
+    return;
+  }
+  object.completed = true;
+  try {
+    object.actor.invoke(
+      &mln::FileSourceRequest::setResponse,
+      error_response(
+        "resource request was released without a response",
+        mln::Response::Error::Reason::Other
+      )
+    );
+  } catch (...) {
+    // The request already went away, so nothing is waiting on it.
+  }
+}
+
 // Runs the registered cancel callback, if any, for a request that has not been
 // completed. Callers hold no lock; the callback may call back into this handle.
 void run_cancel_callback(ResourceRequestObject& object) noexcept {
@@ -371,8 +396,22 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
     }
     const auto request =
       make_request_view(invocation.resource, invocation.resolved_url);
+    {
+      const std::scoped_lock lock(invocation.object->mutex);
+      invocation.object->deciding = true;
+    }
     const auto decision =
       invocation.callback(invocation.user_data, &request, invocation.handle);
+    {
+      const std::scoped_lock lock(invocation.object->mutex);
+      invocation.object->deciding = false;
+      if (decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
+        invocation.object->claimed = true;
+        if (invocation.object->released_while_deciding) {
+          fail_unanswered_locked(*invocation.object);
+        }
+      }
+    }
     if (decision == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH) {
       retire_request(invocation.handle);
       return false;
@@ -604,6 +643,18 @@ auto wait_for_resource_request_retired(mln_resource_request_handle handle)
 }
 
 void release_resource_request(mln_resource_request_handle handle) noexcept {
+  if (
+    const auto object = handle_table<ResourceRequestObject>().try_lease(handle)
+  ) {
+    const std::scoped_lock lock(object->mutex);
+    if (!object->retired) {
+      if (object->claimed) {
+        fail_unanswered_locked(*object);
+      } else if (object->deciding) {
+        object->released_while_deciding = true;
+      }
+    }
+  }
   retire_request(handle);
 }
 
