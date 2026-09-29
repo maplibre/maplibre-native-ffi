@@ -44,9 +44,10 @@ const State = struct {
     }
     fn runFinalizer(context: *anyopaque) void {
         const self: *State = @ptrCast(@alignCast(context));
+        // A failed disposal leaves the native handle to native cleanup; the
+        // binding state and its parent anchor are still this finalizer's to free.
         self.dispose(self.raw) catch |err| {
             std.log.err("native owner disposal failed: {s}", .{@errorName(err)});
-            return;
         };
         self.release();
     }
