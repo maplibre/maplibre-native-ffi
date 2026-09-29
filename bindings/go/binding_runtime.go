@@ -352,8 +352,12 @@ func bindingCallbackValue[T any](pointer unsafe.Pointer) (T, bool) {
 	return value, ok
 }
 
+// Native threads enter the two exports below, so a panic must not cross cgo:
+// it would abort the process. Like the generated trampolines, they recover.
+
 //export mlnGoCallbackRelease
 func mlnGoCallbackRelease(pointer unsafe.Pointer) {
+	defer func() { _ = recover() }()
 	if ticket := bindingTicket(pointer); ticket != nil {
 		ticket.release()
 	} else if pointer != nil {
@@ -363,7 +367,12 @@ func mlnGoCallbackRelease(pointer unsafe.Pointer) {
 }
 
 //export mlnGoCallbackOwner
-func mlnGoCallbackOwner(pointer unsafe.Pointer) C.uint64_t {
+func mlnGoCallbackOwner(pointer unsafe.Pointer) (owner C.uint64_t) {
+	defer func() {
+		if recover() != nil {
+			owner = 0
+		}
+	}()
 	if ticket := bindingTicket(pointer); ticket != nil {
 		return C.uint64_t(ticket.identity)
 	}
