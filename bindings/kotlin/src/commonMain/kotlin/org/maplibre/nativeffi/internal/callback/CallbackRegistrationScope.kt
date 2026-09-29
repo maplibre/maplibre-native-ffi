@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.internal.callback
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import org.maplibre.nativeffi.internal.lifecycle.yieldThread
 
 @OptIn(ExperimentalAtomicApi::class)
 internal class CallbackRoot(value: Any, val owner: Long? = null) {
@@ -34,7 +35,7 @@ internal class CallbackOwner {
   private var first: CallbackRoot? = null
 
   private inline fun <T> locked(block: () -> T): T {
-    while (!locked.compareAndSet(0, 1)) {}
+    while (!locked.compareAndSet(0, 1)) yieldThread()
     try {
       return block()
     } finally {

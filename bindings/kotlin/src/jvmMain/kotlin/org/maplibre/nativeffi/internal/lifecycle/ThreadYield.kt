@@ -1,5 +1,5 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
-internal actual fun yieldWhileClosing() {
+internal actual fun yieldThread() {
   Thread.yield()
 }
