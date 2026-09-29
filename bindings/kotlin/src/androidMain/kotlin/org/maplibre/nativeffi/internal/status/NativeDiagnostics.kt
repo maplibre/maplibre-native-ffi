@@ -10,11 +10,13 @@ import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
  * right after on the same thread, so calls nested in callbacks during that call cannot clobber it.
  */
 internal object NativeDiagnostics {
-  private val buffers = ThreadLocal.withInitial {
-    // The extra reference keeps a PointerScope open at first use from freeing the buffer. The
-    // garbage collector still frees it once its thread ends.
-    MaplibreNativeC.mln_diagnostic().retainReference<MaplibreNativeC.mln_diagnostic>()
-  }
+  private val buffers =
+    object : ThreadLocal<MaplibreNativeC.mln_diagnostic>() {
+      // The extra reference keeps a PointerScope open at first use from freeing the buffer. The
+      // garbage collector still frees it once its thread ends.
+      override fun initialValue(): MaplibreNativeC.mln_diagnostic =
+        MaplibreNativeC.mln_diagnostic().retainReference()
+    }
 
   /** Calls native with this thread's diagnostic and throws the mapped exception on failure. */
   inline fun check(call: (MaplibreNativeC.mln_diagnostic) -> Int) {
