@@ -1260,8 +1260,6 @@ void _deliverLogCallback(LogCallback callback, List<dynamic> message) {
       arguments.code,
       arguments.message.cast<Utf8>().toDartString(),
     );
-  } catch (_) {
-    // The native answer is final, so the failure stays here.
   } finally {
     raw.mln_adapter_deferred_call_record_destroy(record);
   }
@@ -3111,7 +3109,6 @@ void _deliverResourceProviderCallback(
     message[1] as int,
   );
   ResourceRequestHandle? owner;
-  var failed = false;
   try {
     final arguments = record.ref.arguments
         .cast<raw.mln_adapter_resource_provider_callback_arguments>()
@@ -3119,16 +3116,13 @@ void _deliverResourceProviderCallback(
     final adopted = owner = ResourceRequestHandle._(
       NativeResourceRequest(arguments.handle),
     );
-    callback(_readResourceRequest(arguments.request.ref), adopted);
     raw.mln_adapter_deferred_call_record_adopt(record);
+    callback(_readResourceRequest(arguments.request.ref), adopted);
   } catch (_) {
-    // The native answer is final, so the failure stays here.
-    failed = true;
+    owner?.close();
+    rethrow;
   } finally {
     raw.mln_adapter_deferred_call_record_destroy(record);
-    if (failed) {
-      owner?.close();
-    }
   }
 }
 
@@ -3596,6 +3590,8 @@ void androidInit(
   NativePointer jniClass,
   NativePointer context,
 ) => withNativeArena((arena) {
+  ensureAbiVersion();
+
   _check(
     raw.mln_android_init(
       Pointer<Void>.fromAddress(jniEnv.address).cast(),
@@ -3606,58 +3602,80 @@ void androidInit(
 });
 
 AnimationOptions animationOptionsDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_animation_options_default();
   return _readAnimationOptions(nativeResult);
 });
 
 BoundOptions boundOptionsDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_bound_options_default();
   return _readBoundOptions(nativeResult);
 });
 
 int cVersion() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_c_version();
   return nativeResult;
 });
 
 CameraDelta cameraDeltaDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_camera_delta_default();
   return _readCameraDelta(nativeResult);
 });
 
 CameraFitOptions cameraFitOptionsDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_camera_fit_options_default();
   return _readCameraFitOptions(nativeResult);
 });
 
 CameraOptions cameraOptionsDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_camera_options_default();
   return _readCameraOptions(nativeResult);
 });
 
 CameraUpdate cameraUpdateDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_camera_update_default();
   return _readCameraUpdate(nativeResult);
 });
 
 CustomGeometrySourceOptions customGeometrySourceOptionsDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_custom_geometry_source_options_default();
       return _readCustomGeometrySourceOptions(nativeResult);
     });
 
 CustomMvtVectorSourceOptions customMvtVectorSourceOptionsDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_custom_mvt_vector_source_options_default();
       return _readCustomMvtVectorSourceOptions(nativeResult);
     });
 
 FrameDemand frameDemandDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_frame_demand_default();
   return _readFrameDemand(nativeResult);
 });
 
 FreeCameraOptions freeCameraOptionsDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_free_camera_options_default();
   return _readFreeCameraOptions(nativeResult);
 });
@@ -3666,6 +3684,7 @@ GeojsonSourceDataHandle geojsonSourceDataCreate(
   Uint8List data, {
   GeojsonSourceOptions? options,
 }) => withNativeArena((arena) {
+  ensureAbiVersion();
   final outData = arena<Uint64>();
   _check(
     raw.mln_geojson_source_data_create(
@@ -3684,17 +3703,22 @@ GeojsonSourceDataHandle geojsonSourceDataCreate(
 });
 
 GeojsonSourceOptions geojsonSourceOptionsDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_geojson_source_options_default();
   return _readGeojsonSourceOptions(nativeResult);
 });
 
 GpuSync gpuSyncDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_gpu_sync_default();
   return _readGpuSync(nativeResult);
 });
 
 LatLng latLngForProjectedMeters(ProjectedMeters meters) =>
     withNativeArena((arena) {
+      ensureAbiVersion();
       final outCoordinate = arena<raw.mln_lat_lng>();
       _check(
         raw.mln_lat_lng_for_projected_meters(
@@ -3706,14 +3730,19 @@ LatLng latLngForProjectedMeters(ProjectedMeters meters) =>
     });
 
 void logClearCallback() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   _check(raw.mln_log_clear_callback());
 });
 
 void logSetAsyncSeverityMask(LogSeverityMask mask) => withNativeArena((arena) {
+  ensureAbiVersion();
+
   _check(raw.mln_log_set_async_severity_mask(mask.rawValue));
 });
 
 void logSetCallback(LogCallback callback) {
+  ensureAbiVersion();
   final port = _globalCallbackPorts.registerDeferred(
     (raw.mln_adapter_deferred_callback.MLN_ADAPTER_DEFERRED_LOG_CALLBACK &
         0xffffffff),
@@ -3746,85 +3775,113 @@ void logSetCallback(LogCallback callback) {
 }
 
 MapOptions mapOptionsDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_map_options_default();
   return _readMapOptions(nativeResult);
 });
 
 MapTileOptions mapTileOptionsDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_map_tile_options_default();
   return _readMapTileOptions(nativeResult);
 });
 
 MapViewportOptions mapViewportOptionsDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_map_viewport_options_default();
   return _readMapViewportOptions(nativeResult);
 });
 
 MetalBorrowedTextureDescriptor metalBorrowedTextureDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_metal_borrowed_texture_descriptor_default();
       return _readMetalBorrowedTextureDescriptor(nativeResult);
     });
 
 MetalOwnedTextureDescriptor metalOwnedTextureDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_metal_owned_texture_descriptor_default();
       return _readMetalOwnedTextureDescriptor(nativeResult);
     });
 
 MetalSurfaceDescriptor metalSurfaceDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_metal_surface_descriptor_default();
       return _readMetalSurfaceDescriptor(nativeResult);
     });
 
 NetworkStatus networkStatusGet() => withNativeArena((arena) {
+  ensureAbiVersion();
   final outStatus = arena<Uint32>();
   _check(raw.mln_network_status_get(outStatus));
   return NetworkStatus.fromRawValue(outStatus.value);
 });
 
 void networkStatusSet(NetworkStatus status) => withNativeArena((arena) {
+  ensureAbiVersion();
+
   _check(raw.mln_network_status_set(status.rawValue));
 });
 
 OpenglBorrowedTextureDescriptor openglBorrowedTextureDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_opengl_borrowed_texture_descriptor_default();
       return _readOpenglBorrowedTextureDescriptor(nativeResult);
     });
 
 OpenglOwnedTextureDescriptor openglOwnedTextureDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_opengl_owned_texture_descriptor_default();
       return _readOpenglOwnedTextureDescriptor(nativeResult);
     });
 
 OpenglContextProviderFlag openglSupportedContextProviderMask() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_opengl_supported_context_provider_mask();
       return OpenglContextProviderFlag.fromRawValue(nativeResult);
     });
 
 OpenglSurfaceDescriptor openglSurfaceDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_opengl_surface_descriptor_default();
       return _readOpenglSurfaceDescriptor(nativeResult);
     });
 
 NativePointer pluginGetRegisterFunctionV1() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_plugin_get_register_function_v1();
   return NativePointer(nativeResult.address);
 });
 
 PremultipliedRgba8Image premultipliedRgba8ImageDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_premultiplied_rgba8_image_default();
       return _readPremultipliedRgba8Image(nativeResult);
     });
 
 ProjectedMeters projectedMetersForLatLng(LatLng coordinate) =>
     withNativeArena((arena) {
+      ensureAbiVersion();
       final outMeters = arena<raw.mln_projected_meters>();
       _check(
         raw.mln_projected_meters_for_lat_lng(
@@ -3836,18 +3893,23 @@ ProjectedMeters projectedMetersForLatLng(LatLng coordinate) =>
     });
 
 ProjectionMode projectionModeDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_projection_mode_default();
   return _readProjectionMode(nativeResult);
 });
 
 RenderSessionAttachOptions renderSessionAttachOptionsDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_render_session_attach_options_default();
       return _readRenderSessionAttachOptions(nativeResult);
     });
 
 (int, int) renderTargetExtentPhysicalSize(RenderTargetExtent extent) =>
     withNativeArena((arena) {
+      ensureAbiVersion();
       final outWidth = arena<Uint32>();
       final outHeight = arena<Uint32>();
       _check(
@@ -3862,12 +3924,16 @@ RenderSessionAttachOptions renderSessionAttachOptionsDefault() =>
 
 RenderedFeatureQueryOptions renderedFeatureQueryOptionsDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_rendered_feature_query_options_default();
       return _readRenderedFeatureQueryOptions(nativeResult);
     });
 
 RenderedQueryGeometry renderedQueryGeometryBox(ScreenBox box) =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_rendered_query_geometry_box(
         _writeScreenBox(box, arena).ref,
       );
@@ -3877,6 +3943,7 @@ RenderedQueryGeometry renderedQueryGeometryBox(ScreenBox box) =>
 RenderedQueryGeometry renderedQueryGeometryLineString(
   List<ScreenPoint> points,
 ) => withNativeArena((arena) {
+  ensureAbiVersion();
   final nativepoints = arena<raw.mln_screen_point>(
     points.isEmpty ? 1 : points.length,
   );
@@ -3892,6 +3959,8 @@ RenderedQueryGeometry renderedQueryGeometryLineString(
 
 RenderedQueryGeometry renderedQueryGeometryPoint(ScreenPoint point) =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_rendered_query_geometry_point(
         _writeScreenPoint(point, arena).ref,
       );
@@ -3899,6 +3968,7 @@ RenderedQueryGeometry renderedQueryGeometryPoint(ScreenPoint point) =>
     });
 
 RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
+  ensureAbiVersion();
   final registrations = _NativeRegistrations(_NativeCallbackPorts());
   try {
     final outRuntime = arena<Uint64>();
@@ -3924,85 +3994,115 @@ RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
 });
 
 RuntimeOptions runtimeOptionsDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_runtime_options_default();
   return _readRuntimeOptions(nativeResult);
 });
 
 SourceFeatureQueryOptions sourceFeatureQueryOptionsDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_source_feature_query_options_default();
       return _readSourceFeatureQueryOptions(nativeResult);
     });
 
 StyleImageInfo styleImageInfoDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_style_image_info_default();
   return _readStyleImageInfo(nativeResult);
 });
 
 StyleImageOptions styleImageOptionsDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_style_image_options_default();
   return _readStyleImageOptions(nativeResult);
 });
 
 StyleTileSourceOptions styleTileSourceOptionsDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_style_tile_source_options_default();
       return _readStyleTileSourceOptions(nativeResult);
     });
 
 StyleTransitionOptions styleTransitionOptionsDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_style_transition_options_default();
       return _readStyleTransitionOptions(nativeResult);
     });
 
 RenderBackendFlag supportedRenderBackendMask() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_supported_render_backend_mask();
   return RenderBackendFlag.fromRawValue(nativeResult);
 });
 
 TextureImageInfo textureImageInfoDefault() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_texture_image_info_default();
   return _readTextureImageInfo(nativeResult);
 });
 
 String threadLastErrorMessage() => withNativeArena((arena) {
+  ensureAbiVersion();
+
   final nativeResult = raw.mln_thread_last_error_message();
   return nativeResult.cast<Utf8>().toDartString();
 });
 
 VulkanBorrowedTextureDescriptor vulkanBorrowedTextureDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_vulkan_borrowed_texture_descriptor_default();
       return _readVulkanBorrowedTextureDescriptor(nativeResult);
     });
 
 VulkanOwnedTextureDescriptor vulkanOwnedTextureDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_vulkan_owned_texture_descriptor_default();
       return _readVulkanOwnedTextureDescriptor(nativeResult);
     });
 
 VulkanSurfaceDescriptor vulkanSurfaceDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_vulkan_surface_descriptor_default();
       return _readVulkanSurfaceDescriptor(nativeResult);
     });
 
 WebgpuBorrowedTextureDescriptor webgpuBorrowedTextureDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_webgpu_borrowed_texture_descriptor_default();
       return _readWebgpuBorrowedTextureDescriptor(nativeResult);
     });
 
 WebgpuOwnedTextureDescriptor webgpuOwnedTextureDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_webgpu_owned_texture_descriptor_default();
       return _readWebgpuOwnedTextureDescriptor(nativeResult);
     });
 
 WebgpuSurfaceDescriptor webgpuSurfaceDescriptorDefault() =>
     withNativeArena((arena) {
+      ensureAbiVersion();
+
       final nativeResult = raw.mln_webgpu_surface_descriptor_default();
       return _readWebgpuSurfaceDescriptor(nativeResult);
     });

@@ -97,8 +97,14 @@ from its map on the isolate that will own the graphics session.
 
 Resource-request completion is one-shot. Calling `complete()` or `close()`
 releases the provider reference even when completion reports a native error.
-Callback exceptions are contained at the native boundary and reported through
-the native diagnostic path.
+Closing a request without completing it fails the request, so the load reports
+an error instead of waiting.
+
+Native code never waits on a Dart callback. Resource providers and the log
+callback answer native code immediately and run on the registering isolate
+later, as do cancel callbacks. An exception a callback throws goes to the
+registering zone's error handler; a resource provider that throws also fails its
+request.
 
 `ResourceRequestHandle.setCancelCallback()` registers one callback per request
 that runs when MapLibre discards a request the provider left open. The binding

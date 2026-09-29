@@ -619,9 +619,10 @@ class Values:
     def render_deferred_delivery(self, callback):
         """Decode one deferred call record and run the host callback with it.
 
-        MapLibre already has the deferred answer, so a failed callback stays
-        contained. Destroying a record whose decision handle the callback did
-        not keep fails the request.
+        MapLibre already has the deferred answer, so a callback error reaches
+        the registering zone instead of the native caller. The owner adopts a
+        decision handle before the callback runs; closing it after a failure
+        releases the unanswered request, which native then fails.
         """
         public = public_name(callback.native)
         decision = callback.decision
@@ -631,7 +632,7 @@ class Values:
         ]
         if decision:
             owner, native = owner_names(decision.handle.native)
-            lines += [f"  {owner}? owner;", "  var failed = false;"]
+            lines += [f"  {owner}? owner;"]
         lines += [
             "  try {",
             f"    final arguments = record.ref.arguments.cast<raw.{arguments_record(callback.native)}>().ref;",
@@ -641,9 +642,10 @@ class Values:
             if parameter.name == callback.context:
                 continue
             if decision and parameter.name == decision.parameter:
-                lines.append(
-                    f"    final adopted = owner = {owner}._({native}(arguments.{parameter.name}));"
-                )
+                lines += [
+                    f"    final adopted = owner = {owner}._({native}(arguments.{parameter.name}));",
+                    "    raw.mln_adapter_deferred_call_record_adopt(record);",
+                ]
                 decoded.append("adopted")
             else:
                 decoded.append(
@@ -652,19 +654,15 @@ class Values:
         lines.append(f"    callback({', '.join(decoded)});")
         if decision:
             lines += [
-                "    raw.mln_adapter_deferred_call_record_adopt(record);",
                 "  } catch (_) {",
-                "    // The native answer is final, so the failure stays here.",
-                "    failed = true;",
+                "    owner?.close();",
+                "    rethrow;",
                 "  } finally {",
                 "    raw.mln_adapter_deferred_call_record_destroy(record);",
-                "    if (failed) { owner?.close(); }",
                 "  }",
             ]
         else:
             lines += [
-                "  } catch (_) {",
-                "    // The native answer is final, so the failure stays here.",
                 "  } finally {",
                 "    raw.mln_adapter_deferred_call_record_destroy(record);",
                 "  }",

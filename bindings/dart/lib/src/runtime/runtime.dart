@@ -10,6 +10,7 @@ import '../error/maplibre_exception.dart';
 import '../log/log.dart';
 import '../internal/callback/completion.dart';
 import '../internal/callback/retained.dart';
+import '../internal/c/maplibre_native_c.dart' show ensureAbiVersion;
 import '../internal/c/maplibre_native_c.g.dart' as raw;
 import '../internal/lifecycle/lifecycle.dart';
 import '../internal/lifecycle/native_handles.dart';

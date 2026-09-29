@@ -809,12 +809,30 @@ def generate(api: Api | BoundApi) -> str:
         )
         else "",
     ]
-    chunks.extend(methods.get("Globals", []))
+    chunks.extend(abi_checked(body) for body in methods.get("Globals", []))
     for native, handle in sorted(bound.public_handles.items()):
         chunks.append(render_owner(native, handle, methods.get(native, []), bound))
     chunks.extend(render_attachments(bound, generated))
     chunks.append(render_scoped_views(bound, generated, values))
     return "\n".join(chunks)
+
+
+def abi_checked(body: str) -> str:
+    """Validate the C ABI first in an entry point that needs no existing handle.
+
+    Receiver operations are reachable only through a handle that such an entry
+    point produced, so only globals carry the check.
+    """
+    head, newline, rest = body.partition("\n")
+    if head.rstrip().endswith("{"):
+        return f"{head}\n    ensureAbiVersion();{newline}{rest}"
+    signature, arrow, expression = body.partition(" => ")
+    if not arrow or not expression.rstrip().endswith(";"):
+        raise Unsupported("global entry point needs an ABI check insertion point")
+    return (
+        f"{signature} {{\n    ensureAbiVersion();\n"
+        f"    return {expression.rstrip()[:-1]};\n  }}\n"
+    )
 
 
 def coverage(api: Api | BoundApi):

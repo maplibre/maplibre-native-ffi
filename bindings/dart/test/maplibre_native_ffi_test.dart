@@ -719,14 +719,15 @@ void main() {
     await runtime.close();
   });
 
-  test(
-    'deferred resource provider callback exceptions are contained',
-    () async {
-      const styleUrl = 'custom://dart-provider-throws.json';
-      final runtime = runtimeCreate(runtimeOptionsDefault());
-      var calls = 0;
+  test('deferred resource provider callback errors reach the zone and fail the '
+      'request', () async {
+    const styleUrl = 'custom://dart-provider-throws.json';
+    final runtime = runtimeCreate(runtimeOptionsDefault());
+    var calls = 0;
+    final zoneErrors = <Object>[];
 
-      runtime.setResourceProvider(
+    runZonedGuarded(
+      () => runtime.setResourceProvider(
         _routed(
           routes: [
             AdapterResourceRoute(
@@ -739,24 +740,26 @@ void main() {
             throw StateError('provider failed');
           },
         ),
-      );
+      ),
+      (error, _) => zoneErrors.add(error),
+    );
 
-      final map = await runtime.createMap();
-      map.setStyleUrl(styleUrl);
-      await _waitUntil(() => calls > 0);
+    final map = await runtime.createMap();
+    map.setStyleUrl(styleUrl);
+    await _waitUntil(() => calls > 0);
 
-      // The binding fails the request the throwing callback abandoned, so the
-      // style load reports its failure rather than hanging.
-      final failure = await _waitUntilEvent(
-        runtime,
-        (candidate) => candidate.type == RuntimeEventType.mapLoadingFailed,
-      );
-      expect(failure.message, isNotNull);
+    // Closing the handle the throwing callback abandoned fails the request,
+    // so the style load reports its failure rather than hanging.
+    final failure = await _waitUntilEvent(
+      runtime,
+      (candidate) => candidate.type == RuntimeEventType.mapLoadingFailed,
+    );
+    expect(failure.message, contains('released without a response'));
+    expect(zoneErrors.single, isA<StateError>());
 
-      await map.close();
-      await runtime.close();
-    },
-  );
+    await map.close();
+    await runtime.close();
+  });
 
   test('closed resource request handles reject further use', () async {
     const styleUrl = 'custom://dart-provider-closed-handle.json';
@@ -1896,13 +1899,19 @@ void main() {
     );
 
     var throwingLogCalls = 0;
-    logSetCallback((_, _, _, _) {
-      throwingLogCalls += 1;
-      throw StateError('log callback failure');
-    });
+    final logErrors = <Object>[];
+    runZonedGuarded(
+      () => logSetCallback((_, _, _, _) {
+        throwingLogCalls += 1;
+        throw StateError('log callback failure');
+      }),
+      (error, _) => logErrors.add(error),
+    );
     map.dumpDebugLogs();
     await _waitUntil(() => throwingLogCalls > 0);
     logClearCallback();
+    expect(logErrors, isNotEmpty);
+    expect(logErrors, everyElement(isA<StateError>()));
     final copiedEvents = runtime.drainCopiedEvents();
     final styleLoadedEvent = copiedEvents.firstWhere(
       (event) => event.type == RuntimeEventType.mapStyleLoaded,
