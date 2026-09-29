@@ -3216,9 +3216,20 @@ auto render_session_resize_start(
     async.completion->accept();
     return MLN_STATUS_OK;
   }
-  enqueue_work(
-    live, make_ordered_resize_work(live, async.operation, copied, ticket)
-  );
+  // A detach that starts after the checks above must not find this resize
+  // queued behind its own work, where it would run against released backends.
+  if (!enqueue_work_if_attached(
+        live, make_ordered_resize_work(live, async.operation, copied, ticket)
+      )) {
+    {
+      const auto lock = std::scoped_lock{live->control_mutex};
+      live->pending_extent.reset();
+    }
+    async.operation->complete(
+      MLN_STATUS_INVALID_STATE,
+      "render session detached before the resize applied", {}
+    );
+  }
   async.completion->accept();
   return MLN_STATUS_OK;
 }

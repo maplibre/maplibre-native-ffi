@@ -375,6 +375,8 @@ MLN_API mln_status mln_acquired_frame_release(
  *   at the new extent.
  * - MLN_STATUS_OK and MLN_COMMAND_DISPOSITION_SUPERSEDED when a later resize
  *   replaced this one.
+ * - MLN_STATUS_INVALID_STATE when the session starts detaching before the
+ *   driver applies the extent.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
