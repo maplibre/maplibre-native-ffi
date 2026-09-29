@@ -183,7 +183,7 @@ fn renderLoop(
         }
         if (!target_pending and render_requested) {
             render_requested = false;
-            const outcome = try target.renderUpdate(allocator, null, current_viewport.*);
+            const outcome = try target.renderUpdate(allocator, current_viewport.*);
             if (!outcome.rendered or outcome.needs_repaint) render_requested = true;
         }
 

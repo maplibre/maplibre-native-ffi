@@ -78,19 +78,16 @@ pub fn Future(comptime T: type) type {
             return state.completed.load(.acquire) != 0;
         }
 
-        /// Returns the copied terminal diagnostic until this future is
-        /// deinitialized, and an empty slice before the completion arrives.
-        pub fn diagnostic(self: *const Self) status.BindingError![]const u8 {
-            const state = self.state orelse return error.ClosedHandle;
-            if (state.completed.load(.acquire) == 0) return &.{};
-            return state.diagnostic;
-        }
-
         /// Blocks until the completion arrives and hands out its terminal value.
         ///
-        /// A value the caller never takes is released by `deinit`, including
-        /// an owned handle returned by a creation operation.
-        pub fn wait(self: *Self, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!T {
+        /// A failed completion writes its status and message into
+        /// `diagnostic`, including a failed command, whose completion `wait`
+        /// still returns. A value the caller never takes is released by
+        /// `deinit`, including an owned handle returned by a creation
+        /// operation.
+        pub fn wait(self: *Self, diagnostic: ?*diagnostics.Diagnostic) status.Error!T {
+            status.begin(diagnostic);
+            errdefer |err| status.fail(diagnostic, err);
             const state = self.state orelse return error.ClosedHandle;
             state.ready.wait();
             if (state.consumed.swap(true, .acq_rel)) return error.AlreadyCompleted;
@@ -98,10 +95,8 @@ pub fn Future(comptime T: type) type {
                 disposeOwned(T, owned);
                 state.value = null;
             };
-            if (state.diagnostic.len != 0) {
-                if (diagnostic_store) |store| try store.set(state.raw_status, state.diagnostic);
-            }
-            if (state.conversion_error) |err| return err;
+            if (state.raw_status != c.MLN_STATUS_OK) status.record(diagnostic, state.raw_status, state.diagnostic);
+            if (state.conversion_error) |conversion_error| return @as(status.Error!T, conversion_error);
             if (T != CommandCompletion) try status.errorFromRawStatus(state.raw_status);
             return state.value orelse unreachable;
         }
@@ -172,7 +167,7 @@ pub fn completed(comptime T: type, terminal_value: T) std.mem.Allocator.Error!Fu
 
 pub fn submit(
     comptime T: type,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    diagnostic: ?*diagnostics.Diagnostic,
     comptime copy: *const fn (*const c.mln_completion_result) status.Error!T,
     comptime start: anytype,
     arguments: anytype,
@@ -186,13 +181,13 @@ pub fn submit(
             }
         }.copyResult,
     };
-    return finishSubmission(T, state, diagnostic_store, start, arguments);
+    return finishSubmission(T, state, diagnostic, start, arguments);
 }
 
 pub fn submitWithCopyContext(
     comptime T: type,
     comptime CopyContext: type,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    diagnostic: ?*diagnostics.Diagnostic,
     comptime copy: *const fn (*const c.mln_completion_result, *CopyContext) status.Error!T,
     copy_context: CopyContext,
     comptime start: anytype,
@@ -226,20 +221,20 @@ pub fn submitWithCopyContext(
             }
         }.release,
     };
-    return finishSubmission(T, state, diagnostic_store, start, arguments);
+    return finishSubmission(T, state, diagnostic, start, arguments);
 }
 
 fn finishSubmission(
     comptime T: type,
     state: *Future(T).State,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    diagnostic: ?*diagnostics.Diagnostic,
     comptime start: anytype,
     arguments: anytype,
 ) status.Error!Future(T) {
     const FutureType = Future(T);
     var future = FutureType{ .state = state };
     const completion_descriptor = FutureType.descriptor(state);
-    status.call(start, arguments ++ .{&completion_descriptor}, diagnostic_store) catch |err| {
+    status.call(start, arguments ++ .{&completion_descriptor}, diagnostic) catch |err| {
         state.release();
         future.deinit();
         return err;

@@ -44,14 +44,14 @@ pub const Session = struct {
         // needs, so it finishes first.
         var abandon = if (self.awaitPending()) |_| false else |_| true;
         if (!abandon) {
-            if (maplibre.renderSessionDetach(handle.*)) |completion| {
+            if (maplibre.renderSessionDetach(handle.*, null)) |completion| {
                 self.beginPending(completion, self.detachError(), "render session detach failed");
                 abandon = if (self.awaitPending()) |_| false else |_| true;
             } else |_| {
                 abandon = true;
             }
         }
-        if (abandon) _ = maplibre.renderSessionAbandon(handle.*) catch {};
+        if (abandon) _ = maplibre.renderSessionAbandon(handle.*, null) catch {};
         handle.deinit();
         self.discardPending();
         self.target = .none;
@@ -100,16 +100,17 @@ pub const Session = struct {
             return false;
         };
         var serviced = true;
-        _ = maplibre.renderSessionServiceDriverWork(session.*, 0) catch |err| {
+        var diagnostic: maplibre.Diagnostic = .{};
+        _ = maplibre.renderSessionServiceDriverWork(session.*, 0, &diagnostic) catch |err| {
             serviced = false;
-            diagnostics.logError(self.pending.?.message, err, null);
+            diagnostics.logError(self.pending.?.message, err, &diagnostic);
         };
         if (serviced and !try self.pending.?.future.poll()) return true;
         var pending = self.takePending().?;
         defer pending.future.deinit();
         if (!serviced) return pending.app_error;
-        pending.future.wait(null) catch |err| {
-            diagnostics.logError(pending.message, err, null);
+        pending.future.wait(&diagnostic) catch |err| {
+            diagnostics.logError(pending.message, err, &diagnostic);
             return pending.app_error;
         };
         return false;
@@ -126,8 +127,9 @@ pub const Session = struct {
     pub fn startResize(self: *Session, viewport: types.Viewport) !void {
         const session = self.nativeHandle() orelse return types.AppError.TextureResizeFailed;
         const app_error = self.resizeError();
-        const completion = maplibre.renderSessionResize(std.heap.smp_allocator, session.*, extent(viewport)) catch |err| {
-            diagnostics.logError("render target resize failed", err, null);
+        var diagnostic: maplibre.Diagnostic = .{};
+        const completion = maplibre.renderSessionResize(std.heap.smp_allocator, session.*, extent(viewport), &diagnostic) catch |err| {
+            diagnostics.logError("render target resize failed", err, &diagnostic);
             return app_error;
         };
         self.beginPending(completion, app_error, "render target resize failed");
@@ -138,8 +140,9 @@ pub const Session = struct {
     /// surface target. Both change only the graphics resource.
     pub fn resizeMap(self: *Session, viewport: types.Viewport) !void {
         const map = self.map orelse return self.resizeError();
-        var completion = maplibre.mapResize(map.*, .{ .width = viewport.logical_width, .height = viewport.logical_height, .scale_factor = viewport.scale_factor }) catch |err| {
-            diagnostics.logError("map resize failed", err, null);
+        var diagnostic: maplibre.Diagnostic = .{};
+        var completion = maplibre.mapResize(map.*, .{ .width = viewport.logical_width, .height = viewport.logical_height, .scale_factor = viewport.scale_factor }, &diagnostic) catch |err| {
+            diagnostics.logError("map resize failed", err, &diagnostic);
             return self.resizeError();
         };
         completion.deinit();
@@ -150,7 +153,6 @@ pub const Session = struct {
     pub fn renderUpdate(
         self: *Session,
         allocator: std.mem.Allocator,
-        diagnostic_store: ?*const maplibre.DiagnosticStore,
     ) !FrameOutcome {
         const presents = self.target == .surface;
         const session = self.nativeHandle() orelse return FrameOutcome{};
@@ -160,22 +162,23 @@ pub const Session = struct {
             types.AppError.TextureRenderFailed;
         self.next_token += 1;
         const token = self.next_token;
-        maplibre.renderSessionRequestFrame(allocator, session.*, .{ .flags = .{ .if_needed = true, .present = presents }, .token = token }) catch |err| {
-            diagnostics.logError("frame request failed", err, diagnostic_store);
+        var diagnostic: maplibre.Diagnostic = .{};
+        maplibre.renderSessionRequestFrame(allocator, session.*, .{ .flags = .{ .if_needed = true, .present = presents }, .token = token }, &diagnostic) catch |err| {
+            diagnostics.logError("frame request failed", err, &diagnostic);
             return app_error;
         };
-        _ = maplibre.renderSessionServiceDriverWork(session.*, 0) catch |err| {
-            diagnostics.logError("render driver service failed", err, diagnostic_store);
+        _ = maplibre.renderSessionServiceDriverWork(session.*, 0, &diagnostic) catch |err| {
+            diagnostics.logError("render driver service failed", err, &diagnostic);
             return app_error;
         };
         // The batch owns the results for this frame.
-        var batch = maplibre.renderSessionDrainFrameResults(session.*) catch |err| switch (err) {
+        var batch = maplibre.renderSessionDrainFrameResults(session.*, null) catch |err| switch (err) {
             error.NotReady => return .{},
             else => return err,
         };
         defer batch.deinit();
-        for (0..try maplibre.renderFrameBatchCount(batch)) |index| {
-            const result = try maplibre.renderFrameBatchGet(batch, index);
+        for (0..try maplibre.renderFrameBatchCount(batch, null)) |index| {
+            const result = try maplibre.renderFrameBatchGet(batch, index, null);
             if (result.token != token) continue;
             return .{
                 .rendered = result.disposition == .rendered,
@@ -231,7 +234,7 @@ fn attachedSession(
     var owned = attachment;
     var session = Session{ .target = target, .map = map };
     errdefer {
-        _ = maplibre.renderSessionAbandon(owned.session) catch {};
+        _ = maplibre.renderSessionAbandon(owned.session, null) catch {};
         owned.session.deinit();
     }
     session.beginPending(owned.ready, session.detachError(), "render target attach failed");
@@ -255,10 +258,10 @@ const PendingFuture = union(enum) {
             inline else => |*future| future.poll(),
         };
     }
-    fn wait(self: *PendingFuture, store: ?*maplibre.DiagnosticStore) !void {
+    fn wait(self: *PendingFuture, diagnostic: ?*maplibre.Diagnostic) !void {
         switch (self.*) {
-            .ready => |*future| try future.wait(store),
-            .command => |*future| try (try future.wait(store)).statusError(),
+            .ready => |*future| try future.wait(diagnostic),
+            .command => |*future| try (try future.wait(diagnostic)).statusError(),
         }
     }
     fn deinit(self: *PendingFuture) void {

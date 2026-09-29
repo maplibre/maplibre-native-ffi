@@ -5,7 +5,7 @@ const maplibre = @import("maplibre_native_ffi");
 const support = @import("support.zig");
 
 fn drainRuntimeOnThread(runtime: *maplibre.Runtime, out_error: *?anyerror) void {
-    var batch = maplibre.runtimeDrainEvents(support.handle(runtime)) catch |err| {
+    var batch = maplibre.runtimeDrainEvents(support.handle(runtime), null) catch |err| {
         out_error.* = err;
         return;
     };
@@ -26,7 +26,7 @@ const cross_thread_map_mask = blk: {
 };
 
 fn setRuntimeEventMaskOnThread(runtime: *maplibre.Runtime, out_error: *?anyerror) void {
-    maplibre.runtimeSetEventMask(support.handle(runtime), cross_thread_runtime_mask) catch |err| {
+    maplibre.runtimeSetEventMask(support.handle(runtime), cross_thread_runtime_mask, null) catch |err| {
         out_error.* = err;
         return;
     };
@@ -34,7 +34,7 @@ fn setRuntimeEventMaskOnThread(runtime: *maplibre.Runtime, out_error: *?anyerror
 }
 
 fn setMapEventMaskOnThread(map: *maplibre.Map, out_error: *?anyerror) void {
-    support.expectCommitted(maplibre.mapSetEventMask(support.handle(map), cross_thread_map_mask) catch |err| {
+    support.expectCommitted(maplibre.mapSetEventMask(support.handle(map), cross_thread_map_mask, null) catch |err| {
         out_error.* = err;
         return;
     }) catch |err| {
@@ -80,8 +80,8 @@ fn expectOnlySelectedTypes(
     // Narrowing gates later events and keeps queued ones, so start empty.
     _ = try support.drainEvents(runtime);
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
-    try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map)));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
+    try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map), null));
 
     var saw_style_loaded = false;
     for (0..1000) |_| {
@@ -126,7 +126,7 @@ test "runtime drain and close are callable from another thread" {
     close_thread.join();
     try testing.expect(close_error == null);
     // The close another thread ran is the one this thread observes.
-    try testing.expectError(error.InvalidState, maplibre.runtimeDrainEvents(support.handle(runtime)));
+    try testing.expectError(error.InvalidState, maplibre.runtimeDrainEvents(support.handle(runtime), null));
 }
 
 test "event mask setters accept calls from another thread" {
@@ -147,8 +147,8 @@ test "event mask setters accept calls from another thread" {
     try testing.expect(map_mask_error == null);
 
     // Both handles publish the mask the other thread installed.
-    try testing.expectEqual(cross_thread_runtime_mask, try maplibre.runtimeGetEventMask(support.handle(runtime)));
-    try testing.expectEqual(cross_thread_map_mask, (try maplibre.mapSnapshotGet(support.handle(map))).event_mask);
+    try testing.expectEqual(cross_thread_runtime_mask, try maplibre.runtimeGetEventMask(support.handle(runtime), null));
+    try testing.expectEqual(cross_thread_map_mask, (try maplibre.mapSnapshotGet(support.handle(map), null)).event_mask);
 }
 
 test "runtime option strings reject embedded NUL before C calls" {
@@ -165,7 +165,7 @@ test "one drain reports the events a style load queued together" {
     var map = try support.createMap(&runtime, .{});
     defer support.closeMap(&map) catch @panic("map close failed");
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
 
     var largest_batch: usize = 0;
     var saw_style_loaded = false;
@@ -195,7 +195,7 @@ test "a drained batch outlives its runtime" {
     defer if (map_open) support.closeMap(&map) catch @panic("map close failed");
     const map_id = map.raw;
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "unsupported://style.json"));
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, support.handle(map), "unsupported://style.json", null));
 
     var kept: maplibre.OwnedValue(maplibre.RuntimeEventBatchView) = undefined;
     var kept_index: usize = 0;
@@ -239,7 +239,7 @@ test "closing a map leaves its queued runtime events unchanged" {
     var map = try support.createMap(&runtime, .{});
     // An unparseable style fails the command; the logs and events it produces
     // are what these tests read.
-    try support.expectCommandError(try maplibre.mapSetStyleJson(support.handle(map), "{"), error.NativeError);
+    try support.expectCommandError(try maplibre.mapSetStyleJson(support.handle(map), "{", null), error.NativeError);
     try support.waitForBarrier(&runtime);
     try support.closeMap(&map);
 
@@ -261,19 +261,19 @@ test "event masks round-trip through both handles" {
     var map = try support.createMap(&runtime, .{});
     defer support.closeMap(&map) catch @panic("map close failed");
 
-    var runtime_mask = try maplibre.runtimeGetEventMask(support.handle(runtime));
+    var runtime_mask = try maplibre.runtimeGetEventMask(support.handle(runtime), null);
     runtime_mask.offline_region_status_changed = false;
-    try maplibre.runtimeSetEventMask(support.handle(runtime), runtime_mask);
-    const read_runtime_mask = try maplibre.runtimeGetEventMask(support.handle(runtime));
+    try maplibre.runtimeSetEventMask(support.handle(runtime), runtime_mask, null);
+    const read_runtime_mask = try maplibre.runtimeGetEventMask(support.handle(runtime), null);
     try testing.expectEqual(runtime_mask, read_runtime_mask);
     // A runtime ignores the map bits and still reports them back.
     try testing.expect(read_runtime_mask.map_style_loaded);
 
-    var map_mask = (try maplibre.mapSnapshotGet(support.handle(map))).event_mask;
+    var map_mask = (try maplibre.mapSnapshotGet(support.handle(map), null)).event_mask;
     map_mask.map_tile_action = false;
-    try support.expectCommitted(try maplibre.mapSetEventMask(support.handle(map), map_mask));
+    try support.expectCommitted(try maplibre.mapSetEventMask(support.handle(map), map_mask, null));
     try support.waitForBarrier(&runtime);
-    const read_map_mask = (try maplibre.mapSnapshotGet(support.handle(map))).event_mask;
+    const read_map_mask = (try maplibre.mapSnapshotGet(support.handle(map), null)).event_mask;
     try testing.expectEqual(map_mask, read_map_mask);
     try testing.expect(read_map_mask.offline_region_status_changed);
 }
@@ -291,16 +291,16 @@ test "a narrowed map mask drops the type it clears and keeps the rest" {
     defer support.closeMap(&map) catch @panic("map close failed");
 
     const narrowed = maskWithout("map_render_update_available");
-    try support.expectCommitted(try maplibre.mapSetEventMask(support.handle(map), narrowed));
+    try support.expectCommitted(try maplibre.mapSetEventMask(support.handle(map), narrowed, null));
     try support.waitForBarrier(&runtime);
-    try testing.expectEqual(narrowed, (try maplibre.mapSnapshotGet(support.handle(map))).event_mask);
+    try testing.expectEqual(narrowed, (try maplibre.mapSnapshotGet(support.handle(map), null)).event_mask);
 
     try expectOnlySelectedTypes(&runtime, &map, .map_render_update_available);
 
     // Restoring the bit lets the map's only invalidation report arrive again.
-    try support.expectCommitted(try maplibre.mapSetEventMask(support.handle(map), maplibre.RuntimeEventMask.all));
+    try support.expectCommitted(try maplibre.mapSetEventMask(support.handle(map), maplibre.RuntimeEventMask.all, null));
     try support.waitForBarrier(&runtime);
-    try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map)));
+    try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map), null));
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
 }
 
@@ -308,12 +308,12 @@ test "masks passed as create options narrow both handles" {
     const narrowed_runtime_mask = maskWithout("offline_region_status_changed");
     var runtime = try support.createRuntime(.{ .event_mask = narrowed_runtime_mask });
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
-    try testing.expectEqual(narrowed_runtime_mask, try maplibre.runtimeGetEventMask(support.handle(runtime)));
+    try testing.expectEqual(narrowed_runtime_mask, try maplibre.runtimeGetEventMask(support.handle(runtime), null));
 
     const narrowed_map_mask = maskWithout("map_render_update_available");
     var map = try support.createMap(&runtime, .{ .event_mask = narrowed_map_mask });
     defer support.closeMap(&map) catch @panic("map close failed");
-    try testing.expectEqual(narrowed_map_mask, (try maplibre.mapSnapshotGet(support.handle(map))).event_mask);
+    try testing.expectEqual(narrowed_map_mask, (try maplibre.mapSnapshotGet(support.handle(map), null)).event_mask);
 
     try expectOnlySelectedTypes(&runtime, &map, .map_render_update_available);
 }
@@ -327,13 +327,13 @@ test "drained events keep the order the map committed their commands in" {
     defer support.closeMap(&map) catch @panic("map close failed");
     _ = try support.drainEvents(&runtime);
 
-    try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map)));
+    try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map), null));
     try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .mode = .ease,
         .camera = .{ .zoom = 4.0 },
         .animation = .{ .duration_ms = 60_000, .transition_id = 41 },
-    }));
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .mode = .jump, .camera = .{ .zoom = 8.0 } }));
+    }, null));
+    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .mode = .jump, .camera = .{ .zoom = 8.0 } }, null));
 
     var saw_update = false;
     var saw_transition_finished = false;
@@ -379,7 +379,7 @@ test "runtime wake lifetime follows native runtime retirement" {
     var runtime = try support.createRuntime(.{ .event_wake = maplibre.Wake{ .callback = WakeCounter.onWake, .context = &counter } });
     var map = try support.createMap(&runtime, .{});
     _ = try support.drainEvents(&runtime);
-    try support.expectCommitted(try maplibre.mapRequestRepaint(map));
+    try support.expectCommitted(try maplibre.mapRequestRepaint(map, null));
     try counter.waitForWake();
     try support.closeMap(&map);
     try support.closeRuntime(&runtime);

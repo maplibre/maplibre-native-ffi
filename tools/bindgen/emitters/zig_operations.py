@@ -1,6 +1,13 @@
 """Lower resolved operations through the shared Zig owner and completion runtimes."""
 
-from .zig import camel, failure, identifier, status_call
+from .zig import (
+    DIAGNOSTIC_PARAMETER,
+    DIAGNOSTIC_PREAMBLE,
+    camel,
+    failure,
+    identifier,
+    status_call,
+)
 from .zig_dynamic_values import decode, dynamic, encode
 
 
@@ -200,13 +207,9 @@ def operation(plan, api, values):
     ]
     body = []
     receiver_lease = leases.get(plan.receiver)
-    # Handle calls report into the receiver's store; other status calls take one.
-    diagnostic = "null"
-    if receiver_lease and plan.receiver_access != "issued":
-        diagnostic = receiver_lease + ".diagnostic_store"
-    elif function.diagnostic:
-        diagnostic = "diagnostic_store"
-        declarations.append("diagnostic_store: ?*diagnostics.DiagnosticStore")
+    diagnostic = "diagnostic" if function.diagnostic else "null"
+    if function.diagnostic:
+        declarations.append(DIAGNOSTIC_PARAMETER)
     close_commit = [f"{receiver_lease}.commit();"] if plan.consumes else []
 
     def parent_anchor(owner):
@@ -218,7 +221,7 @@ def operation(plan, api, values):
 
     def capture(value, local, owner=None):
         if owner:
-            return f"try {values.public(value)}.adopt({local}, {parent_anchor(owner)}, {diagnostic})"
+            return f"try {values.public(value)}.adopt({local}, {parent_anchor(owner)})"
         return decode(values, value, local)
 
     if completion:
@@ -237,9 +240,9 @@ def operation(plan, api, values):
             public = values.public(result)
             parent = parent_anchor(completion.result_owner)
             body.append(
-                f"const result_context = OwnerCopyContext{{ .parent = if (@as(?owner.Anchor, {parent})) |anchor| anchor.retain() else null, .diagnostic_store = {diagnostic} }};"
+                f"const result_context = OwnerCopyContext{{ .parent = if (@as(?owner.Anchor, {parent})) |anchor| anchor.retain() else null }};"
             )
-            copier = f"struct {{ fn copy(raw: *const c.mln_completion_result, context: *OwnerCopyContext) status.Error!{public} {{ return {public}.adopt(try completion.value(c.{result.native})(raw), context.parent, context.diagnostic_store); }} }}.copy"
+            copier = f"struct {{ fn copy(raw: *const c.mln_completion_result, context: *OwnerCopyContext) status.Error!{public} {{ return {public}.adopt(try completion.value(c.{result.native})(raw), context.parent); }} }}.copy"
             submit = f"completion.submitWithCopyContext({public}, OwnerCopyContext, {diagnostic}, {copier}, result_context, c.{plan.name}, native_arguments)"
         else:
             values.add(result)
@@ -403,7 +406,9 @@ def operation(plan, api, values):
             ]
     code = (
         f"pub fn {camel(plan.name.removeprefix('mln_'))}({', '.join(declarations)}) status.Error!{return_type} {{\n    "
-        + "\n    ".join([*setup, *body])
+        + "\n    ".join(
+            [*(DIAGNOSTIC_PREAMBLE if function.diagnostic else []), *setup, *body]
+        )
         + "\n}\n"
     )
     return code, "global", "", None
@@ -412,19 +417,17 @@ def operation(plan, api, values):
 def view_operation(plan, values):
     view = plan.view
     functions = values.bound.source.functions_by_name
-    begin = status_call(
-        functions[view.owner.view_begin],
-        ["lease.native", "&token"],
-        "lease.diagnostic_store",
-    )
-    get = status_call(plan.function, ["lease.native", "&raw"], "lease.diagnostic_store")
+    begin = status_call(functions[view.owner.view_begin], ["lease.native", "&token"])
+    get = status_call(plan.function, ["lease.native", "&raw"])
+    preamble = "\n    ".join(DIAGNOSTIC_PREAMBLE)
     value = plan.outputs[0].value.element
     values.add(value)
     handle_type = values.public(
         next(p.value for p in plan.inputs if p.name == plan.receiver)
     )
     typ = values.public(value)
-    code = f'''pub fn {camel(plan.name.removeprefix("mln_"))}(comptime Result: type, handle: {handle_type}, context: anytype, comptime use: *const fn (@TypeOf(context), {typ}) anyerror!Result) anyerror!Result {{
+    code = f'''pub fn {camel(plan.name.removeprefix("mln_"))}(comptime Result: type, handle: {handle_type}, context: anytype, comptime use: *const fn (@TypeOf(context), {typ}) anyerror!Result, {DIAGNOSTIC_PARAMETER}) anyerror!Result {{
+    {preamble}
     try callback.check("{plan.name}", handle.raw);
     const lease = try handle.lease();
     defer lease.release();

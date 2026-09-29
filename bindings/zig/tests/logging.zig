@@ -39,8 +39,8 @@ test "log callback receives and consumes native logs" {
 
     // An unparseable style fails the command; the logs and events it produces
     // are what these tests read.
-    try support.expectCommandError(try maplibre.mapSetStyleJson(support.handle(map), "{"), error.NativeError);
-    var barrier = try maplibre.runtimeBarrier(support.handle(runtime));
+    try support.expectCommandError(try maplibre.mapSetStyleJson(support.handle(map), "{", null), error.NativeError);
+    var barrier = try maplibre.runtimeBarrier(support.handle(runtime), null);
     defer barrier.deinit();
     _ = try barrier.wait(null);
     try testing.expect(state.count > 0);
@@ -63,8 +63,8 @@ test "log callback can be cleared" {
 
     // An unparseable style fails the command; the logs and events it produces
     // are what these tests read.
-    try support.expectCommandError(try maplibre.mapSetStyleJson(support.handle(map), "{"), error.NativeError);
-    var barrier = try maplibre.runtimeBarrier(support.handle(runtime));
+    try support.expectCommandError(try maplibre.mapSetStyleJson(support.handle(map), "{", null), error.NativeError);
+    var barrier = try maplibre.runtimeBarrier(support.handle(runtime), null);
     defer barrier.deinit();
     _ = try barrier.wait(null);
     try testing.expectEqual(@as(usize, 0), state.count);
@@ -89,8 +89,8 @@ test "log callback replacement invokes only the replacement" {
 
     // An unparseable style fails the command; the logs and events it produces
     // are what these tests read.
-    try support.expectCommandError(try maplibre.mapSetStyleJson(support.handle(map), "{"), error.NativeError);
-    var barrier = try maplibre.runtimeBarrier(support.handle(runtime));
+    try support.expectCommandError(try maplibre.mapSetStyleJson(support.handle(map), "{", null), error.NativeError);
+    var barrier = try maplibre.runtimeBarrier(support.handle(runtime), null);
     defer barrier.deinit();
     _ = try barrier.wait(null);
     try testing.expectEqual(@as(usize, 0), first_state.count);

@@ -471,6 +471,5 @@ pub const Future = @import("completion.zig").Future;
 pub const CommandCompletion = @import("completion.zig").CommandCompletion;
 pub const Error = @import("status.zig").Error;
 pub const BindingError = @import("status.zig").BindingError;
-pub const DiagnosticStore = @import("diagnostics.zig").DiagnosticStore;
 pub const Diagnostic = @import("diagnostics.zig").Diagnostic;
 pub const validateAbiVersion = @import("status.zig").validateAbiVersion;

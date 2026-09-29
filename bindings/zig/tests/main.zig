@@ -25,9 +25,6 @@ comptime {
 }
 
 test "package validates the supported C ABI version" {
-    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
-    defer diagnostics.deinit();
-
-    try maplibre.validateAbiVersion(&diagnostics);
-    try testing.expect(diagnostics.get() == null);
+    var diagnostic: maplibre.Diagnostic = .{};
+    try maplibre.validateAbiVersion(&diagnostic);
 }

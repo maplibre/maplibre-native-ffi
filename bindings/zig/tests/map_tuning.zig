@@ -17,7 +17,7 @@ test "map debug options fence and round trip through the snapshot" {
         .collision = true,
         .depth_buffer = true,
     };
-    const completion = try maplibre.mapSetDebugOptions(support.handle(map), debug);
+    const completion = try maplibre.mapSetDebugOptions(support.handle(map), debug, null);
     const snapshot = try support.snapshotAfterCommand(&map, completion);
     try testing.expect(snapshot.debug_options.tile_borders);
     try testing.expect(snapshot.debug_options.collision);
@@ -25,11 +25,11 @@ test "map debug options fence and round trip through the snapshot" {
     try testing.expect(!snapshot.debug_options.overdraw);
 
     try testing.expect(!snapshot.rendering_stats_view_enabled);
-    const stats_id = try maplibre.mapSetRenderingStatsViewEnabled(support.handle(map), true);
+    const stats_id = try maplibre.mapSetRenderingStatsViewEnabled(support.handle(map), true, null);
     const stats_snapshot = try support.snapshotAfterCommand(&map, stats_id);
     try testing.expect(stats_snapshot.rendering_stats_view_enabled);
 
-    try support.expectCommitted(try maplibre.mapDumpDebugLogs(support.handle(map)));
+    try support.expectCommitted(try maplibre.mapDumpDebugLogs(support.handle(map), null));
 }
 
 test "map viewport options update selected snapshot fields" {
@@ -43,7 +43,7 @@ test "map viewport options update selected snapshot fields" {
         .constrain_mode = .width_and_height,
         .viewport_mode = .flipped_y,
         .frustum_offset = .{ .top = 1.0, .left = 2.0, .bottom = 3.0, .right = 4.0 },
-    });
+    }, null);
 
     var snapshot = try support.snapshotAfterCommand(&map, completion);
     try testing.expectEqual(maplibre.NorthOrientation.right, snapshot.viewport.north_orientation.?);
@@ -54,7 +54,7 @@ test "map viewport options update selected snapshot fields" {
     try testing.expectApproxEqAbs(@as(f64, 3.0), snapshot.viewport.frustum_offset.?.bottom, 0.000001);
     try testing.expectApproxEqAbs(@as(f64, 4.0), snapshot.viewport.frustum_offset.?.right, 0.000001);
 
-    const narrowed_id = try maplibre.mapSetViewportOptions(testing.allocator, support.handle(map), .{ .north_orientation = .down });
+    const narrowed_id = try maplibre.mapSetViewportOptions(testing.allocator, support.handle(map), .{ .north_orientation = .down }, null);
     snapshot = try support.snapshotAfterCommand(&map, narrowed_id);
     try testing.expectEqual(maplibre.NorthOrientation.down, snapshot.viewport.north_orientation.?);
     try testing.expectEqual(maplibre.ConstrainMode.width_and_height, snapshot.viewport.constrain_mode.?);
@@ -73,7 +73,7 @@ test "map tile options update selected snapshot fields" {
         .lod_pitch_threshold = 0.75,
         .lod_zoom_shift = -1.0,
         .lod_mode = .distance,
-    });
+    }, null);
 
     var snapshot = try support.snapshotAfterCommand(&map, completion);
     try testing.expectEqual(@as(u32, 2), snapshot.tile.prefetch_zoom_delta.?);
@@ -83,7 +83,7 @@ test "map tile options update selected snapshot fields" {
     try testing.expectApproxEqAbs(@as(f64, -1.0), snapshot.tile.lod_zoom_shift.?, 0.000001);
     try testing.expectEqual(maplibre.TileLodMode.distance, snapshot.tile.lod_mode.?);
 
-    const narrowed_id = try maplibre.mapSetTileOptions(testing.allocator, support.handle(map), .{ .prefetch_zoom_delta = 7 });
+    const narrowed_id = try maplibre.mapSetTileOptions(testing.allocator, support.handle(map), .{ .prefetch_zoom_delta = 7 }, null);
     snapshot = try support.snapshotAfterCommand(&map, narrowed_id);
     try testing.expectEqual(@as(u32, 7), snapshot.tile.prefetch_zoom_delta.?);
     try testing.expectEqual(maplibre.TileLodMode.distance, snapshot.tile.lod_mode.?);
@@ -95,8 +95,8 @@ test "map tuning public descriptors report invalid native arguments" {
     var map = try support.createMap(&runtime, .{});
     defer support.closeMap(&map) catch @panic("map close failed");
 
-    try testing.expectError(error.InvalidArgument, maplibre.mapSetViewportOptions(testing.allocator, support.handle(map), .{ .frustum_offset = .{ .top = std.math.inf(f64) } }));
-    try testing.expectError(error.InvalidArgument, maplibre.mapSetViewportOptions(testing.allocator, support.handle(map), .{ .frustum_offset = .{ .left = -1.0 } }));
-    try testing.expectError(error.InvalidArgument, maplibre.mapSetTileOptions(testing.allocator, support.handle(map), .{ .prefetch_zoom_delta = 256 }));
-    try testing.expectError(error.InvalidArgument, maplibre.mapSetTileOptions(testing.allocator, support.handle(map), .{ .lod_scale = std.math.nan(f64) }));
+    try testing.expectError(error.InvalidArgument, maplibre.mapSetViewportOptions(testing.allocator, support.handle(map), .{ .frustum_offset = .{ .top = std.math.inf(f64) } }, null));
+    try testing.expectError(error.InvalidArgument, maplibre.mapSetViewportOptions(testing.allocator, support.handle(map), .{ .frustum_offset = .{ .left = -1.0 } }, null));
+    try testing.expectError(error.InvalidArgument, maplibre.mapSetTileOptions(testing.allocator, support.handle(map), .{ .prefetch_zoom_delta = 256 }, null));
+    try testing.expectError(error.InvalidArgument, maplibre.mapSetTileOptions(testing.allocator, support.handle(map), .{ .lod_scale = std.math.nan(f64) }, null));
 }

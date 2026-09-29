@@ -29,51 +29,92 @@ pub const BindingError = NativeStatusError || error{
 
 pub const Error = BindingError || std.mem.Allocator.Error;
 
+/// Starts a call that reports into `diagnostic`, clearing the details of an
+/// earlier call.
+pub fn begin(diagnostic: ?*diagnostics.Diagnostic) void {
+    const target = diagnostic orelse return;
+    target.raw_status = null;
+    target.native.message[0] = 0;
+    target.recorded = false;
+}
+
+/// Records a binding error into `diagnostic` unless the failing step already
+/// recorded details. Generated functions run it from `errdefer`, so an error
+/// from a host callback passes through without a message.
+pub fn fail(diagnostic: ?*diagnostics.Diagnostic, err: anyerror) void {
+    const target = diagnostic orelse return;
+    if (target.recorded) return;
+    inline for (@typeInfo(Error).error_set.?) |binding_error| {
+        if (err == @field(anyerror, binding_error.name)) return record(target, null, bindingMessage(err));
+    }
+}
+
+/// Copies `message`, truncated to the buffer, and `raw_status` into
+/// `diagnostic`.
+pub fn record(diagnostic: ?*diagnostics.Diagnostic, raw_status: ?i32, message: []const u8) void {
+    const target = diagnostic orelse return;
+    const length = @min(message.len, target.native.message.len - 1);
+    @memcpy(target.native.message[0..length], message[0..length]);
+    target.native.message[length] = 0;
+    target.raw_status = raw_status;
+    target.recorded = true;
+}
+
 /// Calls a status-returning native function with `arguments` and a trailing
-/// diagnostic, and converts its status. A failure copies the raw status and
-/// the native message into `diagnostic_store`.
+/// diagnostic, and converts its status. Native writes the message of a failure
+/// straight into `diagnostic`.
 pub fn call(
     comptime function: anytype,
     arguments: anytype,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    diagnostic: ?*diagnostics.Diagnostic,
 ) Error!void {
-    var diagnostic: c.mln_diagnostic = undefined;
-    diagnostic.size = @sizeOf(c.mln_diagnostic);
-    // Without a store the message has nowhere to go, so native skips it.
-    const out_diagnostic: [*c]c.mln_diagnostic = if (diagnostic_store != null) &diagnostic else null;
+    var out_diagnostic: [*c]c.mln_diagnostic = null;
+    if (diagnostic) |target| {
+        target.native.size = @sizeOf(c.mln_diagnostic);
+        out_diagnostic = &target.native;
+    }
     const raw_status: i32 = @call(.auto, function, arguments ++ .{out_diagnostic});
     if (raw_status == c.MLN_STATUS_OK) return;
-    if (diagnostic_store) |store| try store.set(raw_status, std.mem.sliceTo(&diagnostic.message, 0));
+    if (diagnostic) |target| {
+        target.raw_status = raw_status;
+        target.recorded = true;
+    }
     return nativeStatusError(raw_status);
 }
 
-pub fn validateAbiVersion(diagnostic_store: ?*diagnostics.DiagnosticStore) Error!void {
-    return validateAbiVersionValue(c.mln_c_version(), expected_c_abi_version, diagnostic_store);
+pub fn validateAbiVersion(diagnostic: ?*diagnostics.Diagnostic) Error!void {
+    return validateAbiVersionValue(c.mln_c_version(), expected_c_abi_version, diagnostic);
 }
 
 pub fn validateAbiVersionValue(
     actual: u32,
     expected: u32,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    diagnostic: ?*diagnostics.Diagnostic,
 ) Error!void {
+    begin(diagnostic);
     if (actual == expected) return;
-    if (diagnostic_store) |store| {
-        var buffer: [96]u8 = undefined;
-        const message = std.fmt.bufPrint(
-            &buffer,
-            "unsupported MapLibre Native C ABI version: expected {d}, got {d}",
-            .{ expected, actual },
-        ) catch "unsupported MapLibre Native C ABI version";
-        try store.set(null, message);
-    }
+    var buffer: [96]u8 = undefined;
+    const message = std.fmt.bufPrint(
+        &buffer,
+        "unsupported MapLibre Native C ABI version: expected {d}, got {d}",
+        .{ expected, actual },
+    ) catch "unsupported MapLibre Native C ABI version";
+    record(diagnostic, null, message);
     return error.AbiVersionMismatch;
 }
 
-pub fn setBindingDiagnostic(
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-    message: []const u8,
-) std.mem.Allocator.Error!void {
-    if (diagnostic_store) |store| try store.set(null, message);
+fn bindingMessage(err: anyerror) []const u8 {
+    return switch (err) {
+        error.ClosedHandle => "the handle is closed",
+        error.ActiveBorrow => "the handle has an active borrow",
+        error.InvalidString => "the string contains a NUL byte",
+        error.AlreadyCompleted => "the operation already completed",
+        error.OutOfMemory => "out of memory",
+        error.InvalidState => "the handle is not in a state that permits the call",
+        error.WrongThread => "the call is not permitted on this thread",
+        error.NativeError => "native returned a value that the binding cannot read",
+        else => @errorName(err),
+    };
 }
 
 /// Converts a raw native status into this binding's error set without touching
@@ -99,28 +140,8 @@ fn nativeStatusError(raw_status: i32) NativeStatusError {
     };
 }
 
-test "call copies the native diagnostic of a failed call" {
-    var store = diagnostics.DiagnosticStore.init(std.testing.allocator);
-    defer store.deinit();
-
-    const descriptor = c.mln_completion{
-        .size = @sizeOf(c.mln_completion),
-        .callback = struct {
-            fn callback(_: ?*anyopaque, _: [*c]const c.mln_completion_result) callconv(.c) void {}
-        }.callback,
-        .user_data = null,
-        .release_user_data = null,
-    };
-    try std.testing.expectError(error.InvalidArgument, call(c.mln_runtime_release, .{ 0, &descriptor }, &store));
-    const diagnostic = store.get().?;
-    try std.testing.expectEqual(@as(?i32, c.MLN_STATUS_INVALID_ARGUMENT), diagnostic.raw_status);
-    try std.testing.expect(diagnostic.message.len > 0);
-}
-
 test "unknown status preserves raw status" {
-    var store = diagnostics.DiagnosticStore.init(std.testing.allocator);
-    defer store.deinit();
-
+    var diagnostic: diagnostics.Diagnostic = .{};
     const unknown_raw_status: i32 = -9999;
     const unknown = struct {
         fn function(out_diagnostic: [*c]c.mln_diagnostic) callconv(.c) c.mln_status {
@@ -128,18 +149,15 @@ test "unknown status preserves raw status" {
             return unknown_raw_status;
         }
     }.function;
-    try std.testing.expectError(error.UnknownStatus, call(unknown, .{}, &store));
-    try std.testing.expectEqual(@as(?i32, unknown_raw_status), store.get().?.raw_status);
+    try std.testing.expectError(error.UnknownStatus, call(unknown, .{}, &diagnostic));
+    try std.testing.expectEqual(@as(?i32, unknown_raw_status), diagnostic.raw_status);
 }
 
 test "ABI version validation reports mismatch diagnostics" {
-    var store = diagnostics.DiagnosticStore.init(std.testing.allocator);
-    defer store.deinit();
-
-    try std.testing.expectError(error.AbiVersionMismatch, validateAbiVersionValue(1, 0, &store));
-    const diagnostic = store.get().?;
+    var diagnostic: diagnostics.Diagnostic = .{};
+    try std.testing.expectError(error.AbiVersionMismatch, validateAbiVersionValue(1, 0, &diagnostic));
     try std.testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
-    try std.testing.expect(std.mem.indexOf(u8, diagnostic.message, "expected 0, got 1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, diagnostic.message(), "expected 0, got 1") != null);
 }
 
 pub fn rawStatus(err: Error) c.mln_status {

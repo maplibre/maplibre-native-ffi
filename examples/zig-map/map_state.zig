@@ -6,24 +6,20 @@ const types = @import("types.zig");
 
 pub const MapState = struct {
     allocator: std.mem.Allocator,
-    diagnostic_store: *maplibre.DiagnosticStore,
+    // The details of the latest failed camera call. The example drives the
+    // map from one thread, so one diagnostic serves every call.
+    diagnostic: maplibre.Diagnostic = .{},
     runtime: maplibre.Runtime,
     map: maplibre.Map,
 
     pub fn init(allocator: std.mem.Allocator, viewport: types.Viewport, wake: maplibre.Wake) !MapState {
-        const diagnostic_store = try allocator.create(maplibre.DiagnosticStore);
-        diagnostic_store.* = maplibre.DiagnosticStore.init(allocator);
-        errdefer {
-            diagnostic_store.deinit();
-            allocator.destroy(diagnostic_store);
-        }
-
-        var runtime = maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:", .event_wake = wake }, diagnostic_store) catch |err| {
-            diagnostics.logError("runtime create failed", err, diagnostic_store);
+        var diagnostic: maplibre.Diagnostic = .{};
+        var runtime = maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:", .event_wake = wake }, &diagnostic) catch |err| {
+            diagnostics.logError("runtime create failed", err, &diagnostic);
             return types.AppError.RuntimeCreateFailed;
         };
         errdefer runtime.deinit();
-        errdefer if (maplibre.runtimeRelease(runtime)) |future| {
+        errdefer if (maplibre.runtimeRelease(runtime, null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();
@@ -37,26 +33,25 @@ pub const MapState = struct {
             .initial_extent = .{ .width = viewport.logical_width, .height = viewport.logical_height, .scale_factor = viewport.scale_factor },
             .map_mode = .continuous,
             .event_mask = .{ .map_render_update_available = true },
-        }) catch |err| {
-            diagnostics.logError("map create failed", err, diagnostic_store);
+        }, &diagnostic) catch |err| {
+            diagnostics.logError("map create failed", err, &diagnostic);
             return types.AppError.MapCreateFailed;
         };
         defer map_future.deinit();
-        var map = map_future.wait(diagnostic_store) catch |err| {
-            diagnostics.logError("map create failed", err, diagnostic_store);
+        var map = map_future.wait(&diagnostic) catch |err| {
+            diagnostics.logError("map create failed", err, &diagnostic);
             return types.AppError.MapCreateFailed;
         };
         errdefer map.deinit();
-        errdefer if (maplibre.mapRelease(map)) |future| {
+        errdefer if (maplibre.mapRelease(map, null)) |future| {
             var teardown = future;
             teardown.deinit();
         } else |_| {};
 
-        try loadStyle(allocator, &map, diagnostic_store);
-        try setCamera(allocator, &map, diagnostic_store);
+        try loadStyle(allocator, &map, &diagnostic);
+        try setCamera(allocator, &map, &diagnostic);
         return .{
             .allocator = allocator,
-            .diagnostic_store = diagnostic_store,
             .runtime = runtime,
             .map = map,
         };
@@ -65,20 +60,18 @@ pub const MapState = struct {
     pub fn deinit(self: *MapState) void {
         // Awaiting both release completions keeps process exit ordered after
         // native teardown.
-        if (maplibre.mapRelease(self.map)) |future| {
+        if (maplibre.mapRelease(self.map, null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();
         } else |_| {}
-        if (maplibre.runtimeRelease(self.runtime)) |future| {
+        if (maplibre.runtimeRelease(self.runtime, null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};
             teardown.deinit();
         } else |_| {}
         self.map.deinit();
         self.runtime.deinit();
-        self.diagnostic_store.deinit();
-        self.allocator.destroy(self.diagnostic_store);
     }
 
     pub fn setGesture(self: *MapState, phase: maplibre.GesturePhase) !void {
@@ -86,18 +79,18 @@ pub const MapState = struct {
     }
 
     pub fn moveBy(self: *MapState, dx: f64, dy: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .offset = .{ .x = dx, .y = dy } }));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .offset = .{ .x = dx, .y = dy } }, &self.diagnostic));
     }
 
     pub fn moveByAnimated(self: *MapState, dx: f64, dy: f64, duration_ms: f64) !void {
         try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{
             .offset = .{ .x = dx, .y = dy },
             .animation = .{ .duration_ms = duration_ms },
-        }));
+        }, &self.diagnostic));
     }
 
     pub fn scaleBy(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .scale, .amount = scale, .anchor = anchor }));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .scale, .amount = scale, .anchor = anchor }, &self.diagnostic));
     }
 
     pub fn scaleByAnimated(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint, duration_ms: f64) !void {
@@ -106,15 +99,15 @@ pub const MapState = struct {
             .amount = scale,
             .anchor = anchor,
             .animation = .{ .duration_ms = duration_ms },
-        }));
+        }, &self.diagnostic));
     }
 
     pub fn pitchBy(self: *MapState, delta: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .pitch, .amount = delta }));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .pitch, .amount = delta }, &self.diagnostic));
     }
 
     pub fn adjustBearing(self: *MapState, delta: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .bearing, .amount = delta }));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .bearing, .amount = delta }, &self.diagnostic));
     }
 
     pub fn adjustBearingAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
@@ -122,7 +115,7 @@ pub const MapState = struct {
             .kind = .bearing,
             .amount = delta,
             .animation = .{ .duration_ms = duration_ms },
-        }));
+        }, &self.diagnostic));
     }
 
     pub fn adjustPitchAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
@@ -130,7 +123,7 @@ pub const MapState = struct {
             .kind = .pitch,
             .amount = delta,
             .animation = .{ .duration_ms = duration_ms },
-        }));
+        }, &self.diagnostic));
     }
 
     pub fn resetOrientation(self: *MapState, duration_ms: f64) !void {
@@ -142,24 +135,24 @@ pub const MapState = struct {
     }
 
     fn updateCamera(self: *MapState, update: maplibre.CameraUpdate) !void {
-        try self.cameraMutation(maplibre.mapUpdateCamera(self.allocator, self.map, update));
+        try self.cameraMutation(maplibre.mapUpdateCamera(self.allocator, self.map, update, &self.diagnostic));
     }
 
     /// Ends any running camera transition, so a starting gesture takes over
     /// from it rather than fighting it.
     pub fn cancelTransitions(self: *MapState) !void {
-        try self.cameraMutation(maplibre.mapCancelTransitions(self.map));
+        try self.cameraMutation(maplibre.mapCancelTransitions(self.map, &self.diagnostic));
     }
 
     /// Drains runtime events, reporting whether the map requested another
     /// frame.
     pub fn drainEvents(self: *MapState) !bool {
-        var batch = maplibre.runtimeDrainEvents(self.runtime) catch |err| switch (err) {
+        var batch = maplibre.runtimeDrainEvents(self.runtime, null) catch |err| switch (err) {
             error.NotReady => return false,
             else => return err,
         };
         defer batch.deinit();
-        var events = try maplibre.eventBatchGet(self.allocator, batch);
+        var events = try maplibre.eventBatchGet(self.allocator, batch, null);
         defer events.deinit();
         for (events.value.events) |event| {
             if (event.source_type != .map or event.source != self.map.raw) continue;
@@ -170,7 +163,7 @@ pub const MapState = struct {
 
     fn cameraMutation(self: *MapState, result: anytype) !void {
         var completion = result catch |err| {
-            diagnostics.logError("camera update failed", err, self.diagnostic_store);
+            diagnostics.logError("camera update failed", err, &self.diagnostic);
             return types.AppError.CameraUpdateFailed;
         };
         completion.deinit();
@@ -180,10 +173,10 @@ pub const MapState = struct {
 fn loadStyle(
     allocator: std.mem.Allocator,
     map: *maplibre.Map,
-    diagnostic_store: *const maplibre.DiagnosticStore,
+    diagnostic: *maplibre.Diagnostic,
 ) !void {
-    var completion = maplibre.mapSetStyleUrl(allocator, map.*, "https://tiles.openfreemap.org/styles/bright") catch |err| {
-        diagnostics.logError("style load failed", err, diagnostic_store);
+    var completion = maplibre.mapSetStyleUrl(allocator, map.*, "https://tiles.openfreemap.org/styles/bright", diagnostic) catch |err| {
+        diagnostics.logError("style load failed", err, diagnostic);
         return types.AppError.StyleLoadFailed;
     };
     completion.deinit();
@@ -192,15 +185,15 @@ fn loadStyle(
 fn setCamera(
     allocator: std.mem.Allocator,
     map: *maplibre.Map,
-    diagnostic_store: *const maplibre.DiagnosticStore,
+    diagnostic: *maplibre.Diagnostic,
 ) !void {
     var completion = maplibre.mapUpdateCamera(allocator, map.*, .{ .camera = .{
         .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
         .zoom = 13.0,
         .bearing = 12.0,
         .pitch = 30.0,
-    } }) catch |err| {
-        diagnostics.logError("camera jump failed", err, diagnostic_store);
+    } }, diagnostic) catch |err| {
+        diagnostics.logError("camera jump failed", err, diagnostic);
         return types.AppError.CameraJumpFailed;
     };
     completion.deinit();

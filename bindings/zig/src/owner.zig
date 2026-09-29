@@ -1,7 +1,6 @@
 const std = @import("std");
 const status = @import("status.zig");
 const callback = @import("callback.zig");
-const diagnostics = @import("diagnostics.zig");
 const allocator = std.heap.smp_allocator;
 
 pub const Anchor = struct {
@@ -18,7 +17,6 @@ pub const Anchor = struct {
 const State = struct {
     references: std.atomic.Value(usize) = .init(1),
     parent: ?Anchor,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
     readers: usize = 0,
     closing: bool = false,
     dispose_pending: bool = false,
@@ -69,13 +67,13 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
             std.Io.Threaded.mutexUnlock(&mutex);
         }
 
-        pub fn adopt(raw: u64, parent: ?Anchor, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!Self {
+        pub fn adopt(raw: u64, parent: ?Anchor) status.Error!Self {
             if (raw == 0) return error.InvalidArgument;
             errdefer dispose(raw) catch {};
             try callback.initialize();
             const state = try allocator.create(State);
             errdefer allocator.destroy(state);
-            state.* = .{ .parent = if (parent) |p| p.retain() else null, .diagnostic_store = diagnostic_store, .raw = raw, .dispose = dispose };
+            state.* = .{ .parent = if (parent) |p| p.retain() else null, .raw = raw, .dispose = dispose };
             errdefer if (state.parent) |p| p.release();
             lock();
             defer unlock();
@@ -87,7 +85,7 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
             try callback.initialize();
             const state = try allocator.create(State);
             errdefer allocator.destroy(state);
-            state.* = .{ .parent = null, .diagnostic_store = null, .raw = raw, .dispose = dispose, .decision_pending = true };
+            state.* = .{ .parent = null, .raw = raw, .dispose = dispose, .decision_pending = true };
             lock();
             defer unlock();
             try registry.put(allocator, raw, state);
@@ -115,12 +113,11 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
             if (state.completed) return error.AlreadyCompleted;
             state.completing = true;
             state.retain();
-            return .{ .state = state, .native = self.raw, .diagnostic_store = state.diagnostic_store };
+            return .{ .state = state, .native = self.raw };
         }
         pub const Lease = struct {
             state: *State,
             native: u64,
-            diagnostic_store: ?*diagnostics.DiagnosticStore,
             reserved: bool = false,
             pub fn finishComplete(self: Lease, accepted: bool) void {
                 lock();
@@ -155,7 +152,7 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
             const state = registry.get(self.raw) orelse return error.InvalidState;
             if (state.closing) return error.InvalidState;
             state.retain();
-            return .{ .state = state, .native = self.raw, .diagnostic_store = state.diagnostic_store };
+            return .{ .state = state, .native = self.raw };
         }
 
         pub fn borrow(self: Self) status.Error!Lease {
@@ -165,13 +162,12 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
             if (state.closing) return error.InvalidState;
             state.readers += 1;
             state.retain();
-            return .{ .state = state, .native = self.raw, .diagnostic_store = state.diagnostic_store, .reserved = true };
+            return .{ .state = state, .native = self.raw, .reserved = true };
         }
 
         pub const Close = struct {
             state: *State,
             native: u64,
-            diagnostic_store: ?*diagnostics.DiagnosticStore,
             deferred: bool,
             pub fn rollback(self: Close) void {
                 lock();
@@ -200,7 +196,7 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
             if (state.closing) return error.InvalidState;
             if (state.readers != 0) return error.ActiveBorrow;
             state.closing = true;
-            return .{ .state = state, .native = self.raw, .diagnostic_store = state.diagnostic_store, .deferred = state.decision_pending or state.completing };
+            return .{ .state = state, .native = self.raw, .deferred = state.decision_pending or state.completing };
         }
 
         pub fn deinit(self: *Self) void {
@@ -240,7 +236,7 @@ test "copied owners defer disposal through borrowed copies exactly once" {
     };
     const Owner = Handle("borrowed-owner-test", Probe.dispose);
     Probe.disposals = 0;
-    var value = try Owner.adopt(71, null, null);
+    var value = try Owner.adopt(71, null);
     const copy = value;
     const ordinary = try value.lease();
     const borrowed = try value.borrow();
@@ -264,7 +260,7 @@ test "rejected close restores owner and accepted provider actions force ownershi
     };
     const Owner = Handle("provider-owner-test", Probe.dispose);
     Probe.disposals = 0;
-    var value = try Owner.adopt(81, null, null);
+    var value = try Owner.adopt(81, null);
     const closing = (try value.beginClose()).?;
     try std.testing.expectError(error.InvalidState, value.beginClose());
     closing.rollback();

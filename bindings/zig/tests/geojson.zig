@@ -18,7 +18,7 @@ test "prepared GeoJSON data adds and updates sources through public binding" {
 
     const empty_data = try maplibre.geojsonSourceDataCreate(testing.allocator, empty_collection, null, null);
     defer maplibre.geojsonSourceDataDestroy(support.handle(empty_data)) catch @panic("prepared data destroy failed");
-    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "empty", empty_data));
+    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "empty", empty_data, null));
     try testing.expect(try support.styleSourceExists(&map, "empty"));
     var source_ids = try support.listStyleSourceIds(&map);
     defer source_ids.deinit();
@@ -26,8 +26,8 @@ test "prepared GeoJSON data adds and updates sources through public binding" {
 
     const point_data = try maplibre.geojsonSourceDataCreate(testing.allocator, point_collection, null, null);
     defer maplibre.geojsonSourceDataDestroy(support.handle(point_data)) catch @panic("prepared data destroy failed");
-    try support.expectCommitted(try maplibre.mapSetGeojsonSourceData(support.handle(map), "empty", point_data));
-    try support.expectCommitted(try maplibre.mapSetGeojsonSourceUrl(support.handle(map), "empty", "https://example.com/data.geojson"));
+    try support.expectCommitted(try maplibre.mapSetGeojsonSourceData(support.handle(map), "empty", point_data, null));
+    try support.expectCommitted(try maplibre.mapSetGeojsonSourceUrl(support.handle(map), "empty", "https://example.com/data.geojson", null));
     try support.expectCommitted(try maplibre.mapAddGeojsonSourceUrl(testing.allocator, support.handle(map), "geo-url", "https://example.com/initial.geojson", .{
         .min_zoom = 1,
         .max_zoom = 16,
@@ -35,9 +35,9 @@ test "prepared GeoJSON data adds and updates sources through public binding" {
         .buffer = 0,
         .tile_size = 256,
         .line_metrics = true,
-    }));
+    }, null));
     try testing.expectEqual(maplibre.StyleSourceType.geojson, (try support.styleSourceType(&map, "geo-url")).?);
-    try support.expectCommandError(try maplibre.mapAddGeojsonSourceUrl(testing.allocator, support.handle(map), "empty", "https://example.com/again.geojson", null), error.InvalidArgument);
+    try support.expectCommandError(try maplibre.mapAddGeojsonSourceUrl(testing.allocator, support.handle(map), "empty", "https://example.com/again.geojson", null, null), error.InvalidArgument);
 }
 
 test "prepared GeoJSON data supports nested geometry collections" {
@@ -49,7 +49,7 @@ test "prepared GeoJSON data supports nested geometry collections" {
     const collection = "{\"type\":\"GeometryCollection\",\"geometries\":[{\"type\":\"LineString\",\"coordinates\":[[-123,37],[-122,38]]},{\"type\":\"Polygon\",\"coordinates\":[[[-123,37],[-123,38],[-122,38],[-123,37]]]}]}";
     const data = try maplibre.geojsonSourceDataCreate(testing.allocator, collection, null, null);
     defer maplibre.geojsonSourceDataDestroy(support.handle(data)) catch @panic("prepared data destroy failed");
-    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "collection", data));
+    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "collection", data, null));
     try testing.expect(try support.styleSourceExists(&map, "collection"));
 }
 
@@ -67,13 +67,13 @@ test "GeoJSON preparation rejects invalid data and passes explicit-length string
     const empty_data = try maplibre.geojsonSourceDataCreate(testing.allocator, empty_collection, null, null);
     defer maplibre.geojsonSourceDataDestroy(support.handle(empty_data)) catch @panic("prepared data destroy failed");
     // An empty source ID submits, then the command reports the rejection.
-    const empty_id = try maplibre.mapAddGeojsonSourceData(support.handle(map), "", empty_data);
+    const empty_id = try maplibre.mapAddGeojsonSourceData(support.handle(map), "", empty_data, null);
     try support.expectCommandError(empty_id, error.InvalidArgument);
 
     const embedded_nul_id = "{\"type\":\"Feature\",\"id\":\"bad\\u0000id\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},\"properties\":{}}";
     const nul_data = try maplibre.geojsonSourceDataCreate(testing.allocator, embedded_nul_id, null, null);
     defer maplibre.geojsonSourceDataDestroy(support.handle(nul_data)) catch @panic("prepared data destroy failed");
-    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "embedded-nul-id", nul_data));
+    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "embedded-nul-id", nul_data, null));
     try testing.expect(try support.styleSourceExists(&map, "embedded-nul-id"));
 }
 
@@ -93,9 +93,9 @@ test "GeoJSON preparation bakes in options and validates clustering" {
     };
     const clustered = try maplibre.geojsonSourceDataCreate(testing.allocator, features, cluster_options, null);
     defer maplibre.geojsonSourceDataDestroy(clustered) catch @panic("prepared data destroy failed");
-    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "clustered", clustered));
+    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "clustered", clustered, null));
     try testing.expect(try support.styleSourceExists(&map, "clustered"));
-    try support.expectCommitted(try maplibre.mapSetGeojsonSourceData(support.handle(map), "clustered", clustered));
+    try support.expectCommitted(try maplibre.mapSetGeojsonSourceData(support.handle(map), "clustered", clustered, null));
 
     // Cluster validation happens at preparation, before any map is involved.
     try testing.expectError(error.InvalidArgument, maplibre.geojsonSourceDataCreate(
@@ -115,14 +115,14 @@ test "GeoJSON preparation bakes in options and validates clustering" {
     // cluster aggregation expressions included; the command reports it.
     const unclustered = try maplibre.geojsonSourceDataCreate(testing.allocator, features, null, null);
     defer maplibre.geojsonSourceDataDestroy(unclustered) catch @panic("prepared data destroy failed");
-    const unclustered_set = try maplibre.mapSetGeojsonSourceData(support.handle(map), "clustered", unclustered);
+    const unclustered_set = try maplibre.mapSetGeojsonSourceData(support.handle(map), "clustered", unclustered, null);
     try support.expectCommandError(unclustered_set, error.InvalidArgument);
 
     var reproperty_options = cluster_options;
     reproperty_options.cluster_properties = "{\"total\":[\"max\",[\"get\",\"rank\"]]}";
     const repropertied = try maplibre.geojsonSourceDataCreate(testing.allocator, features, reproperty_options, null);
     defer maplibre.geojsonSourceDataDestroy(repropertied) catch @panic("prepared data destroy failed");
-    const repropertied_set = try maplibre.mapSetGeojsonSourceData(support.handle(map), "clustered", repropertied);
+    const repropertied_set = try maplibre.mapSetGeojsonSourceData(support.handle(map), "clustered", repropertied, null);
     try support.expectCommandError(repropertied_set, error.InvalidArgument);
 
     // Aggregations compare by parsed equality, so equivalent JSON with
@@ -131,7 +131,7 @@ test "GeoJSON preparation bakes in options and validates clustering" {
     reformatted_options.cluster_properties = " { \"total\" : [\"+\", [\"get\", \"rank\"]] } ";
     const reformatted = try maplibre.geojsonSourceDataCreate(testing.allocator, features, reformatted_options, null);
     defer maplibre.geojsonSourceDataDestroy(reformatted) catch @panic("prepared data destroy failed");
-    const reformatted_set = try maplibre.mapSetGeojsonSourceData(support.handle(map), "clustered", reformatted);
+    const reformatted_set = try maplibre.mapSetGeojsonSourceData(support.handle(map), "clustered", reformatted, null);
     try support.expectCommitted(reformatted_set);
 }
 
@@ -142,9 +142,9 @@ test "prepared GeoJSON data installs on many sources and outlives release" {
     defer support.closeMap(&map) catch @panic("map close failed");
 
     const shared = try maplibre.geojsonSourceDataCreate(testing.allocator, point_collection, null, null);
-    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "shared-a", shared));
-    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "shared-b", shared));
-    try support.expectCommitted(try maplibre.mapSetGeojsonSourceData(support.handle(map), "shared-a", shared));
+    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "shared-a", shared, null));
+    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "shared-b", shared, null));
+    try support.expectCommitted(try maplibre.mapSetGeojsonSourceData(support.handle(map), "shared-a", shared, null));
 
     // Submitted installs keep their own lease, so a release right after
     // submit never invalidates them, and a second release is a no-op.
@@ -154,8 +154,8 @@ test "prepared GeoJSON data installs on many sources and outlives release" {
     try testing.expect(try support.styleSourceExists(&map, "shared-b"));
 
     // A released handle is stale for new installs, rejected at submit.
-    try testing.expectError(error.InvalidState, maplibre.mapSetGeojsonSourceData(support.handle(map), "shared-a", shared));
-    try testing.expectError(error.InvalidState, maplibre.mapAddGeojsonSourceData(support.handle(map), "shared-c", shared));
+    try testing.expectError(error.InvalidState, maplibre.mapSetGeojsonSourceData(support.handle(map), "shared-a", shared, null));
+    try testing.expectError(error.InvalidState, maplibre.mapAddGeojsonSourceData(support.handle(map), "shared-c", shared, null));
 }
 
 test "GeoJSON preparation runs on a worker thread" {
@@ -174,7 +174,7 @@ test "GeoJSON preparation runs on a worker thread" {
     thread.join();
     const data = try result;
     defer maplibre.geojsonSourceDataDestroy(support.handle(data)) catch @panic("prepared data destroy failed");
-    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "worker-prepared", data));
+    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "worker-prepared", data, null));
     try testing.expect(try support.styleSourceExists(&map, "worker-prepared"));
 }
 
@@ -186,16 +186,16 @@ test "synchronous tiling override applies at runtime" {
 
     const data = try maplibre.geojsonSourceDataCreate(testing.allocator, point_collection, null, null);
     defer maplibre.geojsonSourceDataDestroy(support.handle(data)) catch @panic("prepared data destroy failed");
-    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "tracked", data));
+    try support.expectCommitted(try maplibre.mapAddGeojsonSourceData(support.handle(map), "tracked", data, null));
 
-    const enable_id = try maplibre.mapSetGeojsonSourceSynchronousTiling(support.handle(map), "tracked", true);
+    const enable_id = try maplibre.mapSetGeojsonSourceSynchronousTiling(support.handle(map), "tracked", true, null);
     try support.expectCommitted(enable_id);
-    const set_id = try maplibre.mapSetGeojsonSourceData(support.handle(map), "tracked", data);
+    const set_id = try maplibre.mapSetGeojsonSourceData(support.handle(map), "tracked", data, null);
     try support.expectCommitted(set_id);
-    try support.expectCommitted(try maplibre.mapSetGeojsonSourceSynchronousTiling(support.handle(map), "tracked", false));
+    try support.expectCommitted(try maplibre.mapSetGeojsonSourceSynchronousTiling(support.handle(map), "tracked", false, null));
 
     // The override rejects a source ID that names nothing, reported by the
     // command since the style is only readable at commit.
-    const missing_id = try maplibre.mapSetGeojsonSourceSynchronousTiling(support.handle(map), "missing", true);
+    const missing_id = try maplibre.mapSetGeojsonSourceSynchronousTiling(support.handle(map), "missing", true, null);
     try support.expectCommandError(missing_id, error.NotFound);
 }

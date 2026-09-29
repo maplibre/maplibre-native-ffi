@@ -284,13 +284,12 @@ const PlatformOpenGLRenderTarget = union(enum) {
     pub fn renderUpdate(
         self: *PlatformOpenGLRenderTarget,
         allocator: std.mem.Allocator,
-        diagnostic_store: ?*const maplibre.DiagnosticStore,
         viewport: types.Viewport,
     ) !render_target.FrameOutcome {
         return switch (self.*) {
-            .owned_texture => |*backend| backend.renderUpdate(allocator, diagnostic_store, viewport),
-            .borrowed_texture => |*backend| backend.renderUpdate(allocator, diagnostic_store, viewport),
-            .native_surface => |*backend| backend.session.renderUpdate(allocator, diagnostic_store),
+            .owned_texture => |*backend| backend.renderUpdate(allocator, viewport),
+            .borrowed_texture => |*backend| backend.renderUpdate(allocator, viewport),
+            .native_surface => |*backend| backend.session.renderUpdate(allocator),
         };
     }
 };
@@ -544,11 +543,12 @@ const OpenGLOwnedTextureBackend = struct {
         map: *maplibre.Map,
         viewport: types.Viewport,
     ) !render_target.Session {
+        var diagnostic: maplibre.Diagnostic = .{};
         const texture = maplibre.openglOwnedTextureAttach(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .context = self.compositor.context.descriptor(),
-        }, .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 2 }) catch |err| {
-            diagnostics.logError("OpenGL texture attach failed", err, null);
+        }, .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 2 }, &diagnostic) catch |err| {
+            diagnostics.logError("OpenGL texture attach failed", err, &diagnostic);
             return types.AppError.TextureAttachFailed;
         };
         return render_target.textureSession(map, texture);
@@ -563,7 +563,7 @@ const OpenGLOwnedTextureBackend = struct {
                 if (sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
                 var with_sync = context;
                 with_sync.sync = sync;
-                return maplibre.acquiredFrameGetOpenglTexture(bool, context.frame, with_sync, draw);
+                return maplibre.acquiredFrameGetOpenglTexture(bool, context.frame, with_sync, draw, null);
             }
             fn draw(context: @This(), info: maplibre.OpenglOwnedTextureFrame) anyerror!bool {
                 const rendered = try context.backend.compositor.drawTexture(info.texture);
@@ -571,32 +571,32 @@ const OpenGLOwnedTextureBackend = struct {
                 return rendered;
             }
         };
-        return maplibre.acquiredFrameGetProducerSync(bool, frame, Context{ .backend = self, .frame = frame }, Context.producer);
+        return maplibre.acquiredFrameGetProducerSync(bool, frame, Context{ .backend = self, .frame = frame }, Context.producer, null);
     }
 
     fn renderUpdate(
         self: *OpenGLOwnedTextureBackend,
         allocator: std.mem.Allocator,
-        diagnostic_store: ?*const maplibre.DiagnosticStore,
         viewport: types.Viewport,
     ) !render_target.FrameOutcome {
         _ = viewport;
-        var outcome = try self.session.renderUpdate(allocator, diagnostic_store);
+        var outcome = try self.session.renderUpdate(allocator);
         if (!outcome.rendered) return outcome;
         const texture = try self.session.textureHandle();
-        const frame = maplibre.renderSessionAcquireFrame(texture.*) catch |err| switch (err) {
+        var diagnostic: maplibre.Diagnostic = .{};
+        const frame = maplibre.renderSessionAcquireFrame(texture.*, &diagnostic) catch |err| switch (err) {
             error.NotReady => {
                 outcome.rendered = false;
                 return outcome;
             },
             else => {
-                diagnostics.logError("OpenGL texture acquire failed", err, null);
+                diagnostics.logError("OpenGL texture acquire failed", err, &diagnostic);
                 return types.AppError.BackendDrawFailed;
             },
         };
-        errdefer maplibre.acquiredFrameRelease(std.heap.smp_allocator, frame, .{ .kind = .cpu_complete }) catch {};
+        errdefer maplibre.acquiredFrameRelease(std.heap.smp_allocator, frame, .{ .kind = .cpu_complete }, null) catch {};
         outcome.rendered = try self.drawAcquiredFrame(frame);
-        try maplibre.acquiredFrameRelease(std.heap.smp_allocator, frame, .{ .kind = .cpu_complete });
+        try maplibre.acquiredFrameRelease(std.heap.smp_allocator, frame, .{ .kind = .cpu_complete }, null);
         return outcome;
     }
 };
@@ -694,6 +694,7 @@ const OpenGLBorrowedTextureBackend = struct {
             viewport,
         );
         errdefer replacement.deinit(&self.compositor.context, self.compositor.procs);
+        var diagnostic: maplibre.Diagnostic = .{};
         const completion = maplibre.openglBorrowedTextureSetTarget(std.heap.smp_allocator, session.*, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
@@ -701,8 +702,8 @@ const OpenGLBorrowedTextureBackend = struct {
             .context = self.compositor.context.descriptor(),
             .texture = replacement.texture,
             .target = gl_texture_target,
-        }) catch |err| {
-            diagnostics.logError("OpenGL borrowed texture set target failed", err, null);
+        }, &diagnostic) catch |err| {
+            diagnostics.logError("OpenGL borrowed texture set target failed", err, &diagnostic);
             return types.AppError.TextureResizeFailed;
         };
         self.session.beginPending(
@@ -726,6 +727,7 @@ const OpenGLBorrowedTextureBackend = struct {
         map: *maplibre.Map,
         viewport: types.Viewport,
     ) !render_target.Session {
+        var diagnostic: maplibre.Diagnostic = .{};
         const texture = maplibre.openglBorrowedTextureAttach(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
@@ -733,8 +735,8 @@ const OpenGLBorrowedTextureBackend = struct {
             .context = self.compositor.context.descriptor(),
             .texture = self.borrowed_texture.texture,
             .target = gl_texture_target,
-        }, .{ .driver = .caller_graphics_thread }) catch |err| {
-            diagnostics.logError("OpenGL borrowed texture attach failed", err, null);
+        }, .{ .driver = .caller_graphics_thread }, &diagnostic) catch |err| {
+            diagnostics.logError("OpenGL borrowed texture attach failed", err, &diagnostic);
             return types.AppError.TextureAttachFailed;
         };
         return render_target.textureSession(map, texture);
@@ -743,11 +745,10 @@ const OpenGLBorrowedTextureBackend = struct {
     fn renderUpdate(
         self: *OpenGLBorrowedTextureBackend,
         allocator: std.mem.Allocator,
-        diagnostic_store: ?*const maplibre.DiagnosticStore,
         viewport: types.Viewport,
     ) !render_target.FrameOutcome {
         _ = viewport;
-        var outcome = try self.session.renderUpdate(allocator, diagnostic_store);
+        var outcome = try self.session.renderUpdate(allocator);
         if (!outcome.rendered) return outcome;
         outcome.rendered = try self.compositor.drawTexture(self.borrowed_texture.texture);
         return outcome;
@@ -800,12 +801,13 @@ const OpenGLSurfaceBackend = struct {
             return;
         }
         const handle = try self.session.surfaceHandle();
+        var diagnostic: maplibre.Diagnostic = .{};
         const completion = maplibre.openglSurfaceSetTarget(std.heap.smp_allocator, handle.*, .{
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
-        }) catch |err| {
-            diagnostics.logError("OpenGL surface set target failed", err, null);
+        }, &diagnostic) catch |err| {
+            diagnostics.logError("OpenGL surface set target failed", err, &diagnostic);
             return types.AppError.SurfaceAttachFailed;
         };
         self.session.beginPending(
@@ -820,7 +822,7 @@ const OpenGLSurfaceBackend = struct {
     /// failure.
     fn detachSuppressed(self: *OpenGLSurfaceBackend) void {
         const handle = self.session.surfaceHandle() catch return;
-        const completion = maplibre.renderSessionDetach(handle.*) catch return;
+        const completion = maplibre.renderSessionDetach(handle.*, null) catch return;
         self.session.beginPending(
             completion,
             types.AppError.SurfaceAttachFailed,
@@ -839,12 +841,13 @@ const OpenGLSurfaceBackend = struct {
         map: *maplibre.Map,
         viewport: types.Viewport,
     ) !render_target.Session {
+        var diagnostic: maplibre.Diagnostic = .{};
         const surface = maplibre.openglSurfaceAttach(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
-        }, .{ .driver = .caller_graphics_thread }) catch |err| {
-            diagnostics.logError("OpenGL surface attach failed", err, null);
+        }, .{ .driver = .caller_graphics_thread }, &diagnostic) catch |err| {
+            diagnostics.logError("OpenGL surface attach failed", err, &diagnostic);
             return types.AppError.SurfaceAttachFailed;
         };
         return render_target.surfaceSession(map, surface);

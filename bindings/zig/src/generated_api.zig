@@ -18,7 +18,6 @@ const diagnostics = @import("diagnostics.zig");
 
 const OwnerCopyContext = struct {
     parent: ?owner.Anchor,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
     pub fn deinit(self: *OwnerCopyContext) void {
         if (self.parent) |parent| parent.release();
     }
@@ -5899,8 +5898,10 @@ fn copyOptionalWglContextDescriptorValue(result: *const c.mln_completion_result)
     return try copyWglContextDescriptorValue(result);
 }
 
-pub fn acquiredFrameDispose(frame: AcquiredFrame) status.Error!void {
+pub fn acquiredFrameDispose(frame: AcquiredFrame, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = frame;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_dispose", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -5909,53 +5910,61 @@ pub fn acquiredFrameDispose(frame: AcquiredFrame) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.call(c.mln_acquired_frame_dispose, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_acquired_frame_dispose, .{binding_arg_0_native}, diagnostic);
     }
     roots.accept();
     binding_arg_0_lease.commit();
 }
 
-pub fn acquiredFrameGetMetalTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), MetalOwnedTextureFrame) anyerror!Result) anyerror!Result {
+pub fn acquiredFrameGetMetalTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), MetalOwnedTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_get_metal_texture", handle.raw);
     const lease = try handle.lease();
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, lease.diagnostic_store);
+    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
     defer c.mln_adapter_acquired_frame_view_end(token);
     var raw: c.mln_metal_owned_texture_frame = std.mem.zeroes(c.mln_metal_owned_texture_frame);
     raw.size = @sizeOf(c.mln_metal_owned_texture_frame);
-    try status.call(c.mln_acquired_frame_get_metal_texture, .{ lease.native, &raw }, lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_metal_texture, .{ lease.native, &raw }, diagnostic);
     return use(context, MetalOwnedTextureFrame.fromNative(raw));
 }
 
-pub fn acquiredFrameGetOpenglTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), OpenglOwnedTextureFrame) anyerror!Result) anyerror!Result {
+pub fn acquiredFrameGetOpenglTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), OpenglOwnedTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_get_opengl_texture", handle.raw);
     const lease = try handle.lease();
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, lease.diagnostic_store);
+    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
     defer c.mln_adapter_acquired_frame_view_end(token);
     var raw: c.mln_opengl_owned_texture_frame = std.mem.zeroes(c.mln_opengl_owned_texture_frame);
     raw.size = @sizeOf(c.mln_opengl_owned_texture_frame);
-    try status.call(c.mln_acquired_frame_get_opengl_texture, .{ lease.native, &raw }, lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_opengl_texture, .{ lease.native, &raw }, diagnostic);
     return use(context, OpenglOwnedTextureFrame.fromNative(raw));
 }
 
-pub fn acquiredFrameGetProducerSync(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), GpuSync) anyerror!Result) anyerror!Result {
+pub fn acquiredFrameGetProducerSync(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), GpuSync) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_get_producer_sync", handle.raw);
     const lease = try handle.lease();
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, lease.diagnostic_store);
+    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
     defer c.mln_adapter_acquired_frame_view_end(token);
     var raw: c.mln_gpu_sync = std.mem.zeroes(c.mln_gpu_sync);
     raw.size = @sizeOf(c.mln_gpu_sync);
-    try status.call(c.mln_acquired_frame_get_producer_sync, .{ lease.native, &raw }, lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_producer_sync, .{ lease.native, &raw }, diagnostic);
     return use(context, GpuSync.fromNative(raw));
 }
 
-pub fn acquiredFrameGetResult(frame: AcquiredFrame) status.Error!RenderFrameResult {
+pub fn acquiredFrameGetResult(frame: AcquiredFrame, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderFrameResult {
     const binding_arg_0 = frame;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_get_result", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -5964,40 +5973,46 @@ pub fn acquiredFrameGetResult(frame: AcquiredFrame) status.Error!RenderFrameResu
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_render_frame_result = std.mem.zeroes(c.mln_render_frame_result);
     binding_arg_1.size = @sizeOf(c.mln_render_frame_result);
-    try status.call(c.mln_acquired_frame_get_result, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_result, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
     return RenderFrameResult.fromNative(binding_arg_1);
 }
 
-pub fn acquiredFrameGetVulkanTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), VulkanOwnedTextureFrame) anyerror!Result) anyerror!Result {
+pub fn acquiredFrameGetVulkanTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), VulkanOwnedTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_get_vulkan_texture", handle.raw);
     const lease = try handle.lease();
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, lease.diagnostic_store);
+    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
     defer c.mln_adapter_acquired_frame_view_end(token);
     var raw: c.mln_vulkan_owned_texture_frame = std.mem.zeroes(c.mln_vulkan_owned_texture_frame);
     raw.size = @sizeOf(c.mln_vulkan_owned_texture_frame);
-    try status.call(c.mln_acquired_frame_get_vulkan_texture, .{ lease.native, &raw }, lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_vulkan_texture, .{ lease.native, &raw }, diagnostic);
     return use(context, VulkanOwnedTextureFrame.fromNative(raw));
 }
 
-pub fn acquiredFrameGetWebgpuTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), WebgpuOwnedTextureFrame) anyerror!Result) anyerror!Result {
+pub fn acquiredFrameGetWebgpuTexture(comptime Result: type, handle: AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), WebgpuOwnedTextureFrame) anyerror!Result, diagnostic: ?*diagnostics.Diagnostic) anyerror!Result {
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_get_webgpu_texture", handle.raw);
     const lease = try handle.lease();
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, lease.diagnostic_store);
+    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
     defer c.mln_adapter_acquired_frame_view_end(token);
     var raw: c.mln_webgpu_owned_texture_frame = std.mem.zeroes(c.mln_webgpu_owned_texture_frame);
     raw.size = @sizeOf(c.mln_webgpu_owned_texture_frame);
-    try status.call(c.mln_acquired_frame_get_webgpu_texture, .{ lease.native, &raw }, lease.diagnostic_store);
+    try status.call(c.mln_acquired_frame_get_webgpu_texture, .{ lease.native, &raw }, diagnostic);
     return use(context, WebgpuOwnedTextureFrame.fromNative(raw));
 }
 
-pub fn acquiredFrameRelease(allocator: std.mem.Allocator, frame: AcquiredFrame, consumer_completion: GpuSync) status.Error!void {
+pub fn acquiredFrameRelease(allocator: std.mem.Allocator, frame: AcquiredFrame, consumer_completion: GpuSync, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = frame;
     const binding_arg_1 = consumer_completion;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6009,21 +6024,23 @@ pub fn acquiredFrameRelease(allocator: std.mem.Allocator, frame: AcquiredFrame, 
     errdefer binding_arg_0_lease.rollback();
     var binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.call(c.mln_acquired_frame_release, .{ &binding_arg_0_native, try store(input_allocator, binding_arg_1.toNative()) }, binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_acquired_frame_release, .{ &binding_arg_0_native, try store(input_allocator, binding_arg_1.toNative()) }, diagnostic);
     }
     roots.accept();
     binding_arg_0_lease.commit();
 }
 
-pub fn androidInit(jni_env: ?*anyopaque, jni_class: ?*anyopaque, context: ?*anyopaque, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
+pub fn androidInit(jni_env: ?*anyopaque, jni_class: ?*anyopaque, context: ?*anyopaque, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = jni_env;
     const binding_arg_1 = jni_class;
     const binding_arg_2 = context;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_android_init", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.call(c.mln_android_init, .{ @as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[0].type.?, binding_arg_0), @as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[1].type.?, binding_arg_1), @as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[2].type.?, binding_arg_2) }, diagnostic_store);
+    try status.call(c.mln_android_init, .{ @as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[0].type.?, binding_arg_0), @as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[1].type.?, binding_arg_1), @as(@typeInfo(@TypeOf(c.mln_android_init)).@"fn".params[2].type.?, binding_arg_2) }, diagnostic);
     roots.accept();
 }
 
@@ -6063,8 +6080,10 @@ pub fn bufferDestroy(buffer: Buffer) status.Error!void {
     binding_arg_0_lease.commit();
 }
 
-pub fn bufferGet(allocator: std.mem.Allocator, buffer: Buffer) status.Error!OwnedValue([]const u8) {
+pub fn bufferGet(allocator: std.mem.Allocator, buffer: Buffer, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const u8) {
     const binding_arg_0 = buffer;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_buffer_get", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6072,7 +6091,7 @@ pub fn bufferGet(allocator: std.mem.Allocator, buffer: Buffer) status.Error!Owne
     const binding_arg_0_lease = try binding_arg_0.borrow();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_buffer_view = std.mem.zeroes(c.mln_buffer_view);
-    try status.call(c.mln_buffer_get, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_buffer_get, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
     var arena = std.heap.ArenaAllocator.init(allocator);
     errdefer arena.deinit();
@@ -6159,8 +6178,10 @@ pub fn customMvtVectorSourceOptionsDefault(allocator: std.mem.Allocator) status.
     return .{ .arena = arena, .value = copied_value };
 }
 
-pub fn eventBatchGet(allocator: std.mem.Allocator, batch: EventBatch) status.Error!OwnedValue(RuntimeEventBatchView) {
+pub fn eventBatchGet(allocator: std.mem.Allocator, batch: EventBatch, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue(RuntimeEventBatchView) {
     const binding_arg_0 = batch;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_event_batch_get", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6169,7 +6190,7 @@ pub fn eventBatchGet(allocator: std.mem.Allocator, batch: EventBatch) status.Err
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_runtime_event_batch_view = std.mem.zeroes(c.mln_runtime_event_batch_view);
     binding_arg_1.size = @sizeOf(c.mln_runtime_event_batch_view);
-    try status.call(c.mln_event_batch_get, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_event_batch_get, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
     var arena = std.heap.ArenaAllocator.init(allocator);
     errdefer arena.deinit();
@@ -6214,9 +6235,11 @@ pub fn freeCameraOptionsDefault() status.Error!FreeCameraOptions {
     return FreeCameraOptions.fromNative(raw_result);
 }
 
-pub fn geojsonSourceDataCreate(allocator: std.mem.Allocator, data: []const u8, options: ?GeojsonSourceOptions, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!GeojsonSourceData {
+pub fn geojsonSourceDataCreate(allocator: std.mem.Allocator, data: []const u8, options: ?GeojsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!GeojsonSourceData {
     const binding_arg_0 = data;
     const binding_arg_1 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6225,9 +6248,9 @@ pub fn geojsonSourceDataCreate(allocator: std.mem.Allocator, data: []const u8, o
     const roots = &root_storage;
     defer roots.deinit();
     var binding_arg_2: c.mln_geojson_source_data = std.mem.zeroes(c.mln_geojson_source_data);
-    try status.call(c.mln_geojson_source_data_create, .{ @as(@typeInfo(@TypeOf(c.mln_geojson_source_data_create)).@"fn".params[0].type.?, view(binding_arg_0)), if (binding_arg_1) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null, &binding_arg_2 }, diagnostic_store);
+    try status.call(c.mln_geojson_source_data_create, .{ @as(@typeInfo(@TypeOf(c.mln_geojson_source_data_create)).@"fn".params[0].type.?, view(binding_arg_0)), if (binding_arg_1) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null, &binding_arg_2 }, diagnostic);
     roots.accept();
-    return try GeojsonSourceData.adopt(binding_arg_2, null, diagnostic_store);
+    return try GeojsonSourceData.adopt(binding_arg_2, null);
 }
 
 pub fn geojsonSourceDataDestroy(data: GeojsonSourceData) status.Error!void {
@@ -6270,46 +6293,54 @@ pub fn gpuSyncDefault() status.Error!GpuSync {
     return GpuSync.fromNative(raw_result);
 }
 
-pub fn httpHeaderTransformResponseSet(response: HttpHeaderTransformResponse, name: []const u8, value: []const u8, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
+pub fn httpHeaderTransformResponseSet(response: HttpHeaderTransformResponse, name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = response;
     const binding_arg_1 = name;
     const binding_arg_3 = value;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.checkScoped("mln_http_header_transform_response_set", @intFromPtr(binding_arg_0.native));
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.call(c.mln_http_header_transform_response_set, .{ binding_arg_0.native, @as(@typeInfo(@TypeOf(c.mln_http_header_transform_response_set)).@"fn".params[1].type.?, @ptrCast(binding_arg_1.ptr)), binding_arg_1.len, @as(@typeInfo(@TypeOf(c.mln_http_header_transform_response_set)).@"fn".params[3].type.?, @ptrCast(binding_arg_3.ptr)), binding_arg_3.len }, diagnostic_store);
+    try status.call(c.mln_http_header_transform_response_set, .{ binding_arg_0.native, @as(@typeInfo(@TypeOf(c.mln_http_header_transform_response_set)).@"fn".params[1].type.?, @ptrCast(binding_arg_1.ptr)), binding_arg_1.len, @as(@typeInfo(@TypeOf(c.mln_http_header_transform_response_set)).@"fn".params[3].type.?, @ptrCast(binding_arg_3.ptr)), binding_arg_3.len }, diagnostic);
     roots.accept();
 }
 
-pub fn latLngForProjectedMeters(meters: ProjectedMeters, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!LatLng {
+pub fn latLngForProjectedMeters(meters: ProjectedMeters, diagnostic: ?*diagnostics.Diagnostic) status.Error!LatLng {
     const binding_arg_0 = meters;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_lat_lng_for_projected_meters", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
     var binding_arg_1: c.mln_lat_lng = std.mem.zeroes(c.mln_lat_lng);
-    try status.call(c.mln_lat_lng_for_projected_meters, .{ @as(@typeInfo(@TypeOf(c.mln_lat_lng_for_projected_meters)).@"fn".params[0].type.?, binding_arg_0.toNative()), &binding_arg_1 }, diagnostic_store);
+    try status.call(c.mln_lat_lng_for_projected_meters, .{ @as(@typeInfo(@TypeOf(c.mln_lat_lng_for_projected_meters)).@"fn".params[0].type.?, binding_arg_0.toNative()), &binding_arg_1 }, diagnostic);
     roots.accept();
     return LatLng.fromNative(binding_arg_1);
 }
 
-pub fn logClearCallback(diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
+pub fn logClearCallback(diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_log_clear_callback", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.call(c.mln_log_clear_callback, .{}, diagnostic_store);
+    try status.call(c.mln_log_clear_callback, .{}, diagnostic);
     roots.accept();
 }
 
-pub fn logSetAsyncSeverityMask(mask: LogSeverityMask, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
+pub fn logSetAsyncSeverityMask(mask: LogSeverityMask, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = mask;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_log_set_async_severity_mask", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.call(c.mln_log_set_async_severity_mask, .{@as(@typeInfo(@TypeOf(c.mln_log_set_async_severity_mask)).@"fn".params[0].type.?, binding_arg_0.toNative())}, diagnostic_store);
+    try status.call(c.mln_log_set_async_severity_mask, .{@as(@typeInfo(@TypeOf(c.mln_log_set_async_severity_mask)).@"fn".params[0].type.?, binding_arg_0.toNative())}, diagnostic);
     roots.accept();
 }
 
@@ -6340,8 +6371,10 @@ pub const LogCallback = struct {
         };
     }
 };
-pub fn logSetCallback(callback_input: ?LogCallback, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
+pub fn logSetCallback(callback_input: ?LogCallback, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = callback_input;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_log_set_callback", 0);
     var roots: callback.Roots = .{};
     defer roots.deinit();
@@ -6349,15 +6382,17 @@ pub fn logSetCallback(callback_input: ?LogCallback, diagnostic_store: ?*diagnost
     if (binding_arg_0) |value| {
         if (value.call != null) context = try roots.retain(LogCallback, value);
     }
-    try status.call(c.mln_log_set_callback, .{ if (context != null) &LogCallback.callTrampoline else null, context, if (context != null) &callback.Registration(LogCallback).releaseNative else null }, diagnostic_store);
+    try status.call(c.mln_log_set_callback, .{ if (context != null) &LogCallback.callTrampoline else null, context, if (context != null) &callback.Registration(LogCallback).releaseNative else null }, diagnostic);
     roots.accept();
 }
 
-pub fn mapAddColorReliefLayer(map: Map, layer_id: []const u8, source_id: []const u8, before_layer_id: ?[]const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddColorReliefLayer(map: Map, layer_id: []const u8, source_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = source_id;
     const binding_arg_3 = before_layer_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_add_color_relief_layer", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6365,15 +6400,17 @@ pub fn mapAddColorReliefLayer(map: Map, layer_id: []const u8, source_id: []const
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_color_relief_layer)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_color_relief_layer)).@"fn".params[2].type.?, view(binding_arg_2)), @as(@typeInfo(@TypeOf(c.mln_map_add_color_relief_layer)).@"fn".params[3].type.?, if (binding_arg_3) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_color_relief_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_color_relief_layer, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddCustomGeometrySource(allocator: std.mem.Allocator, map: Map, source_id: []const u8, options: CustomGeometrySourceOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddCustomGeometrySource(allocator: std.mem.Allocator, map: Map, source_id: []const u8, options: CustomGeometrySourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6384,15 +6421,17 @@ pub fn mapAddCustomGeometrySource(allocator: std.mem.Allocator, map: Map, source
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_custom_geometry_source)).@"fn".params[1].type.?, view(binding_arg_1)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_custom_geometry_source, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_custom_geometry_source, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddCustomMvtVectorSource(allocator: std.mem.Allocator, map: Map, source_id: []const u8, options: CustomMvtVectorSourceOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddCustomMvtVectorSource(allocator: std.mem.Allocator, map: Map, source_id: []const u8, options: CustomMvtVectorSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6403,15 +6442,17 @@ pub fn mapAddCustomMvtVectorSource(allocator: std.mem.Allocator, map: Map, sourc
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_custom_mvt_vector_source)).@"fn".params[1].type.?, view(binding_arg_1)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_custom_mvt_vector_source, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_custom_mvt_vector_source, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddGeojsonSourceData(map: Map, source_id: []const u8, data: GeojsonSourceData) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddGeojsonSourceData(map: Map, source_id: []const u8, data: GeojsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = data;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_add_geojson_source_data", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6421,16 +6462,18 @@ pub fn mapAddGeojsonSourceData(map: Map, source_id: []const u8, data: GeojsonSou
     const binding_arg_2_lease = try binding_arg_2.lease();
     defer binding_arg_2_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_geojson_source_data)).@"fn".params[1].type.?, view(binding_arg_1)), binding_arg_2_lease.native };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_geojson_source_data, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_geojson_source_data, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddGeojsonSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, url: []const u8, options: ?GeojsonSourceOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddGeojsonSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, url: []const u8, options: ?GeojsonSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = url;
     const binding_arg_3 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6441,16 +6484,18 @@ pub fn mapAddGeojsonSourceUrl(allocator: std.mem.Allocator, map: Map, source_id:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_geojson_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_geojson_source_url)).@"fn".params[2].type.?, view(binding_arg_2)), if (binding_arg_3) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_geojson_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_geojson_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddHillshadeLayer(map: Map, layer_id: []const u8, source_id: []const u8, before_layer_id: ?[]const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddHillshadeLayer(map: Map, layer_id: []const u8, source_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = source_id;
     const binding_arg_3 = before_layer_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_add_hillshade_layer", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6458,16 +6503,18 @@ pub fn mapAddHillshadeLayer(map: Map, layer_id: []const u8, source_id: []const u
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_hillshade_layer)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_hillshade_layer)).@"fn".params[2].type.?, view(binding_arg_2)), @as(@typeInfo(@TypeOf(c.mln_map_add_hillshade_layer)).@"fn".params[3].type.?, if (binding_arg_3) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_hillshade_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_hillshade_layer, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddImageSourceImage(allocator: std.mem.Allocator, map: Map, source_id: []const u8, coordinates: []const LatLng, image: PremultipliedRgba8Image) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddImageSourceImage(allocator: std.mem.Allocator, map: Map, source_id: []const u8, coordinates: []const LatLng, image: PremultipliedRgba8Image, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = coordinates;
     const binding_arg_4 = image;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6482,16 +6529,18 @@ pub fn mapAddImageSourceImage(allocator: std.mem.Allocator, map: Map, source_id:
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_2.len, try store(input_allocator, try binding_arg_4.toNative(input_allocator, roots)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_image_source_image, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_image_source_image, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddImageSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, coordinates: []const LatLng, url: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddImageSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, coordinates: []const LatLng, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = coordinates;
     const binding_arg_4 = url;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6506,15 +6555,17 @@ pub fn mapAddImageSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: [
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_2.len, @as(@typeInfo(@TypeOf(c.mln_map_add_image_source_url)).@"fn".params[4].type.?, view(binding_arg_4)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_image_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_image_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddLocationIndicatorLayer(map: Map, layer_id: []const u8, before_layer_id: ?[]const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddLocationIndicatorLayer(map: Map, layer_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = before_layer_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_add_location_indicator_layer", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6522,16 +6573,18 @@ pub fn mapAddLocationIndicatorLayer(map: Map, layer_id: []const u8, before_layer
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_location_indicator_layer)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_location_indicator_layer)).@"fn".params[2].type.?, if (binding_arg_2) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_location_indicator_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_location_indicator_layer, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddRasterDemSourceTiles(allocator: std.mem.Allocator, map: Map, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddRasterDemSourceTiles(allocator: std.mem.Allocator, map: Map, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = tiles;
     const binding_arg_4 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6546,16 +6599,18 @@ pub fn mapAddRasterDemSourceTiles(allocator: std.mem.Allocator, map: Map, source
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = view(array_item_0);
         break :blk items.ptr;
     }), binding_arg_2.len, if (binding_arg_4) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_dem_source_tiles, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_raster_dem_source_tiles, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddRasterDemSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddRasterDemSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = url;
     const binding_arg_3 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6566,16 +6621,18 @@ pub fn mapAddRasterDemSourceUrl(allocator: std.mem.Allocator, map: Map, source_i
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_raster_dem_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_raster_dem_source_url)).@"fn".params[2].type.?, view(binding_arg_2)), if (binding_arg_3) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_dem_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_raster_dem_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddRasterSourceTiles(allocator: std.mem.Allocator, map: Map, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddRasterSourceTiles(allocator: std.mem.Allocator, map: Map, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = tiles;
     const binding_arg_4 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6590,16 +6647,18 @@ pub fn mapAddRasterSourceTiles(allocator: std.mem.Allocator, map: Map, source_id
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = view(array_item_0);
         break :blk items.ptr;
     }), binding_arg_2.len, if (binding_arg_4) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_source_tiles, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_raster_source_tiles, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddRasterSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddRasterSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = url;
     const binding_arg_3 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6610,15 +6669,17 @@ pub fn mapAddRasterSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_raster_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_raster_source_url)).@"fn".params[2].type.?, view(binding_arg_2)), if (binding_arg_3) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_raster_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_raster_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddStyleLayerJson(map: Map, layer_json: []const u8, before_layer_id: ?[]const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddStyleLayerJson(map: Map, layer_json: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_json;
     const binding_arg_2 = before_layer_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_add_style_layer_json", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6626,15 +6687,17 @@ pub fn mapAddStyleLayerJson(map: Map, layer_json: []const u8, before_layer_id: ?
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_style_layer_json)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_style_layer_json)).@"fn".params[2].type.?, if (binding_arg_2) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_style_layer_json, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_style_layer_json, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddStyleSourceJson(map: Map, source_id: []const u8, source_json: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddStyleSourceJson(map: Map, source_id: []const u8, source_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = source_json;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_add_style_source_json", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6642,16 +6705,18 @@ pub fn mapAddStyleSourceJson(map: Map, source_id: []const u8, source_json: []con
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_style_source_json)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_style_source_json)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_style_source_json, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_style_source_json, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddVectorSourceTiles(allocator: std.mem.Allocator, map: Map, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddVectorSourceTiles(allocator: std.mem.Allocator, map: Map, source_id: []const u8, tiles: []const []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = tiles;
     const binding_arg_4 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6666,16 +6731,18 @@ pub fn mapAddVectorSourceTiles(allocator: std.mem.Allocator, map: Map, source_id
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = view(array_item_0);
         break :blk items.ptr;
     }), binding_arg_2.len, if (binding_arg_4) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_vector_source_tiles, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_vector_source_tiles, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapAddVectorSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapAddVectorSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, url: []const u8, options: ?StyleTileSourceOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = url;
     const binding_arg_3 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6686,14 +6753,16 @@ pub fn mapAddVectorSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_add_vector_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_add_vector_source_url)).@"fn".params[2].type.?, view(binding_arg_2)), if (binding_arg_3) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_add_vector_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_add_vector_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapApplyCameraDelta(allocator: std.mem.Allocator, map: Map, delta: CameraDelta) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapApplyCameraDelta(allocator: std.mem.Allocator, map: Map, delta: CameraDelta, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = delta;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6704,15 +6773,17 @@ pub fn mapApplyCameraDelta(allocator: std.mem.Allocator, map: Map, delta: Camera
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_apply_camera_delta, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_apply_camera_delta, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapCameraForGeometry(allocator: std.mem.Allocator, map: Map, geometry: []const u8, fit_options: ?CameraFitOptions) status.Error!completion.Future(CameraOptions) {
+pub fn mapCameraForGeometry(allocator: std.mem.Allocator, map: Map, geometry: []const u8, fit_options: ?CameraFitOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(CameraOptions) {
     const binding_arg_0 = map;
     const binding_arg_1 = geometry;
     const binding_arg_2 = fit_options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6723,7 +6794,7 @@ pub fn mapCameraForGeometry(allocator: std.mem.Allocator, map: Map, geometry: []
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_camera_for_geometry)).@"fn".params[1].type.?, view(binding_arg_1)), if (binding_arg_2) |array_item_0| try store(input_allocator, array_item_0.toNative()) else null };
-    const readiness = try completion.submit(CameraOptions, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(CameraOptions, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!CameraOptions {
             const raw_value = try completion.value(c.mln_camera_options)(result);
             return CameraOptions.fromNative(raw_value);
@@ -6733,10 +6804,12 @@ pub fn mapCameraForGeometry(allocator: std.mem.Allocator, map: Map, geometry: []
     return readiness;
 }
 
-pub fn mapCameraForLatLngBounds(allocator: std.mem.Allocator, map: Map, bounds: LatLngBounds, fit_options: ?CameraFitOptions) status.Error!completion.Future(CameraOptions) {
+pub fn mapCameraForLatLngBounds(allocator: std.mem.Allocator, map: Map, bounds: LatLngBounds, fit_options: ?CameraFitOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(CameraOptions) {
     const binding_arg_0 = map;
     const binding_arg_1 = bounds;
     const binding_arg_2 = fit_options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6747,7 +6820,7 @@ pub fn mapCameraForLatLngBounds(allocator: std.mem.Allocator, map: Map, bounds: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_camera_for_lat_lng_bounds)).@"fn".params[1].type.?, binding_arg_1.toNative()), if (binding_arg_2) |array_item_0| try store(input_allocator, array_item_0.toNative()) else null };
-    const readiness = try completion.submit(CameraOptions, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(CameraOptions, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!CameraOptions {
             const raw_value = try completion.value(c.mln_camera_options)(result);
             return CameraOptions.fromNative(raw_value);
@@ -6757,10 +6830,12 @@ pub fn mapCameraForLatLngBounds(allocator: std.mem.Allocator, map: Map, bounds: 
     return readiness;
 }
 
-pub fn mapCameraForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: []const LatLng, fit_options: ?CameraFitOptions) status.Error!completion.Future(CameraOptions) {
+pub fn mapCameraForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: []const LatLng, fit_options: ?CameraFitOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(CameraOptions) {
     const binding_arg_0 = map;
     const binding_arg_1 = coordinates;
     const binding_arg_3 = fit_options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6775,7 +6850,7 @@ pub fn mapCameraForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: 
         for (binding_arg_1, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_1.len, if (binding_arg_3) |array_item_0| try store(input_allocator, array_item_0.toNative()) else null };
-    const readiness = try completion.submit(CameraOptions, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(CameraOptions, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!CameraOptions {
             const raw_value = try completion.value(c.mln_camera_options)(result);
             return CameraOptions.fromNative(raw_value);
@@ -6785,8 +6860,10 @@ pub fn mapCameraForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: 
     return readiness;
 }
 
-pub fn mapCameraQuery(map: Map) status.Error!completion.Future(CameraQueryResult) {
+pub fn mapCameraQuery(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(CameraQueryResult) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_camera_query", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6794,7 +6871,7 @@ pub fn mapCameraQuery(map: Map) status.Error!completion.Future(CameraQueryResult
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(CameraQueryResult, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(CameraQueryResult, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!CameraQueryResult {
             const raw_value = try completion.value(c.mln_camera_query_result)(result);
             return CameraQueryResult.fromNative(raw_value);
@@ -6804,8 +6881,10 @@ pub fn mapCameraQuery(map: Map) status.Error!completion.Future(CameraQueryResult
     return readiness;
 }
 
-pub fn mapCameraSnapshotGet(map: Map) status.Error!struct { camera: CameraOptions, generation: u64 } {
+pub fn mapCameraSnapshotGet(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { camera: CameraOptions, generation: u64 } {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_camera_snapshot_get", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6815,13 +6894,15 @@ pub fn mapCameraSnapshotGet(map: Map) status.Error!struct { camera: CameraOption
     var binding_arg_1: c.mln_camera_options = std.mem.zeroes(c.mln_camera_options);
     binding_arg_1.size = @sizeOf(c.mln_camera_options);
     var binding_arg_2: u64 = std.mem.zeroes(u64);
-    try status.call(c.mln_map_camera_snapshot_get, .{ binding_arg_0_lease.native, &binding_arg_1, &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_camera_snapshot_get, .{ binding_arg_0_lease.native, &binding_arg_1, &binding_arg_2 }, diagnostic);
     roots.accept();
     return .{ .camera = CameraOptions.fromNative(binding_arg_1), .generation = binding_arg_2 };
 }
 
-pub fn mapCancelTransitions(map: Map) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapCancelTransitions(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_cancel_transitions", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6829,14 +6910,16 @@ pub fn mapCancelTransitions(map: Map) status.Error!completion.Future(completion.
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_cancel_transitions, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_cancel_transitions, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapCopyLayerSourceId(allocator: std.mem.Allocator, map: Map, layer_id: []const u8) status.Error!completion.Future(?OwnedValue([]const u8)) {
+pub fn mapCopyLayerSourceId(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_copy_layer_source_id", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6844,7 +6927,7 @@ pub fn mapCopyLayerSourceId(allocator: std.mem.Allocator, map: Map, layer_id: []
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_layer_source_id)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             if (raw_value.size == 0) return null;
@@ -6859,9 +6942,11 @@ pub fn mapCopyLayerSourceId(allocator: std.mem.Allocator, map: Map, layer_id: []
     return readiness;
 }
 
-pub fn mapCopyLayerSourceLayer(allocator: std.mem.Allocator, map: Map, layer_id: []const u8) status.Error!completion.Future(?OwnedValue([]const u8)) {
+pub fn mapCopyLayerSourceLayer(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_copy_layer_source_layer", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6869,7 +6954,7 @@ pub fn mapCopyLayerSourceLayer(allocator: std.mem.Allocator, map: Map, layer_id:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_layer_source_layer)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             if (raw_value.size == 0) return null;
@@ -6884,9 +6969,11 @@ pub fn mapCopyLayerSourceLayer(allocator: std.mem.Allocator, map: Map, layer_id:
     return readiness;
 }
 
-pub fn mapCopyStyleImagePremultipliedRgba8(allocator: std.mem.Allocator, map: Map, image_id: []const u8) status.Error!completion.Future(?OwnedValue([]const u8)) {
+pub fn mapCopyStyleImagePremultipliedRgba8(allocator: std.mem.Allocator, map: Map, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
     const binding_arg_0 = map;
     const binding_arg_1 = image_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_copy_style_image_premultiplied_rgba8", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6894,7 +6981,7 @@ pub fn mapCopyStyleImagePremultipliedRgba8(allocator: std.mem.Allocator, map: Ma
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_style_image_premultiplied_rgba8)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -6909,9 +6996,11 @@ pub fn mapCopyStyleImagePremultipliedRgba8(allocator: std.mem.Allocator, map: Ma
     return readiness;
 }
 
-pub fn mapCopyStyleImageStretches(allocator: std.mem.Allocator, map: Map, image_id: []const u8) status.Error!completion.Future(?OwnedValue(StyleImageStretchesResult)) {
+pub fn mapCopyStyleImageStretches(allocator: std.mem.Allocator, map: Map, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleImageStretchesResult)) {
     const binding_arg_0 = map;
     const binding_arg_1 = image_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_copy_style_image_stretches", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6919,7 +7008,7 @@ pub fn mapCopyStyleImageStretches(allocator: std.mem.Allocator, map: Map, image_
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_style_image_stretches)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleImageStretchesResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleImageStretchesResult), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(StyleImageStretchesResult) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_style_image_stretches_result)(result);
@@ -6934,9 +7023,11 @@ pub fn mapCopyStyleImageStretches(allocator: std.mem.Allocator, map: Map, image_
     return readiness;
 }
 
-pub fn mapCopyStyleSourceAttribution(allocator: std.mem.Allocator, map: Map, source_id: []const u8) status.Error!completion.Future(?OwnedValue([]const u8)) {
+pub fn mapCopyStyleSourceAttribution(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_copy_style_source_attribution", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6944,7 +7035,7 @@ pub fn mapCopyStyleSourceAttribution(allocator: std.mem.Allocator, map: Map, sou
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_style_source_attribution)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -6959,9 +7050,11 @@ pub fn mapCopyStyleSourceAttribution(allocator: std.mem.Allocator, map: Map, sou
     return readiness;
 }
 
-pub fn mapCopyStyleSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8) status.Error!completion.Future(?OwnedValue([]const u8)) {
+pub fn mapCopyStyleSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_copy_style_source_url", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -6969,7 +7062,7 @@ pub fn mapCopyStyleSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_copy_style_source_url)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -6984,9 +7077,11 @@ pub fn mapCopyStyleSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: 
     return readiness;
 }
 
-pub fn mapCreate(allocator: std.mem.Allocator, runtime: Runtime, options: MapOptions) status.Error!completion.Future(Map) {
+pub fn mapCreate(allocator: std.mem.Allocator, runtime: Runtime, options: MapOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(Map) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -6997,18 +7092,20 @@ pub fn mapCreate(allocator: std.mem.Allocator, runtime: Runtime, options: MapOpt
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const result_context = OwnerCopyContext{ .parent = if (@as(?owner.Anchor, binding_arg_0_lease.anchor())) |anchor| anchor.retain() else null, .diagnostic_store = binding_arg_0_lease.diagnostic_store };
-    const readiness = try completion.submitWithCopyContext(Map, OwnerCopyContext, binding_arg_0_lease.diagnostic_store, struct {
+    const result_context = OwnerCopyContext{ .parent = if (@as(?owner.Anchor, binding_arg_0_lease.anchor())) |anchor| anchor.retain() else null };
+    const readiness = try completion.submitWithCopyContext(Map, OwnerCopyContext, diagnostic, struct {
         fn copy(raw: *const c.mln_completion_result, context: *OwnerCopyContext) status.Error!Map {
-            return Map.adopt(try completion.value(c.mln_map)(raw), context.parent, context.diagnostic_store);
+            return Map.adopt(try completion.value(c.mln_map)(raw), context.parent);
         }
     }.copy, result_context, c.mln_map_create, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapDispose(map: Map) status.Error!void {
+pub fn mapDispose(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_dispose", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7017,14 +7114,16 @@ pub fn mapDispose(map: Map) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.call(c.mln_map_dispose, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_map_dispose, .{binding_arg_0_native}, diagnostic);
     }
     roots.accept();
     binding_arg_0_lease.commit();
 }
 
-pub fn mapDumpDebugLogs(map: Map) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapDumpDebugLogs(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_dump_debug_logs", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7032,14 +7131,16 @@ pub fn mapDumpDebugLogs(map: Map) status.Error!completion.Future(completion.Comm
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_dump_debug_logs, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_dump_debug_logs, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapGetFeatureState(allocator: std.mem.Allocator, map: Map, selector: FeatureStateSelector) status.Error!completion.Future(OwnedValue([]const u8)) {
+pub fn mapGetFeatureState(allocator: std.mem.Allocator, map: Map, selector: FeatureStateSelector, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const u8)) {
     const binding_arg_0 = map;
     const binding_arg_1 = selector;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -7050,7 +7151,7 @@ pub fn mapGetFeatureState(allocator: std.mem.Allocator, map: Map, selector: Feat
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -7064,8 +7165,10 @@ pub fn mapGetFeatureState(allocator: std.mem.Allocator, map: Map, selector: Feat
     return readiness;
 }
 
-pub fn mapGetGlobalState(allocator: std.mem.Allocator, map: Map) status.Error!completion.Future(OwnedValue([]const u8)) {
+pub fn mapGetGlobalState(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const u8)) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_get_global_state", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7073,7 +7176,7 @@ pub fn mapGetGlobalState(allocator: std.mem.Allocator, map: Map) status.Error!co
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -7087,9 +7190,11 @@ pub fn mapGetGlobalState(allocator: std.mem.Allocator, map: Map) status.Error!co
     return readiness;
 }
 
-pub fn mapGetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, source_id: []const u8) status.Error!completion.Future(?OwnedValue([]const LatLng)) {
+pub fn mapGetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const LatLng)) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_get_image_source_coordinates", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7097,7 +7202,7 @@ pub fn mapGetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, sour
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_image_source_coordinates)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const LatLng), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const LatLng), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const LatLng) {
             if (result.value == null) return null;
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -7115,9 +7220,11 @@ pub fn mapGetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, sour
     return readiness;
 }
 
-pub fn mapGetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []const u8) status.Error!completion.Future(?OwnedValue([]const u8)) {
+pub fn mapGetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_get_layer_filter", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7125,7 +7232,7 @@ pub fn mapGetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []con
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_layer_filter)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -7140,10 +7247,12 @@ pub fn mapGetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []con
     return readiness;
 }
 
-pub fn mapGetLayerProperty(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, property_name: []const u8) status.Error!completion.Future(?OwnedValue([]const u8)) {
+pub fn mapGetLayerProperty(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, property_name: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = property_name;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_get_layer_property", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7151,7 +7260,7 @@ pub fn mapGetLayerProperty(allocator: std.mem.Allocator, map: Map, layer_id: []c
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_layer_property)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_get_layer_property)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -7166,9 +7275,11 @@ pub fn mapGetLayerProperty(allocator: std.mem.Allocator, map: Map, layer_id: []c
     return readiness;
 }
 
-pub fn mapGetStyleImageInfo(allocator: std.mem.Allocator, map: Map, image_id: []const u8) status.Error!completion.Future(?OwnedValue(StyleImageResult)) {
+pub fn mapGetStyleImageInfo(allocator: std.mem.Allocator, map: Map, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleImageResult)) {
     const binding_arg_0 = map;
     const binding_arg_1 = image_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_get_style_image_info", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7176,7 +7287,7 @@ pub fn mapGetStyleImageInfo(allocator: std.mem.Allocator, map: Map, image_id: []
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_image_info)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleImageResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleImageResult), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(StyleImageResult) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_style_image_result)(result);
@@ -7191,9 +7302,11 @@ pub fn mapGetStyleImageInfo(allocator: std.mem.Allocator, map: Map, image_id: []
     return readiness;
 }
 
-pub fn mapGetStyleLayerInfo(allocator: std.mem.Allocator, map: Map, layer_id: []const u8) status.Error!completion.Future(?OwnedValue(StyleLayerResult)) {
+pub fn mapGetStyleLayerInfo(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleLayerResult)) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_get_style_layer_info", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7201,7 +7314,7 @@ pub fn mapGetStyleLayerInfo(allocator: std.mem.Allocator, map: Map, layer_id: []
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_layer_info)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleLayerResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleLayerResult), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(StyleLayerResult) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_style_layer_result)(result);
@@ -7216,9 +7329,11 @@ pub fn mapGetStyleLayerInfo(allocator: std.mem.Allocator, map: Map, layer_id: []
     return readiness;
 }
 
-pub fn mapGetStyleLayerJson(allocator: std.mem.Allocator, map: Map, layer_id: []const u8) status.Error!completion.Future(?OwnedValue([]const u8)) {
+pub fn mapGetStyleLayerJson(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_get_style_layer_json", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7226,7 +7341,7 @@ pub fn mapGetStyleLayerJson(allocator: std.mem.Allocator, map: Map, layer_id: []
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_layer_json)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -7241,9 +7356,11 @@ pub fn mapGetStyleLayerJson(allocator: std.mem.Allocator, map: Map, layer_id: []
     return readiness;
 }
 
-pub fn mapGetStyleLightProperty(allocator: std.mem.Allocator, map: Map, property_name: []const u8) status.Error!completion.Future(?OwnedValue([]const u8)) {
+pub fn mapGetStyleLightProperty(allocator: std.mem.Allocator, map: Map, property_name: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
     const binding_arg_0 = map;
     const binding_arg_1 = property_name;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_get_style_light_property", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7251,7 +7368,7 @@ pub fn mapGetStyleLightProperty(allocator: std.mem.Allocator, map: Map, property
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_light_property)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue([]const u8) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_buffer_view)(result);
@@ -7266,9 +7383,11 @@ pub fn mapGetStyleLightProperty(allocator: std.mem.Allocator, map: Map, property
     return readiness;
 }
 
-pub fn mapGetStyleSourceInfo(allocator: std.mem.Allocator, map: Map, source_id: []const u8) status.Error!completion.Future(?OwnedValue(StyleSourceResult)) {
+pub fn mapGetStyleSourceInfo(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleSourceResult)) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_get_style_source_info", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7276,7 +7395,7 @@ pub fn mapGetStyleSourceInfo(allocator: std.mem.Allocator, map: Map, source_id: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_source_info)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleSourceResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleSourceResult), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(StyleSourceResult) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_style_source_result)(result);
@@ -7291,9 +7410,11 @@ pub fn mapGetStyleSourceInfo(allocator: std.mem.Allocator, map: Map, source_id: 
     return readiness;
 }
 
-pub fn mapGetStyleSourceTileUrls(allocator: std.mem.Allocator, map: Map, source_id: []const u8) status.Error!completion.Future(?OwnedValue(StyleSourceTileUrlsResult)) {
+pub fn mapGetStyleSourceTileUrls(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleSourceTileUrlsResult)) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_get_style_source_tile_urls", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7301,7 +7422,7 @@ pub fn mapGetStyleSourceTileUrls(allocator: std.mem.Allocator, map: Map, source_
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_get_style_source_tile_urls)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleSourceTileUrlsResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(StyleSourceTileUrlsResult), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(StyleSourceTileUrlsResult) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_style_source_tile_urls_result)(result);
@@ -7316,8 +7437,10 @@ pub fn mapGetStyleSourceTileUrls(allocator: std.mem.Allocator, map: Map, source_
     return readiness;
 }
 
-pub fn mapGetStyleTransitionOptions(map: Map) status.Error!completion.Future(StyleTransitionOptions) {
+pub fn mapGetStyleTransitionOptions(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(StyleTransitionOptions) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_get_style_transition_options", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7325,7 +7448,7 @@ pub fn mapGetStyleTransitionOptions(map: Map) status.Error!completion.Future(Sty
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(StyleTransitionOptions, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(StyleTransitionOptions, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!StyleTransitionOptions {
             const raw_value = try completion.value(c.mln_style_transition_options)(result);
             return StyleTransitionOptions.fromNative(raw_value);
@@ -7335,10 +7458,12 @@ pub fn mapGetStyleTransitionOptions(map: Map) status.Error!completion.Future(Sty
     return readiness;
 }
 
-pub fn mapInvalidateCustomGeometrySourceRegion(map: Map, source_id: []const u8, bounds: LatLngBounds) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapInvalidateCustomGeometrySourceRegion(map: Map, source_id: []const u8, bounds: LatLngBounds, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = bounds;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_invalidate_custom_geometry_source_region", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7346,15 +7471,17 @@ pub fn mapInvalidateCustomGeometrySourceRegion(map: Map, source_id: []const u8, 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_geometry_source_region)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_geometry_source_region)).@"fn".params[2].type.?, binding_arg_2.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_invalidate_custom_geometry_source_region, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_invalidate_custom_geometry_source_region, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapInvalidateCustomGeometrySourceTile(map: Map, source_id: []const u8, tile_id: CanonicalTileId) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapInvalidateCustomGeometrySourceTile(map: Map, source_id: []const u8, tile_id: CanonicalTileId, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = tile_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_invalidate_custom_geometry_source_tile", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7362,15 +7489,17 @@ pub fn mapInvalidateCustomGeometrySourceTile(map: Map, source_id: []const u8, ti
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_geometry_source_tile)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_geometry_source_tile)).@"fn".params[2].type.?, binding_arg_2.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_invalidate_custom_geometry_source_tile, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_invalidate_custom_geometry_source_tile, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapInvalidateCustomMvtVectorSourceTile(map: Map, source_id: []const u8, tile_id: CanonicalTileId) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapInvalidateCustomMvtVectorSourceTile(map: Map, source_id: []const u8, tile_id: CanonicalTileId, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = tile_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_invalidate_custom_mvt_vector_source_tile", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7378,14 +7507,16 @@ pub fn mapInvalidateCustomMvtVectorSourceTile(map: Map, source_id: []const u8, t
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_mvt_vector_source_tile)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_invalidate_custom_mvt_vector_source_tile)).@"fn".params[2].type.?, binding_arg_2.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_invalidate_custom_mvt_vector_source_tile, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_invalidate_custom_mvt_vector_source_tile, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapLatLngBoundsForCamera(allocator: std.mem.Allocator, map: Map, camera: CameraOptions) status.Error!completion.Future(LatLngBounds) {
+pub fn mapLatLngBoundsForCamera(allocator: std.mem.Allocator, map: Map, camera: CameraOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(LatLngBounds) {
     const binding_arg_0 = map;
     const binding_arg_1 = camera;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -7396,7 +7527,7 @@ pub fn mapLatLngBoundsForCamera(allocator: std.mem.Allocator, map: Map, camera: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(LatLngBounds, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(LatLngBounds, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!LatLngBounds {
             const raw_value = try completion.value(c.mln_lat_lng_bounds)(result);
             return LatLngBounds.fromNative(raw_value);
@@ -7406,9 +7537,11 @@ pub fn mapLatLngBoundsForCamera(allocator: std.mem.Allocator, map: Map, camera: 
     return readiness;
 }
 
-pub fn mapLatLngBoundsForCameraUnwrapped(allocator: std.mem.Allocator, map: Map, camera: CameraOptions) status.Error!completion.Future(LatLngBounds) {
+pub fn mapLatLngBoundsForCameraUnwrapped(allocator: std.mem.Allocator, map: Map, camera: CameraOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(LatLngBounds) {
     const binding_arg_0 = map;
     const binding_arg_1 = camera;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -7419,7 +7552,7 @@ pub fn mapLatLngBoundsForCameraUnwrapped(allocator: std.mem.Allocator, map: Map,
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(LatLngBounds, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(LatLngBounds, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!LatLngBounds {
             const raw_value = try completion.value(c.mln_lat_lng_bounds)(result);
             return LatLngBounds.fromNative(raw_value);
@@ -7429,9 +7562,11 @@ pub fn mapLatLngBoundsForCameraUnwrapped(allocator: std.mem.Allocator, map: Map,
     return readiness;
 }
 
-pub fn mapLatLngForPixel(map: Map, point: ScreenPoint) status.Error!completion.Future(LatLng) {
+pub fn mapLatLngForPixel(map: Map, point: ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(LatLng) {
     const binding_arg_0 = map;
     const binding_arg_1 = point;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_lat_lng_for_pixel", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7439,7 +7574,7 @@ pub fn mapLatLngForPixel(map: Map, point: ScreenPoint) status.Error!completion.F
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_lat_lng_for_pixel)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(LatLng, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(LatLng, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!LatLng {
             const raw_value = try completion.value(c.mln_lat_lng)(result);
             return LatLng.fromNative(raw_value);
@@ -7449,9 +7584,11 @@ pub fn mapLatLngForPixel(map: Map, point: ScreenPoint) status.Error!completion.F
     return readiness;
 }
 
-pub fn mapLatLngForPixelUnwrapped(map: Map, point: ScreenPoint) status.Error!completion.Future(LatLng) {
+pub fn mapLatLngForPixelUnwrapped(map: Map, point: ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(LatLng) {
     const binding_arg_0 = map;
     const binding_arg_1 = point;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_lat_lng_for_pixel_unwrapped", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7459,7 +7596,7 @@ pub fn mapLatLngForPixelUnwrapped(map: Map, point: ScreenPoint) status.Error!com
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_lat_lng_for_pixel_unwrapped)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(LatLng, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(LatLng, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!LatLng {
             const raw_value = try completion.value(c.mln_lat_lng)(result);
             return LatLng.fromNative(raw_value);
@@ -7469,9 +7606,11 @@ pub fn mapLatLngForPixelUnwrapped(map: Map, point: ScreenPoint) status.Error!com
     return readiness;
 }
 
-pub fn mapLatLngsForPixels(allocator: std.mem.Allocator, map: Map, points: []const ScreenPoint) status.Error!completion.Future(OwnedValue([]const LatLng)) {
+pub fn mapLatLngsForPixels(allocator: std.mem.Allocator, map: Map, points: []const ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const LatLng)) {
     const binding_arg_0 = map;
     const binding_arg_1 = points;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -7486,7 +7625,7 @@ pub fn mapLatLngsForPixels(allocator: std.mem.Allocator, map: Map, points: []con
         for (binding_arg_1, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_1.len };
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const LatLng), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const LatLng), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const LatLng) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7503,9 +7642,11 @@ pub fn mapLatLngsForPixels(allocator: std.mem.Allocator, map: Map, points: []con
     return readiness;
 }
 
-pub fn mapLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, map: Map, points: []const ScreenPoint) status.Error!completion.Future(OwnedValue([]const LatLng)) {
+pub fn mapLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, map: Map, points: []const ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const LatLng)) {
     const binding_arg_0 = map;
     const binding_arg_1 = points;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -7520,7 +7661,7 @@ pub fn mapLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, map: Map, poin
         for (binding_arg_1, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_1.len };
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const LatLng), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const LatLng), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const LatLng) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7537,8 +7678,10 @@ pub fn mapLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, map: Map, poin
     return readiness;
 }
 
-pub fn mapListStyleLayerIds(allocator: std.mem.Allocator, map: Map) status.Error!completion.Future(OwnedValue([]const []const u8)) {
+pub fn mapListStyleLayerIds(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const []const u8)) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_list_style_layer_ids", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7546,7 +7689,7 @@ pub fn mapListStyleLayerIds(allocator: std.mem.Allocator, map: Map) status.Error
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const []const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const []const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const []const u8) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7563,8 +7706,10 @@ pub fn mapListStyleLayerIds(allocator: std.mem.Allocator, map: Map) status.Error
     return readiness;
 }
 
-pub fn mapListStyleLayers(allocator: std.mem.Allocator, map: Map) status.Error!completion.Future(OwnedValue([]const StyleLayerEntry)) {
+pub fn mapListStyleLayers(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const StyleLayerEntry)) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_list_style_layers", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7572,7 +7717,7 @@ pub fn mapListStyleLayers(allocator: std.mem.Allocator, map: Map) status.Error!c
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const StyleLayerEntry), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const StyleLayerEntry), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const StyleLayerEntry) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7589,8 +7734,10 @@ pub fn mapListStyleLayers(allocator: std.mem.Allocator, map: Map) status.Error!c
     return readiness;
 }
 
-pub fn mapListStyleSourceIds(allocator: std.mem.Allocator, map: Map) status.Error!completion.Future(OwnedValue([]const []const u8)) {
+pub fn mapListStyleSourceIds(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const []const u8)) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_list_style_source_ids", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7598,7 +7745,7 @@ pub fn mapListStyleSourceIds(allocator: std.mem.Allocator, map: Map) status.Erro
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const []const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const []const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const []const u8) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7615,8 +7762,10 @@ pub fn mapListStyleSourceIds(allocator: std.mem.Allocator, map: Map) status.Erro
     return readiness;
 }
 
-pub fn mapLoadedStyleJson(allocator: std.mem.Allocator, map: Map) status.Error!completion.Future(OwnedValue([]const u8)) {
+pub fn mapLoadedStyleJson(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const u8)) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_loaded_style_json", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7624,7 +7773,7 @@ pub fn mapLoadedStyleJson(allocator: std.mem.Allocator, map: Map) status.Error!c
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -7638,9 +7787,11 @@ pub fn mapLoadedStyleJson(allocator: std.mem.Allocator, map: Map) status.Error!c
     return readiness;
 }
 
-pub fn mapMetersPerPixelAtLatitude(map: Map, latitude: f64) status.Error!completion.Future(f64) {
+pub fn mapMetersPerPixelAtLatitude(map: Map, latitude: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(f64) {
     const binding_arg_0 = map;
     const binding_arg_1 = latitude;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_meters_per_pixel_at_latitude", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7648,7 +7799,7 @@ pub fn mapMetersPerPixelAtLatitude(map: Map, latitude: f64) status.Error!complet
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_meters_per_pixel_at_latitude)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try completion.submit(f64, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(f64, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!f64 {
             const raw_value = try completion.value(f64)(result);
             return raw_value;
@@ -7658,10 +7809,12 @@ pub fn mapMetersPerPixelAtLatitude(map: Map, latitude: f64) status.Error!complet
     return readiness;
 }
 
-pub fn mapMoveStyleLayer(map: Map, layer_id: []const u8, before_layer_id: ?[]const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapMoveStyleLayer(map: Map, layer_id: []const u8, before_layer_id: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = before_layer_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_move_style_layer", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7669,7 +7822,7 @@ pub fn mapMoveStyleLayer(map: Map, layer_id: []const u8, before_layer_id: ?[]con
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_move_style_layer)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_move_style_layer)).@"fn".params[2].type.?, if (binding_arg_2) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_move_style_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_move_style_layer, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -7684,9 +7837,11 @@ pub fn mapOptionsDefault() status.Error!MapOptions {
     return MapOptions.fromNative(raw_result);
 }
 
-pub fn mapPixelForLatLng(map: Map, coordinate: LatLng) status.Error!completion.Future(ScreenPoint) {
+pub fn mapPixelForLatLng(map: Map, coordinate: LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(ScreenPoint) {
     const binding_arg_0 = map;
     const binding_arg_1 = coordinate;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_pixel_for_lat_lng", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7694,7 +7849,7 @@ pub fn mapPixelForLatLng(map: Map, coordinate: LatLng) status.Error!completion.F
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_pixel_for_lat_lng)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(ScreenPoint, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(ScreenPoint, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!ScreenPoint {
             const raw_value = try completion.value(c.mln_screen_point)(result);
             return ScreenPoint.fromNative(raw_value);
@@ -7704,9 +7859,11 @@ pub fn mapPixelForLatLng(map: Map, coordinate: LatLng) status.Error!completion.F
     return readiness;
 }
 
-pub fn mapPixelsForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: []const LatLng) status.Error!completion.Future(OwnedValue([]const ScreenPoint)) {
+pub fn mapPixelsForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: []const LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const ScreenPoint)) {
     const binding_arg_0 = map;
     const binding_arg_1 = coordinates;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -7721,7 +7878,7 @@ pub fn mapPixelsForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: 
         for (binding_arg_1, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_1.len };
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const ScreenPoint), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const ScreenPoint), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const ScreenPoint) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -7738,8 +7895,10 @@ pub fn mapPixelsForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: 
     return readiness;
 }
 
-pub fn mapProjectionClose(projection: MapProjection) status.Error!void {
+pub fn mapProjectionClose(projection: MapProjection, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = projection;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_projection_close", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7748,14 +7907,16 @@ pub fn mapProjectionClose(projection: MapProjection) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.call(c.mln_map_projection_close, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_map_projection_close, .{binding_arg_0_native}, diagnostic);
     }
     roots.accept();
     binding_arg_0_lease.commit();
 }
 
-pub fn mapProjectionCreate(map: Map) status.Error!completion.Future(MapProjection) {
+pub fn mapProjectionCreate(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(MapProjection) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_projection_create", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7763,18 +7924,20 @@ pub fn mapProjectionCreate(map: Map) status.Error!completion.Future(MapProjectio
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const result_context = OwnerCopyContext{ .parent = if (@as(?owner.Anchor, null)) |anchor| anchor.retain() else null, .diagnostic_store = binding_arg_0_lease.diagnostic_store };
-    const readiness = try completion.submitWithCopyContext(MapProjection, OwnerCopyContext, binding_arg_0_lease.diagnostic_store, struct {
+    const result_context = OwnerCopyContext{ .parent = if (@as(?owner.Anchor, null)) |anchor| anchor.retain() else null };
+    const readiness = try completion.submitWithCopyContext(MapProjection, OwnerCopyContext, diagnostic, struct {
         fn copy(raw: *const c.mln_completion_result, context: *OwnerCopyContext) status.Error!MapProjection {
-            return MapProjection.adopt(try completion.value(c.mln_map_projection)(raw), context.parent, context.diagnostic_store);
+            return MapProjection.adopt(try completion.value(c.mln_map_projection)(raw), context.parent);
         }
     }.copy, result_context, c.mln_map_projection_create, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapProjectionGetCamera(projection: MapProjection) status.Error!CameraOptions {
+pub fn mapProjectionGetCamera(projection: MapProjection, diagnostic: ?*diagnostics.Diagnostic) status.Error!CameraOptions {
     const binding_arg_0 = projection;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_projection_get_camera", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7783,14 +7946,16 @@ pub fn mapProjectionGetCamera(projection: MapProjection) status.Error!CameraOpti
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_camera_options = std.mem.zeroes(c.mln_camera_options);
     binding_arg_1.size = @sizeOf(c.mln_camera_options);
-    try status.call(c.mln_map_projection_get_camera, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_get_camera, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
     return CameraOptions.fromNative(binding_arg_1);
 }
 
-pub fn mapProjectionLatLngForPixel(projection: MapProjection, point: ScreenPoint) status.Error!LatLng {
+pub fn mapProjectionLatLngForPixel(projection: MapProjection, point: ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!LatLng {
     const binding_arg_0 = projection;
     const binding_arg_1 = point;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_projection_lat_lng_for_pixel", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7798,14 +7963,16 @@ pub fn mapProjectionLatLngForPixel(projection: MapProjection, point: ScreenPoint
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_2: c.mln_lat_lng = std.mem.zeroes(c.mln_lat_lng);
-    try status.call(c.mln_map_projection_lat_lng_for_pixel, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_lat_lng_for_pixel)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_lat_lng_for_pixel, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_lat_lng_for_pixel)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2 }, diagnostic);
     roots.accept();
     return LatLng.fromNative(binding_arg_2);
 }
 
-pub fn mapProjectionLatLngForPixelUnwrapped(projection: MapProjection, point: ScreenPoint) status.Error!LatLng {
+pub fn mapProjectionLatLngForPixelUnwrapped(projection: MapProjection, point: ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!LatLng {
     const binding_arg_0 = projection;
     const binding_arg_1 = point;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_projection_lat_lng_for_pixel_unwrapped", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7813,14 +7980,16 @@ pub fn mapProjectionLatLngForPixelUnwrapped(projection: MapProjection, point: Sc
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_2: c.mln_lat_lng = std.mem.zeroes(c.mln_lat_lng);
-    try status.call(c.mln_map_projection_lat_lng_for_pixel_unwrapped, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_lat_lng_for_pixel_unwrapped)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_lat_lng_for_pixel_unwrapped, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_lat_lng_for_pixel_unwrapped)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2 }, diagnostic);
     roots.accept();
     return LatLng.fromNative(binding_arg_2);
 }
 
-pub fn mapProjectionMetersPerPixelAtLatitude(projection: MapProjection, latitude: f64) status.Error!f64 {
+pub fn mapProjectionMetersPerPixelAtLatitude(projection: MapProjection, latitude: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!f64 {
     const binding_arg_0 = projection;
     const binding_arg_1 = latitude;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_projection_meters_per_pixel_at_latitude", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7828,14 +7997,16 @@ pub fn mapProjectionMetersPerPixelAtLatitude(projection: MapProjection, latitude
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_2: f64 = std.mem.zeroes(f64);
-    try status.call(c.mln_map_projection_meters_per_pixel_at_latitude, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_meters_per_pixel_at_latitude)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_meters_per_pixel_at_latitude, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_meters_per_pixel_at_latitude)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2 }, diagnostic);
     roots.accept();
     return binding_arg_2;
 }
 
-pub fn mapProjectionPixelForLatLng(projection: MapProjection, coordinate: LatLng) status.Error!ScreenPoint {
+pub fn mapProjectionPixelForLatLng(projection: MapProjection, coordinate: LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!ScreenPoint {
     const binding_arg_0 = projection;
     const binding_arg_1 = coordinate;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_projection_pixel_for_lat_lng", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7843,14 +8014,16 @@ pub fn mapProjectionPixelForLatLng(projection: MapProjection, coordinate: LatLng
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_2: c.mln_screen_point = std.mem.zeroes(c.mln_screen_point);
-    try status.call(c.mln_map_projection_pixel_for_lat_lng, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_pixel_for_lat_lng)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_pixel_for_lat_lng, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_pixel_for_lat_lng)).@"fn".params[1].type.?, binding_arg_1.toNative()), &binding_arg_2 }, diagnostic);
     roots.accept();
     return ScreenPoint.fromNative(binding_arg_2);
 }
 
-pub fn mapProjectionSetCamera(allocator: std.mem.Allocator, projection: MapProjection, camera: CameraOptions) status.Error!void {
+pub fn mapProjectionSetCamera(allocator: std.mem.Allocator, projection: MapProjection, camera: CameraOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = projection;
     const binding_arg_1 = camera;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -7860,14 +8033,16 @@ pub fn mapProjectionSetCamera(allocator: std.mem.Allocator, projection: MapProje
     defer roots.deinit();
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
-    try status.call(c.mln_map_projection_set_camera, .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_set_camera, .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) }, diagnostic);
     roots.accept();
 }
 
-pub fn mapProjectionSetVisibleCoordinates(allocator: std.mem.Allocator, projection: MapProjection, coordinates: []const LatLng, padding: EdgeInsets) status.Error!void {
+pub fn mapProjectionSetVisibleCoordinates(allocator: std.mem.Allocator, projection: MapProjection, coordinates: []const LatLng, padding: EdgeInsets, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = projection;
     const binding_arg_1 = coordinates;
     const binding_arg_3 = padding;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -7881,26 +8056,30 @@ pub fn mapProjectionSetVisibleCoordinates(allocator: std.mem.Allocator, projecti
         const items = try input_allocator.alloc(c.mln_lat_lng, binding_arg_1.len);
         for (binding_arg_1, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
-    }), binding_arg_1.len, @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_coordinates)).@"fn".params[3].type.?, binding_arg_3.toNative()) }, binding_arg_0_lease.diagnostic_store);
+    }), binding_arg_1.len, @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_coordinates)).@"fn".params[3].type.?, binding_arg_3.toNative()) }, diagnostic);
     roots.accept();
 }
 
-pub fn mapProjectionSetVisibleGeometry(projection: MapProjection, geometry: []const u8, padding: EdgeInsets) status.Error!void {
+pub fn mapProjectionSetVisibleGeometry(projection: MapProjection, geometry: []const u8, padding: EdgeInsets, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = projection;
     const binding_arg_1 = geometry;
     const binding_arg_2 = padding;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_projection_set_visible_geometry", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
-    try status.call(c.mln_map_projection_set_visible_geometry, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_geometry)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_geometry)).@"fn".params[2].type.?, binding_arg_2.toNative()) }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_projection_set_visible_geometry, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_geometry)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_projection_set_visible_geometry)).@"fn".params[2].type.?, binding_arg_2.toNative()) }, diagnostic);
     roots.accept();
 }
 
-pub fn mapRelease(map: Map) status.Error!completion.Future(void) {
+pub fn mapRelease(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_release", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7909,15 +8088,17 @@ pub fn mapRelease(map: Map) status.Error!completion.Future(void) {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     const native_arguments = .{binding_arg_0_native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_map_release, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_map_release, native_arguments);
     roots.accept();
     binding_arg_0_lease.commit();
     return readiness;
 }
 
-pub fn mapRemoveFeatureState(allocator: std.mem.Allocator, map: Map, selector: FeatureStateSelector) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapRemoveFeatureState(allocator: std.mem.Allocator, map: Map, selector: FeatureStateSelector, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = selector;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -7928,14 +8109,16 @@ pub fn mapRemoveFeatureState(allocator: std.mem.Allocator, map: Map, selector: F
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_feature_state, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_remove_feature_state, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapRemoveStyleImage(map: Map, image_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapRemoveStyleImage(map: Map, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = image_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_remove_style_image", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7943,14 +8126,16 @@ pub fn mapRemoveStyleImage(map: Map, image_id: []const u8) status.Error!completi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_remove_style_image)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_style_image, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_remove_style_image, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapRemoveStyleLayer(map: Map, layer_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapRemoveStyleLayer(map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_remove_style_layer", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7958,14 +8143,16 @@ pub fn mapRemoveStyleLayer(map: Map, layer_id: []const u8) status.Error!completi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_remove_style_layer)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_style_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_remove_style_layer, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapRemoveStyleSource(map: Map, source_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapRemoveStyleSource(map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_remove_style_source", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7973,13 +8160,15 @@ pub fn mapRemoveStyleSource(map: Map, source_id: []const u8) status.Error!comple
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_remove_style_source)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_remove_style_source, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_remove_style_source, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapRequestRepaint(map: Map) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapRequestRepaint(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_request_repaint", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -7987,13 +8176,15 @@ pub fn mapRequestRepaint(map: Map) status.Error!completion.Future(completion.Com
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_request_repaint, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_request_repaint, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapRequestStillImage(map: Map) status.Error!completion.Future(void) {
+pub fn mapRequestStillImage(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_request_still_image", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8001,14 +8192,16 @@ pub fn mapRequestStillImage(map: Map) status.Error!completion.Future(void) {
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_map_request_still_image, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_map_request_still_image, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapResize(map: Map, extent: LogicalExtent) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapResize(map: Map, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = extent;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_resize", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8016,14 +8209,16 @@ pub fn mapResize(map: Map, extent: LogicalExtent) status.Error!completion.Future
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_resize)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_resize, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_resize, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetBounds(allocator: std.mem.Allocator, map: Map, options: BoundOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetBounds(allocator: std.mem.Allocator, map: Map, options: BoundOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8034,16 +8229,18 @@ pub fn mapSetBounds(allocator: std.mem.Allocator, map: Map, options: BoundOption
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_bounds, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_bounds, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetCustomGeometrySourceTileData(map: Map, source_id: []const u8, tile_id: CanonicalTileId, data: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetCustomGeometrySourceTileData(map: Map, source_id: []const u8, tile_id: CanonicalTileId, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = tile_id;
     const binding_arg_3 = data;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_custom_geometry_source_tile_data", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8051,16 +8248,18 @@ pub fn mapSetCustomGeometrySourceTileData(map: Map, source_id: []const u8, tile_
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_custom_geometry_source_tile_data)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_geometry_source_tile_data)).@"fn".params[2].type.?, binding_arg_2.toNative()), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_geometry_source_tile_data)).@"fn".params[3].type.?, view(binding_arg_3)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_custom_geometry_source_tile_data, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_custom_geometry_source_tile_data, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetCustomMvtVectorSourceTileData(map: Map, source_id: []const u8, tile_id: CanonicalTileId, data: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetCustomMvtVectorSourceTileData(map: Map, source_id: []const u8, tile_id: CanonicalTileId, data: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = tile_id;
     const binding_arg_3 = data;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_custom_mvt_vector_source_tile_data", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8068,16 +8267,18 @@ pub fn mapSetCustomMvtVectorSourceTileData(map: Map, source_id: []const u8, tile
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_data)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_data)).@"fn".params[2].type.?, binding_arg_2.toNative()), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_data)).@"fn".params[3].type.?, view(binding_arg_3)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_custom_mvt_vector_source_tile_data, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_custom_mvt_vector_source_tile_data, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetCustomMvtVectorSourceTileError(map: Map, source_id: []const u8, tile_id: CanonicalTileId, message: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetCustomMvtVectorSourceTileError(map: Map, source_id: []const u8, tile_id: CanonicalTileId, message: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = tile_id;
     const binding_arg_3 = message;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_custom_mvt_vector_source_tile_error", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8085,14 +8286,16 @@ pub fn mapSetCustomMvtVectorSourceTileError(map: Map, source_id: []const u8, til
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_error)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_error)).@"fn".params[2].type.?, binding_arg_2.toNative()), @as(@typeInfo(@TypeOf(c.mln_map_set_custom_mvt_vector_source_tile_error)).@"fn".params[3].type.?, view(binding_arg_3)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_custom_mvt_vector_source_tile_error, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_custom_mvt_vector_source_tile_error, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetDebugOptions(map: Map, options: MapDebugOption) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetDebugOptions(map: Map, options: MapDebugOption, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_debug_options", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8100,14 +8303,16 @@ pub fn mapSetDebugOptions(map: Map, options: MapDebugOption) status.Error!comple
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_debug_options)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_debug_options, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_debug_options, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetEventMask(map: Map, mask: RuntimeEventMask) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetEventMask(map: Map, mask: RuntimeEventMask, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = mask;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_event_mask", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8115,15 +8320,17 @@ pub fn mapSetEventMask(map: Map, mask: RuntimeEventMask) status.Error!completion
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_event_mask)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_event_mask, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_event_mask, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetFeatureState(allocator: std.mem.Allocator, map: Map, selector: FeatureStateSelector, state: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetFeatureState(allocator: std.mem.Allocator, map: Map, selector: FeatureStateSelector, state: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = selector;
     const binding_arg_2 = state;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8134,14 +8341,16 @@ pub fn mapSetFeatureState(allocator: std.mem.Allocator, map: Map, selector: Feat
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), @as(@typeInfo(@TypeOf(c.mln_map_set_feature_state)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_feature_state, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_feature_state, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetFreeCameraOptions(allocator: std.mem.Allocator, map: Map, options: FreeCameraOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetFreeCameraOptions(allocator: std.mem.Allocator, map: Map, options: FreeCameraOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8152,15 +8361,17 @@ pub fn mapSetFreeCameraOptions(allocator: std.mem.Allocator, map: Map, options: 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_free_camera_options, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_free_camera_options, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetGeojsonSourceData(map: Map, source_id: []const u8, data: GeojsonSourceData) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetGeojsonSourceData(map: Map, source_id: []const u8, data: GeojsonSourceData, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = data;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_geojson_source_data", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8170,15 +8381,17 @@ pub fn mapSetGeojsonSourceData(map: Map, source_id: []const u8, data: GeojsonSou
     const binding_arg_2_lease = try binding_arg_2.lease();
     defer binding_arg_2_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_geojson_source_data)).@"fn".params[1].type.?, view(binding_arg_1)), binding_arg_2_lease.native };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_geojson_source_data, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_geojson_source_data, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetGeojsonSourceSynchronousTiling(map: Map, source_id: []const u8, enabled: bool) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetGeojsonSourceSynchronousTiling(map: Map, source_id: []const u8, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = enabled;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_geojson_source_synchronous_tiling", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8186,15 +8399,17 @@ pub fn mapSetGeojsonSourceSynchronousTiling(map: Map, source_id: []const u8, ena
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_geojson_source_synchronous_tiling)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_geojson_source_synchronous_tiling)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_geojson_source_synchronous_tiling, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_geojson_source_synchronous_tiling, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetGeojsonSourceUrl(map: Map, source_id: []const u8, url: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetGeojsonSourceUrl(map: Map, source_id: []const u8, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = url;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_geojson_source_url", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8202,15 +8417,17 @@ pub fn mapSetGeojsonSourceUrl(map: Map, source_id: []const u8, url: []const u8) 
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_geojson_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_geojson_source_url)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_geojson_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_geojson_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetGlobalStateProperty(map: Map, property_name: []const u8, value: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetGlobalStateProperty(map: Map, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = property_name;
     const binding_arg_2 = value;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_global_state_property", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8218,15 +8435,17 @@ pub fn mapSetGlobalStateProperty(map: Map, property_name: []const u8, value: []c
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_global_state_property)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_global_state_property)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_global_state_property, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_global_state_property, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, source_id: []const u8, coordinates: []const LatLng) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, source_id: []const u8, coordinates: []const LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = coordinates;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8241,15 +8460,17 @@ pub fn mapSetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, sour
         for (binding_arg_2, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
         break :blk items.ptr;
     }), binding_arg_2.len };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_image_source_coordinates, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_image_source_coordinates, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetImageSourceImage(allocator: std.mem.Allocator, map: Map, source_id: []const u8, image: PremultipliedRgba8Image) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetImageSourceImage(allocator: std.mem.Allocator, map: Map, source_id: []const u8, image: PremultipliedRgba8Image, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = image;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8260,15 +8481,17 @@ pub fn mapSetImageSourceImage(allocator: std.mem.Allocator, map: Map, source_id:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_image_source_image)).@"fn".params[1].type.?, view(binding_arg_1)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_image_source_image, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_image_source_image, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetImageSourceUrl(map: Map, source_id: []const u8, url: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetImageSourceUrl(map: Map, source_id: []const u8, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = url;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_image_source_url", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8276,15 +8499,17 @@ pub fn mapSetImageSourceUrl(map: Map, source_id: []const u8, url: []const u8) st
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_image_source_url)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_image_source_url)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_image_source_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_image_source_url, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, filter: ?[]const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, filter: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = filter;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8295,15 +8520,17 @@ pub fn mapSetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []con
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_filter)).@"fn".params[1].type.?, view(binding_arg_1)), if (binding_arg_2) |array_item_0| try store(input_allocator, view(array_item_0)) else null };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_filter, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_layer_filter, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetLayerMaxZoom(map: Map, layer_id: []const u8, max_zoom: f64) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetLayerMaxZoom(map: Map, layer_id: []const u8, max_zoom: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = max_zoom;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_layer_max_zoom", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8311,15 +8538,17 @@ pub fn mapSetLayerMaxZoom(map: Map, layer_id: []const u8, max_zoom: f64) status.
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_max_zoom)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_max_zoom)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_max_zoom, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_layer_max_zoom, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetLayerMinZoom(map: Map, layer_id: []const u8, min_zoom: f64) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetLayerMinZoom(map: Map, layer_id: []const u8, min_zoom: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = min_zoom;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_layer_min_zoom", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8327,16 +8556,18 @@ pub fn mapSetLayerMinZoom(map: Map, layer_id: []const u8, min_zoom: f64) status.
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_min_zoom)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_min_zoom)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_min_zoom, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_layer_min_zoom, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetLayerProperty(map: Map, layer_id: []const u8, property_name: []const u8, value: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetLayerProperty(map: Map, layer_id: []const u8, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = property_name;
     const binding_arg_3 = value;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_layer_property", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8344,15 +8575,17 @@ pub fn mapSetLayerProperty(map: Map, layer_id: []const u8, property_name: []cons
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_property)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_property)).@"fn".params[2].type.?, view(binding_arg_2)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_property)).@"fn".params[3].type.?, view(binding_arg_3)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_property, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_layer_property, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetLayerSourceId(map: Map, layer_id: []const u8, source_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetLayerSourceId(map: Map, layer_id: []const u8, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = source_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_layer_source_id", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8360,15 +8593,17 @@ pub fn mapSetLayerSourceId(map: Map, layer_id: []const u8, source_id: []const u8
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_source_id)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_source_id)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_source_id, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_layer_source_id, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetLayerSourceLayer(map: Map, layer_id: []const u8, source_layer: ?[]const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetLayerSourceLayer(map: Map, layer_id: []const u8, source_layer: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = source_layer;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_layer_source_layer", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8376,15 +8611,17 @@ pub fn mapSetLayerSourceLayer(map: Map, layer_id: []const u8, source_layer: ?[]c
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_source_layer)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_source_layer)).@"fn".params[2].type.?, if (binding_arg_2) |array_item_0| view(array_item_0) else std.mem.zeroes(c.mln_buffer_view)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_source_layer, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_layer_source_layer, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetLayerVisibility(map: Map, layer_id: []const u8, visibility: StyleLayerVisibility) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetLayerVisibility(map: Map, layer_id: []const u8, visibility: StyleLayerVisibility, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = visibility;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_layer_visibility", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8392,15 +8629,17 @@ pub fn mapSetLayerVisibility(map: Map, layer_id: []const u8, visibility: StyleLa
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_layer_visibility)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_layer_visibility)).@"fn".params[2].type.?, binding_arg_2.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_layer_visibility, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_layer_visibility, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetLocationIndicatorAccuracyRadius(map: Map, layer_id: []const u8, radius: f64) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetLocationIndicatorAccuracyRadius(map: Map, layer_id: []const u8, radius: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = radius;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_location_indicator_accuracy_radius", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8408,15 +8647,17 @@ pub fn mapSetLocationIndicatorAccuracyRadius(map: Map, layer_id: []const u8, rad
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_accuracy_radius)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_accuracy_radius)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_accuracy_radius, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_location_indicator_accuracy_radius, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetLocationIndicatorBearing(map: Map, layer_id: []const u8, bearing: f64) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetLocationIndicatorBearing(map: Map, layer_id: []const u8, bearing: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = bearing;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_location_indicator_bearing", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8424,16 +8665,18 @@ pub fn mapSetLocationIndicatorBearing(map: Map, layer_id: []const u8, bearing: f
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_bearing)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_bearing)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_bearing, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_location_indicator_bearing, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetLocationIndicatorImageName(map: Map, layer_id: []const u8, image_kind: LocationIndicatorImageKind, image_id: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetLocationIndicatorImageName(map: Map, layer_id: []const u8, image_kind: LocationIndicatorImageKind, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = image_kind;
     const binding_arg_3 = image_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_location_indicator_image_name", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8441,16 +8684,18 @@ pub fn mapSetLocationIndicatorImageName(map: Map, layer_id: []const u8, image_ki
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_image_name)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_image_name)).@"fn".params[2].type.?, binding_arg_2.toNative()), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_image_name)).@"fn".params[3].type.?, view(binding_arg_3)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_image_name, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_location_indicator_image_name, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetLocationIndicatorLocation(map: Map, layer_id: []const u8, coordinate: LatLng, altitude: f64) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetLocationIndicatorLocation(map: Map, layer_id: []const u8, coordinate: LatLng, altitude: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = layer_id;
     const binding_arg_2 = coordinate;
     const binding_arg_3 = altitude;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_location_indicator_location", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8458,14 +8703,16 @@ pub fn mapSetLocationIndicatorLocation(map: Map, layer_id: []const u8, coordinat
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_location)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_location)).@"fn".params[2].type.?, binding_arg_2.toNative()), @as(@typeInfo(@TypeOf(c.mln_map_set_location_indicator_location)).@"fn".params[3].type.?, binding_arg_3) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_location_indicator_location, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_location_indicator_location, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetProjectionMode(allocator: std.mem.Allocator, map: Map, mode: ProjectionMode) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetProjectionMode(allocator: std.mem.Allocator, map: Map, mode: ProjectionMode, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = mode;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8476,14 +8723,16 @@ pub fn mapSetProjectionMode(allocator: std.mem.Allocator, map: Map, mode: Projec
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_projection_mode, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_projection_mode, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetRenderingStatsViewEnabled(map: Map, enabled: bool) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetRenderingStatsViewEnabled(map: Map, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = enabled;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_rendering_stats_view_enabled", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8491,16 +8740,18 @@ pub fn mapSetRenderingStatsViewEnabled(map: Map, enabled: bool) status.Error!com
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_rendering_stats_view_enabled)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_rendering_stats_view_enabled, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_rendering_stats_view_enabled, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetStyleImage(allocator: std.mem.Allocator, map: Map, image_id: []const u8, image: PremultipliedRgba8Image, options: ?StyleImageOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetStyleImage(allocator: std.mem.Allocator, map: Map, image_id: []const u8, image: PremultipliedRgba8Image, options: ?StyleImageOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = image_id;
     const binding_arg_2 = image;
     const binding_arg_3 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8511,14 +8762,16 @@ pub fn mapSetStyleImage(allocator: std.mem.Allocator, map: Map, image_id: []cons
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_image)).@"fn".params[1].type.?, view(binding_arg_1)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), if (binding_arg_3) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_image, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_style_image, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetStyleJson(map: Map, json: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetStyleJson(map: Map, json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = json;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_style_json", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8526,14 +8779,16 @@ pub fn mapSetStyleJson(map: Map, json: []const u8) status.Error!completion.Futur
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_json)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_json, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_style_json, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetStyleLightJson(map: Map, light_json: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetStyleLightJson(map: Map, light_json: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = light_json;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_style_light_json", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8541,15 +8796,17 @@ pub fn mapSetStyleLightJson(map: Map, light_json: []const u8) status.Error!compl
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_light_json)).@"fn".params[1].type.?, view(binding_arg_1)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_light_json, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_style_light_json, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetStyleLightProperty(map: Map, property_name: []const u8, value: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetStyleLightProperty(map: Map, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = property_name;
     const binding_arg_2 = value;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_style_light_property", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8557,15 +8814,17 @@ pub fn mapSetStyleLightProperty(map: Map, property_name: []const u8, value: []co
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_light_property)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_style_light_property)).@"fn".params[2].type.?, view(binding_arg_2)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_light_property, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_style_light_property, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetStyleSourceVolatile(map: Map, source_id: []const u8, is_volatile: bool) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetStyleSourceVolatile(map: Map, source_id: []const u8, is_volatile: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = source_id;
     const binding_arg_2 = is_volatile;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_set_style_source_volatile", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8573,14 +8832,16 @@ pub fn mapSetStyleSourceVolatile(map: Map, source_id: []const u8, is_volatile: b
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_source_volatile)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_map_set_style_source_volatile)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_source_volatile, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_style_source_volatile, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetStyleTransitionOptions(allocator: std.mem.Allocator, map: Map, options: StyleTransitionOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetStyleTransitionOptions(allocator: std.mem.Allocator, map: Map, options: StyleTransitionOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8591,14 +8852,16 @@ pub fn mapSetStyleTransitionOptions(allocator: std.mem.Allocator, map: Map, opti
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_transition_options, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_style_transition_options, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetStyleUrl(allocator: std.mem.Allocator, map: Map, url: []const u8) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetStyleUrl(allocator: std.mem.Allocator, map: Map, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = url;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8609,14 +8872,16 @@ pub fn mapSetStyleUrl(allocator: std.mem.Allocator, map: Map, url: []const u8) s
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_map_set_style_url)).@"fn".params[1].type.?, try cString(input_allocator, binding_arg_1)) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_style_url, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_style_url, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetTileOptions(allocator: std.mem.Allocator, map: Map, options: MapTileOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetTileOptions(allocator: std.mem.Allocator, map: Map, options: MapTileOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8627,14 +8892,16 @@ pub fn mapSetTileOptions(allocator: std.mem.Allocator, map: Map, options: MapTil
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_tile_options, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_tile_options, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSetViewportOptions(allocator: std.mem.Allocator, map: Map, options: MapViewportOptions) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapSetViewportOptions(allocator: std.mem.Allocator, map: Map, options: MapViewportOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8645,13 +8912,15 @@ pub fn mapSetViewportOptions(allocator: std.mem.Allocator, map: Map, options: Ma
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_set_viewport_options, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_set_viewport_options, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn mapSnapshotGet(map: Map) status.Error!MapSnapshot {
+pub fn mapSnapshotGet(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapSnapshot {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_snapshot_get", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8660,13 +8929,15 @@ pub fn mapSnapshotGet(map: Map) status.Error!MapSnapshot {
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_map_snapshot = std.mem.zeroes(c.mln_map_snapshot);
     binding_arg_1.size = @sizeOf(c.mln_map_snapshot);
-    try status.call(c.mln_map_snapshot_get, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_map_snapshot_get, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
     return MapSnapshot.fromNative(binding_arg_1);
 }
 
-pub fn mapStyleUrl(allocator: std.mem.Allocator, map: Map) status.Error!completion.Future(OwnedValue([]const u8)) {
+pub fn mapStyleUrl(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const u8)) {
     const binding_arg_0 = map;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_map_style_url", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -8674,7 +8945,7 @@ pub fn mapStyleUrl(allocator: std.mem.Allocator, map: Map) status.Error!completi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -8698,9 +8969,11 @@ pub fn mapTileOptionsDefault() status.Error!MapTileOptions {
     return MapTileOptions.fromNative(raw_result);
 }
 
-pub fn mapUpdateCamera(allocator: std.mem.Allocator, map: Map, update: CameraUpdate) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn mapUpdateCamera(allocator: std.mem.Allocator, map: Map, update: CameraUpdate, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = map;
     const binding_arg_1 = update;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8711,7 +8984,7 @@ pub fn mapUpdateCamera(allocator: std.mem.Allocator, map: Map, update: CameraUpd
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_map_update_camera, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_map_update_camera, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -8726,10 +8999,12 @@ pub fn mapViewportOptionsDefault() status.Error!MapViewportOptions {
     return MapViewportOptions.fromNative(raw_result);
 }
 
-pub fn metalBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: MetalBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn metalBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: MetalBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8741,10 +9016,10 @@ pub fn metalBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descri
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_borrowed_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_metal_borrowed_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn metalBorrowedTextureDescriptorDefault() status.Error!MetalBorrowedTextureDescriptor {
@@ -8757,9 +9032,11 @@ pub fn metalBorrowedTextureDescriptorDefault() status.Error!MetalBorrowedTexture
     return MetalBorrowedTextureDescriptor.fromNative(raw_result);
 }
 
-pub fn metalBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: MetalBorrowedTextureDescriptor) status.Error!completion.Future(void) {
+pub fn metalBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: MetalBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
     const binding_arg_1 = descriptor;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8770,15 +9047,17 @@ pub fn metalBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: Rend
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_borrowed_texture_set_target, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_metal_borrowed_texture_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn metalOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: MetalOwnedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn metalOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: MetalOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8790,10 +9069,10 @@ pub fn metalOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descripto
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_owned_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_metal_owned_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn metalOwnedTextureDescriptorDefault() status.Error!MetalOwnedTextureDescriptor {
@@ -8806,10 +9085,12 @@ pub fn metalOwnedTextureDescriptorDefault() status.Error!MetalOwnedTextureDescri
     return MetalOwnedTextureDescriptor.fromNative(raw_result);
 }
 
-pub fn metalSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn metalSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8821,10 +9102,10 @@ pub fn metalSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: Me
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_surface_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_metal_surface_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn metalSurfaceDescriptorDefault() status.Error!MetalSurfaceDescriptor {
@@ -8837,9 +9118,11 @@ pub fn metalSurfaceDescriptorDefault() status.Error!MetalSurfaceDescriptor {
     return MetalSurfaceDescriptor.fromNative(raw_result);
 }
 
-pub fn metalSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: MetalSurfaceDescriptor) status.Error!completion.Future(void) {
+pub fn metalSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: MetalSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
     const binding_arg_1 = descriptor;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8850,36 +9133,42 @@ pub fn metalSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSessio
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_metal_surface_set_target, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_metal_surface_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn networkStatusGet(diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!NetworkStatus {
+pub fn networkStatusGet(diagnostic: ?*diagnostics.Diagnostic) status.Error!NetworkStatus {
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_network_status_get", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
     var binding_arg_0: c.mln_network_status = std.mem.zeroes(c.mln_network_status);
-    try status.call(c.mln_network_status_get, .{&binding_arg_0}, diagnostic_store);
+    try status.call(c.mln_network_status_get, .{&binding_arg_0}, diagnostic);
     roots.accept();
     return NetworkStatus.fromNative(binding_arg_0);
 }
 
-pub fn networkStatusSet(status_input: NetworkStatus, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
+pub fn networkStatusSet(status_input: NetworkStatus, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = status_input;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_network_status_set", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.call(c.mln_network_status_set, .{@as(@typeInfo(@TypeOf(c.mln_network_status_set)).@"fn".params[0].type.?, binding_arg_0.toNative())}, diagnostic_store);
+    try status.call(c.mln_network_status_set, .{@as(@typeInfo(@TypeOf(c.mln_network_status_set)).@"fn".params[0].type.?, binding_arg_0.toNative())}, diagnostic);
     roots.accept();
 }
 
-pub fn openglBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: OpenglBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn openglBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: OpenglBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8891,10 +9180,10 @@ pub fn openglBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descr
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_borrowed_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_opengl_borrowed_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn openglBorrowedTextureDescriptorDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(OpenglBorrowedTextureDescriptor) {
@@ -8911,9 +9200,11 @@ pub fn openglBorrowedTextureDescriptorDefault(allocator: std.mem.Allocator) stat
     return .{ .arena = arena, .value = copied_value };
 }
 
-pub fn openglBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: OpenglBorrowedTextureDescriptor) status.Error!completion.Future(void) {
+pub fn openglBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: OpenglBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
     const binding_arg_1 = descriptor;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8924,15 +9215,17 @@ pub fn openglBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: Ren
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_borrowed_texture_set_target, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_opengl_borrowed_texture_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn openglOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: OpenglOwnedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn openglOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: OpenglOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8944,10 +9237,10 @@ pub fn openglOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descript
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_owned_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_opengl_owned_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn openglOwnedTextureDescriptorDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(OpenglOwnedTextureDescriptor) {
@@ -8974,10 +9267,12 @@ pub fn openglSupportedContextProviderMask() status.Error!OpenglContextProviderFl
     return OpenglContextProviderFlag.fromNative(raw_result);
 }
 
-pub fn openglSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: OpenglSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn openglSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: OpenglSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -8989,10 +9284,10 @@ pub fn openglSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: O
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_surface_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_opengl_surface_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn openglSurfaceDescriptorDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(OpenglSurfaceDescriptor) {
@@ -9009,9 +9304,11 @@ pub fn openglSurfaceDescriptorDefault(allocator: std.mem.Allocator) status.Error
     return .{ .arena = arena, .value = copied_value };
 }
 
-pub fn openglSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: OpenglSurfaceDescriptor) status.Error!completion.Future(void) {
+pub fn openglSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: OpenglSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
     const binding_arg_1 = descriptor;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -9022,7 +9319,7 @@ pub fn openglSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSessi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_opengl_surface_set_target, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_opengl_surface_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -9051,14 +9348,16 @@ pub fn premultipliedRgba8ImageDefault(allocator: std.mem.Allocator) status.Error
     return .{ .arena = arena, .value = copied_value };
 }
 
-pub fn projectedMetersForLatLng(coordinate: LatLng, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!ProjectedMeters {
+pub fn projectedMetersForLatLng(coordinate: LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!ProjectedMeters {
     const binding_arg_0 = coordinate;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_projected_meters_for_lat_lng", 0);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
     var binding_arg_1: c.mln_projected_meters = std.mem.zeroes(c.mln_projected_meters);
-    try status.call(c.mln_projected_meters_for_lat_lng, .{ @as(@typeInfo(@TypeOf(c.mln_projected_meters_for_lat_lng)).@"fn".params[0].type.?, binding_arg_0.toNative()), &binding_arg_1 }, diagnostic_store);
+    try status.call(c.mln_projected_meters_for_lat_lng, .{ @as(@typeInfo(@TypeOf(c.mln_projected_meters_for_lat_lng)).@"fn".params[0].type.?, binding_arg_0.toNative()), &binding_arg_1 }, diagnostic);
     roots.accept();
     return ProjectedMeters.fromNative(binding_arg_1);
 }
@@ -9073,8 +9372,10 @@ pub fn projectionModeDefault() status.Error!ProjectionMode {
     return ProjectionMode.fromNative(raw_result);
 }
 
-pub fn renderFrameBatchCount(batch: RenderFrameBatch) status.Error!usize {
+pub fn renderFrameBatchCount(batch: RenderFrameBatch, diagnostic: ?*diagnostics.Diagnostic) status.Error!usize {
     const binding_arg_0 = batch;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_frame_batch_count", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9082,14 +9383,16 @@ pub fn renderFrameBatchCount(batch: RenderFrameBatch) status.Error!usize {
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: usize = std.mem.zeroes(usize);
-    try status.call(c.mln_render_frame_batch_count, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_frame_batch_count, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
     return binding_arg_1;
 }
 
-pub fn renderFrameBatchGet(batch: RenderFrameBatch, index: usize) status.Error!RenderFrameResult {
+pub fn renderFrameBatchGet(batch: RenderFrameBatch, index: usize, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderFrameResult {
     const binding_arg_0 = batch;
     const binding_arg_1 = index;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_frame_batch_get", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9098,7 +9401,7 @@ pub fn renderFrameBatchGet(batch: RenderFrameBatch, index: usize) status.Error!R
     defer binding_arg_0_lease.release();
     var binding_arg_2: c.mln_render_frame_result = std.mem.zeroes(c.mln_render_frame_result);
     binding_arg_2.size = @sizeOf(c.mln_render_frame_result);
-    try status.call(c.mln_render_frame_batch_get, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_frame_batch_get)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_frame_batch_get, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_frame_batch_get)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2 }, diagnostic);
     roots.accept();
     return RenderFrameResult.fromNative(binding_arg_2);
 }
@@ -9119,8 +9422,10 @@ pub fn renderFrameBatchRelease(batch: RenderFrameBatch) status.Error!void {
     binding_arg_0_lease.commit();
 }
 
-pub fn renderSessionAbandon(session: RenderSession) status.Error!RenderAbandonResult {
+pub fn renderSessionAbandon(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderAbandonResult {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_abandon", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9129,13 +9434,15 @@ pub fn renderSessionAbandon(session: RenderSession) status.Error!RenderAbandonRe
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_render_abandon_result = std.mem.zeroes(c.mln_render_abandon_result);
     binding_arg_1.size = @sizeOf(c.mln_render_abandon_result);
-    try status.call(c.mln_render_session_abandon, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_abandon, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
     return RenderAbandonResult.fromNative(binding_arg_1);
 }
 
-pub fn renderSessionAcquireFrame(session: RenderSession) status.Error!AcquiredFrame {
+pub fn renderSessionAcquireFrame(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!AcquiredFrame {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_acquire_frame", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9143,9 +9450,9 @@ pub fn renderSessionAcquireFrame(session: RenderSession) status.Error!AcquiredFr
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_acquired_frame = std.mem.zeroes(c.mln_acquired_frame);
-    try status.call(c.mln_render_session_acquire_frame, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_acquire_frame, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
-    return try AcquiredFrame.adopt(binding_arg_1, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store);
+    return try AcquiredFrame.adopt(binding_arg_1, binding_arg_0_lease.anchor());
 }
 
 pub fn renderSessionAttachOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(RenderSessionAttachOptions) {
@@ -9162,8 +9469,10 @@ pub fn renderSessionAttachOptionsDefault(allocator: std.mem.Allocator) status.Er
     return .{ .arena = arena, .value = copied_value };
 }
 
-pub fn renderSessionBarrier(session: RenderSession) status.Error!completion.Future(void) {
+pub fn renderSessionBarrier(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_barrier", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9171,13 +9480,15 @@ pub fn renderSessionBarrier(session: RenderSession) status.Error!completion.Futu
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_barrier, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_render_session_barrier, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn renderSessionClearData(session: RenderSession) status.Error!completion.Future(void) {
+pub fn renderSessionClearData(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_clear_data", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9185,13 +9496,15 @@ pub fn renderSessionClearData(session: RenderSession) status.Error!completion.Fu
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_clear_data, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_render_session_clear_data, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn renderSessionDestroy(session: RenderSession) status.Error!void {
+pub fn renderSessionDestroy(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_destroy", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9200,14 +9513,16 @@ pub fn renderSessionDestroy(session: RenderSession) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.call(c.mln_render_session_destroy, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_render_session_destroy, .{binding_arg_0_native}, diagnostic);
     }
     roots.accept();
     binding_arg_0_lease.commit();
 }
 
-pub fn renderSessionDetach(session: RenderSession) status.Error!completion.Future(void) {
+pub fn renderSessionDetach(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_detach", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9215,13 +9530,15 @@ pub fn renderSessionDetach(session: RenderSession) status.Error!completion.Futur
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_detach, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_render_session_detach, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn renderSessionDispose(session: RenderSession) status.Error!void {
+pub fn renderSessionDispose(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_dispose", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9230,14 +9547,16 @@ pub fn renderSessionDispose(session: RenderSession) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.call(c.mln_render_session_dispose, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_render_session_dispose, .{binding_arg_0_native}, diagnostic);
     }
     roots.accept();
     binding_arg_0_lease.commit();
 }
 
-pub fn renderSessionDrainFrameResults(session: RenderSession) status.Error!RenderFrameBatch {
+pub fn renderSessionDrainFrameResults(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderFrameBatch {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_drain_frame_results", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9245,13 +9564,15 @@ pub fn renderSessionDrainFrameResults(session: RenderSession) status.Error!Rende
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_render_frame_batch = std.mem.zeroes(c.mln_render_frame_batch);
-    try status.call(c.mln_render_session_drain_frame_results, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_drain_frame_results, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
-    return try RenderFrameBatch.adopt(binding_arg_1, null, binding_arg_0_lease.diagnostic_store);
+    return try RenderFrameBatch.adopt(binding_arg_1, null);
 }
 
-pub fn renderSessionDumpDebugLogs(session: RenderSession) status.Error!completion.Future(void) {
+pub fn renderSessionDumpDebugLogs(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_dump_debug_logs", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9259,13 +9580,15 @@ pub fn renderSessionDumpDebugLogs(session: RenderSession) status.Error!completio
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_dump_debug_logs, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_render_session_dump_debug_logs, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn renderSessionGetCapabilities(session: RenderSession) status.Error!RenderSessionCapabilities {
+pub fn renderSessionGetCapabilities(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionCapabilities {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_get_capabilities", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9274,13 +9597,15 @@ pub fn renderSessionGetCapabilities(session: RenderSession) status.Error!RenderS
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_render_session_capabilities = std.mem.zeroes(c.mln_render_session_capabilities);
     binding_arg_1.size = @sizeOf(c.mln_render_session_capabilities);
-    try status.call(c.mln_render_session_get_capabilities, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_get_capabilities, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
     return RenderSessionCapabilities.fromNative(binding_arg_1);
 }
 
-pub fn renderSessionGetSnapshot(session: RenderSession) status.Error!RenderSessionSnapshot {
+pub fn renderSessionGetSnapshot(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderSessionSnapshot {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_get_snapshot", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9289,13 +9614,15 @@ pub fn renderSessionGetSnapshot(session: RenderSession) status.Error!RenderSessi
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_render_session_snapshot = std.mem.zeroes(c.mln_render_session_snapshot);
     binding_arg_1.size = @sizeOf(c.mln_render_session_snapshot);
-    try status.call(c.mln_render_session_get_snapshot, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_get_snapshot, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
     return RenderSessionSnapshot.fromNative(binding_arg_1);
 }
 
-pub fn renderSessionProjectionCreate(session: RenderSession) status.Error!MapProjection {
+pub fn renderSessionProjectionCreate(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_projection_create", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9303,18 +9630,20 @@ pub fn renderSessionProjectionCreate(session: RenderSession) status.Error!MapPro
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_map_projection = std.mem.zeroes(c.mln_map_projection);
-    try status.call(c.mln_render_session_projection_create, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_projection_create, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
-    return try MapProjection.adopt(binding_arg_1, null, binding_arg_0_lease.diagnostic_store);
+    return try MapProjection.adopt(binding_arg_1, null);
 }
 
-pub fn renderSessionQueryFeatureExtensions(allocator: std.mem.Allocator, session: RenderSession, source_id: []const u8, feature: []const u8, extension: []const u8, extension_field: []const u8, arguments: ?[]const u8) status.Error!completion.Future(OwnedValue([]const u8)) {
+pub fn renderSessionQueryFeatureExtensions(allocator: std.mem.Allocator, session: RenderSession, source_id: []const u8, feature: []const u8, extension: []const u8, extension_field: []const u8, arguments: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const u8)) {
     const binding_arg_0 = session;
     const binding_arg_1 = source_id;
     const binding_arg_2 = feature;
     const binding_arg_3 = extension;
     const binding_arg_4 = extension_field;
     const binding_arg_5 = arguments;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -9325,7 +9654,7 @@ pub fn renderSessionQueryFeatureExtensions(allocator: std.mem.Allocator, session
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_session_query_feature_extensions)).@"fn".params[1].type.?, view(binding_arg_1)), @as(@typeInfo(@TypeOf(c.mln_render_session_query_feature_extensions)).@"fn".params[2].type.?, view(binding_arg_2)), @as(@typeInfo(@TypeOf(c.mln_render_session_query_feature_extensions)).@"fn".params[3].type.?, view(binding_arg_3)), @as(@typeInfo(@TypeOf(c.mln_render_session_query_feature_extensions)).@"fn".params[4].type.?, view(binding_arg_4)), if (binding_arg_5) |array_item_0| try store(input_allocator, view(array_item_0)) else null };
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const u8), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const u8) {
             const raw_value = try completion.value(c.mln_buffer_view)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -9339,10 +9668,12 @@ pub fn renderSessionQueryFeatureExtensions(allocator: std.mem.Allocator, session
     return readiness;
 }
 
-pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session: RenderSession, geometry: RenderedQueryGeometry, options: ?RenderedFeatureQueryOptions) status.Error!completion.Future(OwnedValue([]const QueriedFeature)) {
+pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session: RenderSession, geometry: RenderedQueryGeometry, options: ?RenderedFeatureQueryOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const QueriedFeature)) {
     const binding_arg_0 = session;
     const binding_arg_1 = geometry;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -9353,7 +9684,7 @@ pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), if (binding_arg_2) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const QueriedFeature), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const QueriedFeature), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const QueriedFeature) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -9370,10 +9701,12 @@ pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session:
     return readiness;
 }
 
-pub fn renderSessionQuerySourceFeatures(allocator: std.mem.Allocator, session: RenderSession, source_id: []const u8, options: ?SourceFeatureQueryOptions) status.Error!completion.Future(OwnedValue([]const QueriedFeature)) {
+pub fn renderSessionQuerySourceFeatures(allocator: std.mem.Allocator, session: RenderSession, source_id: []const u8, options: ?SourceFeatureQueryOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const QueriedFeature)) {
     const binding_arg_0 = session;
     const binding_arg_1 = source_id;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -9384,7 +9717,7 @@ pub fn renderSessionQuerySourceFeatures(allocator: std.mem.Allocator, session: R
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_session_query_source_features)).@"fn".params[1].type.?, view(binding_arg_1)), if (binding_arg_2) |array_item_0| try store(input_allocator, try array_item_0.toNative(input_allocator, roots)) else null };
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const QueriedFeature), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const QueriedFeature), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const QueriedFeature) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -9401,8 +9734,10 @@ pub fn renderSessionQuerySourceFeatures(allocator: std.mem.Allocator, session: R
     return readiness;
 }
 
-pub fn renderSessionReduceMemoryUse(session: RenderSession) status.Error!completion.Future(void) {
+pub fn renderSessionReduceMemoryUse(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_reduce_memory_use", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9410,14 +9745,16 @@ pub fn renderSessionReduceMemoryUse(session: RenderSession) status.Error!complet
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_render_session_reduce_memory_use, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_render_session_reduce_memory_use, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn renderSessionRequestFrame(allocator: std.mem.Allocator, session: RenderSession, demand: FrameDemand) status.Error!void {
+pub fn renderSessionRequestFrame(allocator: std.mem.Allocator, session: RenderSession, demand: FrameDemand, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = session;
     const binding_arg_1 = demand;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -9427,13 +9764,15 @@ pub fn renderSessionRequestFrame(allocator: std.mem.Allocator, session: RenderSe
     defer roots.deinit();
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
-    try status.call(c.mln_render_session_request_frame, .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_request_frame, .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) }, diagnostic);
     roots.accept();
 }
 
-pub fn renderSessionResize(allocator: std.mem.Allocator, session: RenderSession, extent: RenderTargetExtent) status.Error!completion.Future(completion.CommandCompletion) {
+pub fn renderSessionResize(allocator: std.mem.Allocator, session: RenderSession, extent: RenderTargetExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     const binding_arg_0 = session;
     const binding_arg_1 = extent;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -9444,14 +9783,16 @@ pub fn renderSessionResize(allocator: std.mem.Allocator, session: RenderSession,
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(completion.CommandCompletion, binding_arg_0_lease.diagnostic_store, completion.command, c.mln_render_session_resize, native_arguments);
+    const readiness = try completion.submit(completion.CommandCompletion, diagnostic, completion.command, c.mln_render_session_resize, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn renderSessionServiceDriverWork(session: RenderSession, max_work: usize) status.Error!usize {
+pub fn renderSessionServiceDriverWork(session: RenderSession, max_work: usize, diagnostic: ?*diagnostics.Diagnostic) status.Error!usize {
     const binding_arg_0 = session;
     const binding_arg_1 = max_work;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_render_session_service_driver_work", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9459,13 +9800,15 @@ pub fn renderSessionServiceDriverWork(session: RenderSession, max_work: usize) s
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_2: usize = std.mem.zeroes(usize);
-    try status.call(c.mln_render_session_service_driver_work, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_session_service_driver_work)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_render_session_service_driver_work, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_render_session_service_driver_work)).@"fn".params[1].type.?, binding_arg_1), &binding_arg_2 }, diagnostic);
     roots.accept();
     return binding_arg_2;
 }
 
-pub fn renderTargetExtentPhysicalSize(allocator: std.mem.Allocator, extent: RenderTargetExtent, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!struct { width: u32, height: u32 } {
+pub fn renderTargetExtentPhysicalSize(allocator: std.mem.Allocator, extent: RenderTargetExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { width: u32, height: u32 } {
     const binding_arg_0 = extent;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -9475,7 +9818,7 @@ pub fn renderTargetExtentPhysicalSize(allocator: std.mem.Allocator, extent: Rend
     defer roots.deinit();
     var binding_arg_1: u32 = std.mem.zeroes(u32);
     var binding_arg_2: u32 = std.mem.zeroes(u32);
-    try status.call(c.mln_render_target_extent_physical_size, .{ try store(input_allocator, binding_arg_0.toNative()), &binding_arg_1, &binding_arg_2 }, diagnostic_store);
+    try status.call(c.mln_render_target_extent_physical_size, .{ try store(input_allocator, binding_arg_0.toNative()), &binding_arg_1, &binding_arg_2 }, diagnostic);
     roots.accept();
     return .{ .width = binding_arg_1, .height = binding_arg_2 };
 }
@@ -9546,8 +9889,10 @@ pub fn renderedQueryGeometryPoint(allocator: std.mem.Allocator, point: ScreenPoi
     return .{ .arena = arena, .value = copied_value };
 }
 
-pub fn resourceRequestCancelled(handle: ResourceRequestHandle) status.Error!bool {
+pub fn resourceRequestCancelled(handle: ResourceRequestHandle, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
     const binding_arg_0 = handle;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_resource_request_cancelled", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9555,14 +9900,16 @@ pub fn resourceRequestCancelled(handle: ResourceRequestHandle) status.Error!bool
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: bool = std.mem.zeroes(bool);
-    try status.call(c.mln_resource_request_cancelled, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_resource_request_cancelled, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
     return binding_arg_1;
 }
 
-pub fn resourceRequestComplete(allocator: std.mem.Allocator, handle: ResourceRequestHandle, response: ResourceResponse) status.Error!void {
+pub fn resourceRequestComplete(allocator: std.mem.Allocator, handle: ResourceRequestHandle, response: ResourceResponse, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = handle;
     const binding_arg_1 = response;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -9572,7 +9919,7 @@ pub fn resourceRequestComplete(allocator: std.mem.Allocator, handle: ResourceReq
     defer roots.deinit();
     const binding_arg_0_lease = try binding_arg_0.beginComplete();
     errdefer binding_arg_0_lease.finishComplete(false);
-    try status.call(c.mln_resource_request_complete, .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_resource_request_complete, .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) }, diagnostic);
     binding_arg_0_lease.finishComplete(true);
     roots.accept();
 }
@@ -9615,9 +9962,11 @@ pub const ResourceRequestCancelCallback = struct {
         };
     }
 };
-pub fn resourceRequestSetCancelCallback(handle: ResourceRequestHandle, callback_input: ?ResourceRequestCancelCallback) status.Error!bool {
+pub fn resourceRequestSetCancelCallback(handle: ResourceRequestHandle, callback_input: ?ResourceRequestCancelCallback, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
     const binding_arg_0 = handle;
     const binding_arg_1 = callback_input;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_resource_request_set_cancel_callback", binding_arg_0.raw);
     const lease = try binding_arg_0.lease();
     defer lease.release();
@@ -9630,35 +9979,41 @@ pub fn resourceRequestSetCancelCallback(handle: ResourceRequestHandle, callback_
         if (retained.call != null) context = try roots.retain(ResourceRequestCancelCallback, retained);
     }
     var rejected: bool = false;
-    try status.call(c.mln_resource_request_set_cancel_callback, .{ lease.native, if (context != null) &ResourceRequestCancelCallback.callTrampoline else null, context, if (context != null) &callback.Registration(ResourceRequestCancelCallback).releaseNative else null, &rejected }, lease.diagnostic_store);
+    try status.call(c.mln_resource_request_set_cancel_callback, .{ lease.native, if (context != null) &ResourceRequestCancelCallback.callTrampoline else null, context, if (context != null) &callback.Registration(ResourceRequestCancelCallback).releaseNative else null, &rejected }, diagnostic);
     if (rejected) return true;
     roots.accept();
     return false;
 }
 
-pub fn resourceRequestWaitUntilRetired(handle: ResourceRequestHandle, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
+pub fn resourceRequestWaitUntilRetired(handle: ResourceRequestHandle, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = handle;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_resource_request_wait_until_retired", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.call(c.mln_resource_request_wait_until_retired, .{binding_arg_0.raw}, diagnostic_store);
+    try status.call(c.mln_resource_request_wait_until_retired, .{binding_arg_0.raw}, diagnostic);
     roots.accept();
 }
 
-pub fn resourceTransformResponseSetUrl(response: ResourceTransformResponse, url: []const u8, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
+pub fn resourceTransformResponseSetUrl(response: ResourceTransformResponse, url: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = response;
     const binding_arg_1 = url;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.checkScoped("mln_resource_transform_response_set_url", @intFromPtr(binding_arg_0.native));
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
-    try status.call(c.mln_resource_transform_response_set_url, .{ binding_arg_0.native, @as(@typeInfo(@TypeOf(c.mln_resource_transform_response_set_url)).@"fn".params[1].type.?, @ptrCast(binding_arg_1.ptr)), binding_arg_1.len }, diagnostic_store);
+    try status.call(c.mln_resource_transform_response_set_url, .{ binding_arg_0.native, @as(@typeInfo(@TypeOf(c.mln_resource_transform_response_set_url)).@"fn".params[1].type.?, @ptrCast(binding_arg_1.ptr)), binding_arg_1.len }, diagnostic);
     roots.accept();
 }
 
-pub fn runtimeBarrier(runtime: Runtime) status.Error!completion.Future(void) {
+pub fn runtimeBarrier(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_barrier", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9666,13 +10021,15 @@ pub fn runtimeBarrier(runtime: Runtime) status.Error!completion.Future(void) {
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_barrier, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_barrier, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeClearHttpHeaderTransform(runtime: Runtime) status.Error!completion.Future(void) {
+pub fn runtimeClearHttpHeaderTransform(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_clear_http_header_transform", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9680,13 +10037,15 @@ pub fn runtimeClearHttpHeaderTransform(runtime: Runtime) status.Error!completion
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_clear_http_header_transform, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_clear_http_header_transform, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeClearResourceProvider(runtime: Runtime) status.Error!completion.Future(void) {
+pub fn runtimeClearResourceProvider(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_clear_resource_provider", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9694,13 +10053,15 @@ pub fn runtimeClearResourceProvider(runtime: Runtime) status.Error!completion.Fu
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_clear_resource_provider, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_clear_resource_provider, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeClearResourceTransform(runtime: Runtime) status.Error!completion.Future(void) {
+pub fn runtimeClearResourceTransform(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_clear_resource_transform", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9708,13 +10069,15 @@ pub fn runtimeClearResourceTransform(runtime: Runtime) status.Error!completion.F
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_clear_resource_transform, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_clear_resource_transform, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeCreate(allocator: std.mem.Allocator, options: RuntimeOptions, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!Runtime {
+pub fn runtimeCreate(allocator: std.mem.Allocator, options: RuntimeOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!Runtime {
     const binding_arg_0 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -9723,13 +10086,15 @@ pub fn runtimeCreate(allocator: std.mem.Allocator, options: RuntimeOptions, diag
     const roots = &root_storage;
     defer roots.deinit();
     var binding_arg_1: c.mln_runtime = std.mem.zeroes(c.mln_runtime);
-    try status.call(c.mln_runtime_create, .{ try store(input_allocator, try binding_arg_0.toNative(input_allocator, roots)), &binding_arg_1 }, diagnostic_store);
+    try status.call(c.mln_runtime_create, .{ try store(input_allocator, try binding_arg_0.toNative(input_allocator, roots)), &binding_arg_1 }, diagnostic);
     roots.accept();
-    return try Runtime.adopt(binding_arg_1, null, diagnostic_store);
+    return try Runtime.adopt(binding_arg_1, null);
 }
 
-pub fn runtimeDispose(runtime: Runtime) status.Error!void {
+pub fn runtimeDispose(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = runtime;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_dispose", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9738,14 +10103,16 @@ pub fn runtimeDispose(runtime: Runtime) status.Error!void {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     if (!binding_arg_0_lease.deferred) {
-        try status.call(c.mln_runtime_dispose, .{binding_arg_0_native}, binding_arg_0_lease.diagnostic_store);
+        try status.call(c.mln_runtime_dispose, .{binding_arg_0_native}, diagnostic);
     }
     roots.accept();
     binding_arg_0_lease.commit();
 }
 
-pub fn runtimeDrainEvents(runtime: Runtime) status.Error!EventBatch {
+pub fn runtimeDrainEvents(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!EventBatch {
     const binding_arg_0 = runtime;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_drain_events", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9753,13 +10120,15 @@ pub fn runtimeDrainEvents(runtime: Runtime) status.Error!EventBatch {
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_event_batch = std.mem.zeroes(c.mln_event_batch);
-    try status.call(c.mln_runtime_drain_events, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_runtime_drain_events, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
-    return try EventBatch.adopt(binding_arg_1, null, binding_arg_0_lease.diagnostic_store);
+    return try EventBatch.adopt(binding_arg_1, null);
 }
 
-pub fn runtimeGetEventMask(runtime: Runtime) status.Error!RuntimeEventMask {
+pub fn runtimeGetEventMask(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!RuntimeEventMask {
     const binding_arg_0 = runtime;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_get_event_mask", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9767,15 +10136,17 @@ pub fn runtimeGetEventMask(runtime: Runtime) status.Error!RuntimeEventMask {
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     var binding_arg_1: c.mln_runtime_event_mask = std.mem.zeroes(c.mln_runtime_event_mask);
-    try status.call(c.mln_runtime_get_event_mask, .{ binding_arg_0_lease.native, &binding_arg_1 }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_runtime_get_event_mask, .{ binding_arg_0_lease.native, &binding_arg_1 }, diagnostic);
     roots.accept();
     return RuntimeEventMask.fromNative(binding_arg_1);
 }
 
-pub fn runtimeOfflineRegionCreate(allocator: std.mem.Allocator, runtime: Runtime, definition: OfflineRegionDefinition, metadata: []const u8) status.Error!completion.Future(OwnedValue(OfflineRegionInfo)) {
+pub fn runtimeOfflineRegionCreate(allocator: std.mem.Allocator, runtime: Runtime, definition: OfflineRegionDefinition, metadata: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue(OfflineRegionInfo)) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = definition;
     const binding_arg_2 = metadata;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -9786,7 +10157,7 @@ pub fn runtimeOfflineRegionCreate(allocator: std.mem.Allocator, runtime: Runtime
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)), @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_create)).@"fn".params[2].type.?, @ptrCast(binding_arg_2.ptr)), binding_arg_2.len };
-    const readiness = try completion.submitWithCopyContext(OwnedValue(OfflineRegionInfo), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue(OfflineRegionInfo), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue(OfflineRegionInfo) {
             const raw_value = try completion.value(c.mln_offline_region_info)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -9800,9 +10171,11 @@ pub fn runtimeOfflineRegionCreate(allocator: std.mem.Allocator, runtime: Runtime
     return readiness;
 }
 
-pub fn runtimeOfflineRegionDelete(runtime: Runtime, region_id: i64) status.Error!completion.Future(void) {
+pub fn runtimeOfflineRegionDelete(runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = region_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_offline_region_delete", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9810,14 +10183,16 @@ pub fn runtimeOfflineRegionDelete(runtime: Runtime, region_id: i64) status.Error
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_delete)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_delete, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_offline_region_delete, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeOfflineRegionGet(allocator: std.mem.Allocator, runtime: Runtime, region_id: i64) status.Error!completion.Future(?OwnedValue(OfflineRegionInfo)) {
+pub fn runtimeOfflineRegionGet(allocator: std.mem.Allocator, runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(OfflineRegionInfo)) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = region_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_offline_region_get", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9825,7 +10200,7 @@ pub fn runtimeOfflineRegionGet(allocator: std.mem.Allocator, runtime: Runtime, r
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_get)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try completion.submitWithCopyContext(?OwnedValue(OfflineRegionInfo), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(?OwnedValue(OfflineRegionInfo), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue(OfflineRegionInfo) {
             if (result.value == null) return null;
             const raw_value = try completion.value(c.mln_offline_region_info)(result);
@@ -9840,9 +10215,11 @@ pub fn runtimeOfflineRegionGet(allocator: std.mem.Allocator, runtime: Runtime, r
     return readiness;
 }
 
-pub fn runtimeOfflineRegionGetStatus(runtime: Runtime, region_id: i64) status.Error!completion.Future(OfflineRegionStatus) {
+pub fn runtimeOfflineRegionGetStatus(runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OfflineRegionStatus) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = region_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_offline_region_get_status", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9850,7 +10227,7 @@ pub fn runtimeOfflineRegionGetStatus(runtime: Runtime, region_id: i64) status.Er
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_get_status)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try completion.submit(OfflineRegionStatus, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submit(OfflineRegionStatus, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result) status.Error!OfflineRegionStatus {
             const raw_value = try completion.value(c.mln_offline_region_status)(result);
             return OfflineRegionStatus.fromNative(raw_value);
@@ -9860,9 +10237,11 @@ pub fn runtimeOfflineRegionGetStatus(runtime: Runtime, region_id: i64) status.Er
     return readiness;
 }
 
-pub fn runtimeOfflineRegionInvalidate(runtime: Runtime, region_id: i64) status.Error!completion.Future(void) {
+pub fn runtimeOfflineRegionInvalidate(runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = region_id;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_offline_region_invalidate", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9870,15 +10249,17 @@ pub fn runtimeOfflineRegionInvalidate(runtime: Runtime, region_id: i64) status.E
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_invalidate)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_invalidate, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_offline_region_invalidate, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeOfflineRegionSetDownloadState(runtime: Runtime, region_id: i64, state: OfflineRegionDownloadState) status.Error!completion.Future(void) {
+pub fn runtimeOfflineRegionSetDownloadState(runtime: Runtime, region_id: i64, state: OfflineRegionDownloadState, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = region_id;
     const binding_arg_2 = state;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_offline_region_set_download_state", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9886,15 +10267,17 @@ pub fn runtimeOfflineRegionSetDownloadState(runtime: Runtime, region_id: i64, st
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_set_download_state)).@"fn".params[1].type.?, binding_arg_1), @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_set_download_state)).@"fn".params[2].type.?, binding_arg_2.toNative()) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_set_download_state, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_offline_region_set_download_state, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeOfflineRegionSetObserved(runtime: Runtime, region_id: i64, observed: bool) status.Error!completion.Future(void) {
+pub fn runtimeOfflineRegionSetObserved(runtime: Runtime, region_id: i64, observed: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = region_id;
     const binding_arg_2 = observed;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_offline_region_set_observed", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9902,15 +10285,17 @@ pub fn runtimeOfflineRegionSetObserved(runtime: Runtime, region_id: i64, observe
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_set_observed)).@"fn".params[1].type.?, binding_arg_1), @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_set_observed)).@"fn".params[2].type.?, binding_arg_2) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_offline_region_set_observed, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_offline_region_set_observed, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeOfflineRegionUpdateMetadata(allocator: std.mem.Allocator, runtime: Runtime, region_id: i64, metadata: []const u8) status.Error!completion.Future(OwnedValue(OfflineRegionInfo)) {
+pub fn runtimeOfflineRegionUpdateMetadata(allocator: std.mem.Allocator, runtime: Runtime, region_id: i64, metadata: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue(OfflineRegionInfo)) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = region_id;
     const binding_arg_2 = metadata;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_offline_region_update_metadata", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9918,7 +10303,7 @@ pub fn runtimeOfflineRegionUpdateMetadata(allocator: std.mem.Allocator, runtime:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_update_metadata)).@"fn".params[1].type.?, binding_arg_1), @as(@typeInfo(@TypeOf(c.mln_runtime_offline_region_update_metadata)).@"fn".params[2].type.?, @ptrCast(binding_arg_2.ptr)), binding_arg_2.len };
-    const readiness = try completion.submitWithCopyContext(OwnedValue(OfflineRegionInfo), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue(OfflineRegionInfo), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue(OfflineRegionInfo) {
             const raw_value = try completion.value(c.mln_offline_region_info)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -9932,8 +10317,10 @@ pub fn runtimeOfflineRegionUpdateMetadata(allocator: std.mem.Allocator, runtime:
     return readiness;
 }
 
-pub fn runtimeOfflineRegionsList(allocator: std.mem.Allocator, runtime: Runtime) status.Error!completion.Future(OwnedValue([]const OfflineRegionInfo)) {
+pub fn runtimeOfflineRegionsList(allocator: std.mem.Allocator, runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const OfflineRegionInfo)) {
     const binding_arg_0 = runtime;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_offline_regions_list", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -9941,7 +10328,7 @@ pub fn runtimeOfflineRegionsList(allocator: std.mem.Allocator, runtime: Runtime)
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const OfflineRegionInfo), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const OfflineRegionInfo), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const OfflineRegionInfo) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -9958,9 +10345,11 @@ pub fn runtimeOfflineRegionsList(allocator: std.mem.Allocator, runtime: Runtime)
     return readiness;
 }
 
-pub fn runtimeOfflineRegionsMergeDatabase(allocator: std.mem.Allocator, runtime: Runtime, side_database_path: []const u8) status.Error!completion.Future(OwnedValue([]const OfflineRegionInfo)) {
+pub fn runtimeOfflineRegionsMergeDatabase(allocator: std.mem.Allocator, runtime: Runtime, side_database_path: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const OfflineRegionInfo)) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = side_database_path;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -9971,7 +10360,7 @@ pub fn runtimeOfflineRegionsMergeDatabase(allocator: std.mem.Allocator, runtime:
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_offline_regions_merge_database)).@"fn".params[1].type.?, try cString(input_allocator, binding_arg_1)) };
-    const readiness = try completion.submitWithCopyContext(OwnedValue([]const OfflineRegionInfo), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue([]const OfflineRegionInfo), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue([]const OfflineRegionInfo) {
             var arena = std.heap.ArenaAllocator.init(target.*);
             errdefer arena.deinit();
@@ -10002,8 +10391,10 @@ pub fn runtimeOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedVal
     return .{ .arena = arena, .value = copied_value };
 }
 
-pub fn runtimeRelease(runtime: Runtime) status.Error!completion.Future(void) {
+pub fn runtimeRelease(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_release", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -10012,15 +10403,17 @@ pub fn runtimeRelease(runtime: Runtime) status.Error!completion.Future(void) {
     errdefer binding_arg_0_lease.rollback();
     const binding_arg_0_native = binding_arg_0_lease.native;
     const native_arguments = .{binding_arg_0_native};
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_release, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_release, native_arguments);
     roots.accept();
     binding_arg_0_lease.commit();
     return readiness;
 }
 
-pub fn runtimeRunAmbientCacheOperation(runtime: Runtime, operation: AmbientCacheOperation) status.Error!completion.Future(void) {
+pub fn runtimeRunAmbientCacheOperation(runtime: Runtime, operation: AmbientCacheOperation, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = operation;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_run_ambient_cache_operation", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -10028,27 +10421,31 @@ pub fn runtimeRunAmbientCacheOperation(runtime: Runtime, operation: AmbientCache
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_run_ambient_cache_operation)).@"fn".params[1].type.?, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_run_ambient_cache_operation, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_run_ambient_cache_operation, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeSetEventMask(runtime: Runtime, mask: RuntimeEventMask) status.Error!void {
+pub fn runtimeSetEventMask(runtime: Runtime, mask: RuntimeEventMask, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     const binding_arg_0 = runtime;
     const binding_arg_1 = mask;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_set_event_mask", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
     defer roots.deinit();
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
-    try status.call(c.mln_runtime_set_event_mask, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_set_event_mask)).@"fn".params[1].type.?, binding_arg_1.toNative()) }, binding_arg_0_lease.diagnostic_store);
+    try status.call(c.mln_runtime_set_event_mask, .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_set_event_mask)).@"fn".params[1].type.?, binding_arg_1.toNative()) }, diagnostic);
     roots.accept();
 }
 
-pub fn runtimeSetHttpHeaderTransform(allocator: std.mem.Allocator, runtime: Runtime, transform: HttpHeaderTransform) status.Error!completion.Future(void) {
+pub fn runtimeSetHttpHeaderTransform(allocator: std.mem.Allocator, runtime: Runtime, transform: HttpHeaderTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = transform;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10059,14 +10456,16 @@ pub fn runtimeSetHttpHeaderTransform(allocator: std.mem.Allocator, runtime: Runt
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_http_header_transform, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_set_http_header_transform, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeSetMaximumAmbientCacheSize(runtime: Runtime, size: u64) status.Error!completion.Future(void) {
+pub fn runtimeSetMaximumAmbientCacheSize(runtime: Runtime, size: u64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = size;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_runtime_set_maximum_ambient_cache_size", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -10074,14 +10473,16 @@ pub fn runtimeSetMaximumAmbientCacheSize(runtime: Runtime, size: u64) status.Err
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, @as(@typeInfo(@TypeOf(c.mln_runtime_set_maximum_ambient_cache_size)).@"fn".params[1].type.?, binding_arg_1) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_maximum_ambient_cache_size, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_set_maximum_ambient_cache_size, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeSetResourceProvider(allocator: std.mem.Allocator, runtime: Runtime, provider: ResourceProvider) status.Error!completion.Future(void) {
+pub fn runtimeSetResourceProvider(allocator: std.mem.Allocator, runtime: Runtime, provider: ResourceProvider, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = provider;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10092,14 +10493,16 @@ pub fn runtimeSetResourceProvider(allocator: std.mem.Allocator, runtime: Runtime
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_resource_provider, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_set_resource_provider, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn runtimeSetResourceTransform(allocator: std.mem.Allocator, runtime: Runtime, transform: ResourceTransform) status.Error!completion.Future(void) {
+pub fn runtimeSetResourceTransform(allocator: std.mem.Allocator, runtime: Runtime, transform: ResourceTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = runtime;
     const binding_arg_1 = transform;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10110,7 +10513,7 @@ pub fn runtimeSetResourceTransform(allocator: std.mem.Allocator, runtime: Runtim
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, try binding_arg_1.toNative(input_allocator, roots)) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_runtime_set_resource_transform, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_runtime_set_resource_transform, native_arguments);
     roots.accept();
     return readiness;
 }
@@ -10197,8 +10600,10 @@ pub fn textureImageInfoDefault() status.Error!TextureImageInfo {
     return TextureImageInfo.fromNative(raw_result);
 }
 
-pub fn textureReadPremultipliedRgba8(allocator: std.mem.Allocator, session: RenderSession) status.Error!completion.Future(OwnedValue(TextureReadbackResult)) {
+pub fn textureReadPremultipliedRgba8(allocator: std.mem.Allocator, session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue(TextureReadbackResult)) {
     const binding_arg_0 = session;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_texture_read_premultiplied_rgba8", binding_arg_0.raw);
     var root_storage: callback.Roots = .{};
     const roots = &root_storage;
@@ -10206,7 +10611,7 @@ pub fn textureReadPremultipliedRgba8(allocator: std.mem.Allocator, session: Rend
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{binding_arg_0_lease.native};
-    const readiness = try completion.submitWithCopyContext(OwnedValue(TextureReadbackResult), std.mem.Allocator, binding_arg_0_lease.diagnostic_store, struct {
+    const readiness = try completion.submitWithCopyContext(OwnedValue(TextureReadbackResult), std.mem.Allocator, diagnostic, struct {
         fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue(TextureReadbackResult) {
             const raw_value = try completion.value(c.mln_texture_readback_result)(result);
             var arena = std.heap.ArenaAllocator.init(target.*);
@@ -10220,10 +10625,12 @@ pub fn textureReadPremultipliedRgba8(allocator: std.mem.Allocator, session: Rend
     return readiness;
 }
 
-pub fn vulkanBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn vulkanBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10235,10 +10642,10 @@ pub fn vulkanBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descr
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_borrowed_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_vulkan_borrowed_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn vulkanBorrowedTextureDescriptorDefault() status.Error!VulkanBorrowedTextureDescriptor {
@@ -10251,9 +10658,11 @@ pub fn vulkanBorrowedTextureDescriptorDefault() status.Error!VulkanBorrowedTextu
     return VulkanBorrowedTextureDescriptor.fromNative(raw_result);
 }
 
-pub fn vulkanBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: VulkanBorrowedTextureDescriptor) status.Error!completion.Future(void) {
+pub fn vulkanBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: VulkanBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
     const binding_arg_1 = descriptor;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10264,15 +10673,17 @@ pub fn vulkanBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: Ren
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_borrowed_texture_set_target, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_vulkan_borrowed_texture_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn vulkanOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn vulkanOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10284,10 +10695,10 @@ pub fn vulkanOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descript
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_owned_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_vulkan_owned_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn vulkanOwnedTextureDescriptorDefault() status.Error!VulkanOwnedTextureDescriptor {
@@ -10300,10 +10711,12 @@ pub fn vulkanOwnedTextureDescriptorDefault() status.Error!VulkanOwnedTextureDesc
     return VulkanOwnedTextureDescriptor.fromNative(raw_result);
 }
 
-pub fn vulkanSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn vulkanSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10315,10 +10728,10 @@ pub fn vulkanSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: V
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_surface_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_vulkan_surface_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn vulkanSurfaceDescriptorDefault() status.Error!VulkanSurfaceDescriptor {
@@ -10331,9 +10744,11 @@ pub fn vulkanSurfaceDescriptorDefault() status.Error!VulkanSurfaceDescriptor {
     return VulkanSurfaceDescriptor.fromNative(raw_result);
 }
 
-pub fn vulkanSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: VulkanSurfaceDescriptor) status.Error!completion.Future(void) {
+pub fn vulkanSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: VulkanSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
     const binding_arg_1 = descriptor;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10344,15 +10759,17 @@ pub fn vulkanSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSessi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_vulkan_surface_set_target, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_vulkan_surface_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn webgpuBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn webgpuBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10364,10 +10781,10 @@ pub fn webgpuBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descr
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_borrowed_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_webgpu_borrowed_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn webgpuBorrowedTextureDescriptorDefault() status.Error!WebgpuBorrowedTextureDescriptor {
@@ -10380,9 +10797,11 @@ pub fn webgpuBorrowedTextureDescriptorDefault() status.Error!WebgpuBorrowedTextu
     return WebgpuBorrowedTextureDescriptor.fromNative(raw_result);
 }
 
-pub fn webgpuBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: WebgpuBorrowedTextureDescriptor) status.Error!completion.Future(void) {
+pub fn webgpuBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: WebgpuBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
     const binding_arg_1 = descriptor;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10393,15 +10812,17 @@ pub fn webgpuBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: Ren
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_borrowed_texture_set_target, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_webgpu_borrowed_texture_set_target, native_arguments);
     roots.accept();
     return readiness;
 }
 
-pub fn webgpuOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuOwnedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn webgpuOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10413,10 +10834,10 @@ pub fn webgpuOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descript
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_owned_texture_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_webgpu_owned_texture_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn webgpuOwnedTextureDescriptorDefault() status.Error!WebgpuOwnedTextureDescriptor {
@@ -10429,10 +10850,12 @@ pub fn webgpuOwnedTextureDescriptorDefault() status.Error!WebgpuOwnedTextureDesc
     return WebgpuOwnedTextureDescriptor.fromNative(raw_result);
 }
 
-pub fn webgpuSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+pub fn webgpuSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
     const binding_arg_0 = map;
     const binding_arg_1 = descriptor;
     const binding_arg_2 = options;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10444,10 +10867,10 @@ pub fn webgpuSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: W
     defer binding_arg_0_lease.release();
     var binding_arg_3: c.mln_render_session = std.mem.zeroes(c.mln_render_session);
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()), try store(input_allocator, try binding_arg_2.toNative(input_allocator, roots)), &binding_arg_3 };
-    var readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_surface_attach, native_arguments);
+    var readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_webgpu_surface_attach, native_arguments);
     roots.accept();
     errdefer readiness.deinit();
-    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor(), binding_arg_0_lease.diagnostic_store), .ready = readiness };
+    return .{ .session = try RenderSession.adopt(binding_arg_3, binding_arg_0_lease.anchor()), .ready = readiness };
 }
 
 pub fn webgpuSurfaceDescriptorDefault() status.Error!WebgpuSurfaceDescriptor {
@@ -10460,9 +10883,11 @@ pub fn webgpuSurfaceDescriptorDefault() status.Error!WebgpuSurfaceDescriptor {
     return WebgpuSurfaceDescriptor.fromNative(raw_result);
 }
 
-pub fn webgpuSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: WebgpuSurfaceDescriptor) status.Error!completion.Future(void) {
+pub fn webgpuSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: WebgpuSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     const binding_arg_0 = session;
     const binding_arg_1 = descriptor;
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
     var input_arena = std.heap.ArenaAllocator.init(allocator);
     defer input_arena.deinit();
     const input_allocator = input_arena.allocator();
@@ -10473,7 +10898,7 @@ pub fn webgpuSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSessi
     const binding_arg_0_lease = try binding_arg_0.lease();
     defer binding_arg_0_lease.release();
     const native_arguments = .{ binding_arg_0_lease.native, try store(input_allocator, binding_arg_1.toNative()) };
-    const readiness = try completion.submit(void, binding_arg_0_lease.diagnostic_store, completion.unit, c.mln_webgpu_surface_set_target, native_arguments);
+    const readiness = try completion.submit(void, diagnostic, completion.unit, c.mln_webgpu_surface_set_target, native_arguments);
     roots.accept();
     return readiness;
 }

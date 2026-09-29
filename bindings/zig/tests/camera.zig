@@ -7,7 +7,7 @@ const support = @import("support.zig");
 const center = maplibre.LatLng{ .latitude = 37.7749, .longitude = -122.4194 };
 
 fn orderedCamera(map: *maplibre.Map) !maplibre.CameraQueryResult {
-    var future = try maplibre.mapCameraQuery(support.handle(map));
+    var future = try maplibre.mapCameraQuery(support.handle(map), null);
     defer future.deinit();
     return future.wait(null);
 }
@@ -15,7 +15,7 @@ fn orderedCamera(map: *maplibre.Map) !maplibre.CameraQueryResult {
 fn updateCameraOnThread(map: *maplibre.Map, out_generation: *u64, out_error: *?anyerror) void {
     var future = maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .camera = .{ .center = center, .zoom = 9.0 },
-    }) catch |err| {
+    }, null) catch |err| {
         out_error.* = err;
         return;
     };
@@ -34,7 +34,7 @@ test "camera jump updates snapshot fields through public binding" {
     var map = try support.createMap(&runtime, .{});
     defer support.closeMap(&map) catch @panic("map close failed");
 
-    var update = try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .camera = .{ .center = center, .zoom = 10.0 } });
+    var update = try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .camera = .{ .center = center, .zoom = 10.0 } }, null);
     defer update.deinit();
     try testing.expect((try update.wait(null)).generation != 0);
 
@@ -52,21 +52,21 @@ test "camera commands accept valid public descriptors" {
     var jump = try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .mode = .jump,
         .camera = .{ .center = center, .zoom = 10.0 },
-    });
+    }, null);
     defer jump.deinit();
     const jump_result = try jump.wait(null);
     var ease = try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .mode = .ease,
         .camera = .{ .center = center, .zoom = 12.0 },
         .animation = .{ .duration_ms = 0, .easing = .{ .x1 = 0.0, .y1 = 0.0, .x2 = 0.25, .y2 = 1.0 }, .transition_id = 7 },
-    });
+    }, null);
     defer ease.deinit();
     const ease_result = try ease.wait(null);
     var fly = try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .mode = .fly,
         .camera = .{ .center = center, .zoom = 11.0 },
         .animation = .{ .duration_ms = 0 },
-    });
+    }, null);
     defer fly.deinit();
     const fly_result = try fly.wait(null);
     try testing.expect(jump_result.generation < ease_result.generation);
@@ -104,7 +104,7 @@ test "camera fitting computes camera and visible bounds" {
         .padding = .{ .top = 8, .left = 12, .bottom = 8, .right = 12 },
         .bearing = 5,
         .pitch = 15,
-    });
+    }, null);
     defer camera_future.deinit();
     const camera = try camera_future.wait(null);
     try testing.expect(camera.center != null);
@@ -114,23 +114,23 @@ test "camera fitting computes camera and visible bounds" {
     try testing.expect(camera.pitch != null);
 
     const coordinates = [_]maplibre.LatLng{ bounds.southwest, bounds.northeast };
-    var coordinate_future = try maplibre.mapCameraForLatLngs(testing.allocator, support.handle(map), coordinates[0..], null);
+    var coordinate_future = try maplibre.mapCameraForLatLngs(testing.allocator, support.handle(map), coordinates[0..], null, null);
     defer coordinate_future.deinit();
     const coordinate_camera = try coordinate_future.wait(null);
     try testing.expect(coordinate_camera.center != null);
     try testing.expect(coordinate_camera.zoom != null);
 
-    var geometry_future = try maplibre.mapCameraForGeometry(testing.allocator, support.handle(map), "{\"type\":\"LineString\",\"coordinates\":[[-125,35],[-120,39]]}", null);
+    var geometry_future = try maplibre.mapCameraForGeometry(testing.allocator, support.handle(map), "{\"type\":\"LineString\",\"coordinates\":[[-125,35],[-120,39]]}", null, null);
     defer geometry_future.deinit();
     const geometry_camera = try geometry_future.wait(null);
     try testing.expect(geometry_camera.center != null);
     try testing.expect(geometry_camera.zoom != null);
 
-    var bounds_future = try maplibre.mapLatLngBoundsForCamera(testing.allocator, support.handle(map), camera);
+    var bounds_future = try maplibre.mapLatLngBoundsForCamera(testing.allocator, support.handle(map), camera, null);
     defer bounds_future.deinit();
     const visible_bounds = try bounds_future.wait(null);
     try testing.expect(visible_bounds.southwest.latitude <= visible_bounds.northeast.latitude);
-    var unwrapped_future = try maplibre.mapLatLngBoundsForCameraUnwrapped(testing.allocator, support.handle(map), camera);
+    var unwrapped_future = try maplibre.mapLatLngBoundsForCameraUnwrapped(testing.allocator, support.handle(map), camera, null);
     defer unwrapped_future.deinit();
     const unwrapped_bounds = try unwrapped_future.wait(null);
     try testing.expect(unwrapped_bounds.southwest.latitude <= unwrapped_bounds.northeast.latitude);
@@ -152,7 +152,7 @@ test "camera constraints and free camera options round-trip public values" {
         .min_pitch = 0.0,
         .max_pitch = 45.0,
     };
-    const bounds_id = try maplibre.mapSetBounds(testing.allocator, support.handle(map), constraints);
+    const bounds_id = try maplibre.mapSetBounds(testing.allocator, support.handle(map), constraints, null);
     const bounded = try support.snapshotAfterCommand(&map, bounds_id);
     const copied_constraints = bounded.bounds;
     try testing.expect(copied_constraints.bounds != null);
@@ -162,13 +162,13 @@ test "camera constraints and free camera options round-trip public values" {
     const free_camera = bounded.free_camera;
     try testing.expect(free_camera.position != null);
     try testing.expect(free_camera.orientation != null);
-    const free_camera_id = try maplibre.mapSetFreeCameraOptions(testing.allocator, support.handle(map), .{ .orientation = free_camera.orientation });
+    const free_camera_id = try maplibre.mapSetFreeCameraOptions(testing.allocator, support.handle(map), .{ .orientation = free_camera.orientation }, null);
     const oriented = try support.snapshotAfterCommand(&map, free_camera_id);
     try testing.expect(oriented.free_camera.orientation != null);
 }
 
 fn jumpedLongitude(map: *maplibre.Map, longitude: f64) !f64 {
-    var future = try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .camera = .{ .center = .{ .latitude = 0, .longitude = longitude }, .zoom = 2.0 } });
+    var future = try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .camera = .{ .center = .{ .latitude = 0, .longitude = longitude }, .zoom = 2.0 } }, null);
     defer future.deinit();
     _ = try future.wait(null);
     const snapshot = try orderedCamera(map);
@@ -183,20 +183,20 @@ test "camera bounds separate the unbounded constraint from world bounds" {
     var map = try support.createMap(&runtime, .{});
     defer support.closeMap(&map) catch @panic("map close failed");
 
-    const pristine = (try maplibre.mapSnapshotGet(support.handle(map))).bounds;
+    const pristine = (try maplibre.mapSnapshotGet(support.handle(map), null)).bounds;
     try testing.expect(pristine.unbounded);
     try testing.expectApproxEqAbs(@as(f64, -160.0), try jumpedLongitude(&map, 200.0), 1e-6);
 
     const world_id = try maplibre.mapSetBounds(testing.allocator, support.handle(map), .{ .bounds = .{
         .southwest = .{ .latitude = -90.0, .longitude = -180.0 },
         .northeast = .{ .latitude = 90.0, .longitude = 180.0 },
-    } });
+    } }, null);
 
     const world = (try support.snapshotAfterCommand(&map, world_id)).bounds;
     try testing.expectApproxEqAbs(@as(f64, 180.0), world.bounds.?.northeast.longitude, 1e-6);
     try testing.expectApproxEqAbs(@as(f64, 180.0), try jumpedLongitude(&map, 200.0), 1e-6);
 
-    const released_id = try maplibre.mapSetBounds(testing.allocator, support.handle(map), .{ .unbounded = true });
+    const released_id = try maplibre.mapSetBounds(testing.allocator, support.handle(map), .{ .unbounded = true }, null);
     const released = (try support.snapshotAfterCommand(&map, released_id)).bounds;
     try testing.expect(released.unbounded);
     try testing.expectApproxEqAbs(@as(f64, -160.0), try jumpedLongitude(&map, 200.0), 1e-6);
@@ -210,29 +210,29 @@ test "camera public descriptors report invalid native arguments" {
 
     try testing.expectError(error.InvalidArgument, maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .camera = .{ .center = .{ .latitude = std.math.inf(f64), .longitude = 0 } },
-    }));
+    }, null));
     try testing.expectError(error.InvalidArgument, maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .mode = .ease,
         .camera = .{ .center = center },
         .animation = .{ .duration_ms = -1 },
-    }));
+    }, null));
     try testing.expectError(error.InvalidArgument, maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .mode = .fly,
         .camera = .{ .center = center },
         .animation = .{ .easing = .{ .x1 = 2, .y1 = 0, .x2 = 1, .y2 = 1 } },
-    }));
+    }, null));
 
     const inverted_bounds = maplibre.LatLngBounds{
         .southwest = .{ .latitude = 10.0, .longitude = 10.0 },
         .northeast = .{ .latitude = -10.0, .longitude = 20.0 },
     };
-    try testing.expectError(error.InvalidArgument, maplibre.mapCameraForLatLngBounds(testing.allocator, support.handle(map), inverted_bounds, null));
-    try testing.expectError(error.InvalidArgument, maplibre.mapCameraForLatLngs(testing.allocator, support.handle(map), &.{}, null));
-    try testing.expectError(error.InvalidArgument, maplibre.mapCameraForGeometry(testing.allocator, support.handle(map), "{", null));
+    try testing.expectError(error.InvalidArgument, maplibre.mapCameraForLatLngBounds(testing.allocator, support.handle(map), inverted_bounds, null, null));
+    try testing.expectError(error.InvalidArgument, maplibre.mapCameraForLatLngs(testing.allocator, support.handle(map), &.{}, null, null));
+    try testing.expectError(error.InvalidArgument, maplibre.mapCameraForGeometry(testing.allocator, support.handle(map), "{", null, null));
 
-    try testing.expectError(error.InvalidArgument, maplibre.mapSetBounds(testing.allocator, support.handle(map), .{ .min_zoom = 10, .max_zoom = 1 }));
-    try testing.expectError(error.InvalidArgument, maplibre.mapSetFreeCameraOptions(testing.allocator, support.handle(map), .{ .position = .{ .x = std.math.inf(f64), .y = 0, .z = 0 } }));
-    try testing.expectError(error.InvalidArgument, maplibre.mapSetFreeCameraOptions(testing.allocator, support.handle(map), .{ .orientation = .{ .x = 0, .y = 0, .z = 0, .w = 0 } }));
+    try testing.expectError(error.InvalidArgument, maplibre.mapSetBounds(testing.allocator, support.handle(map), .{ .min_zoom = 10, .max_zoom = 1 }, null));
+    try testing.expectError(error.InvalidArgument, maplibre.mapSetFreeCameraOptions(testing.allocator, support.handle(map), .{ .position = .{ .x = std.math.inf(f64), .y = 0, .z = 0 } }, null));
+    try testing.expectError(error.InvalidArgument, maplibre.mapSetFreeCameraOptions(testing.allocator, support.handle(map), .{ .orientation = .{ .x = 0, .y = 0, .z = 0, .w = 0 } }, null));
 }
 
 // Counts the camera-transition-finished events in one drain and reports the
@@ -262,7 +262,7 @@ fn submitCameraUpdate(
         // Long enough that the transition is still running when the next
         // command ends it, so every outcome below is the one the test named.
         .animation = .{ .duration_ms = 60_000, .transition_id = transition_id },
-    }));
+    }, null));
 }
 
 // A transition ends exactly once, whichever way it ends: replaced by a later
@@ -303,11 +303,11 @@ test "cancelling transitions ends the running transition and keeps the camera" {
     var map = try support.createMap(&runtime, .{});
     defer support.closeMap(&map) catch @panic("map close failed");
 
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .camera = .{ .zoom = 3.0 } }));
+    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .camera = .{ .zoom = 3.0 } }, null));
     _ = try support.drainEvents(&runtime);
 
     try submitCameraUpdate(&map, .ease, 15.0, 21);
-    try support.expectCommitted(try maplibre.mapCancelTransitions(support.handle(map)));
+    try support.expectCommitted(try maplibre.mapCancelTransitions(support.handle(map), null));
 
     var transition_id: u64 = 0;
     try testing.expectEqual(@as(usize, 1), try drainCountingTransitions(&runtime, &transition_id));
@@ -319,7 +319,7 @@ test "cancelling transitions ends the running transition and keeps the camera" {
     try testing.expect(snapshot.camera.zoom.? < 15.0);
 
     // A map with no running transition commits the command anyway.
-    try support.expectCommitted(try maplibre.mapCancelTransitions(support.handle(map)));
+    try support.expectCommitted(try maplibre.mapCancelTransitions(support.handle(map), null));
 }
 
 test "camera deltas move scale rotate and pitch the camera" {
@@ -330,17 +330,17 @@ test "camera deltas move scale rotate and pitch the camera" {
 
     try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .camera = .{ .center = center, .zoom = 6.0, .bearing = 0, .pitch = 0 },
-    }));
+    }, null));
     const start = try orderedCamera(&map);
 
     try support.expectCommitted(try maplibre.mapApplyCameraDelta(testing.allocator, support.handle(map), .{
         .kind = .move,
         .offset = .{ .x = 64, .y = 0 },
-    }));
+    }, null));
     const moved = try orderedCamera(&map);
     try testing.expect(moved.camera.center.?.longitude != start.camera.center.?.longitude);
 
-    try support.expectCommitted(try maplibre.mapApplyCameraDelta(testing.allocator, support.handle(map), .{ .kind = .scale, .amount = 2.0 }));
+    try support.expectCommitted(try maplibre.mapApplyCameraDelta(testing.allocator, support.handle(map), .{ .kind = .scale, .amount = 2.0 }, null));
     const scaled = try orderedCamera(&map);
     try testing.expectApproxEqAbs(start.camera.zoom.? + 1.0, scaled.camera.zoom.?, 1e-6);
 
@@ -350,18 +350,18 @@ test "camera deltas move scale rotate and pitch the camera" {
         .kind = .scale,
         .amount = 2.0,
         .anchor = .{ .x = 0, .y = 0 },
-    }));
+    }, null));
     const anchored = try orderedCamera(&map);
     try testing.expectApproxEqAbs(scaled.camera.zoom.? + 1.0, anchored.camera.zoom.?, 1e-6);
     try testing.expect(anchored.camera.center.?.longitude != scaled.camera.center.?.longitude);
 
-    try support.expectCommitted(try maplibre.mapApplyCameraDelta(testing.allocator, support.handle(map), .{ .kind = .bearing, .amount = 30.0 }));
+    try support.expectCommitted(try maplibre.mapApplyCameraDelta(testing.allocator, support.handle(map), .{ .kind = .bearing, .amount = 30.0 }, null));
     const rotated = try orderedCamera(&map);
     try testing.expectApproxEqAbs(@as(f64, 30.0), rotated.camera.bearing.?, 1e-6);
 
     // A pitch delta adds to the current pitch, the opposite sign of MapLibre
     // Native's Map::pitchBy().
-    try support.expectCommitted(try maplibre.mapApplyCameraDelta(testing.allocator, support.handle(map), .{ .kind = .pitch, .amount = 20.0 }));
+    try support.expectCommitted(try maplibre.mapApplyCameraDelta(testing.allocator, support.handle(map), .{ .kind = .pitch, .amount = 20.0 }, null));
     const pitched = try orderedCamera(&map);
     try testing.expectApproxEqAbs(@as(f64, 20.0), pitched.camera.pitch.?, 1e-6);
 }
@@ -372,7 +372,7 @@ test "gesture phases publish the gesture flag through the map snapshot" {
     var map = try support.createMap(&runtime, .{});
     defer support.closeMap(&map) catch @panic("map close failed");
 
-    try testing.expect(!(try maplibre.mapSnapshotGet(support.handle(map))).gesture_in_progress);
+    try testing.expect(!(try maplibre.mapSnapshotGet(support.handle(map), null)).gesture_in_progress);
 
     // A gesture begin sets the flag; it does not cancel a running transition.
     _ = try support.drainEvents(&runtime);
@@ -380,29 +380,29 @@ test "gesture phases publish the gesture flag through the map snapshot" {
     try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .camera = .{ .zoom = 5.0 },
         .gesture_phase = .begin,
-    }));
-    try testing.expect((try maplibre.mapSnapshotGet(support.handle(map))).gesture_in_progress);
+    }, null));
+    try testing.expect((try maplibre.mapSnapshotGet(support.handle(map), null)).gesture_in_progress);
 
     try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .camera = .{ .zoom = 5.5 },
         .gesture_phase = .update,
-    }));
-    try testing.expect((try maplibre.mapSnapshotGet(support.handle(map))).gesture_in_progress);
+    }, null));
+    try testing.expect((try maplibre.mapSnapshotGet(support.handle(map), null)).gesture_in_progress);
 
     try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .camera = .{ .zoom = 6.0 },
         .gesture_phase = .end,
-    }));
-    try testing.expect(!(try maplibre.mapSnapshotGet(support.handle(map))).gesture_in_progress);
+    }, null));
+    try testing.expect(!(try maplibre.mapSnapshotGet(support.handle(map), null)).gesture_in_progress);
 
     // A cancel phase clears the flag and ends the running transition.
     try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .camera = .{ .zoom = 6.5 },
         .gesture_phase = .begin,
-    }));
+    }, null));
     try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{
         .camera = .{ .zoom = 7.0 },
         .gesture_phase = .cancel,
-    }));
-    try testing.expect(!(try maplibre.mapSnapshotGet(support.handle(map))).gesture_in_progress);
+    }, null));
+    try testing.expect(!(try maplibre.mapSnapshotGet(support.handle(map), null)).gesture_in_progress);
 }

@@ -28,14 +28,14 @@ pub const style_json =
 /// Closes a runtime and waits for its native teardown, so a test leaves no
 /// native thread or resource behind.
 pub fn closeRuntime(runtime: *maplibre.Runtime) !void {
-    var teardown = try maplibre.runtimeRelease(handle(runtime));
+    var teardown = try maplibre.runtimeRelease(handle(runtime), null);
     defer teardown.deinit();
     try teardown.wait(null);
 }
 
 /// Closes a map and waits for its native teardown.
 pub fn closeMap(map: *maplibre.Map) !void {
-    var teardown = try maplibre.mapRelease(handle(map));
+    var teardown = try maplibre.mapRelease(handle(map), null);
     defer teardown.deinit();
     try teardown.wait(null);
 }
@@ -49,22 +49,17 @@ pub fn handle(value: anytype) if (@typeInfo(@TypeOf(value)) == .pointer) @typeIn
 }
 
 pub fn createRuntime(options: anytype) !maplibre.Runtime {
-    return createRuntimeWithDiagnostics(options, null);
-}
-
-/// Creates a runtime whose handles report failures into `diagnostic_store`.
-pub fn createRuntimeWithDiagnostics(options: anytype, diagnostic_store: ?*maplibre.DiagnosticStore) !maplibre.Runtime {
     var defaults = try maplibre.runtimeOptionsDefault(testing.allocator);
     defer defaults.deinit();
     inline for (@typeInfo(@TypeOf(options)).@"struct".fields) |field| @field(defaults.value, field.name) = @field(options, field.name);
-    return maplibre.runtimeCreate(testing.allocator, defaults.value, diagnostic_store);
+    return maplibre.runtimeCreate(testing.allocator, defaults.value, null);
 }
 
 pub fn waitForEvent(runtime: *maplibre.Runtime, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
-        var batch = try maplibre.runtimeDrainEvents(runtime.*);
+        var batch = try maplibre.runtimeDrainEvents(runtime.*, null);
         defer batch.deinit();
-        var copy = try maplibre.eventBatchGet(testing.allocator, batch);
+        var copy = try maplibre.eventBatchGet(testing.allocator, batch, null);
         defer copy.deinit();
         for (copy.value.events) |event| if (event.type == event_type) {
             return true;
@@ -76,9 +71,9 @@ pub fn waitForEvent(runtime: *maplibre.Runtime, event_type: maplibre.RuntimeEven
 
 pub fn waitForOwnedEvent(runtime: *maplibre.Runtime, event_type: maplibre.RuntimeEventType) !maplibre.OwnedValue(maplibre.RuntimeEvent) {
     for (0..5000) |_| {
-        var batch = try maplibre.runtimeDrainEvents(runtime.*);
+        var batch = try maplibre.runtimeDrainEvents(runtime.*, null);
         defer batch.deinit();
-        var copy = try maplibre.eventBatchGet(testing.allocator, batch);
+        var copy = try maplibre.eventBatchGet(testing.allocator, batch, null);
         for (copy.value.events) |event| if (event.type == event_type) {
             return .{ .arena = copy.arena, .value = event };
         };
@@ -110,10 +105,12 @@ pub fn expectCommandError(
 ) !void {
     var future = future_value;
     defer future.deinit();
-    const completion = try future.wait(null);
+    var diagnostic: maplibre.Diagnostic = .{};
+    const completion = try future.wait(&diagnostic);
     try testing.expectEqual(maplibre.CommandDisposition.failed, completion.disposition);
     try testing.expectError(expected, completion.statusError());
-    try testing.expect((try future.diagnostic()).len != 0);
+    try testing.expectEqual(@as(?i32, completion.raw_status), diagnostic.raw_status);
+    try testing.expect(diagnostic.message().len != 0);
 }
 
 /// Awaits `future`'s commit and returns a map snapshot that observes it: the
@@ -126,16 +123,16 @@ pub fn snapshotAfterCommand(
     const finished = try resolve(maplibre.CommandCompletion, future);
     try testing.expectEqual(maplibre.CommandDisposition.committed, finished.disposition);
     try testing.expect(finished.generation != 0);
-    const snapshot = try maplibre.mapSnapshotGet(handle(map));
+    const snapshot = try maplibre.mapSnapshotGet(handle(map), null);
     try testing.expect(snapshot.generation >= finished.generation);
     return snapshot;
 }
 
 /// Drains every queued event, reporting how many the batch carried.
 pub fn drainEvents(runtime: *maplibre.Runtime) !usize {
-    var batch = try maplibre.runtimeDrainEvents(handle(runtime));
+    var batch = try maplibre.runtimeDrainEvents(handle(runtime), null);
     defer batch.deinit();
-    var copy = try maplibre.eventBatchGet(testing.allocator, batch);
+    var copy = try maplibre.eventBatchGet(testing.allocator, batch, null);
     defer copy.deinit();
     return copy.value.events.len;
 }
@@ -144,7 +141,7 @@ pub fn drainEvents(runtime: *maplibre.Runtime) !usize {
 pub fn createLoadedMap(runtime: *maplibre.Runtime) !maplibre.Map {
     var map = try createMap(runtime, .{});
     errdefer closeMap(&map) catch {};
-    try expectCommitted(try maplibre.mapSetStyleJson(handle(map), style_json));
+    try expectCommitted(try maplibre.mapSetStyleJson(handle(map), style_json, null));
     try testing.expect(try waitForEvent(runtime, .map_style_loaded));
     return map;
 }
@@ -158,16 +155,16 @@ pub fn createMap(runtime: *maplibre.Runtime, options: anytype) !maplibre.Map {
             defaults.map_mode = @field(options, field.name);
         } else @field(defaults, field.name) = @field(options, field.name);
     }
-    return resolve(maplibre.Map, try maplibre.mapCreate(testing.allocator, runtime.*, defaults));
+    return resolve(maplibre.Map, try maplibre.mapCreate(testing.allocator, runtime.*, defaults, null));
 }
 
 pub fn waitForBarrier(runtime: *maplibre.Runtime) !void {
-    _ = try resolve(void, try maplibre.runtimeBarrier(handle(runtime)));
+    _ = try resolve(void, try maplibre.runtimeBarrier(handle(runtime), null));
 }
 
 /// Copies one source's metadata, reporting null when no source has the ID.
 pub fn styleSourceInfo(map: *maplibre.Map, source_id: []const u8) !?maplibre.generated.OwnedValue(maplibre.generated.StyleSourceResult) {
-    return resolve(?maplibre.generated.OwnedValue(maplibre.generated.StyleSourceResult), try maplibre.mapGetStyleSourceInfo(testing.allocator, handle(map), source_id));
+    return resolve(?maplibre.generated.OwnedValue(maplibre.generated.StyleSourceResult), try maplibre.mapGetStyleSourceInfo(testing.allocator, handle(map), source_id, null));
 }
 
 /// Existence via the info getter's found flag.
@@ -201,20 +198,20 @@ fn awaitRemoval(future: maplibre.Future(maplibre.CommandCompletion)) !bool {
 }
 
 pub fn removeStyleSource(map: *maplibre.Map, source_id: []const u8) !bool {
-    return awaitRemoval(try maplibre.mapRemoveStyleSource(handle(map), source_id));
+    return awaitRemoval(try maplibre.mapRemoveStyleSource(handle(map), source_id, null));
 }
 
 pub fn removeStyleLayer(map: *maplibre.Map, layer_id: []const u8) !bool {
-    return awaitRemoval(try maplibre.mapRemoveStyleLayer(handle(map), layer_id));
+    return awaitRemoval(try maplibre.mapRemoveStyleLayer(handle(map), layer_id, null));
 }
 
 pub fn removeStyleImage(map: *maplibre.Map, image_id: []const u8) !bool {
-    return awaitRemoval(try maplibre.mapRemoveStyleImage(handle(map), image_id));
+    return awaitRemoval(try maplibre.mapRemoveStyleImage(handle(map), image_id, null));
 }
 
 /// Copies fixed layer metadata, reporting null when no layer has the ID.
 pub fn styleLayerInfo(map: *maplibre.Map, layer_id: []const u8) !?maplibre.generated.OwnedValue(maplibre.generated.StyleLayerResult) {
-    return resolve(?maplibre.generated.OwnedValue(maplibre.generated.StyleLayerResult), try maplibre.mapGetStyleLayerInfo(testing.allocator, handle(map), layer_id));
+    return resolve(?maplibre.generated.OwnedValue(maplibre.generated.StyleLayerResult), try maplibre.mapGetStyleLayerInfo(testing.allocator, handle(map), layer_id, null));
 }
 
 /// Existence via the info getter's found flag.
@@ -225,31 +222,31 @@ pub fn styleLayerExists(map: *maplibre.Map, layer_id: []const u8) !bool {
 }
 
 pub fn loadedStyleJson(map: *maplibre.Map) !maplibre.OwnedValue([]const u8) {
-    return resolve(maplibre.OwnedValue([]const u8), try maplibre.mapLoadedStyleJson(testing.allocator, handle(map)));
+    return resolve(maplibre.OwnedValue([]const u8), try maplibre.mapLoadedStyleJson(testing.allocator, handle(map), null));
 }
 
 pub fn styleUrl(map: *maplibre.Map) !maplibre.OwnedValue([]const u8) {
-    return resolve(maplibre.OwnedValue([]const u8), try maplibre.mapStyleUrl(testing.allocator, handle(map)));
+    return resolve(maplibre.OwnedValue([]const u8), try maplibre.mapStyleUrl(testing.allocator, handle(map), null));
 }
 
 pub fn listStyleSourceIds(map: *maplibre.Map) !maplibre.OwnedValue([]const []const u8) {
-    return resolve(maplibre.OwnedValue([]const []const u8), try maplibre.mapListStyleSourceIds(testing.allocator, handle(map)));
+    return resolve(maplibre.OwnedValue([]const []const u8), try maplibre.mapListStyleSourceIds(testing.allocator, handle(map), null));
 }
 
 pub fn listStyleLayerIds(map: *maplibre.Map) !maplibre.OwnedValue([]const []const u8) {
-    return resolve(maplibre.OwnedValue([]const []const u8), try maplibre.mapListStyleLayerIds(testing.allocator, handle(map)));
+    return resolve(maplibre.OwnedValue([]const []const u8), try maplibre.mapListStyleLayerIds(testing.allocator, handle(map), null));
 }
 
 pub fn styleSourceAttribution(map: *maplibre.Map, source_id: []const u8) !?maplibre.OwnedValue([]const u8) {
-    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapCopyStyleSourceAttribution(testing.allocator, handle(map), source_id));
+    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapCopyStyleSourceAttribution(testing.allocator, handle(map), source_id, null));
 }
 
 pub fn styleSourceUrl(map: *maplibre.Map, source_id: []const u8) !?maplibre.OwnedValue([]const u8) {
-    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapCopyStyleSourceUrl(testing.allocator, handle(map), source_id));
+    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapCopyStyleSourceUrl(testing.allocator, handle(map), source_id, null));
 }
 
 pub fn styleSourceTileUrls(map: *maplibre.Map, source_id: []const u8) !?maplibre.generated.OwnedValue(maplibre.generated.StyleSourceTileUrlsResult) {
-    return resolve(?maplibre.generated.OwnedValue(maplibre.generated.StyleSourceTileUrlsResult), try maplibre.mapGetStyleSourceTileUrls(testing.allocator, handle(map), source_id));
+    return resolve(?maplibre.generated.OwnedValue(maplibre.generated.StyleSourceTileUrlsResult), try maplibre.mapGetStyleSourceTileUrls(testing.allocator, handle(map), source_id, null));
 }
 
 pub fn expectStyleLayerType(map: *maplibre.Map, layer_id: []const u8, expected: []const u8) !void {
@@ -259,42 +256,42 @@ pub fn expectStyleLayerType(map: *maplibre.Map, layer_id: []const u8, expected: 
 }
 
 pub fn styleLayerJson(map: *maplibre.Map, layer_id: []const u8) !?maplibre.OwnedValue([]const u8) {
-    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapGetStyleLayerJson(testing.allocator, handle(map), layer_id));
+    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapGetStyleLayerJson(testing.allocator, handle(map), layer_id, null));
 }
 
 pub fn styleImageInfo(map: *maplibre.Map, image_id: []const u8) !?maplibre.generated.OwnedValue(maplibre.generated.StyleImageResult) {
-    return resolve(?maplibre.generated.OwnedValue(maplibre.generated.StyleImageResult), try maplibre.mapGetStyleImageInfo(testing.allocator, handle(map), image_id));
+    return resolve(?maplibre.generated.OwnedValue(maplibre.generated.StyleImageResult), try maplibre.mapGetStyleImageInfo(testing.allocator, handle(map), image_id, null));
 }
 
 pub fn styleImageStretches(map: *maplibre.Map, image_id: []const u8) !?maplibre.generated.OwnedValue(maplibre.generated.StyleImageStretchesResult) {
-    return resolve(?maplibre.generated.OwnedValue(maplibre.generated.StyleImageStretchesResult), try maplibre.mapCopyStyleImageStretches(testing.allocator, handle(map), image_id));
+    return resolve(?maplibre.generated.OwnedValue(maplibre.generated.StyleImageStretchesResult), try maplibre.mapCopyStyleImageStretches(testing.allocator, handle(map), image_id, null));
 }
 
 pub fn imageSourceCoordinates(map: *maplibre.Map, source_id: []const u8) !?[4]maplibre.LatLng {
-    var snapshot = (try resolve(?maplibre.generated.OwnedValue([]const maplibre.LatLng), try maplibre.mapGetImageSourceCoordinates(testing.allocator, handle(map), source_id))) orelse return null;
+    var snapshot = (try resolve(?maplibre.generated.OwnedValue([]const maplibre.LatLng), try maplibre.mapGetImageSourceCoordinates(testing.allocator, handle(map), source_id, null))) orelse return null;
     defer snapshot.deinit();
     if (snapshot.value.len != 4) return error.NativeError;
     return snapshot.value[0..4].*;
 }
 
 pub fn layerSourceLayer(map: *maplibre.Map, layer_id: []const u8) !?maplibre.OwnedValue([]const u8) {
-    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapCopyLayerSourceLayer(testing.allocator, handle(map), layer_id));
+    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapCopyLayerSourceLayer(testing.allocator, handle(map), layer_id, null));
 }
 
 pub fn layerSourceId(map: *maplibre.Map, layer_id: []const u8) !?maplibre.OwnedValue([]const u8) {
-    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapCopyLayerSourceId(testing.allocator, handle(map), layer_id));
+    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapCopyLayerSourceId(testing.allocator, handle(map), layer_id, null));
 }
 
 pub fn layerProperty(map: *maplibre.Map, layer_id: []const u8, property_name: []const u8) !?maplibre.OwnedValue([]const u8) {
-    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapGetLayerProperty(testing.allocator, handle(map), layer_id, property_name));
+    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapGetLayerProperty(testing.allocator, handle(map), layer_id, property_name, null));
 }
 
 pub fn layerFilter(map: *maplibre.Map, layer_id: []const u8) !?maplibre.OwnedValue([]const u8) {
-    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapGetLayerFilter(testing.allocator, handle(map), layer_id));
+    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapGetLayerFilter(testing.allocator, handle(map), layer_id, null));
 }
 
 pub fn styleLightProperty(map: *maplibre.Map, property_name: []const u8) !?maplibre.OwnedValue([]const u8) {
-    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapGetStyleLightProperty(testing.allocator, handle(map), property_name));
+    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapGetStyleLightProperty(testing.allocator, handle(map), property_name, null));
 }
 
 /// Existence via the info getter's found flag.
@@ -305,11 +302,11 @@ pub fn styleImageExists(map: *maplibre.Map, image_id: []const u8) !bool {
 }
 
 pub fn styleImagePixels(map: *maplibre.Map, image_id: []const u8) !?maplibre.OwnedValue([]const u8) {
-    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapCopyStyleImagePremultipliedRgba8(testing.allocator, handle(map), image_id));
+    return resolve(?maplibre.OwnedValue([]const u8), try maplibre.mapCopyStyleImagePremultipliedRgba8(testing.allocator, handle(map), image_id, null));
 }
 
 pub fn styleTransitionOptions(map: *maplibre.Map) !maplibre.StyleTransitionOptions {
-    return resolve(maplibre.StyleTransitionOptions, try maplibre.mapGetStyleTransitionOptions(handle(map)));
+    return resolve(maplibre.StyleTransitionOptions, try maplibre.mapGetStyleTransitionOptions(handle(map), null));
 }
 
 pub fn listIndexOf(list: maplibre.OwnedValue([]const []const u8), value: []const u8) ?usize {
@@ -349,7 +346,7 @@ pub fn resolveSessionFuture(
     defer future.deinit();
     for (0..wait_turns) |turn| {
         if (try future.poll()) return future.wait(null);
-        if (service_driver) _ = maplibre.renderSessionServiceDriverWork(handle(session), 64) catch 0;
+        if (service_driver) _ = maplibre.renderSessionServiceDriverWork(handle(session), 64, null) catch 0;
         try waitOneTurn(turn);
     }
     return error.OperationTimedOut;
@@ -371,15 +368,15 @@ pub fn finishAttachment(
 ) !maplibre.RenderSession {
     errdefer {
         const session = attachment.session;
-        maplibre.renderSessionDestroy(handle(session)) catch {};
+        maplibre.renderSessionDestroy(handle(session), null) catch {};
     }
     try finishOperation(attachment.session, attachment.ready, service_driver);
     return attachment.session;
 }
 
 pub fn closeSession(session: *maplibre.RenderSession, service_driver: bool) !void {
-    try finishOperation(session.*, try maplibre.renderSessionDetach(handle(session)), service_driver);
-    try maplibre.renderSessionDestroy(handle(session));
+    try finishOperation(session.*, try maplibre.renderSessionDetach(handle(session), null), service_driver);
+    try maplibre.renderSessionDestroy(handle(session), null);
 }
 
 var next_frame_token: std.atomic.Value(u32) = .init(1);
@@ -394,10 +391,10 @@ pub fn renderFrameWithDemand(
     demand: maplibre.FrameDemand,
     service_driver: bool,
 ) !maplibre.RenderFrameResult {
-    try maplibre.renderSessionRequestFrame(testing.allocator, handle(session), demand);
+    try maplibre.renderSessionRequestFrame(testing.allocator, handle(session), demand, null);
     for (0..wait_turns) |turn| {
-        if (service_driver) _ = maplibre.renderSessionServiceDriverWork(handle(session), 64) catch 0;
-        var batch = maplibre.renderSessionDrainFrameResults(handle(session)) catch |err| {
+        if (service_driver) _ = maplibre.renderSessionServiceDriverWork(handle(session), 64, null) catch 0;
+        var batch = maplibre.renderSessionDrainFrameResults(handle(session), null) catch |err| {
             if (err == error.NotReady) {
                 try waitOneTurn(turn);
                 continue;
@@ -405,8 +402,8 @@ pub fn renderFrameWithDemand(
             return err;
         };
         defer batch.deinit();
-        for (0..try maplibre.renderFrameBatchCount(batch)) |index| {
-            const result = try maplibre.renderFrameBatchGet(batch, index);
+        for (0..try maplibre.renderFrameBatchCount(batch, null)) |index| {
+            const result = try maplibre.renderFrameBatchGet(batch, index, null);
             if (result.token == demand.token) return result;
         }
         try waitOneTurn(turn);
@@ -420,7 +417,7 @@ pub fn renderFrame(
     if_needed: bool,
     service_driver: bool,
 ) !maplibre.RenderFrameResult {
-    const capabilities = try maplibre.renderSessionGetCapabilities(handle(session));
+    const capabilities = try maplibre.renderSessionGetCapabilities(handle(session), null);
     return renderFrameWithDemand(session, .{
         .flags = .{ .if_needed = if_needed, .present = capabilities.flags.presentation },
         .token = nextFrameToken(),
@@ -445,7 +442,7 @@ pub fn expectRenderedFrame(
 }
 
 pub fn drainEventSnapshot(runtime: anytype) !maplibre.OwnedValue(maplibre.RuntimeEventBatchView) {
-    var batch = try maplibre.runtimeDrainEvents(handle(runtime));
+    var batch = try maplibre.runtimeDrainEvents(handle(runtime), null);
     defer batch.deinit();
-    return maplibre.eventBatchGet(testing.allocator, batch);
+    return maplibre.eventBatchGet(testing.allocator, batch, null);
 }

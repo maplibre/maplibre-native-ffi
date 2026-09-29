@@ -537,24 +537,24 @@ fn attachOwnedTexture(
         try finishAttachment(try maplibre.vulkanOwnedTextureAttach(testing.allocator, support.handle(map), .{
             .extent = extent,
             .context = context.descriptor(),
-        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 2 }))
+        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 2 }, null))
     else if (build_options.supports_opengl)
         try finishAttachment(try maplibre.openglOwnedTextureAttach(testing.allocator, support.handle(map), .{
             .extent = extent,
             .context = context.descriptor(),
-        }, .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 2 }))
+        }, .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 2 }, null))
     else if (build_options.supports_metal)
         try finishAttachment(try maplibre.metalOwnedTextureAttach(testing.allocator, support.handle(map), .{
             .extent = extent,
             .context = context.descriptor(),
-        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 2 }))
+        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 2 }, null))
     else
         unreachable;
     errdefer {
-        if (maplibre.renderSessionDetach(support.handle(session))) |operation| {
+        if (maplibre.renderSessionDetach(support.handle(session), null)) |operation| {
             finishOperation(session, operation) catch {};
         } else |_| {}
-        maplibre.renderSessionDestroy(support.handle(session)) catch {};
+        maplibre.renderSessionDestroy(support.handle(session), null) catch {};
     }
 
     return session;
@@ -910,7 +910,7 @@ fn expectOwnedFrameExtent(
     session: maplibre.RenderSession,
     extent: maplibre.RenderTargetExtent,
 ) !void {
-    const frame = try maplibre.renderSessionAcquireFrame(session);
+    const frame = try maplibre.renderSessionAcquireFrame(session, null);
     const View = if (build_options.supports_vulkan) maplibre.VulkanOwnedTextureFrame else if (build_options.supports_opengl) maplibre.OpenglOwnedTextureFrame else maplibre.MetalOwnedTextureFrame;
     const inspect = struct {
         fn use(expected: maplibre.RenderTargetExtent, info: View) anyerror!void {
@@ -927,11 +927,11 @@ fn expectOwnedFrameExtent(
             }
         }
     }.use;
-    if (build_options.supports_vulkan) try maplibre.acquiredFrameGetVulkanTexture(void, frame, extent, inspect) else if (build_options.supports_opengl) try maplibre.acquiredFrameGetOpenglTexture(void, frame, extent, inspect) else try maplibre.acquiredFrameGetMetalTexture(void, frame, extent, inspect);
+    if (build_options.supports_vulkan) try maplibre.acquiredFrameGetVulkanTexture(void, frame, extent, inspect, null) else if (build_options.supports_opengl) try maplibre.acquiredFrameGetOpenglTexture(void, frame, extent, inspect, null) else try maplibre.acquiredFrameGetMetalTexture(void, frame, extent, inspect, null);
     try maplibre.acquiredFrameGetProducerSync(void, frame, {}, struct {
         fn use(_: void, _: maplibre.GpuSync) anyerror!void {}
-    }.use);
-    try maplibre.acquiredFrameRelease(testing.allocator, frame, .{ .kind = .cpu_complete });
+    }.use, null);
+    try maplibre.acquiredFrameRelease(testing.allocator, frame, .{ .kind = .cpu_complete }, null);
 }
 
 test "owned texture session renders acquires resizes and reads back" {
@@ -944,18 +944,18 @@ test "owned texture session renders acquires resizes and reads back" {
     const initial_extent = maplibre.RenderTargetExtent{ .width = 32, .height = 16, .scale_factor = 1.0 };
     var owned = try attachTestOwnedTexture(&map, initial_extent);
     defer owned.close() catch @panic("render session close failed");
-    const capabilities = try maplibre.renderSessionGetCapabilities(support.handle(owned.session));
+    const capabilities = try maplibre.renderSessionGetCapabilities(support.handle(owned.session), null);
     try testing.expect(capabilities.flags.frame_acquisition);
-    try testing.expectEqual(.attached, (try maplibre.renderSessionGetSnapshot(support.handle(owned.session))).state);
+    try testing.expectEqual(.attached, (try maplibre.renderSessionGetSnapshot(support.handle(owned.session), null)).state);
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
     try testing.expectEqual(.rendered, (try support.renderFrame(owned.session, false, true)).disposition);
     try expectOwnedFrameExtent(owned.session, initial_extent);
 
     try testing.expect(capabilities.flags.readback);
     {
-        var image = try resolveFuture(maplibre.OwnedValue(maplibre.TextureReadbackResult), owned.session, try maplibre.textureReadPremultipliedRgba8(testing.allocator, owned.session));
+        var image = try resolveFuture(maplibre.OwnedValue(maplibre.TextureReadbackResult), owned.session, try maplibre.textureReadPremultipliedRgba8(testing.allocator, owned.session, null));
         defer image.deinit();
         try testing.expectEqual(@as(u32, 32), image.value.info.width);
         try testing.expectEqual(@as(u32, 16), image.value.info.height);
@@ -965,7 +965,7 @@ test "owned texture session renders acquires resizes and reads back" {
     }
 
     const resized_extent = maplibre.RenderTargetExtent{ .width = 48, .height = 24, .scale_factor = 1.0 };
-    try finishOperation(owned.session, try maplibre.renderSessionResize(testing.allocator, support.handle(owned.session), resized_extent));
+    try finishOperation(owned.session, try maplibre.renderSessionResize(testing.allocator, support.handle(owned.session), resized_extent, null));
     try support.waitForBarrier(&runtime);
     for (0..1000) |_| {
         const result = try support.renderFrame(owned.session, false, true);
@@ -975,7 +975,7 @@ test "owned texture session renders acquires resizes and reads back" {
         try testing.expect(!result.needs_repaint);
     } else return error.ResizeDidNotConverge;
     try expectOwnedFrameExtent(owned.session, resized_extent);
-    const snapshot = try maplibre.renderSessionGetSnapshot(support.handle(owned.session));
+    const snapshot = try maplibre.renderSessionGetSnapshot(support.handle(owned.session), null);
     try testing.expectEqual(resized_extent.width, snapshot.extent.width);
     try testing.expectEqual(resized_extent.height, snapshot.extent.height);
 }
@@ -989,27 +989,27 @@ test "a session with no rendered frame has nothing to acquire or read back" {
     var owned = try attachTestOwnedTexture(&map, .{ .width = 16, .height = 16, .scale_factor = 1.0 });
     defer owned.close() catch @panic("render session close failed");
 
-    try testing.expect((try maplibre.renderSessionGetCapabilities(support.handle(owned.session))).flags.readback);
+    try testing.expect((try maplibre.renderSessionGetCapabilities(support.handle(owned.session), null)).flags.readback);
     // No frame has rendered, so neither a readback nor an acquisition has a
     // frame to take.
-    try testing.expectError(error.NotReady, maplibre.renderSessionAcquireFrame(support.handle(owned.session)));
-    try testing.expectError(error.InvalidState, resolveFuture(maplibre.OwnedValue(maplibre.TextureReadbackResult), owned.session, try maplibre.textureReadPremultipliedRgba8(testing.allocator, owned.session)));
+    try testing.expectError(error.NotReady, maplibre.renderSessionAcquireFrame(support.handle(owned.session), null));
+    try testing.expectError(error.InvalidState, resolveFuture(maplibre.OwnedValue(maplibre.TextureReadbackResult), owned.session, try maplibre.textureReadPremultipliedRgba8(testing.allocator, owned.session, null)));
 }
 
 test "live render session blocks map close until detached" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
 
-    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
-    defer diagnostics.deinit();
-    var runtime = try support.createRuntimeWithDiagnostics(.{}, &diagnostics);
+    var runtime = try support.createRuntime(.{});
     errdefer support.closeRuntime(&runtime) catch {};
     var map = try support.createMap(&runtime, .{ .width = 32, .height = 32, .scale_factor = 1.0 });
     errdefer support.closeMap(&map) catch {};
     var owned = try attachTestOwnedTexture(&map, .{ .width = 32, .height = 32, .scale_factor = 1.0 });
     errdefer owned.close() catch {};
 
-    try testing.expectError(error.InvalidState, maplibre.mapRelease(support.handle(map)));
-    try testing.expectEqualStrings("map still has an attached render session", diagnostics.get().?.message);
+    var diagnostic: maplibre.Diagnostic = .{};
+    try testing.expectError(error.InvalidState, maplibre.mapRelease(support.handle(map), &diagnostic));
+    try testing.expectEqual(@as(?i32, -2), diagnostic.raw_status);
+    try testing.expectEqualStrings("map still has an attached render session", diagnostic.message());
 
     try owned.close();
     try support.closeMap(&map);
@@ -1026,9 +1026,9 @@ test "still-image map modes complete owned texture renders" {
         var owned = try attachTestOwnedTexture(&map, .{ .width = 32, .height = 32, .scale_factor = 1.0 });
         defer owned.close() catch @panic("render session close failed");
 
-        try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+        try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
         try support.waitForBarrier(&runtime);
-        var future = try maplibre.mapRequestStillImage(support.handle(map));
+        var future = try maplibre.mapRequestStillImage(support.handle(map), null);
         defer future.deinit();
         for (0..1000) |_| {
             _ = try support.renderFrame(owned.session, false, true);
@@ -1132,13 +1132,13 @@ test "feature state and rendered queries copy operation results" {
     var owned = try attachTestOwnedTexture(&map, .{ .width = 64, .height = 64, .scale_factor = 1.0 });
     defer owned.close() catch @panic("render session close failed");
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), feature_state_style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), feature_state_style_json, null));
     try support.waitForBarrier(&runtime);
     _ = try support.renderFrame(owned.session, false, true);
 
     const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
-    try support.expectCommitted(try maplibre.mapSetFeatureState(testing.allocator, support.handle(map), selector, "{\"hover\":true,\"count\":3}"));
-    var state_future = try maplibre.mapGetFeatureState(testing.allocator, support.handle(map), selector);
+    try support.expectCommitted(try maplibre.mapSetFeatureState(testing.allocator, support.handle(map), selector, "{\"hover\":true,\"count\":3}", null));
+    var state_future = try maplibre.mapGetFeatureState(testing.allocator, support.handle(map), selector, null);
     defer state_future.deinit();
     var state = try state_future.wait(null);
     defer state.deinit();
@@ -1156,6 +1156,7 @@ test "feature state and rendered queries copy operation results" {
                     .max = .{ .x = 64, .y = 64 },
                 } } },
                 null,
+                null,
             ),
         );
         defer result.deinit();
@@ -1164,7 +1165,7 @@ test "feature state and rendered queries copy operation results" {
             try testing.expect(std.mem.indexOf(u8, result.value[0].state.?, "\"hover\":true") != null);
             break;
         }
-        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map)));
+        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map), null));
         try support.waitForBarrier(&runtime);
         _ = try support.renderFrame(owned.session, false, true);
     } else return error.RenderedFeatureNotQueryable;
@@ -1172,17 +1173,17 @@ test "feature state and rendered queries copy operation results" {
     var source = try resolveFuture(
         maplibre.OwnedValue([]const maplibre.QueriedFeature),
         owned.session,
-        try maplibre.renderSessionQuerySourceFeatures(testing.allocator, support.handle(owned.session), "point", null),
+        try maplibre.renderSessionQuerySourceFeatures(testing.allocator, support.handle(owned.session), "point", null, null),
     );
     defer source.deinit();
     try testing.expectEqualStrings("point", source.value[0].source_id.?);
     try testing.expect(std.mem.indexOf(u8, source.value[0].feature, "\"type\":\"Point\"") != null);
 
-    try support.expectCommitted(try maplibre.mapRemoveFeatureState(testing.allocator, support.handle(map), selector));
+    try support.expectCommitted(try maplibre.mapRemoveFeatureState(testing.allocator, support.handle(map), selector, null));
 }
 
 fn featureState(map: *maplibre.Map, selector: maplibre.FeatureStateSelector) !maplibre.OwnedValue([]const u8) {
-    var future = try maplibre.mapGetFeatureState(testing.allocator, support.handle(map), selector);
+    var future = try maplibre.mapGetFeatureState(testing.allocator, support.handle(map), selector, null);
     defer future.deinit();
     return future.wait(null);
 }
@@ -1201,15 +1202,15 @@ test "map feature state set get and remove" {
 
     const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
     const feature_state = "{\"hover\":true,\"radius\":18446744073709551615}";
-    try support.expectCommitted(try maplibre.mapSetFeatureState(testing.allocator, support.handle(map), selector, feature_state));
-    try support.expectCommitted(try maplibre.mapRemoveFeatureState(testing.allocator, support.handle(map), .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" }));
+    try support.expectCommitted(try maplibre.mapSetFeatureState(testing.allocator, support.handle(map), selector, feature_state, null));
+    try support.expectCommitted(try maplibre.mapRemoveFeatureState(testing.allocator, support.handle(map), .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" }, null));
     var queued = try featureState(&map, selector);
     defer queued.deinit();
     try testing.expect(rawJsonMember(queued.value, "hover") == null);
     try testing.expectEqualStrings("18446744073709551615", rawJsonMember(queued.value, "radius").?);
 
     // A style load drops style-owned objects, not map-owned feature state.
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), feature_state_style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), feature_state_style_json, null));
     try support.waitForBarrier(&runtime);
     _ = try support.renderFrame(owned.session, false, true);
     var after_style = try featureState(&map, selector);
@@ -1217,24 +1218,24 @@ test "map feature state set get and remove" {
     try testing.expect(rawJsonMember(after_style.value, "hover") == null);
     try testing.expectEqualStrings("18446744073709551615", rawJsonMember(after_style.value, "radius").?);
 
-    try support.expectCommitted(try maplibre.mapSetFeatureState(testing.allocator, support.handle(map), selector, feature_state));
+    try support.expectCommitted(try maplibre.mapSetFeatureState(testing.allocator, support.handle(map), selector, feature_state, null));
     var restored = try featureState(&map, selector);
     defer restored.deinit();
     try testing.expectEqualStrings("true", rawJsonMember(restored.value, "hover").?);
     try testing.expectEqualStrings("18446744073709551615", rawJsonMember(restored.value, "radius").?);
 
-    try testing.expectError(error.InvalidArgument, maplibre.mapRemoveFeatureState(testing.allocator, support.handle(map), .{ .source_id = "point", .state_key = "hover" }));
+    try testing.expectError(error.InvalidArgument, maplibre.mapRemoveFeatureState(testing.allocator, support.handle(map), .{ .source_id = "point", .state_key = "hover" }, null));
 
     // The scale factor is fixed at attach, so a resize that changes it is
     // rejected and the session keeps the extent it had.
     try testing.expectError(
         error.InvalidArgument,
-        maplibre.renderSessionResize(testing.allocator, support.handle(owned.session), .{ .width = 64, .height = 64, .scale_factor = 2.0 }),
+        maplibre.renderSessionResize(testing.allocator, support.handle(owned.session), .{ .width = 64, .height = 64, .scale_factor = 2.0 }, null),
     );
-    try testing.expectEqual(@as(f64, 1.0), (try maplibre.renderSessionGetSnapshot(support.handle(owned.session))).extent.scale_factor);
+    try testing.expectEqual(@as(f64, 1.0), (try maplibre.renderSessionGetSnapshot(support.handle(owned.session), null)).extent.scale_factor);
 
     // A size change retires the renderer; map-owned state survives.
-    try finishOperation(owned.session, try maplibre.renderSessionResize(testing.allocator, support.handle(owned.session), .{ .width = 96, .height = 48, .scale_factor = 1.0 }));
+    try finishOperation(owned.session, try maplibre.renderSessionResize(testing.allocator, support.handle(owned.session), .{ .width = 96, .height = 48, .scale_factor = 1.0 }, null));
     _ = try support.expectRenderedFrame(owned.session, true);
     var after_resize = try featureState(&map, selector);
     defer after_resize.deinit();
@@ -1251,7 +1252,7 @@ test "cluster feature extensions copy values and feature collections" {
     var owned = try attachTestOwnedTexture(&map, .{ .width = 64, .height = 64, .scale_factor = 1.0 });
     defer owned.close() catch @panic("render session close failed");
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), cluster_style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), cluster_style_json, null));
     try support.waitForBarrier(&runtime);
     _ = try support.renderFrame(owned.session, false, true);
 
@@ -1268,6 +1269,7 @@ test "cluster feature extensions copy values and feature collections" {
                     .max = .{ .x = 64, .y = 64 },
                 } } },
                 null,
+                null,
             ),
         );
         if (result.value.len != 0) {
@@ -1275,7 +1277,7 @@ test "cluster feature extensions copy values and feature collections" {
             break;
         }
         result.deinit();
-        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map)));
+        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map), null));
         try support.waitForBarrier(&runtime);
         _ = try support.renderFrame(owned.session, false, true);
     }
@@ -1297,6 +1299,7 @@ test "cluster feature extensions copy values and feature collections" {
             "supercluster",
             "children",
             null,
+            null,
         ),
     );
     defer children.deinit();
@@ -1312,6 +1315,7 @@ test "cluster feature extensions copy values and feature collections" {
             feature,
             "supercluster",
             "expansion-zoom",
+            null,
             null,
         ),
     );
@@ -1329,6 +1333,7 @@ test "cluster feature extensions copy values and feature collections" {
             "supercluster",
             "leaves",
             "{\"limit\":1,\"offset\":0}",
+            null,
         ),
     );
     defer first_leaf.deinit();
@@ -1343,6 +1348,7 @@ test "cluster feature extensions copy values and feature collections" {
             "supercluster",
             "leaves",
             "{\"limit\":1,\"offset\":1}",
+            null,
         ),
     );
     defer second_leaf.deinit();
@@ -1357,15 +1363,15 @@ test "sustained frame demands outlast the texture ring depth" {
     defer support.closeMap(&map) catch @panic("map close failed");
     var owned = try attachTestOwnedTexture(&map, .{ .width = 32, .height = 32, .scale_factor = 1.0 });
     defer owned.close() catch @panic("render session close failed");
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
 
     for (0..64) |_| {
-        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map)));
+        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map), null));
         try support.waitForBarrier(&runtime);
         try testing.expectEqual(.rendered, (try support.renderFrame(owned.session, false, true)).disposition);
     }
-    try testing.expect((try maplibre.renderSessionGetSnapshot(support.handle(owned.session))).frame_generation >= 64);
+    try testing.expect((try maplibre.renderSessionGetSnapshot(support.handle(owned.session), null)).frame_generation >= 64);
 }
 
 test "a rendered frame during an ease reports needs repaint" {
@@ -1377,7 +1383,7 @@ test "a rendered frame during an ease reports needs repaint" {
     var owned = try attachTestOwnedTexture(&map, .{ .width = 32, .height = 16, .scale_factor = 1.0 });
     defer owned.close() catch @panic("render session close failed");
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
     // Settle the style's own frames so the transition drives what follows.
     try testing.expectEqual(.rendered, (try support.renderFrame(owned.session, false, true)).disposition);
@@ -1386,7 +1392,7 @@ test "a rendered frame during an ease reports needs repaint" {
         .mode = .ease,
         .camera = .{ .center = .{ .latitude = 37.7749, .longitude = -122.4194 }, .zoom = 4.0 },
         .animation = .{ .duration_ms = 60_000 },
-    }));
+    }, null));
     try support.waitForBarrier(&runtime);
 
     // Mid-transition the map asks for the next frame with the one it renders,
@@ -1403,7 +1409,7 @@ test "a rendered frame during an ease reports needs repaint" {
 }
 
 fn readSnapshotOnThread(session: maplibre.RenderSession, failure: *?anyerror) void {
-    _ = maplibre.renderSessionGetSnapshot(session) catch |err| {
+    _ = maplibre.renderSessionGetSnapshot(session, null) catch |err| {
         failure.* = err;
         return;
     };
@@ -1437,14 +1443,15 @@ test "Vulkan borrowed texture replaces its target" {
         support.handle(map),
         borrowed.descriptor(),
         .{ .driver = .core_worker, .requested_texture_ring_depth = 1 },
+        null,
     ));
     defer support.closeSession(&session, true) catch @panic("render session close failed");
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
     for (0..1000) |_| {
         if ((try support.renderFrame(session, false, true)).disposition == .rendered) break;
-        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map)));
+        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map), null));
         try support.waitForBarrier(&runtime);
     } else return error.FrameDidNotRender;
 
@@ -1453,21 +1460,21 @@ test "Vulkan borrowed texture replaces its target" {
         errdefer borrowed.release(replacement);
         try finishOperation(
             session,
-            try maplibre.vulkanBorrowedTextureSetTarget(testing.allocator, session, borrowed.descriptorFor(replacement, 48, 24)),
+            try maplibre.vulkanBorrowedTextureSetTarget(testing.allocator, session, borrowed.descriptorFor(replacement, 48, 24), null),
         );
         borrowed.adopt(replacement, 48, 24);
     }
     // A borrowed texture belongs to the host, so the session cannot resize it;
     // the replacement target carries the new size and the map takes it here.
-    try testing.expectError(error.Unsupported, maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 48, .height = 24, .scale_factor = 1.0 }));
-    try support.expectCommitted(try maplibre.mapResize(support.handle(map), .{ .width = 48, .height = 24, .scale_factor = 1.0 }));
+    try testing.expectError(error.Unsupported, maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 48, .height = 24, .scale_factor = 1.0 }, null));
+    try support.expectCommitted(try maplibre.mapResize(support.handle(map), .{ .width = 48, .height = 24, .scale_factor = 1.0 }, null));
     try support.waitForBarrier(&runtime);
     for (0..1000) |_| {
         if ((try support.renderFrame(session, false, true)).disposition == .rendered) break;
-        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map)));
+        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map), null));
         try support.waitForBarrier(&runtime);
     } else return error.FrameDidNotRender;
-    const snapshot = try maplibre.renderSessionGetSnapshot(session);
+    const snapshot = try maplibre.renderSessionGetSnapshot(session, null);
     try testing.expectEqual(@as(u32, 48), snapshot.extent.width);
     try testing.expectEqual(@as(u32, 24), snapshot.extent.height);
 }
@@ -1485,10 +1492,11 @@ test "OpenGL borrowed texture replaces its target" {
         support.handle(map),
         borrowed.descriptor(),
         .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 1 },
+        null,
     ));
     defer support.closeSession(&session, true) catch @panic("render session close failed");
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
     try testing.expectEqual(.rendered, (try support.renderFrame(session, false, true)).disposition);
     var initial_pixels: [32 * 16 * 4]u8 = undefined;
@@ -1500,18 +1508,18 @@ test "OpenGL borrowed texture replaces its target" {
         errdefer borrowed.context.destroyTexture(replacement);
         try finishOperation(
             session,
-            try maplibre.openglBorrowedTextureSetTarget(testing.allocator, session, borrowed.descriptorFor(replacement, 48, 24)),
+            try maplibre.openglBorrowedTextureSetTarget(testing.allocator, session, borrowed.descriptorFor(replacement, 48, 24), null),
         );
         borrowed.adopt(replacement, 48, 24);
     }
     // A borrowed texture belongs to the host, so the session cannot resize it;
     // the replacement target carries the new size and the map takes it here.
-    try testing.expectError(error.Unsupported, maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 48, .height = 24, .scale_factor = 1.0 }));
-    try support.expectCommitted(try maplibre.mapResize(support.handle(map), .{ .width = 48, .height = 24, .scale_factor = 1.0 }));
+    try testing.expectError(error.Unsupported, maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 48, .height = 24, .scale_factor = 1.0 }, null));
+    try support.expectCommitted(try maplibre.mapResize(support.handle(map), .{ .width = 48, .height = 24, .scale_factor = 1.0 }, null));
     try support.waitForBarrier(&runtime);
     for (0..1000) |_| {
         if ((try support.renderFrame(session, false, true)).disposition == .rendered) break;
-        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map)));
+        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map), null));
         try support.waitForBarrier(&runtime);
     } else return error.FrameDidNotRender;
 }
@@ -1531,7 +1539,7 @@ test "a map takes one render session at a time" {
     try owned.close();
     var replacement = try attachTestOwnedTexture(&map, .{ .width = 16, .height = 16, .scale_factor = 1.0 });
     defer replacement.close() catch @panic("render session close failed");
-    try testing.expectEqual(.attached, (try maplibre.renderSessionGetSnapshot(support.handle(replacement.session))).state);
+    try testing.expectEqual(.attached, (try maplibre.renderSessionGetSnapshot(support.handle(replacement.session), null)).state);
 }
 
 test "a detached session rejects the calls that need a target" {
@@ -1543,29 +1551,29 @@ test "a detached session rejects the calls that need a target" {
     var context = try TestOwnedTextureContext.init();
     defer context.deinit();
     const session = try attachOwnedTexture(&map, &context, .{ .width = 16, .height = 16, .scale_factor = 1.0 });
-    defer maplibre.renderSessionDestroy(support.handle(session)) catch @panic("render session destroy failed");
+    defer maplibre.renderSessionDestroy(support.handle(session), null) catch @panic("render session destroy failed");
 
     // Establish a renderable update before racing a demand with detach.
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
     try testing.expectEqual(.rendered, (try support.renderFrame(session, false, true)).disposition);
 
     // A demand still outstanding at detach reports a target that went away.
     const token = support.nextFrameToken();
-    try maplibre.renderSessionRequestFrame(testing.allocator, support.handle(session), .{ .flags = .{ .if_needed = false }, .token = token });
-    try finishOperation(session, try maplibre.renderSessionDetach(support.handle(session)));
+    try maplibre.renderSessionRequestFrame(testing.allocator, support.handle(session), .{ .flags = .{ .if_needed = false }, .token = token }, null);
+    try finishOperation(session, try maplibre.renderSessionDetach(support.handle(session), null));
 
-    try testing.expectEqual(.detached, (try maplibre.renderSessionGetSnapshot(session)).state);
-    try testing.expectError(error.InvalidState, maplibre.renderSessionAcquireFrame(support.handle(session)));
-    try testing.expectError(error.InvalidState, maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 32, .height = 32, .scale_factor = 1.0 }));
+    try testing.expectEqual(.detached, (try maplibre.renderSessionGetSnapshot(session, null)).state);
+    try testing.expectError(error.InvalidState, maplibre.renderSessionAcquireFrame(support.handle(session), null));
+    try testing.expectError(error.InvalidState, maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 32, .height = 32, .scale_factor = 1.0 }, null));
 
     // Detach resolves the demand either way: the frame it rendered before the
     // detach, or the target that went away.
-    var batch = try maplibre.renderSessionDrainFrameResults(support.handle(session));
+    var batch = try maplibre.renderSessionDrainFrameResults(support.handle(session), null);
     defer batch.deinit();
     var saw_token = false;
-    for (0..try maplibre.renderFrameBatchCount(batch)) |index| {
-        const result = try maplibre.renderFrameBatchGet(batch, index);
+    for (0..try maplibre.renderFrameBatchCount(batch, null)) |index| {
+        const result = try maplibre.renderFrameBatchGet(batch, index, null);
         if (result.token != token) continue;
         saw_token = true;
         switch (result.disposition) {
@@ -1593,18 +1601,18 @@ test "a set-target call for another target kind reports unsupported" {
             .extent = extent,
             .surface = 1,
             .context = fakeVulkanContext(),
-        }));
+        }, null));
     } else if (build_options.supports_opengl) {
         try testing.expectError(error.Unsupported, maplibre.openglSurfaceSetTarget(testing.allocator, owned.session, .{
             .extent = extent,
             .surface = fakeNativePointer(),
             .context = fakeOpenGLContext(),
-        }));
+        }, null));
     } else if (build_options.supports_metal) {
         try testing.expectError(error.Unsupported, maplibre.metalSurfaceSetTarget(testing.allocator, owned.session, .{
             .extent = extent,
             .layer = fakeNativePointer(),
-        }));
+        }, null));
     }
 }
 
@@ -1617,7 +1625,7 @@ test "an empty frame-result drain reports an empty batch" {
     var owned = try attachTestOwnedTexture(&map, .{ .width = 16, .height = 16, .scale_factor = 1.0 });
     defer owned.close() catch @panic("render session close failed");
 
-    try testing.expectError(error.NotReady, maplibre.renderSessionDrainFrameResults(owned.session));
+    try testing.expectError(error.NotReady, maplibre.renderSessionDrainFrameResults(owned.session, null));
 }
 
 test "memory and data maintenance commands leave the session rendering" {
@@ -1629,16 +1637,16 @@ test "memory and data maintenance commands leave the session rendering" {
     var owned = try attachTestOwnedTexture(&map, .{ .width = 32, .height = 32, .scale_factor = 1.0 });
     defer owned.close() catch @panic("render session close failed");
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
     _ = try support.expectRenderedFrame(owned.session, true);
 
-    try finishOperation(owned.session, try maplibre.renderSessionReduceMemoryUse(support.handle(owned.session)));
-    try finishOperation(owned.session, try maplibre.renderSessionClearData(support.handle(owned.session)));
-    try finishOperation(owned.session, try maplibre.renderSessionDumpDebugLogs(support.handle(owned.session)));
-    try finishOperation(owned.session, try maplibre.renderSessionBarrier(support.handle(owned.session)));
+    try finishOperation(owned.session, try maplibre.renderSessionReduceMemoryUse(support.handle(owned.session), null));
+    try finishOperation(owned.session, try maplibre.renderSessionClearData(support.handle(owned.session), null));
+    try finishOperation(owned.session, try maplibre.renderSessionDumpDebugLogs(support.handle(owned.session), null));
+    try finishOperation(owned.session, try maplibre.renderSessionBarrier(support.handle(owned.session), null));
 
-    try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map)));
+    try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map), null));
     try support.waitForBarrier(&runtime);
     _ = try support.expectRenderedFrame(owned.session, true);
 }
@@ -1651,15 +1659,15 @@ test "disposing a parent graph retires its acquired frame and session" {
     var context = try TestOwnedTextureContext.init();
     defer context.deinit();
     var session = try attachOwnedTexture(&map, &context, .{ .width = 16, .height = 16, .scale_factor = 1.0 });
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), "{\"version\":8,\"sources\":{},\"layers\":[]}"));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), "{\"version\":8,\"sources\":{},\"layers\":[]}", null));
     try support.waitForBarrier(&runtime);
     _ = try support.expectRenderedFrame(session, true);
-    var frame = try maplibre.renderSessionAcquireFrame(support.handle(session));
+    var frame = try maplibre.renderSessionAcquireFrame(support.handle(session), null);
     map.deinit();
     frame.deinit();
     session.deinit();
-    try testing.expectError(error.InvalidState, maplibre.acquiredFrameGetResult(frame));
-    try testing.expectError(error.InvalidState, maplibre.renderSessionGetSnapshot(session));
+    try testing.expectError(error.InvalidState, maplibre.acquiredFrameGetResult(frame, null));
+    try testing.expectError(error.InvalidState, maplibre.renderSessionGetSnapshot(session, null));
 }
 
 test "abandoning a session releases the map without a graphics call" {
@@ -1672,17 +1680,17 @@ test "abandoning a session releases the map without a graphics call" {
     defer context.deinit();
     const session = try attachOwnedTexture(&map, &context, .{ .width = 16, .height = 16, .scale_factor = 1.0 });
 
-    const abandoned = try maplibre.renderSessionAbandon(support.handle(session));
+    const abandoned = try maplibre.renderSessionAbandon(support.handle(session), null);
     switch (abandoned.disposition) {
         .clean => try testing.expectEqual(@as(u32, 0), abandoned.quarantined_resource_count),
         .quarantined => try testing.expect(abandoned.quarantined_resource_count != 0),
         else => return error.UnexpectedAbandonDisposition,
     }
-    try testing.expectEqual(.abandoned, (try maplibre.renderSessionGetSnapshot(session)).state);
+    try testing.expectEqual(.abandoned, (try maplibre.renderSessionGetSnapshot(session, null)).state);
     // An abandoned session is no longer attached, so a frame acquisition has
     // no target to take from.
-    try testing.expectError(error.InvalidState, maplibre.renderSessionAcquireFrame(support.handle(session)));
-    try maplibre.renderSessionDestroy(support.handle(session));
+    try testing.expectError(error.InvalidState, maplibre.renderSessionAcquireFrame(support.handle(session), null));
+    try maplibre.renderSessionDestroy(support.handle(session), null);
 
     // The abandoned session no longer holds the map, so the map closes.
     try support.closeMap(&map);
@@ -1697,11 +1705,11 @@ test "rendered and source queries clip and filter their inputs" {
     var owned = try attachTestOwnedTexture(&map, .{ .width = 64, .height = 64, .scale_factor = 1.0 });
     defer owned.close() catch @panic("render session close failed");
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .camera = .{
         .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
         .zoom = 4.0,
-    } }));
+    } }, null));
     try support.waitForBarrier(&runtime);
     _ = try support.expectRenderedFrame(owned.session, true);
 
@@ -1720,13 +1728,13 @@ test "rendered and source queries clip and filter their inputs" {
             var result = try resolveFuture(
                 maplibre.OwnedValue([]const maplibre.QueriedFeature),
                 owned.session,
-                try maplibre.renderSessionQueryRenderedFeatures(testing.allocator, support.handle(owned.session), .{ .data = .{ .box = box } }, layer_options),
+                try maplibre.renderSessionQueryRenderedFeatures(testing.allocator, support.handle(owned.session), .{ .data = .{ .box = box } }, layer_options, null),
             );
             defer result.deinit();
             if (result.value.len != 0) hits += 1;
         }
         if (hits == boxes.len) break;
-        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map)));
+        try support.expectCommitted(try maplibre.mapRequestRepaint(support.handle(map), null));
         try support.waitForBarrier(&runtime);
         _ = try support.renderFrame(owned.session, false, true);
     }
@@ -1739,7 +1747,7 @@ test "rendered and source queries clip and filter their inputs" {
         try maplibre.renderSessionQueryRenderedFeatures(testing.allocator, support.handle(owned.session), .{ .data = .{ .box = .{
             .min = .{ .x = 400, .y = 400 },
             .max = .{ .x = 500, .y = 500 },
-        } } }, layer_options),
+        } } }, layer_options, null),
     );
     defer offscreen.deinit();
     try testing.expectEqual(@as(usize, 0), offscreen.value.len);
@@ -1750,7 +1758,7 @@ test "rendered and source queries clip and filter their inputs" {
         owned.session,
         try maplibre.renderSessionQueryRenderedFeatures(testing.allocator, support.handle(owned.session), .{ .data = .{ .box = boxes[0] } }, .{
             .layer_ids = &.{"no-such-layer"},
-        }),
+        }, null),
     );
     defer filtered.deinit();
     try testing.expectEqual(@as(usize, 0), filtered.value.len);
@@ -1762,7 +1770,7 @@ test "rendered and source queries clip and filter their inputs" {
         owned.session,
         try maplibre.renderSessionQuerySourceFeatures(testing.allocator, support.handle(owned.session), "point", .{
             .filter = "[\"==\", [\"get\", \"kind\"], \"capital\"]",
-        }),
+        }, null),
     );
     defer source_hits.deinit();
     try testing.expect(source_hits.value.len != 0);
@@ -1772,7 +1780,7 @@ test "rendered and source queries clip and filter their inputs" {
         owned.session,
         try maplibre.renderSessionQuerySourceFeatures(testing.allocator, support.handle(owned.session), "point", .{
             .filter = "[\"==\", [\"get\", \"kind\"], \"village\"]",
-        }),
+        }, null),
     );
     defer source_misses.deinit();
     try testing.expectEqual(@as(usize, 0), source_misses.value.len);
@@ -1796,14 +1804,14 @@ test "OpenGL surface renders through the caller's driver" {
         .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
         .context = context.descriptor(),
         .surface = context.surface(),
-    }, .{ .driver = .caller_graphics_thread }), true);
+    }, .{ .driver = .caller_graphics_thread }, null), true);
     defer support.closeSession(&session, true) catch @panic("render session close failed");
 
-    const capabilities = try maplibre.renderSessionGetCapabilities(support.handle(session));
+    const capabilities = try maplibre.renderSessionGetCapabilities(support.handle(session), null);
     try testing.expectEqual(.caller_graphics_thread, capabilities.driver);
     try testing.expect(capabilities.flags.presentation);
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
     _ = try support.expectRenderedFrame(session, true);
 
@@ -1825,12 +1833,12 @@ test "Vulkan surface attach rejects a descriptor with no surface" {
         .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
         .context = fakeVulkanContext(),
         .surface = 0,
-    }, .{ .driver = .core_worker }));
+    }, .{ .driver = .core_worker }, null));
     try testing.expectError(error.InvalidArgument, maplibre.vulkanSurfaceAttach(testing.allocator, support.handle(map), .{
         .extent = .{ .width = 0, .height = 16, .scale_factor = 1.0 },
         .context = fakeVulkanContext(),
         .surface = 1,
-    }, .{ .driver = .core_worker }));
+    }, .{ .driver = .core_worker }, null));
 }
 
 test "projection captures last rendered update and survives session" {
@@ -1846,25 +1854,25 @@ test "projection captures last rendered update and survives session" {
     });
     defer owned.close() catch {};
     const session = &owned.session;
-    try testing.expectError(error.InvalidState, maplibre.renderSessionProjectionCreate(support.handle(session)));
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .camera = .{ .center = .{ .latitude = 0, .longitude = 0 }, .zoom = 5 } }));
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try testing.expectError(error.InvalidState, maplibre.renderSessionProjectionCreate(support.handle(session), null));
+    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .camera = .{ .center = .{ .latitude = 0, .longitude = 0 }, .zoom = 5 } }, null));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(.rendered, (try support.renderFrame(session.*, false, true)).disposition);
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .camera = .{ .center = .{ .latitude = 10, .longitude = 20 }, .zoom = 3 } }));
+    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, support.handle(map), .{ .camera = .{ .center = .{ .latitude = 10, .longitude = 20 }, .zoom = 3 } }, null));
     try support.waitForBarrier(&runtime);
-    const projection = try maplibre.renderSessionProjectionCreate(support.handle(session));
-    defer maplibre.mapProjectionClose(support.handle(projection)) catch @panic("projection close failed");
-    try testing.expectApproxEqAbs(@as(f64, 5), (try maplibre.mapProjectionGetCamera(support.handle(projection))).zoom.?, 0.000001);
+    const projection = try maplibre.renderSessionProjectionCreate(support.handle(session), null);
+    defer maplibre.mapProjectionClose(support.handle(projection), null) catch @panic("projection close failed");
+    try testing.expectApproxEqAbs(@as(f64, 5), (try maplibre.mapProjectionGetCamera(support.handle(projection), null)).zoom.?, 0.000001);
     try testing.expectEqual(.rendered, (try support.renderFrame(session.*, false, true)).disposition);
-    const newer = try maplibre.renderSessionProjectionCreate(support.handle(session));
-    defer maplibre.mapProjectionClose(newer) catch @panic("projection close failed");
-    try testing.expectApproxEqAbs(@as(f64, 3), (try maplibre.mapProjectionGetCamera(support.handle(newer))).zoom.?, 0.000001);
-    try finishOperation(session.*, try maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 80, .height = 40, .scale_factor = 1.0 }));
-    try testing.expectError(error.InvalidState, maplibre.renderSessionProjectionCreate(support.handle(session)));
+    const newer = try maplibre.renderSessionProjectionCreate(support.handle(session), null);
+    defer maplibre.mapProjectionClose(newer, null) catch @panic("projection close failed");
+    try testing.expectApproxEqAbs(@as(f64, 3), (try maplibre.mapProjectionGetCamera(support.handle(newer), null)).zoom.?, 0.000001);
+    try finishOperation(session.*, try maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 80, .height = 40, .scale_factor = 1.0 }, null));
+    try testing.expectError(error.InvalidState, maplibre.renderSessionProjectionCreate(support.handle(session), null));
     try owned.close();
     try support.closeMap(&map);
-    try testing.expectApproxEqAbs(@as(f64, 5), (try maplibre.mapProjectionGetCamera(support.handle(projection))).zoom.?, 0.000001);
+    try testing.expectApproxEqAbs(@as(f64, 5), (try maplibre.mapProjectionGetCamera(support.handle(projection), null)).zoom.?, 0.000001);
 }
 
 test "scoped GPU reads pin the frame across sibling disposal" {
@@ -1876,28 +1884,28 @@ test "scoped GPU reads pin the frame across sibling disposal" {
     var context = try TestOwnedTextureContext.init();
     defer context.deinit();
     const session = try attachOwnedTexture(&map, &context, .{ .width = 16, .height = 16, .scale_factor = 1 });
-    defer maplibre.renderSessionDestroy(session) catch @panic("session destroy failed");
-    try support.expectCommitted(try maplibre.mapSetStyleJson(map, support.style_json));
+    defer maplibre.renderSessionDestroy(session, null) catch @panic("session destroy failed");
+    try support.expectCommitted(try maplibre.mapSetStyleJson(map, support.style_json, null));
     _ = try support.expectRenderedFrame(session, true);
-    var frame = try maplibre.renderSessionAcquireFrame(session);
+    var frame = try maplibre.renderSessionAcquireFrame(session, null);
     defer frame.deinit();
     _ = try support.expectRenderedFrame(session, true);
-    var sibling = try maplibre.renderSessionAcquireFrame(session);
+    var sibling = try maplibre.renderSessionAcquireFrame(session, null);
     defer sibling.deinit();
     const Probe = struct {
         frame: maplibre.AcquiredFrame,
         sibling: *maplibre.AcquiredFrame,
         session: maplibre.RenderSession,
         fn inspect(self: @This(), _: maplibre.GpuSync) anyerror!void {
-            try testing.expectError(error.Busy, maplibre.acquiredFrameRelease(testing.allocator, self.frame, .{ .kind = .cpu_complete }));
-            try testing.expectError(error.Busy, maplibre.renderSessionAbandon(self.session));
+            try testing.expectError(error.Busy, maplibre.acquiredFrameRelease(testing.allocator, self.frame, .{ .kind = .cpu_complete }, null));
+            try testing.expectError(error.Busy, maplibre.renderSessionAbandon(self.session, null));
             self.sibling.deinit();
             try testing.expectError(error.TargetLost, maplibre.acquiredFrameGetProducerSync(void, self.frame, {}, struct {
                 fn use(_: void, _: maplibre.GpuSync) anyerror!void {}
-            }.use));
+            }.use, null));
             return error.HostConsumerFailed;
         }
     };
-    try testing.expectError(error.HostConsumerFailed, maplibre.acquiredFrameGetProducerSync(void, frame, Probe{ .frame = frame, .sibling = &sibling, .session = session }, Probe.inspect));
-    try maplibre.acquiredFrameRelease(testing.allocator, frame, .{ .kind = .cpu_complete });
+    try testing.expectError(error.HostConsumerFailed, maplibre.acquiredFrameGetProducerSync(void, frame, Probe{ .frame = frame, .sibling = &sibling, .session = session }, Probe.inspect, null));
+    try maplibre.acquiredFrameRelease(testing.allocator, frame, .{ .kind = .cpu_complete }, null);
 }

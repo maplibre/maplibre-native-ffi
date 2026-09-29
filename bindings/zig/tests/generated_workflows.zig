@@ -13,22 +13,22 @@ test "generated owners preserve rejected release and copied event snapshots" {
     defer options.deinit();
     var runtime = try g.runtimeCreate(testing.allocator, options.value, null);
     defer runtime.deinit();
-    var map = try resolve(try g.mapCreate(testing.allocator, runtime, try g.mapOptionsDefault()));
+    var map = try resolve(try g.mapCreate(testing.allocator, runtime, try g.mapOptionsDefault(), null));
     defer map.deinit();
-    try testing.expectError(error.InvalidState, g.runtimeRelease(runtime));
-    const command = try resolve(try g.mapSetStyleJson(map, test_style));
+    try testing.expectError(error.InvalidState, g.runtimeRelease(runtime, null));
+    const command = try resolve(try g.mapSetStyleJson(map, test_style, null));
     try command.statusError();
-    try resolve(try g.runtimeBarrier(runtime));
-    var batch = try g.runtimeDrainEvents(runtime);
+    try resolve(try g.runtimeBarrier(runtime, null));
+    var batch = try g.runtimeDrainEvents(runtime, null);
     defer batch.deinit();
-    var copied = try g.eventBatchGet(testing.allocator, batch);
+    var copied = try g.eventBatchGet(testing.allocator, batch, null);
     defer copied.deinit();
     try g.eventBatchRelease(batch);
     try testing.expect(copied.value.events.len != 0);
     const saved = map;
-    try resolve(try g.mapRelease(map));
-    try testing.expectError(error.InvalidState, g.mapSnapshotGet(saved));
-    try resolve(try g.runtimeRelease(runtime));
+    try resolve(try g.mapRelease(map, null));
+    try testing.expectError(error.InvalidState, g.mapSnapshotGet(saved, null));
+    try resolve(try g.runtimeRelease(runtime, null));
 }
 
 const ProviderProbe = struct {
@@ -39,14 +39,14 @@ const ProviderProbe = struct {
         const self: *@This() = @ptrCast(@alignCast(context.?));
         _ = self.calls.fetchAdd(1, .seq_cst);
         if (request.kind != .style) return .pass_through;
-        if (g.runtimeBarrier(self.runtime)) |unexpected| {
+        if (g.runtimeBarrier(self.runtime, null)) |unexpected| {
             var future = unexpected;
             future.deinit();
             return error.NativeError;
         } else |err| {
             if (err != error.InvalidState) return err;
         }
-        try g.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .bytes = test_style });
+        try g.resourceRequestComplete(std.heap.smp_allocator, handle, .{ .bytes = test_style }, null);
         try g.resourceRequestRelease(handle);
         try g.resourceRequestRelease(handle);
         return .pass_through;
@@ -62,16 +62,16 @@ test "generated provider inline completion and close retain decision ownership" 
     defer options.deinit();
     var runtime = try g.runtimeCreate(testing.allocator, options.value, null);
     defer runtime.deinit();
-    var map = try resolve(try g.mapCreate(testing.allocator, runtime, try g.mapOptionsDefault()));
+    var map = try resolve(try g.mapCreate(testing.allocator, runtime, try g.mapOptionsDefault(), null));
     defer map.deinit();
     var probe = ProviderProbe{ .runtime = runtime };
-    try resolve(try g.runtimeSetResourceProvider(testing.allocator, runtime, .{ .context = &probe, .callback = ProviderProbe.provide, .release_context = ProviderProbe.release }));
-    try (try resolve(try g.mapSetStyleUrl(testing.allocator, map, "binding-test://style"))).statusError();
+    try resolve(try g.runtimeSetResourceProvider(testing.allocator, runtime, .{ .context = &probe, .callback = ProviderProbe.provide, .release_context = ProviderProbe.release }, null));
+    try (try resolve(try g.mapSetStyleUrl(testing.allocator, map, "binding-test://style", null))).statusError();
     var loaded = false;
     for (0..1000) |_| {
-        var batch = try g.runtimeDrainEvents(runtime);
+        var batch = try g.runtimeDrainEvents(runtime, null);
         defer batch.deinit();
-        var copy = try g.eventBatchGet(testing.allocator, batch);
+        var copy = try g.eventBatchGet(testing.allocator, batch, null);
         defer copy.deinit();
         for (copy.value.events) |event| if (event.type == .map_style_loaded) {
             loaded = true;
@@ -80,9 +80,9 @@ test "generated provider inline completion and close retain decision ownership" 
         try testing.io.sleep(.fromMilliseconds(1), .awake);
     }
     try testing.expect(loaded);
-    try resolve(try g.runtimeClearResourceProvider(runtime));
+    try resolve(try g.runtimeClearResourceProvider(runtime, null));
     try testing.expectEqual(@as(usize, 1), probe.calls.load(.seq_cst));
     try testing.expectEqual(@as(usize, 1), probe.releases.load(.seq_cst));
-    try resolve(try g.mapRelease(map));
-    try resolve(try g.runtimeRelease(runtime));
+    try resolve(try g.mapRelease(map, null));
+    try resolve(try g.runtimeRelease(runtime, null));
 }

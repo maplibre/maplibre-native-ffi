@@ -40,12 +40,13 @@ test "Metal surface core worker presents and replaces its target" {
             support.handle(map),
             try metalSurfaceDescriptor(initial_layer, .{ .width = 32, .height = 16, .scale_factor = 2 }),
             .{ .driver = .core_worker },
+            null,
         ),
         false,
     );
     defer support.closeSession(&session, false) catch @panic("render session close failed");
 
-    const capabilities = try maplibre.renderSessionGetCapabilities(support.handle(session));
+    const capabilities = try maplibre.renderSessionGetCapabilities(support.handle(session), null);
     try testing.expectEqual(.core_worker, capabilities.driver);
     try testing.expect(capabilities.flags.presentation);
     try testing.expect(!capabilities.flags.frame_acquisition);
@@ -55,7 +56,7 @@ test "Metal surface core worker presents and replaces its target" {
     try testing.expectEqual(@as(u32, 64), initial_drawable_size.width);
     try testing.expectEqual(@as(u32, 32), initial_drawable_size.height);
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
     const initial_frame = try support.expectRenderedFrame(session, false);
     try testing.expect(initial_frame.frame_generation != 0);
@@ -64,18 +65,18 @@ test "Metal surface core worker presents and replaces its target" {
 
     try support.finishOperation(
         session,
-        try maplibre.metalSurfaceSetTarget(testing.allocator, session, try metalSurfaceDescriptor(replacement_layer, .{ .width = 48, .height = 24, .scale_factor = 1.0 })),
+        try maplibre.metalSurfaceSetTarget(testing.allocator, session, try metalSurfaceDescriptor(replacement_layer, .{ .width = 48, .height = 24, .scale_factor = 1.0 }), null),
         false,
     );
     // The session resize is the single authority for an attached session: it
     // posts the map resize itself.
-    try support.finishOperation(session, try maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 48, .height = 24, .scale_factor = 1.0 }), false);
+    try support.finishOperation(session, try maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 48, .height = 24, .scale_factor = 1.0 }, null), false);
     try support.waitForBarrier(&runtime);
     _ = try support.expectRenderedFrame(session, false);
 
     try testing.expectEqual(initial_drawable_count, try initial_layer.nextDrawableCount());
     try testing.expect((try replacement_layer.nextDrawableCount()) != 0);
-    const snapshot = try maplibre.renderSessionGetSnapshot(session);
+    const snapshot = try maplibre.renderSessionGetSnapshot(session, null);
     try testing.expectEqual(.attached, snapshot.state);
     try testing.expectEqual(@as(u32, 48), snapshot.extent.width);
     try testing.expectEqual(@as(u32, 24), snapshot.extent.height);
@@ -99,13 +100,14 @@ test "Metal surface caller driver presents when the host services it" {
             support.handle(map),
             try metalSurfaceDescriptor(layer, .{ .width = 24, .height = 12, .scale_factor = 1.0 }),
             .{ .driver = .caller_graphics_thread },
+            null,
         ),
         true,
     );
     defer support.closeSession(&session, true) catch @panic("render session close failed");
 
-    try testing.expectEqual(.caller_graphics_thread, (try maplibre.renderSessionGetCapabilities(support.handle(session))).driver);
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try testing.expectEqual(.caller_graphics_thread, (try maplibre.renderSessionGetCapabilities(support.handle(session), null)).driver);
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
     _ = try support.expectRenderedFrame(session, true);
     try testing.expect((try layer.nextDrawableCount()) != 0);
@@ -131,12 +133,13 @@ test "Metal surface honors the present bit on each demand" {
             support.handle(map),
             try metalSurfaceDescriptor(layer, .{ .width = 32, .height = 16, .scale_factor = 1.0 }),
             .{ .driver = .core_worker },
+            null,
         ),
         false,
     );
     defer support.closeSession(&session, false) catch @panic("render session close failed");
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
     const presenting_start = try support.expectRenderedFrame(session, false);
     const presented = try layer.nextDrawableCount();
@@ -175,37 +178,37 @@ test "Metal borrowed texture renders and replaces its target" {
     var session = try support.finishAttachment(
         try maplibre.metalBorrowedTextureAttach(testing.allocator, support.handle(map), initial.descriptor(.{ .width = 32, .height = 16, .scale_factor = 1.0 }), .{
             .driver = .core_worker,
-        }),
+        }, null),
         false,
     );
     defer support.closeSession(&session, false) catch @panic("render session close failed");
 
     // A borrowed texture is the host's, so the session grants neither frame
     // acquisition nor readback.
-    const capabilities = try maplibre.renderSessionGetCapabilities(support.handle(session));
+    const capabilities = try maplibre.renderSessionGetCapabilities(support.handle(session), null);
     try testing.expect(!capabilities.flags.frame_acquisition);
     try testing.expect(!capabilities.flags.readback);
     try testing.expect(!capabilities.flags.presentation);
 
-    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json));
+    try support.expectCommitted(try maplibre.mapSetStyleJson(support.handle(map), support.style_json, null));
     try support.waitForBarrier(&runtime);
     _ = try support.expectRenderedFrame(session, false);
     try testing.expect(try initial.hasNonZeroPixel());
 
     try support.finishOperation(
         session,
-        try maplibre.metalBorrowedTextureSetTarget(testing.allocator, session, replacement.descriptor(.{ .width = 48, .height = 24, .scale_factor = 1.0 })),
+        try maplibre.metalBorrowedTextureSetTarget(testing.allocator, session, replacement.descriptor(.{ .width = 48, .height = 24, .scale_factor = 1.0 }), null),
         false,
     );
     // A borrowed texture belongs to the host, so the session cannot resize it;
     // the replacement target carries the new size and the map takes it here.
-    try testing.expectError(error.Unsupported, maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 48, .height = 24, .scale_factor = 1.0 }));
-    try support.expectCommitted(try maplibre.mapResize(support.handle(map), .{ .width = 48, .height = 24, .scale_factor = 1.0 }));
+    try testing.expectError(error.Unsupported, maplibre.renderSessionResize(testing.allocator, support.handle(session), .{ .width = 48, .height = 24, .scale_factor = 1.0 }, null));
+    try support.expectCommitted(try maplibre.mapResize(support.handle(map), .{ .width = 48, .height = 24, .scale_factor = 1.0 }, null));
     try support.waitForBarrier(&runtime);
     _ = try support.expectRenderedFrame(session, false);
     try testing.expect(try replacement.hasNonZeroPixel());
 
-    const snapshot = try maplibre.renderSessionGetSnapshot(session);
+    const snapshot = try maplibre.renderSessionGetSnapshot(session, null);
     try testing.expectEqual(@as(u32, 48), snapshot.extent.width);
     try testing.expectEqual(@as(u32, 24), snapshot.extent.height);
 }

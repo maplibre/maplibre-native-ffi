@@ -19,10 +19,10 @@ const width = 512;
 const height = 512;
 const style_url = "https://tiles.openfreemap.org/styles/bright";
 
-fn waitForSessionFuture(session: *maplibre.RenderSession, future: *binding.Future(void), diagnostic_store: ?*binding.DiagnosticStore) !void {
-    if (!uses_caller_driver) return future.wait(diagnostic_store);
-    while (!try future.poll()) _ = try maplibre.renderSessionServiceDriverWork(session.*, 0);
-    try future.wait(diagnostic_store);
+fn waitForSessionFuture(session: *maplibre.RenderSession, future: *binding.Future(void), diagnostic: ?*binding.Diagnostic) !void {
+    if (!uses_caller_driver) return future.wait(diagnostic);
+    while (!try future.poll()) _ = try maplibre.renderSessionServiceDriverWork(session.*, 0, null);
+    try future.wait(diagnostic);
 }
 
 pub fn main(init_args: std.process.Init) !void {
@@ -36,12 +36,13 @@ pub fn main(init_args: std.process.Init) !void {
     defer maplibre.logSetAsyncSeverityMask(maplibre.LogSeverityMask.default, null) catch {};
     try logAndValidateRenderBackend();
 
-    var diagnostic_store = binding.DiagnosticStore.init(allocator);
-    defer diagnostic_store.deinit();
+    // Setup calls report into one diagnostic, and a failure prints its details.
+    var diagnostic: binding.Diagnostic = .{};
+    errdefer if (diagnostic.message().len != 0) std.log.err("{s}", .{diagnostic.message()});
 
-    var runtime = try maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:" }, null);
+    var runtime = try maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:" }, &diagnostic);
     defer runtime.deinit();
-    defer if (maplibre.runtimeRelease(runtime)) |future| {
+    defer if (maplibre.runtimeRelease(runtime, null)) |future| {
         var teardown = future;
         _ = teardown.wait(null) catch {};
         teardown.deinit();
@@ -49,11 +50,11 @@ pub fn main(init_args: std.process.Init) !void {
 
     var options = try maplibre.mapOptionsDefault();
     options.map_mode = .static;
-    var map_future = try maplibre.mapCreate(allocator, runtime, options);
+    var map_future = try maplibre.mapCreate(allocator, runtime, options, &diagnostic);
     defer map_future.deinit();
-    var map = try map_future.wait(&diagnostic_store);
+    var map = try map_future.wait(&diagnostic);
     defer map.deinit();
-    defer if (maplibre.mapRelease(map)) |future| {
+    defer if (maplibre.mapRelease(map, null)) |future| {
         var teardown = future;
         _ = teardown.wait(null) catch {};
         teardown.deinit();
@@ -62,15 +63,15 @@ pub fn main(init_args: std.process.Init) !void {
     // This example selects no event types: the still-image request and the
     // readback report through their own futures, and a frame that does not
     // render arrives as the demand's disposition.
-    var resize = try maplibre.mapResize(map, .{ .width = width, .height = height, .scale_factor = 1.0 });
+    var resize = try maplibre.mapResize(map, .{ .width = width, .height = height, .scale_factor = 1.0 }, &diagnostic);
     resize.deinit();
     try setInitialCamera(allocator, &map);
-    var style = try maplibre.mapSetStyleUrl(allocator, map, style_url);
+    var style = try maplibre.mapSetStyleUrl(allocator, map, style_url, &diagnostic);
     style.deinit();
 
-    var barrier = try maplibre.runtimeBarrier(runtime);
+    var barrier = try maplibre.runtimeBarrier(runtime, &diagnostic);
     defer barrier.deinit();
-    try barrier.wait(&diagnostic_store);
+    try barrier.wait(&diagnostic);
 
     var context = try OwnedTextureContext.init();
     defer context.deinit();
@@ -99,7 +100,7 @@ fn renderWithDriver(
     });
     var attachment_needs_cleanup = true;
     errdefer if (attachment_needs_cleanup) {
-        _ = maplibre.renderSessionAbandon(attachment.session) catch {};
+        _ = maplibre.renderSessionAbandon(attachment.session, null) catch {};
         attachment.session.deinit();
     };
     defer attachment.ready.deinit();
@@ -107,29 +108,29 @@ fn renderWithDriver(
 
     var session = attachment.session;
     defer {
-        var detach = maplibre.renderSessionDetach(session) catch null;
+        var detach = maplibre.renderSessionDetach(session, null) catch null;
         if (detach) |*completion| {
             defer completion.deinit();
             waitForSessionFuture(&session, completion, null) catch {
-                _ = maplibre.renderSessionAbandon(session) catch {};
+                _ = maplibre.renderSessionAbandon(session, null) catch {};
             };
         } else {
-            _ = maplibre.renderSessionAbandon(session) catch {};
+            _ = maplibre.renderSessionAbandon(session, null) catch {};
         }
         session.deinit();
     }
     attachment_needs_cleanup = false;
 
-    var still_image = try maplibre.mapRequestStillImage(map.*);
+    var still_image = try maplibre.mapRequestStillImage(map.*, null);
     defer still_image.deinit();
 
-    try maplibre.renderSessionRequestFrame(allocator, session, .{ .token = 1 });
+    try maplibre.renderSessionRequestFrame(allocator, session, .{ .token = 1 }, null);
     try waitForRenderedFrame(io, allocator, &session, &still_image, 1);
 
-    var readback = try maplibre.textureReadPremultipliedRgba8(allocator, session);
+    var readback = try maplibre.textureReadPremultipliedRgba8(allocator, session, null);
     defer readback.deinit();
     if (uses_caller_driver) {
-        while (!try readback.poll()) _ = try maplibre.renderSessionServiceDriverWork(session, 0);
+        while (!try readback.poll()) _ = try maplibre.renderSessionServiceDriverWork(session, 0, null);
     }
     var image = try readback.wait(null);
     defer image.deinit();
@@ -149,9 +150,9 @@ fn waitForRenderedFrame(
     var demand_pending = true;
     for (0..10_000) |_| {
         if (uses_caller_driver) {
-            _ = try maplibre.renderSessionServiceDriverWork(session.*, 0);
+            _ = try maplibre.renderSessionServiceDriverWork(session.*, 0, null);
         }
-        var results = maplibre.renderSessionDrainFrameResults(session.*) catch |err| switch (err) {
+        var results = maplibre.renderSessionDrainFrameResults(session.*, null) catch |err| switch (err) {
             error.NotReady => {
                 try io.sleep(.fromMilliseconds(1), .awake);
                 continue;
@@ -159,8 +160,8 @@ fn waitForRenderedFrame(
             else => return err,
         };
         defer results.deinit();
-        for (0..try maplibre.renderFrameBatchCount(results)) |index| {
-            const result = try maplibre.renderFrameBatchGet(results, index);
+        for (0..try maplibre.renderFrameBatchCount(results, null)) |index| {
+            const result = try maplibre.renderFrameBatchGet(results, index, null);
             if (result.token != token) continue;
             demand_pending = false;
             switch (result.disposition) {
@@ -175,7 +176,7 @@ fn waitForRenderedFrame(
             if (rendered) return;
         }
         if (!demand_pending) {
-            try maplibre.renderSessionRequestFrame(allocator, session.*, .{ .token = token });
+            try maplibre.renderSessionRequestFrame(allocator, session.*, .{ .token = token }, null);
             demand_pending = true;
         }
         try io.sleep(.fromMilliseconds(1), .awake);
@@ -240,12 +241,12 @@ fn attachOwnedTexture(
         try maplibre.vulkanOwnedTextureAttach(allocator, map.*, .{
             .extent = extent,
             .context = context.descriptor(),
-        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 })
+        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 }, null)
     else if (build_options.supports_metal)
         try maplibre.metalOwnedTextureAttach(allocator, map.*, .{
             .extent = extent,
             .context = context.descriptor(),
-        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 })
+        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 }, null)
     else if (build_options.supports_opengl)
         try maplibre.openglOwnedTextureAttach(allocator, map.*, .{
             .extent = extent,
@@ -253,7 +254,7 @@ fn attachOwnedTexture(
         }, .{
             .driver = if (supports_egl) .core_worker else .caller_graphics_thread,
             .requested_texture_ring_depth = 1,
-        })
+        }, null)
     else
         return error.RenderBackendUnavailable;
     return .{ .session = result.session, .ready = result.ready };
@@ -571,7 +572,7 @@ fn setInitialCamera(allocator: std.mem.Allocator, map: *maplibre.Map) !void {
         .zoom = 13.0,
         .bearing = 12.0,
         .pitch = 30.0,
-    } });
+    } }, null);
     completion.deinit();
 }
 
