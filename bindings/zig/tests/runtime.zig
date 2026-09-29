@@ -278,11 +278,6 @@ test "event masks round-trip through both handles" {
     try testing.expect(read_map_mask.offline_region_status_changed);
 }
 
-// A newer native library can report an event type this binding does not name,
-// and a mask holds only 64 bits, so the membership test must not shift by the
-// raw value it was handed.
-test "mask membership rejects an unknown type no mask bit can hold" {}
-
 test "a narrowed map mask drops the type it clears and keeps the rest" {
     var runtime = try support.createRuntime(.{});
     defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
