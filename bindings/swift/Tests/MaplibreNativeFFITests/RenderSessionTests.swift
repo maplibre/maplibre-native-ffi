@@ -1,4 +1,5 @@
 import Foundation
+import GraphicsSupport
 @testable import MaplibreNativeFFI
 import Testing
 
@@ -8,45 +9,64 @@ private struct OwnedTextureSession {
   let fixture: MapFixture
   let graphics: TestGraphics
   let session: RenderSessionHandle
+  /// The host thread that drives an OpenGL session, which Metal and Vulkan
+  /// sessions do not need.
+  let thread: RenderThread?
 
-  /// Detaches and closes the session, then closes the map fixture.
+  /// Detaches and closes the session, then closes the map fixture. A session
+  /// that cannot detach, such as one already abandoned, is abandoned instead.
   func close() async {
     do {
       try await session.detach()
-      try session.close()
     } catch {
+      thread?.stop()
       _ = try? session.abandon()
-      try? session.close()
     }
+    thread?.stop()
+    try? session.close()
     await fixture.close()
   }
 }
 
-/// Attaches a core-worker owned-texture session to a map showing `style`.
+/// Attaches an owned-texture session to a map showing `style`. A Metal or
+/// Vulkan session drives itself on a core worker. An OpenGL session exposes
+/// its frames only through the host's share group, so it joins the fixture's
+/// context and a host render thread drives it.
 private func attachOwnedTexture(
   style: Data = emptyStyle,
   ringDepth: UInt32 = RenderSessionAttachOptions.default
     .requestedTextureRingDepth
 ) async throws -> OwnedTextureSession {
   let fixture = try await MapFixture.make()
+  var thread: RenderThread?
   do {
     try await fixture.map.setStyleJson(json: style)
     let graphics = try TestGraphics()
+    if graphics.backend == MLN_TEST_GRAPHICS_BACKEND_EGL {
+      let host = RenderThread()
+      thread = host
+      try await host.perform { try graphics.makeCurrentIfNeeded() }
+    }
     let attachment = try graphics.attachOwnedTexture(
       map: fixture.map,
       options: RenderSessionAttachOptions(
-        driver: .coreWorker,
+        driver: thread == nil ? .coreWorker : .callerGraphicsThread,
         requestedTextureRingDepth: ringDepth,
-        frameWake: pulsingFrameWake
+        frameWake: pulsingFrameWake,
+        driverWorkWake: thread?.driverWorkWake ??
+          RenderSessionAttachOptions.default.driverWorkWake
       )
     )
+    thread?.service(attachment.session)
     try await attachment.completion.value
     return OwnedTextureSession(
       fixture: fixture,
       graphics: graphics,
-      session: attachment.session
+      session: attachment.session,
+      thread: thread
     )
   } catch {
+    thread?.stop()
     await fixture.close()
     throw error
   }
@@ -122,8 +142,7 @@ private func attachOwnedTexture(
   try await awaitCondition("the dropped frame's session to be abandoned") {
     try session.getSnapshot().state == .abandoned
   }
-  try session.close()
-  await rendered.fixture.close()
+  await rendered.close()
 }
 
 /// A caller-driven session runs on a thread the host owns: the thread

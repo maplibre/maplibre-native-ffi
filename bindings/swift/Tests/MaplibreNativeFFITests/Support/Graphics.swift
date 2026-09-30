@@ -229,12 +229,15 @@ final class RenderThread: @unchecked Sendable {
     }
   }
 
-  /// Stops servicing and waits for the thread to end.
+  /// Stops servicing and waits for the thread to end. A second call does
+  /// nothing.
   func stop() {
-    condition.withLock {
-      stopping = true
+    let first = condition.withLock {
+      defer { stopping = true }
       condition.signal()
+      return !stopping
     }
+    guard first else { return }
     #expect(isSignalled(finished))
   }
 
