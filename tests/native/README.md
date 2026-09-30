@@ -213,14 +213,23 @@ or tile map and keeps a forced frame demand in flight until the image completes.
 `mln_test_render_pending_still_image` does the same for a request the case
 already made.
 
-The style suites also include `support/style.h`. It renders one frame at a time
-until a condition holds, and copies rendered and source feature queries and list
-queries out of their borrowed results. It also serves URL resources through a
-resource provider that fails every request it has no route for, so a case that
-adds a URL source never reaches the network. `MLN_TEST_EXPECT_COMMAND_FAILED`
-expects a command to fail after it was accepted, and
-`MLN_TEST_EXPECT_COMMAND_REJECTED` expects its submission to fail. A copied
-result that overflows its buffer fails the case instead of truncating.
+The style and render suites also include `support/style.h`. It renders one frame
+at a time until a condition holds, and copies rendered and source feature
+queries, with the caller's geometry and options, and list queries out of their
+borrowed results. It also serves URL resources through a resource provider that
+fails every request it has no route for, so a case that adds a URL source never
+reaches the network. `MLN_TEST_EXPECT_COMMAND_FAILED` expects a command to fail
+after it was accepted, and `MLN_TEST_EXPECT_COMMAND_REJECTED` expects its
+submission to fail. A copied result that overflows its buffer fails the case
+instead of truncating.
+
+The backend validation files also include `support/attach_table.h`. It runs a
+validation table over one attach or set_target call, with the rows that every
+attach shares: a null map, descriptor, options, output, or completion,
+undersized options, and an occupied output. A row that an attach rejects must
+leave its output session as it was. The header also defines the
+undersized-descriptor, undersized-extent, and overflowing-extent rows for any
+descriptor type.
 
 The adapter cases also include `support/adapter.h` directly. It provides a
 completion listener that keeps its record, committed resource provider changes,
@@ -264,8 +273,13 @@ load for their GPU objects too. `support/render_graphics.c` attaches the owned
 texture that `mln_test_render_fixture_create` returns. `support/host_graphics.h`
 adds fixtures for the other target kinds: a borrowed texture that a case can
 read back through `mln_test_render_fixture_read_texture`, and a presentation
-surface. A case that builds its own descriptors creates a graphics object with
-`mln_test_graphics_create` and reads its handles from there.
+surface. For a retarget, `mln_test_render_fixture_new_texture` and
+`mln_test_render_fixture_new_surface` make another target on the fixture's
+graphics object, and `mln_test_render_fixture_set_texture` and
+`mln_test_render_fixture_set_surface` hand a target to the backend's set_target.
+The fixture destroys the targets it made after its session. A case that builds
+its own descriptors creates a graphics object with `mln_test_graphics_create`
+and reads its handles from there.
 
 The browser presets have none of these. Their contexts come from JavaScript, so
 `support/render_webgl.c` and `support/render_webgpu.c` create them, and a file
