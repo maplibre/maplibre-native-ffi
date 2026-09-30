@@ -831,7 +831,7 @@ auto database_source_for_runtime(RuntimeObject* runtime)
   }
 
   auto source = mln::FileSourceManager::get()->getFileSource(
-    mln::FileSourceType::Database, resource_options_for_runtime(runtime->self),
+    mln::FileSourceType::Database, resource_options_for_runtime(*runtime),
     mln::ClientOptions()
   );
   // MapLibre is built without RTTI. The registered FileSourceType::Database
@@ -2846,18 +2846,15 @@ auto runtime_run_loop(RuntimeObject* runtime) -> mln::util::RunLoop& {
   return *runtime->executor.run_loop();
 }
 
-auto resource_options_for_runtime(mln_runtime runtime) -> mln::ResourceOptions {
+auto resource_options_for_runtime(const RuntimeObject& runtime)
+  -> mln::ResourceOptions {
   auto options = mln::ResourceOptions::Default();
-  const auto* live = handle_table<RuntimeObject>().try_resolve(runtime);
-  if (live == nullptr) {
-    return options;
+  options.withPlatformContext(runtime.platform_context);
+  if (!runtime.asset_path.empty()) {
+    options.withAssetPath(runtime.asset_path);
   }
-  options.withPlatformContext(live->platform_context);
-  if (!live->asset_path.empty()) {
-    options.withAssetPath(live->asset_path);
-  }
-  if (!live->cache_path.empty()) {
-    options.withCachePath(live->cache_path);
+  if (!runtime.cache_path.empty()) {
+    options.withCachePath(runtime.cache_path);
   }
   return options;
 }

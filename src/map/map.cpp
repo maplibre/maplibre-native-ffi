@@ -2895,7 +2895,7 @@ auto create_map(
       .withFastPFOREnabled(effective.fast_pfor_enabled);
     owned_map->map = std::make_unique<mln::Map>(
       *owned_map->frontend, *owned_map->observer, map_options,
-      resource_options_for_runtime(runtime)
+      resource_options_for_runtime(*live_runtime)
     );
     owned_map->callback_sources->attach(*owned_map->map);
     owned_map->frontend->set_publish_callback(

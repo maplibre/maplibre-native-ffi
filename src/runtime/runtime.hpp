@@ -387,7 +387,11 @@ auto submit_runtime_operation(
 // The continuously running run loop owned by this runtime's executor.
 auto runtime_run_loop(RuntimeObject* runtime) -> mln::util::RunLoop&;
 
-auto resource_options_for_runtime(mln_runtime runtime) -> mln::ResourceOptions;
+// Reads the options from the runtime object rather than its handle, so work
+// accepted before the runtime's release still opens the runtime's own cache
+// after the release has retired the handle.
+auto resource_options_for_runtime(const RuntimeObject& runtime)
+  -> mln::ResourceOptions;
 // Leases the resource provider registered on the runtime named by a MapLibre
 // platform context. Hold the returned lease across the provider callback, so
 // replacement and teardown cannot retire its callback or `user_data`. Returns

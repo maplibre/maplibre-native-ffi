@@ -1074,13 +1074,19 @@ static void offline_submission_never_waits_for_the_runtime_worker(void) {
 }
 
 // An offline operation accepted before its runtime's release still runs and
-// completes after the release has retired the handle, including when it is
-// the runtime's first offline operation and so opens the database.
+// completes after the release has retired the handle. When it is the runtime's
+// first offline operation, it opens the runtime's own database, so a region it
+// creates is there for the next runtime that opens the same cache.
 static void an_offline_operation_accepted_before_release_still_completes(void) {
+  static const uint8_t metadata[] = {4, 2};
+  char cache_path[1024];
+  mln_test_temp_path("release-race.db", cache_path, sizeof(cache_path));
+  remove_database(cache_path);
   // The case releases the runtime itself, so it creates it untracked.
   mln_runtime runtime = MLN_HANDLE_NULL;
   mln_runtime_options options = mln_runtime_options_default();
   options.event_wake = mln_test_pulse_wake();
+  options.cache_path = cache_path;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC)
   );
@@ -1096,10 +1102,13 @@ static void an_offline_operation_accepted_before_release_still_completes(void) {
     mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
   );
 
+  const mln_offline_region_definition definition = tile_definition();
   mln_completion completion;
   region_probe* probe = new_region_probe(&completion);
-  const mln_status list_status =
-    mln_runtime_offline_regions_list(runtime, &completion, MLN_TEST_DIAGNOSTIC);
+  const mln_status create_status = mln_runtime_offline_region_create(
+    runtime, &definition, metadata, sizeof(metadata), &completion,
+    MLN_TEST_DIAGNOSTIC
+  );
   mln_test_completion release = mln_test_completion_default(0);
   const mln_status release_status =
     mln_runtime_release(runtime, &release.descriptor, MLN_TEST_DIAGNOSTIC);
@@ -1108,11 +1117,26 @@ static void an_offline_operation_accepted_before_release_still_completes(void) {
   TEST_ASSERT_EQUAL_INT_MESSAGE(
     MLN_STATUS_OK, release_status, mln_test_last_error()
   );
-  (void)finish_region_probe(list_status, probe);
+  (void)finish_region_probe(create_status, probe);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe->status);
+  const mln_offline_region_id created_id = probe->regions[0].id;
   free(probe);
+  // The release completes once the runtime has closed its database.
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&release));
   mln_test_completion_destroy(&release);
+
+  mln_runtime_options reopen = mln_runtime_options_default();
+  reopen.cache_path = cache_path;
+  mln_runtime reopened = mln_test_create_runtime_with_options(reopen);
+  region_probe* listed = list_regions(reopened);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, listed->status);
+  TEST_ASSERT_EQUAL_size_t(1, listed->count);
+  expect_tile_region(
+    find_region(listed, created_id), metadata, sizeof(metadata)
+  );
+  free(listed);
+  mln_test_destroy_runtime(reopened);
+  remove_database(cache_path);
 }
 
 MLN_TEST_GROUP {
