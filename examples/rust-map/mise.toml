@@ -22,6 +22,11 @@ extends = "ffi:example-run"
 dir = "../.."
 run = '''
 set -euo pipefail
+# ash loads the Vulkan loader at run time, from its search path.
+if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
+  export DYLD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+  export LD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   cargo run -p rust-map -- "$usage_render_target"
 '''
@@ -31,4 +36,36 @@ native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   cargo run -p rust-map -- "$usage_render_target"
+'''
+
+[tasks.smoke]
+description = "Render one frame in each render-target mode, then exit."
+extends = "ffi:preset"
+dir = "../.."
+# The example opens a window, so Linux needs a display server, such as Xvfb
+# with Mesa's software renderer on a runner without a GPU. MLN_EXAMPLE_SMOKE
+# swaps the network style for an inline one, and each mode exits 0 after its
+# first rendered frame.
+run = '''
+set -euo pipefail
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+# ash loads the Vulkan loader at run time, from its search path.
+if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
+  export DYLD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+  export LD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+cargo build -p rust-map
+for mode in owned-texture borrowed-texture native-surface; do
+  MLN_EXAMPLE_SMOKE=1 cargo run -p rust-map -- "$mode"
+done
+'''
+run_windows = '''
+set -euo pipefail
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+cargo build -p rust-map
+for mode in owned-texture borrowed-texture native-surface; do
+  MLN_EXAMPLE_SMOKE=1 cargo run -p rust-map -- "$mode"
+done
 '''

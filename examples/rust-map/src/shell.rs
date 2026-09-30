@@ -92,8 +92,13 @@ impl ApplicationHandler for Shell {
         app.handle_window_event(event);
     }
 
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         if let Some(app) = self.app.as_mut() {
+            if app.smoke_rendered() {
+                app.close_or_abort();
+                event_loop.exit();
+                return;
+            }
             app.step();
         }
     }

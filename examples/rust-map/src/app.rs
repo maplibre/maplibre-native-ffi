@@ -23,6 +23,8 @@ pub struct App {
     render_requested: bool,
     closed: bool,
     mode: Mode,
+    /// Set once a smoke test has rendered its frame.
+    smoke_rendered: bool,
 }
 
 impl App {
@@ -61,6 +63,7 @@ impl App {
             render_requested: true,
             closed: false,
             mode,
+            smoke_rendered: false,
         })
     }
 
@@ -68,6 +71,11 @@ impl App {
         println!("render target: {}", self.mode.cli_name());
         println!("render target status: {}", self.mode.status());
         Controller::print_controls();
+    }
+
+    /// Whether a smoke test has rendered its frame and the app can exit.
+    pub fn smoke_rendered(&self) -> bool {
+        self.smoke_rendered
     }
 
     pub fn window_id(&self) -> WindowId {
@@ -170,6 +178,11 @@ impl App {
             .as_mut()
             .expect("render target is open")
             .render_update(&self.graphics)?;
+        if rendered && crate::smoke_test() {
+            println!("smoke test rendered a frame");
+            self.smoke_rendered = true;
+            return Ok(());
+        }
         if !rendered || needs_repaint {
             self.render_requested = true;
             self.window.request_redraw();

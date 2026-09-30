@@ -12,6 +12,8 @@ use maplibre_native_ffi::{
 use crate::viewport::Viewport;
 
 const STYLE_URL: &str = "https://tiles.openfreemap.org/styles/bright";
+/// The style a smoke test renders, which needs no network.
+const SMOKE_STYLE_JSON: &str = r##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}]}"##;
 
 pub struct MapState {
     map: MapHandle,
@@ -201,7 +203,11 @@ impl MapState {
         // map only has to report updates that arrive between frames.
         self.map
             .set_event_mask(RuntimeEventMask::MAP_RENDER_UPDATE_AVAILABLE)?;
-        self.map.set_style_url(STYLE_URL)?;
+        if crate::smoke_test() {
+            self.map.set_style_json(SMOKE_STYLE_JSON.as_bytes())?;
+        } else {
+            self.map.set_style_url(STYLE_URL)?;
+        }
         let camera = CameraOptions {
             center: Some(LatLng::new(37.7749, -122.4194)),
             zoom: Some(13.0),

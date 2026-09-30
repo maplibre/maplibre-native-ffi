@@ -57,6 +57,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     shell::run(mode, backends)
 }
 
+/// Whether this run is a smoke test, which `MLN_EXAMPLE_SMOKE=1` selects: the
+/// example loads an inline style instead of fetching one, renders one frame,
+/// and exits.
+pub fn smoke_test() -> bool {
+    std::env::var_os("MLN_EXAMPLE_SMOKE").is_some_and(|value| value == "1")
+}
+
 fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Mode>, Box<dyn Error>> {
     let mut args = args.into_iter();
     let Some(arg) = args.next() else {
