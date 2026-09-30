@@ -11,7 +11,4 @@
 "bindings/dart/test/foundational_values_test.dart" = 2
 "bindings/dart/test/maplibre_native_ffi_test.dart" = 33
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/BufferValueEqualityTests.cs" = 3
-"bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleImageTests.cs" = 2
-"bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleJsonTests.cs" = 18
-"bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleLayerTests.cs" = 1
 "src/platform/rust/src/http_client.rs" = 8
