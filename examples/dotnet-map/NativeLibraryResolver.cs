@@ -41,6 +41,12 @@ internal static class NativeLibraryResolver
 
             preloadedGlfw = true;
             ResolveNativeLibrary("glfw", typeof(NativeLibraryResolver).Assembly, null);
+            // GLFW asks the OS loader for ANGLE's libEGL by name on macOS, which finds
+            // it only once it is loaded, so the build's copy is loaded here first.
+            if (OperatingSystem.IsMacOS())
+            {
+                ResolveNativeLibrary("EGL", typeof(NativeLibraryResolver).Assembly, null);
+            }
         }
     }
 

@@ -73,7 +73,11 @@ internal sealed unsafe class GlfwWindow : IDisposable
             var handle = glfw.CreateWindow(width, height, title, null, null);
             if (handle is null)
             {
-                throw new InvalidOperationException("GLFW window creation failed.");
+                glfw.GetError(out byte* description);
+                var reason = description is null
+                    ? "no reason reported"
+                    : System.Runtime.InteropServices.Marshal.PtrToStringUTF8((nint)description);
+                throw new InvalidOperationException($"GLFW window creation failed: {reason}");
             }
 
             var window = new GlfwWindow(glfw, handle);
