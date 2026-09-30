@@ -88,8 +88,7 @@ static mln_style_image_info read_image_info(mln_map map, const char* id) {
     mln_test_completion_default(sizeof(mln_style_image_result));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_get_style_image_info(
-                     map, (mln_buffer_view){.data = id, .size = strlen(id)},
-                     &completion.descriptor, NULL
+                     map, mln_test_view_of(id), &completion.descriptor, NULL
                    )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
@@ -108,8 +107,7 @@ static mln_status copy_pixels(
   mln_test_completion completion = mln_test_completion_buffer_view();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_copy_style_image_premultiplied_rgba8(
-                     map, (mln_buffer_view){.data = id, .size = strlen(id)},
-                     &completion.descriptor, NULL
+                     map, mln_test_view_of(id), &completion.descriptor, NULL
                    )
   );
   const mln_status status = mln_test_completion_finish(&completion);
@@ -198,7 +196,6 @@ static void style_images_copy_their_metadata_and_packed_pixels(void) {
   TEST_ASSERT_EQUAL_MEMORY(packed, copied, sizeof(packed));
 
   // Replacing an image replaces its metadata too, back to the defaults.
-  image.stride = 12;
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_set_style_image(
                      map, MLN_BUFFER_LITERAL("marker"), &image, NULL,

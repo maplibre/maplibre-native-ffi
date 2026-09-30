@@ -224,14 +224,10 @@ static void add_source(
 
 static void draw_source(const custom_kind* kind, mln_map map) {
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_layer_json(
-      map,
-      (mln_buffer_view){
-        .data = kind->layer_json, .size = strlen(kind->layer_json)
-      },
-      MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
-    )
+    MLN_STATUS_OK, mln_map_add_style_layer_json(
+                     map, mln_test_view_of(kind->layer_json),
+                     MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
+                   )
   );
 }
 
@@ -290,11 +286,7 @@ static void an_explicit_removal_releases_once(void) {
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
       mln_map_remove_style_source(
-        map,
-        (mln_buffer_view){
-          .data = kind->source_id, .size = strlen(kind->source_id)
-        },
-        &removal.descriptor, NULL
+        map, mln_test_view_of(kind->source_id), &removal.descriptor, NULL
       )
     );
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&removal));

@@ -11,35 +11,11 @@
 #include "support/test_support.h"
 #include "unity.h"
 
-static const char empty_geojson_source[] =
-  "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
-  "\"features\":[]}}";
-
-#define EXPECT_STYLE_COMMAND_FAILED(terminal_status, fragment, expression) \
-  do {                                                                     \
-    mln_test_completion completion = mln_test_completion_default(0);       \
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, (expression));                    \
-    TEST_ASSERT_EQUAL_INT(                                                 \
-      (terminal_status), mln_test_completion_finish(&completion)           \
-    );                                                                     \
-    TEST_ASSERT_EQUAL_UINT32(                                              \
-      MLN_COMMAND_DISPOSITION_FAILED,                                      \
-      mln_test_completion_disposition(&completion)                         \
-    );                                                                     \
-    TEST_ASSERT_NOT_NULL(                                                  \
-      strstr(mln_test_completion_diagnostic(&completion), (fragment))      \
-    );                                                                     \
-    mln_test_completion_destroy(&completion);                              \
-  } while (false)
-
-static mln_buffer_view view_of(const char* text) {
-  return (mln_buffer_view){.data = text, .size = strlen(text)};
-}
-
 static void add_source(mln_map map, const char* id) {
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_add_style_source_json(
-                     map, view_of(id), MLN_BUFFER_LITERAL(empty_geojson_source),
+                     map, mln_test_view_of(id),
+                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
                      &completion.descriptor, NULL
                    )
   );
@@ -47,10 +23,10 @@ static void add_source(mln_map map, const char* id) {
 
 static void add_layer(mln_map map, const char* json, const char* before) {
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_layer_json(
-      map, view_of(json), view_of(before), &completion.descriptor, NULL
-    )
+    MLN_STATUS_OK, mln_map_add_style_layer_json(
+                     map, mln_test_view_of(json), mln_test_view_of(before),
+                     &completion.descriptor, NULL
+                   )
   );
 }
 
@@ -60,10 +36,10 @@ static const mln_buffer_view fixture_tiles[] = {
 
 static void add_dem_source(mln_map map, const char* id) {
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_raster_dem_source_tiles(
-      map, view_of(id), fixture_tiles, 1, NULL, &completion.descriptor, NULL
-    )
+    MLN_STATUS_OK, mln_map_add_raster_dem_source_tiles(
+                     map, mln_test_view_of(id), fixture_tiles, 1, NULL,
+                     &completion.descriptor, NULL
+                   )
   );
 }
 
@@ -123,7 +99,7 @@ static layer_probe take_layer_result(
   };
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_get_style_layer_info(map, view_of(id), &completion, NULL)
+    mln_map_get_style_layer_info(map, mln_test_view_of(id), &completion, NULL)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   TEST_ASSERT_TRUE(atomic_load(&probe.done));
@@ -198,10 +174,10 @@ static mln_status read_layer_property(
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_get_layer_property(
-      map, view_of(layer), view_of(name), &completion.descriptor, NULL
-    )
+    MLN_STATUS_OK, mln_map_get_layer_property(
+                     map, mln_test_view_of(layer), mln_test_view_of(name),
+                     &completion.descriptor, NULL
+                   )
   );
   return mln_test_style_finish_text(&completion, out, capacity, NULL);
 }
@@ -211,8 +187,9 @@ static mln_status read_layer_filter(
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_get_layer_filter(map, view_of(layer), &completion.descriptor, NULL)
+    MLN_STATUS_OK, mln_map_get_layer_filter(
+                     map, mln_test_view_of(layer), &completion.descriptor, NULL
+                   )
   );
   return mln_test_style_finish_text(&completion, out, capacity, NULL);
 }
@@ -258,21 +235,21 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
     "[\"rgba\",255.0,0.0,0.0,1.0]", map, "dots", "circle-color"
   );
 
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "layer property",
     mln_map_set_layer_property(
       map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("fill-color"),
       MLN_BUFFER_LITERAL("\"#00ff00\""), &completion.descriptor, NULL
     )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "layer property",
     mln_map_set_layer_property(
       map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-radius"),
       MLN_BUFFER_LITERAL("\"wide\""), &completion.descriptor, NULL
     )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "layer property",
     mln_map_set_layer_property(
       map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-radius"),
@@ -302,7 +279,7 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
   TEST_ASSERT_EQUAL_STRING("[\"==\",[\"get\",\"kind\"],\"park\"]", filter);
   const mln_buffer_view bad_filter =
     MLN_BUFFER_LITERAL("[\"no-such-operator\",1]");
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "filter",
     mln_map_set_layer_filter(
       map, MLN_BUFFER_LITERAL("dots"), &bad_filter, &completion.descriptor, NULL
@@ -334,7 +311,7 @@ static mln_status read_layer_json(
   mln_test_completion completion = mln_test_completion_buffer_view();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_get_style_layer_json(
-                     map, view_of(layer), &completion.descriptor, NULL
+                     map, mln_test_view_of(layer), &completion.descriptor, NULL
                    )
   );
   return mln_test_style_finish_text(&completion, out, capacity, found);
@@ -395,10 +372,10 @@ static void layer_json_serializes_the_current_layer(void) {
 
 static void move_layer(mln_map map, const char* layer, const char* before) {
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_move_style_layer(
-      map, view_of(layer), view_of(before), &completion.descriptor, NULL
-    )
+    MLN_STATUS_OK, mln_map_move_style_layer(
+                     map, mln_test_view_of(layer), mln_test_view_of(before),
+                     &completion.descriptor, NULL
+                   )
   );
 }
 
@@ -462,13 +439,13 @@ static mln_status copy_layer_text(
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, source_layer
-                     ? mln_map_copy_layer_source_layer(
-                         map, view_of(layer), &completion.descriptor, NULL
-                       )
-                     : mln_map_copy_layer_source_id(
-                         map, view_of(layer), &completion.descriptor, NULL
-                       )
+    MLN_STATUS_OK,
+    source_layer ? mln_map_copy_layer_source_layer(
+                     map, mln_test_view_of(layer), &completion.descriptor, NULL
+                   )
+                 : mln_map_copy_layer_source_id(
+                     map, mln_test_view_of(layer), &completion.descriptor, NULL
+                   )
   );
   return mln_test_style_finish_text(&completion, out, 64, NULL);
 }
@@ -522,21 +499,21 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
   );
   TEST_ASSERT_EQUAL_STRING("", text);
 
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "does not take a source",
     mln_map_set_layer_source_id(
       map, MLN_BUFFER_LITERAL("paper"), MLN_BUFFER_LITERAL("points"),
       &completion.descriptor, NULL
     )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "does not take a source-layer",
     mln_map_set_layer_source_layer(
       map, MLN_BUFFER_LITERAL("paper"), MLN_BUFFER_LITERAL("pois"),
       &completion.descriptor, NULL
     )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "source_id must not be empty",
     mln_map_set_layer_source_id(
       map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL(""),
@@ -576,7 +553,7 @@ static void terrain_layers_require_a_raster_dem_source(void) {
     {"relief", "color-relief", mln_map_add_color_relief_layer},
   };
   for (size_t index = 0; index < 2; index += 1) {
-    const mln_buffer_view layer = view_of(adders[index].layer);
+    const mln_buffer_view layer = mln_test_view_of(adders[index].layer);
     // Each goes under the paper, before the layer the loop added last.
     MLN_TEST_AWAIT_COMMAND(
       MLN_STATUS_OK, adders[index].add(
@@ -588,21 +565,21 @@ static void terrain_layers_require_a_raster_dem_source(void) {
     TEST_ASSERT_EQUAL_STRING(adders[index].type, probe.type);
     TEST_ASSERT_EQUAL_STRING("dem", probe.source_id);
 
-    EXPECT_STYLE_COMMAND_FAILED(
+    MLN_TEST_EXPECT_COMMAND_FAILED(
       MLN_STATUS_INVALID_ARGUMENT, "layer already exists",
       adders[index].add(
         map, layer, MLN_BUFFER_LITERAL("dem"), MLN_BUFFER_LITERAL(""),
         &completion.descriptor, NULL
       )
     );
-    EXPECT_STYLE_COMMAND_FAILED(
+    MLN_TEST_EXPECT_COMMAND_FAILED(
       MLN_STATUS_INVALID_ARGUMENT, "not a raster DEM source",
       adders[index].add(
         map, MLN_BUFFER_LITERAL("on-points"), MLN_BUFFER_LITERAL("points"),
         MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
       )
     );
-    EXPECT_STYLE_COMMAND_FAILED(
+    MLN_TEST_EXPECT_COMMAND_FAILED(
       MLN_STATUS_NOT_FOUND, "before_layer_id does not exist",
       adders[index].add(
         map, MLN_BUFFER_LITERAL("before-missing"), MLN_BUFFER_LITERAL("dem"),
@@ -746,19 +723,19 @@ static void location_indicator_setters_write_its_properties(void) {
   }
 
   // Values the renderer cannot hold fail the command and change nothing.
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "radius must be non-negative",
     mln_map_set_location_indicator_accuracy_radius(
       map, MLN_BUFFER_LITERAL("puck"), -1.0, &completion.descriptor, NULL
     )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "bearing must fit in finite float32",
     mln_map_set_location_indicator_bearing(
       map, MLN_BUFFER_LITERAL("puck"), 1e39, &completion.descriptor, NULL
     )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "image_kind is invalid",
     mln_map_set_location_indicator_image_name(
       map, MLN_BUFFER_LITERAL("puck"), 9, MLN_BUFFER_LITERAL("arrow"),

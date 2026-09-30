@@ -14,18 +14,15 @@ static mln_feature_state_selector selector_for(
 ) {
   mln_feature_state_selector selector = {
     .size = sizeof(mln_feature_state_selector),
-    .source_id = {.data = source_id, .size = strlen(source_id)},
+    .source_id = mln_test_view_of(source_id),
   };
   if (source_layer_id != NULL) {
     selector.fields |= MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-    selector.source_layer_id = (mln_buffer_view){
-      .data = source_layer_id, .size = strlen(source_layer_id)
-    };
+    selector.source_layer_id = mln_test_view_of(source_layer_id);
   }
   if (feature_id != NULL) {
     selector.fields |= MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
-    selector.feature_id =
-      (mln_buffer_view){.data = feature_id, .size = strlen(feature_id)};
+    selector.feature_id = mln_test_view_of(feature_id);
   }
   return selector;
 }
@@ -34,11 +31,10 @@ static void set_state(
   mln_map map, mln_feature_state_selector selector, const char* state
 ) {
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_feature_state(
-      map, &selector, (mln_buffer_view){.data = state, .size = strlen(state)},
-      &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
+    MLN_STATUS_OK, mln_map_set_feature_state(
+                     map, &selector, mln_test_view_of(state),
+                     &completion.descriptor, MLN_TEST_DIAGNOSTIC
+                   )
   );
 }
 

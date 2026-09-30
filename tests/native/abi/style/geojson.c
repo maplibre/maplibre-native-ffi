@@ -11,27 +11,6 @@
 #include "support/test_support.h"
 #include "unity.h"
 
-#define EXPECT_STYLE_COMMAND_FAILED(terminal_status, fragment, expression) \
-  do {                                                                     \
-    mln_test_completion completion = mln_test_completion_default(0);       \
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, (expression));                    \
-    TEST_ASSERT_EQUAL_INT(                                                 \
-      (terminal_status), mln_test_completion_finish(&completion)           \
-    );                                                                     \
-    TEST_ASSERT_EQUAL_UINT32(                                              \
-      MLN_COMMAND_DISPOSITION_FAILED,                                      \
-      mln_test_completion_disposition(&completion)                         \
-    );                                                                     \
-    TEST_ASSERT_NOT_NULL(                                                  \
-      strstr(mln_test_completion_diagnostic(&completion), (fragment))      \
-    );                                                                     \
-    mln_test_completion_destroy(&completion);                              \
-  } while (false)
-
-static mln_buffer_view view_of(const char* text) {
-  return (mln_buffer_view){.data = text, .size = strlen(text)};
-}
-
 // One point at the map's center, named so a query can tell datasets apart.
 #define POINT_COLLECTION(name)                                           \
   "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\"," \
@@ -47,7 +26,7 @@ static mln_geojson_source_data prepare(
   mln_geojson_source_data data = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_geojson_source_data_create(
-                     view_of(json), options, &data, MLN_TEST_DIAGNOSTIC
+                     mln_test_view_of(json), options, &data, MLN_TEST_DIAGNOSTIC
                    )
   );
   return data;
@@ -61,10 +40,10 @@ static void draw_source(mln_map map, const char* source) {
     "{\"id\":\"%s-dots\",\"type\":\"circle\",\"source\":\"%s\"}", source, source
   );
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_layer_json(
-      map, view_of(layer), MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
-    )
+    MLN_STATUS_OK, mln_map_add_style_layer_json(
+                     map, mln_test_view_of(layer), MLN_BUFFER_LITERAL(""),
+                     &completion.descriptor, NULL
+                   )
   );
 }
 
@@ -238,10 +217,10 @@ static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
   for (size_t index = 0; index < 3; index += 1) {
     mln_test_completion completion = mln_test_completion_default(0);
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_map_add_geojson_source_data(
-        map, view_of(sources[index]), data, &completion.descriptor, NULL
-      )
+      MLN_STATUS_OK, mln_map_add_geojson_source_data(
+                       map, mln_test_view_of(sources[index]), data,
+                       &completion.descriptor, NULL
+                     )
     );
     // The last install is still pending when the handle goes away.
     if (index == 2) {
@@ -322,7 +301,7 @@ static void prepared_data_must_match_the_source_options(void) {
 
   // Data prepared without clustering tiles inconsistently with the source.
   mln_geojson_source_data plain = prepare(points, NULL);
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "do not match",
     mln_map_set_geojson_source_data(
       map, MLN_BUFFER_LITERAL("clustered"), plain, &completion.descriptor, NULL
@@ -358,7 +337,8 @@ static void prepared_data_must_match_the_source_options(void) {
   for (size_t index = 0; index < sizeof(cases) / sizeof(cases[0]); index += 1) {
     mln_geojson_source_options variant = clustered;
     if (cases[index].cluster_properties != NULL) {
-      variant.cluster_properties = view_of(cases[index].cluster_properties);
+      variant.cluster_properties =
+        mln_test_view_of(cases[index].cluster_properties);
     }
     mln_geojson_source_data data = prepare(points, &variant);
     mln_test_completion completion = mln_test_completion_default(0);
@@ -381,7 +361,7 @@ static void prepared_data_must_match_the_source_options(void) {
   synchronous.fields |= MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
   synchronous.synchronous_tiling = true;
   mln_geojson_source_data synchronous_data = prepare(points, &synchronous);
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "do not match",
     mln_map_set_geojson_source_data(
       map, MLN_BUFFER_LITERAL("clustered"), synchronous_data,
@@ -463,7 +443,7 @@ static void the_synchronous_tiling_override_reaches_the_next_frame(void) {
                      &completion.descriptor, NULL
                    )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",
     mln_map_set_geojson_source_synchronous_tiling(
       map, MLN_BUFFER_LITERAL("vector"), true, &completion.descriptor, NULL
@@ -480,7 +460,9 @@ static void the_synchronous_tiling_override_reaches_the_next_frame(void) {
 static void a_url_source_loads_through_the_resource_provider(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_style_route routes[] = {
+  // Static, because a failing case leaves the provider running until the
+  // harness reclaims the runtime.
+  static mln_test_style_route routes[] = {
     {.url = "fixture://first.geojson", .body = POINT_COLLECTION("first")},
     {.url = "fixture://second.geojson", .body = POINT_COLLECTION("second")},
   };
@@ -546,7 +528,7 @@ static void a_url_source_loads_through_the_resource_provider(void) {
                      &completion.descriptor, NULL
                    )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",
     mln_map_set_geojson_source_url(
       map, MLN_BUFFER_LITERAL("image"),

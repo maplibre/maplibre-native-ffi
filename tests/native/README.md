@@ -201,7 +201,10 @@ The style suites also include `support/style.h`. It renders one frame at a time
 until a condition holds, and copies rendered and source feature queries and list
 queries out of their borrowed results. It also serves URL resources through a
 resource provider that fails every request it has no route for, so a case that
-adds a URL source never reaches the network.
+adds a URL source never reaches the network. `MLN_TEST_EXPECT_COMMAND_FAILED`
+expects a command to fail after it was accepted, and
+`MLN_TEST_EXPECT_COMMAND_REJECTED` expects its submission to fail. A copied
+result that overflows its buffer fails the case instead of truncating.
 
 Every wait blocks on a signal and gives up at a deadline: 10 seconds times the
 timeout scale unless the wait names another. The signal is the pulse, a
@@ -256,6 +259,12 @@ or a public fence:
 back-to-back batches while a render thread requests frames. Whether a
 replacement lands while a tile slice is in flight depends on timing. A sync
 point that parks the GeoJSON slicing worker makes the case deterministic.
+
+`the_synchronous_tiling_override_reaches_the_next_frame` expects data set with
+the override on to reach the very next frame. Without the override, the
+asynchronous slice still lands before that frame about 3 runs in 20, so the case
+catches a lost override most of the time but not always. The same slicing sync
+point would let it park the worker and prove that the frame did not wait for it.
 
 ### Cases that work around a core defect
 

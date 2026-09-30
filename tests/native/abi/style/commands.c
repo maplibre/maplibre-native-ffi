@@ -11,14 +11,10 @@
 #include "support/test_support.h"
 #include "unity.h"
 
-static const char empty_geojson_source[] =
-  "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
-  "\"features\":[]}}";
-
 static bool source_exists(mln_map map, const char* id) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_style_source_result));
-  const mln_buffer_view view = {.data = id, .size = strlen(id)};
+  const mln_buffer_view view = mln_test_view_of(id);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_get_style_source_info(map, view, &completion.descriptor, NULL)
@@ -32,7 +28,7 @@ static bool source_exists(mln_map map, const char* id) {
 static bool image_exists(mln_map map, const char* id) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_style_image_result));
-  const mln_buffer_view view = {.data = id, .size = strlen(id)};
+  const mln_buffer_view view = mln_test_view_of(id);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_get_style_image_info(map, view, &completion.descriptor, NULL)
@@ -43,33 +39,15 @@ static bool image_exists(mln_map map, const char* id) {
   return found;
 }
 
-#define EXPECT_STYLE_COMMAND_FAILED(terminal_status, fragment, expression) \
-  do {                                                                     \
-    mln_test_completion completion = mln_test_completion_default(0);       \
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, (expression));                    \
-    TEST_ASSERT_EQUAL_INT(                                                 \
-      (terminal_status), mln_test_completion_finish(&completion)           \
-    );                                                                     \
-    TEST_ASSERT_EQUAL_UINT32(                                              \
-      MLN_COMMAND_DISPOSITION_FAILED,                                      \
-      mln_test_completion_disposition(&completion)                         \
-    );                                                                     \
-    TEST_ASSERT_NOT_NULL(                                                  \
-      strstr(mln_test_completion_diagnostic(&completion), (fragment))      \
-    );                                                                     \
-    mln_test_completion_destroy(&completion);                              \
-  } while (false)
-
 static void style_command_deep_copies_and_ordered_read_observes_it(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   char id[] = "owned-source";
-  char json[sizeof(empty_geojson_source)];
-  memcpy(json, empty_geojson_source, sizeof(json));
+  char json[sizeof(MLN_TEST_EMPTY_GEOJSON_SOURCE)];
+  memcpy(json, MLN_TEST_EMPTY_GEOJSON_SOURCE, sizeof(json));
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_add_style_source_json(
-                     map, (mln_buffer_view){.data = id, .size = strlen(id)},
-                     (mln_buffer_view){.data = json, .size = strlen(json)},
+                     map, mln_test_view_of(id), mln_test_view_of(json),
                      &completion.descriptor, NULL
                    )
   );
@@ -84,7 +62,8 @@ static void duplicate_id_is_an_async_failed_terminal_event(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   const mln_buffer_view id = MLN_BUFFER_LITERAL("duplicate");
-  const mln_buffer_view json = MLN_BUFFER_LITERAL(empty_geojson_source);
+  const mln_buffer_view json =
+    MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE);
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
     mln_map_add_style_source_json(map, id, json, &completion.descriptor, NULL)
@@ -109,11 +88,11 @@ static void remove_commands_commit_and_report_missing_ids(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_source_json(
-      map, MLN_BUFFER_LITERAL("doomed-source"),
-      MLN_BUFFER_LITERAL(empty_geojson_source), &completion.descriptor, NULL
-    )
+    MLN_STATUS_OK, mln_map_add_style_source_json(
+                     map, MLN_BUFFER_LITERAL("doomed-source"),
+                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
+                     &completion.descriptor, NULL
+                   )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
@@ -122,7 +101,7 @@ static void remove_commands_commit_and_report_missing_ids(void) {
     )
   );
   TEST_ASSERT_FALSE(source_exists(map, "doomed-source"));
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "doomed-source",
     mln_map_remove_style_source(
       map, MLN_BUFFER_LITERAL("doomed-source"), &completion.descriptor, NULL
@@ -149,7 +128,7 @@ static void remove_commands_commit_and_report_missing_ids(void) {
     )
   );
   TEST_ASSERT_FALSE(image_exists(map, "doomed-image"));
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "doomed-image",
     mln_map_remove_style_image(
       map, MLN_BUFFER_LITERAL("doomed-image"), &completion.descriptor, NULL
@@ -384,7 +363,7 @@ static void global_state_checks_views_and_completion(void) {
       MLN_BUFFER_LITERAL("true"), &discard, NULL
     )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_STATE, "style JSON has not loaded",
     mln_map_set_global_state_property(
       map, MLN_BUFFER_LITERAL("theme"), MLN_BUFFER_LITERAL("true"),
@@ -484,7 +463,7 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   // Unknown bits and unusable durations are the command's rejections.
   mln_style_transition_options unknown = applied;
   unknown.fields |= UINT32_C(1) << 31;
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "unknown bits",
     mln_map_set_style_transition_options(
       map, &unknown, &completion.descriptor, NULL
@@ -492,7 +471,7 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   );
   mln_style_transition_options negative = applied;
   negative.duration_ms = -1.0;
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "duration_ms",
     mln_map_set_style_transition_options(
       map, &negative, &completion.descriptor, NULL
@@ -500,7 +479,7 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   );
   mln_style_transition_options not_finite = applied;
   not_finite.delay_ms = INFINITY;
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "delay_ms",
     mln_map_set_style_transition_options(
       map, &not_finite, &completion.descriptor, NULL
@@ -522,8 +501,7 @@ static void read_light_property(mln_map map, const char* name, char* out) {
   mln_test_completion completion = mln_test_completion_buffer_view();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_get_style_light_property(
-                     map, (mln_buffer_view){.data = name, .size = strlen(name)},
-                     &completion.descriptor, NULL
+                     map, mln_test_view_of(name), &completion.descriptor, NULL
                    )
   );
   TEST_ASSERT_EQUAL_INT(
@@ -560,21 +538,21 @@ static void the_style_light_round_trips_through_json(void) {
   read_light_property(map, "intensity", value);
   TEST_ASSERT_EQUAL_STRING("0.75", value);
 
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "style light property",
     mln_map_set_style_light_property(
       map, MLN_BUFFER_LITERAL("brightness"), MLN_BUFFER_LITERAL("1"),
       &completion.descriptor, NULL
     )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "style light property",
     mln_map_set_style_light_property(
       map, MLN_BUFFER_LITERAL("intensity"), MLN_BUFFER_LITERAL("\"bright\""),
       &completion.descriptor, NULL
     )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "style light",
     mln_map_set_style_light_json(
       map, MLN_BUFFER_LITERAL("{\"anchor\":7}"), &completion.descriptor, NULL

@@ -14,27 +14,6 @@
 #include "support/test_support.h"
 #include "unity.h"
 
-static const char empty_geojson_source[] =
-  "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
-  "\"features\":[]}}";
-
-#define EXPECT_STYLE_COMMAND_FAILED(terminal_status, fragment, expression) \
-  do {                                                                     \
-    mln_test_completion completion = mln_test_completion_default(0);       \
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, (expression));                    \
-    TEST_ASSERT_EQUAL_INT(                                                 \
-      (terminal_status), mln_test_completion_finish(&completion)           \
-    );                                                                     \
-    TEST_ASSERT_EQUAL_UINT32(                                              \
-      MLN_COMMAND_DISPOSITION_FAILED,                                      \
-      mln_test_completion_disposition(&completion)                         \
-    );                                                                     \
-    TEST_ASSERT_NOT_NULL(                                                  \
-      strstr(mln_test_completion_diagnostic(&completion), (fragment))      \
-    );                                                                     \
-    mln_test_completion_destroy(&completion);                              \
-  } while (false)
-
 // Fails every request, for cases whose URL sources must never load.
 static void serve_nothing(mln_runtime runtime) {
   mln_test_style_serve(runtime, NULL, 0);
@@ -48,8 +27,7 @@ static bool read_source(
     mln_test_completion_default(sizeof(mln_style_source_result));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_get_style_source_info(
-                     map, (mln_buffer_view){.data = id, .size = strlen(id)},
-                     &completion.descriptor, NULL
+                     map, mln_test_view_of(id), &completion.descriptor, NULL
                    )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
@@ -84,7 +62,7 @@ static mln_status add_tile_source(
   const mln_style_tile_source_options* options,
   const mln_completion* completion, mln_diagnostic* diagnostic
 ) {
-  const mln_buffer_view source_id = {.data = id, .size = strlen(id)};
+  const mln_buffer_view source_id = mln_test_view_of(id);
   const mln_buffer_view url = MLN_BUFFER_LITERAL("fixture://tiles.json");
   switch (kind) {
     case TILE_SOURCE_VECTOR:
@@ -422,7 +400,7 @@ static void tile_source_options_are_validated_at_submission(void) {
 static void read_source_text(
   mln_map map, const char* id, bool attribution, char* out, bool* found
 ) {
-  const mln_buffer_view view = {.data = id, .size = strlen(id)};
+  const mln_buffer_view view = mln_test_view_of(id);
   mln_test_completion completion = mln_test_completion_buffer_view();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
@@ -455,8 +433,7 @@ static void sources_copy_their_url_and_attribution(void) {
     mln_style_tile_source_options_default();
   attributed.fields = MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
   char attribution[] = "Fixture tiles";
-  attributed.attribution =
-    (mln_buffer_view){.data = attribution, .size = strlen(attribution)};
+  attributed.attribution = mln_test_view_of(attribution);
   mln_test_completion add = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, add_tile_source(
@@ -528,11 +505,11 @@ static void source_ids_list_in_style_order(void) {
     )
   );
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_source_json(
-      map, MLN_BUFFER_LITERAL("third"),
-      MLN_BUFFER_LITERAL(empty_geojson_source), &completion.descriptor, NULL
-    )
+    MLN_STATUS_OK, mln_map_add_style_source_json(
+                     map, MLN_BUFFER_LITERAL("third"),
+                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
+                     &completion.descriptor, NULL
+                   )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
@@ -691,11 +668,11 @@ static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_source_json(
-      map, MLN_BUFFER_LITERAL("in-use"),
-      MLN_BUFFER_LITERAL(empty_geojson_source), &completion.descriptor, NULL
-    )
+    MLN_STATUS_OK, mln_map_add_style_source_json(
+                     map, MLN_BUFFER_LITERAL("in-use"),
+                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
+                     &completion.descriptor, NULL
+                   )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
@@ -708,7 +685,7 @@ static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
     )
   );
 
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_STATE, "used by a layer",
     mln_map_remove_style_source(
       map, MLN_BUFFER_LITERAL("in-use"), &completion.descriptor, NULL
@@ -740,8 +717,7 @@ static void read_image_source_coordinates(
     mln_test_completion_default(4 * sizeof(mln_lat_lng));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_get_image_source_coordinates(
-                     map, (mln_buffer_view){.data = id, .size = strlen(id)},
-                     &completion.descriptor, NULL
+                     map, mln_test_view_of(id), &completion.descriptor, NULL
                    )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
@@ -843,25 +819,25 @@ static void image_sources_hold_corners_and_pixels(void) {
   );
 
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_source_json(
-      map, MLN_BUFFER_LITERAL("geojson"),
-      MLN_BUFFER_LITERAL(empty_geojson_source), &completion.descriptor, NULL
-    )
+    MLN_STATUS_OK, mln_map_add_style_source_json(
+                     map, MLN_BUFFER_LITERAL("geojson"),
+                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
+                     &completion.descriptor, NULL
+                   )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not an image source",
     mln_map_set_image_source_coordinates(
       map, MLN_BUFFER_LITERAL("geojson"), moved, 4, &completion.descriptor, NULL
     )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not an image source",
     mln_map_set_image_source_image(
       map, MLN_BUFFER_LITERAL("geojson"), &image, &completion.descriptor, NULL
     )
   );
-  EXPECT_STYLE_COMMAND_FAILED(
+  MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "source does not exist",
     mln_map_set_image_source_image(
       map, MLN_BUFFER_LITERAL("missing"), &image, &completion.descriptor, NULL

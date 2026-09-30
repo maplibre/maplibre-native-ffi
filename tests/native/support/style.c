@@ -15,13 +15,21 @@
 #include "unity.h"
 #include "wait.h"
 
-static void copy_text(mln_buffer_view view, char* out, size_t capacity) {
-  const size_t size = view.size < capacity - 1 ? view.size : capacity - 1;
+// Copies `view` into `out` null-terminated, and reports whether it fit. A view
+// that does not fit leaves `out` truncated. Completion callbacks can run off
+// the test thread, so callers record a miss and fail on the test thread.
+static bool copy_text(mln_buffer_view view, char* out, size_t capacity) {
+  const bool fits = view.size < capacity;
+  const size_t size = fits ? view.size : capacity - 1;
   if (size != 0) {
     memcpy(out, view.data, size);
   }
   out[size] = '\0';
+  return fits;
 }
+
+static const char overflow_message[] =
+  "a copied result is larger than its test buffer; raise the capacity";
 
 typedef struct frame_wait {
   mln_render_session session;
@@ -100,6 +108,7 @@ bool mln_test_style_render_until(
 // memory the helper leaked, not into a returned stack frame.
 typedef struct feature_probe {
   atomic_bool done;
+  bool overflowed;
   mln_test_feature_list list;
 } feature_probe;
 
@@ -109,27 +118,31 @@ static void copy_features(
   feature_probe* probe = user_data;
   probe->list.status = result->status;
   probe->list.count = result->value_count;
+  probe->overflowed = result->value_count > MLN_TEST_FEATURE_CAPACITY;
   const mln_queried_feature* features = result->value;
+  bool fits = true;
   for (size_t index = 0;
        index < result->value_count && index < MLN_TEST_FEATURE_CAPACITY;
        index += 1) {
     const mln_queried_feature* source = &features[index];
     mln_test_feature* copy = &probe->list.features[index];
-    copy_text(source->feature, copy->feature, sizeof(copy->feature));
+    fits &= copy_text(source->feature, copy->feature, sizeof(copy->feature));
     if ((source->fields & MLN_QUERIED_FEATURE_SOURCE_ID) != 0) {
-      copy_text(source->source_id, copy->source_id, sizeof(copy->source_id));
+      fits &=
+        copy_text(source->source_id, copy->source_id, sizeof(copy->source_id));
     }
     if ((source->fields & MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0) {
-      copy_text(
+      fits &= copy_text(
         source->source_layer_id, copy->source_layer_id,
         sizeof(copy->source_layer_id)
       );
     }
     copy->has_state = (source->fields & MLN_QUERIED_FEATURE_STATE) != 0;
     if (copy->has_state) {
-      copy_text(source->state, copy->state, sizeof(copy->state));
+      fits &= copy_text(source->state, copy->state, sizeof(copy->state));
     }
   }
+  probe->overflowed |= !fits;
   mln_test_flag_set(&probe->done);
 }
 
@@ -161,7 +174,9 @@ static mln_test_feature_list finish_feature_probe(
     "the feature query never completed"
   );
   const mln_test_feature_list list = probe->list;
+  const bool overflowed = probe->overflowed;
   free(probe);
+  TEST_ASSERT_FALSE_MESSAGE(overflowed, overflow_message);
   return list;
 }
 
@@ -249,12 +264,14 @@ static uint32_t serve_route(
       .byte_count = strlen(route->body),
     };
   }
-  (void)mln_resource_request_complete(handle, &response, NULL);
-  mln_resource_request_release(handle);
+  // Count before completing: the response can reach a query before this
+  // thread runs again.
   if (route != NULL) {
     atomic_fetch_add(&route->requests, 1);
   }
   mln_test_pulse();
+  (void)mln_resource_request_complete(handle, &response, NULL);
+  mln_resource_request_release(handle);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
@@ -291,6 +308,7 @@ void mln_test_style_serve(
 typedef struct list_probe {
   atomic_bool done;
   bool entries;
+  bool overflowed;
   mln_test_style_list list;
 } list_probe;
 
@@ -298,6 +316,7 @@ static void copy_list(void* user_data, const mln_completion_result* result) {
   list_probe* probe = user_data;
   probe->list.status = result->status;
   probe->list.count = result->value_count;
+  bool fits = result->value_count <= MLN_TEST_STYLE_LIST_CAPACITY;
   for (size_t index = 0;
        index < result->value_count && index < MLN_TEST_STYLE_LIST_CAPACITY;
        index += 1) {
@@ -305,19 +324,21 @@ static void copy_list(void* user_data, const mln_completion_result* result) {
     if (probe->entries) {
       const mln_style_layer_entry* entry =
         &((const mln_style_layer_entry*)result->value)[index];
-      copy_text(entry->id, copy->id, sizeof(copy->id));
-      copy_text(entry->type, copy->type, sizeof(copy->type));
-      copy_text(entry->source_id, copy->source_id, sizeof(copy->source_id));
-      copy_text(
+      fits &= copy_text(entry->id, copy->id, sizeof(copy->id));
+      fits &= copy_text(entry->type, copy->type, sizeof(copy->type));
+      fits &=
+        copy_text(entry->source_id, copy->source_id, sizeof(copy->source_id));
+      fits &= copy_text(
         entry->source_layer, copy->source_layer, sizeof(copy->source_layer)
       );
     } else {
-      copy_text(
+      fits &= copy_text(
         ((const mln_buffer_view*)result->value)[index], copy->id,
         sizeof(copy->id)
       );
     }
   }
+  probe->overflowed = !fits;
   mln_test_flag_set(&probe->done);
 }
 
@@ -345,7 +366,9 @@ static mln_test_style_list run_list_query(
     mln_test_wait_for_flag(&probe->done), "the list query never completed"
   );
   const mln_test_style_list list = probe->list;
+  const bool overflowed = probe->overflowed;
   free(probe);
+  TEST_ASSERT_FALSE_MESSAGE(overflowed, overflow_message);
   return list;
 }
 
@@ -372,9 +395,12 @@ mln_status mln_test_style_finish_text(
     TEST_ASSERT_TRUE(
       mln_test_completion_copy_value(completion, &view, sizeof(view))
     );
-    copy_text(view, out, capacity);
+    const bool fits = copy_text(view, out, capacity);
+    mln_test_completion_destroy(completion);
+    TEST_ASSERT_TRUE_MESSAGE(fits, overflow_message);
+  } else {
+    mln_test_completion_destroy(completion);
   }
-  mln_test_completion_destroy(completion);
   if (out_found != NULL) {
     *out_found = found;
   }
