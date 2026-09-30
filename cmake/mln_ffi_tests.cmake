@@ -26,7 +26,7 @@ set(MLN_NATIVE_BROWSER_SHARDS "base,completion,runtime"
     "resources,map,projection,style" "render,backend" "adapter,platform,plugin")
 
 # Tags a test file can end its name with to build only on matching targets,
-# such as render/retarget_metal.c or platform/browser_http_emscripten.c.
+# such as backend/surface_metal.c or platform/browser_http_emscripten.c.
 set(MLN_NATIVE_FILE_TAGS metal opengl vulkan webgpu egl wgl webgl emscripten)
 
 function(mln_native_active_file_tags out_var)
