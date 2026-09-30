@@ -16,7 +16,6 @@ public sealed unsafe class NativeHandleStateTests
     private static mln_status destroyStatus;
     private static int destroyCount;
 
-    [BindingSpecTest("")]
     [Fact]
     public void BorrowedCopyPreventsConcurrentCloseAndReleasesOnException()
     {
@@ -52,7 +51,6 @@ public sealed unsafe class NativeHandleStateTests
         });
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void CloseIsIdempotentAfterSuccess()
     {
@@ -72,7 +70,6 @@ public sealed unsafe class NativeHandleStateTests
         Assert.Equal(1, destroyCount);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void FailedCloseKeepsHandleLiveForRetry()
     {
@@ -99,7 +96,6 @@ public sealed unsafe class NativeHandleStateTests
         Assert.Equal(2, destroyCount);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void PointerFailsWhileCloseIsInProgress()
     {
@@ -125,7 +121,6 @@ public sealed unsafe class NativeHandleStateTests
         Assert.Equal(1, destroy.Count);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void ConcurrentCloseFailsWithoutBlockingOrDestroyingTwice()
     {
@@ -151,7 +146,6 @@ public sealed unsafe class NativeHandleStateTests
         Assert.Equal(1, destroy.Count);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void FinalizerReportsLeakedLiveHandleWithoutDestroyingIt()
     {
@@ -184,7 +178,6 @@ public sealed unsafe class NativeHandleStateTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void AUseStartingAfterCloseBeginsIsRefused()
     {

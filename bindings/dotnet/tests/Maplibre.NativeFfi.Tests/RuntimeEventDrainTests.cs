@@ -8,7 +8,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class RuntimeEventDrainTests
 {
-    [BindingSpecTest("")]
     [Fact]
     public void OneDrainReportsEveryEventAStyleLoadProducedInQueueOrder()
     {
@@ -35,7 +34,6 @@ public sealed class RuntimeEventDrainTests
         Assert.All(batch, runtimeEvent => Assert.Equal(map.Id, runtimeEvent.Source));
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void ADrainedBatchKeepsItsMessagesAfterTheNextDrainReusesTheArena()
     {
@@ -75,7 +73,6 @@ public sealed class RuntimeEventDrainTests
     }
 
     // A host that writes no mask takes the property default, which selects every type.
-    [BindingSpecTest("")]
     [Fact]
     public void TheDefaultMaskReportsAllAndDeliversEveryDrivenType()
     {
@@ -109,7 +106,6 @@ public sealed class RuntimeEventDrainTests
         Assert.Contains(RuntimeEventType.MapCameraDidChange, types);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void AClearedEventTypeNeverReachesABatch()
     {
@@ -135,7 +131,6 @@ public sealed class RuntimeEventDrainTests
         Assert.Contains(RuntimeEventType.MapStyleLoaded, types);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task AMaskRoundTripsAndAReadModifyWriteKeepsTheOtherBits()
     {
@@ -162,7 +157,6 @@ public sealed class RuntimeEventDrainTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void AMaskBitOutsideAllIsRejected()
     {
@@ -204,7 +198,6 @@ public sealed class RuntimeEventDrainTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void EventOperationsAreAnyThread()
     {

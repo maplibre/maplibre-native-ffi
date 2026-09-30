@@ -18,7 +18,6 @@ public sealed partial class MetalRenderSessionLifecycleTests
     [LibraryImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_release")]
     private static partial void ObjectiveCRelease(nint value);
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task CallerDriverAttachmentAndDetachRequireExplicitService()
     {

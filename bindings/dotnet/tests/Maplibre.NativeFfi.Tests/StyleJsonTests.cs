@@ -8,7 +8,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class StyleJsonTests
 {
-    [BindingSpecTest("")]
     [Fact]
     public async Task UrlAndTileSourceApisAdaptThroughNativeMap()
     {
@@ -126,7 +125,6 @@ public sealed class StyleJsonTests
         Assert.Equal(StyleRasterDemEncoding.Mapbox, demInfo?.Info.RasterEncoding);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task StyleSourceVolatilityReadsBackAndRejectsMissingSource()
     {
@@ -203,7 +201,6 @@ public sealed class StyleJsonTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task SourceInspectionCopiesUrlAndInlineTileJsonAfterSourceRelease()
     {
@@ -337,7 +334,6 @@ public sealed class StyleJsonTests
     }
 
     // The narrow copies read the same values the aggregate reports, one field at a time.
-    [BindingSpecTest("")]
     [Fact]
     public async Task NarrowSourceCopiesReadTheSameValuesAsTheAggregate()
     {
@@ -419,7 +415,6 @@ public sealed class StyleJsonTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task LoadedStyleDocumentAndUrlReadBackWhatWasLoaded()
     {
@@ -462,7 +457,6 @@ public sealed class StyleJsonTests
         );
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public void SetStyleJsonReturnsCopiedStyleLoadedEventWithMapIdentity()
     {
@@ -490,7 +484,6 @@ public sealed class StyleJsonTests
         Assert.IsType<RuntimeEvent.PayloadValue.None>(runtimeEvent.Payload);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task LayerJsonPropertiesAndFiltersAdaptThroughNativeMap()
     {
@@ -558,7 +551,6 @@ public sealed class StyleJsonTests
         Assert.Null(await map.GetLayerFilterAsync("fill", TestContext.Current.CancellationToken));
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task StyleSourceAndLayerJsonAdaptThroughNativeMap()
     {
@@ -623,7 +615,6 @@ public sealed class StyleJsonTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task StyleRemovalCommandsReportNotFoundAndInUseFailures()
     {

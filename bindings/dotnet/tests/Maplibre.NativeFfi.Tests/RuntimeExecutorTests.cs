@@ -6,7 +6,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class RuntimeExecutorTests
 {
-    [BindingSpecTest("")]
     [Fact]
     public async Task NativeWorkProgressesAutonomously()
     {

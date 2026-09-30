@@ -8,7 +8,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class ResourceTransformTests
 {
-    [BindingSpecTest("", "", "")]
     [Fact]
     public unsafe void GeneratedResponseExpiresAndRejectsOtherThreads()
     {
@@ -48,7 +47,6 @@ public sealed class ResourceTransformTests
         Assert.Throws<InvalidOperationException>(() => retained.SetUrl("other"));
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task InstalledTransformCopiesUnicodeResponseAndCanBeCleared()
     {

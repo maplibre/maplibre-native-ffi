@@ -53,7 +53,6 @@ public sealed class RenderSessionTests
         Assert.Equal((uint)WebglContextKind.TransferredCanvas, transferred.data.webgl.kind);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public unsafe void VulkanDescriptorsCarryHandleBitsWithoutPointerConversion()
     {
@@ -98,7 +97,6 @@ public sealed class RenderSessionTests
         Assert.Equal(60u, borrowed.final_layout);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void AcquiredFrameAccessIsScopedToItsLease()
     {
@@ -129,7 +127,6 @@ public sealed class RenderSessionTests
         Assert.Throws<InvalidOperationException>(() => frame.ImageView);
     }
 
-    [BindingSpecTest("", "", "", "", "", "", "", "")]
     [Fact]
     public async Task OwnedTextureSessionRendersReadsBackAndDetaches()
     {
@@ -304,7 +301,6 @@ public sealed class RenderSessionTests
     private static WeakReference DropFrame(RenderSessionHandle session) =>
         new(session.AcquireFrame());
 
-    [BindingSpecTest("", "", "")]
     [Fact]
     public async Task OwnedTextureSessionRejectsRetargetAndScaleFactorChange()
     {

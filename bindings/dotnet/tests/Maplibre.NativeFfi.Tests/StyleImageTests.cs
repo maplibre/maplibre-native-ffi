@@ -9,7 +9,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class StyleImageTests
 {
-    [BindingSpecTest("")]
     [Fact]
     public void PremultipliedRgba8ImageSnapshotsPixelsAndReturnsCopies()
     {
@@ -23,7 +22,6 @@ public sealed class StyleImageTests
         Assert.Equal([1, 2, 3, 4], image.Pixels);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task ImageSourceApisAdaptCoordinatesAndImagesThroughNativeMap()
     {
@@ -119,7 +117,6 @@ public sealed class StyleImageTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task StyleImageRoundTripsMetadataAndPixelsThroughNativeMap()
     {
@@ -156,7 +153,6 @@ public sealed class StyleImageTests
         Assert.Null(await map.GetStyleImageInfoAsync("dot", TestContext.Current.CancellationToken));
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task NinePatchStyleImageRoundTripsStretchContentAndTextFit()
     {

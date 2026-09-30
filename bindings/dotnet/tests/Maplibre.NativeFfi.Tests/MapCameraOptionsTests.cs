@@ -81,7 +81,6 @@ public sealed class MapCameraOptionsTests
         Assert.Equal(expected.Longitude, actual.Longitude, CoordinatePrecision);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void ViewportAndTileOptionsRoundTripThroughNativeMap()
     {
@@ -150,7 +149,6 @@ public sealed class MapCameraOptionsTests
         Assert.NotNull(freeCamera.Orientation);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task CameraFitHelpersCopyDescriptorsThroughNativeMap()
     {
@@ -194,7 +192,6 @@ public sealed class MapCameraOptionsTests
         Assert.NotNull(geometryCamera.Zoom);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task BoundsAndProjectionOptionsRoundTripThroughNativeMap()
     {
@@ -263,7 +260,6 @@ public sealed class MapCameraOptionsTests
 
     // Unbounded and world bounds are different constraints: world bounds clamp longitude, so a
     // pan past the antimeridian comes back inside, while unbounded keeps going.
-    [BindingSpecTest("")]
     [Fact]
     public async Task UnboundedCentersDifferFromWorldBoundedOnes()
     {
@@ -307,7 +303,6 @@ public sealed class MapCameraOptionsTests
         Assert.InRange(clamped.Camera.Center!.Value.Longitude, -180, 180);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task CameraCommandsReturnIdsAndSnapshotsAdvance()
     {
@@ -344,7 +339,6 @@ public sealed class MapCameraOptionsTests
         Assert.Equal((ordered.Camera, ordered.Generation), map.CameraSnapshotGet());
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public void AnEasedTransitionReportsItsIdOnceAndACancelEndsTheNextOne()
     {
@@ -401,7 +395,6 @@ public sealed class MapCameraOptionsTests
         WaitForTransition(runtime, map, 12);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void CancellingTransitionsEndsAFlyTransitionByItsId()
     {
@@ -437,7 +430,6 @@ public sealed class MapCameraOptionsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void AGestureMarksTheSnapshotUntilTheGestureEnds()
     {
@@ -479,7 +471,6 @@ public sealed class MapCameraOptionsTests
         Assert.False(map.SnapshotGet().GestureInProgress);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task ARelativeCameraDeltaMovesThePublishedCamera()
     {
@@ -542,7 +533,6 @@ public sealed class MapCameraOptionsTests
         return drained;
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task InvalidCameraUpdatePropagatesNativeDiagnostic()
     {
@@ -570,7 +560,6 @@ public sealed class MapCameraOptionsTests
         Assert.NotEmpty(error.Diagnostic);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task CoordinateProjectionRoundTripsThroughNativeMap()
     {
@@ -604,7 +593,6 @@ public sealed class MapCameraOptionsTests
         AssertClose(new LatLng(0, 0), coordinates[1]);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task UnwrappedCoordinateConversionsPreserveVisibleWorldCopies()
     {
@@ -657,7 +645,6 @@ public sealed class MapCameraOptionsTests
         Assert.Equal(right.Longitude, projectedRight.Longitude, CoordinatePrecision);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task ProjectionConvertsSynchronouslyAndObservesItsOwnSetters()
     {
@@ -725,7 +712,6 @@ public sealed class MapCameraOptionsTests
         Assert.True(projection.IsClosed);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task ProjectionCreatedAfterCameraCommandObservesThatCommand()
     {

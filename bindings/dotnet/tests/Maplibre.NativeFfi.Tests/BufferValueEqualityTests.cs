@@ -14,7 +14,6 @@ public sealed class BufferValueEqualityTests
 {
     private static readonly TextureImageInfo Info = new(2, 1, 8, 8);
 
-    [BindingSpecTest("")]
     [Fact]
     public void ImagesComparePixelContents()
     {
@@ -45,7 +44,6 @@ public sealed class BufferValueEqualityTests
         Assert.NotEqual(left, new PremultipliedRgba8Image(1, 1, 4, [1, 2, 3, 4]));
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void OfflineRegionInfoComparesMetadataContents()
     {
@@ -69,7 +67,6 @@ public sealed class BufferValueEqualityTests
         Assert.NotEqual(left, new OfflineRegionInfo(8, definition, [1, 2, 3]));
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public void OfflineGeometryRegionOwnsAndComparesGeometryContents()
     {
@@ -104,7 +101,6 @@ public sealed class BufferValueEqualityTests
         Assert.Equal(new byte[] { 1, 2, 3 }, left.Value.Geometry);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void UnknownEventPayloadComparesPayloadContents()
     {
@@ -117,7 +113,6 @@ public sealed class BufferValueEqualityTests
         Assert.NotEqual(left, new RuntimeEvent.PayloadValue.Unknown(4, [9, 8, 7]));
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public void QueriedFeatureOwnsAndComparesFeatureAndStateContents()
     {
@@ -191,7 +186,6 @@ public sealed class BufferValueEqualityTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void MutatingTheCallerBufferDoesNotChangeEquality()
     {

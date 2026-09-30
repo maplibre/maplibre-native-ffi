@@ -7,14 +7,12 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class MaplibreTests
 {
-    [BindingSpecTest("")]
     [Fact]
     public void CVersionComesFromNativeLibrary()
     {
         Assert.Equal(NativeLibraryLoader.ExpectedAbiVersion, Maplibre.CVersion());
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void AbiVersionMismatchUsesStableBindingError()
     {
@@ -31,7 +29,6 @@ public sealed class MaplibreTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void SupportedOpenGLContextProvidersComeFromNativeLibrary()
     {
@@ -48,7 +45,6 @@ public sealed class MaplibreTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void ProjectionHelpersRoundTripThroughNativeLibrary()
     {
@@ -61,7 +57,6 @@ public sealed class MaplibreTests
         Assert.True(Math.Abs(roundTripped.Longitude - coordinate.Longitude) < 1e-9);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void UnknownNetworkStatusIsRejectedByNativeValidation()
     {

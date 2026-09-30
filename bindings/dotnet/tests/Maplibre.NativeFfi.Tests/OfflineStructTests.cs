@@ -10,7 +10,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed unsafe class OfflineStructTests
 {
-    [BindingSpecTest("", "")]
     [Fact]
     public void OfflineRegionDefinitionsMaterializeNativeShape()
     {
@@ -73,7 +72,6 @@ public sealed unsafe class OfflineStructTests
         Assert.Equal(0, geometry.data.geometry.include_ideographs);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void OfflineRegionInfoCopiesDefinitionAndMetadata()
     {
@@ -117,7 +115,6 @@ public sealed unsafe class OfflineStructTests
         Assert.Equal(new LatLng(3, 4), definition.Value.Bounds.Northeast);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void OfflineRegionInfoSnapshotsMetadataAndReturnsCopies()
     {
@@ -158,7 +155,6 @@ public sealed unsafe class OfflineStructTests
         Assert.Equal(999u, unknown.Tag);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void OfflineRegionStatusCopiesNativeFields()
     {

@@ -17,7 +17,6 @@ public sealed class ResourceProviderTests
     private static ResourceResponse StyleResponse() =>
         new() { Status = ResourceResponseStatus.Ok, Bytes = TestStyles.Empty };
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task InlineCompletionClaimsHandleEvenWhenCallbackReturnsPassThrough()
     {
@@ -54,7 +53,6 @@ public sealed class ResourceProviderTests
         Assert.True(retained.IsClosed);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task FailedResponseConversionRemainsRetryableAndSuccessfulCompletionKeepsOwner()
     {
@@ -90,7 +88,6 @@ public sealed class ResourceProviderTests
         handle.WaitUntilRetired();
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task CancellationCallbackCanCloseRequestWithoutBlockingNativeRetirement()
     {
@@ -134,7 +131,6 @@ public sealed class ResourceProviderTests
         Assert.True(handle.IsClosed);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task CancelRegistrationIsReleasedOnceItsCallbackReturns()
     {
@@ -163,7 +159,6 @@ public sealed class ResourceProviderTests
         Assert.False(handle.IsClosed);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task CancelRegistrationIsReleasedWithTheRequestWhenNeverCancelled()
     {
@@ -189,7 +184,6 @@ public sealed class ResourceProviderTests
         Assert.Equal(0, calls);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task AlreadyCancelledRegistrationKeepsNothing()
     {
@@ -216,7 +210,6 @@ public sealed class ResourceProviderTests
         Assert.Equal(0, calls);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task CancelCallbackCapturingItsRequestDoesNotRootAnAbandonedRequest()
     {
@@ -308,7 +301,6 @@ public sealed class ResourceProviderTests
         Assert.False(value.IsAlive);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task NativeCompletionRejectionPreservesOwnerAfterCancellation()
     {
@@ -337,7 +329,6 @@ public sealed class ResourceProviderTests
         Assert.False(handle.IsClosed);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task PassThroughAfterCancellationRegistrationDisarmsEscapedWrapper()
     {
@@ -363,7 +354,6 @@ public sealed class ResourceProviderTests
         Assert.Throws<InvalidStateException>(() => escaped.Cancelled());
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task ProviderErrorCopiesItsMessageBeforeTemporaryResponseIsReleased()
     {
@@ -395,7 +385,6 @@ public sealed class ResourceProviderTests
         Assert.Contains("style missing é", failure.Message, StringComparison.Ordinal);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public unsafe void RequestCopiesTransientFieldsAndContainsProviderExceptions()
     {
@@ -438,7 +427,6 @@ public sealed class ResourceProviderTests
         Assert.True(escaped.IsClosed);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public unsafe void DecisionStatePreservesAcceptedAndInFlightCompletionButRollsBackRejection()
     {

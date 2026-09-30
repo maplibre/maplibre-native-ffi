@@ -35,7 +35,6 @@ public sealed unsafe class RuntimeEventTests
     private static int OffsetOf(string fieldName) =>
         Marshal.OffsetOf<mln_runtime_event>(fieldName).ToInt32();
 
-    [BindingSpecTest("", "")]
     [Fact]
     public void CopiesEveryMessageAndTypedPayloadOfOneBatch()
     {
@@ -120,7 +119,6 @@ public sealed unsafe class RuntimeEventTests
         Assert.Equal(RenderMode.Full, renderMap.Value.Mode);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void WalksEventsByTheStrideTheBatchReports()
     {
@@ -157,7 +155,6 @@ public sealed unsafe class RuntimeEventTests
         Assert.Equal([1, 2, 3], copied.Select(runtimeEvent => runtimeEvent.Code));
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void UnknownEventDomainsKeepRawValuesAndCopyThePayloadWindow()
     {
@@ -196,7 +193,6 @@ public sealed unsafe class RuntimeEventTests
         Assert.Equal(1, unknown.PayloadBytes[0]);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public void UnknownRuntimePayloadSnapshotsBytesAndReturnsCopies()
     {
@@ -210,7 +206,6 @@ public sealed unsafe class RuntimeEventTests
         Assert.Equal([1, 2, 3], payload.PayloadBytes);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void UnmatchedMapSourceKeepsItsRawIdentityAndExposesNoPublicMap()
     {
@@ -236,7 +231,6 @@ public sealed unsafe class RuntimeEventTests
         Assert.Equal(source, runtimeEvent.Source);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void OfflineRegionObservationEventsMaterializeCopiedPublicPayloads()
     {

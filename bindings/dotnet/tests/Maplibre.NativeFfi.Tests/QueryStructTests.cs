@@ -9,7 +9,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed unsafe class QueryStructTests
 {
-    [BindingSpecTest("")]
     [Fact]
     public void RenderedQueryGeometryMaterializesPublicShapes()
     {
@@ -52,7 +51,6 @@ public sealed unsafe class QueryStructTests
         Assert.Equal(9, line.data.line_string.points[1].x);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public void QueryOptionsMaterializeOptionalFieldsAndFilters()
     {

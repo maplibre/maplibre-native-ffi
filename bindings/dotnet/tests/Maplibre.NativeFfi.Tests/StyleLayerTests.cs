@@ -8,7 +8,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class StyleLayerTests
 {
-    [BindingSpecTest("")]
     [Fact]
     public async Task GlobalStateDefaultsUpdatesAndStyleReplacement()
     {
@@ -33,7 +32,6 @@ public sealed class StyleLayerTests
         Assert.Equal("""{"theme":null}"""u8.ToArray(), await map.GetGlobalStateAsync());
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task DemAndLocationLayerHelpersAdaptThroughNativeMap()
     {
@@ -113,7 +111,6 @@ public sealed class StyleLayerTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task LayerBaseAccessorsRoundTripThroughNativeMap()
     {
@@ -259,7 +256,6 @@ public sealed class StyleLayerTests
         Assert.Equal(MaplibreStatus.NotFound, error.Status);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task StyleTransitionOptionsRoundTripThroughNativeMap()
     {

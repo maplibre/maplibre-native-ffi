@@ -31,7 +31,6 @@ public sealed class OptionsValueSemanticsTests
         }
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void CameraOptionsComparesByPropertyValue()
     {
@@ -61,7 +60,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void AnimationOptionsComparesByPropertyValue()
     {
@@ -83,7 +81,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void CameraFitOptionsComparesByPropertyValue()
     {
@@ -101,7 +98,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void BoundOptionsComparesByPropertyValue()
     {
@@ -123,7 +119,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void FreeCameraOptionsComparesByPropertyValue()
     {
@@ -139,7 +134,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void ViewportOptionsComparesByPropertyValue()
     {
@@ -159,7 +153,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void TileOptionsComparesByPropertyValue()
     {
@@ -183,7 +176,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void ProjectionModeOptionsComparesByPropertyValue()
     {
@@ -201,7 +193,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void TileSourceOptionsComparesByPropertyValue()
     {
@@ -229,7 +220,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void GeojsonSourceOptionsComparesByPropertyValue()
     {
@@ -274,7 +264,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void StyleImageOptionsComparesByPropertyValue()
     {
@@ -285,7 +274,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void StyleTransitionOptionsComparesByPropertyValue()
     {
@@ -305,7 +293,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void QueryOptionsCompareLayerIdsElementByElement()
     {
@@ -337,7 +324,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public void QueryOptionsSnapshotCallerOwnedLayerIds()
     {
@@ -358,7 +344,6 @@ public sealed class OptionsValueSemanticsTests
         Assert.Equal(["a"], sourceOptions.SourceLayerIds);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void AbsentLayerIdsDifferFromEmptyLayerIds()
     {
@@ -369,7 +354,6 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void WithProducesAnIndependentInstance()
     {

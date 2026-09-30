@@ -21,7 +21,6 @@ public sealed class MapFeatureStateTests
     private static JsonElement ParseState(byte[] state) =>
         JsonDocument.Parse(Encoding.UTF8.GetString(state)).RootElement;
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task FeatureStateRoundTripsThroughTheMapStore()
     {
@@ -75,7 +74,6 @@ public sealed class MapFeatureStateTests
         Assert.Empty(cleared.EnumerateObject());
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task FeatureStateCommandsValidateSelectorShape()
     {

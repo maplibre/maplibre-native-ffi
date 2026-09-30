@@ -8,7 +8,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed unsafe class NativeStatusTests
 {
-    [BindingSpecTest("")]
     [Theory]
     [InlineData(
         (int)mln_status.MLN_STATUS_INVALID_ARGUMENT,
@@ -68,7 +67,6 @@ public sealed unsafe class NativeStatusTests
         Assert.Equal("mapped diagnostic", maplibreError.Diagnostic);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public void NativeInvalidStatusMapsToExceptionWithCallDiagnostic()
     {
@@ -91,7 +89,6 @@ public sealed unsafe class NativeStatusTests
         Assert.Contains("network status", error.Diagnostic, StringComparison.OrdinalIgnoreCase);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void UnknownNativeStatusPreservesRawStatus()
     {

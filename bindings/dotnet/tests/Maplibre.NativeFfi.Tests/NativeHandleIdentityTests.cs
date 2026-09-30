@@ -13,7 +13,6 @@ namespace Maplibre.NativeFfi.Tests;
 /// </summary>
 public sealed unsafe class NativeHandleIdentityTests
 {
-    [BindingSpecTest("")]
     [Fact]
     public void ReleasedMapIdReplayedAfterANewMapReportsInvalidArgument()
     {
@@ -48,7 +47,6 @@ public sealed unsafe class NativeHandleIdentityTests
         Assert.Equal(512u, GetSnapshot(second.Handle).logical_extent.width);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void MapIdPassedToARuntimeOperationReportsInvalidArgument()
     {
@@ -84,7 +82,6 @@ public sealed unsafe class NativeHandleIdentityTests
         Assert.Contains("runtime", error.Diagnostic, StringComparison.OrdinalIgnoreCase);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void MapIdCanBeReadFromAnotherThread()
     {

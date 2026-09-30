@@ -11,7 +11,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class CustomMvtVectorSourceTests
 {
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task CustomMvtVectorSourceApisAdaptThroughNativeMap()
     {
@@ -69,7 +68,6 @@ public sealed class CustomMvtVectorSourceTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task RemovingACustomMvtVectorSourceReleasesItsCallbackState()
     {
@@ -95,7 +93,6 @@ public sealed class CustomMvtVectorSourceTests
         Assert.False(Alive(state));
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task ClosingAMapReleasesItsCustomMvtVectorSourceCallbackState()
     {
@@ -118,7 +115,6 @@ public sealed class CustomMvtVectorSourceTests
         Assert.False(Alive(state));
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task AStyleReplacementReleasesADroppedSourceWithoutStyleLoadedEvents()
     {

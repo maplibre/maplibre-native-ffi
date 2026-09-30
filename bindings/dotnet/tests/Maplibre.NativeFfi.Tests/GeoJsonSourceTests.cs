@@ -14,7 +14,6 @@ public sealed class GeoJsonSourceTests
     private static readonly byte[] NearbyPoints =
         """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},"properties":{"weight":1}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"weight":2}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"weight":3}}]}"""u8.ToArray();
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task PreparedGeoJsonSourceDataAddsAndUpdatesThroughNativeMap()
     {
@@ -57,7 +56,6 @@ public sealed class GeoJsonSourceTests
         );
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task ClusteredGeojsonSourceOptionsValidateDuringPreparation()
     {
@@ -97,7 +95,6 @@ public sealed class GeoJsonSourceTests
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task PreparedDataInstallsOnManySourcesAndOutlivesRelease()
     {
@@ -141,7 +138,6 @@ public sealed class GeoJsonSourceTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task SetRejectsDataPreparedWithDifferentOptions()
     {
@@ -198,7 +194,6 @@ public sealed class GeoJsonSourceTests
         );
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task ClosedPreparedDataRejectsUseAndCloseAgainNoOps()
     {
@@ -233,7 +228,6 @@ public sealed class GeoJsonSourceTests
         );
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task PreparationRunsOffThreadAndInstallsOnMapThread()
     {
@@ -279,7 +273,6 @@ public sealed class GeoJsonSourceTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void SynchronousTilingOverrideAppliesToExistingSourceOnly()
     {

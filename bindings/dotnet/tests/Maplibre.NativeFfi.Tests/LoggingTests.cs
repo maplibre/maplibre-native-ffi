@@ -10,7 +10,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class LoggingTests
 {
-    [BindingSpecTest("")]
     [Fact]
     public void InstalledCallbackReceivesRecordsUntilReplacedAndCleared()
     {
@@ -67,7 +66,6 @@ public sealed class LoggingTests
         RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapLoadingFailed);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void InvalidAsyncSeverityMaskMapsNativeStatus()
     {
@@ -81,7 +79,6 @@ public sealed class LoggingTests
         Assert.Contains("severity", error.Diagnostic, StringComparison.OrdinalIgnoreCase);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public unsafe void CallbackCopiesUnknownValuesRejectsReentryAndContainsExceptions()
     {

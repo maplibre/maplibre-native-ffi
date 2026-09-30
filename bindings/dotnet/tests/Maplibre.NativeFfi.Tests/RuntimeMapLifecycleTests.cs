@@ -60,7 +60,6 @@ public sealed class RuntimeMapLifecycleTests
 
     // A descriptor that writes no field takes the native creation defaults, which the map then
     // publishes.
-    [BindingSpecTest("")]
     [Fact]
     public void DefaultMapOptionsPreserveNativeCreationDefaults()
     {
@@ -74,7 +73,6 @@ public sealed class RuntimeMapLifecycleTests
         Assert.False(snapshot.GestureInProgress);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void MapOptionsMaterializeFastPforDecoding()
     {
@@ -100,7 +98,6 @@ public sealed class RuntimeMapLifecycleTests
         Assert.Equal(new LogicalExtent(128, 64, 1), map.SnapshotGet().LogicalExtent);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public void RuntimeAndMapCloseDeterministically()
     {
@@ -123,7 +120,6 @@ public sealed class RuntimeMapLifecycleTests
         Assert.True(runtime.IsClosed);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task RuntimeCloseAsyncCompletesAfterNativeTeardown()
     {
@@ -148,7 +144,6 @@ public sealed class RuntimeMapLifecycleTests
         await second;
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task RuntimeDisposeAsyncWaitsForNativeTeardown()
     {
@@ -161,7 +156,6 @@ public sealed class RuntimeMapLifecycleTests
         Assert.True(runtime.IsClosed);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void RuntimeCloseFailsWhileMapIsLiveAndCanRetryAfterMapClose()
     {
@@ -191,7 +185,6 @@ public sealed class RuntimeMapLifecycleTests
         Assert.True(runtime.IsClosed);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void CommittedCommandIsVisibleInSnapshotsAtOrPastItsGeneration()
     {
@@ -217,7 +210,6 @@ public sealed class RuntimeMapLifecycleTests
         Assert.False(snapshot.FullyLoaded);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void DumpingDebugLogsCommits()
     {
@@ -237,7 +229,6 @@ public sealed class RuntimeMapLifecycleTests
 
     // A still image stays pending until a render session produces it, so closing the map with
     // no session attached retires the request and reports the cancelled status.
-    [BindingSpecTest("")]
     [Fact]
     public async Task AnOutstandingRequestIsCancelledWhenTheMapCloses()
     {
@@ -261,7 +252,6 @@ public sealed class RuntimeMapLifecycleTests
         Assert.Equal(MaplibreStatus.Cancelled, error.Status);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void RenderingStatsViewEnabledRoundTripsThroughSnapshot()
     {
@@ -301,7 +291,6 @@ public sealed class RuntimeMapLifecycleTests
         Assert.Equal(new LogicalExtent(512, 256, 2), map.SnapshotGet().LogicalExtent);
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task RuntimeAndMapWorkAcrossManagedThreads()
     {
@@ -321,7 +310,6 @@ public sealed class RuntimeMapLifecycleTests
         Assert.Equal(new LogicalExtent(512, 512, 1), snapshot.LogicalExtent);
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public void MethodsRejectClosedMapBeforeNativeCall()
     {

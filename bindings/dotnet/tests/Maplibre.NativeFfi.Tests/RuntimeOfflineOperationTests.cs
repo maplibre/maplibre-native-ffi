@@ -9,7 +9,6 @@ public sealed class RuntimeOfflineOperationTests
 {
     // Ambient-cache maintenance takes no argument the host can observe afterwards, so the
     // observable contract is that a lowered budget still leaves the database usable.
-    [BindingSpecTest("")]
     [Fact]
     public async Task AmbientCacheOperationsCompleteAndLeaveTheDatabaseUsable()
     {
@@ -36,7 +35,6 @@ public sealed class RuntimeOfflineOperationTests
         Assert.Empty(await runtime.OfflineRegionsListAsync(TestContext.Current.CancellationToken));
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task RegionMetadataStatusAndDownloadStateRoundTripThroughTasks()
     {
@@ -90,7 +88,6 @@ public sealed class RuntimeOfflineOperationTests
     }
 
     // A lookup of a missing region is not an error; every other operation reports not found.
-    [BindingSpecTest("")]
     [Fact]
     public async Task OperationsOnAMissingRegionReportNotFound()
     {
@@ -139,7 +136,6 @@ public sealed class RuntimeOfflineOperationTests
             )
         );
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task OfflineRegionsAreCreatedListedAndDeletedThroughTasks()
     {

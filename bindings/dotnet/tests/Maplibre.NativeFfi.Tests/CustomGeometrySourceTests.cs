@@ -11,7 +11,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class CustomGeometrySourceTests
 {
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task CustomGeometrySourceApisAdaptThroughNativeMap()
     {
@@ -73,7 +72,6 @@ public sealed class CustomGeometrySourceTests
         );
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task RemovingACustomGeometrySourceReleasesItsCallbackState()
     {
@@ -99,7 +97,6 @@ public sealed class CustomGeometrySourceTests
         Assert.False(Alive(state));
     }
 
-    [BindingSpecTest("")]
     [Fact]
     public async Task ClosingAMapReleasesItsCustomGeometrySourceCallbackState()
     {
@@ -122,7 +119,6 @@ public sealed class CustomGeometrySourceTests
         Assert.False(Alive(state));
     }
 
-    [BindingSpecTest("", "")]
     [Fact]
     public async Task AStyleReplacementReleasesADroppedSourceWithoutStyleLoadedEvents()
     {

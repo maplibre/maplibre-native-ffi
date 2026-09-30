@@ -7,7 +7,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed unsafe class NativeUtf8StringTests
 {
-    [BindingSpecTest("")]
     [Fact]
     public void RejectsEmbeddedNul()
     {
