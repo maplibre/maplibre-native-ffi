@@ -54,7 +54,7 @@ headers and links the static library. It holds the cases that no public fence
 can order, and the white-box cases for internal modules with contracts of their
 own, such as the completion state machine and disposal. A case belongs here only
 when the ABI suite cannot express it: first look for a public signal, such as a
-completion that a later command fences, a parked completion, or a stepped frame.
+completion that a later command fences, a gate completion, or a stepped frame.
 
 Each file directly under `internal/` is one group, registered the way the ABI
 suite's files are. Its helpers live in `internal/support/`:
@@ -76,6 +76,10 @@ the objects under test are the shipped ones:
   With no handler installed, reaching a point costs one relaxed atomic load.
 - `src/testing/render_clock.hpp` is the clock that frame demand deadlines run
   on. A case advances it rather than waiting for a deadline to pass.
+
+`mise run check-exports [preset]` reads the installed library's symbol table and
+fails when it exports anything beyond the public C API, or any name that belongs
+to a seam. `mise run build` and `mise run archive-native` run it.
 
 The suite's replacement `operator new` covers the static library's own
 allocations, and throws only on a thread inside an `AllocationFaults` scope.

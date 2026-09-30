@@ -86,6 +86,7 @@ shared = [
   "!tests/native/**",
   "!tests/uncalled-exports.txt",
   "!scripts/check-export-calls.py",
+  "!scripts/check-exports.py",
   "!scripts/coverage.py",
   "!scripts/coverage-diff.py",
   "!plans/**",

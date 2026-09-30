@@ -217,6 +217,7 @@ description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = [
   { task = "//:build-preset", args = ["{{usage.preset}}"] },
+  { task = "//:check-exports", args = ["{{usage.preset}}"] },
   { task = "//:select-clangd-preset", args = ["{{usage.preset}}"] },
 ]
 
@@ -303,6 +304,7 @@ run = [{ task = "//:archive-native", args = ["{{usage.preset}}"] }]
 description = "Archive an already-built native CMake preset."
 usage = 'arg "<preset>"'
 run = [
+  { task = "//:check-exports", args = ["{{usage.preset}}"] },
   'cpack --preset "$usage_preset"',
   { task = "//:verify-native-package", args = ["{{usage.preset}}"] },
 ]
@@ -373,6 +375,11 @@ run = 'python3 scripts/coverage.py "$usage_suite" --preset "$usage_preset"'
 [tasks.coverage-diff]
 description = "List src/ lines that one coverage report hits and another misses."
 run = 'python3 scripts/coverage-diff.py "$@"'
+
+[tasks.check-exports]
+description = "Check that an installed native library exports exactly the public C API."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = 'python3 scripts/check-exports.py "$usage_preset"'
 
 [tasks.check-export-calls]
 description = "Check that the C tests call every exported function by name."
