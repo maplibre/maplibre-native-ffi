@@ -144,6 +144,12 @@ bool mln_test_await_event_matching(
   mln_test_deadline deadline
 );
 
+// Drains until a batch reports no events, and returns how many events `match`
+// accepted. Here `match` counts an event instead of ending a wait.
+size_t mln_test_drain_counting_matching(
+  mln_runtime runtime, mln_test_event_match match, void* context
+);
+
 // mln_test_drain_find() as a wait: blocks until an event of `type` from
 // `source` arrives, within the default deadline.
 bool mln_test_await_event(

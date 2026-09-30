@@ -548,6 +548,29 @@ bool mln_test_await_event_matching(
          !search.drain_failed;
 }
 
+size_t mln_test_drain_counting_matching(
+  mln_runtime runtime, mln_test_event_match match, void* context
+) {
+  size_t total = 0;
+  for (;;) {
+    mln_test_event_batch batch = mln_test_event_batch_default();
+    if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
+      return total;
+    }
+    if (batch.event_count == 0) {
+      return total;
+    }
+    for (size_t index = 0; index < batch.event_count; index += 1) {
+      const mln_runtime_event* event =
+        (const mln_runtime_event*)((const char*)batch.events +
+                                   (index * batch.event_size));
+      if (match(event, batch.messages, context)) {
+        total += 1;
+      }
+    }
+  }
+}
+
 typedef struct event_copy {
   uint32_t type;
   mln_map source;

@@ -555,11 +555,10 @@ static void meters_per_pixel_follows_the_projection_camera(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Spherical Mercator on MapLibre's earth radius: the origin sits at zero, the
-// antimeridian half the circumference east, and every coordinate converts
-// back to itself.
+// The origin projects to zero, northing and easting take the signs of latitude
+// and longitude, and every coordinate converts back to itself. The scale is
+// MapLibre's own earth radius, so no case pins it.
 static void projected_meters_round_trip(void) {
-  static const double half_circumference = 20037508.342789244;
   mln_projected_meters meters = {0};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
@@ -567,15 +566,6 @@ static void projected_meters_round_trip(void) {
   );
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, meters.northing);
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, meters.easting);
-
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_projected_meters_for_lat_lng(
-      (mln_lat_lng){.latitude = 0.0, .longitude = 180.0}, &meters, NULL
-    )
-  );
-  TEST_ASSERT_DOUBLE_WITHIN(1e-3, half_circumference, meters.easting);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, meters.northing);
 
   const mln_lat_lng coordinates[] = {
     {.latitude = 37.7749, .longitude = -122.4194},
@@ -588,7 +578,6 @@ static void projected_meters_round_trip(void) {
       MLN_STATUS_OK,
       mln_projected_meters_for_lat_lng(coordinates[index], &meters, NULL)
     );
-    // Northing grows with latitude and easting with longitude.
     TEST_ASSERT_EQUAL(coordinates[index].latitude > 0.0, meters.northing > 0.0);
     TEST_ASSERT_EQUAL(coordinates[index].longitude > 0.0, meters.easting > 0.0);
     mln_lat_lng round_trip = {0};

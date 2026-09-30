@@ -252,6 +252,16 @@ or a public fence:
   A wake-driven wait reaches abandon inside that window about one run in eight
   on Metal. The retry goes once the core stops reporting busy after a published
   result.
+- `mln_test_render_still_image` in `support/map.c` sends only if-needed frame
+  demands, and `a_static_map_renders_still_images` and
+  `a_tile_map_renders_still_images` in `abi/map/still_image.c` rely on it. A
+  forced demand (`flags = 0`) can render the map update from before the still
+  image request again, and MapLibre completes a pending still image after any
+  fully loaded frame. The image then completes with the previous style, which
+  showed on Metal as a stale second readback. The restriction goes once the core
+  holds a still image until a frame renders the update its request followed, or
+  documents which demands may complete one, with a regression test that sends a
+  forced demand between two still images.
 
 ## Process-global state
 

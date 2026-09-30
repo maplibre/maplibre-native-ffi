@@ -65,31 +65,21 @@ typedef struct transition_wait {
   bool failed;
 } transition_wait;
 
+// Accepts the transition-finished events for the ID that `context` points to.
+static bool is_finished_transition(
+  const mln_runtime_event* event, const char* messages, void* context
+) {
+  (void)messages;
+  return event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED &&
+         event->payload.camera_transition_finished.transition_id ==
+           *(const uint64_t*)context;
+}
+
 // Drains the queue and counts the transition-finished events for one ID.
 static size_t drain_finished(mln_runtime runtime, uint64_t transition_id) {
-  size_t finished = 0;
-  for (;;) {
-    mln_test_event_batch batch = mln_test_event_batch_default();
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_test_drain_events(runtime, &batch)
-    );
-    if (batch.event_count == 0) {
-      break;
-    }
-    for (size_t index = 0; index < batch.event_count; index += 1) {
-      const mln_runtime_event* event =
-        (const mln_runtime_event*)((const char*)batch.events +
-                                   (index * batch.event_size));
-      if (
-        event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED &&
-        event->payload.camera_transition_finished.transition_id == transition_id
-      ) {
-        finished += 1;
-      }
-    }
-  }
-  mln_test_release_drained_batch();
-  return finished;
+  return mln_test_drain_counting_matching(
+    runtime, is_finished_transition, &transition_id
+  );
 }
 
 // Keeps one frame demand in flight until the transition reports its end. Each
@@ -170,14 +160,9 @@ static void a_rendered_ease_completes_at_its_target(void) {
     5.0, read_settled_snapshot(runtime, map).camera.zoom
   );
 
-  if (wait.demand_pending) {
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_test_render_step_until(
-                       &fixture, settled_result, (void*)&fixture,
-                       mln_test_deadline_default(), "the last frame result"
-                     )
-    );
-  }
+  // transition_finished collects its demand before it reports the end, so no
+  // frame is in flight here.
+  TEST_ASSERT_FALSE(wait.demand_pending);
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = 0;
   TEST_ASSERT_EQUAL_INT(
