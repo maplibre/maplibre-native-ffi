@@ -190,6 +190,9 @@ Test files include `support/test_support.h`, which brings in the helpers below.
 | `render.h` | The render fixture, driver service, and `mln_test_render_step_until` |
 | `tables.h` | A runner for validation tables                                       |
 
+The host-target fixtures in `support/host_graphics.h` need their own include, as
+described under [GPU objects](#gpu-objects).
+
 Every wait blocks on a signal and gives up at a deadline: 10 seconds times the
 timeout scale unless the wait names another. The signal is the pulse, a
 process-wide counter that flags, gates, completions, and the fixtures' wakes all
@@ -209,8 +212,22 @@ Use the helper that matches what the case waits for:
   session's driver work between checks.
 - Any other condition: `mln_test_await` with a predicate.
 
-The render fixture's context comes from `support/render_<backend>.c`, which
-CMake selects for the preset's backend and OpenGL context provider.
+### GPU objects
+
+On every native backend, the render fixture's context comes from
+[`tests/graphics`](../graphics/README.md), the library that the binding suites
+load for their GPU objects too. `support/render_graphics.c` attaches the owned
+texture that `mln_test_render_fixture_create` returns. `support/host_graphics.h`
+adds fixtures for the other target kinds: a borrowed texture that a case can
+read back through `mln_test_render_fixture_read_texture`, and a presentation
+surface. A case that builds its own descriptors creates a graphics object with
+`mln_test_graphics_create` and reads its handles from there.
+
+The browser presets have none of these. Their contexts come from JavaScript, so
+`support/render_webgl.c` and `support/render_webgpu.c` create them, and a file
+that uses `host_graphics.h` excludes its cases under `__EMSCRIPTEN__`.
+`support/render_egl.c` holds the dedicated EGL fixtures, whose sessions create
+their own context on a display from `tests/graphics`.
 
 ### Cases that still wait on a fixed delay
 

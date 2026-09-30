@@ -28,6 +28,21 @@ bool mln_test_backend_attach(
 // Releases what mln_test_backend_attach() created.
 void mln_test_backend_destroy(void* state);
 
+// The shape of mln_test_backend_attach(), for fixtures that attach another
+// kind of target. The state it writes is released with
+// mln_test_backend_destroy().
+typedef bool (*mln_test_backend_attach_fn)(
+  mln_map map, const mln_render_session_attach_options* options,
+  void** out_state, mln_render_session* out_session,
+  const mln_completion* completion, mln_status* out_status
+);
+
+// mln_test_render_fixture_create() with another attach function.
+bool mln_test_render_fixture_create_with(
+  mln_map map, mln_test_render_fixture* fixture,
+  mln_test_backend_attach_fn attach
+);
+
 // Shared with the backends that attach fixtures of their own.
 void mln_test_render_count_wake(void* user_data);
 void mln_test_render_reserve_session(void);

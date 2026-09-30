@@ -348,18 +348,29 @@ function(mln_native_configure_suite target registry_dir)
   endif()
 
   set(support_dir "${MLN_NATIVE_TESTS_DIR}/support")
-  # The render fixture's context comes from the file for this preset's backend.
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
-    set(render_backend_file "render_${MLN_FFI_OPENGL_CONTEXT_PROVIDER}.c")
+  # The render fixture's context comes from tests/graphics on native targets,
+  # and from the browser file for this preset's backend in the browser.
+  if(EMSCRIPTEN AND MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+    set(render_backend_files "render_webgl.c")
+  elseif(EMSCRIPTEN)
+    set(render_backend_files "render_${MLN_FFI_RENDER_BACKEND}.c")
   else()
-    set(render_backend_file "render_${MLN_FFI_RENDER_BACKEND}.c")
+    set(render_backend_files "render_graphics.c")
+    if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl"
+       AND MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
+      list(APPEND render_backend_files "render_egl.c")
+    endif()
   endif()
+  list(TRANSFORM render_backend_files PREPEND "${support_dir}/")
   target_sources(
     ${target}
     PRIVATE
       "${support_dir}/harness.c" "${support_dir}/watchdog.cpp"
       "${support_dir}/wait.cpp" "${support_dir}/env.c" "${support_dir}/render.c"
-      "${support_dir}/${render_backend_file}")
+      ${render_backend_files})
+  if(TARGET mln_test_graphics_objects)
+    target_link_libraries(${target} PRIVATE mln_test_graphics_objects)
+  endif()
   set_target_properties(
     ${target}
     PROPERTIES

@@ -136,6 +136,15 @@ mln_status mln_test_render_fixture_finish_operation(
 bool mln_test_render_fixture_create(
   mln_map map, mln_test_render_fixture* fixture
 ) {
+  return mln_test_render_fixture_create_with(
+    map, fixture, mln_test_backend_attach
+  );
+}
+
+bool mln_test_render_fixture_create_with(
+  mln_map map, mln_test_render_fixture* fixture,
+  mln_test_backend_attach_fn attach
+) {
   if (map == MLN_HANDLE_NULL || fixture == NULL) {
     return false;
   }
@@ -158,7 +167,7 @@ bool mln_test_render_fixture_create(
   };
   mln_test_completion completion = mln_test_completion_default(0);
   mln_status status = MLN_STATUS_INVALID_STATE;
-  if (!mln_test_backend_attach(
+  if (!attach(
         map, &options, &fixture->backend_state, &fixture->session,
         &completion.descriptor, &status
       )) {
@@ -265,32 +274,3 @@ bool mln_test_render_reclaim_thread_sessions(void) {
   release_empty_session_slots();
   return reclaimed;
 }
-
-#if !(defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_EGL))
-// Builds without an EGL provider report the dedicated fixture unavailable.
-mln_test_fixture_result mln_test_dedicated_egl_surface_create(
-  mln_map map, mln_test_render_fixture* fixture
-) {
-  (void)map;
-  (void)fixture;
-  return MLN_TEST_FIXTURE_UNAVAILABLE;
-}
-
-void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {
-  (void)fixture;
-}
-
-bool mln_test_egl_context_is_current(void) { return false; }
-
-mln_test_fixture_result mln_test_dedicated_egl_texture_create(
-  mln_map map, mln_test_render_fixture* fixture
-) {
-  (void)map;
-  (void)fixture;
-  return MLN_TEST_FIXTURE_UNAVAILABLE;
-}
-
-void mln_test_dedicated_egl_texture_destroy(mln_test_render_fixture* fixture) {
-  (void)fixture;
-}
-#endif
