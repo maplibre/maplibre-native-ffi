@@ -255,11 +255,13 @@ class Values:
                 )
                 captures.append(f"    self.{local} = {present} ? {capture} : nil")
                 materialize.append(
-                    f"    if let item = {local} {{ {set_presence}; {raw} = {self.native(field.value, 'item')} }}"
+                    f"    if let item = self.{local} {{ {set_presence}; {raw} = {self.native(field.value, 'item')} }}"
                 )
             else:
                 captures.append(f"    self.{local} = {capture}")
-                materialize.append(f"    {raw} = {self.native(field.value, local)}")
+                materialize.append(
+                    f"    {raw} = {self.native(field.value, 'self.' + local)}"
+                )
         initial = f"{value.default}()" if value.default else f"{value.native}()"
         return f"""public struct {public}: Equatable, Hashable, Sendable {{
 {chr(10).join(fields)}

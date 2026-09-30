@@ -1,18 +1,17 @@
 """Compile notification stubs added by a new descriptor in the input headers."""
 
-import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from support import parse_sources, protocol_header
+from support import parse_sources, protocol_header, require_tool, run
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import dart
 from tools.bindgen.native_ports import generate
 
 
-def run_port(root, bound, notify, main):
+def run_port(test, root, bound, notify, main):
     """Compile generated port callbacks against a notify stub and run main."""
     header, implementation = generate(bound)
     source = (
@@ -27,11 +26,10 @@ def run_port(root, bound, notify, main):
         + main
     )
     (root / "test.cpp").write_text(source)
-    subprocess.run(
-        ["clang++", "-std=c++20", str(root / "test.cpp"), "-o", str(root / "test")],
-        check=True,
+    require_tool(test, "clang++").run(
+        test, "-std=c++20", str(root / "test.cpp"), "-o", str(root / "test"), cwd=root
     )
-    subprocess.run([str(root / "test")], check=True)
+    run(test, [str(root / "test")], root)
 
 
 class NativePortTests(unittest.TestCase):
@@ -42,6 +40,7 @@ class NativePortTests(unittest.TestCase):
             (root / "sample.h").write_text(header)
             bound = compile_api(parse_sources({"sample.h": header}))
             run_port(
+                self,
                 root,
                 bound,
                 """
@@ -71,6 +70,7 @@ int main() {
             (root / "sample.h").write_text(header)
             bound = compile_api(parse_sources({"sample.h": header}))
             run_port(
+                self,
                 root,
                 bound,
                 """

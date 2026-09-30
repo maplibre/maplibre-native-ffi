@@ -10,9 +10,10 @@
 #ifndef MLN_BINDGEN_PROTOCOLS_H
 #define MLN_BINDGEN_PROTOCOLS_H
 
-// A group that calls a probe implementation needs the fixed-width types.
+// Groups that declare fixed-width types include the standard headers.
 #if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) || \
-  defined(MLN_PROTOCOL_PRESENCE_MASK)
+  defined(MLN_PROTOCOL_PRESENCE_MASK) ||                              \
+  defined(MLN_PROTOCOL_COMPLETION_RUNTIME)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_DECISION)
@@ -46,18 +47,60 @@ typedef enum mln_status : int {
   MLN_STATUS_WRONG_THREAD = -3,
   MLN_STATUS_UNSUPPORTED = -4,
   MLN_STATUS_NATIVE_ERROR = -5,
+  MLN_STATUS_CANCELLED = -6,
+  MLN_STATUS_BUSY = -7,
+  MLN_STATUS_TARGET_LOST = -8,
+  MLN_STATUS_NOT_READY = -9,
+  MLN_STATUS_NOT_FOUND = -10,
 } mln_status;
 typedef struct mln_diagnostic {
   unsigned int size;
   char message[4096];
 } mln_diagnostic;
-typedef struct mln_completion {
-  void* state;
-} mln_completion;
 typedef struct mln_buffer_view {
   const void* data;
   MLN_PROTOCOL_SIZE size;
 } mln_buffer_view;
+#ifdef MLN_PROTOCOL_COMPLETION_RUNTIME
+// The completion types as the C API declares them, for a probe that compiles
+// a binding's handwritten completion runtime.
+typedef enum mln_command_disposition : uint32_t {
+  MLN_COMMAND_DISPOSITION_COMMITTED = 0,
+  MLN_COMMAND_DISPOSITION_SUPERSEDED = 1,
+  MLN_COMMAND_DISPOSITION_FAILED = 2,
+  MLN_COMMAND_DISPOSITION_CANCELLED = 3,
+} mln_command_disposition;
+typedef struct mln_completion_result {
+  uint32_t size BIND("kind=size;default=sizeof");
+  mln_status status;
+  uint32_t disposition BIND("enum=mln_command_disposition");
+  uint32_t reserved BIND("kind=reserved;default=0");
+  uint64_t generation;
+  mln_buffer_view diagnostic BIND("encoding=utf8");
+  const void* value BIND("kind=erased;ownership=borrowed");
+  size_t value_count;
+} mln_completion_result;
+typedef void (*mln_completion_callback)(
+  void* user_data BIND("kind=context;lifetime=owner"),
+  const mln_completion_result* result
+    BIND("ownership=borrowed;lifetime=call;direction=in;length=1")
+) BIND("thread=native;failure=contain");
+typedef void (*mln_completion_release)(
+  void* user_data BIND("kind=context;lifetime=owner")
+) BIND("thread=native;failure=contain");
+typedef struct mln_completion {
+  uint32_t size BIND("kind=size;default=sizeof");
+  mln_completion_callback callback;
+  void* user_data BIND("kind=context;ownership=borrowed");
+  mln_completion_release release_user_data;
+} mln_completion BIND(
+  "kind=callback_registration;user_data=user_data;release=release_user_data"
+);
+#else
+typedef struct mln_completion {
+  void* state;
+} mln_completion;
+#endif
 typedef unsigned long long mln_runtime;
 
 // The map is a plain value unless a test asks for one of its owner forms.
@@ -118,7 +161,7 @@ mln_status mln_probe_nullable_text(
 typedef struct mln_keyword_entry {
   double type;
   double defer;
-  double self;
+  double raw;
 } mln_keyword_entry;
 BIND("execution=immediate")
 mln_status mln_keyword_combine(

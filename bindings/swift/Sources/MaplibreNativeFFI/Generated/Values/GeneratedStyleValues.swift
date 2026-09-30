@@ -574,7 +574,7 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   ) throws {
     width = raw.width
     height = raw.height
-    stride = raw.stride
+    self.stride = raw.stride
     pixels = try NativeString.copyData(
       data: raw.pixels,
       size: Int(raw.byte_length)
@@ -588,7 +588,7 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
     raw.size = UInt32(MemoryLayout<mln_premultiplied_rgba8_image>.size)
     raw.width = width
     raw.height = height
-    raw.stride = stride
+    raw.stride = self.stride
     raw.pixels = arena.view(pixels).data?.assumingMemoryBound(to: UInt8.self)
     raw.byte_length = try NativeInputArena.count(pixels.count)
     return raw
@@ -662,7 +662,7 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
     raw.has_text_fit_height = false
     raw.width = width
     raw.height = height
-    raw.stride = stride
+    raw.stride = self.stride
     raw.byte_length = byteLength
     raw.stretch_x_count = stretchXCount
     raw.stretch_y_count = stretchYCount

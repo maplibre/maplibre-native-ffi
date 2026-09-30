@@ -79,11 +79,16 @@ def operation(plan, api, values):
         if name in length_sources:
             source = length_sources[name]
             value = next(v for v in inputs.values() if v.length == name)
-            arguments.append(
+            length = (
                 f"if ({source}) |items| items.len else 0"
                 if value.nullable or value.optional == "empty"
                 else f"{source}.len"
             )
+            if parameter.type.declaration != "size_t":
+                # A narrower native count rejects a slice it cannot describe.
+                count = f'@typeInfo(@TypeOf(c.{function.name})).@"fn".params[{parameter_index}].type.?'
+                length = f"std.math.cast({count}, {length}) orelse return error.InvalidArgument"
+            arguments.append(length)
             continue
         if name in outputs and not (name == plan.receiver and plan.consumes):
             value = outputs[name]

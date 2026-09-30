@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import shutil
-import subprocess
 import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from support import REAL_CLANG_ARGS, ROOT, parse_directory, real_api
+from support import (
+    REAL_CLANG_ARGS,
+    ROOT,
+    parse_directory,
+    real_api,
+    require_tool,
+    run,
+)
 
 from tools.bindgen.model import ModelError
 from tools.bindgen.native_capture import generate
@@ -37,25 +43,23 @@ class NativeCaptureTests(unittest.TestCase):
             source = staging / "mutation.cpp"
             source.write_text(FIXTURE_TEST)
             executable = staging / "mutation"
-            subprocess.run(
-                [
-                    "clang++",
-                    "-std=c++20",
-                    "-DMLN_STATIC",
-                    "-Wall",
-                    "-Wextra",
-                    "-Werror",
-                    f"-I{include}",
-                    f"-I{staging / 'src'}",
-                    f"-I{ROOT / 'src'}",
-                    f"-I{ROOT / 'third_party/maplibre-native/include'}",
-                    str(source),
-                    "-o",
-                    str(executable),
-                ],
-                check=True,
+            require_tool(self, "clang++").run(
+                self,
+                "-std=c++20",
+                "-DMLN_STATIC",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                f"-I{include}",
+                f"-I{staging / 'src'}",
+                f"-I{ROOT / 'src'}",
+                f"-I{ROOT / 'third_party/maplibre-native/include'}",
+                str(source),
+                "-o",
+                str(executable),
+                cwd=staging,
             )
-            subprocess.run([str(executable)], check=True)
+            run(self, [str(executable)], staging)
             fixture = include / "capture_fixture.h"
             fixture.write_text(
                 FIXTURE_HEADER.replace(
@@ -77,13 +81,13 @@ class NativeCaptureTests(unittest.TestCase):
                 for function in self.api.functions
             ),
         )
-        compile_and_run(generate(api), CAPTURE_TEST)
+        compile_and_run(self, generate(api), CAPTURE_TEST)
 
     def test_deferred_callbacks_answer_early_and_fail_unadopted_decisions(self):
-        compile_and_run(generate(self.api), DEFERRED_TEST)
+        compile_and_run(self, generate(self.api), DEFERRED_TEST)
 
 
-def compile_and_run(outputs, test_source):
+def compile_and_run(test, outputs, test_source):
     with tempfile.TemporaryDirectory() as directory:
         staging = Path(directory)
         for name, text in outputs.items():
@@ -94,26 +98,23 @@ def compile_and_run(outputs, test_source):
         source = staging / "capture.cpp"
         source.write_text(test_source)
         executable = staging / "capture"
-        subprocess.run(
-            [
-                "clang++",
-                "-std=c++20",
-                "-DMLN_STATIC",
-                "-Wall",
-                "-Wextra",
-                "-Werror",
-                f"-I{staging}",
-                f"-I{ROOT / 'include'}",
-                f"-I{ROOT / 'src'}",
-                f"-I{ROOT / 'third_party/maplibre-native/include'}",
-                str(source),
-                "-o",
-                str(executable),
-            ],
-            check=True,
-            text=True,
+        require_tool(test, "clang++").run(
+            test,
+            "-std=c++20",
+            "-DMLN_STATIC",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            f"-I{staging}",
+            f"-I{ROOT / 'include'}",
+            f"-I{ROOT / 'src'}",
+            f"-I{ROOT / 'third_party/maplibre-native/include'}",
+            str(source),
+            "-o",
+            str(executable),
+            cwd=staging,
         )
-        subprocess.run([str(executable)], check=True, capture_output=True, text=True)
+        run(test, [str(executable)], staging)
 
 
 DEFERRED_TEST = r"""

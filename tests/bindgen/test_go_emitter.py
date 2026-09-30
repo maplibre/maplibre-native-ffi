@@ -1,12 +1,18 @@
 """Compile new C value shapes and execute their generated Go round trips."""
 
 import shutil
-import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from support import FIXTURES, PROTOCOLS_STUB, parse_sources, protocol_header
+from support import (
+    FIXTURES,
+    PROTOCOLS_STUB,
+    ROOT,
+    parse_sources,
+    protocol_header,
+    require_tool,
+)
 
 from tools.bindgen.emitters import go
 from tools.bindgen.schema import validate
@@ -100,21 +106,5 @@ func TestRoundtrip(t *testing.T) {
 }
 """.replace("LITERAL", literal)
                 )
-                result = subprocess.run(
-                    [
-                        "mise",
-                        "exec",
-                        "--no-deps",
-                        "--",
-                        "go",
-                        "-C",
-                        str(root),
-                        "test",
-                        "./...",
-                    ],
-                    cwd=Path(__file__).resolve().parents[2] / "bindings/go",
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                go_tool = require_tool(self, "go", ROOT / "bindings/go")
+                go_tool.run(self, "test", "./...", cwd=root)

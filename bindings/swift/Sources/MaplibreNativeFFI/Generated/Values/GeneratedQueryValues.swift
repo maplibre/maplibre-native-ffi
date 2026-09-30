@@ -283,8 +283,8 @@ public struct ScreenBox: Equatable, Hashable, Sendable {
 
   func nativeValue() -> mln_screen_box {
     var raw = mln_screen_box()
-    raw.min = min.nativeValue()
-    raw.max = max.nativeValue()
+    raw.min = self.min.nativeValue()
+    raw.max = self.max.nativeValue()
     return raw
   }
 }

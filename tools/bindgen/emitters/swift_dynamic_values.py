@@ -60,7 +60,16 @@ def encode(values, value, source):
     ):
         converted = encode(values, replace(value, nullable=False, optional=None), "$0")
         fallback = " ?? mln_buffer_view()" if value.buffer_form == "view" else ""
-        return f"{'try ' if encode_throws(value) else ''}{source}.map {{ {converted} }}{fallback}"
+        # Arena arrays and counted pointer buffers are already optional.
+        method = (
+            "flatMap"
+            if value.kind == "array"
+            or value.kind == "buffer"
+            and value.buffer_form != "view"
+            and value.length != "nul"
+            else "map"
+        )
+        return f"{'try ' if encode_throws(value) else ''}{source}.{method} {{ {converted} }}{fallback}"
     if value.kind == "buffer":
         if value.length == "nul":
             return f"try arena.cString({source})"
@@ -279,7 +288,9 @@ def declaration(values, value):
             f"raw.{identifier(field.name)} = {encode(values, field.value, 'item.' + identifier(camel(field.name)))}"
             for field in members
         )
-        encode_lines.append(f"    if let item = {local} {{ {mark}; {materialized} }}")
+        encode_lines.append(
+            f"    if let item = self.{local} {{ {mark}; {materialized} }}"
+        )
     for f in value.fields:
         if f.name in controls or f.name in grouped:
             continue
@@ -302,7 +313,7 @@ def declaration(values, value):
                 or array.value.nullable
                 or array.value.optional == "empty"
             )
-            source = identifier(camel(array.name))
+            source = "self." + identifier(camel(array.name))
             encode_lines.append(
                 f"    {raw} = try NativeInputArena.count({source}{'?.count ?? 0' if optional else '.count'})"
             )
@@ -317,7 +328,7 @@ def declaration(values, value):
                 else f"{local}: {union_type} = .default"
             )
             init.append(f"    self.{local} = {local}")
-            decode_lines.append(f"    {local} = {decode(values, union, raw)}")
+            decode_lines.append(f"    self.{local} = {decode(values, union, raw)}")
             tag_value = next(
                 field.value for field in value.fields if field.name == union.tag
             )
@@ -331,12 +342,12 @@ def declaration(values, value):
             if union.empty_variant:
                 cases += f"\n    case .none: raw.{identifier(union.tag)} = {union.empty_variant[0]}{tag_suffix}"
             encode_lines.append(
-                f'    switch {local} {{\n{cases}\n    case .unknown: throw NativeStringError("unknown union variant cannot be submitted")\n    }}'
+                f'    switch self.{local} {{\n{cases}\n    case .unknown: throw NativeStringError("unknown union variant cannot be submitted")\n    }}'
             )
             continue
         if f.value.kind == "array" and f.value.ctype.kind == "array":
             encode_lines.append(
-                f'    guard {local}.count == {f.value.length} else {{ throw NativeStringError("incorrect fixed array length") }}'
+                f'    guard self.{local}.count == {f.value.length} else {{ throw NativeStringError("incorrect fixed array length") }}'
             )
         optional = f.presence and f.presence.mask
         field_type = values.public(f.value) + ("?" if optional else "")
@@ -373,12 +384,14 @@ def declaration(values, value):
             present = f"raw.{path} & {bit}.rawValue != 0" if bit else f"raw.{path}"
             mark = f"raw.{path} |= {bit}.rawValue" if bit else f"raw.{path} = true"
             encode_lines.append(
-                f"    if let item = {local} {{ {mark}; {raw} = {encode(values, f.value, 'item')} }}"
+                f"    if let item = self.{local} {{ {mark}; {raw} = {encode(values, f.value, 'item')} }}"
             )
-            decode_lines.append(f"    {local} = {present} ? {capture} : nil")
+            decode_lines.append(f"    self.{local} = {present} ? {capture} : nil")
         else:
-            encode_lines.append(f"    {raw} = {encode(values, f.value, local)}")
-            decode_lines.append(f"    {local} = {capture}")
+            encode_lines.append(
+                f"    {raw} = {encode(values, f.value, 'self.' + local)}"
+            )
+            decode_lines.append(f"    self.{local} = {capture}")
     constructors = []
     members = [f for f in value.fields if f.role == "value"]
     if len(members) == 1 and members[0].value.kind == "union":

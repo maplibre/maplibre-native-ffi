@@ -47,6 +47,6 @@ mln_status mln_keyword_combine(
   (void)out_diagnostic;
   out_entry->type = defer - self;
   out_entry->defer = raw;
-  out_entry->self = bindingArg0;
+  out_entry->raw = bindingArg0;
   return MLN_STATUS_OK;
 }

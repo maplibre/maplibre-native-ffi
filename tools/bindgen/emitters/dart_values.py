@@ -1178,11 +1178,20 @@ class Values:
                         ]
                     elif field.value.kind == "array":
                         child = field.value.element
-                        write += [
-                            f"  {native_field} = arena<{self.ffi(child)}>({expression}.isEmpty ? 1 : {expression}.length);",
-                            f"  result.ref.{field.value.length} = {expression}.length;",
-                            f"  for (var index = 0; index < {expression}.length; index++) {{ {native_field}[index] = {self.native(child, expression + '[index]')}; }}",
+                        # A null list leaves the zeroed pointer and count.
+                        items = expression + "!" if field.value.nullable else expression
+                        lines = [
+                            f"  {native_field} = arena<{self.ffi(child)}>({items}.isEmpty ? 1 : {items}.length);",
+                            f"  result.ref.{field.value.length} = {items}.length;",
+                            f"  for (var index = 0; index < {items}.length; index++) {{ {native_field}[index] = {self.native(child, items + '[index]')}; }}",
                         ]
+                        if field.value.nullable:
+                            lines = [
+                                f"  if ({expression} != null) {{",
+                                *lines,
+                                "  }",
+                            ]
+                        write += lines
                     elif deferred and field.name == deferred[0].name:
                         write += self.write_deferred_field(
                             field, deferred[1], expression
@@ -1195,9 +1204,14 @@ class Values:
                         write.append(
                             f"  {native_field} = {self.native(field.value, expression)};"
                         )
-                    decoded.append(
-                        f"{identifier(field.name)}: {self.copy(field.value, 'source.' + field.name, 'source.' + str(field.value.length))}"
+                    copied = self.copy(
+                        field.value,
+                        "source." + field.name,
+                        "source." + str(field.value.length),
                     )
+                    if field.value.kind == "array" and field.value.nullable:
+                        copied = f"source.{field.name} == nullptr ? null : {copied}"
+                    decoded.append(f"{identifier(field.name)}: {copied}")
                 if optional:
                     write.append("  }")
                 if group and group.type in POSITIONAL:

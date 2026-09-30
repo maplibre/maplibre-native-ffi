@@ -1,11 +1,10 @@
 """Compile header-driven Rust value types and methods against an isolated ABI stub."""
 
-import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from support import parse
+from support import parse, require_tool, run
 
 from tools.bindgen.emitters import rust
 from tools.bindgen.schema import validate
@@ -111,10 +110,12 @@ fn main() {
 }
 """)
             binary = root / "probe"
-            subprocess.run(
-                ["rustc", "--edition=2024", str(root / "lib.rs"), "-o", str(binary)],
-                check=True,
-                capture_output=True,
-                text=True,
+            require_tool(self, "rustc").run(
+                self,
+                "--edition=2024",
+                str(root / "lib.rs"),
+                "-o",
+                str(binary),
+                cwd=root,
             )
-            subprocess.run([str(binary)], check=True)
+            run(self, [str(binary)], root)

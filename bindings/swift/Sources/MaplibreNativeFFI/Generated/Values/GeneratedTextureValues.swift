@@ -330,7 +330,7 @@ public struct TextureImageInfo: Equatable, Hashable, Sendable {
     var raw = mln_texture_image_info_default()
     raw.width = width
     raw.height = height
-    raw.stride = stride
+    raw.stride = self.stride
     raw.byte_length = byteLength
     return raw
   }

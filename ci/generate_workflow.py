@@ -222,7 +222,14 @@ def hygiene_job() -> dict:
         "environment": SCCACHE_ENVIRONMENT,
         "steps": [
             *setup(gradle=False),
-            *[run(command) for command in commands],
+            *[
+                # A generator probe whose toolchain is missing fails here
+                # instead of skipping.
+                run(command, env={"MLN_BINDGEN_REQUIRE_TOOLCHAINS": "1"})
+                if command == "mise run bindings:test-generator"
+                else run(command)
+                for command in commands
+            ],
             run(
                 "git update-index -q --refresh\n"
                 "git diff --exit-code -- . ':(exclude)mise*.lock'\n"

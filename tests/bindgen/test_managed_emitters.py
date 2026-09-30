@@ -1,12 +1,11 @@
 """Managed emitters must reject contracts their runtime cannot represent."""
 
 import re
-import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from support import parse
+from support import ROOT, parse, require_tool
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import dart, dotnet, kotlin
@@ -278,7 +277,7 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
 </PropertyGroup></Project>
 """)
             runtime = (
-                Path(__file__).resolve().parents[2]
+                ROOT
                 / "bindings/dotnet/src/Maplibre.NativeFfi/Internal/Memory/NativeCallScope.cs"
             )
             (root / "NativeCallScope.cs").write_text(runtime.read_text())
@@ -340,23 +339,14 @@ static class NativeMethods {
 }
 """
             )
-            result = subprocess.run(
-                [
-                    "mise",
-                    "exec",
-                    "--no-deps",
-                    "--",
-                    "dotnet",
-                    "run",
-                    "--project",
-                    str(root / "Probe.csproj"),
-                    "--verbosity",
-                    "quiet",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=90,
-                check=False,
-                cwd=Path(__file__).resolve().parents[2] / "bindings/dotnet",
+            # The repository's global.json selects the SDK.
+            require_tool(self, "dotnet", ROOT / "bindings/dotnet").run(
+                self,
+                "run",
+                "--project",
+                str(root / "Probe.csproj"),
+                "--verbosity",
+                "quiet",
+                cwd=ROOT / "bindings/dotnet",
+                timeout=180,
             )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

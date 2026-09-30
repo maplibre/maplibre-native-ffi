@@ -315,6 +315,8 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             local in KEYWORDS["dart"]
             or local in LOCALS - {"value"}
             or local.startswith("native")
+            # The generated library imports the C declarations as `raw`.
+            or local == "raw"
         ):
             local += "Value"
         if parameter.name in counts:

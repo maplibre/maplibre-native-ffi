@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
 import unittest
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -101,54 +103,93 @@ def _digest(directory: Path, clang_args: tuple[str, ...]) -> str:
     return digest.hexdigest()
 
 
-def require_tool(
-    test: unittest.TestCase, tool: str, directory: Path = ROOT
-) -> list[str]:
-    """The command prefix that runs `tool` with the tools configured at `directory`.
+@dataclass(frozen=True)
+class Tool:
+    """A probe toolchain executable and the environment it runs in."""
 
-    A missing toolchain skips the test with the tool's name, or fails it when
-    MLN_BINDGEN_REQUIRE_TOOLCHAINS=1.
+    executable: str
+    environment: tuple[tuple[str, str], ...]
+
+    @property
+    def env(self) -> dict[str, str]:
+        return dict(self.environment)
+
+    def run(
+        self,
+        test: unittest.TestCase,
+        *arguments: str,
+        cwd: Path,
+        timeout: float = 120,
+        env: dict[str, str] | None = None,
+        output: Path | None = None,
+    ) -> None:
+        run(
+            test,
+            [self.executable, *arguments],
+            cwd,
+            timeout=timeout,
+            env={**self.env, **(env or {})},
+            output=output,
+        )
+
+
+def require_tool(test: unittest.TestCase, tool: str, directory: Path = ROOT) -> Tool:
+    """The `tool` that the mise configuration at `directory` selects.
+
+    The tool carries that configuration's environment, so it runs from any
+    directory. A missing toolchain skips the test with the tool's name, or
+    fails it when MLN_BINDGEN_REQUIRE_TOOLCHAINS=1.
     """
-    command = _tool_command(tool, directory)
-    if command is None:
+    found = _find_tool(tool, directory)
+    if found is None:
         message = f"{tool} is not installed for {directory.relative_to(ROOT)}"
         if REQUIRE_TOOLCHAINS:
             test.fail(f"{message}; MLN_BINDGEN_REQUIRE_TOOLCHAINS=1 requires it")
         test.skipTest(message)
-    return command
+    return found
 
 
 @functools.cache
-def _tool_command(tool: str, directory: Path) -> list[str] | None:
-    """Prefer the mise-configured tool; fall back to one on PATH."""
-    candidates = []
+def _find_tool(tool: str, directory: Path) -> Tool | None:
+    environment = dict(os.environ)
     if shutil.which("mise"):
-        candidates.append(["mise", "exec", "--no-deps", "--", tool])
-    if shutil.which(tool):
-        candidates.append([tool])
-    for command in candidates:
-        try:
-            subprocess.run(
-                [*command, "--version"],
-                cwd=directory,
-                env={**os.environ, "MISE_EXEC_AUTO_INSTALL": "false"},
-                capture_output=True,
-                check=True,
-                timeout=60,
-            )
-        except OSError, subprocess.SubprocessError:
-            continue
+        loaded = subprocess.run(
+            ["mise", "env", "--json"],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if loaded.returncode == 0:
+            environment.update(json.loads(loaded.stdout))
         if tool in {"swift", "swiftc"} and sys.platform.startswith("linux"):
-            # The Linux toolchain links a libxml2 the host may lack.
-            return [
-                "bash",
-                "-c",
-                f'source "{ROOT}/.mise/bin/swift-libxml2-env.sh" && exec "$@"',
-                tool,
-                *command,
-            ]
-        return command
-    return None
+            # The Linux toolchain links a libxml2 that newer distributions lack;
+            # .mise/bin/swift-libxml2-env.sh explains the pinned copy.
+            libxml2 = subprocess.run(
+                ["mise", "where", "conda:libxml2"],
+                cwd=directory,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if libxml2.returncode == 0:
+                paths = [f"{libxml2.stdout.strip()}/lib"]
+                paths += filter(None, [environment.get("LD_LIBRARY_PATH")])
+                environment["LD_LIBRARY_PATH"] = os.pathsep.join(paths)
+    executable = shutil.which(tool, path=environment.get("PATH"))
+    if executable is None:
+        return None
+    try:
+        subprocess.run(
+            [executable, "version" if tool in {"go", "zig"} else "--version"],
+            env=environment,
+            capture_output=True,
+            check=True,
+            timeout=60,
+        )
+    except OSError, subprocess.SubprocessError:
+        return None
+    return Tool(executable, tuple(sorted(environment.items())))
 
 
 def run(
@@ -158,20 +199,25 @@ def run(
     *,
     timeout: float = 120,
     env: dict[str, str] | None = None,
-) -> subprocess.CompletedProcess:
-    """Run a probe step and fail the test with its output when it fails."""
-    result = subprocess.run(
-        command,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        check=False,
-        env=None if env is None else {**os.environ, **env},
-    )
-    test.assertEqual(
-        result.returncode,
-        0,
-        f"{' '.join(command)}\n{result.stdout}{result.stderr}",
-    )
-    return result
+    output: Path | None = None,
+) -> None:
+    """Run a probe step and fail the test with its output when it fails.
+
+    `output` collects the step's output in a file instead of a pipe, for tools
+    that stall writing to a pipe.
+    """
+    with open(output or os.devnull, "w+") as log:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            stdout=log if output else subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=timeout,
+            check=False,
+            env=None if env is None else {**os.environ, **env},
+        )
+        if output:
+            log.seek(0)
+            result.stdout = log.read()
+    test.assertEqual(result.returncode, 0, f"{' '.join(command)}\n{result.stdout}")
