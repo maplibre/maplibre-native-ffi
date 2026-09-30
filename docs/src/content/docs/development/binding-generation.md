@@ -121,7 +121,8 @@ hygiene job sets `MLN_BINDGEN_REQUIRE_TOOLCHAINS=1`, which turns each skip into
 a failure.
 
 The generator also writes one synthesized result for each completion copy kind
-to `tests/native/abi/adapter/adapter_copy_cases_generated.inc`, for C adapter
-tests that pass each result through the adapter's copy and compare the copy with
-its source. Until those tests exist, `tests/bindgen/test_native_capture.py`
-checks that every copy kind has one case and runs each case through the copy.
+to `tests/native/abi/adapter/adapter_copy_cases_generated.inc`.
+`tests/native/abi/adapter/copies.c` passes each result through an adapter
+completion and checks that the delivered record holds equal content in storage
+of its own. `tests/bindgen/test_native_capture.py` checks that every copy kind
+has exactly one case.
