@@ -56,6 +56,24 @@ static mln_map_snapshot read_settled_snapshot(
   return snapshot;
 }
 
+// An ordered camera read. The transition-finished event is queued from inside
+// the worker task that applies the last frame, before that task publishes the
+// map snapshot, so only a worker-ordered read observes the final camera as soon
+// as the event is drained.
+static mln_camera_options query_camera(mln_map map) {
+  mln_test_completion query =
+    mln_test_completion_default(sizeof(mln_camera_query_result));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_camera_query(map, &query.descriptor, NULL)
+  );
+  mln_camera_query_result result = {.size = sizeof(mln_camera_query_result)};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_completion_finish_value(&query, &result, sizeof(result))
+  );
+  return result.camera;
+}
+
 typedef struct transition_wait {
   mln_runtime runtime;
   const mln_test_render_fixture* fixture;
@@ -156,9 +174,7 @@ static void a_rendered_ease_completes_at_its_target(void) {
   );
   TEST_ASSERT_FALSE(wait.failed);
   TEST_ASSERT_EQUAL_size_t(1, wait.finished);
-  TEST_ASSERT_EQUAL_DOUBLE(
-    5.0, read_settled_snapshot(runtime, map).camera.zoom
-  );
+  TEST_ASSERT_EQUAL_DOUBLE(5.0, query_camera(map).zoom);
 
   // transition_finished collects its demand before it reports the end, so no
   // frame is in flight here.
