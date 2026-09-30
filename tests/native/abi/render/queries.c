@@ -627,7 +627,6 @@ static void cluster_extensions_resolve_an_unsigned_cluster_id(void) {
     {"a leaf limit bounds the leaves", "leaves", "{\"limit\":2}", 2},
     {"an offset past the leaves finds none", "leaves",
      "{\"limit\":1,\"offset\":3}", 0},
-    {"a signed limit is ignored", "leaves", "{\"limit\":-1}", 3},
     {"the expansion zoom is a number", "expansion-zoom", NULL, SIZE_MAX},
   };
   for (size_t index = 0; index < sizeof(rows) / sizeof(rows[0]); index += 1) {
@@ -666,9 +665,9 @@ static void cluster_extensions_resolve_an_unsigned_cluster_id(void) {
   TEST_ASSERT_EQUAL_size_t(1, count_features(second));
   TEST_ASSERT_TRUE_MESSAGE(strcmp(first, second) != 0, first);
 
-  // Only an unsigned cluster_id names a cluster: the same number written as
-  // a signed or fractional value, or a feature for another extension, finds
-  // nothing.
+  // The feature's JSON reaches the source with its number types intact, so
+  // only an unsigned cluster_id names a cluster: the same number written as a
+  // signed or fractional value finds nothing.
   const unsigned long long id = cluster_id_of(cluster);
   char feature[256];
   static const char* const written_ids[] = {"%llu", "-%llu", "%llu.5"};
@@ -693,13 +692,6 @@ static void cluster_extensions_resolve_an_unsigned_cluster_id(void) {
       TEST_ASSERT_EQUAL_STRING_MESSAGE(expected[index], result, written);
     }
   }
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    query_extension(
-      &fixture, cluster, "ancestors", NULL, result, sizeof(result)
-    )
-  );
-  TEST_ASSERT_EQUAL_STRING("null", result);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);

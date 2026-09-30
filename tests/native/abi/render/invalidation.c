@@ -480,6 +480,13 @@ typedef struct update_row {
 
 // Each row runs after the ones before it on one map, so a repeated row
 // measures a command that changes nothing.
+//
+// The runtime barrier after each row fences the updates its command publishes,
+// which is what lets a row assert none. That holds only while no row starts
+// work that finishes on a worker: the style's GeoJSON is inline, the added
+// source takes data parsed before the call, and the image source takes pixels,
+// so nothing loads and publishes an update into a later row. A row that
+// fetched or parsed data asynchronously would need its own fence.
 static const update_row update_rows[] = {
   {"inline GeoJSON added", add_empty_geojson, true},
   {"a source removed", remove_geojson, true},
