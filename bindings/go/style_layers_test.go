@@ -64,9 +64,10 @@ func TestDedicatedStyleLayerHelpers(t *testing.T) {
 	if positions["relief"] >= positions["hillshade"] || positions["location"] <= positions["hillshade"] {
 		t.Fatalf("StyleLayerIDs() = %v, want relief before hillshade and location after hillshade", ids)
 	}
-	completion, err := m.SetLocationIndicatorImageName("location", LocationIndicatorImageKind(99), "bad")
-	requireStyleCommandFailed(t, completion, err)
-	completion, err = m.AddHillshadeLayer("bad-hillshade", "missing", nil)
+	if _, err := m.SetLocationIndicatorImageName("location", LocationIndicatorImageKind(99), "bad"); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetLocationIndicatorImageName(kind 99) error = %v, want ErrInvalidArgument", err)
+	}
+	completion, err := m.AddHillshadeLayer("bad-hillshade", "missing", nil)
 	requireStyleCommandFailed(t, completion, err)
 }
 

@@ -513,11 +513,11 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
       &completion.descriptor, NULL
     )
   );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "source_id must not be empty",
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "source_id must not be empty",
     mln_map_set_layer_source_id(
       map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL(""),
-      &completion.descriptor, NULL
+      &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
   TEST_ASSERT_EQUAL_INT(
@@ -722,28 +722,40 @@ static void location_indicator_setters_write_its_properties(void) {
     mln_test_completion_destroy(&completion);
   }
 
-  // Values the renderer cannot hold fail the command and change nothing.
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "radius must be non-negative",
+  // Values the renderer cannot hold are rejected at submission and change
+  // nothing.
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "radius must be non-negative",
     mln_map_set_location_indicator_accuracy_radius(
-      map, MLN_BUFFER_LITERAL("puck"), -1.0, &completion.descriptor, NULL
+      map, MLN_BUFFER_LITERAL("puck"), -1.0, &completion.descriptor,
+      MLN_TEST_DIAGNOSTIC
     )
   );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "bearing must fit in finite float32",
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "bearing must fit in finite float32",
     mln_map_set_location_indicator_bearing(
-      map, MLN_BUFFER_LITERAL("puck"), 1e39, &completion.descriptor, NULL
+      map, MLN_BUFFER_LITERAL("puck"), 1e39, &completion.descriptor,
+      MLN_TEST_DIAGNOSTIC
     )
   );
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "image_kind is invalid",
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "altitude must be finite",
+    mln_map_set_location_indicator_location(
+      map, MLN_BUFFER_LITERAL("puck"),
+      (mln_lat_lng){.latitude = 37.5, .longitude = -122.25}, INFINITY,
+      &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    )
+  );
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "image_kind is invalid",
     mln_map_set_location_indicator_image_name(
       map, MLN_BUFFER_LITERAL("puck"), 9, MLN_BUFFER_LITERAL("arrow"),
-      &completion.descriptor, NULL
+      &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
   EXPECT_LAYER_PROPERTY("25.0", map, "puck", "accuracy-radius");
   EXPECT_LAYER_PROPERTY("90.0", map, "puck", "bearing");
+  EXPECT_LAYER_PROPERTY("[37.5,-122.25,12.0]", map, "puck", "location");
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

@@ -339,7 +339,7 @@ test "location indicator helpers set focused properties" {
     try support.expectCommitted(try maplibre.mapSetLocationIndicatorImageName(support.handle(map), "location", .bearing, "bearing-icon", null));
     try support.expectCommitted(try maplibre.mapSetLocationIndicatorImageName(support.handle(map), "location", .shadow, "shadow-icon", null));
 
-    try support.expectCommandError(try maplibre.mapSetLocationIndicatorAccuracyRadius(support.handle(map), "location", -1.0, null), error.InvalidArgument);
+    try testing.expectError(error.InvalidArgument, maplibre.mapSetLocationIndicatorAccuracyRadius(support.handle(map), "location", -1.0, null));
     try support.expectCommandError(try maplibre.mapSetLocationIndicatorBearing(support.handle(map), "point-circle", 1.0, null), error.InvalidArgument);
 }
 

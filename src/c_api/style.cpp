@@ -1290,6 +1290,13 @@ auto mln_map_set_location_indicator_location(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      mln::core::validate_location_indicator_location_command(
+        layer_id, coordinate, altitude
+      ) != MLN_STATUS_OK
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{layer_id};
     return command(
       map,
@@ -1309,6 +1316,13 @@ auto mln_map_set_location_indicator_bearing(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      mln::core::validate_location_indicator_bearing_command(
+        layer_id, bearing
+      ) != MLN_STATUS_OK
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{layer_id};
     return command(
       map,
@@ -1327,6 +1341,13 @@ auto mln_map_set_location_indicator_accuracy_radius(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      mln::core::validate_location_indicator_accuracy_radius_command(
+        layer_id, radius
+      ) != MLN_STATUS_OK
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{layer_id};
     return command(
       map,
@@ -1346,6 +1367,13 @@ auto mln_map_set_location_indicator_image_name(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      mln::core::validate_location_indicator_image_name_command(
+        layer_id, image_kind, image_id
+      ) != MLN_STATUS_OK
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto layer = OwnedView{layer_id};
     auto image = OwnedView{image_id};
     return command(
@@ -1845,6 +1873,12 @@ auto mln_map_set_layer_source_id(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      mln::core::validate_layer_source_id_command(layer_id, source_id) !=
+      MLN_STATUS_OK
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{layer_id};
     auto source = OwnedView{source_id};
     return command(

@@ -3052,15 +3052,20 @@ auto map_add_location_indicator_layer(
   return MLN_STATUS_OK;
 }
 
-auto validate_location_indicator_layer(MapObject& map, mln_buffer_view layer_id)
+auto validate_required_id(mln_buffer_view id, const char* name) -> mln_status {
+  if (!validate_string_view(id, name)) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (id.size == 0) {
+    const auto message = std::string{name} + " must not be empty";
+    set_thread_error(message.c_str());
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto find_location_indicator_layer(MapObject& map, mln_buffer_view layer_id)
   -> mln_status {
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   const auto* layer =
     map_native(map).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
@@ -3086,11 +3091,24 @@ auto validate_float64_to_float32(double value, const char* name) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto map_set_location_indicator_location(
-  MapObject& live, mln_buffer_view layer_id, mln_lat_lng coordinate,
-  double altitude
+auto location_indicator_image_property(uint32_t image_kind)
+  -> std::optional<mln_buffer_view> {
+  switch (image_kind) {
+    case MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP:
+      return string_view_from_literal("top-image");
+    case MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING:
+      return string_view_from_literal("bearing-image");
+    case MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW:
+      return string_view_from_literal("shadow-image");
+    default:
+      return std::nullopt;
+  }
+}
+
+auto validate_location_indicator_location_command(
+  mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude
 ) -> mln_status {
-  const auto layer_status = validate_location_indicator_layer(live, layer_id);
+  const auto layer_status = validate_required_id(layer_id, "layer_id");
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
   }
@@ -3101,6 +3119,68 @@ auto map_set_location_indicator_location(
   if (!std::isfinite(altitude)) {
     set_thread_error("altitude must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto validate_location_indicator_bearing_command(
+  mln_buffer_view layer_id, double bearing
+) -> mln_status {
+  const auto layer_status = validate_required_id(layer_id, "layer_id");
+  return layer_status == MLN_STATUS_OK
+           ? validate_float64_to_float32(bearing, "bearing")
+           : layer_status;
+}
+
+auto validate_location_indicator_accuracy_radius_command(
+  mln_buffer_view layer_id, double radius
+) -> mln_status {
+  const auto layer_status = validate_required_id(layer_id, "layer_id");
+  if (layer_status != MLN_STATUS_OK) {
+    return layer_status;
+  }
+  const auto radius_status = validate_float64_to_float32(radius, "radius");
+  if (radius_status != MLN_STATUS_OK) {
+    return radius_status;
+  }
+  if (radius < 0.0) {
+    set_thread_error("radius must be non-negative");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto validate_location_indicator_image_name_command(
+  mln_buffer_view layer_id, uint32_t image_kind, mln_buffer_view image_id
+) -> mln_status {
+  const auto layer_status = validate_required_id(layer_id, "layer_id");
+  if (layer_status != MLN_STATUS_OK) {
+    return layer_status;
+  }
+  const auto image_status = validate_required_id(image_id, "image_id");
+  if (image_status != MLN_STATUS_OK) {
+    return image_status;
+  }
+  if (!location_indicator_image_property(image_kind)) {
+    set_thread_error("image_kind is invalid");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto map_set_location_indicator_location(
+  MapObject& live, mln_buffer_view layer_id, mln_lat_lng coordinate,
+  double altitude
+) -> mln_status {
+  const auto argument_status = validate_location_indicator_location_command(
+    layer_id, coordinate, altitude
+  );
+  if (argument_status != MLN_STATUS_OK) {
+    return argument_status;
+  }
+  const auto layer_status = find_location_indicator_layer(live, layer_id);
+  if (layer_status != MLN_STATUS_OK) {
+    return layer_status;
   }
 
   // The style property is [latitude, longitude, altitude]; the renderer reads
@@ -3120,13 +3200,14 @@ auto map_set_location_indicator_location(
 auto map_set_location_indicator_bearing(
   MapObject& live, mln_buffer_view layer_id, double bearing
 ) -> mln_status {
-  const auto layer_status = validate_location_indicator_layer(live, layer_id);
+  const auto argument_status =
+    validate_location_indicator_bearing_command(layer_id, bearing);
+  if (argument_status != MLN_STATUS_OK) {
+    return argument_status;
+  }
+  const auto layer_status = find_location_indicator_layer(live, layer_id);
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
-  }
-  const auto bearing_status = validate_float64_to_float32(bearing, "bearing");
-  if (bearing_status != MLN_STATUS_OK) {
-    return bearing_status;
   }
   const auto value = serialize_json_value(mln::Value{bearing});
   return map_set_layer_property(
@@ -3138,17 +3219,14 @@ auto map_set_location_indicator_bearing(
 auto map_set_location_indicator_accuracy_radius(
   MapObject& live, mln_buffer_view layer_id, double radius
 ) -> mln_status {
-  const auto layer_status = validate_location_indicator_layer(live, layer_id);
+  const auto argument_status =
+    validate_location_indicator_accuracy_radius_command(layer_id, radius);
+  if (argument_status != MLN_STATUS_OK) {
+    return argument_status;
+  }
+  const auto layer_status = find_location_indicator_layer(live, layer_id);
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
-  }
-  const auto radius_status = validate_float64_to_float32(radius, "radius");
-  if (radius_status != MLN_STATUS_OK) {
-    return radius_status;
-  }
-  if (radius < 0.0) {
-    set_thread_error("radius must be non-negative");
-    return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto value = serialize_json_value(mln::Value{radius});
   return map_set_layer_property(
@@ -3157,44 +3235,25 @@ auto map_set_location_indicator_accuracy_radius(
   );
 }
 
-auto location_indicator_image_property(uint32_t image_kind)
-  -> std::optional<mln_buffer_view> {
-  switch (image_kind) {
-    case MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP:
-      return string_view_from_literal("top-image");
-    case MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING:
-      return string_view_from_literal("bearing-image");
-    case MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW:
-      return string_view_from_literal("shadow-image");
-    default:
-      return std::nullopt;
-  }
-}
-
 auto map_set_location_indicator_image_name(
   MapObject& live, mln_buffer_view layer_id, uint32_t image_kind,
   mln_buffer_view image_id
 ) -> mln_status {
-  const auto layer_status = validate_location_indicator_layer(live, layer_id);
+  const auto argument_status = validate_location_indicator_image_name_command(
+    layer_id, image_kind, image_id
+  );
+  if (argument_status != MLN_STATUS_OK) {
+    return argument_status;
+  }
+  const auto layer_status = find_location_indicator_layer(live, layer_id);
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
-  }
-  if (!validate_string_view(image_id, "image_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (image_id.size == 0) {
-    set_thread_error("image_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto property = location_indicator_image_property(image_kind);
-  if (!property) {
-    set_thread_error("image_kind is invalid");
-    return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto value =
     serialize_json_value(mln::Value{string_from_view(image_id)});
   return map_set_layer_property(
-    live, layer_id, *property, buffer_view_from_string(value)
+    live, layer_id, *location_indicator_image_property(image_kind),
+    buffer_view_from_string(value)
   );
 }
 
@@ -3813,20 +3872,27 @@ auto map_copy_layer_source_layer(
   return MLN_STATUS_OK;
 }
 
+auto validate_layer_source_id_command(
+  mln_buffer_view layer_id, mln_buffer_view source_id
+) -> mln_status {
+  const auto layer_status = validate_required_id(layer_id, "layer_id");
+  return layer_status == MLN_STATUS_OK
+           ? validate_required_id(source_id, "source_id")
+           : layer_status;
+}
+
 auto map_set_layer_source_id(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id
 ) -> mln_status {
+  const auto argument_status =
+    validate_layer_source_id_command(layer_id, source_id);
+  if (argument_status != MLN_STATUS_OK) {
+    return argument_status;
+  }
   mln::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(live, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
-  }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (!require_layer_takes_source(*layer, "source")) {
     return MLN_STATUS_INVALID_ARGUMENT;

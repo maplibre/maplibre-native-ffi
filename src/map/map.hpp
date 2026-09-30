@@ -124,6 +124,21 @@ auto validate_style_image_command_input(
 auto validate_image_source_command_coordinates(
   const mln_lat_lng* coordinates, size_t coordinate_count
 ) -> mln_status;
+auto validate_location_indicator_location_command(
+  mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude
+) -> mln_status;
+auto validate_location_indicator_bearing_command(
+  mln_buffer_view layer_id, double bearing
+) -> mln_status;
+auto validate_location_indicator_accuracy_radius_command(
+  mln_buffer_view layer_id, double radius
+) -> mln_status;
+auto validate_location_indicator_image_name_command(
+  mln_buffer_view layer_id, uint32_t image_kind, mln_buffer_view image_id
+) -> mln_status;
+auto validate_layer_source_id_command(
+  mln_buffer_view layer_id, mln_buffer_view source_id
+) -> mln_status;
 
 enum class GeometryOperationKind : uint32_t {
   CameraForBounds = 0x4701,
