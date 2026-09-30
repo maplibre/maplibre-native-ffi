@@ -19,7 +19,13 @@ if [[ ! -f "$archive_arg" ]]; then
 fi
 archive="$(realpath "$archive_arg")"
 
-build_dir="$MISE_MONOREPO_ROOT/build/$preset"
+repo_root="$MISE_MONOREPO_ROOT"
+# Git Bash on Windows hands over a path with backslashes, which a glob below
+# would read as escapes, so work from its POSIX form.
+if command -v cygpath >/dev/null 2>&1; then
+  repo_root="$(cygpath -u "$repo_root")"
+fi
+build_dir="$repo_root/build/$preset"
 staging_dir="$build_dir/.package-staging"
 package_root="$staging_dir/maplibre-native-c-$preset"
 install_dir="$build_dir/install"
@@ -41,22 +47,36 @@ if [[ "$preset" == macos-*-egl && -f "$install_dir/lib/libEGL.dylib" ]]; then
 fi
 
 # The package also leaves out the test-graphics component, the GPU fixtures
-# that binding suites load. Its install manifest names what the build task put
-# in the tree, so those files are set aside with the manifest and restored
-# below, and a later run of this task finds them the same way.
-test_graphics_manifest="$build_dir/install_manifest_test-graphics.txt"
+# that binding suites load: the mln_test_graphics library, with its import
+# library on Windows, its header, and its pkg-config file. They are set aside
+# by name and restored below, so a later run of this task finds them the same
+# way.
+test_graphics_files=()
+shopt -s nullglob
+for path in "$install_dir"/bin/*mln_test_graphics* \
+  "$install_dir"/lib/*mln_test_graphics* \
+  "$install_dir"/include/mln_test_graphics.h \
+  "$install_dir"/share/pkgconfig/mln-test-graphics.pc; do
+  if [[ -e "$path" || -L "$path" ]]; then
+    test_graphics_files+=("${path#"$install_dir/"}")
+  fi
+done
+shopt -u nullglob
+# A build tree that installed the component but left none of its files in the
+# install directory would lose the fixtures without a trace.
+if ((${#test_graphics_files[@]} == 0)) &&
+  [[ -f "$build_dir/install_manifest_test-graphics.txt" ]]; then
+  echo "The build installed the test-graphics component, but $install_dir holds none of its files:" >&2
+  cat "$build_dir/install_manifest_test-graphics.txt" >&2
+  exit 1
+fi
 test_graphics_stash=""
-if [[ -f "$test_graphics_manifest" ]]; then
+if ((${#test_graphics_files[@]})); then
   test_graphics_stash="$(mktemp -d)"
-  while IFS= read -r installed || [[ -n "$installed" ]]; do
-    relative="${installed#*"/build/$preset/install/"}"
-    if [[ "$relative" == "$installed" || ! -f "$install_dir/$relative" ]]; then
-      continue
-    fi
-    mkdir -p "$test_graphics_stash/files/$(dirname "$relative")"
-    cp -P "$install_dir/$relative" "$test_graphics_stash/files/$relative"
-  done <"$test_graphics_manifest"
-  cp "$test_graphics_manifest" "$test_graphics_stash/manifest.txt"
+  for relative in "${test_graphics_files[@]}"; do
+    mkdir -p "$test_graphics_stash/$(dirname "$relative")"
+    cp -P "$install_dir/$relative" "$test_graphics_stash/$relative"
+  done
 fi
 
 # Rust cross-builds use the configured Zig wrappers after this task replaces the
@@ -103,11 +123,14 @@ if [[ -n "$loader_stash" ]]; then
 fi
 
 if [[ -n "$test_graphics_stash" ]]; then
-  if [[ -d "$test_graphics_stash/files" ]]; then
-    cp -RP "$test_graphics_stash/files/." "$install_dir"
-  fi
-  cp "$test_graphics_stash/manifest.txt" "$test_graphics_manifest"
+  cp -RP "$test_graphics_stash/." "$install_dir"
   rm -rf "$test_graphics_stash"
+  for relative in "${test_graphics_files[@]}"; do
+    if [[ ! -e "$install_dir/$relative" && ! -L "$install_dir/$relative" ]]; then
+      echo "The test-graphics file $relative did not survive the package install." >&2
+      exit 1
+    fi
+  done
 fi
 
 if [[ -n "$zig_shim_stash" ]]; then
