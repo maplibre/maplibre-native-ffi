@@ -291,6 +291,10 @@ Metal, Vulkan, EGL, and WGL. The C suite links it, and `mise run build` installs
 it as `mln_test_graphics` beside the native library for the binding suites to
 load over their FFI. Its README lists how each binding loads it.
 
+The log callback, the async log mask, and the network status are process-global.
+A test that changes one runs in a group that no other test runs alongside, and
+restores the default when it ends, whether it passed or failed.
+
 Use examples for demos and behavior that needs manual validation, such as visual
 output, interactive input, or host graphics integration.
 

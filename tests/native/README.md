@@ -249,6 +249,15 @@ or a public fence:
   on Metal. The retry goes once the core stops reporting busy after a published
   result.
 
+## Process-global state
+
+The log callback, the async log mask, and the network status belong to the
+process, and the browser, emulator, and simulator runs share one process across
+every group. Only `abi/base/logging.c` and `abi/runtime/network_status.c` change
+them. Each case in those files runs its body under `TEST_PROTECT` and then
+restores the default, so a failed assertion still leaves the next group the
+state that it expects.
+
 ## Handle hygiene
 
 `mln_test_create_runtime`, `mln_test_create_map`,

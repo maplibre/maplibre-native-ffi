@@ -173,46 +173,6 @@ static void a_diagnostic_is_written_within_its_declared_size(void) {
   TEST_ASSERT_EQUAL_INT('x', diagnostic.message[4]);
 }
 
-static uint32_t ignore_log_record(
-  void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
-) {
-  (void)user_data;
-  (void)severity;
-  (void)event;
-  (void)code;
-  (void)message;
-  return 0;
-}
-
-static void count_log_callback_release(void* user_data) { ++*(int*)user_data; }
-
-static void log_callback_releases_owned_user_data(void) {
-  int first_releases = 0;
-  int second_releases = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_log_set_callback(
-      ignore_log_record, &first_releases, count_log_callback_release, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(0, first_releases);
-
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_log_set_callback(
-      ignore_log_record, &second_releases, count_log_callback_release, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(1, first_releases);
-  TEST_ASSERT_EQUAL_INT(0, second_releases);
-
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
-  TEST_ASSERT_EQUAL_INT(1, second_releases);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
-  TEST_ASSERT_EQUAL_INT(1, second_releases);
-}
-
 MLN_TEST_GROUP {
   RUN_TEST(runtime_rejects_invalid_arguments);
   RUN_TEST(runtime_rejects_stale_handles);
@@ -222,5 +182,4 @@ MLN_TEST_GROUP {
   RUN_TEST(style_functions_reject_null_inputs);
   RUN_TEST(a_failed_call_writes_its_diagnostic_and_a_successful_call_clears_it);
   RUN_TEST(a_diagnostic_is_written_within_its_declared_size);
-  RUN_TEST(log_callback_releases_owned_user_data);
 }
