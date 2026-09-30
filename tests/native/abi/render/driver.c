@@ -394,6 +394,39 @@ static void a_detached_session_rejects_every_call_that_needs_its_target(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Destroy ends a session only after detach or abandon, so an attached one
+// refuses it and keeps rendering.
+static void destroy_refuses_an_attached_session(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_destroy(fixture.session, MLN_TEST_DIAGNOSTIC)
+  );
+  TEST_ASSERT_NOT_NULL(strstr(
+    mln_test_last_error(),
+    "must be detached or abandoned before it is destroyed"
+  ));
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state
+  );
+  mln_test_render_request_forced(&fixture, 1);
+  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 1);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED,
+    mln_test_render_batch_result(batch, 0).disposition
+  );
+  mln_render_frame_batch_release(batch);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void stale_and_null_sessions_reject_maintenance_commands(void) {
   mln_completion operation = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
@@ -669,6 +702,7 @@ MLN_TEST_GROUP {
   RUN_TEST(maintenance_commands_run_in_order_with_frames);
   RUN_TEST(normal_detach_runs_on_the_driver_and_retires_map_attachment);
   RUN_TEST(a_detached_session_rejects_every_call_that_needs_its_target);
+  RUN_TEST(destroy_refuses_an_attached_session);
   RUN_TEST(stale_and_null_sessions_reject_maintenance_commands);
   RUN_TEST(abandon_completes_pending_work_and_invalidates_accessors);
   RUN_TEST(abandon_from_a_driver_completion_is_busy);
