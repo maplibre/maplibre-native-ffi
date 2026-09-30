@@ -2,6 +2,7 @@ package maplibre
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,12 +12,17 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"weak"
 )
 
 // The suite's shared fixture: one runtime and one map per test, a resource
 // provider that denies every request, and waits that block on the runtime's
 // event wake. Native semantics are tested once, in tests/native; these tests
 // cover what the binding adds on top.
+//
+// Most tests reach no server at all. The resource transform tests, which only
+// the built-in HTTP stack calls, use serveLoopback: an httptest server on the
+// loopback interface that answers the paths a test names.
 
 const emptyStyle = `{"version":8,"sources":{},"layers":[]}`
 
@@ -208,31 +214,31 @@ func notify(wake chan<- struct{}) {
 	}
 }
 
-// disposalSignal wraps an owner's native disposal so that the returned
-// channel closes once cleanup has disposed the handle.
-func disposalSignal(owner *bindingOwner) <-chan struct{} {
-	disposed := make(chan struct{})
-	state := owner.state
-	state.mu.Lock()
-	dispose := state.dispose
-	state.dispose = func(raw uint64) { dispose(raw); close(disposed) }
-	state.mu.Unlock()
-	return disposed
-}
-
-// awaitCollected runs the collector until done closes. A cleanup runs on its
-// own goroutine after a collection finds its object unreachable, so each round
-// blocks on done for a moment before collecting again.
-func awaitCollected(t *testing.T, done <-chan struct{}, what string) {
+// awaitUnreachable runs the collector until the object behind pointer is
+// unreachable, which is when its cleanup is due to dispose it.
+func awaitUnreachable[T any](t *testing.T, pointer weak.Pointer[T], what string) {
 	t.Helper()
 	awaitCondition(t, what, func() bool {
 		stdruntime.GC()
-		select {
-		case <-done:
-			return true
-		default:
+		return pointer.Value() == nil
+	})
+}
+
+// closeOnceCollected runs the collector until runtime closes, which it refuses
+// while a map is live, and so shows that cleanup disposed every map the test
+// dropped. The barrier orders a map's retirement, which disposal only
+// schedules.
+func closeOnceCollected(t *testing.T, runtime *RuntimeHandle, what string) {
+	t.Helper()
+	awaitCondition(t, what, func() bool {
+		stdruntime.GC()
+		await(t, submitted(runtime.Barrier()))
+		teardown, err := runtime.Close()
+		if errors.Is(err, ErrInvalidState) {
 			return false
 		}
+		await(t, submitted(teardown, err))
+		return true
 	})
 }
 

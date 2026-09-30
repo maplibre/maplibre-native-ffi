@@ -12,10 +12,15 @@ package maplibre
 
 #include "binding_callback.h"
 #include "maplibre_native_c.h"
+
+// Receives an image the way a native call does, so that cgo checks the Go
+// pointers inside it.
+static void mln_go_test_receive_image(const mln_premultiplied_rgba8_image* image) { (void)image; }
 */
 import "C"
 
 import (
+	"fmt"
 	"runtime/cgo"
 	"unsafe"
 )
@@ -201,4 +206,57 @@ func staleCallbackCellForTest() (unsafe.Pointer, func()) {
 // diagnostic, through the pooled diagnostic every call shares.
 func failWithoutDiagnosticForTest(status int32) error {
 	return checkNative(func(*C.mln_diagnostic) int32 { return status })
+}
+
+// failWithFullDiagnosticForTest runs a native call that fails and fills the
+// whole diagnostic buffer with no terminating NUL, as a truncated message can.
+// It returns the buffer's capacity and the call's error.
+func failWithFullDiagnosticForTest(status int32) (int, error) {
+	err := checkNative(func(diagnostic *C.mln_diagnostic) int32 {
+		for index := range diagnostic.message {
+			diagnostic.message[index] = 'x'
+		}
+		return status
+	})
+	return int(C.MLN_DIAGNOSTIC_MESSAGE_CAPACITY), err
+}
+
+// passImageToCForTest hands a native image to C. The default cgo check fails
+// the call when the image holds a Go pointer that nothing pinned.
+func passImageToCForTest(image *C.mln_premultiplied_rgba8_image) (err error) {
+	defer func() {
+		if failure := recover(); failure != nil {
+			err = fmt.Errorf("%v", failure)
+		}
+	}()
+	C.mln_go_test_receive_image(image)
+	return nil
+}
+
+// mapCreateFailingAfterAdoptionForTest creates a map through a completion
+// whose conversion adopts the native map and then panics: a conversion that
+// fails while it owns a value.
+func mapCreateFailingAfterAdoptionForTest(receiver *RuntimeHandle) (*Future[*MapHandle], error) {
+	return bindingCall(func() *Future[*MapHandle] {
+		arena := &bindingArena{}
+		defer arena.close()
+		raw, done := receiver.bindingAcquire(false)
+		defer done()
+		options := (*C.mln_map_options)(arena.allocate(unsafe.Sizeof(C.mln_map_options{})))
+		*options = nativeMapOptions(DefaultMapOptions(), arena)
+		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+			return int32(C.mln_map_create(C.mln_runtime(raw), options, completion, diagnostic))
+		}, func(result *C.mln_completion_result) (*MapHandle, error) {
+			value, err := completionValue[C.mln_map](result)
+			if err != nil {
+				return nil, err
+			}
+			adoptMapHandle(uint64(value), receiver)
+			panic("conversion failed after adopting the map")
+		})
+		if err != nil {
+			panic(bindingFailure{err})
+		}
+		return future
+	})
 }

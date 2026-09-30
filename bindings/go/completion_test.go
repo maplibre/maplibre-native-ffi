@@ -10,8 +10,8 @@ import (
 
 // The first terminal result wins, and a later one is ignored. A value that
 // fails to convert, whether by error or by panic, fails the future instead of
-// unwinding into native. Conversion adopts an owned value last, so a failed
-// conversion leaves nothing adopted to dispose.
+// unwinding into native, and an owned value that a failed conversion adopted
+// is disposed: its map no longer holds the runtime open.
 func TestCompletionDeliversExactlyOnce(t *testing.T) {
 	future, deliver := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
 	first, second := int32(7), int32(8)
@@ -34,6 +34,17 @@ func TestCompletionDeliversExactlyOnce(t *testing.T) {
 	if _, err := panicking.Await(context.Background()); !errors.Is(err, ErrNative) {
 		t.Fatalf("a panicking conversion: %v, want ErrNative", err)
 	}
+
+	f := newRuntimeFixture(t)
+	owned, err := mapCreateFailingAfterAdoptionForTest(f.runtime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receive(t, owned.Done(), "the failing map creation")
+	if _, err := owned.Await(context.Background()); !errors.Is(err, ErrNative) {
+		t.Fatalf("a conversion that failed after adopting its map: %v, want ErrNative", err)
+	}
+	closeOnceCollected(t, f.runtime, "the disposal of the map the failed conversion adopted")
 }
 
 // A submission native refuses returns its error at once, and the binding
@@ -50,25 +61,6 @@ func TestRejectedSubmissionFreesItsCompletionState(t *testing.T) {
 		}
 	}()
 	handle.Value()
-}
-
-// A creation whose future nobody awaits still adopts the map it creates, and
-// the collector disposes that map, so its runtime can close.
-func TestDiscardedCreationFutureRetiresItsMap(t *testing.T) {
-	f := newRuntimeFixture(t)
-	future, err := f.runtime.MapCreate(DefaultMapOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	<-future.Done()
-	future.state.mu.Lock()
-	disposed := disposalSignal(future.state.result.value.bindingOwner)
-	future.state.mu.Unlock()
-	future = nil
-	awaitCollected(t, disposed, "the unclaimed map's disposal")
-	// The barrier orders the map's retirement, which disposal only schedules.
-	await(t, submitted(f.runtime.Barrier()))
-	await(t, submitted(f.runtime.Close()))
 }
 
 // A failed command is a disposition in the result, not an error from Await,

@@ -5,24 +5,23 @@ package maplibre
 import (
 	"errors"
 	"math"
-	stdruntime "runtime"
 	"testing"
 	"unsafe"
 )
 
 // A byte input is borrowed, not copied: native reads the Go slice's own
-// memory, which the arena pins so that a collection cannot move or free it.
-func TestByteInputsAreBorrowedAcrossGC(t *testing.T) {
+// memory. The arena pins that memory, so cgo's pointer check lets a native
+// call take the image that points into it.
+func TestByteInputsArePinnedAndBorrowed(t *testing.T) {
 	pixels := []byte{1, 2, 3, 4}
 	arena := &bindingArena{}
 	defer arena.close()
 	image := nativePremultipliedRgba8Image(PremultipliedRgba8Image{Width: 1, Height: 1, Stride: 4, Pixels: pixels}, arena)
-	stdruntime.GC()
 	if unsafe.Pointer(image.pixels) != unsafe.Pointer(&pixels[0]) {
 		t.Fatal("the native image does not borrow the slice")
 	}
-	if got := unsafe.Slice((*byte)(unsafe.Pointer(image.pixels)), 4); got[0] != 1 || got[3] != 4 {
-		t.Fatalf("borrowed pixels after a collection = %v", got)
+	if err := passImageToCForTest(&image); err != nil {
+		t.Fatalf("passing the image to C: %v", err)
 	}
 }
 

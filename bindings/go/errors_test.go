@@ -9,9 +9,11 @@ import (
 )
 
 // A native failure becomes an *Error that wraps its category sentinel and
-// carries the raw status and the call's diagnostic. A status this binding does
-// not know keeps its raw value, and a call that writes no diagnostic reports
-// none even after an earlier call left one in the shared diagnostic buffer.
+// carries the raw status and the call's diagnostic. A diagnostic that fills
+// its buffer with no terminating NUL is read to the buffer's end and no
+// further. A status this binding does not know keeps its raw value, and a call
+// that writes no diagnostic reports none even after an earlier call filled the
+// shared diagnostic buffer.
 func TestNativeStatusMapsToTypedErrors(t *testing.T) {
 	err := NetworkStatusSet(NetworkStatus(999_999))
 	var native *Error
@@ -23,6 +25,14 @@ func TestNativeStatusMapsToTypedErrors(t *testing.T) {
 	}
 	if native.Diagnostic() == "" || !strings.Contains(native.Error(), native.Diagnostic()) {
 		t.Fatalf("diagnostic %q missing from %q", native.Diagnostic(), native.Error())
+	}
+
+	capacity, err := failWithFullDiagnosticForTest(-1)
+	if !errors.As(err, &native) {
+		t.Fatalf("a full diagnostic buffer = %v, want an *Error", err)
+	}
+	if diagnostic := native.Diagnostic(); diagnostic != strings.Repeat("x", capacity) {
+		t.Fatalf("a full diagnostic buffer read as %d bytes, want its %d", len(diagnostic), capacity)
 	}
 
 	err = failWithoutDiagnosticForTest(-12345)

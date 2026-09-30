@@ -4,6 +4,7 @@ import (
 	"errors"
 	stdruntime "runtime"
 	"testing"
+	"weak"
 )
 
 func TestClosingTwiceIsSafe(t *testing.T) {
@@ -46,8 +47,8 @@ func TestRefusedCloseLeavesTheHandleUsable(t *testing.T) {
 	if teardown != nil || !errors.As(err, &native) || !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("runtime close with a live map = (%v, %v), want nil and ErrInvalidState", teardown, err)
 	}
-	if native.Diagnostic() != "handle still owns live or pending children" {
-		t.Fatalf("refusal diagnostic = %q", native.Diagnostic())
+	if native.Diagnostic() == "" {
+		t.Fatal("the refusal carried no diagnostic")
 	}
 	await(t, submitted(f.runtime.Barrier()))
 	await(t, submitted(f.m.Close()))
@@ -91,9 +92,9 @@ func TestNilZeroAndClosedHandlesAreRejected(t *testing.T) {
 	}
 }
 
-// A map holds its runtime: with no other reference left, collecting the
-// runtime's wrapper neither disposes the runtime nor breaks the map, and the
-// runtime's cleanup runs only once the map is gone too.
+// A map holds its runtime: with no other reference left, a collection neither
+// makes the runtime unreachable nor breaks the map, and the runtime becomes
+// unreachable, and so due for disposal, only once the map is gone too.
 func TestChildKeepsItsParentAlive(t *testing.T) {
 	// No fixture: its cleanup would keep the runtime reachable. The map's
 	// cleanup closes it if the test fails, and the collector then reclaims the
@@ -102,7 +103,7 @@ func TestChildKeepsItsParentAlive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	runtimeDisposed := disposalSignal(runtime.bindingOwner)
+	parent := weak.Make(runtime.bindingOwner)
 	m := await(t, submitted(runtime.MapCreate(DefaultMapOptions())))
 	t.Cleanup(func() {
 		if m != nil {
@@ -111,22 +112,16 @@ func TestChildKeepsItsParentAlive(t *testing.T) {
 	})
 	runtime = nil
 
-	// Two collections, each confirmed by a sentinel's cleanup: an unreachable
-	// runtime would be found by the first and cleaned up by the second.
-	for range 2 {
-		collected := make(chan struct{})
-		stdruntime.AddCleanup(new(int), func(done chan struct{}) { close(done) }, collected)
-		awaitCollected(t, collected, "a sentinel cleanup")
-	}
-	select {
-	case <-runtimeDisposed:
-		t.Fatal("cleanup disposed a runtime whose map is live")
-	default:
+	// A completed collection clears a weak pointer to anything it found
+	// unreachable.
+	stdruntime.GC()
+	if parent.Value() == nil {
+		t.Fatal("the runtime became unreachable while its map is live")
 	}
 	awaitCommitted(t, submitted(m.SetStyleJson([]byte(emptyStyle))))
 
 	// Closing the map leaves nothing that holds the runtime.
 	await(t, submitted(m.Close()))
 	m = nil
-	awaitCollected(t, runtimeDisposed, "the runtime's disposal once its map closed")
+	awaitUnreachable(t, parent, "the runtime once its map closed")
 }

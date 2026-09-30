@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"weak"
 )
 
 // rootCount reports how many callback registrations owner roots.
@@ -108,24 +109,23 @@ func TestCallbackRootsFollowTheNativeRegistration(t *testing.T) {
 
 // discardProviderCycle registers a provider whose closure captures its
 // runtime, and drops every other reference to both.
-func discardProviderCycle(t *testing.T) <-chan struct{} {
+func discardProviderCycle(t *testing.T) weak.Pointer[bindingOwner] {
 	t.Helper()
 	host, err := RuntimeCreate(DefaultRuntimeOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
-	disposed := disposalSignal(host.bindingOwner)
 	await(t, submitted(host.SetResourceProvider(ResourceProvider{Callback: func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision {
 		stdruntime.KeepAlive(host)
 		return ResourceProviderDecisionPassThrough
 	}})))
-	return disposed
+	return weak.Make(host.bindingOwner)
 }
 
 // Native holds a registration weakly, so a callback that captures its own
 // receiver leaves a cycle the collector reclaims.
 func TestCallbackDoesNotKeepItsReceiverAlive(t *testing.T) {
-	awaitCollected(t, discardProviderCycle(t), "the runtime's disposal")
+	awaitUnreachable(t, discardProviderCycle(t), "the runtime in a cycle with its provider")
 }
 
 // Inside a callback, the calls its declaration allows succeed, and any other
@@ -160,7 +160,10 @@ func TestCallbackAdmissionPolicy(t *testing.T) {
 
 // A panic in a callback stays in the binding, which returns the callback's
 // declared failure value to native: a transform's rewrite is dropped, and a
-// provider's request passes through to the built-in sources.
+// provider's request passes through to the built-in sources. The binding
+// reports the panic nowhere else. A callback runs on a native thread with no
+// caller to return an error to, so the host sees the panic only as that
+// failure value's outcome, which this test observes.
 func TestCallbackPanicIsContained(t *testing.T) {
 	f := newFixture(t)
 	base := f.serveLoopback(t, map[string]string{"/original.json": emptyStyle})

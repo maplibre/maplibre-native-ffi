@@ -11,6 +11,10 @@
 # WGL context. EX-01 is `mise run
 # //examples/go-map:smoke <preset>` on an EGL preset, since go-map drives
 # OpenGL directly; its smoke run renders one frame in a hidden window.
+#
+# CB-04: the Go binding contains a callback's panic and reports it nowhere
+# else. The callback returns its declared failure value to native, and the
+# test observes that value's outcome.
 
 [cases]
 "ERR-01" = "bindings/go/errors_test.go::TestNativeStatusMapsToTypedErrors"
@@ -18,11 +22,11 @@
 "LIFE-01" = "bindings/go/lifecycle_test.go::TestClosingTwiceIsSafe"
 "LIFE-02" = "bindings/go/lifecycle_test.go::TestRefusedCloseLeavesTheHandleUsable"
 "LIFE-03" = "bindings/go/render_test.go::TestFrameViewIsScopedToItsCallback"
-"LIFE-04" = { na = "The Go binding has no leak reporter. runtime.AddCleanup disposes an abandoned handle on the runtime's cleanup goroutine, never on a callback stack, and PLAT-03's test covers that disposal." }
+"LIFE-04" = { na = "The Go binding has no leak reporter. runtime.AddCleanup disposes an abandoned handle on the runtime's cleanup goroutine, never on a callback stack; bindings/go/platform_test.go::TestCollectorRetiresUnclosedMaps covers that disposal." }
 "LIFE-05" = "bindings/go/lifecycle_test.go::TestChildKeepsItsParentAlive"
 "COMP-01" = "bindings/go/completion_test.go::TestCompletionDeliversExactlyOnce"
 "COMP-02" = "bindings/go/completion_test.go::TestRejectedSubmissionFreesItsCompletionState"
-"COMP-03" = "bindings/go/completion_test.go::TestDiscardedCreationFutureRetiresItsMap"
+"COMP-03" = "bindings/go/platform_test.go::TestCollectorRetiresUnclosedMaps"
 "COMP-04" = "bindings/go/completion_test.go::TestFailedCommandDispositionIsData"
 "COMP-05" = "bindings/go/completion_test.go::TestAwaitEndsWithItsContext"
 "CB-01" = "bindings/go/callbacks_test.go::TestCallbackRootsFollowTheNativeRegistration"
@@ -43,5 +47,5 @@
 "REND-02" = "bindings/go/render_test.go::TestCallerDriverIsServicedFromAGoroutine"
 "PLAT-01" = "bindings/go/platform_test.go::TestLinkedLibraryMatchesTheBuild"
 "PLAT-02" = "bindings/go/platform_test.go::TestProcessExitsCleanlyWithLiveHandles"
-"PLAT-03" = "bindings/go/platform_test.go::TestCollectorReclaimsAnAbandonedHandle"
+"PLAT-03" = "bindings/go/platform_test.go::TestCollectorRetiresUnclosedMaps"
 "EX-01" = "examples/go-map/main.go::--smoke"

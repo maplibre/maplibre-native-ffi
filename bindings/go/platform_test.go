@@ -62,15 +62,18 @@ func exitWithLiveHandles(t *testing.T) {
 	os.Exit(0)
 }
 
-// The collector reclaims a handle nobody closed: its cleanup disposes the
-// native map, which then no longer holds its runtime open.
-func TestCollectorReclaimsAnAbandonedHandle(t *testing.T) {
+// The collector retires a map nobody closed, whether the test dropped its
+// handle or never claimed it from the creation's future: the map's cleanup
+// disposes it, and the runtime then closes.
+func TestCollectorRetiresUnclosedMaps(t *testing.T) {
 	f := newRuntimeFixture(t)
-	m := await(t, submitted(f.runtime.MapCreate(DefaultMapOptions())))
-	disposed := disposalSignal(m.bindingOwner)
-	m = nil
-	awaitCollected(t, disposed, "the abandoned map's disposal")
-	// The barrier orders the map's retirement, which disposal only schedules.
-	await(t, submitted(f.runtime.Barrier()))
-	await(t, submitted(f.runtime.Close()))
+	dropped := await(t, submitted(f.runtime.MapCreate(DefaultMapOptions())))
+	awaitCommitted(t, submitted(dropped.SetStyleJson([]byte(emptyStyle))))
+	unclaimed, err := f.runtime.MapCreate(DefaultMapOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	receive(t, unclaimed.Done(), "the unclaimed map's creation")
+	dropped, unclaimed = nil, nil
+	closeOnceCollected(t, f.runtime, "the disposal of both maps")
 }
