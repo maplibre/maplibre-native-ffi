@@ -169,6 +169,11 @@ sentence-level style, page structure, and project terminology.
 - Example apps don't need tests.
 - Every test skip should be strictly justified. We do not skip rendering tests
   because the CI environment doesn't support them; we fix the environment.
+- Before deleting a binding test, run `mise run coverage` for that binding and
+  for `native`, then
+  `mise run coverage-diff --only-in <binding> --not-in native` to find the
+  `src/` lines only the binding reaches. See
+  [Code coverage](docs/src/content/docs/development/overview.md#code-coverage).
 
 ## Project Docs
 

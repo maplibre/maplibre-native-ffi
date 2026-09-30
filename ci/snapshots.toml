@@ -84,6 +84,8 @@ shared = [
   "!tests/bindgen/**",
   "!tests/graphics/**",
   "!tests/native/**",
+  "!scripts/coverage.py",
+  "!scripts/coverage-diff.py",
   "!plans/**",
   "!dprint.jsonc",
   "!hk.pkl",

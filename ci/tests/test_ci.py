@@ -122,6 +122,21 @@ class CoverageTest(unittest.TestCase):
             {f"target-{target}" for target in preset_sets(presets)[0]} <= set(jobs)
         )
 
+    def test_presets_that_opt_out_of_ci_name_no_target(self):
+        local = {"vendor": {"maplibre-native-ffi": {"ci": False}}}
+        presets = {
+            "configurePresets": [{"name": "host"}, {"name": "host-local", **local}],
+            "buildPresets": [
+                {"name": "host", "configurePreset": "host"},
+                {"name": "host-local", "configurePreset": "host-local"},
+            ],
+            "testPresets": [
+                {"name": "host", "configurePreset": "host"},
+                {"name": "host-local", "configurePreset": "host-local"},
+            ],
+        }
+        self.assertEqual(preset_sets(presets), (["host"], {"host"}, {"host"}, set()))
+
     def test_extended_reuse_requires_identical_complete_scope(self):
         for old_scope, labels, expected in (
             ("apple", ["ci:apple", "unrelated"], "reuse"),

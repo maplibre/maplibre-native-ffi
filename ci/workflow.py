@@ -261,6 +261,15 @@ def uses_gradle(commands: list[str]) -> bool:
 def preset_sets(
     presets: dict[str, object],
 ) -> tuple[list[str], set[str], set[str], set[str]]:
+    # A configure preset whose vendor settings opt out of CI is a local tool,
+    # such as the coverage build. CI builds no preset that references it.
+    local = {
+        preset["name"]
+        for preset in presets.get("configurePresets", [])
+        if preset.get("vendor", {}).get("maplibre-native-ffi", {}).get("ci", True)
+        is False
+    }
+
     def names(kind: str) -> list[str]:
         # Hidden presets carry settings for others to inherit and name no
         # target, so they take part in no preset pairing.
@@ -268,6 +277,8 @@ def preset_sets(
             preset["name"]
             for preset in presets.get(kind, [])
             if not preset.get("hidden", False)
+            and preset["name"] not in local
+            and preset.get("configurePreset") not in local
         ]
 
     configured = names("configurePresets")

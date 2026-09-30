@@ -201,13 +201,16 @@ generators usually live with the language package graph they serve.
 repository-wide formatting defaults.
 
 GitHub Actions runs those checks. `ci/workflow.toml` declares the baseline and
-ready targets and the suites each target runs. `ci/generate_workflow.py` builds
-workflow objects and serializes them as YAML. `mise run ci:generate-workflow`
-updates the generated callers and reusable workflows under `.github/workflows/`;
-`--check` verifies that the checked-in files match. `ci/snapshots.toml` declares
-the input scope of each component the daily snapshot workflow publishes, so a
-component republishes only when the paths it consumes changed;
-`mise run ci:check-snapshot-scopes` keeps every tracked path classified.
+ready targets and the suites each target runs. CI builds every preset in
+`CMakePresets.json` except a local tool, such as the coverage preset, whose
+`vendor` settings set `maplibre-native-ffi.ci` to false.
+`ci/generate_workflow.py` builds workflow objects and serializes them as YAML.
+`mise run ci:generate-workflow` updates the generated callers and reusable
+workflows under `.github/workflows/`; `--check` verifies that the checked-in
+files match. `ci/snapshots.toml` declares the input scope of each component the
+daily snapshot workflow publishes, so a component republishes only when the
+paths it consumes changed; `mise run ci:check-snapshot-scopes` keeps every
+tracked path classified.
 
 [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
 build the documentation site. Generated API reference HTML is installed into
@@ -264,3 +267,32 @@ output, interactive input, or host graphics integration.
 Keep examples small. This repository includes low-level language bindings and
 focused integration examples. Full application SDKs live outside this
 repository.
+
+## Code coverage
+
+Code coverage is a local tool for deciding which suite a test belongs in. CI
+runs no coverage build and enforces no coverage percentage.
+
+`mise run coverage [suite]` builds the `macos-arm64-metal-coverage` preset, runs
+one suite against it, and writes `build/coverage/<suite>/lcov.info` and
+`build/coverage/<suite>/html/index.html`. The suite is `native` for the C tests,
+which is the default, or a binding name such as `rust`. The preset instruments
+the project's own sources with clang source-based coverage, so the report covers
+`src/` alone and leaves out MapLibre Native and the test sources. The preset
+builds on macOS, and the task uses the LLVM tools that ship with Xcode.
+
+Before you delete a binding test, compare that binding's report with the C
+suite's report:
+
+```bash
+mise run coverage native
+mise run coverage rust
+mise run coverage-diff --only-in rust --not-in native
+```
+
+`coverage-diff` lists the `src/` lines that the first report runs and the second
+misses, grouped by file and function. It exits with status 1 when it lists any
+line. Each listed line needs a C test, or a reason that the C suite cannot reach
+it on that preset. Coverage records which lines ran and nothing about what a
+test asserted, so check that a C test asserts the behavior that the binding test
+checked.
