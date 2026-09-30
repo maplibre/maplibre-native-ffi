@@ -54,8 +54,17 @@ static void inverted_zoom_range(mln_geojson_source_options* options) {
 static void negative_tolerance(mln_geojson_source_options* options) {
   options->tolerance = -1.0;
 }
+static void fractional_geojson_max_zoom(mln_geojson_source_options* options) {
+  options->max_zoom = 2.5;
+}
 static void cluster_zoom_out_of_range(mln_geojson_source_options* options) {
   options->cluster_max_zoom = 300.0;
+}
+static void fractional_cluster_zoom(mln_geojson_source_options* options) {
+  options->cluster_max_zoom = 1.5;
+}
+static void oversized_cluster_radius(mln_geojson_source_options* options) {
+  options->cluster_radius = 70000;
 }
 static void empty_tiles(mln_geojson_source_options* options) {
   options->tile_size = 0;
@@ -76,10 +85,13 @@ typedef struct geojson_option_case {
 static const geojson_option_case geojson_option_cases[] = {
   {"inverted zoom range", inverted_zoom_range,
    "min_zoom must be less than or equal to max_zoom"},
+  {"fractional max zoom", fractional_geojson_max_zoom, "max_zoom"},
   {"negative tolerance", negative_tolerance, "tolerance"},
   {"cluster zoom out of range", cluster_zoom_out_of_range, "cluster_max_zoom"},
+  {"fractional cluster zoom", fractional_cluster_zoom, "cluster_max_zoom"},
   {"empty tiles", empty_tiles, "tile_size"},
   {"oversized buffer", oversized_buffer, "buffer"},
+  {"oversized cluster radius", oversized_cluster_radius, "cluster_radius"},
   {"cluster properties that are not an object", cluster_properties_array,
    "cluster_properties must contain a JSON object"},
 };
@@ -93,6 +105,7 @@ static void geojson_data_validates_every_option_field(void) {
       MLN_BUFFER_LITERAL(point_collection), &options, &data, MLN_TEST_DIAGNOSTIC
     )
   );
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
   mln_geojson_source_data_destroy(data);
 
   for (size_t index = 0;
@@ -115,31 +128,34 @@ static void geojson_data_validates_every_option_field(void) {
       strstr(mln_test_last_error(), row->fragment), row->label
     );
   }
-
-  // Clustering names the geometry it cannot read as a point.
-  static const char line_collection[] =
-    "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
-    "\"geometry\":{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]},"
-    "\"properties\":{}}]}";
-  options = every_geojson_option();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(line_collection), &options, &data, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "line string"));
 }
 
-// A URL source checks the same fields: the numeric ones when the call
-// submits, and the cluster properties in the command, which parses them.
-static void geojson_url_sources_validate_their_options(void) {
+// Data prepared with every field installs on a source, and a URL source takes
+// the same options. A URL source checks the same fields: the numeric ones when
+// the call submits, and the cluster properties in the command, which parses
+// them.
+static void geojson_sources_take_and_validate_their_options(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_style_serve(runtime, NULL, 0);
   mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
 
   mln_geojson_source_options options = every_geojson_option();
+  mln_geojson_source_data data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(point_collection), &options, &data, MLN_TEST_DIAGNOSTIC
+    )
+  );
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_add_geojson_source_data(
+      map, MLN_BUFFER_LITERAL("prepared"), data, &completion.descriptor, NULL
+    )
+  );
+  mln_geojson_source_data_destroy(data);
+
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_add_geojson_source_url(
                      map, MLN_BUFFER_LITERAL("points"),
@@ -320,6 +336,6 @@ static void custom_sources_validate_every_option_field(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(geojson_data_validates_every_option_field);
-  RUN_TEST(geojson_url_sources_validate_their_options);
+  RUN_TEST(geojson_sources_take_and_validate_their_options);
   RUN_TEST(custom_sources_validate_every_option_field);
 }

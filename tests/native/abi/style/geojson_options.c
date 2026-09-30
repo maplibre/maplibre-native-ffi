@@ -1,10 +1,8 @@
-// Prepared GeoJSON options: each field a caller sets replaces its default,
-// validation judges the values the caller set, and the clustering fields
-// decide which points a rendered source holds.
+// Prepared GeoJSON options: the clustering fields decide which points a
+// rendered source holds. The validation of each field is in source_options.c.
 
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "support/harness.h"
@@ -44,79 +42,6 @@ static mln_geojson_source_options every_field(void) {
   options.line_metrics = true;
   options.cluster = true;
   return options;
-}
-
-typedef struct option_row {
-  const char* label;
-  void (*mutate)(mln_geojson_source_options* options);
-  const char* fragment;
-} option_row;
-
-static void max_below_min(mln_geojson_source_options* options) {
-  options->min_zoom = 8.0;
-  options->max_zoom = 4.0;
-}
-static void fractional_cluster_max_zoom(mln_geojson_source_options* options) {
-  options->cluster_max_zoom = 1.5;
-}
-static void negative_tolerance(mln_geojson_source_options* options) {
-  options->tolerance = -1.0;
-}
-static void fractional_max_zoom(mln_geojson_source_options* options) {
-  options->max_zoom = 2.5;
-}
-static void zero_tile_size(mln_geojson_source_options* options) {
-  options->tile_size = 0;
-}
-static void oversized_buffer(mln_geojson_source_options* options) {
-  options->buffer = 70000;
-}
-static void oversized_cluster_radius(mln_geojson_source_options* options) {
-  options->cluster_radius = 70000;
-}
-
-// Each rejection needs the field the caller set, since every default passes.
-static const option_row invalid_rows[] = {
-  {"max_zoom below min_zoom", max_below_min, "min_zoom"},
-  {"fractional cluster_max_zoom", fractional_cluster_max_zoom,
-   "cluster_max_zoom"},
-  {"negative tolerance", negative_tolerance, "tolerance"},
-  {"fractional max_zoom", fractional_max_zoom, "max_zoom"},
-  {"zero tile_size", zero_tile_size, "tile_size"},
-  {"oversized buffer", oversized_buffer, "buffer"},
-  {"oversized cluster_radius", oversized_cluster_radius, "cluster_radius"},
-};
-
-static void validation_judges_the_values_the_caller_set(void) {
-  mln_geojson_source_options valid = every_field();
-  mln_geojson_source_data data = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(nearby_points), &valid, &data, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  mln_geojson_source_data_destroy(data);
-
-  for (size_t index = 0; index < sizeof(invalid_rows) / sizeof(*invalid_rows);
-       index += 1) {
-    const option_row* row = &invalid_rows[index];
-    mln_geojson_source_options options = every_field();
-    row->mutate(&options);
-    mln_geojson_source_data rejected = MLN_HANDLE_NULL;
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_INVALID_ARGUMENT,
-      mln_geojson_source_data_create(
-        MLN_BUFFER_LITERAL(nearby_points), &options, &rejected,
-        MLN_TEST_DIAGNOSTIC
-      ),
-      row->label
-    );
-    TEST_ASSERT_EQUAL_UINT64_MESSAGE(MLN_HANDLE_NULL, rejected, row->label);
-    TEST_ASSERT_NOT_NULL_MESSAGE(
-      strstr(mln_test_last_error(), row->fragment), row->label
-    );
-  }
 }
 
 typedef struct cluster_query {
@@ -204,6 +129,5 @@ static void clustering_fields_decide_which_points_the_source_holds(void) {
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(validation_judges_the_values_the_caller_set);
   RUN_TEST(clustering_fields_decide_which_points_the_source_holds);
 }

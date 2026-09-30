@@ -295,8 +295,32 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A zero-duration flight settles at once whatever its other animation fields
+// say, so the committed camera shows the target.
+static void a_flight_with_every_animation_field_commits(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_camera_update update = mln_camera_update_default();
+  update.mode = MLN_CAMERA_UPDATE_MODE_FLY;
+  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  update.camera.zoom = 6.0;
+  update.animation.fields =
+    MLN_ANIMATION_OPTION_DURATION | MLN_ANIMATION_OPTION_VELOCITY |
+    MLN_ANIMATION_OPTION_MIN_ZOOM | MLN_ANIMATION_OPTION_EASING;
+  update.animation.duration_ms = 0.0;
+  update.animation.velocity = 1.2;
+  update.animation.min_zoom = 1.0;
+  update.animation.easing =
+    (mln_unit_bezier){.x1 = 0.25, .y1 = 0.1, .x2 = 0.25, .y2 = 1.0};
+  update_camera(map, &update);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 6.0, query_camera(map).zoom);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(a_rendered_ease_completes_at_its_target);
+  RUN_TEST(a_flight_with_every_animation_field_commits);
   RUN_TEST(cancel_transitions_commits_and_leaves_the_camera);
   RUN_TEST(gesture_phase_publishes_the_snapshot_flag);
 }

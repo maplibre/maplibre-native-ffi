@@ -1,18 +1,15 @@
 // A render session at the edges of its life: the map it holds refuses to
-// release, a resize needs an attached session whose target the session sizes,
-// a readback needs a rendered frame, and a source query takes no options.
+// release, a readback needs a rendered frame, and a source query takes no
+// options.
 
 #include <stdbool.h>
 #include <string.h>
 
+#include "support/frames.h"
 #include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
 #include "unity.h"
-
-#if !defined(__EMSCRIPTEN__)
-#include "support/host_graphics.h"
-#endif
 
 static void detach_fixture(mln_test_render_fixture* fixture) {
   mln_test_completion detach = mln_test_completion_default(0);
@@ -50,51 +47,8 @@ static void a_map_release_waits_for_its_session_to_detach(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static mln_status submit_resize(mln_render_session session) {
-  const mln_render_target_extent extent = {
-    .size = sizeof(mln_render_target_extent),
-    .width = 48,
-    .height = 48,
-    .scale_factor = 1.0,
-  };
-  mln_completion discard = mln_test_discard_completion();
-  return mln_render_session_resize(
-    session, &extent, &discard, MLN_TEST_DIAGNOSTIC
-  );
-}
-
-// A detached session has no target to resize, and a caller-owned texture is
-// sized by the host, which hands over a replacement instead.
-static void resize_needs_an_attached_session_that_sizes_its_target(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  detach_fixture(&fixture);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, submit_resize(fixture.session)
-  );
-  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "not attached"));
-  mln_test_render_fixture_destroy(&fixture);
-
-#if !defined(__EMSCRIPTEN__)
-  mln_test_render_fixture borrowed = {0};
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_borrowed_texture(map, &borrowed),
-    mln_test_graphics_last_error()
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_UNSUPPORTED, submit_resize(borrowed.session)
-  );
-  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "sized by its owner"));
-  mln_test_render_fixture_destroy(&borrowed);
-#endif
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // A readback is accepted before any frame renders, and its completion reports
-// that no frame is available.
+// that no frame is available. Once a frame renders, the readback succeeds.
 static void a_readback_before_any_frame_fails_at_completion(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -113,6 +67,21 @@ static void a_readback_before_any_frame_fails_at_completion(void) {
   TEST_ASSERT_NOT_NULL_MESSAGE(
     strstr(mln_test_completion_diagnostic(&readback), "no rendered frame"),
     mln_test_completion_diagnostic(&readback)
+  );
+  mln_test_completion_destroy(&readback);
+
+  mln_test_render_prepare_map(runtime, map);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, mln_test_style_render_frame(&fixture)
+  );
+  readback = mln_test_completion_readback();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
+                     fixture.session, &readback.descriptor, NULL
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &readback)
   );
   mln_test_completion_destroy(&readback);
   mln_test_render_fixture_destroy(&fixture);
@@ -161,7 +130,6 @@ static void a_source_query_without_options_reads_every_feature(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(a_map_release_waits_for_its_session_to_detach);
-  RUN_TEST(resize_needs_an_attached_session_that_sizes_its_target);
   RUN_TEST(a_readback_before_any_frame_fails_at_completion);
   RUN_TEST(a_source_query_without_options_reads_every_feature);
 }

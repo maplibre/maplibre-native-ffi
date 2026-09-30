@@ -1,9 +1,8 @@
 // Inputs the style functions reject that no other case sends: invalid GeoJSON
 // data and cluster properties, empty source and layer IDs, an empty tile list,
-// malformed images, invalid light JSON, an unknown layer visibility, and style
-// JSON with an embedded NUL. Some
-// are refused at submission and some by the command, so each row reads the
-// status from whichever stage refused it.
+// images without pixels, invalid light JSON, and style JSON with an embedded
+// NUL. Some are refused at submission and some by the command, so each row
+// reads the status from whichever stage refused it.
 
 #include <stdbool.h>
 #include <string.h>
@@ -39,8 +38,6 @@ static void geojson_data_rejects_invalid_documents_and_properties(void) {
     {"empty cluster properties", points, "", true, "must not be empty"},
     {"cluster properties that are not JSON", points, "{\"total\":NaN}", true,
      "cluster_properties"},
-    {"a cluster property without an expression", points, "{\"total\":[\"+\"]}",
-     true, "GeoJSON source options"},
   };
   for (size_t index = 0; index < sizeof(cases) / sizeof(cases[0]); index += 1) {
     const geojson_case* row = &cases[index];
@@ -145,26 +142,6 @@ static mln_status add_vector_source_without_tiles(
   );
 }
 
-static mln_status set_image_with_a_backwards_stretch(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  static const uint8_t pixels[16] = {0};
-  static const mln_image_stretch backwards[] = {{.from = 2, .to = 1}};
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
-  image.width = 2;
-  image.height = 2;
-  image.stride = 8;
-  image.pixels = pixels;
-  image.byte_length = sizeof(pixels);
-  mln_style_image_options options = mln_style_image_options_default();
-  options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_X;
-  options.stretch_x = backwards;
-  options.stretch_x_count = 1;
-  return mln_map_set_style_image(
-    map, MLN_BUFFER_LITERAL("patch"), &image, &options, completion, diagnostic
-  );
-}
-
 static mln_status set_image_without_pixels(
   mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
 ) {
@@ -203,14 +180,6 @@ static mln_status set_style_json_with_a_nul(
   );
 }
 
-static mln_status set_unknown_visibility(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  return mln_map_set_layer_visibility(
-    map, MLN_BUFFER_LITERAL("background"), 99, completion, diagnostic
-  );
-}
-
 typedef struct command_case {
   const char* label;
   mln_status (*submit)(mln_map, const mln_completion*, mln_diagnostic*);
@@ -231,18 +200,14 @@ static void style_commands_reject_invalid_inputs(void) {
      "layer_id must not be empty"},
     {"a vector source without tiles", add_vector_source_without_tiles,
      "tile_count must be greater than 0"},
-    {"an image with a backwards stretch", set_image_with_a_backwards_stretch,
-     "positive width"},
     {"an image without pixels", set_image_without_pixels,
      "pixels must not be null"},
     {"an image source without pixels", add_image_source_without_pixels,
      "pixels must not be null"},
     {"light JSON that does not parse", set_light_to_invalid_json,
      "style light property"},
-    {"an unknown layer visibility", set_unknown_visibility,
-     "visibility is invalid"},
-    // Run last: a style that fails to load leaves the map without the
-    // background layer the row above needs.
+    // Run last: a style that fails to load leaves the map without its
+    // style.
     {"style JSON with an embedded NUL", set_style_json_with_a_nul,
      "must not contain embedded NUL"},
   };

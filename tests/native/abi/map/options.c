@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "support/harness.h"
 #include "support/test_support.h"
@@ -254,6 +255,12 @@ static void verify_free_camera_orientation(
   const mln_free_camera_options* got = &snapshot->free_camera;
   TEST_ASSERT_TRUE_MESSAGE(
     (got->fields & MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0U, label
+  );
+  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
+    1e-9, sent->orientation.x, got->orientation.x, label
+  );
+  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
+    1e-9, sent->orientation.y, got->orientation.y, label
   );
   TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
     1e-9, sent->orientation.z, got->orientation.z, label
@@ -953,9 +960,32 @@ static void generations_increase_across_submitting_threads(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A creation descriptor whose extent has no area or no finite scale factor is
+// rejected before any map exists.
+static void map_creation_rejects_a_degenerate_extent(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map_options options = mln_map_options_default();
+  options.initial_extent.width = 0;
+  mln_map map = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_test_map_create_status(runtime, &options, &map)
+  );
+  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "initial extent"));
+  options = mln_map_options_default();
+  options.initial_extent.scale_factor = INFINITY;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_test_map_create_status(runtime, &options, &map)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(every_option_command_round_trips_through_the_snapshot);
   RUN_TEST(option_descriptors_reject_what_they_cannot_express);
+  RUN_TEST(map_creation_rejects_a_degenerate_extent);
   RUN_TEST(map_debug_commands_reject_a_null_map);
   RUN_TEST(map_extent_snapshot_tracks_resize_and_fixes_scale_factor);
   RUN_TEST(a_replaced_resize_completes_superseded);

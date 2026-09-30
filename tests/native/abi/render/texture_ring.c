@@ -1,9 +1,6 @@
-// A session-owned texture ring across a resize, and the map an attached
-// session holds open.
+// A session-owned texture ring across a resize.
 
-#include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "support/frames.h"
 #include "support/harness.h"
@@ -79,33 +76,4 @@ static void a_resize_retires_every_old_size_slot(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// An attached session holds its map open: the release is refused and leaves
-// the map usable, and succeeds once the session detaches.
-static void an_attached_session_refuses_the_map_release(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-
-  mln_test_completion release = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE,
-    mln_map_release(map, &release.descriptor, MLN_TEST_DIAGNOSTIC)
-  );
-  mln_test_completion_reject(&release);
-  mln_test_completion_destroy(&release);
-  TEST_ASSERT_NOT_NULL(
-    strstr(mln_test_last_error(), "attached render session")
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_request_repaint(map));
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-MLN_TEST_GROUP {
-  RUN_TEST(a_resize_retires_every_old_size_slot);
-  RUN_TEST(an_attached_session_refuses_the_map_release);
-}
+MLN_TEST_GROUP { RUN_TEST(a_resize_retires_every_old_size_slot); }

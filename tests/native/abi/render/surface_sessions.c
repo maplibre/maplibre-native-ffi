@@ -1,6 +1,6 @@
-// Surface sessions from tests/graphics: a frame that renders without
-// presenting, a resize that the session applies to the host's surface, and,
-// on Metal, a replacement surface at a new scale factor.
+// Surface sessions from tests/graphics: a resize that the session applies to
+// the host's surface, after which a frame renders without presenting, and, on
+// Metal, a replacement surface at a new scale factor.
 //
 // The browser presets have no host surface, since JavaScript owns their
 // canvases.
@@ -65,17 +65,6 @@ static mln_render_session_snapshot read_snapshot(
     mln_render_session_get_snapshot(fixture->session, &snapshot, NULL)
   );
   return snapshot;
-}
-
-// A demand without the present flag still renders, and leaves the surface's
-// presentation to a later frame.
-static void a_surface_frame_without_the_present_flag_renders(void) {
-  surface_map map = {0};
-  open_surface_map(&map);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_without_presenting(&map.fixture, 1)
-  );
-  close_surface_map(&map);
 }
 
 // A resize reaches the host's surface, so the next frame renders at the new
@@ -168,7 +157,6 @@ static void a_surface_replacement_can_change_the_scale_factor(void) {
 
 MLN_TEST_GROUP {
 #if !defined(__EMSCRIPTEN__)
-  RUN_TEST(a_surface_frame_without_the_present_flag_renders);
   RUN_TEST(a_surface_session_resizes_its_surface);
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   RUN_TEST(a_surface_replacement_can_change_the_scale_factor);

@@ -1,5 +1,6 @@
-// A standalone projection validates what its setters and conversions take,
-// and a rejected call leaves the projection's camera as it was.
+// A standalone projection validates what its setters take, and a rejected
+// call leaves the projection's camera as it was. The conversions' rejections
+// are in projection.c.
 
 #include <math.h>
 #include <string.h>
@@ -31,7 +32,7 @@ static double projection_zoom(mln_map_projection projection) {
   return camera.zoom;
 }
 
-static void projection_setters_and_conversions_reject_invalid_values(void) {
+static void projection_setters_reject_invalid_values(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_map_projection projection = create_projection(map);
@@ -56,6 +57,7 @@ static void projection_setters_and_conversions_reject_invalid_values(void) {
       projection, past_the_pole, 2, no_padding, MLN_TEST_DIAGNOSTIC
     )
   );
+  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "latitude"));
   const mln_lat_lng corners[2] = {
     {.latitude = -10.0, .longitude = -10.0},
     {.latitude = 10.0, .longitude = 10.0},
@@ -68,14 +70,6 @@ static void projection_setters_and_conversions_reject_invalid_values(void) {
     )
   );
 
-  mln_screen_point point = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_projection_pixel_for_lat_lng(
-      projection, (mln_lat_lng){.latitude = NAN, .longitude = 0.0}, &point,
-      MLN_TEST_DIAGNOSTIC
-    )
-  );
   TEST_ASSERT_EQUAL_DOUBLE(zoom, projection_zoom(projection));
 
   TEST_ASSERT_EQUAL_INT(
@@ -85,6 +79,4 @@ static void projection_setters_and_conversions_reject_invalid_values(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-MLN_TEST_GROUP {
-  RUN_TEST(projection_setters_and_conversions_reject_invalid_values);
-}
+MLN_TEST_GROUP { RUN_TEST(projection_setters_reject_invalid_values); }

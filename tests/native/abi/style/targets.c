@@ -1,6 +1,6 @@
-// Style commands and reads whose target is missing, of the wrong kind, or
-// already taken: a command fails at commit with the reason, and a read reports
-// that it found nothing.
+// Style commands whose target is missing, of the wrong kind, or already
+// taken: each fails at commit with the reason. The reads of a missing target
+// that find nothing are in images.c and sources.c.
 
 #include <stdbool.h>
 #include <string.h>
@@ -128,44 +128,7 @@ static void custom_tile_data_needs_a_real_tile_and_source(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A read of a missing image source or image completes without a value rather
-// than failing.
-static void reads_of_missing_images_find_nothing(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
-
-  mln_test_completion coordinates =
-    mln_test_completion_default(4 * sizeof(mln_lat_lng));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_get_image_source_coordinates(
-      map, MLN_BUFFER_LITERAL("missing"), &coordinates.descriptor, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_completion_finish(&coordinates)
-  );
-  TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&coordinates));
-  mln_test_completion_destroy(&coordinates);
-
-  mln_test_completion stretches =
-    mln_test_completion_default(sizeof(mln_style_image_stretches_result));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_copy_style_image_stretches(
-      map, MLN_BUFFER_LITERAL("missing"), &stretches.descriptor, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&stretches));
-  TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&stretches));
-  mln_test_completion_destroy(&stretches);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 MLN_TEST_GROUP {
   RUN_TEST(source_commands_fail_on_a_taken_missing_or_wrong_target);
   RUN_TEST(custom_tile_data_needs_a_real_tile_and_source);
-  RUN_TEST(reads_of_missing_images_find_nothing);
 }

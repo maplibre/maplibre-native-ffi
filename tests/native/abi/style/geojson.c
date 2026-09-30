@@ -296,6 +296,29 @@ typedef struct cluster_match_case {
   mln_status expected;
 } cluster_match_case;
 
+// One option field that data can carry and a source compares, with a change
+// that moves it off its default.
+typedef struct geojson_field_case {
+  uint32_t field;
+  void (*change)(mln_geojson_source_options* options);
+} geojson_field_case;
+
+static void change_cluster_max_zoom(mln_geojson_source_options* options) {
+  options->cluster_max_zoom = 10.0;
+}
+static void change_cluster_radius(mln_geojson_source_options* options) {
+  options->cluster_radius = 120;
+}
+static void change_cluster_min_points(mln_geojson_source_options* options) {
+  options->cluster_min_points = 5;
+}
+static void change_buffer(mln_geojson_source_options* options) {
+  options->buffer = 64;
+}
+static void change_synchronous_tiling(mln_geojson_source_options* options) {
+  options->synchronous_tiling = true;
+}
+
 // MapLibre Native fixes a source's options when it is added, so installed data
 // must carry equal options. Cluster aggregations compare as parsed
 // expressions, not as JSON text.
@@ -377,52 +400,29 @@ static void prepared_data_must_match_the_source_options(void) {
     mln_geojson_source_data_destroy(data);
   }
 
-  // The cluster zoom, radius, and minimum size are source options too.
-  mln_geojson_source_options tuned = clustered;
-  tuned.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
-                  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
-                  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
-  tuned.cluster_max_zoom = 10.0;
-  tuned.cluster_radius = 80;
-  tuned.cluster_min_points = 3;
-  mln_geojson_source_data tuned_data = prepare(points, &tuned);
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "do not match",
-    mln_map_set_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("clustered"), tuned_data, &completion.descriptor,
-      NULL
-    )
-  );
-  mln_geojson_source_data_destroy(tuned_data);
-
-  // Synchronous tiling is a source option like any other, so data prepared
-  // with it does not match a source added without it.
-  mln_geojson_source_options synchronous = clustered;
-  synchronous.fields |= MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
-  synchronous.synchronous_tiling = true;
-  mln_geojson_source_data synchronous_data = prepare(points, &synchronous);
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "do not match",
-    mln_map_set_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("clustered"), synchronous_data,
-      &completion.descriptor, NULL
-    )
-  );
-  mln_geojson_source_data_destroy(synchronous_data);
-
-  // So is the cluster radius.
-  mln_geojson_source_options wider = clustered;
-  wider.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
-  wider.cluster_radius = 120;
-  mln_geojson_source_data wider_data = prepare(points, &wider);
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "do not match",
-    mln_map_set_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("clustered"), wider_data, &completion.descriptor,
-      NULL
-    )
-  );
-  mln_geojson_source_data_destroy(wider_data);
+  // Every other option is compared too, so data that differs from the source
+  // in any one field does not match it.
+  static const geojson_field_case fields[] = {
+    {MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM, change_cluster_max_zoom},
+    {MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS, change_cluster_radius},
+    {MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, change_cluster_min_points},
+    {MLN_GEOJSON_SOURCE_OPTION_BUFFER, change_buffer},
+    {MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING, change_synchronous_tiling},
+  };
+  for (size_t index = 0; index < sizeof(fields) / sizeof(fields[0]);
+       index += 1) {
+    mln_geojson_source_options variant = clustered;
+    variant.fields |= fields[index].field;
+    fields[index].change(&variant);
+    mln_geojson_source_data data = prepare(points, &variant);
+    MLN_TEST_EXPECT_COMMAND_FAILED(
+      MLN_STATUS_INVALID_ARGUMENT, "do not match",
+      mln_map_set_geojson_source_data(
+        map, MLN_BUFFER_LITERAL("clustered"), data, &completion.descriptor, NULL
+      )
+    );
+    mln_geojson_source_data_destroy(data);
+  }
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
