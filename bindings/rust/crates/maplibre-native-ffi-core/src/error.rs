@@ -136,13 +136,66 @@ unsafe fn diagnostic_message(diagnostic: *const sys::mln_diagnostic) -> String {
 mod tests {
     use super::*;
 
-    #[test]
-    fn maps_unknown_status_without_losing_raw_status() {
-        let error = Error::from_status_and_diagnostic(-123_456, "future status");
+    /// Runs a call that fails with `status` after writing `message` into its
+    /// diagnostic, the way a native call reports a failure.
+    fn failing_call(status: sys::mln_status, message: &[u8]) -> Error {
+        check(|diagnostic| {
+            // SAFETY: check hands the call one diagnostic, and every message
+            // written here fits its capacity.
+            unsafe {
+                let out = (&raw mut (*diagnostic).message).cast::<u8>();
+                std::ptr::copy_nonoverlapping(message.as_ptr(), out, message.len());
+            }
+            status
+        })
+        .unwrap_err()
+    }
 
+    #[test]
+    fn a_failed_call_maps_its_status_and_keeps_an_unknown_code() {
+        let statuses = [
+            (sys::MLN_STATUS_INVALID_ARGUMENT, ErrorKind::InvalidArgument),
+            (sys::MLN_STATUS_INVALID_STATE, ErrorKind::InvalidState),
+            (sys::MLN_STATUS_WRONG_THREAD, ErrorKind::WrongThread),
+            (sys::MLN_STATUS_UNSUPPORTED, ErrorKind::Unsupported),
+            (sys::MLN_STATUS_CANCELLED, ErrorKind::Cancelled),
+            (sys::MLN_STATUS_BUSY, ErrorKind::Busy),
+            (sys::MLN_STATUS_TARGET_LOST, ErrorKind::TargetLost),
+            (sys::MLN_STATUS_NOT_READY, ErrorKind::NotReady),
+            (sys::MLN_STATUS_NOT_FOUND, ErrorKind::NotFound),
+            (sys::MLN_STATUS_NATIVE_ERROR, ErrorKind::NativeError),
+        ];
+        for (status, kind) in statuses {
+            let error = failing_call(status, b"failed\0");
+            assert_eq!(error.kind(), kind);
+            assert_eq!(error.raw_status(), Some(status));
+            assert_eq!(error.diagnostic(), "failed");
+        }
+
+        // A status this binding predates keeps its code rather than folding
+        // into a known one.
+        let error = failing_call(-123_456, b"future status\0");
         assert_eq!(error.kind(), ErrorKind::UnknownStatus);
         assert_eq!(error.raw_status(), Some(-123_456));
         assert_eq!(error.diagnostic(), "future status");
+    }
+
+    #[test]
+    fn a_diagnostic_is_bounded_by_its_capacity_and_empty_when_none_was_written() {
+        // A message that fills the buffer with no terminator ends at capacity.
+        let capacity = sys::MLN_DIAGNOSTIC_MESSAGE_CAPACITY as usize;
+        let error = failing_call(sys::MLN_STATUS_INVALID_STATE, &vec![b'x'; capacity]);
+        assert_eq!(error.diagnostic(), "x".repeat(capacity));
+
+        // Bytes that are not UTF-8 are replaced, not dropped.
+        let error = failing_call(sys::MLN_STATUS_INVALID_STATE, b"bad \xff byte\0");
+        assert_eq!(error.diagnostic(), "bad \u{fffd} byte");
+
+        // Each call starts from an empty message, so a call that fails without
+        // writing one carries none, not the previous call's.
+        let error = check(|_| sys::MLN_STATUS_INVALID_ARGUMENT).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.diagnostic(), "");
     }
 
     #[test]

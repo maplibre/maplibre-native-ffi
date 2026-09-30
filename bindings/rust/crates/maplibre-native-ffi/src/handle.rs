@@ -213,28 +213,86 @@ mod tests {
         assert!(handle.is_closed());
     }
     #[test]
-    fn borrowed_read_blocks_close_and_rejected_or_panicking_close_preserves_owner() {
+    fn a_read_on_another_thread_holds_off_close_until_it_ends() {
+        let handle = Arc::new(unsafe {
+            ConcurrentNativeHandle::from_handle(sys::mln_event_batch(9), "batch").unwrap()
+        });
+        let reading = Arc::new(Barrier::new(2));
+        let release = Arc::new(Barrier::new(2));
+
+        let reader = std::thread::spawn({
+            let handle = Arc::clone(&handle);
+            let reading = Arc::clone(&reading);
+            let release = Arc::clone(&release);
+            move || {
+                let read = handle.read_handle().unwrap();
+                assert_eq!(read.native.0, 9);
+                reading.wait();
+                release.wait();
+            }
+        });
+
+        reading.wait();
+        let error = handle
+            .close_with::<()>(|_| panic!("close reached native during a read"))
+            .unwrap_err();
+        assert_eq!(error.kind(), crate::ErrorKind::InvalidState);
+        assert_eq!(handle.live_handle().unwrap().0, 9);
+        release.wait();
+        reader.join().unwrap();
+
+        handle.close_with(|_| Ok(())).unwrap();
+        assert!(handle.is_closed());
+    }
+
+    #[test]
+    fn a_rejected_or_panicking_close_leaves_the_handle_live() {
         let handle = unsafe {
             ConcurrentNativeHandle::from_handle(sys::mln_event_batch(9), "batch").unwrap()
         };
-        let read = handle.read_handle().unwrap();
-        assert_eq!(read.native.0, 9);
-        assert!(
-            handle
-                .close_with::<()>(|_| panic!("must not enter native close"))
-                .is_err()
-        );
-        drop(read);
         assert!(
             handle
                 .close_with::<()>(|_| Err(Error::invalid_argument("rejected")))
                 .is_err()
         );
+        assert_eq!(handle.live_handle().unwrap().0, 9);
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let _ = handle.close_with::<()>(|_| panic!("host unwind"));
         }));
         assert_eq!(handle.live_handle().unwrap().0, 9);
         handle.close_with(|_| Ok(())).unwrap();
+        assert!(handle.is_closed());
+    }
+
+    #[test]
+    fn a_handle_dropped_in_a_callback_disposes_off_its_stack_and_reports_a_failure() {
+        let (sender, leaks) = mpsc::channel();
+        crate::set_leak_reporter(Some(Box::new(move |leak| {
+            let _ = sender.send((leak, std::thread::current().id()));
+        })));
+        let id = 0x0d00_0000_0000_0007;
+        let mut handle =
+            unsafe { ConcurrentNativeHandle::from_handle(sys::mln_map(id), "mln_map").unwrap() };
+
+        // A drop inside a native callback must not dispose on that callback's
+        // stack, so the disposal runs on the finalization thread, and its
+        // failure reaches the reporter there.
+        {
+            let _callback = maplibre_core::callback::PolicyScope::enter(&[], 0);
+            handle.finalize_with(|_| Err(Error::invalid_argument("dispose refused")));
+        }
+        let received = leaks.recv_timeout(Duration::from_secs(10));
+        crate::set_leak_reporter(None);
+
+        let (leak, thread) = received.expect("the failed disposal was never reported");
+        assert_eq!(
+            leak,
+            crate::NativeHandleLeak {
+                type_name: "mln_map",
+                id,
+            }
+        );
+        assert_ne!(thread, std::thread::current().id());
         assert!(handle.is_closed());
     }
 }

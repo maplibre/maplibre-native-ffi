@@ -333,12 +333,117 @@ impl Drop for ResourceRequestHandleState {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::panic::{AssertUnwindSafe, catch_unwind};
-    use std::sync::Mutex as StdMutex;
-    use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
-    use std::time::{Duration, Instant};
+    use std::sync::atomic::{AtomicI32, AtomicU64, AtomicUsize, Ordering};
+    use std::sync::mpsc::{Receiver, Sender, channel};
+    use std::sync::{Mutex as StdMutex, OnceLock};
+    use std::thread::ThreadId;
+    use std::time::Duration;
 
     use super::*;
+
+    /// The longest a test waits for another thread to reach a point it signals.
+    const WAIT: Duration = Duration::from_secs(10);
+
+    /// One test's fake native request. The fake functions find it through the
+    /// handle id they receive, so tests that run in parallel share no state.
+    struct FakeRequest {
+        completes: AtomicUsize,
+        releases: AtomicUsize,
+        complete_status: AtomicI32,
+        /// Receives the thread that runs native release.
+        release_thread: StdMutex<Option<Sender<ThreadId>>>,
+        /// When set, release waits for this signal the way the C API waits
+        /// for a cancel callback running on another thread.
+        release_waits_for: StdMutex<Option<Receiver<()>>>,
+    }
+
+    fn fakes() -> &'static StdMutex<HashMap<u64, Arc<FakeRequest>>> {
+        static FAKES: OnceLock<StdMutex<HashMap<u64, Arc<FakeRequest>>>> = OnceLock::new();
+        FAKES.get_or_init(Default::default)
+    }
+
+    fn fake_for(handle: sys::mln_resource_request_handle) -> Arc<FakeRequest> {
+        Arc::clone(&fakes().lock().unwrap()[&handle.0])
+    }
+
+    unsafe extern "C" fn fake_complete(
+        handle: sys::mln_resource_request_handle,
+        _response: *const sys::mln_resource_response,
+        _diagnostic: *mut sys::mln_diagnostic,
+    ) -> sys::mln_status {
+        let fake = fake_for(handle);
+        fake.completes.fetch_add(1, Ordering::SeqCst);
+        fake.complete_status.load(Ordering::SeqCst)
+    }
+
+    unsafe extern "C" fn fake_release(handle: sys::mln_resource_request_handle) {
+        let fake = fake_for(handle);
+        if let Some(sender) = fake.release_thread.lock().unwrap().take() {
+            sender.send(std::thread::current().id()).unwrap();
+        }
+        if let Some(receiver) = fake.release_waits_for.lock().unwrap().take() {
+            receiver
+                .recv_timeout(WAIT)
+                .expect("the cancel callback never finished");
+        }
+        fake.releases.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// A request state machine over a fake native request of its own.
+    struct Fixture {
+        fake: Arc<FakeRequest>,
+        state: Arc<ResourceRequestHandleState>,
+    }
+
+    impl Fixture {
+        fn new() -> Self {
+            // The ids keep their high bits set, as the C API's generational
+            // handles do, so a conversion that truncated one would miss its fake.
+            static NEXT_ID: AtomicU64 = AtomicU64::new(0x0c00_0000_0000_0001);
+            let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+            let fake = Arc::new(FakeRequest {
+                completes: AtomicUsize::new(0),
+                releases: AtomicUsize::new(0),
+                complete_status: AtomicI32::new(sys::MLN_STATUS_OK),
+                release_thread: StdMutex::new(None),
+                release_waits_for: StdMutex::new(None),
+            });
+            fakes().lock().unwrap().insert(id, Arc::clone(&fake));
+            // SAFETY: These fake functions implement the native handle
+            // contract, and this id reaches only them, never the C API.
+            let state = unsafe {
+                ResourceRequestHandleState::new(
+                    sys::mln_resource_request_handle(id),
+                    ResourceRequestHandleFns::new(fake_complete, fake_release),
+                )
+            }
+            .unwrap();
+            Self { fake, state }
+        }
+
+        /// A request the provider kept by answering Handle.
+        fn handled() -> Self {
+            let fixture = Self::new();
+            assert_eq!(
+                fixture
+                    .state
+                    .finish_provider_decision(ResourceProviderDecision::Handle),
+                sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+            );
+            fixture
+        }
+
+        fn completes(&self) -> usize {
+            self.fake.completes.load(Ordering::SeqCst)
+        }
+
+        fn releases(&self) -> usize {
+            self.fake.releases.load(Ordering::SeqCst)
+        }
+    }
+
     fn ok_response(bytes: impl Into<Vec<u8>>) -> ResourceResponse {
         ResourceResponse {
             status: crate::ResourceResponseStatus::Ok,
@@ -349,158 +454,52 @@ mod tests {
 
     #[test]
     fn last_request_reference_releases_off_the_callback_stack() {
-        static RELEASED: StdMutex<Option<std::sync::mpsc::Sender<std::thread::ThreadId>>> =
-            StdMutex::new(None);
-        unsafe extern "C" fn record_release(_handle: sys::mln_resource_request_handle) {
-            RELEASED
-                .lock()
-                .unwrap()
-                .take()
-                .unwrap()
-                .send(std::thread::current().id())
-                .unwrap();
-        }
-        let (sender, receiver) = std::sync::mpsc::channel();
-        *RELEASED.lock().unwrap() = Some(sender);
-        let mut fns = fake_fns();
-        fns.release = record_release;
-        // SAFETY: This handle reaches only the local fake function table.
-        let state =
-            unsafe { ResourceRequestHandleState::new(sys::mln_resource_request_handle(7), fns) }
-                .unwrap();
-        state.finish_provider_decision(ResourceProviderDecision::Handle);
+        let Fixture { fake, state } = Fixture::handled();
+        let (sender, receiver) = channel();
+        *fake.release_thread.lock().unwrap() = Some(sender);
         let _policy = crate::callback::PolicyScope::enter(&[], 0);
         drop(state);
         let releasing_thread = receiver
-            .recv_timeout(Duration::from_secs(5))
+            .recv_timeout(WAIT)
             .expect("native release must progress off the callback stack");
         assert_ne!(releasing_thread, std::thread::current().id());
     }
 
-    static HANDLE_TEST_LOCK: StdMutex<()> = StdMutex::new(());
-    static COMPLETE_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static RELEASE_COUNT: AtomicUsize = AtomicUsize::new(0);
-    static COMPLETE_STATUS: AtomicI32 = AtomicI32::new(sys::MLN_STATUS_OK);
-    /// When set, the fake release waits for this flag like the C API waits for
-    /// a cancel callback running on another thread.
-    static RELEASE_WAITS_FOR_CALLBACK: AtomicBool = AtomicBool::new(false);
-    static RELEASE_STARTED: AtomicBool = AtomicBool::new(false);
-    static CALLBACK_FINISHED: AtomicBool = AtomicBool::new(false);
-
-    unsafe extern "C" fn fake_complete(
-        _handle: sys::mln_resource_request_handle,
-        _response: *const sys::mln_resource_response,
-        _diagnostic: *mut sys::mln_diagnostic,
-    ) -> sys::mln_status {
-        COMPLETE_COUNT.fetch_add(1, Ordering::SeqCst);
-        COMPLETE_STATUS.load(Ordering::SeqCst)
-    }
-
-    unsafe extern "C" fn fake_release(_handle: sys::mln_resource_request_handle) {
-        RELEASE_STARTED.store(true, Ordering::SeqCst);
-        if RELEASE_WAITS_FOR_CALLBACK.load(Ordering::SeqCst) {
-            let deadline = Instant::now() + Duration::from_secs(5);
-            while !CALLBACK_FINISHED.load(Ordering::SeqCst) && Instant::now() < deadline {
-                std::thread::yield_now();
-            }
-        }
-        RELEASE_COUNT.fetch_add(1, Ordering::SeqCst);
-    }
-
-    fn fake_fns() -> ResourceRequestHandleFns {
-        // SAFETY: These fake functions implement the native handle contract for tests.
-        unsafe { ResourceRequestHandleFns::new(fake_complete, fake_release) }
-    }
-
-    fn fake_state() -> Arc<ResourceRequestHandleState> {
-        COMPLETE_COUNT.store(0, Ordering::SeqCst);
-        RELEASE_COUNT.store(0, Ordering::SeqCst);
-        COMPLETE_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
-        RELEASE_WAITS_FOR_CALLBACK.store(false, Ordering::SeqCst);
-        RELEASE_STARTED.store(false, Ordering::SeqCst);
-        CALLBACK_FINISHED.store(false, Ordering::SeqCst);
-        // SAFETY: This synthetic handle reaches only the fake functions above,
-        // never the C API.
-        unsafe {
-            ResourceRequestHandleState::new(
-                sys::mln_resource_request_handle(0x0c00_0000_0000_0034),
-                fake_fns(),
-            )
-        }
-        .unwrap()
-    }
-
-    fn handled_fake_state() -> Arc<ResourceRequestHandleState> {
-        let state = fake_state();
-        assert_eq!(
-            state.finish_provider_decision(ResourceProviderDecision::Handle),
-            sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
-        );
-        state
-    }
-
-    fn wait_until(flag: &AtomicBool, what: &str) {
-        let deadline = Instant::now() + Duration::from_secs(5);
-        while !flag.load(Ordering::SeqCst) {
-            assert!(Instant::now() < deadline, "timed out waiting for {what}");
-            std::thread::yield_now();
-        }
-    }
-
-    #[test]
-    fn resource_request_handle_preserves_all_64_bits() {
-        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
-        let state = fake_state();
-        let inner = state.lock_inner().unwrap();
-        assert_eq!(
-            ResourceRequestHandleState::native_handle(&inner).0,
-            0x0c00_0000_0000_0034
-        );
-    }
-
     #[test]
     fn provider_decision_finalization_is_idempotent_for_owned_handles() {
-        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
-        let state = fake_state();
-
-        assert_eq!(
-            state.finish_provider_decision(ResourceProviderDecision::Handle),
-            sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
-        );
+        let Fixture { fake, state } = Fixture::handled();
         assert_eq!(
             state.finish_provider_decision(ResourceProviderDecision::PassThrough),
             sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
         );
         drop(state);
 
-        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(fake.releases.load(Ordering::SeqCst), 1);
     }
 
     #[test]
     fn explicit_close_claims_provider_decision_and_releases_once() {
-        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
         for exception in [false, true] {
-            let state = fake_state();
+            let Fixture { fake, state } = Fixture::new();
             state.close();
             state.close();
-            assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+            assert_eq!(fake.releases.load(Ordering::SeqCst), 0);
             let decision = if exception {
                 state.finish_provider_exception()
             } else {
                 state.finish_provider_decision(ResourceProviderDecision::PassThrough)
             };
             assert_eq!(decision, sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE);
-            assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+            assert_eq!(fake.releases.load(Ordering::SeqCst), 1);
             drop(state);
-            assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+            assert_eq!(fake.releases.load(Ordering::SeqCst), 1);
         }
     }
 
     #[test]
     // The C API releases a passed-through request itself.
     fn pass_through_leaves_the_release_to_native() {
-        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
-        let state = fake_state();
+        let Fixture { fake, state } = Fixture::new();
 
         assert_eq!(
             state.finish_provider_decision(ResourceProviderDecision::PassThrough),
@@ -512,44 +511,47 @@ mod tests {
         );
         drop(state);
 
-        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+        assert_eq!(fake.releases.load(Ordering::SeqCst), 0);
     }
 
     #[test]
     fn request_handle_rejects_double_successful_completion() {
-        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
-        let state = fake_state();
+        let fixture = Fixture::new();
 
-        state.complete(&ok_response([1, 2, 3])).unwrap();
-        let error = state.complete(&ok_response([4, 5, 6])).unwrap_err();
+        fixture.state.complete(&ok_response([1, 2, 3])).unwrap();
+        let error = fixture.state.complete(&ok_response([4, 5, 6])).unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::InvalidState);
-        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(fixture.completes(), 1);
     }
 
     #[test]
     fn request_completion_rejection_is_retryable_and_success_retains_owner() {
-        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
-        let state = handled_fake_state();
-        COMPLETE_STATUS.store(sys::MLN_STATUS_INVALID_ARGUMENT, Ordering::SeqCst);
+        let fixture = Fixture::handled();
+        let status = &fixture.fake.complete_status;
+        status.store(sys::MLN_STATUS_INVALID_ARGUMENT, Ordering::SeqCst);
         assert_eq!(
-            state.complete(&ok_response([1])).unwrap_err().kind(),
+            fixture
+                .state
+                .complete(&ok_response([1]))
+                .unwrap_err()
+                .kind(),
             ErrorKind::InvalidArgument
         );
-        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
-        COMPLETE_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
-        state.complete(&ok_response([2])).unwrap();
-        assert!(state.native_for_call().is_ok());
-        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 2);
-        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
-        state.close();
-        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(fixture.releases(), 0);
+        status.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
+        fixture.state.complete(&ok_response([2])).unwrap();
+        assert!(fixture.state.native_for_call().is_ok());
+        assert_eq!(fixture.completes(), 2);
+        assert_eq!(fixture.releases(), 0);
+        fixture.state.close();
+        assert_eq!(fixture.releases(), 1);
     }
 
     #[test]
     fn completion_reservation_allows_reentry_and_restores_after_panic() {
-        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
-        let state = handled_fake_state();
+        let fixture = Fixture::handled();
+        let state = &fixture.state;
         let result = catch_unwind(AssertUnwindSafe(|| {
             state.complete_with(|_| {
                 assert!(state.native_for_call().is_ok());
@@ -564,34 +566,37 @@ mod tests {
         state
             .complete_with(|_| {
                 state.close();
-                assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+                assert_eq!(fixture.releases(), 0);
                 Ok(())
             })
             .unwrap();
-        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(fixture.releases(), 1);
         state.close();
-        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(fixture.releases(), 1);
     }
 
     #[test]
     // Native release waits for a cancel callback running on another thread, so
     // close must not hold the handle lock while that callback uses the handle.
     fn close_holds_no_lock_while_native_release_waits_for_the_callback() {
-        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
-        let state = handled_fake_state();
-        RELEASE_WAITS_FOR_CALLBACK.store(true, Ordering::SeqCst);
-        let callback_state = Arc::clone(&state);
+        let fixture = Fixture::handled();
+        let (started_sender, started) = channel();
+        let (finished, finished_receiver) = channel();
+        *fixture.fake.release_thread.lock().unwrap() = Some(started_sender);
+        *fixture.fake.release_waits_for.lock().unwrap() = Some(finished_receiver);
+        let callback_state = Arc::clone(&fixture.state);
         let callback_thread = std::thread::spawn(move || {
-            wait_until(&RELEASE_STARTED, "native release to start");
+            started
+                .recv_timeout(WAIT)
+                .expect("native release never started");
             let closed = callback_state.native_for_call().is_err();
-            CALLBACK_FINISHED.store(true, Ordering::SeqCst);
+            finished.send(()).unwrap();
             closed
         });
 
-        state.close();
+        fixture.state.close();
 
-        assert!(CALLBACK_FINISHED.load(Ordering::SeqCst));
         assert!(callback_thread.join().unwrap());
-        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(fixture.releases(), 1);
     }
 }

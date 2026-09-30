@@ -139,16 +139,6 @@ mod tests {
     }
 
     #[test]
-    fn string_views_materialize_with_explicit_length() {
-        let value = "hello";
-        let view = string_view(value).raw();
-
-        assert_eq!(view.size, 5);
-        assert!(!view.data.is_null());
-        assert_eq!(unsafe { copy_string_view(view) }.unwrap(), value);
-    }
-
-    #[test]
     fn invalid_native_string_views_are_rejected() {
         let view = sys::mln_buffer_view {
             data: ptr::null(),

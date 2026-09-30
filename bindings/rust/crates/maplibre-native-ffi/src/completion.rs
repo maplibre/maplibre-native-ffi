@@ -454,6 +454,25 @@ mod tests {
     }
 
     #[test]
+    fn a_wait_times_out_and_a_dropped_future_leaves_native_its_bridge() {
+        let dropped = Arc::new(AtomicBool::new(false));
+        let probe = DropProbe(Arc::clone(&dropped));
+        let (future, accepted) = accept(move |_| Ok(probe), false);
+
+        // Nothing has completed, so a bounded wait gives up.
+        assert!(!future.wait(Duration::ZERO).unwrap());
+
+        // Dropping the future is how a caller stops waiting. Native still owns
+        // the bridge, so the late value lands in it, and native's release
+        // frees it.
+        drop(future);
+        accepted.deliver(sys::MLN_STATUS_OK);
+        assert!(!dropped.load(Ordering::Acquire));
+        accepted.release();
+        assert!(dropped.load(Ordering::Acquire));
+    }
+
+    #[test]
     fn a_rejected_submission_frees_the_bridge_and_reports_the_status() {
         let dropped = Arc::new(AtomicBool::new(false));
         let probe = DropProbe(Arc::clone(&dropped));

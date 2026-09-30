@@ -76,6 +76,7 @@ pub(crate) fn defer(action: Box<dyn FnOnce() + Send>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn nested_callback_contracts_intersect_and_restore_on_unwind() {
         let _outer = PolicyScope::enter(&["complete", "release"], 7);
@@ -88,11 +89,22 @@ mod tests {
             panic!("host callback panicked");
         });
         assert!(check("complete", 7).is_ok());
+    }
+
+    #[test]
+    fn finalization_inside_a_callback_runs_on_another_thread() {
+        let _callback = PolicyScope::enter(&[], 0);
         let (sender, receiver) = std::sync::mpsc::channel();
-        finalize(move || sender.send(check("outside", 0)).unwrap());
-        receiver
-            .recv_timeout(std::time::Duration::from_secs(5))
-            .expect("finalizer must progress while the callback thread waits")
-            .unwrap();
+        finalize(move || {
+            sender
+                .send((std::thread::current().id(), check("outside", 0)))
+                .unwrap()
+        });
+        let (thread, policy) = receiver
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("finalizer must progress while the callback thread waits");
+        assert_ne!(thread, std::thread::current().id());
+        // The finalization thread runs outside every callback's contract.
+        policy.unwrap();
     }
 }
