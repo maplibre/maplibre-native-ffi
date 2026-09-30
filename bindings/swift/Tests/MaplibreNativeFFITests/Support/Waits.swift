@@ -133,10 +133,6 @@ final class LockedBox<Value>: @unchecked Sendable {
     lock.withLock { body(&stored) }
     Pulse.shared.signal()
   }
-
-  func read<Result>(_ body: (Value) -> Result) -> Result {
-    lock.withLock { body(stored) }
-  }
 }
 
 /// Counts its own deallocation, so a test observes when the closure that

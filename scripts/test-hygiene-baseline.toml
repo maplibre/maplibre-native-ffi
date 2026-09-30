@@ -7,8 +7,6 @@
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderSessionTests.cs" = 1
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs" = 1
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTestHelpers.cs" = 3
-"bindings/swift/Tests/MaplibreNativeFFITests/RenderTests.swift" = 1
-"bindings/swift/Tests/MaplibreNativeFFITests/RuntimeEventTestSupport.swift" = 2
 "tests/native/support/render_webgpu.c" = 2
 
 [network-host]
