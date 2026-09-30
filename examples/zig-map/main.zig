@@ -31,8 +31,20 @@ const EventReceiver = struct {
     }
 };
 
+/// Whether this run is a smoke test, which `MLN_EXAMPLE_SMOKE=1` selects: the
+/// example opens a hidden window, loads an inline style instead of fetching
+/// one, and exits after its first rendered frame.
+fn isSmokeRun(init_args: std.process.Init) bool {
+    const value = init_args.environ_map.get("MLN_EXAMPLE_SMOKE") orelse return false;
+    return std.mem.eql(u8, value, "1");
+}
+
+/// How long a smoke run waits for its first rendered frame.
+const smoke_timeout: std.Io.Clock.Duration = .{ .raw = .fromSeconds(60), .clock = .awake };
+
 pub fn main(init_args: std.process.Init) !void {
     const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
+    const smoke = isSmokeRun(init_args);
     try validateNativeRenderBackend();
 
     try maplibre.logSetCallback(.{ .call = diagnostics.logRecord }, null);
@@ -60,7 +72,8 @@ pub fn main(init_args: std.process.Init) !void {
 
     const window_flags = RenderTarget.window_flags |
         c.SDL_WINDOW_RESIZABLE |
-        c.SDL_WINDOW_HIGH_PIXEL_DENSITY;
+        c.SDL_WINDOW_HIGH_PIXEL_DENSITY |
+        (if (smoke) c.SDL_WINDOW_HIDDEN else 0);
     const window = c.SDL_CreateWindow(
         "MapLibre SDL3 Map",
         viewport.window_width,
@@ -74,7 +87,7 @@ pub fn main(init_args: std.process.Init) !void {
     defer c.SDL_DestroyWindow(window);
 
     const window_handle = window.?;
-    _ = c.SDL_RaiseWindow(window_handle);
+    if (!smoke) _ = c.SDL_RaiseWindow(window_handle);
     var current_viewport = viewport.get(window_handle);
     viewport.log("initial viewport", current_viewport);
 
@@ -88,7 +101,7 @@ pub fn main(init_args: std.process.Init) !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var state = try map_state.MapState.init(allocator, current_viewport, .{ .context = &event_receiver, .callback = EventReceiver.schedule });
+    var state = try map_state.MapState.init(allocator, current_viewport, .{ .context = &event_receiver, .callback = EventReceiver.schedule }, smoke);
     defer state.deinit();
 
     // The graphics context, render session, and presentation resources remain
@@ -106,6 +119,7 @@ pub fn main(init_args: std.process.Init) !void {
         &current_viewport,
         &state,
         &event_receiver,
+        smoke,
     );
 }
 
@@ -120,9 +134,11 @@ fn renderLoop(
     current_viewport: *types.Viewport,
     state: *map_state.MapState,
     event_receiver: *EventReceiver,
+    smoke: bool,
 ) !void {
     printStartupStatus(target_mode);
     input.logControls();
+    const smoke_deadline = std.Io.Clock.Timestamp.now(io, .awake).addDuration(smoke_timeout);
 
     var running = true;
     var render_requested = true;
@@ -184,7 +200,15 @@ fn renderLoop(
         if (!target_pending and render_requested) {
             render_requested = false;
             const outcome = try target.renderUpdate(allocator, current_viewport.*);
+            if (smoke and outcome.rendered) {
+                std.debug.print("smoke: rendered one frame\n", .{});
+                return;
+            }
             if (!outcome.rendered or outcome.needs_repaint) render_requested = true;
+        }
+        if (smoke and std.Io.Clock.Timestamp.now(io, .awake).raw.nanoseconds >= smoke_deadline.raw.nanoseconds) {
+            std.debug.print("smoke: no frame rendered within 60 s\n", .{});
+            return error.SmokeFrameTimedOut;
         }
 
         // Stand-in for a display-refresh subscription.

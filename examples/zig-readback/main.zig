@@ -18,6 +18,18 @@ const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @i
 const width = 512;
 const height = 512;
 const style_url = "https://tiles.openfreemap.org/styles/bright";
+/// The style a smoke run renders, which needs no network.
+const smoke_style_json =
+    \\{"version":8,"sources":{},"layers":[{"id":"background","type":"background",
+    \\"paint":{"background-color":"#d8f1ff"}}]}
+;
+
+/// Whether this run is a smoke test, which `MLN_EXAMPLE_SMOKE=1` selects: the
+/// example renders an inline style instead of fetching one.
+fn isSmokeRun(init_args: std.process.Init) bool {
+    const value = init_args.environ_map.get("MLN_EXAMPLE_SMOKE") orelse return false;
+    return std.mem.eql(u8, value, "1");
+}
 
 fn waitForSessionFuture(session: *maplibre.RenderSession, future: *binding.Future(void), diagnostic: ?*binding.Diagnostic) !void {
     if (!uses_caller_driver) return future.wait(diagnostic);
@@ -66,7 +78,10 @@ pub fn main(init_args: std.process.Init) !void {
     var resize = try maplibre.mapResize(map, .{ .width = width, .height = height, .scale_factor = 1.0 }, &diagnostic);
     resize.deinit();
     try setInitialCamera(allocator, &map);
-    var style = try maplibre.mapSetStyleUrl(allocator, map, style_url, &diagnostic);
+    var style = if (isSmokeRun(init_args))
+        try maplibre.mapSetStyleJson(map, smoke_style_json, &diagnostic)
+    else
+        try maplibre.mapSetStyleUrl(allocator, map, style_url, &diagnostic);
     style.deinit();
 
     var barrier = try maplibre.runtimeBarrier(runtime, &diagnostic);

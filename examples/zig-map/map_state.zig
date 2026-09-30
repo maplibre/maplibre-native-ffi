@@ -12,7 +12,7 @@ pub const MapState = struct {
     runtime: maplibre.Runtime,
     map: maplibre.Map,
 
-    pub fn init(allocator: std.mem.Allocator, viewport: types.Viewport, wake: maplibre.Wake) !MapState {
+    pub fn init(allocator: std.mem.Allocator, viewport: types.Viewport, wake: maplibre.Wake, smoke: bool) !MapState {
         var diagnostic: maplibre.Diagnostic = .{};
         var runtime = maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:", .event_wake = wake }, &diagnostic) catch |err| {
             diagnostics.logError("runtime create failed", err, &diagnostic);
@@ -48,7 +48,7 @@ pub const MapState = struct {
             teardown.deinit();
         } else |_| {};
 
-        try loadStyle(allocator, &map, &diagnostic);
+        try loadStyle(allocator, &map, &diagnostic, smoke);
         try setCamera(allocator, &map, &diagnostic);
         return .{
             .allocator = allocator,
@@ -170,12 +170,23 @@ pub const MapState = struct {
     }
 };
 
+/// The style a smoke run renders, which needs no network.
+const smoke_style_json =
+    \\{"version":8,"sources":{},"layers":[{"id":"background","type":"background",
+    \\"paint":{"background-color":"#d8f1ff"}}]}
+;
+
 fn loadStyle(
     allocator: std.mem.Allocator,
     map: *maplibre.Map,
     diagnostic: *maplibre.Diagnostic,
+    smoke: bool,
 ) !void {
-    var completion = maplibre.mapSetStyleUrl(allocator, map.*, "https://tiles.openfreemap.org/styles/bright", diagnostic) catch |err| {
+    const submitted = if (smoke)
+        maplibre.mapSetStyleJson(map.*, smoke_style_json, diagnostic)
+    else
+        maplibre.mapSetStyleUrl(allocator, map.*, "https://tiles.openfreemap.org/styles/bright", diagnostic);
+    var completion = submitted catch |err| {
         diagnostics.logError("style load failed", err, diagnostic);
         return types.AppError.StyleLoadFailed;
     };
