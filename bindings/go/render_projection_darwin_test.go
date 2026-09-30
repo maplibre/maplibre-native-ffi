@@ -8,7 +8,8 @@ import (
 )
 
 func TestRenderedProjectionDarwin(t *testing.T) {
-	_, m, session, attached := newMetalOwnedTextureSession(t, RenderDriverKindCoreWorker)
+	requireCoreWorkerFrames(t)
+	_, m, session, attached := newOwnedTextureSession(t, RenderDriverKindCoreWorker)
 	awaitWithDeadline(t, attached)
 	if _, err := session.ProjectionCreate(); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("before render: %v", err)
@@ -20,7 +21,7 @@ func TestRenderedProjectionDarwin(t *testing.T) {
 	if _, err := awaitForTest(m.SetStyleJson([]byte(`{"version":8,"sources":{},"layers":[]}`))); err != nil {
 		t.Fatal(err)
 	}
-	awaitRenderedMetalFrame(t, session)
+	awaitRenderedFrame(t, session)
 	frame, err := session.AcquireFrame()
 	if err != nil {
 		t.Fatal(err)

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	stdruntime "runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,11 +24,18 @@ func awaitWithDeadline[T any](t *testing.T, future *Future[T]) T {
 	return value
 }
 
-// awaitRenderedMetalFrame demands frames until one of them renders.
-func awaitRenderedMetalFrame(t *testing.T, session *RenderSessionHandle) {
+// frameWakes holds the frame wake of each session that newOwnedTextureSession
+// attached, which awaitRenderedFrame blocks on between drains.
+var frameWakes sync.Map
+
+// awaitRenderedFrame demands frames until one of them renders.
+func awaitRenderedFrame(t *testing.T, session *RenderSessionHandle) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
+	value, _ := frameWakes.Load(session)
+	wake := value.(chan struct{})
+	deadline := time.NewTimer(10 * time.Second)
+	defer deadline.Stop()
+	for {
 		snapshot, err := session.GetSnapshot()
 		if err != nil {
 			t.Fatalf("Snapshot(): %v", err)
@@ -36,14 +44,11 @@ func awaitRenderedMetalFrame(t *testing.T, session *RenderSessionHandle) {
 		if err := session.RequestFrame(FrameDemand{Token: token}); err != nil {
 			t.Fatalf("RequestFrame(): %v", err)
 		}
-		for time.Now().Before(deadline) {
+	drain:
+		for {
 			results, err := drainFramesForTest(session)
 			if err != nil {
 				t.Fatalf("DrainFrameResults(): %v", err)
-			}
-			if len(results) == 0 {
-				time.Sleep(time.Millisecond)
-				continue
 			}
 			for _, result := range results {
 				if result.Token != token {
@@ -52,68 +57,123 @@ func awaitRenderedMetalFrame(t *testing.T, session *RenderSessionHandle) {
 				if result.Disposition == RenderResultRendered {
 					return
 				}
-				break
+				break drain
 			}
-			break
+			select {
+			case <-wake:
+			case <-deadline.C:
+				t.Fatal("the session did not render before the deadline")
+			}
 		}
 	}
-	t.Fatal("Metal session did not render before the deadline")
 }
 
-// newMetalOwnedTextureSession attaches one Metal session-owned texture target
-// with driver, and registers the teardown every path shares. It releases the
-// caller's device reference as soon as the attachment is accepted, so the rest
-// of a test runs on the reference the session retained for itself.
-func newMetalOwnedTextureSession(
+// newOwnedTextureSession attaches one session-owned texture target with driver
+// and a device or context from tests/graphics for the build's backend, and
+// registers the teardown every path shares. An EGL session shares the
+// fixture's context, which becomes current on the calling OS thread, so it
+// takes the caller driver. A Metal fixture releases its device as soon as the
+// attachment is accepted, so the rest of a test runs on the reference the
+// session retained for itself.
+func newOwnedTextureSession(
 	t *testing.T, driver RenderDriverKind,
 ) (*RuntimeHandle, *MapHandle, *RenderSessionHandle, *Future[struct{}]) {
 	t.Helper()
-	backend, err := SupportedRenderBackendMask()
+	backends, err := SupportedRenderBackendMask()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !backend.Has(RenderBackendFlagMetal) {
-		t.Skip("Metal is not the configured render backend")
+	backend := testsupport.BackendEGL
+	switch {
+	case backends.Has(RenderBackendFlagMetal):
+		backend = testsupport.BackendMetal
+	case backends.Has(RenderBackendFlagVulkan):
+		backend = testsupport.BackendVulkan
 	}
-	device := testsupport.DefaultMetalDevice()
-	if device == 0 {
-		t.Fatal("the system default Metal device is unavailable")
+	graphics, err := testsupport.NewGraphics(backend)
+	if err != nil {
+		t.Fatalf("testsupport.NewGraphics(): %v", err)
+	}
+	// Cleanups run last first, so the graphics object outlives the session.
+	t.Cleanup(graphics.Close)
+	if backend == testsupport.BackendEGL {
+		if err := graphics.MakeCurrent(); err != nil {
+			t.Fatalf("Graphics.MakeCurrent(): %v", err)
+		}
 	}
 
 	runtime, err := RuntimeCreate(DefaultRuntimeOptions())
 	if err != nil {
-		testsupport.ReleaseMetalDevice(device)
 		t.Fatalf("RuntimeCreate(DefaultRuntimeOptions()): %v", err)
 	}
 	mapFuture, err := runtime.MapCreate(mapOptionsForTest(32, 16, 1))
 	if err != nil {
-		testsupport.ReleaseMetalDevice(device)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	m := awaitWithDeadline(t, mapFuture)
 
+	wake := make(chan struct{}, 1)
 	options := DefaultRenderSessionAttachOptions()
 	options.Driver = driver
 	options.RequestedTextureRingDepth = 2
-	attachment, err := m.MetalOwnedTextureAttach(
-		MetalOwnedTextureDescriptor{
-			Extent:  RenderTargetExtent{Width: 32, Height: 16, ScaleFactor: 1},
-			Context: MetalContextDescriptor{Device: uintptr(device)},
-		},
-		options,
-	)
-	testsupport.ReleaseMetalDevice(device)
-	session, attach := attachment.Session, attachment.Completion
+	options.FrameWake = Wake{Callback: func() {
+		select {
+		case wake <- struct{}{}:
+		default:
+		}
+	}}
+	extent := RenderTargetExtent{Width: 32, Height: 16, ScaleFactor: 1}
+	context := graphics.Context
+	var session *RenderSessionHandle
+	var attach *Future[struct{}]
+	switch backend {
+	case testsupport.BackendMetal:
+		attachment, attachErr := m.MetalOwnedTextureAttach(MetalOwnedTextureDescriptor{
+			Extent:  extent,
+			Context: MetalContextDescriptor{Device: context.MetalDevice},
+		}, options)
+		graphics.Close()
+		session, attach, err = attachment.Session, attachment.Completion, attachErr
+	case testsupport.BackendVulkan:
+		attachment, attachErr := m.VulkanOwnedTextureAttach(VulkanOwnedTextureDescriptor{
+			Extent: extent,
+			Context: VulkanContextDescriptor{
+				Instance:                 context.VulkanInstance,
+				PhysicalDevice:           context.VulkanPhysicalDevice,
+				Device:                   context.VulkanDevice,
+				GraphicsQueue:            context.VulkanQueue,
+				GraphicsQueueFamilyIndex: context.VulkanQueueFamilyIndex,
+				GetInstanceProcAddr:      context.VulkanGetInstanceProcAddr,
+				GetDeviceProcAddr:        context.VulkanGetDeviceProcAddr,
+			},
+		}, options)
+		session, attach, err = attachment.Session, attachment.Completion, attachErr
+	default:
+		attachment, attachErr := m.OpenglOwnedTextureAttach(OpenglOwnedTextureDescriptor{
+			Extent: extent,
+			Context: OpenglContextDescriptor{
+				Ownership: OpenglContextOwnershipShared,
+				Data: OpenglContextDescriptorDataEglVariant{Value: EglContextDescriptor{
+					Display:      context.EGLDisplay,
+					Config:       context.EGLConfig,
+					ShareContext: context.EGLContext,
+				}},
+			},
+		}, options)
+		session, attach, err = attachment.Session, attachment.Completion, attachErr
+	}
 	if err != nil {
-		t.Fatalf("MetalOwnedTextureAttach(): %v", err)
+		t.Fatalf("owned texture attach: %v", err)
 	}
 	if session == nil || attach == nil {
-		t.Fatal("MetalOwnedTextureAttach() did not publish both session and completion")
+		t.Fatal("the owned texture attach did not publish both session and completion")
 	}
+	frameWakes.Store(session, wake)
 
 	// Every handle below tolerates a second close, so this runs after the
 	// explicit teardown a test performs and reclaims what a failure left behind.
 	t.Cleanup(func() {
+		frameWakes.Delete(session)
 		_, _ = session.Abandon()
 		_ = session.Close()
 		_ = closeMapForTest(m)
@@ -122,6 +182,31 @@ func newMetalOwnedTextureSession(
 		}
 	})
 	return runtime, m, session, attach
+}
+
+// requireMetal skips a test whose assertions read Metal frame views.
+func requireMetal(t *testing.T) {
+	t.Helper()
+	backends, err := SupportedRenderBackendMask()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !backends.Has(RenderBackendFlagMetal) {
+		t.Skip("the test reads Metal frame views, and Metal is not the configured render backend")
+	}
+}
+
+// requireCoreWorkerFrames skips a test that acquires frames from a core-worker
+// session on OpenGL, where a core-worker owned texture is readback-only.
+func requireCoreWorkerFrames(t *testing.T) {
+	t.Helper()
+	backends, err := SupportedRenderBackendMask()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if backends.Has(RenderBackendFlagOpengl) {
+		t.Skip("an OpenGL core-worker owned texture is readback-only, so it has no frames to acquire")
+	}
 }
 
 func awaitCallerDriverCompletion(t *testing.T, session *RenderSessionHandle, future *Future[struct{}]) {
@@ -143,7 +228,8 @@ func awaitCallerDriverCompletion(t *testing.T, session *RenderSessionHandle, fut
 }
 
 func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
-	runtime, m, session, attach := newMetalOwnedTextureSession(t, RenderDriverKindCoreWorker)
+	requireMetal(t)
+	runtime, m, session, attach := newOwnedTextureSession(t, RenderDriverKindCoreWorker)
 	awaitWithDeadline(t, attach)
 
 	capabilities, err := session.GetCapabilities()
@@ -169,7 +255,7 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 	}
 	awaitWithDeadline(t, barrier)
 
-	awaitRenderedMetalFrame(t, session)
+	awaitRenderedFrame(t, session)
 	frame, err := session.AcquireFrame()
 	if err != nil {
 		t.Fatalf("AcquireFrame(): %v", err)
@@ -227,8 +313,8 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 
 	// Leave both old-size ring entries available. Resize must retire them so
 	// acquisition cannot return an older 32x16 frame ahead of the new one.
-	awaitRenderedMetalFrame(t, session)
-	awaitRenderedMetalFrame(t, session)
+	awaitRenderedFrame(t, session)
+	awaitRenderedFrame(t, session)
 	resized := RenderTargetExtent{Width: 48, Height: 24, ScaleFactor: 1}
 	resize, err := session.Resize(resized)
 	if err != nil {
@@ -242,7 +328,7 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 		t.Fatalf("Resize(changed scale factor) = (%v, %v), want nil and ErrInvalidArgument", rescale, err)
 	}
 
-	awaitRenderedMetalFrame(t, session)
+	awaitRenderedFrame(t, session)
 	resizedFrame, err := session.AcquireFrame()
 	if err != nil {
 		t.Fatalf("AcquireFrame() after resize: %v", err)
@@ -296,11 +382,11 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 	awaitWithDeadline(t, teardown)
 }
 
-func TestMetalCallerDriverServicesPublishedAttachingSessionDarwin(t *testing.T) {
+func TestCallerDriverServicesPublishedAttachingSessionDarwin(t *testing.T) {
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()
 
-	_, m, session, attach := newMetalOwnedTextureSession(t, RenderDriverKindCallerGraphicsThread)
+	_, m, session, attach := newOwnedTextureSession(t, RenderDriverKindCallerGraphicsThread)
 
 	// Caller-driver initialization has not run yet, so the published session is
 	// still attaching.

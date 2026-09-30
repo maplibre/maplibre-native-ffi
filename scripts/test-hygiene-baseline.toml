@@ -8,7 +8,6 @@
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs" = 1
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTestHelpers.cs" = 3
 "bindings/go/camera_test.go" = 1
-"bindings/go/render_metal_darwin_test.go" = 1
 "bindings/go/resource_test.go" = 2
 "bindings/go/runtime_event_test.go" = 2
 "bindings/kotlin/src/androidDeviceTest/kotlin/org/maplibre/nativeffi/BackgroundThread.android.kt" = 2
