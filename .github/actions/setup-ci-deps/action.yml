@@ -133,7 +133,8 @@ runs:
           libvulkan1 \
           mesa-utils \
           mesa-utils-extra \
-          mesa-vulkan-drivers
+          mesa-vulkan-drivers \
+          xvfb
         # Software rendering is slower than hardware, so the native suites
         # stretch their waits and hang watchdog to match.
         {

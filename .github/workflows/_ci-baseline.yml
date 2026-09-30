@@ -121,63 +121,78 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/zig:test linux-gnu-x64-egl
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/rust-map:smoke linux-gnu-x64-egl
       - id: suite-6
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-map:build linux-gnu-x64-egl
+        run: mise run //bindings/zig:test linux-gnu-x64-egl
       - id: suite-7
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-readback:run linux-gnu-x64-egl
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/zig-map:smoke linux-gnu-x64-egl
       - id: suite-8
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/kotlin:test linux-gnu-x64-egl
+        run: mise run //examples/zig-readback:smoke linux-gnu-x64-egl
       - id: suite-9
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/compose-map:build linux-gnu-x64-egl
+        run: mise run //bindings/kotlin:test linux-gnu-x64-egl
       - id: suite-10
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/lwjgl-map:build linux-gnu-x64-egl
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/compose-map:smoke linux-gnu-x64-egl
       - id: suite-11
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/swift:test linux-gnu-x64-egl
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/lwjgl-map:smoke linux-gnu-x64-egl
       - id: suite-12
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/dotnet:test linux-gnu-x64-egl
+        run: mise run //bindings/swift:test linux-gnu-x64-egl
       - id: suite-13
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/go:test linux-gnu-x64-egl
+        run: mise run //bindings/dotnet:test linux-gnu-x64-egl
       - id: suite-14
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/go-map:check linux-gnu-x64-egl
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/dotnet-map:smoke linux-gnu-x64-egl
       - id: suite-15
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/c-map:build linux-gnu-x64-egl
+        run: mise run //bindings/go:test linux-gnu-x64-egl
       - id: suite-16
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/python:test linux-gnu-x64-egl
+        run: mise run //examples/go-map:check linux-gnu-x64-egl
       - id: suite-17
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/go-map:smoke linux-gnu-x64-egl
+      - id: suite-18
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/c-map:smoke linux-gnu-x64-egl
+      - id: suite-19
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/python:test linux-gnu-x64-egl
+      - id: suite-20
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -199,7 +214,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure' || steps.suite-19.outcome == 'failure' || steps.suite-20.outcome == 'failure') }}
         run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-gnu-x64-egl')
   target-linux-gnu-x64-vulkan:
@@ -253,68 +268,78 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/rust:test:download linux-gnu-x64-vulkan
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/rust-map:smoke linux-gnu-x64-vulkan
       - id: suite-6
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/dart:test:download linux-gnu-x64-vulkan
+        run: mise run //bindings/rust:test:download linux-gnu-x64-vulkan
       - id: suite-7
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/zig:test linux-gnu-x64-vulkan
+        run: mise run //bindings/dart:test:download linux-gnu-x64-vulkan
       - id: suite-8
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-map:build linux-gnu-x64-vulkan
+        run: mise run //bindings/zig:test linux-gnu-x64-vulkan
       - id: suite-9
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-readback:run linux-gnu-x64-vulkan
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/zig-map:smoke linux-gnu-x64-vulkan
       - id: suite-10
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/kotlin:test linux-gnu-x64-vulkan
+        run: mise run //examples/zig-readback:smoke linux-gnu-x64-vulkan
       - id: suite-11
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/compose-map:build linux-gnu-x64-vulkan
+        run: mise run //bindings/kotlin:test linux-gnu-x64-vulkan
       - id: suite-12
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/lwjgl-map:build linux-gnu-x64-vulkan
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/compose-map:smoke linux-gnu-x64-vulkan
       - id: suite-13
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/swift:test linux-gnu-x64-vulkan release
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/lwjgl-map:smoke linux-gnu-x64-vulkan
       - id: suite-14
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/dotnet:test linux-gnu-x64-vulkan
+        run: mise run //bindings/swift:test linux-gnu-x64-vulkan release
       - id: suite-15
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/go:test linux-gnu-x64-vulkan
+        run: mise run //bindings/dotnet:test linux-gnu-x64-vulkan
       - id: suite-16
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/c-map:build linux-gnu-x64-vulkan
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/dotnet-map:smoke linux-gnu-x64-vulkan
       - id: suite-17
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/python:test linux-gnu-x64-vulkan
+        run: mise run //bindings/go:test linux-gnu-x64-vulkan
       - id: suite-18
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/c-map:smoke linux-gnu-x64-vulkan
+      - id: suite-19
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/python:test linux-gnu-x64-vulkan
+      - id: suite-20
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -336,7 +361,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure' || steps.suite-19.outcome == 'failure' || steps.suite-20.outcome == 'failure') }}
         run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-gnu-x64-vulkan')
   verified:

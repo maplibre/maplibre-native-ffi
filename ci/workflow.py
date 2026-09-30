@@ -16,6 +16,17 @@ EMULATOR_TESTED = {
 }
 
 
+# Linux runners have no display server. A command that opens a window gets a
+# virtual one, and draws on the X11 platform rather than the surfaceless one
+# that the job exports for the headless suites.
+XVFB_RUN = "env -u EGL_PLATFORM xvfb-run --auto-servernum"
+
+
+def mise_command(command: str) -> str:
+    """The `mise run` command a step runs, without the display wrapper."""
+    return command.removeprefix(f"{XVFB_RUN} ")
+
+
 def runtime_tested(preset: str, tested: set[str]) -> bool:
     """Whether CI executes this target's native suite rather than only building it."""
     return preset in tested or preset in EMULATOR_TESTED
@@ -105,7 +116,10 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
             if command.get("preset", True):
                 arguments.append(preset)
             arguments.extend(str(argument) for argument in command.get("args", []))
-            commands.append(f"mise run {shlex.join(arguments)}")
+            line = f"mise run {shlex.join(arguments)}"
+            if command.get("display") and platform(preset) == "linux-gnu":
+                line = f"{XVFB_RUN} {line}"
+            commands.append(line)
     return commands
 
 
@@ -132,7 +146,13 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
             f"mise run //bindings/zig:build {preset}",
         ]
     if build_map:
-        commands.append(f"mise run //examples/android-map:build {arguments} --prebuilt")
+        # The example draws with OpenGL, so only the EGL emulator runs it.
+        if preset in EMULATOR_TESTED and backend(preset) == "egl":
+            commands.append(f"mise run //examples/android-map:smoke {preset}")
+        else:
+            commands.append(
+                f"mise run //examples/android-map:build {arguments} --prebuilt"
+            )
     commands.append(f"mise run //bindings/dart:build:mobile {preset}")
     return commands
 
@@ -164,7 +184,7 @@ SWIFT_PROJECTS = ("mise run //bindings/swift:", "mise run //examples/swift-map:"
 
 def uses_swift(commands: list[str]) -> bool:
     """Whether a row builds a Swift package, which resolves its dependencies."""
-    return any(command.startswith(SWIFT_PROJECTS) for command in commands)
+    return any(mise_command(command).startswith(SWIFT_PROJECTS) for command in commands)
 
 
 def ohos_commands(preset: str) -> list[str]:
@@ -263,7 +283,7 @@ def uses_zig(commands: list[str]) -> bool:
     would claim the key with an incomplete cache.
     """
     return all(
-        any(command.startswith(project) for command in commands)
+        any(mise_command(command).startswith(project) for command in commands)
         for project in ZIG_PROJECTS
     )
 
@@ -285,7 +305,7 @@ def uses_gradle(commands: list[str]) -> bool:
     Gradle build pays that setup and teardown for an empty cache entry.
     """
     return any(
-        command.startswith(project)
+        mise_command(command).startswith(project)
         for command in commands
         for project in GRADLE_PROJECTS
     )

@@ -299,7 +299,10 @@ A test that changes one runs in a group that no other test runs alongside, and
 restores the default when it ends, whether it passed or failed.
 
 Use examples for demos and behavior that needs manual validation, such as visual
-output, interactive input, or host graphics integration.
+output, interactive input, or host graphics integration. CI runs each example's
+`smoke` task, which renders one frame and exits, on every target whose backend
+the runner can render. Linux runners have no display server, so an example that
+opens a window runs under Xvfb there, drawing with Mesa's software drivers.
 
 Keep examples small. This repository includes low-level language bindings and
 focused integration examples. Full application SDKs live outside this

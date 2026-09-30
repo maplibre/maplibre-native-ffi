@@ -28,7 +28,13 @@ from ci.generate_workflow import ROOT, caller, serialize, suite, workflows
 from ci.plan import plan
 from ci.retry import INFRASTRUCTURE_STEPS, retryable
 from ci.retry import main as retry_main
-from ci.workflow import load_configuration, preset_sets
+from ci.workflow import (
+    XVFB_RUN,
+    load_configuration,
+    platform,
+    preset_sets,
+    target_rows,
+)
 
 ENV = {
     "GITHUB_REPOSITORY": "maplibre/maplibre-native-ffi",
@@ -390,6 +396,22 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(full["kotlin-maven"]["with"]["sha"], "${{ github.sha }}")
         self.assertFalse(full["kotlin-maven"]["with"]["publish"])
         self.assertEqual(self.workflows["ci.yml"]["name"], "CI")
+
+    def test_window_commands_get_a_display_on_linux_and_keep_their_caches(self):
+        rows = {row["preset"]: row for row in target_rows(self.source, self.presets)}
+        for preset, row in rows.items():
+            commands = row["native_commands"] + row.get("consumer_commands", [])
+            with self.subTest(preset=preset):
+                wrapped = [c for c in commands if c.startswith(XVFB_RUN)]
+                self.assertEqual(bool(wrapped), platform(preset) == "linux-gnu")
+        linux = rows["linux-gnu-x64-egl"]
+        self.assertIn(
+            f"{XVFB_RUN} mise run //examples/zig-map:smoke linux-gnu-x64-egl",
+            linux["consumer_commands"],
+        )
+        # The wrapped Zig and Gradle examples still count toward their caches.
+        self.assertTrue(linux["zig"])
+        self.assertTrue(linux["gradle"])
 
     def test_suites_run_past_a_failed_suite_and_the_last_step_fails_the_job(self):
         for group in GROUPS:

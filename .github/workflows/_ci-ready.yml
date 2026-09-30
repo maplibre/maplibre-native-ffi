@@ -159,58 +159,73 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/zig:test macos-arm64-metal
+        run: mise run //examples/rust-map:smoke macos-arm64-metal
       - id: suite-5
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-map:build macos-arm64-metal
+        run: mise run //bindings/zig:test macos-arm64-metal
       - id: suite-6
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-readback:run macos-arm64-metal
+        run: mise run //examples/zig-map:smoke macos-arm64-metal
       - id: suite-7
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/kotlin:test macos-arm64-metal
+        run: mise run //examples/zig-readback:smoke macos-arm64-metal
       - id: suite-8
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/compose-map:build macos-arm64-metal
+        run: mise run //bindings/kotlin:test macos-arm64-metal
       - id: suite-9
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/lwjgl-map:build macos-arm64-metal
+        run: mise run //examples/compose-map:smoke macos-arm64-metal
       - id: suite-10
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/swift:test macos-arm64-metal
+        run: mise run //examples/lwjgl-map:smoke macos-arm64-metal
       - id: suite-11
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/swift-map:build macos-arm64-metal
+        run: mise run //bindings/swift:test macos-arm64-metal
       - id: suite-12
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/dotnet:test macos-arm64-metal
+        run: mise run //examples/swift-map:smoke macos-arm64-metal
       - id: suite-13
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/go:test macos-arm64-metal
+        run: mise run //bindings/dotnet:test macos-arm64-metal
       - id: suite-14
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/python:test macos-arm64-metal
+        run: mise run //examples/dotnet-map:smoke macos-arm64-metal
       - id: suite-15
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/go:test macos-arm64-metal
+      - id: suite-16
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //examples/c-map:smoke macos-arm64-metal
+      - id: suite-17
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/python:test macos-arm64-metal
+      - id: suite-18
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -232,7 +247,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure') }}
         run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-macos-arm64-metal')
   target-android-x64-egl:
@@ -302,7 +317,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/android-map:build opengl x86_64 --prebuilt
+        run: mise run //examples/android-map:smoke android-x64-egl
       - id: suite-9
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -451,43 +466,53 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/zig:test windows-x64-wgl
+        run: mise run //examples/rust-map:smoke windows-x64-wgl
       - id: suite-5
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-map:build windows-x64-wgl
+        run: mise run //bindings/zig:test windows-x64-wgl
       - id: suite-6
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-readback:run windows-x64-wgl
+        run: mise run //examples/zig-map:smoke windows-x64-wgl
       - id: suite-7
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/kotlin:test windows-x64-wgl
+        run: mise run //examples/zig-readback:smoke windows-x64-wgl
       - id: suite-8
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/compose-map:build windows-x64-wgl
+        run: mise run //bindings/kotlin:test windows-x64-wgl
       - id: suite-9
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/lwjgl-map:build windows-x64-wgl
+        run: mise run //examples/compose-map:smoke windows-x64-wgl
       - id: suite-10
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/dotnet:test windows-x64-wgl
+        run: mise run //examples/lwjgl-map:smoke windows-x64-wgl
       - id: suite-11
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/python:test windows-x64-wgl
+        run: mise run //bindings/dotnet:test windows-x64-wgl
       - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //examples/dotnet-map:smoke windows-x64-wgl
+      - id: suite-13
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/python:test windows-x64-wgl
+      - id: suite-14
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -509,7 +534,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure') }}
         run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-windows-x64-wgl')
   target-windows-x64-vulkan:
@@ -557,43 +582,53 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/zig:test windows-x64-vulkan
+        run: mise run //examples/rust-map:smoke windows-x64-vulkan
       - id: suite-5
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-map:build windows-x64-vulkan
+        run: mise run //bindings/zig:test windows-x64-vulkan
       - id: suite-6
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-readback:run windows-x64-vulkan
+        run: mise run //examples/zig-map:smoke windows-x64-vulkan
       - id: suite-7
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/kotlin:test windows-x64-vulkan
+        run: mise run //examples/zig-readback:smoke windows-x64-vulkan
       - id: suite-8
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/compose-map:build windows-x64-vulkan
+        run: mise run //bindings/kotlin:test windows-x64-vulkan
       - id: suite-9
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/lwjgl-map:build windows-x64-vulkan
+        run: mise run //examples/compose-map:smoke windows-x64-vulkan
       - id: suite-10
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/dotnet:test windows-x64-vulkan
+        run: mise run //examples/lwjgl-map:smoke windows-x64-vulkan
       - id: suite-11
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/python:test windows-x64-vulkan
+        run: mise run //bindings/dotnet:test windows-x64-vulkan
       - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //examples/dotnet-map:smoke windows-x64-vulkan
+      - id: suite-13
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: mise run //bindings/python:test windows-x64-vulkan
+      - id: suite-14
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
@@ -615,7 +650,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: Fail if any suite failed
         shell: bash
-        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure') }}
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure') }}
         run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-windows-x64-vulkan')
   verified:
