@@ -736,6 +736,53 @@ static void a_request_names_its_alias_and_its_resolved_url(void) {
   mln_test_provider_destroy(provider);
 }
 
+// A PMTiles source asks the provider for its archive with a byte range, the
+// header, while the style request carries none. The archive is unanswered, so
+// nothing past the header is asked for.
+static void a_pmtiles_request_carries_its_byte_range(void) {
+  static const char style_url[] = "custom://pmtiles/style.json";
+  static const char archive_url[] = "custom://pmtiles/archive.pmtiles";
+  static const char style_json[] =
+    "{\"version\":8,\"sources\":{\"archive\":{\"type\":\"vector\","
+    "\"url\":\"pmtiles://custom://pmtiles/archive.pmtiles\"}},"
+    "\"layers\":[]}";
+  static const mln_test_provided_resource resources[] = {
+    {.url = style_url,
+     .response = {
+       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+       .bytes = (const uint8_t*)style_json,
+       .byte_count = sizeof(style_json) - 1,
+     }},
+  };
+  mln_test_provider* provider = mln_test_provider_create(resources, 1);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider_install(runtime, provider);
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_set_style_url(map, style_url)
+  );
+  TEST_ASSERT_TRUE(
+    mln_test_provider_wait_for_requests(provider, archive_url, 1)
+  );
+
+  const mln_test_provider_request* style =
+    mln_test_provider_request_at(provider, style_url, 0);
+  TEST_ASSERT_NOT_NULL(style);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, style->kind);
+  TEST_ASSERT_FALSE(style->has_range);
+
+  const mln_test_provider_request* archive =
+    mln_test_provider_request_at(provider, archive_url, 0);
+  TEST_ASSERT_NOT_NULL(archive);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_SOURCE, archive->kind);
+  TEST_ASSERT_TRUE(archive->has_range);
+  TEST_ASSERT_EQUAL_UINT64(0, archive->range_start);
+  TEST_ASSERT_GREATER_THAN_UINT64(archive->range_start, archive->range_end);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
 // One vector source with one tile at zoom 0, which a 64 by 64 static map
 // requests once.
 static const char tiled_style_json[] =
@@ -1008,6 +1055,7 @@ MLN_TEST_GROUP {
   RUN_TEST(late_cancel_callback_registration_reports_cancelled);
   RUN_TEST(cancel_callback_may_release_the_request);
   RUN_TEST(a_request_names_its_alias_and_its_resolved_url);
+  RUN_TEST(a_pmtiles_request_carries_its_byte_range);
   RUN_TEST(a_tile_answer_decides_whether_the_map_renders);
   RUN_TEST(a_style_error_reaches_the_loading_failure);
   RUN_TEST(a_not_modified_answer_delivers_the_cached_style);
