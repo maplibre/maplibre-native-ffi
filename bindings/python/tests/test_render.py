@@ -314,7 +314,14 @@ class OwnedTexture:
                 self._teardown(release=False)
             raise
         self._teardown(release=True)
-        assert not self.service_errors
+        # An abandoned session reports TargetLostError to any service of its
+        # driver work that runs after the abandonment.
+        errors = [
+            error
+            for error in self.service_errors
+            if detach or not isinstance(error, mln.TargetLostError)
+        ]
+        assert not errors
 
     def __enter__(self) -> Self:
         return self
