@@ -1,0 +1,99 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 3b42e4119476..c8c03057ca79 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -34,6 +34,7 @@
+ ### 🐞 Bug fixes
+ 
+ - *...Add new stuff here...*
++- [core] Evaluate rendered-feature hit-test paint properties at camera zoom, including fractional zoom and overzooming.
+ - [core] Fix rendered-feature queries near the final endpoint of an offset line.
+ - [OpenGL] Fix invisible raster layers on Adreno 3xx by avoiding an in-place alpha assignment in the fragment shader.
+ - [core] Draw numbers and short uppercase codes upright in vertical CJK line labels ([#4565](https://github.com/maplibre/maplibre-native/issues/4565)), compat to [maplibre-gl-js#8205](https://github.com/maplibre/maplibre-gl-js/pull/8205).
+diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
+index 2edfd668fe64..f63904c2136b 100644
+--- a/src/mln/geometry/feature_index.cpp
++++ b/src/mln/geometry/feature_index.cpp
+@@ -290,9 +290,15 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
+ 
+         bool needsCrossTileIndex = renderLayer->baseImpl->getTypeInfo()->crossTileIndex ==
+                                    style::LayerTypeInfo::CrossTileIndex::Required;
+-        if (!needsCrossTileIndex &&
+-            !renderLayer->queryIntersectsFeature(
+-                queryGeometry, *geometryTileFeature, tileID.z, transformState, pixelsToTileUnits, posMatrix, state)) {
++        // Paint properties follow the camera zoom, including fractional zoom and overzooming.
++        // The canonical tile zoom describes the geometry, not its rendered size.
++        if (!needsCrossTileIndex && !renderLayer->queryIntersectsFeature(queryGeometry,
++                                                                         *geometryTileFeature,
++                                                                         static_cast<float>(transformState.getZoom()),
++                                                                         transformState,
++                                                                         pixelsToTileUnits,
++                                                                         posMatrix,
++                                                                         state)) {
+             continue;
+         }
+ 
+diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
+index dea165d1cf4e..b94f10253df4 100644
+--- a/test/api/query.test.cpp
++++ b/test/api/query.test.cpp
+@@ -438,3 +438,59 @@ TEST(Query, QueryRenderedFeaturesLineOffsetEndpoint) {
+         EXPECT_TRUE(test.frontend.getRenderer()->queryRenderedFeatures(outside, {{{"layer"}}, {}}).empty());
+     }
+ }
++
++TEST(Query, QueryRenderedFeaturesCompositePaintZoom) {
++    struct TestCase {
++        const char* property;
++        double inside;
++        double outside;
++    };
++    const TestCase cases[] = {
++        {"line-width", 8, 14},
++        {"line-gap-width", 14, 20},
++        {"circle-radius", 15, 26},
++        {"circle-stroke-width", 24, 32},
++    };
++
++    // Exercise fractional zoom both below and above the default GeoJSON maxzoom (18).
++    for (const double zoom : {16.5, 20.5}) {
++        for (const auto& testCase : cases) {
++            SCOPED_TRACE(testCase.property);
++            SCOPED_TRACE(zoom);
++            QueryTest test;
++            const std::string property = testCase.property;
++            const bool circle = property.starts_with("circle-");
++            const std::string geometry = circle ? R"({"type":"Point","coordinates":[1.003,1]})"
++                                                : R"({"type":"LineString","coordinates":[[0.993,1],[1.013,1]]})";
++            const std::string paint = property == "circle-stroke-width"    ? R"("circle-radius":6,)"
++                                      : circle || property == "line-width" ? ""
++                                                                           : R"("line-width":6,)";
++            const std::string lowerZoom = std::to_string(static_cast<int>(zoom));
++            const std::string upperZoom = std::to_string(static_cast<int>(zoom) + 1);
++            test.map.getStyle().loadJSON(
++                R"({"version":8,"sources":{"source":{"type":"geojson","data":{
++                    "type":"Feature","properties":{"small":4,"large":40},"geometry":)" +
++                geometry + R"(}}},"layers":[{"id":"layer","type":")" + (circle ? "circle" : "line") +
++                R"(","source":"source","paint":{)" + paint + "\"" + testCase.property +
++                R"(":["interpolate",["linear"],["zoom"],)" + lowerZoom + R"(,["get","small"],)" + upperZoom +
++                R"(,["get","large"]]}}]})");
++            test.map.jumpTo(CameraOptions().withCenter(LatLng{1, 1.003}).withZoom(zoom));
++            const auto rendered = test.frontend.render(test.map);
++            const auto center = test.map.pixelForLatLng({1, 1.003});
++            const ScreenCoordinate inside{center.x, center.y + testCase.inside};
++            const ScreenCoordinate outside{center.x, center.y + testCase.outside};
++
++            // At the camera zoom the composite value is 22; at canonical tile zoom it is 4.
++            // Check actual painted pixels as well as query results, away from antialiased edges.
++            const auto alphaAt = [&](const ScreenCoordinate& point) {
++                return rendered.image.data[4 * (static_cast<uint32_t>(point.y) * rendered.image.size.width +
++                                                static_cast<uint32_t>(point.x)) +
++                                           3];
++            };
++            EXPECT_GT(alphaAt(inside), 0);
++            EXPECT_EQ(alphaAt(outside), 0);
++            EXPECT_EQ(test.frontend.getRenderer()->queryRenderedFeatures(inside, {{{"layer"}}, {}}).size(), 1u);
++            EXPECT_TRUE(test.frontend.getRenderer()->queryRenderedFeatures(outside, {{{"layer"}}, {}}).empty());
++        }
++    }
++}

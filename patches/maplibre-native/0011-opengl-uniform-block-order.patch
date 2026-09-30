@@ -335,10 +335,10 @@ index ce5d120c8bad..1ada6fab0001 100644
  uniform sampler2D u_texture_icon;
  
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 6a2e3b6f26e3..be333acf82d9 100644
+index 0af0e18ed957..d9e288858dab 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -2211,6 +2211,87 @@ INSTANTIATE_TEST_SUITE_P(GeoJSON,
+@@ -2210,6 +2210,87 @@ INSTANTIATE_TEST_SUITE_P(GeoJSON,
                                      (withText ? "WithText" : "IconOnly");
                           });
  

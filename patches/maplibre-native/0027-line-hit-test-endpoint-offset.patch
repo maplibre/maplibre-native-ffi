@@ -1,0 +1,62 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index e335240491ef..3b42e4119476 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -34,6 +34,7 @@
+ ### 🐞 Bug fixes
+ 
+ - *...Add new stuff here...*
++- [core] Fix rendered-feature queries near the final endpoint of an offset line.
+ - [OpenGL] Fix invisible raster layers on Adreno 3xx by avoiding an in-place alpha assignment in the fragment shader.
+ - [core] Draw numbers and short uppercase codes upright in vertical CJK line labels ([#4565](https://github.com/maplibre/maplibre-native/issues/4565)), compat to [maplibre-gl-js#8205](https://github.com/maplibre/maplibre-gl-js/pull/8205).
+ - [core] Fix `ImageSource` not rendering across world copies ([#4508](https://github.com/maplibre/maplibre-native/issues/4508)).
+diff --git a/src/mln/renderer/layers/render_line_layer.cpp b/src/mln/renderer/layers/render_line_layer.cpp
+index de2cb8615c17..730afbf2e8f5 100644
+--- a/src/mln/renderer/layers/render_line_layer.cpp
++++ b/src/mln/renderer/layers/render_line_layer.cpp
+@@ -145,7 +145,8 @@ GeometryCollection offsetLine(const GeometryCollection& rings, double offset) {
+             auto& p = *i;
+ 
+             Point<double> aToB = i == ring.begin() ? zero : util::perp(util::unit(convertPoint<double>(p - *(i - 1))));
+-            Point<double> bToC = i + 1 == ring.end() ? zero
++            // At the last vertex, use the incoming normal so the endpoint receives the full offset.
++            Point<double> bToC = i + 1 == ring.end() ? aToB
+                                                      : util::perp(util::unit(convertPoint<double>(*(i + 1) - p)));
+             Point<double> extrude = util::unit(aToB + bToC);
+ 
+diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
+index 193ca91c177a..dea165d1cf4e 100644
+--- a/test/api/query.test.cpp
++++ b/test/api/query.test.cpp
+@@ -410,3 +410,31 @@ TEST(Query, LocationIndicatorTopImageOnly) {
+     EXPECT_TRUE(
+         test.frontend.getRenderer()->queryRenderedFeatures(ScreenCoordinate{center.x + 60, center.y}, options).empty());
+ }
++
++TEST(Query, QueryRenderedFeaturesLineOffsetEndpoint) {
++    for (const double offset : {22.0, -22.0}) {
++        SCOPED_TRACE(offset);
++        QueryTest test;
++        test.map.getStyle().loadJSON(
++            R"({"version":8,"sources":{"source":{"type":"geojson","data":{
++                "type":"LineString","coordinates":[[1.0025,1],[1.0035,1]]
++            }}},"layers":[{"id":"layer","type":"line","source":"source","paint":{
++                "line-width":6,"line-offset":)" +
++            std::to_string(offset) + R"(}}]})");
++        test.map.jumpTo(CameraOptions().withCenter(LatLng{1, 1.003}).withZoom(16.5));
++        const auto rendered = test.frontend.render(test.map);
++        const auto endpoint = test.map.pixelForLatLng({1, 1.0035});
++        // Stay inside the butt cap, away from antialiased edges.
++        const ScreenCoordinate inside{endpoint.x - 5, endpoint.y + offset};
++        const ScreenCoordinate outside{endpoint.x - 5, endpoint.y};
++        const auto alphaAt = [&](const ScreenCoordinate& point) {
++            return rendered.image.data[4 * (static_cast<uint32_t>(point.y) * rendered.image.size.width +
++                                            static_cast<uint32_t>(point.x)) +
++                                       3];
++        };
++        EXPECT_GT(alphaAt(inside), 0);
++        EXPECT_EQ(alphaAt(outside), 0);
++        EXPECT_EQ(test.frontend.getRenderer()->queryRenderedFeatures(inside, {{{"layer"}}, {}}).size(), 1u);
++        EXPECT_TRUE(test.frontend.getRenderer()->queryRenderedFeatures(outside, {{{"layer"}}, {}}).empty());
++    }
++}

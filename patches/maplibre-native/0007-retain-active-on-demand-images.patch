@@ -1,8 +1,8 @@
 diff --git a/src/mln/renderer/image_manager.cpp b/src/mln/renderer/image_manager.cpp
-index f1625f93fe6d..f9d5e0dd4d76 100644
+index 3fdccb67b68e..279446b6d6bf 100644
 --- a/src/mln/renderer/image_manager.cpp
 +++ b/src/mln/renderer/image_manager.cpp
-@@ -226,6 +226,10 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
+@@ -222,6 +222,10 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
      for (const auto& dependency : pair.first) {
          if (!images.contains(dependency.first)) {
              missingDependencies.emplace(dependency);
@@ -13,7 +13,7 @@ index f1625f93fe6d..f9d5e0dd4d76 100644
          }
      }
  
-@@ -277,12 +281,6 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
+@@ -273,12 +277,6 @@ void ImageManager::checkMissingAndNotify(ImageRequestor& requestor, const ImageR
                                            Scheduler::GetCurrent()->bindOnce(std::move(removePendingRequests)));
          }
      } else {

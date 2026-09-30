@@ -27,7 +27,8 @@ into false allocation failures. Upstream:
 mutex, severity settings, and scheduler process lifetime. This prevents static
 destruction from joining a logging worker whose thread-local cleanup must detach
 from an already shut down host VM. Explicit observer replacement and removal
-still release the previous observer. Upstream:
+still release the previous observer. Hosts remove observers before tearing down
+their environment; the Node SDK uses its environment cleanup hook. Upstream:
 [maplibre-native#4574](https://github.com/maplibre/maplibre-native/pull/4574).
 
 `0007-retain-active-on-demand-images.patch` keeps present on-demand images
@@ -55,17 +56,6 @@ regressions cover all five shaders using the existing glyph fixture. See
 Upstream:
 [maplibre-native#4625](https://github.com/maplibre/maplibre-native/pull/4625).
 
-`0014-global-state.patch` adds the `global-state` expression, root `state`
-defaults, and Native's runtime state APIs. State changes update dependent paint
-properties, filters, layout, and color ramps. The patch includes the upstream
-tests and render fixtures. It carries Taiyu Yoshizawa's (NEKOYASAN) existing
-[maplibre-native#4516](https://github.com/maplibre/maplibre-native/pull/4516),
-at commit `c8a0cf203a3d5ec3ca9e26cbcf7c18b974886ab3`, as its diff from base
-`87a97ff582c71f4a4dacef45c2844691a93303a7`. The only change passes the tile
-worker's available images as the shared immutable set that
-[maplibre-native#4651](https://github.com/maplibre/maplibre-native/pull/4651)
-introduced. The C API exposes the runtime state setter and snapshot getter.
-
 `0015-independent-camera-animations.patch` lets partial camera commands animate
 independently. Replacing a property preserves the timing of other properties,
 including properties from the same command. Flights couple center and zoom;
@@ -77,15 +67,15 @@ callback reentrancy. See
 [maplibre-native#2790](https://github.com/maplibre/maplibre-native/issues/2790).
 Upstream:
 [maplibre-native#4637](https://github.com/maplibre/maplibre-native/pull/4637).
-The Android SDK also cancels transitions before invoking Native and needs a
-separate change to expose this behavior.
+The Android and macOS SDK camera entry points cancel transitions before partial
+commands to preserve their existing behavior.
 
 `0016-location-indicator-color-transitions.patch` refreshes the location
 indicator's evaluated paint properties each frame so that accuracy-circle fill
 and border colors reach their transition targets. It includes the upstream
 pixel-readback regression. Upstream:
 [maplibre-native#4639](https://github.com/maplibre/maplibre-native/pull/4639),
-at commit `7176ab92c871b4f99f96755d4e2ce11b73bfcceb`.
+at commit `c6b6de35de0001d1b6005105199cc639a7956fa0`.
 
 `0017-location-indicator-top-image-hit-testing.patch` includes the location
 indicator's top image in rendered-feature queries. Each top and bearing image
@@ -94,7 +84,7 @@ longitude-latitude geometry. The patch includes the upstream regression for a
 top-only indicator and checks that shadow and accuracy-circle coverage outside
 the image stays excluded. Upstream:
 [maplibre-native#4640](https://github.com/maplibre/maplibre-native/pull/4640),
-at commit `363acddb8471dc344cb17dac1e2637e17cff5535`.
+at commit `0b5d2502bb39aa2098c585ae29684956d9e1ffd6`.
 
 `0021-location-indicator-bearing-accuracy.patch` adds a bearing-accuracy sector
 with an angular half-width, a radius in logical pixels, and a color that fades
@@ -122,8 +112,13 @@ legacy annotation source hid both, because it joined every style. Upstream:
 `0024-render-update-publication.patch` publishes render updates after image and
 source removal, source insertion, tile-selection changes, and transition
 changes. Generated layer transition setters also refresh the style's immutable
-layer collection. See
-[issue #736](https://github.com/maplibre/maplibre-native-ffi/issues/736).
+layer collection. Native regressions cover collection changes, transition
+options, and tile-selection updates. Upstream:
+[maplibre-native#4676](https://github.com/maplibre/maplibre-native/pull/4676),
+[maplibre-native#4677](https://github.com/maplibre/maplibre-native/pull/4677),
+and
+[maplibre-native#4678](https://github.com/maplibre/maplibre-native/pull/4678).
+See [issue #736](https://github.com/maplibre/maplibre-native-ffi/issues/736).
 
 `0025-vertex-buffer-upload-timestamps.patch` initializes vertex buffer upload
 timestamps and preserves them during moves in Metal, Vulkan, and WebGPU. An
@@ -139,9 +134,27 @@ regressions cover repeated background-only frames, paint transitions, and symbol
 removal and reappearance within the placement update interval. See
 [issue #735](https://github.com/maplibre/maplibre-native-ffi/issues/735).
 
-Each patch is the squashed diff of its upstream branch, applied on top of the
-patches before it, so a patch that adds a test next to an earlier patch's test
-carries that placement rather than the branch's own context.
+`0027-line-hit-test-endpoint-offset.patch` applies the full line offset to the
+last vertex during rendered-feature hit testing. The Native regression checks
+painted pixels and queries near the endpoint for positive and negative offsets.
+Upstream:
+[maplibre-native#4702](https://github.com/maplibre/maplibre-native/pull/4702).
+
+`0028-hit-test-camera-zoom.patch` evaluates hit-test paint properties at the
+camera zoom. The Native regression covers composite line and circle properties
+at fractional zooms and beyond the source's maximum zoom. Upstream:
+[maplibre-native#4703](https://github.com/maplibre/maplibre-native/pull/4703).
+
+`0029-query-filter-overscaled-zoom.patch` evaluates rendered-feature query
+filters at the overscaled tile zoom, matching layer filters and source queries.
+The Native regression covers symbols and circles at fractional and overzoomed
+camera zooms. Upstream:
+[maplibre-native#4704](https://github.com/maplibre/maplibre-native/pull/4704).
+
+Each patch is a squashed diff applied on top of the patches before it. Patch
+context and test placement follow the pinned source and earlier patches. The
+publication patch includes the transition setters for our bearing-accuracy
+properties, and the query-filter patch preserves the preceding camera-zoom fix.
 
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
