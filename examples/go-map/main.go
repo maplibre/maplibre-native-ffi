@@ -7,6 +7,7 @@ import (
 	"os"
 	stdruntime "runtime"
 	"strings"
+	"time"
 
 	"github.com/jfreymuth/go-sdl3/sdl"
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
@@ -17,20 +18,24 @@ func main() {
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()
 
-	mode, ok := parseArgs(os.Args[1:])
+	mode, smoke, ok := parseArgs(os.Args[1:])
 	if !ok {
 		return
 	}
-	if err := run(mode); err != nil {
+	if err := run(mode, smoke); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
 
-func parseArgs(args []string) (renderTargetMode, bool) {
+func parseArgs(args []string) (renderTargetMode, bool, bool) {
 	if len(args) == 1 && args[0] == "--help" {
 		printUsage()
-		return 0, false
+		return 0, false, false
+	}
+	smoke := len(args) == 2 && args[0] == "--smoke"
+	if smoke {
+		args = args[1:]
 	}
 	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
 		printUsage()
@@ -41,20 +46,27 @@ func parseArgs(args []string) (renderTargetMode, bool) {
 		printUsage()
 		os.Exit(1)
 	}
-	return mode, true
+	return mode, smoke, true
 }
 
 func printUsage() {
-	fmt.Print(`Usage: go-map <mode>
+	fmt.Print(`Usage: go-map [--smoke] <mode>
 
 Modes:
   owned-texture     session-owned texture render target
   borrowed-texture  caller-owned texture render target
   native-surface    native surface render target
+
+Options:
+  --smoke  render one frame of a local style in a hidden window, then exit
 `)
 }
 
-func run(mode renderTargetMode) (result error) {
+// smokeTimeout bounds a smoke run, which exits with an error when no frame
+// renders in time.
+const smokeTimeout = 60 * time.Second
+
+func run(mode renderTargetMode, smoke bool) (result error) {
 	if err := validateNativeRenderBackend(); err != nil {
 		return err
 	}
@@ -86,12 +98,18 @@ func run(mode renderTargetMode) (result error) {
 		}
 	}
 
-	window, err := sdl.CreateWindow("MapLibre Go SDL3 Map", initialWindowWidth, initialWindowHeight, sdl.WindowOpenGL|sdl.WindowResizable|sdl.WindowHighPixelDensity)
+	windowFlags := sdl.WindowOpenGL | sdl.WindowResizable | sdl.WindowHighPixelDensity
+	if smoke {
+		windowFlags |= sdl.WindowHidden
+	}
+	window, err := sdl.CreateWindow("MapLibre Go SDL3 Map", initialWindowWidth, initialWindowHeight, windowFlags)
 	if err != nil {
 		return fmt.Errorf("SDL_CreateWindow failed: %w", err)
 	}
 	defer window.Destroy()
-	_ = window.Raise()
+	if !smoke {
+		_ = window.Raise()
+	}
 
 	view := currentViewport(window)
 	view.log("initial viewport")
@@ -105,7 +123,7 @@ func run(mode renderTargetMode) (result error) {
 	}
 	_ = sdl.GL_SetSwapInterval(1)
 
-	mapState, err := newRuntimeMapState(view)
+	mapState, err := newRuntimeMapState(view, smoke)
 	if err != nil {
 		_ = graphics.Close()
 		return err
@@ -136,6 +154,7 @@ func run(mode renderTargetMode) (result error) {
 	renderRequested := true
 	viewportDirty := false
 	input := inputController{}
+	smokeDeadline := time.Now().Add(smokeTimeout)
 	handleEvent := func(event *sdl.Event) error {
 		switch event.Type() {
 		case sdl.EventQuit, sdl.EventWindowCloseRequested:
@@ -203,6 +222,11 @@ func run(mode renderTargetMode) (result error) {
 			}
 			if outcome.rendered {
 				didWork = true
+				if smoke {
+					// The frame is composed; presenting it below ends the run.
+					running = false
+					fmt.Println("smoke: rendered one frame")
+				}
 			}
 			if !outcome.rendered || outcome.needsRepaint {
 				renderRequested = true
@@ -210,6 +234,9 @@ func run(mode renderTargetMode) (result error) {
 		}
 		if err := state.finishFrame(); err != nil {
 			return err
+		}
+		if smoke && running && time.Now().After(smokeDeadline) {
+			return fmt.Errorf("smoke: no frame rendered within %s", smokeTimeout)
 		}
 
 		if !didWork && running {

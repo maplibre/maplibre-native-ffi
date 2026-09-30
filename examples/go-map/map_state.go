@@ -14,7 +14,11 @@ type runtimeMapState struct {
 	mapID   uint64
 }
 
-func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
+// smokeStyle is the style a smoke run renders, so it reaches no network.
+const smokeStyle = `{"version":8,"sources":{},"layers":[` +
+	`{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}]}`
+
+func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
 	runtimeOptions := maplibre.DefaultRuntimeOptions()
 	cachePath := ":memory:"
 	runtimeOptions.CachePath = &cachePath
@@ -44,7 +48,11 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 		_ = state.Close()
 		return nil, fmt.Errorf("map identity read failed: %w", err)
 	}
-	_, err = mapHandle.SetStyleUrl("https://tiles.openfreemap.org/styles/bright")
+	if smoke {
+		_, err = mapHandle.SetStyleJson([]byte(smokeStyle))
+	} else {
+		_, err = mapHandle.SetStyleUrl("https://tiles.openfreemap.org/styles/bright")
+	}
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("style load failed: %w", err)

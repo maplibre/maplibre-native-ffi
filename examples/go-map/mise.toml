@@ -35,6 +35,22 @@ export CGO_CPPFLAGS="-I$native_install_dir/include -I$MISE_MONOREPO_ROOT/third_p
 go vet ./...
 '''
 
+[tasks.smoke]
+description = "Render one frame of a local style in a hidden window, then exit."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
+export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+# A Linux host without a display server renders through SDL's offscreen
+# driver, which creates its EGL surfaces without one.
+if [[ "$(uname -s)" == Linux && -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+  export SDL_VIDEO_DRIVER=offscreen
+fi
+exec "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map" --smoke owned-texture
+'''
+
 [tasks.run]
 extends = "ffi:example-run"
 run = '''

@@ -5,7 +5,9 @@
 #
 # The render tests, which LIFE-03, VIEW-01, REND-01, and REND-02 name, build
 # only with the backend tag that `mise run //bindings/go:test` passes for a
-# desktop EGL, Metal, or Vulkan preset.
+# desktop EGL, Metal, or Vulkan preset. EX-01 is `mise run
+# //examples/go-map:smoke <preset>` on an EGL preset, since go-map drives
+# OpenGL directly; its smoke run renders one frame in a hidden window.
 
 [cases]
 "ERR-01" = "bindings/go/errors_test.go::TestNativeStatusMapsToTypedErrors"
@@ -39,4 +41,4 @@
 "PLAT-01" = "bindings/go/platform_test.go::TestLinkedLibraryMatchesTheBuild"
 "PLAT-02" = "bindings/go/platform_test.go::TestProcessExitsCleanlyWithLiveHandles"
 "PLAT-03" = "bindings/go/platform_test.go::TestCollectorReclaimsAnAbandonedHandle"
-"EX-01" = { todo = true }
+"EX-01" = "examples/go-map/main.go::--smoke"
