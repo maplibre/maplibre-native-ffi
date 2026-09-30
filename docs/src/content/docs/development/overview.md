@@ -269,7 +269,10 @@ retried.
 Every feature needs automated CI coverage when practical. The root
 `mise run test` command builds the native library and runs the native C suites
 in `tests/native` through CTest and Unity. Language binding suites run through
-their binding-specific CI tasks.
+their binding-specific CI tasks. `mise run bindings:test-generator` tests the
+binding generator;
+[Generate bindings](/maplibre-native-ffi/development/binding-generation/#test-the-generator)
+describes that suite.
 
 Tests wait on signals rather than elapsed time, and serve every request from a
 local fixture. The `test-hygiene` check in hk runs

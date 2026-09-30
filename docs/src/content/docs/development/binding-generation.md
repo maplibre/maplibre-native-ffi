@@ -94,3 +94,30 @@ Generated files include their source notice and are formatted by the generation
 task. Review the header, compiler rule, handwritten runtime mechanism, and
 public behavior test together. The generated diff shows the result of that rule
 across languages.
+
+## Test the generator
+
+`mise run bindings:test-generator` tests generator behavior. A test asserts on
+the semantic plans, on an emitter's coverage report, or on generated code that
+the test compiles and runs, so renames and formatting changes in an emitter
+leave the tests unchanged.
+
+`tests/bindgen/fixtures/protocols.h` declares one group per protocol shape, each
+enabled by its own `MLN_PROTOCOL_*` macro, after base declarations that stand in
+for the C API's shared types. A new protocol adds its group there. The shape
+table test runs every group through every emitter and lists each declaration
+that an emitter reports unsupported, so an emitter that loses a shape fails the
+suite.
+
+The executed probes generate bindings for the value groups, build them with the
+binding's handwritten runtime, and call
+`tests/bindgen/fixtures/protocols_stub.c`. Rust, Go, Swift, Zig, Dart, and .NET
+each have a probe. The Python tests execute the generated modules over fakes of
+the native extension. A probe finds its toolchain through the binding's mise
+configuration and skips when that toolchain is missing. The CI hygiene job sets
+`MLN_BINDGEN_REQUIRE_TOOLCHAINS=1`, which turns each skip into a failure.
+
+The generator also writes one synthesized result for each completion copy kind
+to `tests/native/abi/adapter/adapter_copy_cases_generated.inc`. The C adapter
+tests pass each result through the adapter's copy and compare the copy with its
+source.
