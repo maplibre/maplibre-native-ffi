@@ -17,8 +17,10 @@ from support import (
     run,
 )
 
+from tools.bindgen import copy_cases
+from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import ModelError
-from tools.bindgen.native_capture import generate
+from tools.bindgen.native_capture import capture_roots, copy_kind, generate
 
 
 class NativeCaptureTests(unittest.TestCase):
@@ -83,6 +85,16 @@ class NativeCaptureTests(unittest.TestCase):
         )
         compile_and_run(self, generate(api), CAPTURE_TEST)
 
+    def test_every_copy_kind_has_a_case_that_copies_deeply(self):
+        bound = compile_api(self.api)
+        roots, _, _ = capture_roots(bound)
+        expected = ", ".join(sorted(copy_kind(native) for native in roots))
+        outputs = {
+            **generate(bound),
+            "copy_cases.inc": copy_cases.generate(bound)[copy_cases.PATH],
+        }
+        compile_and_run(self, outputs, COPY_CASES_TEST.replace("EXPECTED", expected))
+
     def test_deferred_callbacks_answer_early_and_fail_unadopted_decisions(self):
         compile_and_run(self, generate(self.api), DEFERRED_TEST)
 
@@ -115,6 +127,39 @@ def compile_and_run(test, outputs, test_source):
             cwd=staging,
         )
         run(test, [str(executable)], staging)
+
+
+COPY_CASES_TEST = r"""
+#include <cstdio>
+#include "c_api/callback_capture.hpp"
+#include "copy_cases.inc"
+extern "C" mln_status mln_map_dispose(mln_map, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
+extern "C" mln_status mln_map_projection_close(mln_map_projection, mln_diagnostic*) noexcept { return MLN_STATUS_OK; }
+static const std::uint32_t expected[] = {EXPECTED};
+
+int main() {
+  constexpr auto cases = sizeof(mln_adapter_copy_cases) / sizeof(mln_adapter_copy_cases[0]);
+  static_assert(cases == sizeof(expected) / sizeof(expected[0]));
+  for (const auto kind : expected) {
+    std::size_t found = 0;
+    for (const auto& entry : mln_adapter_copy_cases) found += entry.kind == kind;
+    if (found != 1) { std::fprintf(stderr, "copy kind %u has %zu cases\n", kind, found); return 1; }
+  }
+  for (const auto& entry : mln_adapter_copy_cases) {
+    std::size_t count = 0;
+    const void* source = entry.value(&count);
+    mln_completion_result result{};
+    result.size = sizeof(result);
+    result.status = MLN_STATUS_OK;
+    result.value = source;
+    result.value_count = count;
+    auto* record = mln::capture::copy(result, entry.kind, entry.element_size);
+    const bool matches = entry.matches(record->view.result.value, source, count);
+    mln::capture::destroy(record);
+    if (!matches) { std::fprintf(stderr, "%s: the copy differs from its source\n", entry.type); return 1; }
+  }
+}
+"""
 
 
 DEFERRED_TEST = r"""

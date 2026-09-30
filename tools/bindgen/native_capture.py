@@ -194,8 +194,11 @@ def _deferred(bound: BoundApi) -> tuple[list[str], list[str]]:
     return header, output
 
 
-def generate(api: Api | BoundApi) -> dict[str, str]:
-    bound = compile_api(api)
+def capture_roots(
+    bound: BoundApi,
+) -> tuple[dict[str, ValuePlan], set[str], dict[str, ValuePlan]]:
+    """Each completion copy kind's root plan, the roots delivered as arrays, and
+    the roots whose handles the copy owns."""
     source = bound.source
     roots = {}
     arrays = set()
@@ -230,6 +233,13 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
     roots.update(owned)
     for plan in roots.values():
         _validate_capture_ownership(plan)
+    return roots, arrays, owned
+
+
+def generate(api: Api | BoundApi) -> dict[str, str]:
+    bound = compile_api(api)
+    source = bound.source
+    roots, arrays, owned = capture_roots(bound)
     identities = {0: "flat"}
     for native in roots:
         identity = capture_id(native, "owned" if native in owned else "borrowed")

@@ -9,6 +9,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from . import copy_cases
 from .compiler import compile_api
 from .frontend import parse_headers
 from .model import Api, ModelError
@@ -26,6 +27,7 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
         raise ModelError(list(bound.diagnostics))
     source_api = api
     outputs = native_capture.generate(bound)
+    outputs.update(copy_cases.generate(bound))
     outputs.update(
         {f"bindings/go/{path}": source for path, source in go.generate(bound).items()}
     )
@@ -344,6 +346,7 @@ def generated_files() -> set[str]:
         ROOT / "include/maplibre_native_c/callback_capture_generated.h",
         ROOT / "src/c_api/callback_capture_generated.inc",
         ROOT / "src/c_api/callback_port_generated.inc",
+        ROOT / copy_cases.PATH,
     ]
     candidates.extend((ROOT / "bindings/dotnet/src").rglob("*.g.cs"))
     for language in ("rust", "python", "swift", "dart", "kotlin", "zig"):
