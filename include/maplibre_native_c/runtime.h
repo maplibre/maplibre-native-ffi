@@ -950,6 +950,13 @@ MLN_API mln_status mln_runtime_create(
  * non-network schemes such as file, asset, mbtiles, and pmtiles are handled by
  * native MainResourceLoader before this extension point.
  *
+ * The provider sees every network request, including one the ambient cache
+ * holds a fresh copy of. MapLibre delivers the cached copy first, then asks the
+ * provider to revalidate it, with prior_etag, prior_modified, and
+ * prior_expires describing that copy. Unlike the native online file source,
+ * the C API does not wait for the copy to expire before asking; the provider
+ * decides whether the copy is still fresh, and answers NOT_MODIFIED to keep it.
+ *
  * The function copies the provider shape and accepts the change from any
  * thread. Execution is ordered with every other command for this runtime.
  * The completion reports the terminal command disposition.
