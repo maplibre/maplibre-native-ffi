@@ -1342,6 +1342,11 @@ MLN_API mln_status mln_runtime_barrier(
  * racing native teardown. A host that outlives its runtimes may pass a
  * discarding completion.
  *
+ * A process MUST NOT exit while any runtime is live or its release completion
+ * has not yet run. Until then, native threads may still be starting or
+ * running, and the static destruction that process exit performs can crash
+ * them.
+ *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or

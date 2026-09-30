@@ -25,6 +25,10 @@ Use a runtime barrier when later work must wait for every preceding submission
 to reach a terminal disposition. The runtime's direct event wake callback tells
 the host when its event queue is ready to drain.
 
+Before the process exits, release every runtime and wait for each release
+completion. Native threads keep running until that completion, and process exit
+can crash a thread that is still running.
+
 ## Map
 
 A map belongs to a runtime. It owns style documents, sources, layers, images,
