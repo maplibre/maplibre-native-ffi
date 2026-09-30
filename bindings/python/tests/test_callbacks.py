@@ -4,6 +4,7 @@ import gc
 import sys
 import threading
 import weakref
+from collections.abc import Callable
 from dataclasses import replace
 
 import maplibre_native_ffi as mln
@@ -182,33 +183,28 @@ def test_a_provider_can_answer_a_request_later_from_another_thread(
 def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
-    # Every URL names a port that nothing serves, so each rewritten request
-    # fails without leaving the machine.
-    styles = ("http://127.0.0.1:0/first.json", "http://127.0.0.1:0/second.json")
+    # The URLs name a loopback port that nothing serves, so the rewritten
+    # request fails without leaving the machine.
+    style = "http://127.0.0.1:0/style.json"
     rewritten = "http://127.0.0.1:0/rewritten.json"
     scopes: list[mln.ResourceTransformResponseScope] = []
     passed_through: list[mln.ResourceRequestHandle] = []
     refusals: list[str] = []
 
+    def refused(use: Callable[[], object]) -> None:
+        try:
+            use()
+        except mln.InvalidStateError as error:
+            refusals.append(error.diagnostic)
+
     def transform(
         kind: mln.ResourceKind, url: str, response: mln.ResourceTransformResponseScope
     ) -> mln.Status:
-        def use_elsewhere() -> None:
-            try:
-                response.set_url(rewritten)
-            except mln.InvalidStateError as error:
-                refusals.append(error.diagnostic)
-
-        worker = threading.Thread(target=use_elsewhere)
+        worker = threading.Thread(
+            target=refused, args=(lambda: response.set_url(rewritten),)
+        )
         worker.start()
         worker.join(TIMEOUT)
-        # The network file source calls each transform on the same thread, so
-        # a later call can reach the scope that an earlier call returned from.
-        for expired in scopes:
-            try:
-                expired.set_url(rewritten)
-            except mln.InvalidStateError as error:
-                refusals.append(error.diagnostic)
         response.set_url(rewritten)
         scopes.append(response)
         return mln.Status.OK
@@ -219,21 +215,19 @@ def test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread(
         passed_through.append(handle)
         return mln.ResourceProviderDecision.PASS_THROUGH
 
-    for style in styles:
-        harness.routes[style] = pass_through
+    harness.routes[style] = pass_through
     result(harness.runtime.set_resource_transform(mln.ResourceTransform(transform)))
-    for style in styles:
-        map_handle.set_style_url(style)
-        harness.wait_event(mln.RuntimeEventType.MAP_LOADING_FAILED)
+    map_handle.set_style_url(style)
+    harness.wait_event(mln.RuntimeEventType.MAP_LOADING_FAILED)
+    refused(lambda: scopes[0].set_url(rewritten))
 
     assert refusals == [
-        "response belongs to its callback thread",
         "response belongs to its callback thread",
         "response callback has returned",
     ]
     # A request handle passed through with its callback closes with it.
-    assert len(passed_through) == 2
-    assert all(handle.closed for handle in passed_through)
+    assert len(passed_through) == 1
+    assert passed_through[0].closed
     with pytest.raises(mln.InvalidStateError):
         passed_through[0].complete(ok_response())
 

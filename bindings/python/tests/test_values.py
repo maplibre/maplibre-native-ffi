@@ -93,6 +93,7 @@ def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(
         harness.runtime.offline_region_create(unknown, b"")
     # Native saw the arm's tag and refused it; the binding passed it through.
     assert raised.value.native_status_code == mln.Status.INVALID_ARGUMENT.native_code
+    assert "definition type is invalid" in raised.value.diagnostic
 
 
 def test_integers_are_range_checked_enums_stay_open_and_64_bit_values_round_trip(

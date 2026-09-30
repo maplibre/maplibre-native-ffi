@@ -448,13 +448,15 @@ struct GeneratedCallbackScope {
 
 impl GeneratedCallbackScope {
     fn pointer(&self, pointer: usize) -> PyResult<usize> {
+        // A scope expires for every thread when its callback returns, so the
+        // expiry is reported first, wherever the call comes from.
+        if !self.alive.load(Ordering::Acquire) || pointer == 0 {
+            return Err(invalid_state_error("response callback has returned"));
+        }
         if self.thread != std::thread::current().id() {
             return Err(invalid_state_error(
                 "response belongs to its callback thread",
             ));
-        }
-        if !self.alive.load(Ordering::Acquire) || pointer == 0 {
-            return Err(invalid_state_error("response callback has returned"));
         }
         Ok(pointer)
     }

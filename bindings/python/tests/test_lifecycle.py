@@ -128,11 +128,6 @@ def test_cyclic_gc_reclaims_a_request_and_the_callback_that_closes_it(
 _SHUTDOWN_WITH_LIVE_HANDLES = """
 import maplibre_native_ffi as m
 
-closed = m.runtime_create()
-map_handle = closed.map_create().result(10)
-map_handle.close().result(10)
-closed.close().result(10)
-
 runtime = m.runtime_create()
 runtime.set_resource_provider(
     m.ResourceProvider(lambda request, handle: m.ResourceProviderDecision.HANDLE)

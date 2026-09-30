@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import sys
 import threading
 import time
 import warnings
@@ -42,8 +43,13 @@ def leak_reports() -> Iterator[list[str]]:
     """Collect the ResourceWarning messages that unclosed handles report.
 
     The list fills when the block exits. A report can come from any thread,
-    such as a native callback thread that drops the last reference.
+    such as a native callback thread that drops the last reference, so this
+    relies on the process-wide warning filters that an interpreter without
+    context-aware warnings keeps. The abi3 extension does not load on a
+    free-threaded build, where those are the default.
     """
+    if getattr(sys.flags, "context_aware_warnings", False):
+        raise RuntimeError("leak_reports needs process-wide warning filters")
     reports: list[str] = []
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always", ResourceWarning)

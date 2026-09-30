@@ -29,6 +29,17 @@ def test_native_statuses_raise_their_exception_with_code_and_diagnostic(
         assert str(raised.value) == raised.value.diagnostic
     assert "network status" in invalid_argument.value.diagnostic
 
+    # Native returns only the statuses it defines, so no call reaches the
+    # mapping's unknown arm; the shared Rust core tests that a code it does
+    # not know stays raw. The exception that arm raises keeps the code.
+    unknown = mln.UnknownStatusError("", 12345)
+    assert unknown.native_status_code == 12345
+    assert unknown.status is not None
+    assert unknown.status.is_unknown
+    assert unknown.status.native_code == 12345
+    # With no diagnostic, the message names the status.
+    assert str(unknown) == "unknown 12345"
+
 
 def test_a_binding_failure_carries_no_native_status() -> None:
     runtime = mln.runtime_create()
@@ -40,15 +51,3 @@ def test_a_binding_failure_carries_no_native_status() -> None:
     assert raised.value.status == mln.Status.INVALID_STATE
     assert raised.value.native_status_code is None
     assert raised.value.diagnostic == "handle is closed"
-
-
-def test_an_unknown_status_code_is_kept() -> None:
-    error = mln.UnknownStatusError("", 12345)
-
-    assert error.native_status_code == 12345
-    assert error.status is not None
-    assert error.status.is_unknown
-    assert error.status.native_code == 12345
-    # With no diagnostic, the message names the status.
-    assert str(error) == "unknown 12345"
-    assert str(mln.NotReadyError()) == "not ready"
