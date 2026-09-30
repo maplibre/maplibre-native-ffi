@@ -164,8 +164,9 @@ sentence-level style, page structure, and project terminology.
   targets it supports, using public binding APIs to validate both native
   workflows and binding-owned safety behavior.
 - Generator tests in `tests/bindgen` assert on semantic plans, coverage reports,
-  or generated code that they compile and run, and never on emitted source text.
-  Protocol fixtures live in `tests/bindgen/fixtures/protocols.h`.
+  or generated code that they compile and run. They never search emitted source
+  for fragments, though they may compare two whole outputs. Protocol fixtures
+  live in `tests/bindgen/fixtures/protocols.h`.
 - Avoid trivial tests, tests that verify constants, tests that assert a negative
   (unless valuable), tests that simply test third party code; we want to keep
   our test suite robust and high-value.

@@ -105,19 +105,23 @@ leave the tests unchanged.
 `tests/bindgen/fixtures/protocols.h` declares one group per protocol shape, each
 enabled by its own `MLN_PROTOCOL_*` macro, after base declarations that stand in
 for the C API's shared types. A new protocol adds its group there. The shape
-table test runs every group through every emitter and lists each declaration
-that an emitter reports unsupported, so an emitter that loses a shape fails the
-suite.
+table test runs every group through every emitter. It lists each declaration
+that an emitter reports unsupported and requires every other declaration to
+generate, so an emitter that loses a shape fails the suite.
 
-The executed probes generate bindings for the value groups, build them with the
-binding's handwritten runtime, and call
-`tests/bindgen/fixtures/protocols_stub.c`. Rust, Go, Swift, Zig, Dart, and .NET
-each have a probe. The Python tests execute the generated modules over fakes of
-the native extension. A probe finds its toolchain through the binding's mise
-configuration and skips when that toolchain is missing. The CI hygiene job sets
-`MLN_BINDGEN_REQUIRE_TOOLCHAINS=1`, which turns each skip into a failure.
+An executed probe builds generated code with the binding's handwritten runtime
+and runs it. The Go, Swift, Zig, and Dart probes generate bindings for the
+`values` and `keywords` groups and call
+`tests/bindgen/fixtures/protocols_stub.c`. The Rust probe compiles its own
+declarations against an ABI stub, and the .NET probe runs the value conversions
+of the `presence_mask` group. The Python tests execute the generated modules
+over fakes of the native extension. A probe finds its toolchain through the
+binding's mise configuration and skips when that toolchain is missing. The CI
+hygiene job sets `MLN_BINDGEN_REQUIRE_TOOLCHAINS=1`, which turns each skip into
+a failure.
 
 The generator also writes one synthesized result for each completion copy kind
-to `tests/native/abi/adapter/adapter_copy_cases_generated.inc`. The C adapter
-tests pass each result through the adapter's copy and compare the copy with its
-source.
+to `tests/native/abi/adapter/adapter_copy_cases_generated.inc`, for C adapter
+tests that pass each result through the adapter's copy and compare the copy with
+its source. Until those tests exist, `tests/bindgen/test_native_capture.py`
+checks that every copy kind has one case and runs each case through the copy.
