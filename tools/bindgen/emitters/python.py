@@ -91,7 +91,7 @@ def result_converter(
         converter = f"""|py, result| {{
             let raw = completion_value::<sys::{result.native}>(result)?;
             let state = unsafe {{ NativeHandleState::from_handle(raw, "{result.native}") }}.map_err(map_error)?.with_disposal(generated_dispose_{result.native});
-            Py::new(py, {owner} {{ state: Arc::new(Mutex::new(state)) }}).map(|value| value.into_any())
+            Py::new(py, {owner} {{ state: generated_owner_state(state) }}).map(|value| value.into_any())
         }}"""
         return "Any", owner, converter, None
     values.supported(result)
@@ -129,7 +129,7 @@ def owned_native(value, expression, callbacks=False):
     state = f'unsafe {{ NativeHandleState::from_handle({expression}, "{value.native}") }}.map_err(map_error)?.with_disposal(generated_dispose_{value.native}){roots}'
     owner = OWNERS[value.native]
     extra = ""
-    return f"{owner} {{ state: Arc::new(Mutex::new({state})){extra} }}"
+    return f"{owner} {{ state: generated_owner_state({state}){extra} }}"
 
 
 def operation(

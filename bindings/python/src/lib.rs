@@ -146,6 +146,165 @@ impl<T: maplibre_core::handle::NativeHandle> Drop for NativeHandleState<T> {
     }
 }
 
+/// The longest interpreter shutdown waits for its runtimes to retire.
+const EXIT_RETIREMENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// An owner that interpreter shutdown retires, because a process must not exit
+/// while a runtime is live or its release completion has not run.
+trait ExitOwner: Send + Sync {
+    fn is_runtime(&self) -> bool;
+    /// Takes the handle from an idle owner, so neither close nor finalization
+    /// reaches it again. An owner in a read or close on another thread stays.
+    fn take_at_exit(&self) -> Option<u64>;
+    fn dispose_at_exit(&self, raw: u64);
+}
+
+impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleState<T>> {
+    fn is_runtime(&self) -> bool {
+        std::any::TypeId::of::<T>() == std::any::TypeId::of::<sys::mln_runtime>()
+    }
+
+    fn take_at_exit(&self) -> Option<u64> {
+        let mut state = self.lock().unwrap_or_else(|p| p.into_inner());
+        if state.closing || state.active_reads != 0 || state.dispose_abandoned.is_none() {
+            return None;
+        }
+        state.id.take().map(std::num::NonZeroU64::get)
+    }
+
+    fn dispose_at_exit(&self, raw: u64) {
+        let state = self.lock().unwrap_or_else(|p| p.into_inner());
+        let (Some(dispose), type_name) = (state.dispose_abandoned, state.type_name) else {
+            return;
+        };
+        drop(state);
+        // SAFETY: take_at_exit transferred sole ownership of the handle here.
+        if unsafe { dispose(T::from_raw(raw)) } != sys::MLN_STATUS_OK {
+            maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
+                type_name,
+                id: raw,
+            });
+        }
+    }
+}
+
+struct ExitOwners {
+    owners: Vec<std::sync::Weak<dyn ExitOwner>>,
+    prune_at: usize,
+}
+
+static EXIT_OWNERS: Mutex<ExitOwners> = Mutex::new(ExitOwners {
+    owners: Vec::new(),
+    prune_at: 64,
+});
+
+/// Shares a new owner's state and enrolls it for retirement at interpreter
+/// shutdown. The first runtime registers the shutdown hook.
+fn generated_owner_state<T: maplibre_core::handle::NativeHandle>(
+    state: NativeHandleState<T>,
+) -> Arc<Mutex<NativeHandleState<T>>> {
+    let state = Arc::new(Mutex::new(state));
+    let owner: Arc<dyn ExitOwner> = state.clone();
+    if owner.is_runtime() {
+        static REGISTERED: std::sync::atomic::AtomicBool =
+            std::sync::atomic::AtomicBool::new(false);
+        if !REGISTERED.swap(true, Ordering::AcqRel) {
+            Python::attach(|py| {
+                let registered = wrap_pyfunction!(retire_owners_at_exit, py)
+                    .and_then(|hook| py.import("atexit")?.call_method1("register", (hook,)));
+                if let Err(error) = registered {
+                    error.write_unraisable(py, None);
+                }
+            });
+        }
+    }
+    let mut registry = EXIT_OWNERS.lock().unwrap_or_else(|p| p.into_inner());
+    if registry.owners.len() >= registry.prune_at {
+        registry.owners.retain(|owner| owner.strong_count() != 0);
+        registry.prune_at = (registry.owners.len() * 2).max(64);
+    }
+    registry.owners.push(Arc::downgrade(&owner));
+    state
+}
+
+struct ExitRelease {
+    retired: Mutex<bool>,
+    signal: std::sync::Condvar,
+}
+
+unsafe extern "C" fn complete_exit_release(
+    user_data: *mut c_void,
+    _result: *const sys::mln_completion_result,
+) {
+    // SAFETY: native owns one reference from accepted release until its
+    // release callback.
+    let release = unsafe { &*user_data.cast::<ExitRelease>() };
+    *release.retired.lock().unwrap_or_else(|p| p.into_inner()) = true;
+    release.signal.notify_all();
+}
+
+unsafe extern "C" fn release_exit_release(user_data: *mut c_void) {
+    // SAFETY: native releases accepted completion state exactly once.
+    drop(unsafe { Arc::from_raw(user_data.cast::<ExitRelease>()) });
+}
+
+/// Disposes every owner the interpreter still holds, then releases each
+/// runtime and waits for its retirement, so no native thread can call into a
+/// finalized interpreter or run while the process exits.
+#[pyfunction]
+fn retire_owners_at_exit(py: Python<'_>) {
+    let owners: Vec<Arc<dyn ExitOwner>> =
+        std::mem::take(&mut EXIT_OWNERS.lock().unwrap_or_else(|p| p.into_inner()).owners)
+            .iter()
+            .filter_map(std::sync::Weak::upgrade)
+            .collect();
+    // Native threads finishing this work may need the GIL to deliver results
+    // and release callbacks.
+    py.detach(move || {
+        for owner in owners.iter().filter(|owner| !owner.is_runtime()) {
+            if let Some(raw) = owner.take_at_exit() {
+                owner.dispose_at_exit(raw);
+            }
+        }
+        let mut releases = Vec::new();
+        for owner in owners.iter().filter(|owner| owner.is_runtime()) {
+            let Some(raw) = owner.take_at_exit() else {
+                continue;
+            };
+            let release = Arc::new(ExitRelease {
+                retired: Mutex::new(false),
+                signal: std::sync::Condvar::new(),
+            });
+            let completion = sys::mln_completion {
+                size: std::mem::size_of::<sys::mln_completion>() as u32,
+                callback: Some(complete_exit_release),
+                user_data: Arc::into_raw(Arc::clone(&release)).cast_mut().cast(),
+                release_user_data: Some(release_exit_release),
+            };
+            let runtime = <sys::mln_runtime as maplibre_core::handle::NativeHandle>::from_raw(raw);
+            // SAFETY: take_at_exit transferred sole ownership of the handle.
+            let status = unsafe { sys::mln_runtime_release(runtime, &completion, ptr::null_mut()) };
+            if status == sys::MLN_STATUS_OK {
+                releases.push(release);
+            } else {
+                // SAFETY: a rejected release retains no completion state.
+                drop(unsafe { Arc::from_raw(completion.user_data.cast::<ExitRelease>()) });
+                // A pending child keeps release from starting, so retirement
+                // proceeds unobserved.
+                owner.dispose_at_exit(raw);
+            }
+        }
+        let deadline = std::time::Instant::now() + EXIT_RETIREMENT_TIMEOUT;
+        for release in releases {
+            let retired = release.retired.lock().unwrap_or_else(|p| p.into_inner());
+            let timeout = deadline.saturating_duration_since(std::time::Instant::now());
+            let _ = release
+                .signal
+                .wait_timeout_while(retired, timeout, |retired| !*retired);
+        }
+    });
+}
+
 type PyCompletionConverter =
     Box<dyn FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send>;
 

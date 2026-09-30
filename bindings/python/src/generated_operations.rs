@@ -8525,7 +8525,7 @@ impl MapHandle {
                 Py::new(
                     py,
                     MapProjectionHandle {
-                        state: Arc::new(Mutex::new(state)),
+                        state: generated_owner_state(state),
                     },
                 )
                 .map(|value| value.into_any())
@@ -10058,7 +10058,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10068,7 +10068,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -10130,7 +10130,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10140,7 +10140,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -10202,7 +10202,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10212,7 +10212,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -10274,7 +10274,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10284,7 +10284,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -10346,7 +10346,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10356,7 +10356,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -10418,7 +10418,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10428,7 +10428,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -10490,7 +10490,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10500,7 +10500,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -10562,7 +10562,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10572,7 +10572,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -10634,7 +10634,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10644,7 +10644,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -10706,7 +10706,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10716,7 +10716,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -10778,7 +10778,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10788,7 +10788,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -10850,7 +10850,7 @@ impl MapHandle {
         let out_session_python = Py::new(
             py,
             RenderSessionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe {
                         NativeHandleState::from_handle(
                             out_session_owner.take(),
@@ -10860,7 +10860,7 @@ impl MapHandle {
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_render_session)
                     .with_callback_roots(callback_roots.clone()),
-                )),
+                ),
             },
         )?;
         let result = PyDict::new(py);
@@ -11411,11 +11411,11 @@ impl RenderSessionHandle {
         Py::new(
             py,
             AcquiredFrameHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe { NativeHandleState::from_handle(out_frame, "mln_acquired_frame") }
                         .map_err(map_error)?
                         .with_disposal(generated_dispose_mln_acquired_frame),
-                )),
+                ),
             },
         )
         .map(|value| value.into_any())
@@ -11532,11 +11532,11 @@ impl RenderSessionHandle {
         Py::new(
             py,
             RenderFrameBatchHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe { NativeHandleState::from_handle(out_batch, "mln_render_frame_batch") }
                         .map_err(map_error)?
                         .with_disposal(generated_dispose_mln_render_frame_batch),
-                )),
+                ),
             },
         )
         .map(|value| value.into_any())
@@ -11640,11 +11640,11 @@ impl RenderSessionHandle {
         Py::new(
             py,
             MapProjectionHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe { NativeHandleState::from_handle(out_projection, "mln_map_projection") }
                         .map_err(map_error)?
                         .with_disposal(generated_dispose_mln_map_projection),
-                )),
+                ),
             },
         )
         .map(|value| value.into_any())
@@ -12257,7 +12257,7 @@ impl RuntimeHandle {
                 Py::new(
                     py,
                     MapHandle {
-                        state: Arc::new(Mutex::new(state)),
+                        state: generated_owner_state(state),
                     },
                 )
                 .map(|value| value.into_any())
@@ -12386,11 +12386,11 @@ impl RuntimeHandle {
         Py::new(
             py,
             EventBatchHandle {
-                state: Arc::new(Mutex::new(
+                state: generated_owner_state(
                     unsafe { NativeHandleState::from_handle(out_batch, "mln_event_batch") }
                         .map_err(map_error)?
                         .with_disposal(generated_dispose_mln_event_batch),
-                )),
+                ),
             },
         )
         .map(|value| value.into_any())
@@ -13378,11 +13378,11 @@ fn geojson_source_data_create(
     Py::new(
         py,
         GeojsonSourceDataHandle {
-            state: Arc::new(Mutex::new(
+            state: generated_owner_state(
                 unsafe { NativeHandleState::from_handle(out_data, "mln_geojson_source_data") }
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_geojson_source_data),
-            )),
+            ),
         },
     )
     .map(|value| value.into_any())
@@ -13636,12 +13636,12 @@ fn runtime_create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult
     Py::new(
         py,
         RuntimeHandle {
-            state: Arc::new(Mutex::new(
+            state: generated_owner_state(
                 unsafe { NativeHandleState::from_handle(out_runtime, "mln_runtime") }
                     .map_err(map_error)?
                     .with_disposal(generated_dispose_mln_runtime)
                     .with_callback_roots(callback_roots.clone()),
-            )),
+            ),
         },
     )
     .map(|value| value.into_any())
