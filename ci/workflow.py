@@ -146,8 +146,9 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
             f"mise run //bindings/zig:build {preset}",
         ]
     if build_map:
-        # The example draws with OpenGL, so only the EGL emulator runs it.
-        if preset in EMULATOR_TESTED and backend(preset) == "egl":
+        # The example draws with either backend, so every emulator target
+        # renders it; the others only build it.
+        if preset in EMULATOR_TESTED:
             commands.append(f"mise run //examples/android-map:smoke {preset}")
         else:
             commands.append(

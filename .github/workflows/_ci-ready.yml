@@ -402,7 +402,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/android-map:build vulkan x86_64 --prebuilt
+        run: mise run //examples/android-map:smoke android-x64-vulkan
       - id: suite-9
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:

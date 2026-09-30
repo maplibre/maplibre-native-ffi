@@ -413,6 +413,16 @@ class WorkflowTest(unittest.TestCase):
         self.assertTrue(linux["zig"])
         self.assertTrue(linux["gradle"])
 
+    def test_every_android_emulator_target_smoke_runs_the_map_example(self):
+        rows = {row["preset"]: row for row in target_rows(self.source, self.presets)}
+        for preset in ("android-x64-egl", "android-x64-vulkan"):
+            row = rows[preset]
+            with self.subTest(preset=preset):
+                self.assertIn(
+                    f"mise run //examples/android-map:smoke {preset}",
+                    row["native_commands"] + row.get("consumer_commands", []),
+                )
+
     def test_suites_run_past_a_failed_suite_and_the_last_step_fails_the_job(self):
         for group in GROUPS:
             for name, job in self.workflows[f"_ci-{group}.yml"]["jobs"].items():
