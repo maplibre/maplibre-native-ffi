@@ -79,10 +79,14 @@ def archive(input_dir: pathlib.Path, preset: str) -> pathlib.Path:
 
 def dynamic_libraries(directory: pathlib.Path) -> list[pathlib.Path]:
     suffixes = (".so", ".dylib", ".dll")
+    # A build tree's install also holds the test graphics fixtures, which no
+    # runtime package carries.
     return [
         path
         for path in directory.rglob("*")
-        if path.is_file() and (path.name.endswith(suffixes) or ".so." in path.name)
+        if path.is_file()
+        and (path.name.endswith(suffixes) or ".so." in path.name)
+        and "mln_test_graphics" not in path.name
     ]
 
 

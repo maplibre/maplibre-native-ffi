@@ -135,7 +135,8 @@ String _targetPlatform(CodeConfig code) {
   };
 }
 
-/// Lists the other shared libraries installed beside [library].
+/// Lists the other shared libraries installed beside [library], leaving out the
+/// test graphics fixtures that a build tree's install also holds.
 Iterable<File> _siblingLibraries(File library, OS targetOS) {
   final extension = switch (targetOS) {
     OS.macOS || OS.iOS => '.dylib',
@@ -143,7 +144,10 @@ Iterable<File> _siblingLibraries(File library, OS targetOS) {
     _ => '.so',
   };
   return library.parent.listSync().whereType<File>().where(
-    (file) => file.path != library.path && file.path.endsWith(extension),
+    (file) =>
+        file.path != library.path &&
+        file.path.endsWith(extension) &&
+        !file.uri.pathSegments.last.contains('mln_test_graphics'),
   );
 }
 
