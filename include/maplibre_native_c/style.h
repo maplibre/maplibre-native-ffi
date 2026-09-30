@@ -488,12 +488,12 @@ typedef struct mln_geojson_source_options {
   /**
    * Slices requested tiles inline during the update pass. Defaults to false.
    *
-   * MapLibre Native normally slices tiles out of the prepared data index on a
-   * worker and shows them in a later frame. When this is set, slicing runs
-   * inline, so data installed through mln_map_set_geojson_source_data() reaches
-   * the next rendered frame at the cost of that work running on the update
-   * thread. mln_map_set_geojson_source_synchronous_tiling() overrides this at
-   * runtime.
+   * MapLibre Native normally slices tiles out of the prepared data index on the
+   * data's worker. When this is set, slicing runs inline on the update thread,
+   * so data installed through mln_map_set_geojson_source_data() never waits
+   * behind that worker. The sliced tiles are still laid out on a tile worker
+   * before a frame shows them.
+   * mln_map_set_geojson_source_synchronous_tiling() overrides this at runtime.
    */
   bool synchronous_tiling
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING");
@@ -1202,7 +1202,7 @@ MLN_API mln_status mln_map_set_geojson_source_data(
  * had set synchronous_tiling; false restores the option the source was added
  * with. The override applies to update passes after the command commits. Hosts
  * enable it around high-frequency small updates, such as a tracked position,
- * so each installed update reaches the next rendered frame.
+ * so that an installed update does not wait for the data's worker.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.

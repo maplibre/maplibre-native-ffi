@@ -53,10 +53,11 @@ MapLibre slices the tiles that the viewport requests out of the installed index
 on a worker thread. New features appear in a later frame, and the install call
 does not extend the current frame. Use this default for most feeds.
 
-Set the synchronous-tiling option when the next frame must include the update.
-Examples include a simulation that advances with rendering and a still image
-captured immediately after an update. Tiling then runs on native worker threads.
-A large dataset can delay the render update that publishes the new tiles.
+Set the synchronous-tiling option when an update must not wait behind the
+worker's slicing, such as a simulation that advances with rendering. Slicing
+then runs inline in the render update, so a large dataset can delay the update
+that publishes the new tiles. A worker still lays out the sliced tiles before a
+frame shows them.
 
 The option chosen when adding the source is the baseline, and a runtime
 override raises it temporarily. Enable the override around a burst of

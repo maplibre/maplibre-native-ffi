@@ -150,10 +150,11 @@ void replaced_data_that_a_slice_outlives_retires_on_its_worker() {
 }
 
 // With the override on, a source slices tiles inline during the update pass,
-// so data installed after one frame is what the next frame's tiles hold. The
-// data's worker stays parked at its slice meanwhile, so an asynchronous slice
-// could not deliver in time.
-void the_synchronous_tiling_override_reaches_the_next_frame() {
+// so installed data reaches the source's tiles without its worker. The data's
+// worker stays parked at its slice throughout, so an asynchronous slice could
+// never deliver. Laying out the sliced tile still runs on a tile worker, so the
+// case renders until that layout lands rather than assuming one frame.
+void the_synchronous_tiling_override_slices_without_the_datas_worker() {
   SyncPointScope sync;
   const auto runtime = mln_test_create_runtime();
   const auto map = mln_test_create_map(runtime);
@@ -178,10 +179,10 @@ void the_synchronous_tiling_override_reaches_the_next_frame() {
   const auto second = prepare(POINT_COLLECTION("second"), nullptr);
   set_data(map, second);
   mln_geojson_source_data_destroy(second);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, mln_test_style_render_frame(&fixture)
-  );
-  TEST_ASSERT_TRUE(holds_the_name(fixture, "second"));
+  TEST_ASSERT_TRUE(render_until(
+    fixture, [&] { return holds_the_name(fixture, "second"); },
+    "the second data's tiles while its worker is parked"
+  ));
 
   sync.release(SyncPoint::GeoJsonTileSlice);
   mln_test_render_fixture_destroy(&fixture);
@@ -193,5 +194,5 @@ void the_synchronous_tiling_override_reaches_the_next_frame() {
 
 MLN_TEST_GROUP {
   RUN_TEST(replaced_data_that_a_slice_outlives_retires_on_its_worker);
-  RUN_TEST(the_synchronous_tiling_override_reaches_the_next_frame);
+  RUN_TEST(the_synchronous_tiling_override_slices_without_the_datas_worker);
 }
