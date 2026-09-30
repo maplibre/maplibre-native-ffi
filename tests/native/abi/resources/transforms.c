@@ -336,6 +336,117 @@ static void a_resource_transform_rewrites_until_cleared(void) {
   mln_test_http_server_stop(server);
 }
 
+// Records the kind each transform reports for the image source's URL.
+typedef struct image_kind_probe {
+  atomic_uint resource_kind;
+  atomic_bool resource_seen;
+  atomic_uint header_kind;
+  atomic_bool header_seen;
+} image_kind_probe;
+
+static const char overlay_path[] = "/overlay.png";
+
+static mln_status record_image_resource_kind(
+  void* user_data, uint32_t kind, const char* url,
+  mln_resource_transform_response* out_response
+) {
+  (void)out_response;
+  image_kind_probe* probe = user_data;
+  if (strstr(url, overlay_path) != NULL) {
+    atomic_store(&probe->resource_kind, kind);
+    mln_test_flag_set(&probe->resource_seen);
+  }
+  return MLN_STATUS_OK;
+}
+
+#if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+static mln_status record_image_header_kind(
+  void* user_data, uint32_t kind, const char* url,
+  mln_http_header_transform_response* out_response
+) {
+  (void)out_response;
+  image_kind_probe* probe = user_data;
+  if (strstr(url, overlay_path) != NULL) {
+    atomic_store(&probe->header_kind, kind);
+    mln_test_flag_set(&probe->header_seen);
+  }
+  return MLN_STATUS_OK;
+}
+#endif
+
+// An image source's URL reaches both transforms as MLN_RESOURCE_KIND_IMAGE,
+// through the resource loader and through the platform transport.
+static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
+  mln_test_http_server* server = mln_test_http_server_start(NULL, 0);
+  image_kind_probe probe;
+  atomic_init(&probe.resource_kind, MLN_RESOURCE_KIND_UNKNOWN);
+  atomic_init(&probe.resource_seen, false);
+  atomic_init(&probe.header_kind, MLN_RESOURCE_KIND_UNKNOWN);
+  atomic_init(&probe.header_seen, false);
+  mln_runtime runtime = mln_test_create_runtime();
+  const mln_resource_transform transform = {
+    .size = sizeof(mln_resource_transform),
+    .callback = record_image_resource_kind,
+    .user_data = &probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_set_resource_transform(runtime, &transform)
+  );
+#if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+  const mln_http_header_transform header_transform = {
+    .size = sizeof(mln_http_header_transform),
+    .callback = record_image_header_kind,
+    .user_data = &probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_set_http_header_transform(runtime, &header_transform)
+  );
+#endif
+
+  char overlay_url[256];
+  mln_test_http_server_url(
+    server, overlay_path, overlay_url, sizeof(overlay_url)
+  );
+  char style[512];
+  const int written = snprintf(
+    style, sizeof(style),
+    "{\"version\":8,\"sources\":{\"overlay\":{\"type\":\"image\",\"url\":"
+    "\"%s\",\"coordinates\":[[-1,1],[1,1],[1,-1],[-1,-1]]}},\"layers\":[]}",
+    overlay_url
+  );
+  TEST_ASSERT_TRUE(written > 0 && (size_t)written < sizeof(style));
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_map_set_style_json(
+      map, (mln_buffer_view){.data = style, .size = (size_t)written}
+    )
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_wait_for_flag(&probe.resource_seen),
+    "the resource transform never saw the image request"
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RESOURCE_KIND_IMAGE, atomic_load(&probe.resource_kind)
+  );
+#if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_wait_for_flag(&probe.header_seen),
+    "the header transform never saw the image request"
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RESOURCE_KIND_IMAGE, atomic_load(&probe.header_kind)
+  );
+#endif
+  TEST_ASSERT_TRUE(
+    mln_test_http_server_wait_for_requests(server, overlay_path, 1)
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_http_server_stop(server);
+}
+
 #endif
 
 #if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
@@ -514,6 +625,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_header_needs_a_transform_invocation_and_a_valid_field);
 #if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_resource_transform_rewrites_until_cleared);
+  RUN_TEST(an_image_source_request_reaches_the_transforms_as_an_image);
 #endif
 #if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   RUN_TEST(a_header_transform_adds_headers_until_cleared);

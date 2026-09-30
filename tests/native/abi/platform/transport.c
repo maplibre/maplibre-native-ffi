@@ -351,6 +351,36 @@ static void a_request_in_flight_does_not_hold_its_map_open(void) {
   mln_test_http_server_stop(server);
 }
 
+#if defined(__APPLE__)
+// NSURLSession gives up on a redirect loop with an error the Apple transport
+// has no specific reason for, and the map still receives it as a loading
+// failure that carries the system's description.
+static void an_unclassified_transport_error_fails_the_style(void) {
+  static const mln_test_http_route routes[] = {
+    {.path = "/loop.json",
+     .status = 302,
+     .headers = "Location: /loop.json\r\n"},
+  };
+  mln_test_http_server* server = mln_test_http_server_start(routes, 1);
+  char url[256];
+  mln_test_http_server_url(server, "/loop.json", url, sizeof(url));
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  char message[512];
+  TEST_ASSERT_TRUE(
+    mln_test_await_loading_failure(runtime, map, message, sizeof(message))
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(strstr(message, "redirect"), message);
+  TEST_ASSERT_GREATER_THAN_INT(
+    1, mln_test_http_server_requests(server, "/loop.json")
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_http_server_stop(server);
+}
+#endif
+
 #endif
 
 MLN_TEST_GROUP {
@@ -361,5 +391,8 @@ MLN_TEST_GROUP {
   RUN_TEST(a_not_modified_response_revalidates_the_cached_style);
   RUN_TEST(a_remote_pmtiles_archive_is_read_in_ranges);
   RUN_TEST(a_request_in_flight_does_not_hold_its_map_open);
+#if defined(__APPLE__)
+  RUN_TEST(an_unclassified_transport_error_fails_the_style);
+#endif
 #endif
 }

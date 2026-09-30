@@ -1073,6 +1073,48 @@ static void offline_submission_never_waits_for_the_runtime_worker(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// An offline operation accepted before its runtime's release still runs and
+// completes after the release has retired the handle, including when it is
+// the runtime's first offline operation and so opens the database.
+static void an_offline_operation_accepted_before_release_still_completes(void) {
+  // The case releases the runtime itself, so it creates it untracked.
+  mln_runtime runtime = MLN_HANDLE_NULL;
+  mln_runtime_options options = mln_runtime_options_default();
+  options.event_wake = mln_test_pulse_wake();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC)
+  );
+  // A resource configuration completion runs on the runtime worker, so the
+  // offline operation and the release queue behind it.
+  mln_test_gate gate;
+  mln_test_gate_init(&gate);
+  const mln_completion hold = mln_test_gate_completion(&gate);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_clear_resource_provider(runtime, &hold, NULL)
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+  );
+
+  mln_completion completion;
+  region_probe* probe = new_region_probe(&completion);
+  const mln_status list_status =
+    mln_runtime_offline_regions_list(runtime, &completion, MLN_TEST_DIAGNOSTIC);
+  mln_test_completion release = mln_test_completion_default(0);
+  const mln_status release_status =
+    mln_runtime_release(runtime, &release.descriptor, MLN_TEST_DIAGNOSTIC);
+  mln_test_gate_release(&gate);
+
+  TEST_ASSERT_EQUAL_INT_MESSAGE(
+    MLN_STATUS_OK, release_status, mln_test_last_error()
+  );
+  (void)finish_region_probe(list_status, probe);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe->status);
+  free(probe);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&release));
+  mln_test_completion_destroy(&release);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(offline_region_creation_validates_its_definition);
   RUN_TEST(an_offline_region_lives_from_creation_to_deletion);
@@ -1083,4 +1125,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_download_completes_from_provider_served_resources);
   RUN_TEST(a_failed_download_request_reports_its_reason);
   RUN_TEST(offline_submission_never_waits_for_the_runtime_worker);
+  RUN_TEST(an_offline_operation_accepted_before_release_still_completes);
 }
