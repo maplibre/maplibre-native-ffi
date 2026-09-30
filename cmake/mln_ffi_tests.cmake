@@ -373,7 +373,16 @@ function(mln_native_configure_suite target registry_dir)
       "${support_dir}/frames.c"
       "${support_dir}/map.c"
       "${support_dir}/style.c"
+      "${support_dir}/resources.c"
       ${render_backend_files})
+  # The browser has no sockets, so its transport runs against the runner's
+  # routes instead of the loopback server.
+  if(NOT EMSCRIPTEN)
+    target_sources(${target} PRIVATE "${support_dir}/http_server.c")
+  endif()
+  if(WIN32)
+    target_link_libraries(${target} PRIVATE ws2_32)
+  endif()
   if(TARGET mln_test_graphics_objects)
     target_link_libraries(${target} PRIVATE mln_test_graphics_objects)
   endif()

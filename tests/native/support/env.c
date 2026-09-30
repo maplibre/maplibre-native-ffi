@@ -36,6 +36,7 @@ const mln_buffer_view mln_test_red_background_style_json =
 #include <windows.h>
 #else
 #include <pthread.h>
+#include <unistd.h>
 #endif
 
 // Per-thread record of the handles these helpers created. A failing assertion
@@ -109,8 +110,11 @@ mln_status mln_test_runtime_close(mln_runtime runtime) {
 }
 
 mln_runtime mln_test_create_runtime(void) {
+  return mln_test_create_runtime_with_options(mln_runtime_options_default());
+}
+
+mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options) {
   mln_runtime runtime = MLN_HANDLE_NULL;
-  mln_runtime_options options = mln_runtime_options_default();
   // Event waits block on this wake rather than polling the queue.
   options.event_wake = mln_test_pulse_wake();
   TEST_ASSERT_EQUAL_INT(
@@ -301,6 +305,36 @@ bool mln_test_fixture_path(
   const int written =
     snprintf(out_path, out_path_capacity, "%s/%s", fixture_dir, relative_path);
   return written >= 0 && (size_t)written < out_path_capacity;
+}
+
+void mln_test_temp_path(const char* name, char* out_path, size_t capacity) {
+  const char* directory = getenv("TMPDIR");
+#if defined(_WIN32)
+  char windows_directory[MAX_PATH + 1];
+  if (directory == NULL || directory[0] == '\0') {
+    const DWORD size =
+      GetTempPathA(sizeof(windows_directory), windows_directory);
+    directory =
+      size > 0 && size < sizeof(windows_directory) ? windows_directory : NULL;
+  }
+  const unsigned long process = (unsigned long)GetCurrentProcessId();
+#else
+  const unsigned long process = (unsigned long)getpid();
+#endif
+  if (directory == NULL || directory[0] == '\0') {
+    directory = ".";
+  }
+  const size_t length = strlen(directory);
+  const bool has_separator = length > 0 && (directory[length - 1] == '/' ||
+                                            directory[length - 1] == '\\');
+  const int written = snprintf(
+    out_path, capacity, "%s%smln-native-%lu-%s", directory,
+    has_separator ? "" : "/", process, name
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    written > 0 && (size_t)written < capacity, "the temporary path does not fit"
+  );
+  (void)remove(out_path);
 }
 
 uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size) {

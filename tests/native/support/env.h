@@ -50,6 +50,9 @@ const char* mln_test_last_error(void);
 // These helpers track what they create per calling thread so the suite can
 // reclaim handles a test left behind. The matching destroy helpers untrack.
 mln_runtime mln_test_create_runtime(void);
+// The same, from options the case fills in. The fixture's event wake replaces
+// options->event_wake.
+mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options);
 mln_status mln_test_runtime_barrier(mln_runtime runtime);
 mln_status mln_test_runtime_close(mln_runtime runtime);
 mln_map mln_test_create_map(mln_runtime runtime);
@@ -86,6 +89,13 @@ bool mln_test_reclaim_thread_resources(void);
 bool mln_test_fixture_path(
   const char* relative_path, char* out_path, size_t out_path_capacity
 );
+
+// Writes a path for `name` in the temporary directory: TMPDIR, the Windows
+// temporary directory, or the working directory when neither is set. The path
+// carries the process ID, so the files a case writes do not collide with
+// another suite's run of the same case. Removes any file already at the path.
+// Fails the case when the path does not fit.
+void mln_test_temp_path(const char* name, char* out_path, size_t capacity);
 
 // Reads relative_path under the fixture directory. On success, returns bytes
 // that the caller frees and writes their length to out_size. Returns null when
