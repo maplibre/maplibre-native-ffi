@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -184,6 +185,13 @@ class SerializedGeoJsonData final : public mln::style::GeoJSONData {
 // tasklet in flight can be that scheduler's last owner, and destroying a
 // ThreadedScheduler on its own worker thread aborts the process on
 // thread::join of the current thread (issue #644).
+//
+// A pinned thread outlives static destruction, so it must not be starting up
+// when the process exits: a MapLibre worker reads the platform settings
+// singleton as its first step. Pinning a scheduler that GetSequenced() has
+// just created therefore waits for its thread to run one task. The caller's
+// reference is then the only one, so no work of the caller's own can be
+// running on that thread.
 auto pin_sequenced_scheduler(const std::shared_ptr<mln::Scheduler>& scheduler)
   -> void {
   struct PinnedSchedulers {
@@ -193,14 +201,23 @@ auto pin_sequenced_scheduler(const std::shared_ptr<mln::Scheduler>& scheduler)
   // Leaked so process exit, not a static destructor joining worker threads
   // mid-teardown, reclaims the pinned threads.
   static auto* pinned = new PinnedSchedulers();
-  const std::scoped_lock lock(pinned->mutex);
-  auto& schedulers = pinned->schedulers;
-  if (
-    std::find(schedulers.begin(), schedulers.end(), scheduler) ==
-    schedulers.end()
-  ) {
+  const auto created = scheduler.use_count() == 1;
+  {
+    const std::scoped_lock lock(pinned->mutex);
+    auto& schedulers = pinned->schedulers;
+    if (
+      std::find(schedulers.begin(), schedulers.end(), scheduler) !=
+      schedulers.end()
+    ) {
+      return;
+    }
     schedulers.push_back(scheduler);
   }
+  if (!created) return;
+  auto started = std::make_shared<std::promise<void>>();
+  auto running = started->get_future();
+  scheduler->schedule([started]() { started->set_value(); });
+  running.wait();
 }
 
 }  // namespace

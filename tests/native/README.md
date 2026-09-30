@@ -29,6 +29,7 @@ same change.
 | `support/`  | The harness and the helpers that the suites share                      |
 | `fixtures/` | Files that the suites read at run time                                 |
 | `plugin/`   | The test plugin, built as a shared library of its own                  |
+| `exit/`     | Programs whose process exit is the check, one per file                 |
 
 The ABI suite, `mln_native_abi_tests`, includes public headers only and links
 the shared library where the platform builds one, so it exercises the export
@@ -55,6 +56,12 @@ Dart VM. The host passes those entry points the address of Dart's
 `NativeApi.postCObject`, so the cases pass a fake that records each message in
 the `Dart_CObject` layout. Where the VM would run a native-pointer finalizer for
 an undelivered message, the case runs it.
+
+Each program in `exit/` makes its calls and returns from `main` at once, so its
+process exits with no harness teardown in between, and a crash at exit fails its
+CTest entry, `native-exit/<file>`. It links the shipped library, as the ABI
+suite does. A behavior belongs there only when process exit is what it promises,
+such as a process that prepares GeoJSON data and exits without a runtime.
 
 ## The internal suite
 
@@ -167,7 +174,7 @@ Each target runs the suites in the shape that suits it:
 
 - **Desktop:** one CTest entry per file, run with `-f /abi/<domain>/<file>.c` or
   `-f /internal/<file>.cpp`, so `ctest --parallel` spreads the suites across
-  processes.
+  processes. Each exit program is one more entry.
 - **Browser:** four CTest entries for the ABI suite, each a page that runs a
   shard of domains: base, completion, and runtime; resources, map, projection,
   and style; render and backend; adapter, platform, and plugin. The internal

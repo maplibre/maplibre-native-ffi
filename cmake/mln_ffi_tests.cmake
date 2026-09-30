@@ -530,6 +530,24 @@ function(mln_native_add_internal_suite out_sources)
   set(${out_sources} ${sources} PARENT_SCOPE)
 endfunction()
 
+# Each exit program makes its calls and returns from main at once, so the
+# process exit that follows is the check. They link the shipped library, as
+# the ABI suite does, and run only where the suites run one process per file.
+function(mln_native_add_exit_tests out_tests)
+  file(GLOB programs CONFIGURE_DEPENDS "${MLN_NATIVE_TESTS_DIR}/exit/*.c")
+  set(tests)
+  foreach(program IN LISTS programs)
+    get_filename_component(NAME "${program}" NAME_WE)
+    set(target "mln_native_exit_${name}")
+    add_executable(${target} "${program}")
+    target_link_libraries(${target} PRIVATE maplibre_native_c)
+    add_test(NAME "native-exit/${name}" COMMAND ${target})
+    set_tests_properties("native-exit/${name}" PROPERTIES TIMEOUT 60)
+    list(APPEND tests "native-exit/${name}")
+  endforeach()
+  set(${out_tests} ${tests} PARENT_SCOPE)
+endfunction()
+
 function(mln_ffi_add_native_tests)
   mln_ffi_add_test_graphics()
   get_target_property(test_supported mln_ffi_platform_dependencies
@@ -587,6 +605,8 @@ function(mln_ffi_add_native_tests)
       set_tests_properties(${test_name} PROPERTIES TIMEOUT 120)
       list(APPEND registered_tests ${test_name})
     endforeach()
+    mln_native_add_exit_tests(exit_tests)
+    list(APPEND registered_tests ${exit_tests})
   endif()
   foreach(test_name IN LISTS registered_tests)
     set_property(TEST ${test_name} PROPERTY ENVIRONMENT ${test_environment})
