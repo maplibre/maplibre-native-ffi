@@ -13,6 +13,7 @@ comptime {
     _ = @import("lifecycle.zig");
     _ = @import("callbacks.zig");
     _ = @import("values.zig");
+    _ = @import("rendering.zig");
     _ = @import("runtime.zig");
     _ = @import("map_lifecycle.zig");
     _ = @import("camera.zig");
@@ -23,8 +24,6 @@ comptime {
     _ = @import("style_sources.zig");
     _ = @import("resources.zig");
     _ = @import("logging.zig");
-    _ = @import("render.zig");
-    _ = @import("surface.zig");
 }
 
 test "package validates the supported C ABI version" {

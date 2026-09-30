@@ -4,7 +4,6 @@
 
 const builtin = @import("builtin");
 const std = @import("std");
-const zigglgen = @import("zigglgen");
 
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
@@ -91,6 +90,10 @@ pub const LinkOptions = struct {
     render_backend: RenderBackend,
     dependency_library_dirs: []const std.Build.LazyPath,
     system_root: ?std.Build.LazyPath,
+    /// Whether to link the render backend's graphics libraries, such as EGL
+    /// and GLESv2, for a consumer that calls them itself. maplibre-native-c
+    /// loads them at run time and needs no link.
+    link_render_backend: bool = true,
 };
 
 pub const DependencyOptions = struct {
@@ -165,8 +168,8 @@ pub fn maybeSystemRootPath(b: *std.Build) ?std.Build.LazyPath {
 
 fn takeTargetLibCPath(b: *std.Build) ?std.Build.LazyPath {
     const path = b.libc_file orelse return null;
-    // `--libc` is a global Zig build option. Keep it off host tools such as
-    // zigglgen, and attach it only to target executables.
+    // `--libc` is a global Zig build option. Keep it off host tools, and attach
+    // it only to target executables.
     b.libc_file = null;
     return lazyPath(path);
 }
@@ -515,12 +518,35 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         addRPaths(module_, runtime_library_dirs);
         module_.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .no });
     }
+    if (!options.link_render_backend) return addPlatformSystemPaths(b, module_, options.target, options.system_root);
     linkRenderBackend(b, module_, .{
         .target = options.target,
         .render_backend = options.render_backend,
         .dependency_library_dirs = options.dependency_library_dirs,
         .system_root = options.system_root,
     });
+}
+
+/// Test executables link no graphics library themselves: tests/graphics loads
+/// the one each backend uses at run time, and a second copy linked beside it,
+/// such as ANGLE's EGL on macOS, would hand the session a context from another
+/// instance of the library.
+fn testLinkOptions(options: BuildOptions) LinkOptions {
+    var link_options = repoLinkOptions(options);
+    link_options.link_render_backend = false;
+    return link_options;
+}
+
+/// The binding module that the test executables import, linked like
+/// `testLinkOptions`.
+fn addTestBindingModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
+    const module_ = b.createModule(.{
+        .root_source_file = b.path("bindings/zig/src/maplibre_native_ffi.zig"),
+        .target = options.target,
+        .optimize = options.optimize,
+    });
+    linkMaplibreNativeC(b, module_, testLinkOptions(options));
+    return module_;
 }
 
 fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
@@ -584,7 +610,7 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
     if (isAppleMobile(options.target)) {
         tests.root_module.addCSourceFile(.{ .file = b.path("src/zig_test_support/ios_simulator_dyld_stub.m") });
     }
-    linkMaplibreNativeC(b, tests.root_module, repoLinkOptions(options));
+    linkMaplibreNativeC(b, tests.root_module, testLinkOptions(options));
     return tests;
 }
 
@@ -629,7 +655,7 @@ fn addShutdownProbe(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *
     if (isAppleMobile(options.target)) {
         probe.root_module.addCSourceFile(.{ .file = b.path("src/zig_test_support/ios_simulator_dyld_stub.m") });
     }
-    linkMaplibreNativeC(b, probe.root_module, repoLinkOptions(options));
+    linkMaplibreNativeC(b, probe.root_module, testLinkOptions(options));
     probe.root_module.addImport("maplibre_native_ffi", maplibre_native_ffi);
     return probe;
 }
@@ -639,37 +665,6 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *s
     tests.root_module.addImport("maplibre_native_ffi", maplibre_native_ffi);
     addTestGraphics(b, tests.root_module, options);
     addRenderBackendOptions(b, tests.root_module, options.render_backend);
-    addRenderBackendTranslateC(b, tests.root_module, .{
-        .target = options.target,
-        .optimize = options.optimize,
-        .include_dirs = options.include_dirs,
-        .render_backend = options.render_backend,
-        .system_root = options.system_root,
-    });
-    if (options.render_backend == .opengl) {
-        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
-            .{ .api = .gles, .version = .@"3.0" }
-        else
-            .{ .api = .gl, .version = .@"3.0" });
-        tests.root_module.addImport("gl", gl_bindings);
-        if (options.target.result.os.tag == .windows) {
-            const wgl_test_context = b.createModule(.{
-                .root_source_file = b.path("src/zig_test_support/wgl_context.zig"),
-                .target = options.target,
-                .optimize = options.optimize,
-            });
-            wgl_test_context.addImport("gl", gl_bindings);
-            tests.root_module.addImport("wgl_test_context", wgl_test_context);
-        }
-    }
-    if (options.render_backend == .metal and options.target.result.os.tag.isDarwin()) {
-        tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_apple.m") });
-        tests.root_module.linkSystemLibrary("objc", .{});
-        tests.root_module.linkFramework("Foundation", .{});
-        if (options.target.result.os.tag == .macos) {
-            tests.root_module.linkFramework("AppKit", .{});
-        }
-    }
     return tests;
 }
 
@@ -766,7 +761,8 @@ pub fn build(b: *std.Build) void {
         .target_libc = target_libc,
     };
 
-    const maplibre_native_ffi = addMaplibreNativeModule(b, options);
+    _ = addMaplibreNativeModule(b, options);
+    const test_binding_module = addTestBindingModule(b, options);
 
     // Each hand-written runtime module's inline tests, and those of the modules
     // it imports, build and run on their own.
@@ -777,8 +773,8 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run Zig binding tests");
 
-    const binding_tests = addBindingTests(b, options, maplibre_native_ffi);
-    const shutdown_probe = addShutdownProbe(b, options, maplibre_native_ffi);
+    const binding_tests = addBindingTests(b, options, test_binding_module);
+    const shutdown_probe = addShutdownProbe(b, options, test_binding_module);
     var test_compiles: [test_sources.len + 2]*std.Build.Step.Compile = undefined;
     test_compiles[0] = binding_tests;
     test_compiles[1] = shutdown_probe;
