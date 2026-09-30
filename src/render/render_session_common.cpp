@@ -12,7 +12,6 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -52,6 +51,7 @@
 #include "render/render_session_common.hpp"
 #include "runtime/runtime.hpp"
 #include "style/style_value.hpp"
+#include "testing/render_clock.hpp"
 
 namespace mln::core {
 
@@ -1222,26 +1222,6 @@ auto enqueue_driver_result_operation(
   );
 }
 
-auto enqueue_blocking_test_render_operation(
-  mln_render_session session, std::atomic_bool* entered,
-  const std::atomic_bool* release, const mln_completion* completion
-) -> mln_status {
-  if (entered == nullptr || release == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return enqueue_driver_operation(
-    session,
-    [entered, release](mln_render_session_object&) {
-      entered->store(true, std::memory_order_release);
-      while (!release->load(std::memory_order_acquire)) {
-        std::this_thread::yield();
-      }
-      return MLN_STATUS_OK;
-    },
-    completion
-  );
-}
-
 auto validate_render_session_attach_request(
   const mln_render_session_attach_options* options,
   const mln_render_session* out_session, const mln_completion* completion
@@ -2335,7 +2315,7 @@ auto run_frame_demand(
   };
   const auto elapsed_ns =
     std::chrono::duration_cast<std::chrono::nanoseconds>(
-      std::chrono::steady_clock::now() - pending.accepted_at
+      mln::testing::render_clock_now() - pending.accepted_at
     )
       .count();
   if (
@@ -2592,7 +2572,7 @@ auto render_session_request_frame(
   live->demands.push_back(
     PendingFrameDemand{
       .demand = *demand,
-      .accepted_at = std::chrono::steady_clock::now(),
+      .accepted_at = mln::testing::render_clock_now(),
       .barrier_epoch = live->barrier_epoch,
     }
   );

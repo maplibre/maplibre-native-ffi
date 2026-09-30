@@ -11,8 +11,6 @@
 
 namespace mln::platform::emscripten {
 
-void setStopSubmittedHook(void (*callback)(void*), void* context);
-
 struct RunLoopWake {
   class Runnable {
    public:

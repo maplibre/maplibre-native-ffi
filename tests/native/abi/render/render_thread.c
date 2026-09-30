@@ -188,121 +188,6 @@ static void a_released_frame_batch_names_no_batch(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void demand_coalescing_preserves_boundaries_and_generations(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  prepare_renderable_map(runtime, map);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  atomic_bool entered;
-  atomic_bool release;
-  atomic_init(&entered, false);
-  atomic_init(&release, false);
-  mln_test_completion blocker = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_session_blocking_operation_create(
-                     fixture.session, &entered, &release, &blocker.descriptor
-                   )
-  );
-  if (fixture.driver == MLN_RENDER_DRIVER_CORE_WORKER) {
-    if (!mln_test_wait_for_flag(&entered)) {
-      // The operation still holds &release, so it has to finish before this
-      // frame's atomics go out of scope with the failing assertion.
-      mln_test_flag_set(&release);
-      mln_test_render_fixture_finish_operation(&fixture, &blocker);
-      mln_test_completion_destroy(&blocker);
-      TEST_FAIL_MESSAGE("the blocking driver operation never ran");
-    }
-  }
-
-  mln_frame_demand first = mln_frame_demand_default();
-  first.flags = 0;
-  first.token = 101;
-  first.coalescing_boundary = 7;
-  mln_frame_demand newest = first;
-  newest.token = 102;
-  mln_frame_demand separate = newest;
-  separate.token = 103;
-  separate.coalescing_boundary = 8;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_request_frame(fixture.session, &first, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_request_frame(fixture.session, &newest, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_request_frame(fixture.session, &separate, NULL)
-  );
-  mln_test_flag_set(&release);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &blocker)
-  );
-  mln_test_completion_destroy(&blocker);
-
-  mln_frame_demand unknown = mln_frame_demand_default();
-  unknown.flags = 1U << 8U;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_render_session_request_frame(fixture.session, &unknown, NULL)
-  );
-
-  mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  TEST_ASSERT_TRUE(wait_for_results(&fixture, 3, &batch));
-  mln_frame_demand later = separate;
-  later.token = 104;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_request_frame(fixture.session, &later, NULL)
-  );
-  mln_render_frame_batch second_batch = MLN_HANDLE_NULL;
-  TEST_ASSERT_TRUE(wait_for_results(&fixture, 1, &second_batch));
-  TEST_ASSERT_EQUAL_UINT64(104, batch_result(second_batch, 0).token);
-  mln_render_frame_batch_release(second_batch);
-  const mln_render_frame_result superseded = batch_result(batch, 0);
-  const mln_render_frame_result rendered = batch_result(batch, 1);
-  const mln_render_frame_result boundary = batch_result(batch, 2);
-  TEST_ASSERT_EQUAL_UINT64(101, superseded.token);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_SUPERSEDED, superseded.disposition
-  );
-  TEST_ASSERT_EQUAL_UINT64(102, rendered.token);
-  TEST_ASSERT_EQUAL_UINT64(103, boundary.token);
-  TEST_ASSERT_GREATER_THAN_UINT64(0, rendered.extent_generation);
-  TEST_ASSERT_GREATER_THAN_UINT64(0, rendered.map_update_generation);
-  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
-    rendered.map_update_generation, boundary.map_update_generation
-  );
-  TEST_ASSERT_GREATER_THAN_UINT64(0, rendered.frame_generation);
-  mln_render_frame_batch_release(batch);
-
-  mln_frame_demand timed_out = mln_frame_demand_default();
-  timed_out.flags = 0;
-  timed_out.token = 105;
-  timed_out.timeout_ns = 1;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_request_frame(fixture.session, &timed_out, NULL)
-  );
-  // Lets the 1 ns deadline pass on the real clock; the render clock seam
-  // replaces this.
-  mln_test_sleep_milliseconds(1);
-  batch = MLN_HANDLE_NULL;
-  TEST_ASSERT_TRUE(wait_for_results(&fixture, 1, &batch));
-  const mln_render_frame_result missed = batch_result(batch, 0);
-  TEST_ASSERT_EQUAL_UINT64(105, missed.token);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_DEADLINE_MISSED, missed.disposition
-  );
-  mln_render_frame_batch_release(batch);
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 static mln_acquired_frame render_and_acquire(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
@@ -879,89 +764,6 @@ static void driver_service_fixes_and_enforces_graphics_thread_identity(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-typedef struct abandon_busy_probe {
-  mln_render_session session;
-  atomic_bool* entered;
-  atomic_bool* release;
-  mln_status status;
-} abandon_busy_probe;
-
-static void abandon_when_driver_enters(void* argument) {
-  abandon_busy_probe* probe = argument;
-  (void)mln_test_wait_for_flag(probe->entered);
-  mln_render_abandon_result result = {
-    .size = sizeof(mln_render_abandon_result)
-  };
-  probe->status = mln_render_session_abandon(probe->session, &result, NULL);
-  atomic_store(probe->release, true);
-}
-
-static void abandon_is_busy_during_a_driver_call_and_changes_nothing(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  atomic_bool entered;
-  atomic_bool release;
-  atomic_init(&entered, false);
-  atomic_init(&release, false);
-  mln_test_completion operation = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_session_blocking_operation_create(
-                     fixture.session, &entered, &release, &operation.descriptor
-                   )
-  );
-
-  mln_status abandon_status = MLN_STATUS_NATIVE_ERROR;
-  if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
-    abandon_busy_probe probe = {
-      .session = fixture.session, .entered = &entered, .release = &release
-    };
-    mln_test_thread* thread =
-      mln_test_thread_start(abandon_when_driver_enters, &probe);
-    size_t serviced = 0;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_session_service_driver_work(
-                       fixture.session, SIZE_MAX, &serviced, NULL
-                     )
-    );
-    mln_test_thread_join(thread);
-    abandon_status = probe.status;
-  } else {
-    if (!mln_test_wait_for_flag(&entered)) {
-      // The operation still holds &release, so it has to finish before this
-      // frame's atomics go out of scope with the failing assertion.
-      mln_test_flag_set(&release);
-      mln_test_render_fixture_finish_operation(&fixture, &operation);
-      mln_test_completion_destroy(&operation);
-      TEST_FAIL_MESSAGE("the blocking driver operation never ran");
-    }
-    mln_render_abandon_result result = {
-      .size = sizeof(mln_render_abandon_result)
-    };
-    abandon_status = mln_render_session_abandon(fixture.session, &result, NULL);
-    mln_test_flag_set(&release);
-  }
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_BUSY, abandon_status);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_render_fixture_finish_operation(&fixture, &operation)
-  );
-  mln_test_completion_destroy(&operation);
-  mln_render_session_snapshot snapshot = {
-    .size = sizeof(mln_render_session_snapshot)
-  };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
-  );
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_ATTACHED, snapshot.state);
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 static void abandon_completes_pending_work_and_invalidates_accessors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -1099,10 +901,8 @@ static void transferred_offscreen_canvas_runs_on_core_worker(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(attach_reports_the_selected_native_driver);
-  RUN_TEST(demand_coalescing_preserves_boundaries_and_generations);
   RUN_TEST(a_released_frame_batch_names_no_batch);
   RUN_TEST(driver_service_fixes_and_enforces_graphics_thread_identity);
-  RUN_TEST(abandon_is_busy_during_a_driver_call_and_changes_nothing);
   RUN_TEST(frame_wake_runs_when_the_result_queue_becomes_nonempty);
   RUN_TEST(texture_ring_leases_apply_backpressure_until_cpu_release);
   RUN_TEST(texture_readback_is_an_ordered_owned_operation_result);

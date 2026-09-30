@@ -44,6 +44,7 @@
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
+#include "testing/sync_point.hpp"
 #include "wake/wake.hpp"
 
 struct OfflineRegionData {
@@ -1134,12 +1135,17 @@ namespace {
 
 // Swaps one callback registration under its own lock and destroys the retired
 // one after the lock is released, so a host's release_user_data never runs with
-// that lock held.
+// that lock held. Taking the lock waits for the callbacks already running.
 template <typename State, typename Registration>
 auto replace_registration(
   State& state, Registration State::* member,
   std::type_identity_t<Registration> next
 ) -> void {
+  if constexpr (std::is_same_v<State, ResourceTransformState>) {
+    mln::testing::hit(mln::testing::SyncPoint::ResourceTransformExclusive);
+  } else if constexpr (std::is_same_v<State, ResourceProviderState>) {
+    mln::testing::hit(mln::testing::SyncPoint::ResourceProviderExclusive);
+  }
   auto previous = Registration{};
   {
     const std::unique_lock lock(state.mutex);
@@ -2880,6 +2886,7 @@ auto has_resource_transform_for_platform_context(
     return false;
   }
 
+  mln::testing::hit(mln::testing::SyncPoint::ResourceTransformLookup);
   const std::shared_lock transform_lock(state->mutex);
   return state->registration != nullptr;
 }
@@ -2894,6 +2901,7 @@ auto invoke_resource_transform(
   }
 
   // Same locking rule as `acquire_resource_provider_for_platform_context()`.
+  mln::testing::hit(mln::testing::SyncPoint::ResourceTransformLookup);
   const std::shared_lock transform_lock(state->mutex);
   const auto registration = state->registration;
   if (registration == nullptr) {

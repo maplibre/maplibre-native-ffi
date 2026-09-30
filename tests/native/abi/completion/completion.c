@@ -72,11 +72,6 @@ static void a_rejected_submission_leaves_callback_state_with_the_caller(void) {
   TEST_ASSERT_EQUAL_UINT32(0, atomic_load(&probe.releases));
 }
 
-static void completion_state_handles_inline_abandonment_and_races(void) {
-  const char* failure = mln_test_completion_contract();
-  TEST_ASSERT_NULL_MESSAGE(failure, failure);
-}
-
 static void record_wake(void* user_data) {
   atomic_fetch_add((atomic_uint*)user_data, 1);
 }
@@ -109,6 +104,5 @@ static void runtime_events_wake_the_receiver_directly(void) {
 MLN_TEST_GROUP {
   RUN_TEST(an_accepted_completion_runs_and_releases_exactly_once);
   RUN_TEST(a_rejected_submission_leaves_callback_state_with_the_caller);
-  RUN_TEST(completion_state_handles_inline_abandonment_and_races);
   RUN_TEST(runtime_events_wake_the_receiver_directly);
 }

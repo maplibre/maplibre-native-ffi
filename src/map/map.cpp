@@ -94,6 +94,7 @@
 #include "operation/operation.hpp"
 #include "runtime/runtime.hpp"
 #include "style/style_value.hpp"
+#include "testing/sync_point.hpp"
 
 namespace {
 
@@ -3057,9 +3058,7 @@ auto retire_disposed_map(RetirementTask* task) noexcept -> void {
   task->run = [](RetirementTask* node) noexcept {
     auto* retiring = static_cast<MapObject*>(node->context);
     auto owned = std::move(retiring->disposal_owner);
-#if defined(MLN_FFI_ENABLE_TEST_HOOKS)
-    if (owned->before_pool_shutdown) owned->before_pool_shutdown();
-#endif
+    mln::testing::hit(mln::testing::SyncPoint::MapPoolShutdown);
     owned->frontend->shutdown_thread_pool();
   };
   map_teardown_lane().submit(*task);
@@ -3198,9 +3197,7 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
       }
       try {
         map_teardown_lane().submit([owned]() mutable {
-#if defined(MLN_FFI_ENABLE_TEST_HOOKS)
-          if (owned->before_pool_shutdown) owned->before_pool_shutdown();
-#endif
+          mln::testing::hit(mln::testing::SyncPoint::MapPoolShutdown);
           owned->frontend->shutdown_thread_pool();
           owned.reset();
         });

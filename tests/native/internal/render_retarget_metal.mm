@@ -1,10 +1,16 @@
+// A Metal surface retarget queued behind a busy driver keeps its replacement
+// layer alive until the driver runs it.
+
 #include <atomic>
 
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
 #import <objc/runtime.h>
 
-#include "test_support.h"
+#include "internal/support/driver_blocker.hpp"
+#include "support/harness.h"
+#include "support/test_support.h"
+#include "unity.h"
 
 @interface MLNTestDeallocationProbe : NSObject
 
@@ -59,10 +65,9 @@ auto teardown(mln_render_session session, const char* failure) -> const char* {
   return failure;
 }
 
-}  // namespace
-
-extern "C" auto mln_test_metal_surface_retarget_retains_submission(mln_map map)
-  -> const char* {
+// Returns the step that failed, or null when the retarget kept the replacement
+// layer alive until the driver ran it.
+auto retarget_retains_submission(mln_map map) -> const char* {
   @autoreleasepool {
     id<MTLDevice> device = MTLCreateSystemDefaultDevice();
     CAMetalLayer* initial_layer = [[CAMetalLayer alloc] init];
@@ -91,23 +96,16 @@ extern "C" auto mln_test_metal_surface_retarget_retains_submission(mln_map map)
 
     // Every later step runs behind one blocking driver operation, so the tail
     // below has to release it and settle its completion on every path.
-    atomic_bool entered = false;
-    atomic_bool release = false;
-    auto blocker = mln_test_completion_default(0);
-    if (
-      failure != nullptr || mln_test_render_session_blocking_operation_create(
-                              session, &entered, &release, &blocker.descriptor
-                            ) != MLN_STATUS_OK
-    ) {
-      discard(blocker);
+    auto blocker = mln::native_tests::DriverBlocker{};
+    if (failure != nullptr || blocker.submit(session) != MLN_STATUS_OK) {
       if (failure == nullptr) {
         failure = "the blocking driver operation was rejected";
       }
       return teardown(session, failure);
     }
-    if (!mln_test_wait_for_flag(&entered)) {
-      atomic_store(&release, true);
-      static_cast<void>(finish(blocker));
+    if (!mln_test_gate_wait_entered(blocker.gate.get())) {
+      mln_test_gate_release(blocker.gate.get());
+      static_cast<void>(finish(blocker.completion));
       return teardown(session, "the blocking driver operation never ran");
     }
 
@@ -133,8 +131,8 @@ extern "C" auto mln_test_metal_surface_retarget_retains_submission(mln_map map)
         "ran it";
     }
 
-    atomic_store(&release, true);
-    if (!finish(blocker) && failure == nullptr) {
+    mln_test_gate_release(blocker.gate.get());
+    if (!finish(blocker.completion) && failure == nullptr) {
       failure = "the blocking driver operation did not complete";
     }
     if (replacement_status != MLN_STATUS_OK) {
@@ -153,3 +151,16 @@ extern "C" auto mln_test_metal_surface_retarget_retains_submission(mln_map map)
     return teardown(session, failure);
   }
 }
+
+void metal_surface_retarget_retains_submission_inputs() {
+  auto runtime = mln_test_create_runtime();
+  auto map = mln_test_create_map(runtime);
+  const char* failure = retarget_retains_submission(map);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_NULL_MESSAGE(failure, failure);
+}
+
+}  // namespace
+
+MLN_TEST_GROUP { RUN_TEST(metal_surface_retarget_retains_submission_inputs); }

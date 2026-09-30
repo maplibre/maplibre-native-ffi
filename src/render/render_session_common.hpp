@@ -702,14 +702,6 @@ using RenderDriverResultCallable =
 
 [[nodiscard]] auto lease_render_session(mln_render_session session)
   -> std::shared_ptr<mln_render_session_object>;
-// Occupies the session's driver until *release is set, publishing *entered
-// once it runs. Reachable from outside the library through the test hook the
-// C ABI suite links; see src/c_api/test_hooks.hpp.
-auto enqueue_blocking_test_render_operation(
-  mln_render_session session, std::atomic_bool* entered,
-  const std::atomic_bool* release, const mln_completion* completion
-) -> mln_status;
-
 auto enqueue_driver_operation(
   mln_render_session session, RenderDriverCallable work,
   const mln_completion* completion

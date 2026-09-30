@@ -24,6 +24,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
+#include "testing/sync_point.hpp"
 
 namespace mln::core {
 
@@ -307,6 +308,7 @@ void retire_request(mln_resource_request_handle handle) noexcept {
         object->state_changed.notify_all();
         return;
       }
+      mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelWait);
       object->state_changed.wait(lock, [&object] {
         return !object->cancel_callback_running;
       });
@@ -490,6 +492,7 @@ auto request_custom_resource(
       object->cancelled = true;
     }
     run_cancel_callback(*object);
+    mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelled);
   });
   try {
     const auto handled = invoke_custom_provider(
@@ -636,9 +639,13 @@ auto wait_for_resource_request_retired(mln_resource_request_handle handle)
   // A callback that released its own request leaves the entry in place until
   // it returns, so a drained request is one whose callback has also returned.
   auto lock = std::unique_lock{live->mutex};
-  live->state_changed.wait(lock, [&live] {
+  const auto drained = [&live] {
     return live->retired && !live->cancel_callback_running;
-  });
+  };
+  if (!drained() && live->cancel_callback_running) {
+    mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelWait);
+  }
+  live->state_changed.wait(lock, drained);
   return MLN_STATUS_OK;
 }
 

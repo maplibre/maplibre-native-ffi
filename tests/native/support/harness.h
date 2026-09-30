@@ -43,9 +43,15 @@ void mln_test_watchdog_note(const char* what);
 #endif
 
 // MLN_TEST_GROUP_NAME comes from CMake per file, so the group's symbol follows
-// the file's path. A test file without a group fails to link.
-#define MLN_TEST_GROUP            \
-  void MLN_TEST_GROUP_NAME(void); \
-  void MLN_TEST_GROUP_NAME(void)
+// the file's path. A test file without a group fails to link. The harness is C,
+// so a C++ file's group keeps C linkage.
+#ifdef __cplusplus
+#define MLN_TEST_GROUP_LINKAGE extern "C"
+#else
+#define MLN_TEST_GROUP_LINKAGE
+#endif
+#define MLN_TEST_GROUP                                   \
+  MLN_TEST_GROUP_LINKAGE void MLN_TEST_GROUP_NAME(void); \
+  MLN_TEST_GROUP_LINKAGE void MLN_TEST_GROUP_NAME(void)
 
 #endif

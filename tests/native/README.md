@@ -47,9 +47,38 @@ that `mln_plugin_get_register_function_v1()` returns to the plugin's entry
 point, and the plugin registers its layer type through that pointer. Emscripten
 builds link the plugin statically, as they do the library.
 
-`internal/` holds `disposal_allocation.cpp`, a fault-injection executable with
-its own runner. It links the static library so that its `operator new`
-replacement applies to native disposal without altering the shipped library.
+## The internal suite
+
+The internal suite, `mln_native_internal_tests`, is C++ that includes `src/`
+headers and links the static library. It holds the cases that no public fence
+can order, and the white-box cases for internal modules with contracts of their
+own, such as the completion state machine and disposal. A case belongs here only
+when the ABI suite cannot express it: first look for a public signal, such as a
+completion that a later command fences, a parked completion, or a stepped frame.
+
+Each file directly under `internal/` is one group, registered the way the ABI
+suite's files are. Its helpers live in `internal/support/`:
+
+| Header                  | Provides                                                      |
+| ----------------------- | ------------------------------------------------------------- |
+| `sync_points.hpp`       | `SyncPointScope`, which counts and holds the library's points |
+| `allocation_faults.hpp` | `AllocationFaults`, which fails every allocation on a thread  |
+| `driver_blocker.hpp`    | `DriverBlocker`, which parks a render driver inside its call  |
+| `resources.hpp`         | Resource provider, transform, and offline download helpers    |
+| `checks.hpp`            | A wait on a C++ predicate, and checks for library threads     |
+
+The library's seams are compiled into every build, and nothing exports them, so
+the objects under test are the shipped ones:
+
+- `src/testing/sync_point.hpp` names the points where a case can observe or park
+  a thread, such as a map's pool shutdown, a writer about to take a resource
+  registration exclusively, or a release blocked on a running cancel callback.
+  With no handler installed, reaching a point costs one relaxed atomic load.
+- `src/testing/render_clock.hpp` is the clock that frame demand deadlines run
+  on. A case advances it rather than waiting for a deadline to pass.
+
+The suite's replacement `operator new` covers the static library's own
+allocations, and throws only on a thread inside an `AllocationFaults` scope.
 
 ## Adding tests
 
@@ -72,9 +101,9 @@ CMake globs `abi/<domain>/*.c`, names each group after its path, and generates
 the registry that the harness walks. A new file or case needs no other edit.
 
 A file whose name ends in a backend or platform tag builds only on matching
-presets: `_metal`, `_vulkan`, `_opengl`, `_webgpu`, `_egl`, `_wgl`, `_webgl`, or
-`_emscripten`. Select a whole file this way rather than skipping its cases at
-run time.
+presets, in either suite: `_metal`, `_vulkan`, `_opengl`, `_webgpu`, `_egl`,
+`_wgl`, `_webgl`, or `_emscripten`. Select a whole file this way rather than
+skipping its cases at run time.
 
 The build enforces the registration rather than trusting review:
 
@@ -100,17 +129,20 @@ accepts Unity's options:
 `TEXT` may list alternatives separated by commas, and `<file>:<case>` selects
 one case in one file. A filter that matches no case fails the run.
 
-Each target runs the ABI suite in the shape that suits it:
+Each target runs the suites in the shape that suits it:
 
-- **Desktop:** one CTest entry per file, run with `-f /abi/<domain>/<file>.c`,
-  so `ctest --parallel` spreads the suite across processes.
-- **Browser:** four CTest entries, each a page that runs a shard of domains:
-  base, completion, and runtime; resources, map, projection, and style; render
-  and backend; adapter, platform, and plugin.
-- **iOS and tvOS simulators:** one CTest entry for the suite, then one for the
+- **Desktop:** one CTest entry per file, run with `-f /abi/<domain>/<file>.c` or
+  `-f /internal/<file>.cpp`, so `ctest --parallel` spreads the suites across
+  processes.
+- **Browser:** four CTest entries for the ABI suite, each a page that runs a
+  shard of domains: base, completion, and runtime; resources, map, projection,
+  and style; render and backend; adapter, platform, and plugin. The internal
+  suite runs as one more page.
+- **iOS and tvOS simulators:** one CTest entry for the ABI suite, one for its
+  plugin group, and one for the internal suite.
+- **Android, OpenHarmony, and musl:** the runner script pushes and runs the ABI
+  suite and then the internal suite, then runs the ABI suite again for the
   plugin group.
-- **Android, OpenHarmony, and musl:** the runner script runs the executable
-  once, then again for the plugin group.
 
 The plugin group runs last because a plugin registration lasts for the rest of
 the process. Every target except the browser also runs it in an invocation of
@@ -124,11 +156,11 @@ case was waiting on when a wait helper recorded it, and aborts the process. The
 scale is 1 on hardware. The runner scripts and CI set it to 3 for emulators,
 simulators, the browser, and software renderers.
 
-CTest bounds each desktop entry at 120 seconds, each browser shard at 180
-seconds, and a simulator's suite and plugin entries at 300 and 120 seconds. The
-browser and simulator runners stop ten seconds short of their entry's bound, so
-the runner reports the timeout rather than CTest. The emulator runners bound
-each executable at 300 seconds.
+CTest bounds each desktop entry at 120 seconds, each browser page at 180
+seconds, and a simulator's ABI suite, plugin, and internal suite entries at 300,
+120, and 120 seconds. The browser and simulator runners stop ten seconds short
+of their entry's bound, so the runner reports the timeout rather than CTest. The
+emulator runners bound each executable at 300 seconds.
 
 ## Support helpers
 
@@ -140,7 +172,6 @@ Test files include `support/test_support.h`, which brings in the helpers below.
 | `env.h`    | Runtime and map fixtures, event draining and waits, fixture files    |
 | `render.h` | The render fixture, driver service, and `mln_test_render_step_until` |
 | `tables.h` | A runner for validation tables                                       |
-| `hooks.h`  | The library's test hooks and the browser run-loop probes             |
 
 Every wait blocks on a signal and gives up at a deadline: 10 seconds times the
 timeout scale unless the wait names another. The signal is the pulse, a
@@ -167,22 +198,9 @@ CMake selects for the preset's backend and OpenGL context provider.
 ### Cases that still wait on a fixed delay
 
 These cases order threads or open a negative window with a fixed delay, which
-the helpers cannot replace directly. Each needs a sync point, the render clock
-seam, or a fence:
+the helpers cannot replace directly. Each needs a sync point, the render clock,
+or a public fence:
 
-- `runtime_teardown_leaves_other_runtimes_responsive`,
-  `resource_transform_lookup_leaves_other_runtimes_responsive`,
-  `clearing_resource_provider_waits_for_in_flight_callback`,
-  `runtime_teardown_waits_for_in_flight_provider_callback`, and the three cases
-  that run `run_release_waits_for_in_flight_cancel_callback`: 200 ms delays
-  inside provider, transform, and cancel callbacks.
-- `cancel_callback_skips_a_completed_request`: a 200 ms window in which no
-  cancel may arrive.
-- `a_barrier_completes_after_preceding_work` and
-  `runtime_release_waits_for_retired_map_cleanup`: 100 ms windows in which a
-  completion must not arrive.
-- `demand_coalescing_preserves_boundaries_and_generations`: a 1 ms delay that
-  lets a 1 ns frame deadline pass on the real clock.
 - `barrier_waits_for_a_demand_parked_by_a_full_ring`: a 50-iteration service
   loop in which a barrier must not complete.
 - `fast_pfor_option_gates_mlt_tile_decoding`: 600 render attempts spaced 1 ms

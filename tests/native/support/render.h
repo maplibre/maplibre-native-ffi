@@ -70,12 +70,6 @@ bool mln_test_transferred_webgl_surface_create(
 );
 #endif
 
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-// Returns the step that failed, or null when the retarget kept the replacement
-// layer alive until the driver ran it.
-const char* mln_test_metal_surface_retarget_retains_submission(mln_map map);
-#endif
-
 // Outcome of building the dedicated EGL surface fixture. Unavailable is a skip;
 // a failed attach is a failure, because it is the behavior under test.
 typedef enum mln_test_fixture_result {

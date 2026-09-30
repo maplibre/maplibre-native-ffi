@@ -14,10 +14,6 @@
 #include "unity.h"
 
 static const char offline_style_url[] = "http://example.com/offline-style.json";
-static const char lookup_blocking_style_url[] =
-  "http://example.com/lookup-blocking-style.json";
-static const char lookup_probe_style_url[] =
-  "http://example.com/lookup-probe-style.json";
 static const char unsupported_scheme_style_url[] =
   "jar:file:/packaged/style.json";
 static const char credentialed_unsupported_scheme_style_url[] =
@@ -781,291 +777,6 @@ static void http_header_transform_rejects_raw_invalid_inputs(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The transform callback and the second runtime executor run concurrently, so
-// every field crosses a thread boundary.
-typedef struct teardown_probe {
-  atomic_bool transform_entered;
-  atomic_bool teardown_started;
-  atomic_bool transform_released;
-  atomic_bool other_runtime_ready;
-  atomic_bool other_runtime_call_done;
-  atomic_bool other_runtime_call_observed;
-  atomic_int other_runtime_status;
-} teardown_probe;
-
-static void mark_transform_released(void* user_data) {
-  teardown_probe* probe = user_data;
-  mln_test_flag_set(&probe->transform_released);
-}
-
-// Wait budgets are generous on purpose: a slow machine delays the passing run
-// instead of turning it red.
-enum {
-  teardown_transform_block_milliseconds = 3000,
-  teardown_call_delay_milliseconds = 200,
-  provider_callback_block_milliseconds = 200,
-};
-
-// The provider callback runs on a MapLibre file source thread while a runtime
-// command clears the provider, so every field crosses a thread boundary.
-typedef struct provider_quiescence_probe {
-  atomic_bool entered;
-  atomic_bool clear_started;
-  atomic_bool callback_returned;
-} provider_quiescence_probe;
-
-// Blocks so the per-runtime transform lock stays held while another thread
-// starts runtime teardown. Calls no C API function while blocked.
-static mln_status blocking_resource_transform(
-  void* user_data, uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
-) {
-  (void)kind;
-  (void)url;
-  teardown_probe* probe = user_data;
-  mln_test_flag_set(&probe->transform_entered);
-  (void)mln_test_wait_for_flag_until(
-    &probe->other_runtime_call_done,
-    mln_test_deadline_after(teardown_transform_block_milliseconds)
-  );
-  atomic_store(
-    &probe->other_runtime_call_observed,
-    atomic_load(&probe->other_runtime_call_done)
-  );
-  if (out_response != NULL) {
-    out_response->url = NULL;
-  }
-  return MLN_STATUS_OK;
-}
-
-// Owns a second runtime and calls into it while the first runtime is blocked
-// inside teardown.
-static void other_runtime_entry(void* argument) {
-  teardown_probe* probe = argument;
-  mln_runtime runtime = MLN_HANDLE_NULL;
-  const mln_runtime_options options = mln_runtime_options_default();
-  const mln_status create_status = mln_runtime_create(&options, &runtime, NULL);
-  if (create_status != MLN_STATUS_OK) {
-    atomic_store(&probe->other_runtime_status, create_status);
-    mln_test_flag_set(&probe->other_runtime_call_done);
-    return;
-  }
-
-  mln_test_flag_set(&probe->other_runtime_ready);
-  mln_test_wait_for_flag(&probe->teardown_started);
-  // Give the teardown thread time to reach the transform wait.
-  mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
-  atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
-  mln_test_flag_set(&probe->other_runtime_call_done);
-  (void)mln_test_runtime_close(runtime);
-}
-
-// Creates a region for `style_url` and activates its download, which requests
-// the style from the MapLibre file source thread that runs the provider and
-// transform callbacks.
-static bool activate_style_download(
-  mln_runtime runtime, const char* style_url
-) {
-  const mln_offline_region_definition definition =
-    offline_tile_definition_for_style(style_url);
-  return create_and_activate_offline_region(runtime, &definition, NULL);
-}
-
-// Waits until `flag` is set by a MapLibre thread.
-static bool start_offline_region_download(
-  mln_runtime runtime, teardown_probe* probe
-) {
-  return activate_style_download(runtime, offline_style_url) &&
-         mln_test_wait_until(runtime, &probe->transform_entered);
-}
-
-// Runtime teardown waits for an in-flight resource transform callback without
-// holding the process-global runtime registry lock, so calls on an unrelated
-// runtime keep running. The callback comes from an offline download, which
-// needs no live map.
-static void runtime_teardown_leaves_other_runtimes_responsive(void) {
-  teardown_probe probe = {0};
-  atomic_store(&probe.other_runtime_status, MLN_STATUS_NATIVE_ERROR);
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_test_thread* other_thread =
-    mln_test_thread_start(other_runtime_entry, &probe);
-  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.other_runtime_ready));
-
-  const mln_resource_transform transform = {
-    .size = sizeof(mln_resource_transform),
-    .callback = blocking_resource_transform,
-    .user_data = &probe,
-    .release_user_data = mark_transform_released,
-  };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, set_resource_transform_committed(runtime, &transform)
-  );
-  TEST_ASSERT_TRUE(start_offline_region_download(runtime, &probe));
-
-  mln_test_flag_set(&probe.teardown_started);
-  // Teardown blocks here until the transform callback returns.
-  mln_test_destroy_runtime(runtime);
-  mln_test_thread_join(other_thread);
-  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.transform_released));
-
-  TEST_ASSERT_TRUE_MESSAGE(
-    atomic_load(&probe.other_runtime_call_observed),
-    "a call on an unrelated runtime was stalled by runtime teardown"
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, atomic_load(&probe.other_runtime_status)
-  );
-}
-
-// The provider callback, the transform callback, and the second runtime's owner
-// thread are three threads, so every field crosses a thread boundary.
-typedef struct lookup_probe {
-  atomic_bool transform_entered;
-  atomic_bool provider_entered;
-  atomic_bool writer_pending;
-  atomic_bool lookup_reached;
-  atomic_bool other_runtime_ready;
-  atomic_bool other_runtime_call_done;
-  atomic_bool other_runtime_call_observed;
-  atomic_int other_runtime_status;
-} lookup_probe;
-
-// Blocks the transform for the first region's style so its shared transform
-// lock stays held, making the pending writer below wait. Calls no C API
-// function while blocked.
-static mln_status lookup_blocking_transform(
-  void* user_data, uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
-) {
-  (void)kind;
-  lookup_probe* probe = user_data;
-  if (out_response != NULL) {
-    out_response->url = NULL;
-  }
-  if (url == NULL || strstr(url, "lookup-blocking") == NULL) {
-    return MLN_STATUS_OK;
-  }
-
-  mln_test_flag_set(&probe->transform_entered);
-  (void)mln_test_wait_for_flag_until(
-    &probe->other_runtime_call_done,
-    mln_test_deadline_after(teardown_transform_block_milliseconds)
-  );
-  atomic_store(
-    &probe->other_runtime_call_observed,
-    atomic_load(&probe->other_runtime_call_done)
-  );
-  return MLN_STATUS_OK;
-}
-
-// Runs on the file source thread immediately before that thread looks up the
-// resource transform. Blocking here parks the thread until the runtime worker
-// has a transform writer waiting; passing the request through then enters the
-// lookup under test.
-static uint32_t lookup_probe_resource_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
-) {
-  (void)handle;
-  lookup_probe* probe = user_data;
-  if (
-    request == NULL || request->requested_url == NULL ||
-    strstr(request->requested_url, "lookup-probe") == NULL
-  ) {
-    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
-  }
-
-  mln_test_flag_set(&probe->provider_entered);
-  mln_test_wait_for_flag(&probe->writer_pending);
-  // Give the runtime worker time to reach the exclusive transform lock, so the
-  // lookup this thread is about to make queues behind a waiting writer.
-  mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
-  mln_test_flag_set(&probe->lookup_reached);
-  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
-}
-
-// Owns a second runtime and calls into it while a file source thread is inside
-// the resource transform lookup for the first runtime.
-static void lookup_other_runtime_entry(void* argument) {
-  lookup_probe* probe = argument;
-  mln_runtime runtime = MLN_HANDLE_NULL;
-  const mln_runtime_options options = mln_runtime_options_default();
-  const mln_status create_status = mln_runtime_create(&options, &runtime, NULL);
-  if (create_status != MLN_STATUS_OK) {
-    atomic_store(&probe->other_runtime_status, create_status);
-    mln_test_flag_set(&probe->other_runtime_call_done);
-    return;
-  }
-
-  mln_test_flag_set(&probe->other_runtime_ready);
-  mln_test_wait_for_flag(&probe->lookup_reached);
-  // Give the file source thread time to reach the lookup itself.
-  mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
-  atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
-  mln_test_flag_set(&probe->other_runtime_call_done);
-  (void)mln_test_runtime_close(runtime);
-}
-
-// A file source resource transform lookup releases the process-global runtime
-// registry lock before it waits on the per-runtime transform lock. The setup
-// below queues that lookup behind a pending writer, where holding the registry
-// lock would stall every unrelated runtime.
-static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
-  lookup_probe probe = {0};
-  atomic_store(&probe.other_runtime_status, MLN_STATUS_NATIVE_ERROR);
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_test_thread* other_thread =
-    mln_test_thread_start(lookup_other_runtime_entry, &probe);
-  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.other_runtime_ready));
-
-  const mln_resource_provider provider = {
-    .size = sizeof(mln_resource_provider),
-    .callback = lookup_probe_resource_provider,
-    .user_data = &probe,
-  };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
-  );
-  const mln_resource_transform transform = {
-    .size = sizeof(mln_resource_transform),
-    .callback = lookup_blocking_transform,
-    .user_data = &probe,
-  };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, set_resource_transform_committed(runtime, &transform)
-  );
-
-  // The first download parks a transform callback inside the shared lock.
-  TEST_ASSERT_TRUE(activate_style_download(runtime, lookup_blocking_style_url));
-  TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.transform_entered));
-
-  // The second download parks a file source thread in the provider callback,
-  // one step ahead of the lookup under test.
-  TEST_ASSERT_TRUE(activate_style_download(runtime, lookup_probe_style_url));
-  TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.provider_entered));
-
-  mln_test_flag_set(&probe.writer_pending);
-  // Clearing waits for the in-flight transform callback to return, so it is
-  // the pending writer the lookup queues behind.
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, clear_resource_transform_committed(runtime)
-  );
-  mln_test_thread_join(other_thread);
-
-  TEST_ASSERT_TRUE_MESSAGE(
-    atomic_load(&probe.lookup_reached),
-    "the file source thread never reached the resource transform lookup"
-  );
-  TEST_ASSERT_TRUE_MESSAGE(
-    atomic_load(&probe.other_runtime_call_observed),
-    "a call on an unrelated runtime was stalled by a resource transform lookup"
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, atomic_load(&probe.other_runtime_status)
-  );
-  mln_test_destroy_runtime(runtime);
-}
-
 static void resource_provider_rejects_raw_invalid_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
@@ -1091,38 +802,24 @@ static void resource_provider_rejects_raw_invalid_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Blocks inside the provider callback so the per-runtime provider lock stays
-// held while the runtime executor clears the provider. It calls no C API
-// function while blocked.
-static uint32_t blocking_resource_provider_for_clear(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
-) {
-  (void)request;
-  (void)handle;
-  provider_quiescence_probe* probe = user_data;
-  mln_test_flag_set(&probe->entered);
-  mln_test_wait_for_flag(&probe->clear_started);
-  // Keep running after clear submission so an implementation that emits the
-  // terminal event too early exposes callback-owned state.
-  mln_test_sleep_milliseconds(provider_callback_block_milliseconds);
-  mln_test_flag_set(&probe->callback_returned);
-  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
-}
+// The provider callback runs on a MapLibre file source thread.
+typedef struct provider_request_probe {
+  atomic_bool entered;
+} provider_request_probe;
 
 // Drives an offline region download until the provider callback runs. The
 // download requests its style from a MapLibre file source thread and needs no
 // live map.
-static bool wait_for_clear_provider_callback(
-  mln_runtime runtime, provider_quiescence_probe* probe
+static bool wait_for_provider_request(
+  mln_runtime runtime, provider_request_probe* probe
 ) {
   const mln_offline_region_definition definition = offline_tile_definition();
   if (!create_and_activate_offline_region(runtime, &definition, NULL)) {
     return false;
   }
-
   return mln_test_wait_until(runtime, &probe->entered);
 }
+
 typedef struct cross_thread_provider_submission {
   mln_runtime runtime;
   mln_resource_provider provider;
@@ -1144,13 +841,15 @@ static uint32_t recording_resource_provider(
 ) {
   (void)request;
   (void)handle;
-  provider_quiescence_probe* probe = user_data;
+  provider_request_probe* probe = user_data;
   mln_test_flag_set(&probe->entered);
-  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  // An unknown decision becomes a handled provider error, which keeps the
+  // request off the network.
+  return UINT32_MAX;
 }
 
 static void resource_provider_command_copies_cross_thread_descriptor(void) {
-  provider_quiescence_probe probe = {0};
+  provider_request_probe probe = {0};
   mln_runtime runtime = mln_test_create_runtime();
   cross_thread_provider_submission submission = {
     .runtime = runtime,
@@ -1176,38 +875,10 @@ static void resource_provider_command_copies_cross_thread_descriptor(void) {
     MLN_STATUS_OK, mln_test_completion_finish(&submission.completion)
   );
   mln_test_completion_destroy(&submission.completion);
-  TEST_ASSERT_TRUE(wait_for_clear_provider_callback(runtime, &probe));
+  TEST_ASSERT_TRUE(wait_for_provider_request(runtime, &probe));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, clear_resource_provider_committed(runtime)
   );
-  mln_test_destroy_runtime(runtime);
-}
-
-// The clear command reaches its terminal event only after a provider callback
-// that was already running returns.
-static void clearing_resource_provider_waits_for_in_flight_callback(void) {
-  provider_quiescence_probe probe = {0};
-  mln_runtime runtime = mln_test_create_runtime();
-  const mln_resource_provider provider = {
-    .size = sizeof(mln_resource_provider),
-    .callback = blocking_resource_provider_for_clear,
-    .user_data = &probe,
-  };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
-  );
-  TEST_ASSERT_TRUE(wait_for_clear_provider_callback(runtime, &probe));
-
-  mln_test_flag_set(&probe.clear_started);
-  // The terminal event waits until the provider callback returns.
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, clear_resource_provider_committed(runtime)
-  );
-  TEST_ASSERT_TRUE_MESSAGE(
-    atomic_load(&probe.callback_returned),
-    "the clear completion ran while a provider callback was still running"
-  );
-
   mln_test_destroy_runtime(runtime);
 }
 
@@ -1368,78 +1039,6 @@ static void resource_provider_defers_inline_release_until_callback_returns(
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&state.completion_status));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-}
-
-typedef struct provider_teardown_probe {
-  atomic_bool entered;
-  atomic_bool teardown_started;
-  atomic_bool callback_returned;
-  atomic_bool released;
-} provider_teardown_probe;
-
-static void mark_provider_released(void* user_data) {
-  provider_teardown_probe* probe = user_data;
-  mln_test_flag_set(&probe->released);
-}
-
-enum {
-  provider_teardown_block_milliseconds = 200,
-};
-
-// Blocks after teardown starts so the test can distinguish teardown waiting
-// for this invocation from teardown returning while callback state is live.
-static uint32_t blocking_resource_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
-) {
-  (void)request;
-  (void)handle;
-  provider_teardown_probe* probe = user_data;
-  mln_test_flag_set(&probe->entered);
-  (void)mln_test_wait_for_flag(&probe->teardown_started);
-  mln_test_sleep_milliseconds(provider_teardown_block_milliseconds);
-  mln_test_flag_set(&probe->callback_returned);
-  // An unknown decision becomes a handled provider error, which keeps the
-  // request off the native network teardown path.
-  return UINT32_MAX;
-}
-
-// An offline download's network request runs on a MapLibre file source thread
-// and needs no live map during runtime teardown.
-static bool wait_for_provider_callback(
-  mln_runtime runtime, provider_teardown_probe* probe
-) {
-  const mln_offline_region_definition definition = offline_tile_definition();
-  if (!create_and_activate_offline_region(runtime, &definition, NULL)) {
-    return false;
-  }
-
-  return mln_test_wait_for_flag(&probe->entered);
-}
-
-// Native retains provider user_data until every in-flight callback returns,
-// even though public runtime release itself does not wait for teardown.
-static void runtime_teardown_waits_for_in_flight_provider_callback(void) {
-  provider_teardown_probe probe = {0};
-  mln_runtime runtime = mln_test_create_runtime();
-  const mln_resource_provider provider = {
-    .size = sizeof(mln_resource_provider),
-    .callback = blocking_resource_provider,
-    .user_data = &probe,
-    .release_user_data = mark_provider_released,
-  };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
-  );
-  TEST_ASSERT_TRUE(wait_for_provider_callback(runtime, &probe));
-
-  mln_test_flag_set(&probe.teardown_started);
-  mln_test_destroy_runtime(runtime);
-  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.released));
-  TEST_ASSERT_TRUE_MESSAGE(
-    atomic_load(&probe.callback_returned),
-    "runtime teardown returned while a provider callback was still running"
-  );
 }
 
 typedef struct cancel_probe {
@@ -1676,199 +1275,6 @@ static void cancel_callback_may_release_the_request(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// MapLibre runs its cancel hook on every request teardown, including after the
-// response was delivered. The C API reports cancellation only for a request the
-// provider has not completed.
-static void cancel_callback_skips_a_completed_request(void) {
-  cancel_probe probe = {0};
-  mln_test_flag_set(&probe.complete_inline);
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = start_cancel_probe_request(runtime, &probe);
-  const mln_resource_request_handle handle = atomic_load(&probe.handle);
-
-  // Let the response reach the style before the map goes away.
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  mln_test_destroy_map(map);
-  // A window in which no cancel may arrive; a fence replaces it.
-  TEST_ASSERT_FALSE(
-    wait_for_cancel_count(&probe, 1, mln_test_deadline_after(200))
-  );
-  bool cancelled = true;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled, NULL)
-  );
-  TEST_ASSERT_FALSE(cancelled);
-  TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.release_count));
-
-  // A registration whose callback never ran retires with the request.
-  mln_resource_request_release(handle);
-  TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
-  TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.release_count));
-  mln_test_destroy_runtime(runtime);
-}
-
-typedef struct blocking_cancel_probe {
-  cancel_probe base;
-  atomic_bool self_release;
-  atomic_bool waiter_drains_instead_of_releasing;
-  atomic_int status_after_self_release;
-  atomic_int complete_status_after_self_release;
-  atomic_bool callback_entered;
-  atomic_bool release_started;
-  atomic_bool release_returned;
-  atomic_bool release_returned_during_callback;
-  atomic_bool callback_returned;
-  atomic_bool callback_returned_before_release;
-} blocking_cancel_probe;
-
-// Runs on the runtime worker thread while the map release discards the request.
-// Waits for the releasing thread to enter its release call, gives it time to
-// return, and records whether it did.
-static void block_in_cancel(void* user_data) {
-  blocking_cancel_probe* probe = user_data;
-  if (atomic_load(&probe->self_release)) {
-    const mln_resource_request_handle handle = atomic_load(&probe->base.handle);
-    mln_resource_request_release(handle);
-    // The entry outlives this callback, but the handle is released: every
-    // other entry point reports it as such.
-    bool cancelled = false;
-    atomic_store(
-      &probe->status_after_self_release,
-      mln_resource_request_cancelled(handle, &cancelled, NULL)
-    );
-    const mln_resource_response response = style_response();
-    atomic_store(
-      &probe->complete_status_after_self_release,
-      mln_resource_request_complete(handle, &response, NULL)
-    );
-  }
-  mln_test_flag_set(&probe->callback_entered);
-  mln_test_wait_for_flag(&probe->release_started);
-  mln_test_sleep_milliseconds(provider_teardown_block_milliseconds);
-  atomic_store(
-    &probe->release_returned_during_callback,
-    atomic_load(&probe->release_returned)
-  );
-  mln_test_flag_set(&probe->callback_returned);
-}
-
-static uint32_t blocking_cancel_resource_provider(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
-) {
-  (void)request;
-  blocking_cancel_probe* probe = user_data;
-  atomic_store(&probe->base.handle, handle);
-  bool cancelled = true;
-  atomic_store(
-    &probe->base.register_status,
-    mln_resource_request_set_cancel_callback(
-      handle, block_in_cancel, probe, NULL, &cancelled, NULL
-    )
-  );
-  atomic_store(&probe->base.register_reported_cancelled, cancelled);
-  mln_test_flag_set(&probe->base.provider_entered);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-}
-
-static void run_release_waits_for_in_flight_cancel_callback(
-  blocking_cancel_probe* probe
-) {
-  mln_runtime runtime = mln_test_create_runtime();
-  const mln_resource_provider provider = {
-    .size = sizeof(mln_resource_provider),
-    .callback = blocking_cancel_resource_provider,
-    .user_data = probe,
-  };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
-  );
-  mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_map_set_style_url(map, "custom://blocking-cancel.json")
-  );
-  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->base.provider_entered));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, atomic_load(&probe->base.register_status)
-  );
-  TEST_ASSERT_FALSE(atomic_load(&probe->base.register_reported_cancelled));
-
-  // The map release submits and returns, so the cancel callback runs on the
-  // runtime worker while this thread does the release it must wait for.
-  mln_test_destroy_map(map);
-  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->callback_entered));
-  mln_test_flag_set(&probe->release_started);
-  if (atomic_load(&probe->waiter_drains_instead_of_releasing)) {
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_resource_request_wait_until_retired(
-                       atomic_load(&probe->base.handle), NULL
-                     )
-    );
-  } else {
-    mln_resource_request_release(atomic_load(&probe->base.handle));
-  }
-  atomic_store(
-    &probe->callback_returned_before_release,
-    atomic_load(&probe->callback_returned)
-  );
-  mln_test_flag_set(&probe->release_returned);
-  TEST_ASSERT_FALSE_MESSAGE(
-    atomic_load(&probe->release_returned_during_callback),
-    "releasing the request returned while the cancel callback was running"
-  );
-  TEST_ASSERT_TRUE(atomic_load(&probe->callback_returned_before_release));
-  if (atomic_load(&probe->self_release)) {
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_INVALID_ARGUMENT,
-      atomic_load(&probe->status_after_self_release)
-    );
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_INVALID_ARGUMENT,
-      atomic_load(&probe->complete_status_after_self_release)
-    );
-  } else {
-    mln_resource_request_release(atomic_load(&probe->base.handle));
-  }
-  bool cancelled = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_resource_request_cancelled(
-      atomic_load(&probe->base.handle), &cancelled, NULL
-    )
-  );
-  mln_test_destroy_runtime(runtime);
-}
-
-// user_data may be freed once release returns, so release waits for a callback
-// still running on another thread. Destroying the map cancels its style request
-// on the runtime worker, so the release runs on the test thread.
-static void release_waits_for_in_flight_cancel_callback(void) {
-  blocking_cancel_probe probe = {0};
-  run_release_waits_for_in_flight_cancel_callback(&probe);
-}
-
-// Release is idempotent, so a release from the test thread must still find the
-// request and wait after the callback released it from inside. Inside that
-// window the released handle already rejects every other entry point.
-static void release_waits_for_a_cancel_callback_that_released_itself(void) {
-  blocking_cancel_probe probe = {0};
-  mln_test_flag_set(&probe.self_release);
-  run_release_waits_for_in_flight_cancel_callback(&probe);
-}
-
-// Teardown drains requests through the wait-until-retired call, so a request
-// whose callback released it from inside is drained only once the callback
-// returns.
-static void wait_until_retired_waits_for_a_self_releasing_cancel_callback(
-  void
-) {
-  blocking_cancel_probe probe = {0};
-  mln_test_flag_set(&probe.self_release);
-  mln_test_flag_set(&probe.waiter_drains_instead_of_releasing);
-  run_release_waits_for_in_flight_cancel_callback(&probe);
-}
-
 MLN_TEST_GROUP {
   RUN_TEST(custom_provider_request_handles_reject_raw_null_handles);
   RUN_TEST(network_status_get_rejects_raw_null_output);
@@ -1884,24 +1290,16 @@ MLN_TEST_GROUP {
   RUN_TEST(resource_transform_rejects_raw_invalid_descriptors);
   RUN_TEST(http_header_transform_registration_follows_the_transport);
   RUN_TEST(http_header_transform_rejects_raw_invalid_inputs);
-  RUN_TEST(runtime_teardown_leaves_other_runtimes_responsive);
-  RUN_TEST(resource_transform_lookup_leaves_other_runtimes_responsive);
   RUN_TEST(resource_provider_rejects_raw_invalid_descriptors);
   RUN_TEST(resource_provider_registration_releases_owned_state);
   RUN_TEST(resource_provider_command_copies_cross_thread_descriptor);
-  RUN_TEST(clearing_resource_provider_waits_for_in_flight_callback);
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);
   RUN_TEST(releasing_a_claimed_request_without_a_response_fails_it);
   RUN_TEST(releasing_a_request_inside_its_callback_then_claiming_fails_it);
   RUN_TEST(unsupported_style_url_diagnostic_redacts_credentials);
   RUN_TEST(unsupported_style_url_names_declining_provider);
   RUN_TEST(resource_provider_defers_inline_release_until_callback_returns);
-  RUN_TEST(runtime_teardown_waits_for_in_flight_provider_callback);
   RUN_TEST(cancel_callback_runs_when_map_discards_request);
   RUN_TEST(late_cancel_callback_registration_reports_cancelled);
   RUN_TEST(cancel_callback_may_release_the_request);
-  RUN_TEST(cancel_callback_skips_a_completed_request);
-  RUN_TEST(release_waits_for_in_flight_cancel_callback);
-  RUN_TEST(release_waits_for_a_cancel_callback_that_released_itself);
-  RUN_TEST(wait_until_retired_waits_for_a_self_releasing_cancel_callback);
 }

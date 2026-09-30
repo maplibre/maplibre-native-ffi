@@ -14,17 +14,7 @@
 #include <mln/util/run_loop.hpp>
 
 #include "run_loop_wake.hpp"
-
-#if defined(MLN_FFI_ENABLE_TEST_HOOKS)
-namespace mln::platform::emscripten {
-namespace {
-thread_local std::pair<void (*)(void*), void*> after_stop_submitted{};
-}
-void setStopSubmittedHook(void (*callback)(void*), void* context) {
-  after_stop_submitted = {callback, context};
-}
-}  // namespace mln::platform::emscripten
-#endif
+#include "testing/sync_point.hpp"
 
 namespace mln {
 namespace util {
@@ -93,16 +83,10 @@ void RunLoop::runOnce() {
 }
 
 void RunLoop::stop() {
-#if defined(MLN_FFI_ENABLE_TEST_HOOKS)
-  const auto hook =
-    std::exchange(platform::emscripten::after_stop_submitted, {});
-#endif
   // invoke() publishes and wakes under the queue lock. The worker can destroy
   // this loop as soon as that lock is released, so touch no members afterwards.
   invoke([this] { impl->running = false; });
-#if defined(MLN_FFI_ENABLE_TEST_HOOKS)
-  if (hook.first) hook.first(hook.second);
-#endif
+  mln::testing::hit(mln::testing::SyncPoint::EmscriptenRunLoopStopSubmitted);
 }
 
 void RunLoop::updateTime() {}

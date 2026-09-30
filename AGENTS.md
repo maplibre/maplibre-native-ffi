@@ -160,6 +160,9 @@ sentence-level style, page structure, and project terminology.
   targets where they run.
 - For tests that _must_ reach below the bindings, there are dedicated C tests in
   `tests/native`.
+- C tests exercise the public ABI by default. The internal suite in
+  `tests/native/internal` and the seams in `src/testing` are a fallback for
+  orderings that no public fence reaches, and they stay unexported.
 - Each binding's test suite should stand on its own for the C API domains and
   targets it supports, using public binding APIs to validate both native
   workflows and binding-owned safety behavior.
