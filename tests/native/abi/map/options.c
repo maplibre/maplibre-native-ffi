@@ -247,6 +247,22 @@ static void verify_free_camera_position(
   TEST_ASSERT_GREATER_THAN_DOUBLE(0.0, got->position.z);
 }
 
+static void verify_free_camera_orientation(
+  const char* label, const mln_map_snapshot* snapshot, const void* input
+) {
+  const mln_free_camera_options* sent = input;
+  const mln_free_camera_options* got = &snapshot->free_camera;
+  TEST_ASSERT_TRUE_MESSAGE(
+    (got->fields & MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0U, label
+  );
+  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
+    1e-9, sent->orientation.z, got->orientation.z, label
+  );
+  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
+    1e-9, sent->orientation.w, got->orientation.w, label
+  );
+}
+
 static mln_status submit_event_mask(
   mln_map map, const void* input, const mln_completion* completion
 ) {
@@ -406,6 +422,15 @@ static const snapshot_row snapshot_rows[] = {
      .position = {.x = 0.25, .y = 0.25, .z = 0.5},
    },
    verify_free_camera_position},
+  // A quarter turn about the vertical axis.
+  {"free camera orientation", submit_free_camera,
+   &(const mln_free_camera_options){
+     .size = sizeof(mln_free_camera_options),
+     .fields = MLN_FREE_CAMERA_OPTION_ORIENTATION,
+     .orientation =
+       {.x = 0.0, .y = 0.0, .z = 0.7071067811865476, .w = 0.7071067811865476},
+   },
+   verify_free_camera_orientation},
   {"zoom and pitch limits", submit_bounds,
    &(const mln_bound_options){
      .size = sizeof(mln_bound_options),

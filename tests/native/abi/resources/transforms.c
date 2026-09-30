@@ -513,6 +513,75 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
     mln_test_http_server_stop(server);
   }
 
+  // Keeps every URL, and records the kind of the last request it saw.
+  static mln_status record_kind(
+    void* user_data, uint32_t kind, const char* url,
+    mln_resource_transform_response* out_response
+  ) {
+    (void)url;
+    (void)out_response;
+    atomic_store((atomic_uint*)user_data, kind);
+    return MLN_STATUS_OK;
+  }
+
+  // An image source's request reaches both transforms as an image request.
+  static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
+    static const uint8_t body[] = {0};
+    static const mln_test_http_route routes[] = {
+      {.path = "/picture.png", .body = body, .body_size = sizeof(body)},
+    };
+    mln_test_http_server* server = mln_test_http_server_start(routes, 1);
+    mln_runtime runtime = mln_test_create_runtime();
+    token_transform headers;
+    install_token_transform(runtime, &headers);
+    atomic_uint resource_kind;
+    atomic_init(&resource_kind, 0);
+    const mln_resource_transform transform = {
+      .size = sizeof(mln_resource_transform),
+      .callback = record_kind,
+      .user_data = &resource_kind,
+    };
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_test_set_resource_transform(runtime, &transform)
+    );
+    mln_map map = mln_test_create_map(runtime);
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_test_map_set_style_json(map, mln_test_empty_style_json)
+    );
+
+    char url[256];
+    mln_test_http_server_url(server, "/picture.png", url, sizeof(url));
+    char source[512];
+    const int written = snprintf(
+      source, sizeof(source),
+      "{\"type\":\"image\",\"url\":\"%s\",\"coordinates\":"
+      "[[-1,1],[1,1],[1,-1],[-1,-1]]}",
+      url
+    );
+    TEST_ASSERT_TRUE(written > 0 && (size_t)written < sizeof(source));
+    MLN_TEST_AWAIT_COMMAND(
+      MLN_STATUS_OK,
+      mln_map_add_style_source_json(
+        map, MLN_BUFFER_LITERAL("picture"),
+        (mln_buffer_view){.data = source, .size = (size_t)written},
+        &completion.descriptor, NULL
+      )
+    );
+    // Both transforms run before the request leaves.
+    TEST_ASSERT_TRUE(
+      mln_test_http_server_wait_for_requests(server, "/picture.png", 1)
+    );
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RESOURCE_KIND_IMAGE, atomic_load(&resource_kind)
+    );
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RESOURCE_KIND_IMAGE, atomic_load(&headers.last_kind)
+    );
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+    mln_test_http_server_stop(server);
+  }
+
 #endif
 
 #if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
@@ -698,5 +767,9 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
     RUN_TEST(a_header_transform_adds_headers_until_cleared);
     RUN_TEST(a_header_transform_skips_requests_that_are_not_http);
     RUN_TEST(a_redirect_keeps_headers_only_within_the_origin);
+    RUN_TEST(a_header_transform_adds_headers_until_cleared);
+    RUN_TEST(a_header_transform_skips_requests_that_are_not_http);
+    RUN_TEST(a_redirect_keeps_headers_only_within_the_origin);
+    RUN_TEST(an_image_source_request_reaches_the_transforms_as_an_image);
 #endif
   }

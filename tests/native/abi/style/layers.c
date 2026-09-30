@@ -653,6 +653,22 @@ static mln_status set_indicator_image(
     MLN_BUFFER_LITERAL("arrow"), completion, NULL
   );
 }
+static mln_status set_indicator_top_image(
+  mln_map map, mln_buffer_view layer, const mln_completion* completion
+) {
+  return mln_map_set_location_indicator_image_name(
+    map, layer, MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP,
+    MLN_BUFFER_LITERAL("dot"), completion, NULL
+  );
+}
+static mln_status set_indicator_shadow_image(
+  mln_map map, mln_buffer_view layer, const mln_completion* completion
+) {
+  return mln_map_set_location_indicator_image_name(
+    map, layer, MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW,
+    MLN_BUFFER_LITERAL("halo"), completion, NULL
+  );
+}
 
 static mln_status set_indicator_top_image(
   mln_map map, mln_buffer_view layer, const mln_completion* completion
@@ -693,6 +709,9 @@ static void location_indicator_setters_write_its_properties(void) {
      "\"name\":\"arrow\""},
     {"top image", set_indicator_top_image, "top-image",
      "\"name\":\"puck-top\""},
+    {"top image", set_indicator_top_image, "top-image", "\"name\":\"dot\""},
+    {"shadow image", set_indicator_shadow_image, "shadow-image",
+     "\"name\":\"halo\""},
   };
   for (size_t index = 0; index < sizeof(setters) / sizeof(setters[0]);
        index += 1) {

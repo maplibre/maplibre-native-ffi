@@ -167,6 +167,8 @@ typedef struct custom_kind {
   const char* source_layer;
   // A layer that draws the source, so its tiles become required.
   const char* layer_json;
+  // The type the source's info reports.
+  uint32_t source_type;
   mln_status (*add)(
     mln_map map, custom_probe* probe, enum add_variant variant,
     const mln_completion* completion
@@ -182,6 +184,7 @@ static const custom_kind kinds[] = {
     .source_layer = NULL,
     .layer_json = "{\"id\":\"custom-dots\",\"type\":\"circle\",\"source\":"
                   "\"custom-geometry\"}",
+    .source_type = MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR,
     .add = add_geometry_source,
     .deliver_point = deliver_geometry_point,
     .invalidate_root = invalidate_geometry_tile,
@@ -192,6 +195,7 @@ static const custom_kind kinds[] = {
     .source_layer = "points",
     .layer_json = "{\"id\":\"custom-dots\",\"type\":\"circle\",\"source\":"
                   "\"custom-mvt-vector\",\"source-layer\":\"points\"}",
+    .source_type = MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR,
     .add = add_mvt_source,
     .deliver_point = deliver_mvt_point,
     .invalidate_root = invalidate_mvt_tile,
@@ -619,6 +623,37 @@ static void a_region_invalidation_refetches_only_the_tiles_inside_it(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Each kind of custom source reports its own type through the source info.
+static void each_custom_source_reports_its_own_type(void) {
+  FOR_EACH_KIND(kind) {
+    mln_runtime runtime = mln_test_create_runtime();
+    mln_map map = mln_test_create_map(runtime);
+    custom_probe probe;
+    init_probe(&probe);
+    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+    add_source(kind, map, &probe);
+
+    mln_test_completion info =
+      mln_test_completion_default(sizeof(mln_style_source_result));
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_map_get_style_source_info(
+        map, mln_test_view_of(kind->source_id), &info.descriptor, NULL
+      )
+    );
+    mln_style_source_result result = {0};
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_test_completion_finish_value(&info, &result, sizeof(result))
+    );
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
+      kind->source_type, result.info.type, kind->name
+    );
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+  }
+}
+
 static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
   const custom_kind* kind = &kinds[1];
   mln_runtime runtime = mln_test_create_runtime();
@@ -839,6 +874,7 @@ MLN_TEST_GROUP {
   RUN_TEST(fetches_follow_the_rendered_tiles);
   RUN_TEST(a_delivered_tile_becomes_features_and_invalidation_refetches_it);
   RUN_TEST(a_region_invalidation_refetches_only_the_tiles_inside_it);
+  RUN_TEST(each_custom_source_reports_its_own_type);
   RUN_TEST(tile_delivery_and_invalidate_accept_an_empty_tile);
   RUN_TEST(tile_operations_reject_the_other_custom_source_kind);
   RUN_TEST(custom_sources_take_every_option_they_declare);

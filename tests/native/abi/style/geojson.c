@@ -410,6 +410,20 @@ static void prepared_data_must_match_the_source_options(void) {
   );
   mln_geojson_source_data_destroy(synchronous_data);
 
+  // So is the cluster radius.
+  mln_geojson_source_options wider = clustered;
+  wider.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+  wider.cluster_radius = 120;
+  mln_geojson_source_data wider_data = prepare(points, &wider);
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "do not match",
+    mln_map_set_geojson_source_data(
+      map, MLN_BUFFER_LITERAL("clustered"), wider_data, &completion.descriptor,
+      NULL
+    )
+  );
+  mln_geojson_source_data_destroy(wider_data);
+
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

@@ -139,6 +139,11 @@ static void owned_with_undersized_provider(void* call) {
 static void owned_without_shared_context(void* call) {
   clear_shared_context(&owned_of(call)->context);
 }
+#if !defined(MLN_FFI_TEST_OPENGL_WGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+static void owned_without_egl_display(void* call) {
+  owned_of(call)->context.data.egl.display = NULL;
+}
+#endif
 #if defined(MLN_FFI_TEST_OPENGL_WGL)
 // A WGL owned texture borrows a window's device context, so it cannot hand
 // its graphics state to a core worker.
@@ -250,6 +255,10 @@ static void opengl_attach_rejects_malformed_calls(void) {
      MLN_STATUS_INVALID_ARGUMENT, "size is too small"},
     {"no shared context", owned_without_shared_context,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
+#if !defined(MLN_FFI_TEST_OPENGL_WGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+    {"no EGL display", owned_without_egl_display, MLN_STATUS_INVALID_ARGUMENT,
+     "EGL display and config must not be null"},
+#endif
 #if defined(MLN_FFI_TEST_OPENGL_WGL)
     {"a dedicated WGL context", dedicated_wgl_owned_texture,
      MLN_STATUS_UNSUPPORTED, "require EGL or a transferred WebGL canvas"},

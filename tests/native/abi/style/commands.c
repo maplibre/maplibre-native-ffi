@@ -509,6 +509,97 @@ static void the_loaded_style_reads_back_as_the_loaded_document(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void read_global_state(mln_map map, char* out, size_t capacity) {
+  mln_test_completion completion = mln_test_completion_buffer_view();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_global_state(map, &completion.descriptor, NULL)
+  );
+  bool found = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_style_finish_text(&completion, out, capacity, &found)
+  );
+  TEST_ASSERT_TRUE(found);
+}
+
+static void set_global_state(mln_map map, const char* value) {
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK, mln_map_set_global_state_property(
+                     map, MLN_BUFFER_LITERAL("theme"), mln_test_view_of(value),
+                     &completion.descriptor, NULL
+                   )
+  );
+}
+
+// Global state starts from the defaults the style declares. A set property
+// shadows its default until it is set to null, and loading another style
+// discards both.
+static void global_state_reads_back_defaults_and_set_properties(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_set_style_json(
+                     map, MLN_BUFFER_LITERAL(
+                            "{\"version\":8,\"sources\":{},\"layers\":[],"
+                            "\"state\":{\"theme\":{\"default\":\"light\"}}}"
+                          )
+                   )
+  );
+  char state[128];
+  read_global_state(map, state, sizeof(state));
+  TEST_ASSERT_EQUAL_STRING("{\"theme\":\"light\"}", state);
+
+  set_global_state(map, "[\"dark\",{\"enabled\":true}]");
+  read_global_state(map, state, sizeof(state));
+  TEST_ASSERT_EQUAL_STRING("{\"theme\":[\"dark\",{\"enabled\":true}]}", state);
+
+  set_global_state(map, "null");
+  read_global_state(map, state, sizeof(state));
+  TEST_ASSERT_EQUAL_STRING("{\"theme\":\"light\"}", state);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_set_style_json(map, mln_test_empty_style_json)
+  );
+  read_global_state(map, state, sizeof(state));
+  TEST_ASSERT_EQUAL_STRING("{}", state);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void read_loaded_style_json(mln_map map, char* out, size_t capacity) {
+  mln_test_completion completion = mln_test_completion_buffer_view();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_loaded_style_json(map, &completion.descriptor, NULL)
+  );
+  bool found = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_style_finish_text(&completion, out, capacity, &found)
+  );
+  TEST_ASSERT_TRUE(found);
+}
+
+// The loaded document reads back byte for byte, so a host can reload it
+// unchanged, and a map that parsed nothing reads back empty.
+static void the_loaded_style_document_reads_back_as_loaded(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  char document[128];
+  read_loaded_style_json(map, document, sizeof(document));
+  TEST_ASSERT_EQUAL_STRING("", document);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_set_style_json(map, mln_test_empty_style_json)
+  );
+  read_loaded_style_json(map, document, sizeof(document));
+  TEST_ASSERT_EQUAL_size_t(mln_test_empty_style_json.size, strlen(document));
+  TEST_ASSERT_EQUAL_MEMORY(
+    mln_test_empty_style_json.data, document, mln_test_empty_style_json.size
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // Reads the style's transition configuration back through the ordered query.
 static mln_style_transition_options read_transition_options(mln_map map) {
   mln_test_completion completion =
@@ -736,6 +827,8 @@ MLN_TEST_GROUP {
   RUN_TEST(global_state_starts_from_style_defaults_and_takes_sets);
   RUN_TEST(the_loaded_style_reads_back_as_the_loaded_document);
   RUN_TEST(the_loaded_style_serializes_as_json);
+  RUN_TEST(global_state_reads_back_defaults_and_set_properties);
+  RUN_TEST(the_loaded_style_document_reads_back_as_loaded);
   RUN_TEST(a_loaded_style_reports_the_300_ms_transition_default);
   RUN_TEST(style_transition_options_reject_unsafe_raw_input);
   RUN_TEST(the_style_light_round_trips_through_json);
