@@ -164,6 +164,12 @@ static void ambient_cache_changes_reach_the_next_request(void) {
     mln_map first = load_style(runtime);
     apply_change(runtime, row);
     mln_map second = load_style(runtime);
+    // A kept entry loads the style from the cache before its revalidation
+    // reaches the provider.
+    TEST_ASSERT_TRUE_MESSAGE(
+      mln_test_provider_wait_for_requests(provider, cached_style_url, 2),
+      row->label
+    );
 
     const mln_test_provider_request* next =
       mln_test_provider_request_at(provider, cached_style_url, 1);
