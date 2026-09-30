@@ -1149,12 +1149,18 @@ auto submit_driver_work(
   const auto registered =
     create_completion_operation(completion, std::move(deliver), async);
   if (registered != MLN_STATUS_OK) return registered;
-  if (!enqueue_work_if_attached(live, make_work(live, async.operation))) {
-    async.completion->reject();
-    set_thread_error("render session is not attached");
-    return MLN_STATUS_INVALID_STATE;
+  {
+    const auto lock = std::scoped_lock{live->control_mutex};
+    if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
+      async.completion->reject();
+      set_thread_error("render session is not attached");
+      return MLN_STATUS_INVALID_STATE;
+    }
+    // Accepted before the driver can take the work, so the driver, rather
+    // than this thread, delivers a completion that finishes early.
+    async.completion->accept();
+    push_driver_work_locked(*live, make_work(live, async.operation));
   }
-  async.completion->accept();
   return MLN_STATUS_OK;
 }
 
@@ -3276,6 +3282,9 @@ auto render_session_barrier_start(
       set_thread_error("render session is not attached");
       return MLN_STATUS_INVALID_STATE;
     }
+    // Accepted before the driver can settle the barrier, so the driver, rather
+    // than this thread, delivers its completion.
+    async.completion->accept();
     const auto epoch = ++live->barrier_epoch;
     // The barrier waits for the demands accepted before it, not merely for the
     // queue position it takes: a demand parked by a full texture ring gives up
@@ -3287,7 +3296,6 @@ auto render_session_barrier_start(
       *live, RenderDriverWork{[live]() { settle_barriers(*live); }, {}}
     );
   }
-  async.completion->accept();
   return MLN_STATUS_OK;
 }
 
