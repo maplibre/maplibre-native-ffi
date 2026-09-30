@@ -75,6 +75,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0030-custom-geometry-query-before-data.patch"
   "$repo_root/patches/maplibre-native/0031-webgpu-frame-stats.patch"
   "$repo_root/patches/maplibre-native/0032-in-memory-database-reset.patch"
+  "$repo_root/patches/maplibre-native/0033-process-lifetime-thread-state.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the

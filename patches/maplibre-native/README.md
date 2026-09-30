@@ -163,6 +163,15 @@ the working directory, which deleted any such file there and failed where the
 directory was read-only. The C suite's ambient cache reset case covers it.
 Upstream: not yet filed.
 
+`0033-process-lifetime-thread-state.patch` gives process lifetime to the state
+that a MapLibre thread reads as it starts: the platform settings singleton,
+which holds thread priorities, and the network status observer set, which each
+online file source thread joins. A file source thread that started while the
+process exited otherwise locked a mutex that static destruction had already
+destroyed. The Zig binding's shutdown probe, which returns from main with a
+runtime and a map live, crashed this way in about one run in five on the Android
+emulator. Upstream: not yet filed.
+
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 publication patch includes the transition setters for our bearing-accuracy

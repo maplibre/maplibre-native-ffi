@@ -1,0 +1,89 @@
+diff --git a/include/mln/storage/network_status.hpp b/include/mln/storage/network_status.hpp
+--- a/include/mln/storage/network_status.hpp
++++ b/include/mln/storage/network_status.hpp
+@@ -27,8 +27,6 @@ public:
+ 
+ private:
+     static std::atomic<bool> online;
+-    static std::mutex mtx;
+-    static std::unordered_set<util::AsyncTask*> observers;
+ };
+ 
+ } // namespace mln
+diff --git a/src/mln/platform/settings.cpp b/src/mln/platform/settings.cpp
+--- a/src/mln/platform/settings.cpp
++++ b/src/mln/platform/settings.cpp
+@@ -25,8 +25,11 @@ Settings::Settings()
+     : impl(std::make_unique<Impl>()) {}
+ 
+ Settings& Settings::getInstance() noexcept {
+-    static Settings instance;
+-    return instance;
++    // Never destroyed: a thread reads its priority setting here as it starts,
++    // and a thread that starts during process exit would otherwise lock the
++    // mutex of an instance that static destruction already released.
++    static auto* const instance = new Settings();
++    return *instance;
+ }
+ 
+ void Settings::set(const std::string& key, mapbox::base::Value value) noexcept {
+diff --git a/src/mln/storage/network_status.cpp b/src/mln/storage/network_status.cpp
+--- a/src/mln/storage/network_status.cpp
++++ b/src/mln/storage/network_status.cpp
+@@ -10,8 +10,22 @@
+ namespace mln {
+ 
+ std::atomic<bool> NetworkStatus::online(true);
+-std::mutex NetworkStatus::mtx;
+-std::unordered_set<util::AsyncTask *> NetworkStatus::observers;
++
++namespace {
++
++// Never destroyed: a file source thread subscribes as it starts, which can be
++// while the process exits.
++struct Observers {
++    std::mutex mutex;
++    std::unordered_set<util::AsyncTask *> tasks;
++};
++
++Observers &observers() {
++    static auto *const instance = new Observers();
++    return *instance;
++}
++
++} // namespace
+ 
+ NetworkStatus::Status NetworkStatus::Get() {
+     if (online) {
+@@ -31,13 +45,15 @@ void NetworkStatus::Set(Status status) {
+ }
+ 
+ void NetworkStatus::Subscribe(util::AsyncTask *async) {
+-    std::scoped_lock lock(NetworkStatus::mtx);
+-    observers.insert(async);
++    auto &state = observers();
++    std::scoped_lock lock(state.mutex);
++    state.tasks.insert(async);
+ }
+ 
+ void NetworkStatus::Unsubscribe(util::AsyncTask *async) {
+-    std::scoped_lock lock(NetworkStatus::mtx);
+-    observers.erase(async);
++    auto &state = observers();
++    std::scoped_lock lock(state.mutex);
++    state.tasks.erase(async);
+ }
+ 
+ void NetworkStatus::Reachable() {
+@@ -45,8 +61,9 @@ void NetworkStatus::Reachable() {
+         return;
+     }
+ 
+-    std::scoped_lock lock(NetworkStatus::mtx);
+-    for (auto async : observers) { // NOLINT(bugprone-nondeterministic-pointer-iteration-order)
++    auto &state = observers();
++    std::scoped_lock lock(state.mutex);
++    for (auto async : state.tasks) { // NOLINT(bugprone-nondeterministic-pointer-iteration-order)
+         async->send();
+     }
+ }
