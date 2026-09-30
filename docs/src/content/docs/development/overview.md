@@ -279,7 +279,8 @@ one suite against it, and writes `build/coverage/<suite>/lcov.info` and
 which is the default, or a binding name such as `rust`. The preset instruments
 the project's own sources with clang source-based coverage, so the report covers
 `src/` alone and leaves out MapLibre Native and the test sources. The preset
-builds on macOS, and the task uses the LLVM tools that ship with Xcode.
+builds on macOS, and the task uses the LLVM tools that ship with Xcode. Each run
+executes the suite again, past Go's test cache and Gradle's up-to-date checks.
 
 Before you delete a binding test, compare that binding's report with the C
 suite's report:

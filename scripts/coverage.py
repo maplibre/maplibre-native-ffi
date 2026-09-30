@@ -83,6 +83,9 @@ def main() -> int:
     # %p keeps one file per process, and %m one per instrumented binary, so
     # parallel test processes never write the same file.
     env = {**os.environ, "LLVM_PROFILE_FILE": str(profiles / "%m-%p.profraw")}
+    # Go caches test results without tracking the profiles a run writes, so a
+    # cached run would write none.
+    env["GOFLAGS"] = " ".join(filter(None, (env.get("GOFLAGS"), "-count=1")))
     print(f"Running {task} {args.preset} with coverage", flush=True)
     tests = subprocess.run(["mise", "run", task, args.preset], env=env, check=False)
 

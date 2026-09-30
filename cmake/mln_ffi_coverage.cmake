@@ -53,11 +53,14 @@ function(mln_ffi_configure_coverage_objects target)
 endfunction()
 
 # A shared library carries the profile runtime itself. An in-tree static
-# library passes the link flag on to whatever links it.
+# library passes the link flag on to whatever links it. Both export
+# mln_ffi_coverage_write_profile, uninstrumented, for hosts that exit without
+# running the runtime's exit hook.
 function(mln_ffi_configure_coverage_library target)
   if(NOT MLN_FFI_ENABLE_COVERAGE)
     return()
   endif()
+  target_sources(${target} PRIVATE ${PROJECT_SOURCE_DIR}/src/coverage/profile.c)
   get_target_property(type ${target} TYPE)
   if(type STREQUAL "SHARED_LIBRARY")
     target_link_options(${target} PRIVATE -fprofile-instr-generate)

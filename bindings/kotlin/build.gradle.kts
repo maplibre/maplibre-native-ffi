@@ -1,4 +1,5 @@
 import java.time.Duration
+import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
@@ -357,6 +358,14 @@ tasks.named<Test>("jvmTest") {
     inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
   }
   testLogging { exceptionFormat = TestExceptionFormat.FULL }
+}
+
+// A coverage run needs the tests to execute, because Gradle does not track the
+// native profiles they write. An up-to-date or cached result would write none.
+if (providers.environmentVariable("LLVM_PROFILE_FILE").isPresent) {
+  tasks.withType<AbstractTestTask>().configureEach {
+    doNotTrackState("A coverage run records native profiles on every run")
+  }
 }
 
 tasks.withType<KotlinNativeTest>().configureEach {
