@@ -46,6 +46,14 @@ class GenerationTests(unittest.TestCase):
                         PROTOCOL_GAPS.get((group, language), set()),
                         coverage["unsupported"],
                     )
+                    # No declaration disappears without a reason. Support
+                    # functions back the generated values that call them.
+                    self.assertEqual(
+                        set(coverage["generated"])
+                        | set(coverage["unsupported"])
+                        | set(coverage.get("support", ())),
+                        {function.name for function in api.public_functions},
+                    )
 
     def rendered(self, emitter, api):
         output = emitter.generate(api)

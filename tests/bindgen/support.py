@@ -38,13 +38,17 @@ def protocol_header(
     return "\n".join([*lines, PROTOCOLS.read_text(), source, ""])
 
 
+# Fixture switches that change the base declarations rather than add a shape.
+_BASE_SWITCHES = {"STANDARD_TYPES", "COMPLETION_RUNTIME"}
+
+
 def protocol_groups() -> tuple[str, ...]:
     """The fixture's declaration groups, in file order."""
     names = re.findall(
         r"^#ifdef MLN_PROTOCOL_(\w+)$", PROTOCOLS.read_text(), re.MULTILINE
     )
     return tuple(
-        dict.fromkeys(name.lower() for name in names if name != "STANDARD_TYPES")
+        dict.fromkeys(name.lower() for name in names if name not in _BASE_SWITCHES)
     )
 
 
@@ -75,8 +79,10 @@ def parse_directory(directory: Path, clang_args: tuple[str, ...] = ()) -> Api:
     """Parse a header directory once per distinct content and arguments.
 
     The model records locations relative to the directory, so identical input
-    in another directory produces an equal model. Models are immutable, so
-    tests share them.
+    in another directory produces an equal model. Tests share each model, so
+    neither a test nor the generator may change one. The dataclasses are
+    frozen, but their `metadata` dicts are not, so code that adjusts metadata
+    copies it first.
     """
     key = _digest(directory, clang_args)
     if key not in _MODELS:
