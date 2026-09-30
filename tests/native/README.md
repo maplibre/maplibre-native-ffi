@@ -47,6 +47,12 @@ that `mln_plugin_get_register_function_v1()` returns to the plugin's entry
 point, and the plugin registers its layer type through that pointer. Emscripten
 builds link the plugin statically, as they do the library.
 
+The adapter group tests the Dart entry points of `callback_adapter.h` without a
+Dart VM. The host passes those entry points the address of Dart's
+`NativeApi.postCObject`, so the cases pass a fake that records each message in
+the `Dart_CObject` layout. Where the VM would run a native-pointer finalizer for
+an undelivered message, the case runs it.
+
 ## The internal suite
 
 The internal suite, `mln_native_internal_tests`, is C++ that includes `src/`
@@ -205,6 +211,11 @@ adds a URL source never reaches the network. `MLN_TEST_EXPECT_COMMAND_FAILED`
 expects a command to fail after it was accepted, and
 `MLN_TEST_EXPECT_COMMAND_REJECTED` expects its submission to fail. A copied
 result that overflows its buffer fails the case instead of truncating.
+
+The adapter cases also include `support/adapter.h` directly. It provides a
+completion listener that keeps its record, committed resource provider changes,
+and a map that the handle fixtures do not record, for a case in which an adapter
+owner disposes it.
 
 Every wait blocks on a signal and gives up at a deadline: 10 seconds times the
 timeout scale unless the wait names another. The signal is the pulse, a
