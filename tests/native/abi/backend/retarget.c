@@ -49,21 +49,45 @@ static void restore_fixture_context(const mln_test_render_fixture* fixture) {
 }
 
 // A surface replacement leaves the new surface configured for the session. A
-// Metal layer reports the drawable size the session gave it; the other
-// backends' surfaces report nothing a host can read.
+// Metal layer reports the drawable size the session gave it, so the case first
+// shrinks the layer tests/graphics sized to the target; the other backends'
+// surfaces report nothing a host can read.
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+typedef struct layer_size {
+  double width;
+  double height;
+} layer_size;
+
+static id metal_layer(const mln_test_graphics_surface* surface) {
+  mln_test_graphics_surface_info info = {0};
+  TEST_ASSERT_TRUE(mln_test_graphics_surface_get_info(surface, &info));
+  return (id)info.metal_layer;
+}
+
+static layer_size drawable_size(const mln_test_graphics_surface* surface) {
+  return ((layer_size (*)(id, SEL))objc_msgSend)(
+    metal_layer(surface), sel_registerName("drawableSize")
+  );
+}
+#endif
+
+static void unconfigure_surface(const mln_test_graphics_surface* surface) {
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  ((void (*)(id, SEL, layer_size))objc_msgSend)(
+    metal_layer(surface), sel_registerName("setDrawableSize:"),
+    (layer_size){1.0, 1.0}
+  );
+  TEST_ASSERT_EQUAL_INT(1, (int)drawable_size(surface).width);
+#else
+  (void)surface;
+#endif
+}
+
 static void expect_surface_configured(
   const mln_test_graphics_surface* surface
 ) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  typedef struct layer_size {
-    double width;
-    double height;
-  } layer_size;
-  mln_test_graphics_surface_info info = {0};
-  TEST_ASSERT_TRUE(mln_test_graphics_surface_get_info(surface, &info));
-  const layer_size size = ((layer_size (*)(id, SEL))objc_msgSend)(
-    (id)info.metal_layer, sel_registerName("drawableSize")
-  );
+  const layer_size size = drawable_size(surface);
   TEST_ASSERT_EQUAL_INT(MLN_TEST_HOST_TARGET_SIZE, (int)size.width);
   TEST_ASSERT_EQUAL_INT(MLN_TEST_HOST_TARGET_SIZE, (int)size.height);
 #else
@@ -277,6 +301,7 @@ static void a_surface_retarget_presents_through_the_new_surface(void) {
   mln_test_graphics_surface* replacement =
     mln_test_render_fixture_new_surface(fixture);
   TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());
+  unconfigure_surface(replacement);
   mln_test_completion completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT_MESSAGE(
     MLN_STATUS_OK,
