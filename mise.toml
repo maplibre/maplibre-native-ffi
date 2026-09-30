@@ -248,11 +248,14 @@ outputs = { auto = true }
 # The loader component holds the graphics implementation a host supplies for
 # itself, which the package deliberately leaves out. Installing it here is what
 # lets the fixtures and examples drive the API the way a host does; presets
-# whose loader comes from the platform or an SDK install nothing.
+# whose loader comes from the platform or an SDK install nothing. The
+# test-graphics component, also left out of the package, holds the GPU fixtures
+# that binding suites load.
 run = [
   { task = "//:check-cross-sdk", args = ["{{usage.preset}}"] },
   '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
+  'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component test-graphics',
 ]
 
 [tasks.select-clangd-preset]

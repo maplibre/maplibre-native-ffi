@@ -285,6 +285,12 @@ local fixture. The `test-hygiene` check in hk runs
 reserved host in test code. Its baseline, `scripts/test-hygiene-baseline.toml`,
 counts the violations that predate the check, and a count may only fall.
 
+Tests take their GPU objects from `tests/graphics`, a small C library that
+creates a device or context, a borrowed texture, and a presentation surface for
+Metal, Vulkan, EGL, and WGL. The C suite links it, and `mise run build` installs
+it as `mln_test_graphics` beside the native library for the binding suites to
+load over their FFI. Its README lists how each binding loads it.
+
 Use examples for demos and behavior that needs manual validation, such as visual
 output, interactive input, or host graphics integration.
 

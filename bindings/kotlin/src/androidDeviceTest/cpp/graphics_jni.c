@@ -1,24 +1,30 @@
 #include <jni.h>
 #include <stdint.h>
 
-#include "GraphicsSupport.h"
+#include "mln_test_graphics.h"
 
 JNIEXPORT jlongArray JNICALL
 Java_org_maplibre_nativeffi_render_TestVulkanDriver_create(
   JNIEnv* env, jobject self
 ) {
   (void)self;
-  mln_test_graphics* graphics = mln_test_graphics_create(true);
+  mln_test_graphics* graphics =
+    mln_test_graphics_create(MLN_TEST_GRAPHICS_BACKEND_VULKAN);
   if (!graphics) return NULL;
+  mln_test_graphics_context context;
+  if (!mln_test_graphics_get_context(graphics, &context)) {
+    mln_test_graphics_destroy(graphics);
+    return NULL;
+  }
   const jlong values[] = {
     (jlong)(uintptr_t)graphics,
-    (jlong)(uintptr_t)graphics->instance,
-    (jlong)(uintptr_t)graphics->physical_device,
-    (jlong)(uintptr_t)graphics->device,
-    (jlong)(uintptr_t)graphics->queue,
-    (jlong)graphics->queue_family,
-    (jlong)(uintptr_t)graphics->get_instance_proc_addr,
-    (jlong)(uintptr_t)graphics->get_device_proc_addr,
+    (jlong)(uintptr_t)context.vulkan_instance,
+    (jlong)(uintptr_t)context.vulkan_physical_device,
+    (jlong)(uintptr_t)context.vulkan_device,
+    (jlong)(uintptr_t)context.vulkan_queue,
+    (jlong)context.vulkan_queue_family_index,
+    (jlong)(uintptr_t)context.vulkan_get_instance_proc_addr,
+    (jlong)(uintptr_t)context.vulkan_get_device_proc_addr,
   };
   jlongArray result = (*env)->NewLongArray(env, 8);
   if (!result) {

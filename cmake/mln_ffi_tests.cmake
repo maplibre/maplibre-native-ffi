@@ -1,6 +1,8 @@
 # Builds the native suites under tests/native and registers how each target
 # runs them. See tests/native/README.md for the layout and the rules.
 
+include(mln_ffi_test_graphics)
+
 set(MLN_NATIVE_TESTS_DIR "${PROJECT_SOURCE_DIR}/tests/native")
 
 # The ABI suite's domains, one directory each under tests/native/abi, in the
@@ -503,6 +505,7 @@ function(mln_native_add_internal_suite out_sources)
 endfunction()
 
 function(mln_ffi_add_native_tests)
+  mln_ffi_add_test_graphics()
   find_program(MLN_FFI_UV_EXECUTABLE uv REQUIRED)
   add_test(
     NAME binding-contracts

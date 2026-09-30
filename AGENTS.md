@@ -174,6 +174,9 @@ sentence-level style, page structure, and project terminology.
 - Avoid trivial tests, tests that verify constants, tests that assert a negative
   (unless valuable), tests that simply test third party code; we want to keep
   our test suite robust and high-value.
+- GPU contexts, textures, and surfaces in tests come from `tests/graphics`,
+  which the C suite links and each binding loads over its FFI. See
+  [tests/graphics/README.md](tests/graphics/README.md).
 - Example apps don't need tests.
 - Every test skip should be strictly justified. We do not skip rendering tests
   because the CI environment doesn't support them; we fix the environment.

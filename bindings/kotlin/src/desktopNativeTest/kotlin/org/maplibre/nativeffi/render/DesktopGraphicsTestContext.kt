@@ -2,8 +2,13 @@
 
 package org.maplibre.nativeffi.render
 
-import kotlinx.cinterop.pointed
+import cnames.structs.mln_test_graphics
+import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
 import kotlinx.cinterop.rawValue
+import kotlinx.cinterop.toKString
 import org.maplibre.nativeffi.generated.EglContextDescriptor
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapHandle
@@ -16,8 +21,13 @@ import org.maplibre.nativeffi.generated.RenderBackendFlag
 import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
+import org.maplibre.nativeffi.internal.graphics.MLN_TEST_GRAPHICS_BACKEND_EGL
+import org.maplibre.nativeffi.internal.graphics.MLN_TEST_GRAPHICS_BACKEND_VULKAN
+import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_context
 import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_create
 import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_destroy
+import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_get_context
+import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_last_error
 import org.maplibre.nativeffi.internal.graphics.mln_test_graphics_make_current
 
 internal fun attachDesktopOwnedTexture(
@@ -29,15 +39,17 @@ internal fun attachDesktopOwnedTexture(
   val backends = GeneratedApi.supportedRenderBackendMask()
   val vulkan = RenderBackendFlag.VULKAN in backends
   check(vulkan || RenderBackendFlag.OPENGL in backends) { "No desktop test driver for $backends" }
+  val backend = if (vulkan) MLN_TEST_GRAPHICS_BACKEND_VULKAN else MLN_TEST_GRAPHICS_BACKEND_EGL
   val graphics =
-    checkNotNull(mln_test_graphics_create(vulkan)) {
-      "Test graphics driver initialization failed: $backends"
+    checkNotNull(mln_test_graphics_create(backend.toUInt())) {
+      "Test graphics driver initialization failed: ${lastGraphicsError()}"
     }
   if (!vulkan && !mln_test_graphics_make_current(graphics)) {
+    val reason = lastGraphicsError()
     mln_test_graphics_destroy(graphics)
-    error("EGL test context creation failed")
+    error("EGL test context creation failed: $reason")
   }
-  val state = graphics.pointed
+  val state = TestGraphicsContext.of(graphics)
   return attachOwnedTextureFixture(
     map,
     width,
@@ -50,13 +62,13 @@ internal fun attachDesktopOwnedTexture(
           VulkanOwnedTextureDescriptor(
             extent,
             VulkanContextDescriptor(
-              NativePointer.ofAddress(state.instance.rawValue.toLong()),
-              NativePointer.ofAddress(state.physical_device.rawValue.toLong()),
-              NativePointer.ofAddress(state.device.rawValue.toLong()),
-              NativePointer.ofAddress(state.queue.rawValue.toLong()),
-              state.queue_family,
-              NativePointer.ofAddress(state.get_instance_proc_addr.rawValue.toLong()),
-              NativePointer.ofAddress(state.get_device_proc_addr.rawValue.toLong()),
+              NativePointer.ofAddress(state.vulkanInstance),
+              NativePointer.ofAddress(state.vulkanPhysicalDevice),
+              NativePointer.ofAddress(state.vulkanDevice),
+              NativePointer.ofAddress(state.vulkanQueue),
+              state.vulkanQueueFamilyIndex,
+              NativePointer.ofAddress(state.vulkanGetInstanceProcAddr),
+              NativePointer.ofAddress(state.vulkanGetDeviceProcAddr),
             ),
           ),
           options,
@@ -69,9 +81,9 @@ internal fun attachDesktopOwnedTexture(
               OpenglContextOwnership.SHARED,
               OpenglContextDescriptorData.Egl(
                 EglContextDescriptor(
-                  NativePointer.ofAddress(state.display.rawValue.toLong()),
-                  NativePointer.ofAddress(state.config.rawValue.toLong()),
-                  NativePointer.ofAddress(state.context.rawValue.toLong()),
+                  NativePointer.ofAddress(state.eglDisplay),
+                  NativePointer.ofAddress(state.eglConfig),
+                  NativePointer.ofAddress(state.eglContext),
                   OpenglClientApi.GLES,
                   NativePointer.NULL_POINTER,
                 )
@@ -88,4 +100,41 @@ internal fun attachDesktopOwnedTexture(
     },
     releaseGraphics = { mln_test_graphics_destroy(graphics) },
   )
+}
+
+private fun lastGraphicsError(): String = mln_test_graphics_last_error()?.toKString().orEmpty()
+
+/** The handles of a tests/graphics context, as addresses. */
+private class TestGraphicsContext(
+  val vulkanInstance: Long,
+  val vulkanPhysicalDevice: Long,
+  val vulkanDevice: Long,
+  val vulkanQueue: Long,
+  val vulkanQueueFamilyIndex: UInt,
+  val vulkanGetInstanceProcAddr: Long,
+  val vulkanGetDeviceProcAddr: Long,
+  val eglDisplay: Long,
+  val eglConfig: Long,
+  val eglContext: Long,
+) {
+  companion object {
+    fun of(graphics: CPointer<mln_test_graphics>): TestGraphicsContext = memScoped {
+      val context = alloc<mln_test_graphics_context>()
+      check(mln_test_graphics_get_context(graphics, context.ptr)) {
+        "Test graphics context lookup failed: ${lastGraphicsError()}"
+      }
+      TestGraphicsContext(
+        context.vulkan_instance.rawValue.toLong(),
+        context.vulkan_physical_device.rawValue.toLong(),
+        context.vulkan_device.rawValue.toLong(),
+        context.vulkan_queue.rawValue.toLong(),
+        context.vulkan_queue_family_index,
+        context.vulkan_get_instance_proc_addr.rawValue.toLong(),
+        context.vulkan_get_device_proc_addr.rawValue.toLong(),
+        context.egl_display.rawValue.toLong(),
+        context.egl_config.rawValue.toLong(),
+        context.egl_context.rawValue.toLong(),
+      )
+    }
+  }
 }
