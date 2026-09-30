@@ -33,7 +33,9 @@ function's contract.
   create the targets that borrowed texture and surface descriptors name. Their
   `get_info` functions return the handles.
 - `mln_test_graphics_texture_read_rgba8()` copies a borrowed texture's pixels to
-  memory, so a test can check what a session rendered into it.
+  memory, so a test can check what a session rendered into it. It shares the
+  core's queue or context unsynchronized, so a test reads directly after a
+  fence, such as a finished render barrier.
 
 The library loads each graphics API at run time and links none. It looks for the
 Vulkan loader in `MLN_FFI_VULKAN_LOADER_DIR` first, then at the path that the
@@ -79,21 +81,23 @@ links `dl` on Linux, or `user32` and `gdi32` on Windows.
 
 Each binding loads the library the way it loads `maplibre-native-c`, from
 `build/<preset>/install`. The handles come back as pointers and 64-bit integers,
-which the binding passes to its own descriptor types.
+which the binding passes to its own descriptor types. The rows marked planned
+describe the mechanism a binding adopts when its GPU fixture moves here; until
+then, that binding keeps its own fixture.
 
-| Binding        | How it loads the library                                                                                                                                   |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C              | Links `mln_test_graphics_objects` in CMake.                                                                                                                |
-| Go             | `#cgo pkg-config: mln-test-graphics` in `internal/testsupport`, with `PKG_CONFIG_PATH` at the install's `share/pkgconfig`.                                 |
-| Rust           | A dev-only `build.rs` step emits `cargo:rustc-link-lib=mln_test_graphics` and the install's `lib` search path, and declares the functions in `extern "C"`. |
-| Zig            | `@cImport(@cInclude("mln_test_graphics.h"))`, with the install's `include` and `lib` added to the test step and `linkSystemLibrary("mln_test_graphics")`.  |
-| Python         | `ctypes.CDLL` on the library path, with `Structure` classes for the three info structs.                                                                    |
-| .NET           | `[LibraryImport("mln_test_graphics")]`, resolved through the same `NativeLibrary` import resolver as the C API.                                            |
-| Dart           | `DynamicLibrary.open` on the library path, with `Struct` classes for the info structs.                                                                     |
-| Kotlin/JVM     | FFM `SymbolLookup.libraryLookup` on the library path.                                                                                                      |
-| Kotlin/Native  | A cinterop definition over `mln_test_graphics.h`, linking `graphics.c` compiled by Gradle.                                                                 |
-| Kotlin/Android | A JNI shim compiled with `graphics.c` by the NDK, loaded with `System.loadLibrary`.                                                                        |
-| Swift          | The `GraphicsSupport` SwiftPM target, which compiles `graphics.c` from this directory.                                                                     |
+| Binding        | Status  | How it loads the library                                                                                                                                   |
+| -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C              | In use  | Links `mln_test_graphics_objects` in CMake.                                                                                                                |
+| Go             | In use  | `#cgo pkg-config: mln-test-graphics` in `internal/testsupport`, with `PKG_CONFIG_PATH` at the install's `share/pkgconfig`.                                 |
+| Swift          | In use  | The `GraphicsSupport` SwiftPM target, which compiles `graphics.c` from this directory.                                                                     |
+| Kotlin/Native  | In use  | A cinterop definition over `mln_test_graphics.h`, linking `graphics.c` compiled by Gradle.                                                                 |
+| Kotlin/Android | In use  | A JNI shim compiled with `graphics.c` by the NDK, loaded with `System.loadLibrary`.                                                                        |
+| Rust           | Planned | A dev-only `build.rs` step emits `cargo:rustc-link-lib=mln_test_graphics` and the install's `lib` search path, and declares the functions in `extern "C"`. |
+| Zig            | Planned | `@cImport(@cInclude("mln_test_graphics.h"))`, with the install's `include` and `lib` added to the test step and `linkSystemLibrary("mln_test_graphics")`.  |
+| Python         | Planned | `ctypes.CDLL` on the library path, with `Structure` classes for the three info structs.                                                                    |
+| .NET           | Planned | `[LibraryImport("mln_test_graphics")]`, resolved through the same `NativeLibrary` import resolver as the C API.                                            |
+| Dart           | Planned | `DynamicLibrary.open` on the library path, with `Struct` classes for the info structs.                                                                     |
+| Kotlin/JVM     | Planned | FFM `SymbolLookup.libraryLookup` on the library path.                                                                                                      |
 
 A binding that runs its tests on a device, such as through the Android or
 OpenHarmony emulator runners, pushes the library beside its test executables, as

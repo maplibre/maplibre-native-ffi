@@ -160,9 +160,11 @@ MLN_TEST_GRAPHICS_API bool mln_test_graphics_texture_get_info(
 
 // Copies the texture's pixels into `pixels` as 8-bit RGBA, row 0 of the
 // texture first. Which row of a rendered map lands in row 0 depends on the
-// backend. `size` must be at least width * height * 4. Call it only while no
-// session is rendering into the texture, because the copy runs on the
-// context's own queue or context.
+// backend. `size` must be at least width * height * 4. The copy submits on the
+// context's own queue or share group, which the core's worker also uses with
+// no other synchronization, so call it only directly after a fence that leaves
+// every session on the context idle, such as a finished render barrier or a
+// completed detach.
 MLN_TEST_GRAPHICS_API bool mln_test_graphics_texture_read_rgba8(
   mln_test_graphics_texture* MLN_TEST_GRAPHICS_NONNULL texture,
   uint8_t* MLN_TEST_GRAPHICS_NONNULL pixels, size_t size

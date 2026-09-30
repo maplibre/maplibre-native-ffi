@@ -46,6 +46,7 @@ let targets: [Target] = [
   .target(
     name: "GraphicsSupport",
     path: "tests/graphics",
+    exclude: ["README.md"],
     cSettings: [
       .headerSearchPath(
         "../../third_party/maplibre-native/vendor/Vulkan-Headers/include"

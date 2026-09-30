@@ -2,8 +2,10 @@
 #define MLN_NATIVE_TESTS_RENDER_H
 
 // The backend-neutral render fixture: an owned texture target attached with a
-// context the fixture creates for the preset's backend. Each backend's context
-// lives in its own render_<backend>.c, which CMake selects by preset.
+// context the fixture creates for the preset's backend. On native targets the
+// context comes from tests/graphics through render_graphics.c; in the browser
+// it comes from render_webgl.c or render_webgpu.c, which CMake selects by
+// preset.
 
 #include <stdatomic.h>
 #include <stdbool.h>
