@@ -296,3 +296,9 @@ line. Each listed line needs a C test, or a reason that the C suite cannot reach
 it on that preset. Coverage records which lines ran and nothing about what a
 test asserted, so check that a C test asserts the behavior that the binding test
 checked.
+
+`mise run check-export-calls` runs with the other repository checks. It fails
+when a function that a public header declares with `MLN_API` appears by name in
+no C test source. `tests/uncalled-exports.txt` lists the functions that no C
+test calls yet. The check also fails when a listed function is called, so the
+list only shrinks; `mise run check-export-calls --prune` removes those names.

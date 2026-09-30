@@ -31,6 +31,19 @@ local lintSteps = new Mapping<String, Step> {
   ["snapshot-scopes"] {
     check = "mise run ci:check-snapshot-scopes"
   }
+  // Whole-suite check: a header change can export a function that no C test
+  // calls, and a test change can call one that tests/uncalled-exports.txt
+  // still lists.
+  ["export-calls"] {
+    glob = List(
+      "include/**/*.h",
+      "src/c_api/tests/**",
+      "tests/native/**",
+      "tests/uncalled-exports.txt",
+      "scripts/check-export-calls.py",
+    )
+    check = "mise run check-export-calls"
+  }
   ["jvl"] {
     glob = List("**/*.json", "**/*.jsonc")
     check = "jvl check {{files}}"

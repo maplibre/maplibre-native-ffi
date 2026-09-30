@@ -12,6 +12,11 @@ contracts that every binding would otherwise test again: completion delivery,
 disposal order, event payloads, render-session driving, resource providers, and
 style edits.
 
+Every function that a public header exports is called by name somewhere in these
+sources. `mise run check-export-calls` fails on an exported function that no
+test calls unless `tests/uncalled-exports.txt` lists it. Adding a call to a
+listed function means dropping its line from that file in the same change.
+
 ## Layout
 
 | Directory   | Contents                                                               |

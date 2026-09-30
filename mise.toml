@@ -371,6 +371,10 @@ run = 'python3 scripts/coverage.py "$usage_suite" --preset "$usage_preset"'
 description = "List src/ lines that one coverage report hits and another misses."
 run = 'python3 scripts/coverage-diff.py "$@"'
 
+[tasks.check-export-calls]
+description = "Check that the C tests call every exported function by name."
+run = 'python3 scripts/check-export-calls.py "$@"'
+
 [tasks."android-sdk-packages"]
 description = "Install the pinned Android SDK packages into $ANDROID_HOME."
 # The `android-*` presets name the pinned NDK, so an SDK without it configures no
