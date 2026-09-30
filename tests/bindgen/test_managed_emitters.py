@@ -6,24 +6,11 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from support import parse
+
 from tools.bindgen.emitters import dart, dotnet, kotlin
 from tools.bindgen.emitters.dotnet_values import Values
-from tools.bindgen.frontend import parse_headers
 from tools.bindgen.schema import validate
-
-PRELUDE = """
-#define BIND(x) __attribute__((annotate("mln:" x)))
-typedef unsigned long long mln_map;
-typedef int mln_status;
-typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
-typedef struct mln_completion { void *state; } mln_completion;
-typedef struct mln_buffer_view { const void *data; unsigned long size; } mln_buffer_view;
-"""
-# Kotlin generates operations only for receivers that are handles.
-MAP_HANDLE = (
-    'typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_close;'
-    'dispose=mln_map_close;parent=none");'
-)
 
 
 class ManagedEmitterTests(unittest.TestCase):
@@ -37,15 +24,7 @@ class ManagedEmitterTests(unittest.TestCase):
         ]
 
     def test_dotnet_new_owner_uses_shared_release_and_copy_reservation(self):
-        api = self.parse("""
-typedef unsigned long long mln_measurement BIND("kind=handle;release=mln_measurement_close;dispose=mln_measurement_close;parent=none");
-BIND("execution=immediate")
-mln_status mln_measurement_create(mln_measurement *out_owner BIND("direction=out;ownership=owned"), mln_diagnostic *out_diagnostic);
-BIND("execution=immediate")
-void mln_measurement_close(mln_measurement owner);
-BIND("execution=immediate")
-mln_status mln_measurement_read(mln_measurement owner, double *out_value BIND("direction=out"), mln_diagnostic *out_diagnostic);
-""")
+        api = self.parse(groups=("child_owner",))
         emitted = dotnet.emit(api)
         self.assertEqual(emitted.unsupported, {})
         source = emitted.files["Metrics/MeasurementHandle.Operations.g.cs"]
@@ -125,20 +104,19 @@ mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("ki
         self.assertIn("CallbackAdmission.scope(root.owner,", values)
         self.assertIn("CallbackRoots.release(context.address())", values)
 
-    def parse(self, source, header="metrics.h", map_handle=False):
-        prelude = PRELUDE
-        if map_handle:
-            prelude = prelude.replace("typedef unsigned long long mln_map;", MAP_HANDLE)
-            prelude += 'BIND("execution=immediate") void mln_map_close(mln_map map);\n'
+    def parse(self, source="", header="metrics.h", map_handle=False, groups=()):
+        # Kotlin generates operations only for receivers that are handles.
         source = re.sub(
             r'BIND\("([^"\n]*)"\)(\s+mln_status mln_map_\w+\(mln_map map)',
             r'BIND("receiver=map;\1")\2',
             source,
         )
-        with TemporaryDirectory() as directory:
-            path = Path(directory)
-            (path / header).write_text(prelude + source)
-            api = parse_headers(path)
+        api = parse(
+            source,
+            groups=groups,
+            defines=("MLN_PROTOCOL_MAP_CLOSE",) if map_handle else (),
+            header=header,
+        )
         validate(api)
         return api
 
@@ -223,16 +201,7 @@ mln_status mln_notice_set_callback(mln_notice_callback callback, void *context B
         )
 
     def test_dart_owners_come_from_handle_plans(self):
-        api = self.parse("""
-typedef unsigned long long mln_measurement BIND("kind=handle;release=mln_measurement_close;dispose=mln_measurement_close;parent=none");
-typedef unsigned long long mln_sample_handle BIND("kind=handle;release=mln_sample_close;dispose=mln_sample_close;parent=mln_measurement");
-BIND("execution=immediate")
-void mln_measurement_close(mln_measurement owner);
-BIND("execution=immediate")
-void mln_sample_close(mln_sample_handle sample);
-BIND("receiver=measurement;execution=immediate")
-mln_status mln_measurement_take_sample(mln_measurement measurement, mln_sample_handle *out_sample BIND("direction=out;ownership=owned"), mln_diagnostic *out_diagnostic);
-""")
+        api = self.parse(groups=("child_owner",))
         self.assertEqual(dart.coverage(api)["unsupported"], {})
         source = dart.generate(api)
         # The owner name drops the handle suffix, and the child keeps its parent.
@@ -388,31 +357,7 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
         self.assertNotIn("mln_map_metric", dotnet.coverage(api)["generated"])
 
     def test_dotnet_nested_values_preserve_grouped_presence_and_override_defaults(self):
-        api = self.parse("""
-typedef unsigned int uint32_t;
-typedef unsigned long long uint64_t;
-typedef enum BIND("kind=bitmask") mln_camera_field : unsigned long long {
-  MLN_CAMERA_CENTER = 1ULL << 40, MLN_CAMERA_ZOOM = 2
-} mln_camera_field;
-typedef struct mln_lat_lng { double latitude; double longitude; } mln_lat_lng;
-typedef struct mln_camera {
-  uint32_t abi_size BIND("kind=size;default=sizeof");
-  uint64_t fields BIND("kind=presence_mask;enum=mln_camera_field");
-  double latitude BIND("mask=fields;bit=MLN_CAMERA_CENTER;group_type=mln_lat_lng");
-  double longitude BIND("mask=fields;bit=MLN_CAMERA_CENTER;group_type=mln_lat_lng");
-  double zoom BIND("mask=fields;bit=MLN_CAMERA_ZOOM");
-} mln_camera BIND("default=mln_camera_default");
-typedef unsigned long size_t;
-typedef struct mln_snapshot {
-  mln_camera camera;
-  uint64_t generation;
-  const mln_lat_lng* coordinates BIND("length=coordinate_count;ownership=borrowed");
-  size_t coordinate_count BIND("kind=count");
-} mln_snapshot;
-BIND("execution=immediate") mln_camera mln_camera_default(void);
-BIND("execution=query;result=mln_snapshot;shape=value;ownership=borrowed")
-mln_status mln_map_snapshot(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
+        api = self.parse(groups=("presence_mask",))
         values = Values(api)
         values.record("mln_snapshot")
         plans = list(values.plans.values())

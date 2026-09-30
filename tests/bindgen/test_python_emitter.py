@@ -4,30 +4,17 @@ import enum
 import sys
 import types
 import unittest
-from pathlib import Path
-from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from tools.bindgen.emitters import python
-from tools.bindgen.frontend import parse_headers
-from tools.bindgen.schema import validate
+from support import parse
 
-PRELUDE = """
-#define BIND(x) __attribute__((annotate("mln:" x)))
-typedef unsigned long long mln_map;
-typedef int mln_status;
-typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
-typedef struct mln_completion { void *state; } mln_completion;
-typedef struct mln_buffer_view { const void *data; unsigned long size; } mln_buffer_view;
-"""
+from tools.bindgen.emitters import python
+from tools.bindgen.schema import validate
 
 
 class PythonEmitterTests(unittest.TestCase):
-    def parse(self, source):
-        with TemporaryDirectory() as directory:
-            headers = Path(directory)
-            (headers / "api.h").write_text(PRELUDE + source)
-            api = parse_headers(headers)
+    def parse(self, source="", groups=()):
+        api = parse(source, groups=groups)
         validate(api)
         return api
 
@@ -117,19 +104,7 @@ BIND("execution=immediate") mln_status mln_host_closed(mln_host host, bool *out 
         self.assertIn("owner member", result["unsupported"]["mln_host_closed"])
 
     def test_tagged_union_wrapper_keeps_payload_record_and_unknown_tag(self):
-        api = self.parse("""
-typedef enum mln_event_kind { MLN_EVENT_NONE = 0, MLN_EVENT_FRAME = 1 } mln_event_kind;
-typedef struct mln_event_frame { double timestamp; } mln_event_frame;
-typedef union mln_event_payload {
-  mln_event_frame frame BIND("variant=MLN_EVENT_FRAME");
-} mln_event_payload;
-typedef struct mln_event {
-  unsigned int kind BIND("kind=tag;enum=mln_event_kind");
-  mln_event_payload payload BIND("tag=kind");
-} mln_event;
-BIND("execution=query;result=mln_event;shape=value;ownership=borrowed")
-mln_status mln_map_event(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
+        api = self.parse(groups=("tagged_union",))
         _, values = self.materialize(api)
         event = values.Event._from_native(
             {"payload": {"kind": "frame", "value": {"timestamp": 12.5}}}
@@ -141,28 +116,7 @@ mln_status mln_map_event(mln_map map, const mln_completion *completion, mln_diag
         self.assertEqual(unknown.payload, values.UnknownVariant(42))
 
     def test_decision_handle_owner_takes_its_name_from_the_issued_handle(self):
-        api = self.parse("""
-typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
-typedef unsigned long long mln_host BIND("kind=handle;release=mln_host_destroy;parent=none");
-typedef unsigned long long mln_ticket BIND("kind=handle;release=mln_ticket_release;parent=none");
-typedef void (*release_context)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
-typedef void (*cancel)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
-typedef unsigned (*provider)(void *context BIND("kind=context;lifetime=owner"), mln_ticket ticket) BIND("thread=native;enum=decision;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=mln_ticket_answer;cancelled=mln_ticket_cancelled;cancel_registration=mln_ticket_on_cancel;wait_retired=mln_ticket_await");
-typedef struct mln_ticket_provider {
-  provider callback;
-  void *user_data BIND("kind=context;ownership=borrowed");
-  release_context release;
-} mln_ticket_provider BIND("kind=callback_registration;user_data=user_data;release=release");
-BIND("execution=immediate") mln_status mln_host_destroy(mln_host host, mln_diagnostic *out_diagnostic);
-BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_host_set_provider(mln_host host, const mln_ticket_provider *provider BIND("length=1"), const mln_completion *completion, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") mln_status mln_ticket_answer(mln_ticket ticket, unsigned response, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") mln_status mln_ticket_cancelled(mln_ticket ticket, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled") mln_status mln_ticket_on_cancel(
-  mln_ticket ticket, cancel callback, void *context BIND("kind=context"), release_context release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") void mln_ticket_release(mln_ticket ticket);
-BIND("execution=immediate") mln_status mln_ticket_await(mln_ticket ticket BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
-""")
+        api = self.parse(groups=("decision",))
         self.assertEqual(python.coverage(api)["unsupported"], {})
         files, values = self.materialize(api)
         native = files["src/generated_operations.rs"]

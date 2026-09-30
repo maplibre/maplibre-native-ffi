@@ -1,41 +1,23 @@
 """Header mutations must drive emitter changes and explicit coverage failures."""
 
 import unittest
-from pathlib import Path
-from tempfile import TemporaryDirectory
+
+from support import parse
 
 from tools.bindgen.emitters import dart, dotnet, go, kotlin, python, rust, swift, zig
-from tools.bindgen.frontend import parse_headers
 from tools.bindgen.model import ModelError
 from tools.bindgen.schema import validate
 
 EMITTERS = (dart, dotnet, go, kotlin, python, rust, swift, zig)
 
-PRELUDE = """
-#define BIND(x) __attribute__((annotate("mln:" x)))
-typedef unsigned long long mln_map;
-typedef int mln_status;
-typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
-typedef struct mln_completion { void *state; } mln_completion;
-typedef struct mln_buffer_view { const void *data; unsigned long size; } mln_buffer_view;
-"""
-
 
 class GenerationTests(unittest.TestCase):
     def parse(self, source, *, owned_map=False):
-        with TemporaryDirectory() as directory:
-            include = Path(directory)
-            prelude = PRELUDE
-            if owned_map:
-                prelude = prelude.replace(
-                    "typedef unsigned long long mln_map;",
-                    'typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_close;dispose=mln_map_close;parent=none");',
-                )
-                prelude += (
-                    '\nBIND("execution=immediate") void mln_map_close(mln_map map);\n'
-                )
-            (include / "style.h").write_text(prelude + source)
-            api = parse_headers(include)
+        api = parse(
+            source,
+            defines=("MLN_PROTOCOL_MAP_CLOSE",) if owned_map else (),
+            header="style.h",
+        )
         validate(api)
         return api
 

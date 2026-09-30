@@ -1,25 +1,16 @@
 """Semantic mutation tests shared by every static language backend."""
 
 import unittest
-from pathlib import Path
-from tempfile import TemporaryDirectory
 
-from tools.bindgen.frontend import parse_headers
+from support import parse
+
 from tools.bindgen.model import ModelError
 from tools.bindgen.semantic import bind
 
 
 class SemanticTests(unittest.TestCase):
     def parse(self, source):
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "api.h").write_text(
-                '#define BIND(x) __attribute__((annotate("mln:" x)))\n'
-                "typedef int mln_status;\n"
-                "typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;\n"
-                + source
-            )
-            return parse_headers(root)
+        return parse(source)
 
     def test_scalar_carriers_preserve_portable_typedefs_across_host_abis(self):
         for underlying in ("long", "long long"):
@@ -531,7 +522,6 @@ BIND("execution=immediate") mln_status set_options(const options *value BIND("le
 
     def test_attachment_keeps_immediate_owner_separate_from_completion(self):
         source = """
-typedef struct mln_completion { unsigned size; } mln_completion;
 typedef unsigned long root BIND("kind=handle;release=close_root;parent=none");
 typedef unsigned long child BIND("kind=handle;release=close_child;parent=root;abandon=abandon_child");
 BIND("execution=immediate") mln_status close_root(root value, mln_diagnostic *out_diagnostic);
@@ -691,7 +681,6 @@ BIND("execution=immediate") mln_status await_retirement(request value BIND("hand
     def test_nullable_completion_array_has_optional_container(self):
         model = bind(
             self.parse("""
-typedef struct mln_completion { unsigned size; } mln_completion;
 typedef struct entry { double value; } entry;
 BIND("execution=query;result=entry;shape=array;ownership=borrowed;nullable=true")
 mln_status query(const mln_completion *completion BIND("length=1"), mln_diagnostic *out_diagnostic);

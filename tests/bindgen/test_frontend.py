@@ -4,26 +4,16 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from support import parse, protocol_header
+
 from tools.bindgen.frontend import parse_headers
 from tools.bindgen.model import ModelError
 from tools.bindgen.schema import validate
 
-PRELUDE = """
-#define BIND(x) __attribute__((annotate("mln:" x)))
-typedef unsigned long long mln_map;
-typedef unsigned long long mln_runtime;
-typedef int mln_status;
-typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
-typedef struct mln_completion { void *state; } mln_completion;
-"""
-
 
 class FrontendTests(unittest.TestCase):
     def parse(self, source):
-        with TemporaryDirectory() as directory:
-            path = Path(directory)
-            (path / "api.h").write_text(PRELUDE + source)
-            return parse_headers(path)
+        return parse(source)
 
     def test_interface_entrypoints_separate_runtime_exports_and_reject_orphans(self):
         with TemporaryDirectory() as directory:
@@ -33,8 +23,9 @@ class FrontendTests(unittest.TestCase):
             )
             (root / "public.h").write_text(
                 "#pragma once\n"
-                + PRELUDE
-                + 'BIND("execution=immediate") mln_status public_operation(mln_diagnostic *out_diagnostic);\n'
+                + protocol_header(
+                    'BIND("execution=immediate") mln_status public_operation(mln_diagnostic *out_diagnostic);\n'
+                )
             )
             (root / "runtime.h").write_text(
                 '#include "public.h"\ntypedef enum runtime_kind { RUNTIME_COPY = 1 } runtime_kind;\nBIND("execution=immediate") mln_status runtime_operation(mln_diagnostic *out_diagnostic);\n'
@@ -119,7 +110,8 @@ typedef enum mln_flags : unsigned long long {
   MLN_COMBINED = MLN_HIGH | MLN_LOW
 } mln_flags;
 """)
-        values = {value.name: value.value for value in api.enums[0].values}
+        (flags,) = (enum for enum in api.enums if enum.name == "mln_flags")
+        values = {value.name: value.value for value in flags.values}
         self.assertEqual(values["MLN_COMBINED"], (1 << 63) | 3)
 
     def test_enum_typedef_underlying_preserves_unsigned_high_bits(self):
@@ -131,7 +123,12 @@ typedef enum mln_u32 : sample_u32 { MLN_U32_HIGH = 0xf1234567U } mln_u32;
 typedef enum mln_u64 : sample_u64 { MLN_U64_HIGH = 0xf123456789abcdefULL } mln_u64;
 typedef enum mln_i32 : sample_i32 { MLN_I32_NEGATIVE = -17 } mln_i32;
 """)
-        values = {item.name: item.value for enum in api.enums for item in enum.values}
+        values = {
+            item.name: item.value
+            for enum in api.enums
+            if enum.name in {"mln_u32", "mln_u64", "mln_i32"}
+            for item in enum.values
+        }
         self.assertEqual(
             values,
             {
@@ -142,11 +139,16 @@ typedef enum mln_i32 : sample_i32 { MLN_I32_NEGATIVE = -17 } mln_i32;
         )
 
     def test_model_is_independent_of_checkout_path(self):
-        source = """
+        source = protocol_header("""
 typedef struct mln_options { union { int one; float two; } choice; } mln_options;
 BIND("execution=immediate") mln_options mln_options_default(void);
-"""
-        self.assertEqual(self.parse(source).to_json(), self.parse(source).to_json())
+""")
+        models = []
+        for _ in range(2):
+            with TemporaryDirectory() as directory:
+                (Path(directory) / "api.h").write_text(source)
+                models.append(parse_headers(Path(directory)).to_json())
+        self.assertEqual(*models)
 
     def test_invalid_c_never_produces_partial_bindings(self):
         with self.assertRaisesRegex(ModelError, "unknown type name"):

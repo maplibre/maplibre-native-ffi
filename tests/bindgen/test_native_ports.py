@@ -5,44 +5,11 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from support import parse_sources, protocol_header
+
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import dart
-from tools.bindgen.frontend import parse_headers
 from tools.bindgen.native_ports import generate
-
-HEADER = """
-#define BIND(x) __attribute__((annotate("mln:" x)))
-typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_close;dispose=mln_map_close;parent=none");
-typedef int mln_status;
-typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
-BIND("execution=immediate") void mln_map_close(mln_map map);
-typedef struct mln_completion { void *state; } mln_completion;
-typedef struct mln_sample_point { unsigned int x; unsigned int y; } mln_sample_point;
-typedef void (*mln_sample_notification)(void *context BIND("kind=context;lifetime=owner"), mln_sample_point point) BIND("thread=native;failure=contain");
-typedef void (*mln_sample_release)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
-typedef struct mln_sample_options {
-  unsigned int size BIND("kind=size;default=sizeof");
-  mln_sample_notification changed;
-  void *context BIND("kind=context;lifetime=owner");
-  mln_sample_release release;
-} mln_sample_options BIND("kind=callback_registration;user_data=context;release=release");
-BIND("receiver=map;execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_observe_sample(mln_map map, const mln_sample_options *options BIND("length=1"), const mln_completion *completion, mln_diagnostic *out_diagnostic);
-"""
-
-
-DIRECT_HEADER = """
-#include <stdbool.h>
-#define BIND(x) __attribute__((annotate("mln:" x)))
-typedef unsigned long long mln_ticket BIND("kind=handle;release=mln_ticket_release;dispose=mln_ticket_release;parent=none");
-typedef int mln_status;
-typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
-BIND("execution=immediate") void mln_ticket_release(mln_ticket ticket);
-typedef void (*mln_ticket_cancel)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
-typedef void (*mln_runtime_callback_release)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
-BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=declined")
-mln_status mln_ticket_on_cancel(mln_ticket ticket, mln_ticket_cancel callback, void *context BIND("kind=context;ownership=borrowed"), mln_runtime_callback_release release, bool *declined BIND("direction=out"), mln_diagnostic *out_diagnostic);
-"""
 
 
 def run_port(root, bound, notify, main):
@@ -71,8 +38,9 @@ class NativePortTests(unittest.TestCase):
     def test_new_record_callback_generates_a_native_port_and_dart_registration(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "sample.h").write_text(HEADER)
-            bound = compile_api(parse_headers(root))
+            header = protocol_header(groups=("retained_registration",))
+            (root / "sample.h").write_text(header)
+            bound = compile_api(parse_sources({"sample.h": header}))
             run_port(
                 root,
                 bound,
@@ -108,8 +76,9 @@ int main() {
     def test_direct_registration_generates_a_native_port_and_dart_method(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "sample.h").write_text(DIRECT_HEADER)
-            bound = compile_api(parse_headers(root))
+            header = protocol_header(groups=("direct_registration",))
+            (root / "sample.h").write_text(header)
+            bound = compile_api(parse_sources({"sample.h": header}))
             run_port(
                 root,
                 bound,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import os
 import shutil
 import subprocess
@@ -67,6 +68,12 @@ def enum_value(cursor, underlying) -> int:
 
 def compiler_arguments(clang: str = "clang") -> list[str]:
     """Use the configured compiler's system headers with the pinned parser."""
+    return list(_compiler_arguments(clang, os.environ.get("SDKROOT")))
+
+
+@functools.cache
+def _compiler_arguments(clang: str, sdk: str | None) -> tuple[str, ...]:
+    """Discover once per process; each discovery starts the compiler."""
     executable = shutil.which(clang)
     if executable is None:
         raise ModelError([f"compiler not found: {clang}"])
@@ -77,13 +84,13 @@ def compiler_arguments(clang: str = "clang") -> list[str]:
         arguments = ["-resource-dir", resource]
         if sys.platform == "darwin":
             sdk = (
-                os.environ.get("SDKROOT")
+                sdk
                 or subprocess.check_output(
                     ["xcrun", "--show-sdk-path"], text=True
                 ).strip()
             )
             arguments += ["-isysroot", sdk]
-        return arguments
+        return tuple(arguments)
     except (OSError, subprocess.CalledProcessError) as error:
         raise ModelError([f"cannot discover compiler headers: {error}"]) from error
 

@@ -9,20 +9,16 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from tools.bindgen.frontend import parse_headers
+from support import REAL_CLANG_ARGS, ROOT, parse_directory, real_api
+
 from tools.bindgen.model import ModelError
 from tools.bindgen.native_capture import generate
-
-ROOT = Path(__file__).resolve().parents[2]
 
 
 class NativeCaptureTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.api = parse_headers(
-            ROOT / "include",
-            clang_args=(f"-I{ROOT / 'third_party/maplibre-native/include'}",),
-        )
+        cls.api = real_api()
 
     def test_added_header_result_gets_recursive_capture_without_emitter_entries(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -32,10 +28,7 @@ class NativeCaptureTests(unittest.TestCase):
             (include / "capture_fixture.h").write_text(FIXTURE_HEADER)
             with (include / "maplibre_native_c.h").open("a") as umbrella:
                 umbrella.write('\n#include "capture_fixture.h"\n')
-            api = parse_headers(
-                include,
-                clang_args=(f"-I{ROOT / 'third_party/maplibre-native/include'}",),
-            )
+            api = parse_directory(include, REAL_CLANG_ARGS)
             outputs = generate(api)
             for name, text in outputs.items():
                 path = staging / name
@@ -70,10 +63,7 @@ class NativeCaptureTests(unittest.TestCase):
                     'size_t count; const mln_map* owned_maps MLN_BINDING("length=count;ownership=owned");',
                 )
             )
-            mutated = parse_headers(
-                include,
-                clang_args=(f"-I{ROOT / 'third_party/maplibre-native/include'}",),
-            )
+            mutated = parse_directory(include, REAL_CLANG_ARGS)
             with self.assertRaisesRegex(ModelError, "owned"):
                 generate(mutated)
 

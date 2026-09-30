@@ -1,31 +1,16 @@
 """Native emitter names preserve C declarations without shadowing runtime locals."""
 
 import unittest
-from pathlib import Path
-from tempfile import TemporaryDirectory
+
+from support import parse
 
 from tools.bindgen.emitters import go, swift, zig
-from tools.bindgen.frontend import parse_headers
 from tools.bindgen.schema import validate
 
 
 class NativeEmitterTests(unittest.TestCase):
     def parse(self, declarations):
-        with TemporaryDirectory() as directory:
-            headers = Path(directory)
-            (headers / "api.h").write_text(
-                """
-#define BIND(x) __attribute__((annotate("mln:" x)))
-typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release;parent=none");
-BIND("execution=immediate") void mln_map_release(mln_map map BIND("consumes=always"));
-typedef int mln_status;
-typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
-typedef struct mln_completion { void *state; } mln_completion;
-typedef struct mln_buffer_view { const void *data; unsigned long size; } mln_buffer_view;
-"""
-                + declarations
-            )
-            api = parse_headers(headers)
+        api = parse(declarations, defines=("MLN_PROTOCOL_MAP_RELEASE",))
         validate(api)
         return api
 

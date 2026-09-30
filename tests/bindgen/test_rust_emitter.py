@@ -5,8 +5,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from support import parse
+
 from tools.bindgen.emitters import rust
-from tools.bindgen.frontend import parse_headers
 from tools.bindgen.schema import validate
 
 
@@ -14,22 +15,16 @@ class RustEmitterTests(unittest.TestCase):
     def test_new_record_keywords_and_runtime_local_collisions_compile(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            headers = root / "include"
-            headers.mkdir()
-            (headers / "api.h").write_text("""
-#define BIND(x) __attribute__((annotate("mln:" x)))
-typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release;parent=none");
-BIND("execution=immediate") void mln_map_release(mln_map map BIND("consumes=always"));
-typedef int mln_status;
-typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
-typedef struct mln_completion { void *state; } mln_completion;
+            api = parse(
+                """
 typedef struct mln_new_point { double type; double self; double str; } mln_new_point;
 BIND("execution=query;result=mln_new_point;shape=value;ownership=borrowed")
 mln_status mln_map_match(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_map_move(mln_map map, mln_new_point native, mln_new_point arena, mln_new_point binding_arg_1, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""")
-            api = parse_headers(headers)
+""",
+                defines=("MLN_PROTOCOL_MAP_RELEASE",),
+            )
             validate(api)
             self.assertEqual(
                 set(rust.coverage(api)["generated"]),

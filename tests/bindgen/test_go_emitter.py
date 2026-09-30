@@ -1,12 +1,14 @@
 """Compile new C value shapes and execute their generated Go round trips."""
 
+import shutil
 import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from support import FIXTURES, PROTOCOLS_STUB, parse, parse_sources, protocol_header
+
 from tools.bindgen.emitters import go
-from tools.bindgen.frontend import parse_headers
 from tools.bindgen.schema import validate
 
 
@@ -17,34 +19,13 @@ class GoEmitterTests(unittest.TestCase):
                 root = Path(directory)
                 include = root / "include"
                 include.mkdir()
-                header = """
-#ifndef PROBE_H
-#define PROBE_H
-#include <stdint.h>
-#include <stdlib.h>
-#define BIND(x) __attribute__((annotate("mln:" x)))
-typedef int mln_status;
-typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
-typedef struct mln_buffer_view { const void *data; size_t size; } mln_buffer_view;
-typedef struct mln_probe_point { double type; SCALAR gain; } mln_probe_point;
-typedef struct mln_probe_options {
-  mln_buffer_view title BIND("encoding=utf8;nullable=true");
-  _Bool has_point BIND("kind=presence_mask");
-  mln_probe_point point BIND("mask=has_point");
-  const mln_probe_point *left BIND("length=left_count;ownership=borrowed;nullable=true");
-  uint16_t left_count BIND("kind=count");
-  const mln_probe_point *right BIND("length=right_count;ownership=borrowed");
-  uint32_t right_count BIND("kind=count");
-} mln_probe_options;
-BIND("execution=immediate")
-static inline mln_status mln_probe_roundtrip(mln_probe_options input, mln_probe_options *out BIND("direction=out"), mln_diagnostic *out_diagnostic) { *out = input; return 0; }
-typedef struct mln_probe_text_result { mln_buffer_view text BIND("encoding=utf8;nullable=true"); } mln_probe_text_result;
-BIND("execution=immediate")
-static inline mln_status mln_probe_nullable_text(const char *text BIND("length=text_size;encoding=utf8;nullable=true;ownership=borrowed"), uint16_t text_size BIND("kind=count"), mln_probe_text_result *out BIND("direction=out"), mln_diagnostic *out_diagnostic) { out->text = (mln_buffer_view){text, text_size}; return 0; }
-#endif
-""".replace("SCALAR", scalar)
+                header = protocol_header(
+                    groups=("values",),
+                    defines=(f"MLN_PROTOCOL_GAIN_TYPE {scalar}",),
+                )
                 (include / "api.h").write_text(header)
-                api = parse_headers(include)
+                shutil.copy(PROTOCOLS_STUB, root / "protocols_stub.c")
+                api = parse_sources({"api.h": header})
                 validate(api)
                 self.assertEqual(
                     go.coverage(api),
@@ -70,9 +51,10 @@ static inline mln_status mln_probe_nullable_text(const char *text BIND("length=t
                     "enum { binding_operation_mln_probe_roundtrip = 1, binding_operation_mln_probe_nullable_text = 2 };\n"
                 )
                 (root / "go.mod").write_text("module fixture\n\ngo 1.24\n")
-                (root / "runtime.go").write_text("""package maplibre
+                (root / "runtime.go").write_text(
+                    """package maplibre
 /*
-#cgo CFLAGS: -I${SRCDIR}/include
+#cgo CFLAGS: -I${SRCDIR}/include -IFIXTURES -DMLN_PROTOCOL_GAIN_TYPE=SCALAR
 #include <stdlib.h>
 #include "api.h"
 */
@@ -93,7 +75,8 @@ func bindingCount[T ~uint16 | ~uint32](n int) T { if uint64(T(n)) != uint64(n) {
 func bindingCountLike[T ~uint16 | ~uint32](_ T,n int) T { if uint64(T(n)) != uint64(n) { panic("overflow") }; return T(n) }
 func bindingLength(n uint64) int { return int(n) }
 func bindingElement(p unsafe.Pointer,i int,stride uint64,size,align uintptr) unsafe.Pointer { if stride < uint64(size) || stride%uint64(align)!=0 { panic(fmt.Sprint("invalid stride",stride)) }; return unsafe.Add(p,uintptr(i)*uintptr(stride)) }
-""")
+""".replace("FIXTURES", str(FIXTURES)).replace("SCALAR", scalar)
+                )
                 (root / "values_test.go").write_text(
                     """package maplibre
 import "testing"
@@ -137,45 +120,16 @@ func TestRoundtrip(t *testing.T) {
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_owned_output_retains_its_parent_input_rather_than_the_receiver(self):
-        with TemporaryDirectory() as directory:
-            include = Path(directory)
-            (include / "api.h").write_text("""
-#define BIND(x) __attribute__((annotate("mln:" x)))
-typedef int mln_status;
-typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
-typedef unsigned long long mln_forest BIND("kind=handle;release=mln_forest_close;dispose=mln_forest_close;parent=none");
-typedef unsigned long long mln_seed BIND("kind=handle;release=mln_seed_close;dispose=mln_seed_close;parent=none");
-typedef unsigned long long mln_tree BIND("kind=handle;release=mln_tree_close;dispose=mln_tree_close;parent=mln_forest");
-BIND("execution=immediate") void mln_forest_close(mln_forest forest);
-BIND("execution=immediate") void mln_seed_close(mln_seed seed);
-BIND("execution=immediate") void mln_tree_close(mln_tree tree);
-BIND("execution=immediate")
-mln_status mln_seed_plant(mln_seed seed, mln_forest forest, mln_tree *out_tree BIND("direction=out;ownership=owned"), mln_diagnostic *out_diagnostic);
-""")
-            api = parse_headers(include)
-            validate(api)
-            source = go.generate(api)["generated_api.go"]
+        api = parse(groups=("owned_output",))
+        validate(api)
+        source = go.generate(api)["generated_api.go"]
         self.assertIn("func (receiver *SeedHandle) Plant(forest *ForestHandle)", source)
         self.assertIn("adoptTreeHandle(uint64(outputOutTree), input1)", source)
 
     def test_receiver_registration_transfers_its_root_unless_rejected(self):
-        with TemporaryDirectory() as directory:
-            include = Path(directory)
-            (include / "api.h").write_text("""
-#include <stdbool.h>
-#define BIND(x) __attribute__((annotate("mln:" x)))
-typedef int mln_status;
-typedef struct mln_diagnostic { unsigned int size; char message[4096]; } mln_diagnostic;
-typedef unsigned long long mln_ticket BIND("kind=handle;release=mln_ticket_release;parent=none");
-typedef void (*release_context)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
-typedef void (*cancel)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
-BIND("execution=immediate") void mln_ticket_release(mln_ticket ticket);
-BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled")
-mln_status mln_ticket_on_cancel(mln_ticket ticket, cancel callback, void *context BIND("kind=context"), release_context release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
-""")
-            api = parse_headers(include)
-            validate(api)
-            source = go.generate(api)["generated_api.go"]
+        api = parse(groups=("direct_registration",))
+        validate(api)
+        source = go.generate(api)["generated_api.go"]
         self.assertIn(
             "func (receiver *TicketHandle) OnCancel(callback func()) (bool, error)",
             source,
