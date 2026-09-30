@@ -1,7 +1,8 @@
 diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_orchestrator.cpp
+index ef2d2e4052b0..48e3532a8c8c 100644
 --- a/src/mln/renderer/render_orchestrator.cpp
 +++ b/src/mln/renderer/render_orchestrator.cpp
-@@ -547,7 +547,17 @@
+@@ -547,7 +547,17 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
          }
      }
  
@@ -21,9 +22,10 @@ diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_
  
          std::optional<Duration> placementUpdatePeriodOverride;
 diff --git a/src/mln/text/placement.cpp b/src/mln/text/placement.cpp
+index 2834336fece9..bfcc63a9bd2c 100644
 --- a/src/mln/text/placement.cpp
 +++ b/src/mln/text/placement.cpp
-@@ -150,11 +150,18 @@
+@@ -150,13 +150,20 @@ public:
  // PlacementController implementation
  
  PlacementController::PlacementController()
@@ -34,19 +36,22 @@ diff --git a/src/mln/text/placement.cpp b/src/mln/text/placement.cpp
  void PlacementController::setPlacement(Immutable<Placement> placement_) {
      placement = std::move(placement_);
      stale = false;
-+}
-+
+ }
+ 
 +bool PlacementController::reset() {
 +    const bool changed = placement != emptyPlacement;
 +    setPlacement(emptyPlacement);
 +    return changed;
- }
- 
++}
++
  bool PlacementController::placementIsRecent(TimePoint now,
+                                             const float zoom,
+                                             std::optional<Duration> periodOverride) const {
 diff --git a/src/mln/text/placement.hpp b/src/mln/text/placement.hpp
+index 48e295d87cc4..e3900d7bac0c 100644
 --- a/src/mln/text/placement.hpp
 +++ b/src/mln/text/placement.hpp
-@@ -98,12 +98,15 @@
+@@ -98,12 +98,15 @@ class PlacementController {
  public:
      PlacementController();
      void setPlacement(Immutable<Placement>);
@@ -63,9 +68,10 @@ diff --git a/src/mln/text/placement.hpp b/src/mln/text/placement.hpp
      bool stale = false;
  };
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
+index 1464d2bd7535..1a8a5512b954 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -1982,6 +1982,161 @@
+@@ -1992,6 +1992,161 @@ TEST(Map, ObserveTileLifecycle) {
      }
  }
  

@@ -1,8 +1,8 @@
 diff --git a/src/mln/tile/geometry_tile_worker.cpp b/src/mln/tile/geometry_tile_worker.cpp
-index ba8ad7d3b0ae..a69df5a24d12 100644
+index 2b3a193d09fb..885d61897eab 100644
 --- a/src/mln/tile/geometry_tile_worker.cpp
 +++ b/src/mln/tile/geometry_tile_worker.cpp
-@@ -374,7 +374,8 @@ void GeometryTileWorker::onImagesAvailable(ImageMap newIconMap,
+@@ -376,7 +376,8 @@ void GeometryTileWorker::onImagesAvailable(ImageMap newIconMap,
      symbolDependenciesChanged();
  }
  
@@ -12,7 +12,7 @@ index ba8ad7d3b0ae..a69df5a24d12 100644
      MLN_TRACE_FUNC();
  
      for (auto& fontDependencies : glyphDependencies.glyphs) {
-@@ -395,16 +396,14 @@ void GeometryTileWorker::requestNewGlyphs(const GlyphDependencies& glyphDependen
+@@ -397,16 +398,14 @@ void GeometryTileWorker::requestNewGlyphs(const GlyphDependencies& glyphDependen
              }
          }
      }
@@ -34,7 +34,7 @@ index ba8ad7d3b0ae..a69df5a24d12 100644
      if (!pendingImageDependencies.empty()) {
          parent.invoke(&GeometryTile::getImages, std::make_pair(pendingImageDependencies, ++imageCorrelationID));
      }
-@@ -526,8 +525,7 @@ void GeometryTileWorker::parse() {
+@@ -530,8 +529,7 @@ void GeometryTileWorker::parse() {
          }
      }
  
@@ -45,10 +45,10 @@ index ba8ad7d3b0ae..a69df5a24d12 100644
      MBGL_TIMING_FINISH(watch,
                         " Action: " << "Parsing,"
 diff --git a/src/mln/tile/geometry_tile_worker.hpp b/src/mln/tile/geometry_tile_worker.hpp
-index 703dfa23262c..7420f1c72521 100644
+index dd3bb48c5354..d488206f5739 100644
 --- a/src/mln/tile/geometry_tile_worker.hpp
 +++ b/src/mln/tile/geometry_tile_worker.hpp
-@@ -74,8 +74,7 @@ private:
+@@ -76,8 +76,7 @@ private:
  
      void coalesce();
  
@@ -59,10 +59,10 @@ index 703dfa23262c..7420f1c72521 100644
      void symbolDependenciesChanged();
      bool hasPendingDependencies() const;
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 383efcc77846..6a2e3b6f26e3 100644
+index 383efcc77846..0af0e18ed957 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -21,6 +21,7 @@
+@@ -21,10 +21,10 @@
  #include <mln/storage/online_file_source.hpp>
  #include <mln/storage/resource_options.hpp>
  #include <mln/style/expression/dsl.hpp>
@@ -70,7 +70,11 @@ index 383efcc77846..6a2e3b6f26e3 100644
  #include <mln/style/image_impl.hpp>
  #include <mln/style/image.hpp>
  #include <mln/style/layers/background_layer.hpp>
-@@ -40,11 +41,13 @@
+-#include <mln/style/layers/background_layer.hpp>
+ #include <mln/style/layers/fill_layer.hpp>
+ #include <mln/style/layers/line_layer.hpp>
+ #include <mln/style/layers/raster_layer.hpp>
+@@ -40,11 +40,13 @@
  #include <mln/util/color.hpp>
  #include <mln/util/image.hpp>
  #include <mln/util/geo.hpp>
@@ -84,7 +88,7 @@ index 383efcc77846..6a2e3b6f26e3 100644
  
  using namespace mln;
  using namespace mln::style;
-@@ -2127,6 +2130,87 @@ TEST(Map, SetFrustumOffset) {
+@@ -2127,6 +2129,87 @@ TEST(Map, SetFrustumOffset) {
      test::checkImage("test/fixtures/map/setFrustumOffset/after", test.frontend.render(test.map).image, 0.0006, 0.1);
  }
  

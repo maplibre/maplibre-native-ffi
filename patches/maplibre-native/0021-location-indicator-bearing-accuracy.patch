@@ -130,7 +130,7 @@ index 43d527dc1ee0..611f93afced3 100644
  )";
  };
 diff --git a/include/mln/shaders/vulkan/location_indicator.hpp b/include/mln/shaders/vulkan/location_indicator.hpp
-index c387640ca62f..65aa33a43220 100644
+index 9169eab94349..2d93c509b7e3 100644
 --- a/include/mln/shaders/vulkan/location_indicator.hpp
 +++ b/include/mln/shaders/vulkan/location_indicator.hpp
 @@ -19,13 +19,16 @@ struct ShaderSource<BuiltIn::LocationIndicatorShader, gfx::Backend::Type::Vulkan

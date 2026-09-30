@@ -5750,6 +5750,21 @@ final class mln_plugin_drawable_descriptor_v1 extends ffi.Struct {
 
   @ffi.Size()
   external int segment_count;
+
+  @ffi.Uint8()
+  external int depth_mode;
+
+  @ffi.Uint8()
+  external int enable_stencil_overlap;
+
+  @ffi.Uint8()
+  external int cull_back_faces;
+
+  @ffi.Uint8()
+  external int blend_mode;
+
+  @ffi.Uint8()
+  external int reserved;
 }
 
 final class mln_plugin_feature_v1 extends ffi.Struct {
@@ -5898,6 +5913,8 @@ final class mln_plugin_layer_type_v1 extends ffi.Struct {
 
   @ffi.Uint8()
   external int enable_near_clipped_matrix;
+
+  external mln_plugin_should_animate_fn should_animate;
 }
 
 final class mln_plugin_layout_context_v1 extends ffi.Struct {
@@ -6190,6 +6207,19 @@ final class mln_plugin_shader_source_v1 extends ffi.Struct {
 
   external mln_plugin_string fragment_entry_point;
 }
+
+typedef mln_plugin_should_animate_fn =
+    ffi.Pointer<ffi.NativeFunction<mln_plugin_should_animate_fnFunction>>;
+typedef mln_plugin_should_animate_fnFunction =
+    ffi.Uint8 Function(
+      ffi.Pointer<mln_plugin_property_value_v1> properties,
+      ffi.Size property_count,
+    );
+typedef Dartmln_plugin_should_animate_fnFunction =
+    int Function(
+      ffi.Pointer<mln_plugin_property_value_v1> properties,
+      int property_count,
+    );
 
 sealed class mln_plugin_status {
   static const MLN_PLUGIN_STATUS_OK = 0;

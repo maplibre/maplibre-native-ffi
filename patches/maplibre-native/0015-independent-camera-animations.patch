@@ -25,6 +25,112 @@ index 63e7d2b92c20..a67ab2dddec5 100644
      std::function<void()> transitionFinishFn;
  
      /** Creates an animation with no options specified. */
+diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java
+index 56059f023100..30b02b65d597 100644
+--- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java
++++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java
+@@ -877,6 +877,9 @@ public final class MapLibreMap {
+    */
+   public void scrollBy(float x, float y, long duration) {
+     notifyDeveloperAnimationListeners();
++    // Core animates camera properties independently (#4637). Cancel first so
++    // this partial command replaces the whole running animation, as before.
++    nativeMapView.cancelTransitions();
+     nativeMapView.moveBy(x, y, duration);
+   }
+ 
+@@ -895,6 +898,9 @@ public final class MapLibreMap {
+    */
+   public void setZoom(double zoom, @NonNull PointF focalPoint, long duration ) {
+     notifyDeveloperAnimationListeners();
++    // Core animates camera properties independently (#4637). Cancel first so
++    // this partial command replaces the whole running animation, as before.
++    nativeMapView.cancelTransitions();
+     nativeMapView.setZoom(zoom, focalPoint, duration);
+   }
+ 
+@@ -920,6 +926,9 @@ public final class MapLibreMap {
+    */
+   public void setFocalBearing(double bearing, float focalX, float focalY, long duration) {
+     notifyDeveloperAnimationListeners();
++    // Core animates camera properties independently (#4637). Cancel first so
++    // this partial command replaces the whole running animation, as before.
++    nativeMapView.cancelTransitions();
+     transform.setBearing(bearing, focalX, focalY, duration);
+   }
+ 
+diff --git a/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt b/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt
+index dd722a6003b7..0831b6239e7e 100644
+--- a/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt
++++ b/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt
+@@ -106,6 +106,7 @@ class MapLibreMapTest : BaseTest() {
+     @Test
+     fun testScrollBy() {
+         maplibreMap.scrollBy(100f, 200f)
++        verify { nativeMapView.cancelTransitions() }
+         verify { nativeMapView.moveBy(100.0, 200.0, 0) }
+         verify { developerAnimationListener.onDeveloperAnimationStarted() }
+     }
+@@ -120,6 +121,7 @@ class MapLibreMapTest : BaseTest() {
+     @Test
+     fun testFocalBearing() {
+         maplibreMap.setFocalBearing(35.0, 100f, 200f, 1000)
++        verify { nativeMapView.cancelTransitions() }
+         verify { transform.setBearing(35.0, 100f, 200f, 1000) }
+         verify { developerAnimationListener.onDeveloperAnimationStarted() }
+     }
+@@ -259,6 +261,7 @@ class MapLibreMapTest : BaseTest() {
+         val target = PointF(100f, 100f)
+         maplibreMap.setZoom(2.0, target, 0)
+         verify { developerAnimationListener.onDeveloperAnimationStarted() }
++        verify { nativeMapView.cancelTransitions() }
+         verify { nativeMapView.setZoom(2.0, target, 0) }
+     }
+ 
+diff --git a/platform/macos/src/MLNMapView.mm b/platform/macos/src/MLNMapView.mm
+index 90a44dd7888f..55dd1e77fdc0 100644
+--- a/platform/macos/src/MLNMapView.mm
++++ b/platform/macos/src/MLNMapView.mm
+@@ -1307,6 +1307,9 @@ - (void)setCenterCoordinate:(CLLocationCoordinate2D)centerCoordinate
+     }
+   };
+ 
++  // Core animates camera properties independently (#4637). Cancel first so
++  // this partial command replaces the whole running animation, as before.
++  _mbglMap->cancelTransitions();
+   [self willChangeValueForKey:@"centerCoordinate"];
+   _mbglMap->easeTo(mln::CameraOptions()
+                        .withCenter(MLNLatLngFromLocationCoordinate2D(centerCoordinate))
+@@ -1359,6 +1362,9 @@ - (void)setZoomLevel:(double)zoomLevel {
+ 
+ - (void)setZoomLevel:(double)zoomLevel animated:(BOOL)animated {
+   MLNLogDebug(@"Setting zoomLevel: %f animated: %@", zoomLevel, MLNStringFromBOOL(animated));
++  // Core animates camera properties independently (#4637). Cancel first so
++  // this partial command replaces the whole running animation, as before.
++  _mbglMap->cancelTransitions();
+   [self willChangeValueForKey:@"zoomLevel"];
+   _mbglMap->easeTo(mln::CameraOptions().withZoom(zoomLevel).withPadding(
+                        MLNEdgeInsetsFromNSEdgeInsets(self.contentInsets)),
+@@ -1367,6 +1373,9 @@ - (void)setZoomLevel:(double)zoomLevel animated:(BOOL)animated {
+ }
+ 
+ - (void)setZoomLevel:(double)zoomLevel atPoint:(NSPoint)point animated:(BOOL)animated {
++  // Core animates camera properties independently (#4637). Cancel first so
++  // this partial command replaces the whole running animation, as before.
++  _mbglMap->cancelTransitions();
+   [self willChangeValueForKey:@"centerCoordinate"];
+   [self willChangeValueForKey:@"zoomLevel"];
+   MLNMapCamera *oldCamera = self.camera;
+@@ -1430,6 +1439,9 @@ - (void)setDirection:(CLLocationDirection)direction {
+ 
+ - (void)setDirection:(CLLocationDirection)direction animated:(BOOL)animated {
+   MLNLogDebug(@"Setting direction: %f animated: %@", direction, MLNStringFromBOOL(animated));
++  // Core animates camera properties independently (#4637). Cancel first so
++  // this partial command replaces the whole running animation, as before.
++  _mbglMap->cancelTransitions();
+   [self willChangeValueForKey:@"direction"];
+   _mbglMap->easeTo(mln::CameraOptions().withBearing(direction).withPadding(
+                        MLNEdgeInsetsFromNSEdgeInsets(self.contentInsets)),
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
 index c05acb105252..f091f2d5cf35 100644
 --- a/src/mln/map/transform.cpp

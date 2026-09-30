@@ -77,7 +77,7 @@ index 4763dc7d17d3..1bf03943de84 100644
  
  using UniqueVertexBufferResource = std::unique_ptr<VertexBufferResource>;
 diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
-index c1bf83adaacf..71ff64b75b42 100644
+index 868619667cf0..52b3afce9ee4 100644
 --- a/test/CMakeLists.txt
 +++ b/test/CMakeLists.txt
 @@ -11,6 +11,7 @@ add_library(

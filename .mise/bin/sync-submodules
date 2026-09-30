@@ -60,7 +60,6 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0007-retain-active-on-demand-images.patch"
   "$repo_root/patches/maplibre-native/0009-synchronous-symbol-dependencies.patch"
   "$repo_root/patches/maplibre-native/0011-opengl-uniform-block-order.patch"
-  "$repo_root/patches/maplibre-native/0014-global-state.patch"
   "$repo_root/patches/maplibre-native/0015-independent-camera-animations.patch"
   "$repo_root/patches/maplibre-native/0016-location-indicator-color-transitions.patch"
   "$repo_root/patches/maplibre-native/0017-location-indicator-top-image-hit-testing.patch"
@@ -70,9 +69,12 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0024-render-update-publication.patch"
   "$repo_root/patches/maplibre-native/0025-vertex-buffer-upload-timestamps.patch"
   "$repo_root/patches/maplibre-native/0026-empty-symbol-placement.patch"
-  "$repo_root/patches/maplibre-native/0027-custom-geometry-query-before-data.patch"
-  "$repo_root/patches/maplibre-native/0028-webgpu-frame-stats.patch"
-  "$repo_root/patches/maplibre-native/0029-in-memory-database-reset.patch"
+  "$repo_root/patches/maplibre-native/0027-line-hit-test-endpoint-offset.patch"
+  "$repo_root/patches/maplibre-native/0028-hit-test-camera-zoom.patch"
+  "$repo_root/patches/maplibre-native/0029-query-filter-overscaled-zoom.patch"
+  "$repo_root/patches/maplibre-native/0030-custom-geometry-query-before-data.patch"
+  "$repo_root/patches/maplibre-native/0031-webgpu-frame-stats.patch"
+  "$repo_root/patches/maplibre-native/0032-in-memory-database-reset.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the
