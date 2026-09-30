@@ -22,7 +22,10 @@ inline auto render_clock_now() noexcept
          };
 }
 
-// Moves the render clock forward for every session in the process.
+// Moves the render clock forward for every session in the process. The offset
+// only grows and lasts for the process, which single-process runners share
+// across every case, so a case may rely on how far the clock moves after its
+// own requests but never on the clock's value.
 void advance_render_clock(std::chrono::nanoseconds duration) noexcept;
 
 }  // namespace mln::testing

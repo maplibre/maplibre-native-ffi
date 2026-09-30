@@ -182,7 +182,8 @@ void demand_coalescing_preserves_boundaries_and_generations() {
 
 // A demand's timeout runs from its acceptance on the render clock, so one
 // whose deadline passes while the driver is busy misses it, and one with time
-// left renders.
+// left renders. The timeouts are far longer than any run, so only the clock
+// advance decides which demand misses.
 void a_demand_misses_a_deadline_that_passes_while_the_driver_is_busy() {
   auto fixture = Fixture{};
   create_fixture(fixture);
@@ -193,9 +194,9 @@ void a_demand_misses_a_deadline_that_passes_while_the_driver_is_busy() {
   missed.flags = 0;
   missed.token = 105;
   missed.coalescing_boundary = 1;
-  missed.timeout_ns = std::chrono::nanoseconds{std::chrono::seconds{1}}.count();
+  missed.timeout_ns = std::chrono::nanoseconds{std::chrono::hours{1}}.count();
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, request_frame(fixture, missed));
-  mln::testing::advance_render_clock(std::chrono::seconds{2});
+  mln::testing::advance_render_clock(std::chrono::hours{2});
   auto in_time = missed;
   in_time.token = 106;
   in_time.coalescing_boundary = 2;
