@@ -1,0 +1,19 @@
+diff --git a/src/mln/tile/custom_geometry_tile.cpp b/src/mln/tile/custom_geometry_tile.cpp
+--- a/src/mln/tile/custom_geometry_tile.cpp
++++ b/src/mln/tile/custom_geometry_tile.cpp
+@@ -72,8 +72,14 @@
+ void CustomGeometryTile::querySourceFeatures(std::vector<Feature>& result,
+                                              const SourceQueryOptions& queryOptions,
+                                              const GlobalStateMap* globalState) {
++    // Data not yet available
++    const auto* tileData = getData();
++    if (!tileData) {
++        return;
++    }
++
+     // Ignore the sourceLayer, there is only one
+-    auto layer = getData()->getLayer({});
++    auto layer = tileData->getLayer({});
+
+     if (layer) {
+         auto featureCount = layer->featureCount();

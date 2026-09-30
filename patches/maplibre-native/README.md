@@ -133,6 +133,12 @@ regressions cover repeated background-only frames, paint transitions, and symbol
 removal and reappearance within the placement update interval. See
 [issue #735](https://github.com/maplibre/maplibre-native-ffi/issues/735).
 
+`0027-custom-geometry-query-before-data.patch` returns no features from a custom
+geometry tile that has no data yet, as GeoJSON and vector tiles already do. A
+source-feature query that reached a fetched tile before the host delivered its
+data otherwise dereferenced null. The C suite's custom source cases cover it.
+Upstream: not yet filed.
+
 Each patch is the squashed diff of its upstream branch, applied on top of the
 patches before it, so a patch that adds a test next to an earlier patch's test
 carries that placement rather than the branch's own context.
