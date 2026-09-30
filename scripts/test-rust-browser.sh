@@ -67,82 +67,54 @@ cargo_binding_test() {
     -p maplibre-native-ffi \
     --target wasm32-unknown-emscripten \
     -Zbuild-std=std,panic_abort \
-    -- "$@" --test-threads=1
+    "$@"
 }
 
-# Chromium retains GPU and pthread resources longer than their native handles.
-# Give every integration test a fresh process so otherwise independent tests
-# cannot inherit a context budget or worker-pool state from their predecessors.
-binding_source="$MISE_MONOREPO_ROOT/bindings/rust/crates/maplibre-native-ffi/src"
+# The unit tests hold no GPU context, so they share one page.
+cargo_binding_test --lib -- --test-threads=1
 
-# Each entry pairs a source file with the module path its tests are compiled
-# under. Tests live in indented `mod tests` blocks, so the names are read from
-# the first function declaration after each `#[test]` attribute at any depth.
-test_sources=(
-  "completion.rs completion::tests::"
-  "handle.rs handle::tests::"
-  "logging.rs logging::tests::"
-  "tests/mod.rs tests::"
-  "tests/map.rs tests::map::"
-  "tests/map/invalidation.rs tests::map::invalidation::"
-  "tests/projection.rs tests::projection::"
-  "tests/render.rs tests::render::"
-  "tests/render/invalidation.rs tests::render::invalidation::"
-  "tests/runtime.rs tests::runtime::"
-)
-
-list_test_names() {
-  awk '
-    /#\[test\]/ { pending = 1; next }
-    pending && /^[[:space:]]*(pub[[:space:]]+)?(async[[:space:]]+)?fn[[:space:]]/ {
-      sub(/^[[:space:]]*(pub[[:space:]]+)?(async[[:space:]]+)?fn[[:space:]]+/, "")
-      sub(/[(<].*/, "")
-      print
-      pending = 0
-    }
-  ' "$1"
-}
-
-# A source file that grows tests without an entry here would otherwise be
-# skipped silently, and so would a file whose module path stopped matching.
-listed_files=()
-for entry in "${test_sources[@]}"; do
-  listed_files+=("${entry%% *}")
-done
-while IFS= read -r source; do
-  relative="${source#"$binding_source/"}"
-  for listed in "${listed_files[@]}"; do
-    if [[ "$listed" == "$relative" ]]; then
-      continue 2
-    fi
-  done
-  echo "$relative declares tests but is missing from test_sources in ${BASH_SOURCE[0]}" >&2
-  exit 1
-done < <(grep -rl $'#\[test\]' "$binding_source" | sort)
-
-for entry in "${test_sources[@]}"; do
-  relative="${entry%% *}"
-  prefix="${entry#* }"
-  source="$binding_source/$relative"
-  declared=$(grep -c $'#\[test\]' "$source")
-  enumerated=0
-  test_names=()
-  while IFS= read -r test_name; do
-    enumerated=$((enumerated + 1))
-    # A pair of `cfg` alternatives shares one name, and only one of them is
-    # compiled for this target.
-    case " ${test_names[*]:-} " in
-      *" $test_name "*) continue ;;
-    esac
+# Chromium retains GPU and pthread resources longer than their native handles,
+# so every integration test gets a page of its own and cannot inherit a context
+# budget or worker-pool state from its predecessors. The browser build compiles
+# only the suite's browser module, and a test there that names a render backend
+# in its cfg compiles only for that backend. The names come from the source:
+# the first function after each `#[test]`, kept when its cfg matches.
+browser_tests="$MISE_MONOREPO_ROOT/bindings/rust/crates/maplibre-native-ffi/tests/suite/browser/mod.rs"
+render_backend=$(sed -n 's/.*"renderBackend": *"\([^"]*\)".*/\1/p' \
+  "$native_install_dir/share/maplibre-native-c/artifact.json")
+declared=$(grep -c $'^#\[test\]' "$browser_tests")
+enumerated=0
+test_names=()
+while IFS=' ' read -r backend test_name; do
+  enumerated=$((enumerated + 1))
+  if [[ "$backend" == any || "$backend" == "$render_backend" ]]; then
     test_names+=("$test_name")
-  done < <(list_test_names "$source")
-  if [[ "$enumerated" -ne "$declared" ]]; then
-    echo "enumerated $enumerated of $declared tests in $relative" >&2
-    exit 1
   fi
-  for test_name in "${test_names[@]}"; do
-    cargo_binding_test "$prefix$test_name" --exact
-  done
+done < <(awk '
+  /^#\[cfg\(mln_render_backend = "/ {
+    backend = $0
+    sub(/^#\[cfg\(mln_render_backend = "/, "", backend)
+    sub(/".*/, "", backend)
+    next
+  }
+  /^#\[test\]/ { pending = 1; next }
+  pending && /^fn / {
+    name = $0
+    sub(/^fn /, "", name)
+    sub(/\(.*/, "", name)
+    print (backend == "" ? "any" : backend), name
+    pending = 0
+    backend = ""
+    next
+  }
+  !pending { backend = "" }
+' "$browser_tests")
+if [[ "$enumerated" -ne "$declared" || ${#test_names[@]} -eq 0 ]]; then
+  echo "enumerated $enumerated of $declared tests in $browser_tests for $render_backend" >&2
+  exit 1
+fi
+for test_name in "${test_names[@]}"; do
+  cargo_binding_test --test suite -- "browser::$test_name" --exact --test-threads=1
 done
 
 cargo_support_tests

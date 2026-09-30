@@ -73,11 +73,12 @@ if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
 fi
 export LD_LIBRARY_PATH="$lib_dirs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DYLD_LIBRARY_PATH="$lib_dirs${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+# Tests run in parallel: the ones that change process-global state serialize
+# on a lock of their own.
 cargo test "${cargo_args[@]}" \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  -- --test-threads=1
+  -p maplibre-native-ffi
 # Clippy is profile-independent. Every other host preset runs it against the
 # dev graph, so the release variant avoids compiling that graph a second time.
 if [[ "$usage_profile" == "dev" ]]; then
@@ -103,8 +104,7 @@ fi
 cargo test "${cargo_args[@]}" \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  -- --test-threads=1
+  -p maplibre-native-ffi
 if [[ "$usage_profile" == "dev" ]]; then
   cargo clippy \
     -p maplibre-native-ffi-sys \

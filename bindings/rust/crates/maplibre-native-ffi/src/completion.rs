@@ -83,18 +83,6 @@ impl<T> NativeFuture<T> {
     }
 }
 
-#[cfg(test)]
-#[track_caller]
-pub(crate) fn blocking<T>(future: Result<NativeFuture<T>>) -> T {
-    let future = future.expect("native submission failed");
-    assert!(
-        future
-            .wait(Duration::from_secs(30))
-            .expect("native wait failed")
-    );
-    future.take().expect("native completion failed")
-}
-
 impl<T> Future for NativeFuture<T> {
     type Output = Result<T>;
 

@@ -57,6 +57,9 @@ cargo clippy \
 # Each test binary gets ten minutes on the guest, where the suite renders in
 # software and the whole binding suite runs single-threaded.
 timeout_seconds=600
+# The render tests load their GPU contexts from tests/graphics, which travels
+# beside the C API library.
+graphics_library="$native_install_dir/lib/libmln_test_graphics.so"
 
 # A while loop rather than mapfile: macOS tasks can run under Bash 3.2.
 test_binaries=()
@@ -75,10 +78,12 @@ if [[ "$preset" == android-* ]]; then
     "$abi" \
     "$native_install_dir/lib/libmaplibre-native-c.so" \
     ${emulator_args[@]+"${emulator_args[@]}"} \
+    --library "$graphics_library" \
     --test-threads=1 -- ${test_binaries[@]+"${test_binaries[@]}"}
 fi
 exec "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
   "$timeout_seconds" \
   "$native_install_dir/lib/libmaplibre-native-c.so" \
   "$OHOS_SDK_NATIVE/llvm/lib/$compiler_target/libc++_shared.so" \
+  --library "$graphics_library" \
   --test-threads=1 -- ${test_binaries[@]+"${test_binaries[@]}"}

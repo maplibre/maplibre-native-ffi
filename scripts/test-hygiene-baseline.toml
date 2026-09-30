@@ -30,7 +30,6 @@
 "bindings/python/tests/test_render_metal_owned.py" = 3
 "bindings/python/tests/test_render_opengl_egl.py" = 2
 "bindings/python/tests/test_render_vulkan_owned.py" = 3
-"bindings/rust/crates/maplibre-native-ffi/src/tests/render.rs" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/RenderTests.swift" = 1
 "bindings/swift/Tests/MaplibreNativeFFITests/RuntimeEventTestSupport.swift" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/StyleTests.swift" = 1

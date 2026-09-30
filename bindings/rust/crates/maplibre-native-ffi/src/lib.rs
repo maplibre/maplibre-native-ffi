@@ -11,17 +11,11 @@
 //! reference cycle that requires an explicit clear or release.
 
 #![deny(unsafe_op_in_unsafe_fn)]
-#![cfg_attr(test, allow(clippy::field_reassign_with_default))]
 
 mod completion;
 #[allow(clippy::all, dead_code, unused_imports, unused_parens)]
 mod generated;
 mod handle;
-mod logging;
-#[cfg(test)]
-mod test_support;
-#[cfg(test)]
-mod tests;
 
 pub use completion::{CommandCompletion, NativeFuture};
 pub use generated::*;
@@ -29,5 +23,3 @@ pub use maplibre_core::generated::*;
 pub use maplibre_core::handle::{NativeHandleLeak, set_leak_reporter};
 pub use maplibre_core::{Error, ErrorKind, Result};
 use maplibre_native_ffi_core as maplibre_core;
-#[cfg(test)]
-use maplibre_native_ffi_sys as sys;

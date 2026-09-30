@@ -1021,16 +1021,11 @@ dependencies = [
 name = "maplibre-native-ffi"
 version = "0.0.0"
 dependencies = [
- "ash",
  "bindgen",
  "bitflags 2.13.0",
- "gl_generator",
- "glow",
- "glutin_egl_sys",
  "libloading",
  "maplibre-native-ffi-core",
  "maplibre-native-ffi-sys",
- "serde_json",
  "static_assertions",
 ]
 

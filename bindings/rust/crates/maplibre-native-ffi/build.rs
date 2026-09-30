@@ -3,15 +3,15 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 /// Tells the tests which render backend the native library compiled in, and
-/// builds platform render fixture support.
+/// builds the browser fixture support.
 fn main() {
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
-    println!("cargo:rustc-check-cfg=cfg(mln_webgpu_backend)");
     println!(
         "cargo:rustc-check-cfg=cfg(mln_render_backend, values(\"metal\", \"opengl\", \"vulkan\", \"webgpu\"))"
     );
     // The sys crate reads the backend from the native install's descriptor.
-    if let Ok(backend) = env::var("DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND") {
+    let backend = env::var("DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND").ok();
+    if let Some(backend) = &backend {
         println!("cargo:rustc-cfg=mln_render_backend=\"{backend}\"");
     }
     // The GPU fixtures that the tests load from tests/graphics install beside
@@ -29,9 +29,6 @@ fn main() {
             directory.display()
         );
     }
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
-        generate_macos_egl_bindings();
-    }
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("emscripten") {
         return;
     }
@@ -40,7 +37,7 @@ fn main() {
         PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("cargo sets the manifest dir"))
             .join("emscripten");
 
-    // WebGL fixture context registry.
+    // The browser fixtures' canvas and context registry.
     let canvas_library = emscripten.join("test_support.js");
     println!("cargo:rerun-if-changed={}", canvas_library.display());
     println!(
@@ -49,11 +46,9 @@ fn main() {
     );
 
     // Only WebGPU artifacts need WebGPU fixtures.
-    if env::var("DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND").as_deref() != Ok("webgpu") {
-        return;
+    if backend.as_deref() == Some("webgpu") {
+        generate_webgpu_bindings();
     }
-    println!("cargo:rustc-cfg=mln_webgpu_backend");
-    generate_webgpu_bindings();
 }
 
 /// Binds the emdawnwebgpu header linked into this module.
@@ -102,21 +97,4 @@ fn webgpu_port_include_dir() -> PathBuf {
         .find(|line| line.ends_with("emdawnwebgpu_pkg/webgpu/include"))
         .map(PathBuf::from)
         .expect("emcc lists the emdawnwebgpu port's include directory for --use-port")
-}
-
-// glutin_egl_sys excludes macOS, where the test fixture uses ANGLE.
-fn generate_macos_egl_bindings() {
-    use gl_generator::{Api, Fallbacks, Profile, Registry, StructGenerator};
-    let out_dir = PathBuf::from(env::var("OUT_DIR").expect("cargo sets the out dir"));
-    let mut file =
-        std::fs::File::create(out_dir.join("egl.rs")).expect("creating the EGL fixture bindings");
-    Registry::new(
-        Api::Egl,
-        (1, 5),
-        Profile::Core,
-        Fallbacks::All,
-        ["EGL_EXT_platform_base"],
-    )
-    .write_bindings(StructGenerator, &mut file)
-    .expect("generating the EGL fixture bindings");
 }
