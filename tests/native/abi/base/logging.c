@@ -90,6 +90,30 @@ LOG_STATE_CASE(log_callback_releases_owned_user_data) {
   TEST_ASSERT_EQUAL_INT(1, second_releases);
 }
 
+// A null callback clears the registration, releasing the old user data, and
+// releases the user data passed with it before returning.
+LOG_STATE_CASE(a_null_callback_clears_and_releases_the_user_data_it_passes) {
+  int installed_releases = 0;
+  int passed_releases = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_log_set_callback(
+      ignore_log_record, &installed_releases, count_log_callback_release, NULL
+    )
+  );
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_log_set_callback(
+                     NULL, &passed_releases, count_log_callback_release, NULL
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(1, installed_releases);
+  TEST_ASSERT_EQUAL_INT(1, passed_releases);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
+  TEST_ASSERT_EQUAL_INT(1, installed_releases);
+  TEST_ASSERT_EQUAL_INT(1, passed_releases);
+}
+
 // Counts the releases a deferred log context hands its listener.
 static void count_deferred_release(
   void* user_data, mln_adapter_deferred_call_record* record
@@ -410,6 +434,7 @@ LOG_STATE_CASE(only_records_the_callback_passes_on_reach_the_platform_logger) {
 
 MLN_TEST_GROUP {
   RUN_TEST(log_callback_releases_owned_user_data);
+  RUN_TEST(a_null_callback_clears_and_releases_the_user_data_it_passes);
   RUN_TEST(a_deferred_log_registration_releases_its_context_once);
   RUN_TEST(the_async_mask_accepts_only_severity_bits);
   RUN_TEST(a_synchronous_record_arrives_on_the_logging_thread);

@@ -4,6 +4,7 @@
 // from local inputs only, and checks every event it drained against the rows
 // for those types.
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -13,6 +14,14 @@
 #include "support/harness.h"
 #include "support/test_support.h"
 #include "unity.h"
+
+// A binding copies an undeclared payload kind as the bytes from the payload to
+// the end of the event, so a member after the payload would join that window.
+static_assert(
+  offsetof(mln_runtime_event, payload) + sizeof(mln_runtime_event_payload) ==
+    sizeof(mln_runtime_event),
+  "the payload union ends the runtime event record"
+);
 
 // A GeoJSON point under a circle and an icon whose image the style never
 // provides, so rendering it to idle reports tile work and a missing image
