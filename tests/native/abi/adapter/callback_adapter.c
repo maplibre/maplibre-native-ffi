@@ -507,24 +507,6 @@ static void deferred_provider_passes_through_an_uncopyable_request(void) {
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.releases));
 }
 
-// Setting and clearing a log registration releases its context once, after
-// the final call.
-static void deferred_log_registration_releases_its_context_once(void) {
-  deferred_probe probe = {0};
-  void* context = deferred_context(MLN_ADAPTER_DEFERRED_LOG_CALLBACK, &probe);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_log_set_callback(
-                     deferred_log_callback(), context,
-                     mln_adapter_deferred_callback_release, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_size_t(0, atomic_load(&probe.releases));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
-  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.releases));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
-  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.releases));
-}
-
 static bool wait_for_map_event(
   mln_runtime runtime, uint32_t type, mln_map map, char* message,
   size_t message_capacity
@@ -680,7 +662,6 @@ MLN_TEST_GROUP {
   RUN_TEST(deferred_callbacks_reject_raw_invalid_arguments);
   RUN_TEST(deferred_log_callback_consumes_and_delivers_a_copy);
   RUN_TEST(deferred_provider_passes_through_an_uncopyable_request);
-  RUN_TEST(deferred_log_registration_releases_its_context_once);
   RUN_TEST(routed_deferred_provider_delivers_a_request_the_host_completes);
   RUN_TEST(unadopted_deferred_request_fails_and_releases_once);
 }

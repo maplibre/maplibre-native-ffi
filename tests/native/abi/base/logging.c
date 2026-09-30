@@ -26,6 +26,7 @@
 #include <unistd.h>
 #endif
 
+#include "maplibre_native_c/callback_adapter.h"
 #include "support/harness.h"
 #include "support/test_support.h"
 #include "unity.h"
@@ -87,6 +88,49 @@ LOG_STATE_CASE(log_callback_releases_owned_user_data) {
   TEST_ASSERT_EQUAL_INT(1, second_releases);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_INT(1, second_releases);
+}
+
+// Counts the releases a deferred log context hands its listener.
+static void count_deferred_release(
+  void* user_data, mln_adapter_deferred_call_record* record
+) {
+  if (record == NULL) {
+    atomic_fetch_add((atomic_int*)user_data, 1);
+  } else {
+    mln_adapter_deferred_call_record_destroy(record);
+  }
+}
+
+// Setting and clearing a deferred log registration releases its context once,
+// after the final call. The counter outlives a failed case, whose registration
+// restoring_log_state() releases later.
+LOG_STATE_CASE(a_deferred_log_registration_releases_its_context_once) {
+  static atomic_int releases;
+  atomic_store(&releases, 0);
+  void* context = NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_adapter_deferred_callback_create(
+                     MLN_ADAPTER_DEFERRED_LOG_CALLBACK, count_deferred_release,
+                     &releases, &context, NULL
+                   )
+  );
+  void* address =
+    mln_adapter_deferred_callback_function(MLN_ADAPTER_DEFERRED_LOG_CALLBACK);
+  TEST_ASSERT_NOT_NULL(address);
+  mln_log_callback callback = NULL;
+  memcpy(&callback, &address, sizeof(callback));
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_log_set_callback(
+      callback, context, mln_adapter_deferred_callback_release, NULL
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&releases));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&releases));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&releases));
 }
 
 static const struct {
@@ -193,7 +237,9 @@ static void record_dump_completion(
 
 // Dumps a map's debug logs through a callback that records them, under
 // whatever async mask is in effect, and waits for the command and all three
-// records.
+// records. The probe must outlive a failed case: a failed wait leaves the
+// callback registered until restoring_log_state() clears it, and a late
+// record or completion still writes to the probe.
 static void dump_debug_logs(dump_probe* probe) {
   memset(probe, 0, sizeof(*probe));
   atomic_init(&probe->count, 0);
@@ -246,7 +292,7 @@ LOG_STATE_CASE(a_synchronous_record_arrives_on_the_logging_thread) {
     MLN_STATUS_OK,
     mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_ERROR, NULL)
   );
-  dump_probe probe;
+  static dump_probe probe;
   dump_debug_logs(&probe);
   TEST_ASSERT_EQUAL_INT(
     DUMP_RECORD_COUNT, atomic_load(&probe.count_at_completion)
@@ -263,7 +309,7 @@ LOG_STATE_CASE(an_asynchronous_record_arrives_on_the_log_thread) {
     MLN_STATUS_OK,
     mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_INFO, NULL)
   );
-  dump_probe probe;
+  static dump_probe probe;
   dump_debug_logs(&probe);
   const void* log_thread = probe.records[0].thread;
   TEST_ASSERT_NOT_EQUAL(probe.completion_thread, log_thread);
@@ -285,7 +331,7 @@ LOG_STATE_CASE(a_rejected_async_mask_leaves_the_previous_one) {
       MLN_LOG_SEVERITY_MASK_ALL | (UINT32_C(1) << 31U), NULL
     )
   );
-  dump_probe probe;
+  static dump_probe probe;
   dump_debug_logs(&probe);
   TEST_ASSERT_EQUAL_INT(
     DUMP_RECORD_COUNT, atomic_load(&probe.count_at_completion)
@@ -364,6 +410,7 @@ LOG_STATE_CASE(only_records_the_callback_passes_on_reach_the_platform_logger) {
 
 MLN_TEST_GROUP {
   RUN_TEST(log_callback_releases_owned_user_data);
+  RUN_TEST(a_deferred_log_registration_releases_its_context_once);
   RUN_TEST(the_async_mask_accepts_only_severity_bits);
   RUN_TEST(a_synchronous_record_arrives_on_the_logging_thread);
   RUN_TEST(an_asynchronous_record_arrives_on_the_log_thread);
