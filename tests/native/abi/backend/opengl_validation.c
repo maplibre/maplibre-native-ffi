@@ -10,6 +10,7 @@
 
 #include "support/attach_table.h"
 #include "support/harness.h"
+#include "support/host_graphics.h"
 #include "support/test_support.h"
 #include "unity.h"
 
@@ -159,7 +160,7 @@ MLN_TEST_ATTACH_SUBMITTER(submit_owned_attach, mln_opengl_owned_texture_attach)
 MLN_TEST_ATTACH_SUBMITTER(
   submit_borrowed_attach, mln_opengl_borrowed_texture_attach
 )
-#if !defined(MLN_FFI_TEST_BACKEND_OPENGL)
+#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
 MLN_TEST_SET_TARGET_SUBMITTER(
   submit_surface_set_target, mln_opengl_surface_set_target
 )
@@ -317,13 +318,25 @@ static void only_the_builds_providers_attach(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if !defined(MLN_FFI_TEST_BACKEND_OPENGL)
-// A build without OpenGL checks a replacement descriptor before it reports
-// the missing backend, whatever the session.
-static void opengl_set_target_checks_its_descriptor_first(void) {
+#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+// set_target checks the session before the descriptor, and a build without
+// OpenGL reports the missing backend last, so there the rows name no session.
+// An OpenGL build submits them for a live session of the replacement's kind;
+// a WebGL build has no host graphics for one.
+static void opengl_set_target_rejects_malformed_descriptors(void) {
   mln_test_target_call call = mln_test_target_call_default(
     MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
   );
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_surface(map, &fixture),
+    mln_test_graphics_last_error()
+  );
+  call.session = fixture.session;
+#endif
   call.descriptor.opengl_surface = surface_descriptor();
   static const mln_test_validation_case surface_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
@@ -331,14 +344,24 @@ static void opengl_set_target_checks_its_descriptor_first(void) {
     MLN_TEST_DESCRIPTOR_CASES(opengl_surface),
     {"no drawable", surface_without_its_drawable, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
+#if !defined(MLN_FFI_TEST_BACKEND_OPENGL)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
+#endif
   };
   mln_test_run_validation_table(
     surface_rows, sizeof(surface_rows) / sizeof(surface_rows[0]), &call,
     sizeof(call), submit_surface_set_target, NULL
   );
 
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
+  mln_test_render_fixture_destroy(&fixture);
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_borrowed_texture(map, &fixture),
+    mln_test_graphics_last_error()
+  );
+  call.session = fixture.session;
+#endif
   call.descriptor.opengl_borrowed = borrowed_descriptor();
   static const mln_test_validation_case borrowed_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
@@ -347,20 +370,27 @@ static void opengl_set_target_checks_its_descriptor_first(void) {
     {"no texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"zero physical width", borrowed_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
+#if !defined(MLN_FFI_TEST_BACKEND_OPENGL)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
+#endif
   };
   mln_test_run_validation_table(
     borrowed_rows, sizeof(borrowed_rows) / sizeof(borrowed_rows[0]), &call,
     sizeof(call), submit_borrowed_set_target, NULL
   );
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+#endif
 }
 #endif
 
 MLN_TEST_GROUP {
   RUN_TEST(opengl_attach_rejects_malformed_calls);
   RUN_TEST(only_the_builds_providers_attach);
-#if !defined(MLN_FFI_TEST_BACKEND_OPENGL)
-  RUN_TEST(opengl_set_target_checks_its_descriptor_first);
+#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+  RUN_TEST(opengl_set_target_rejects_malformed_descriptors);
 #endif
 }

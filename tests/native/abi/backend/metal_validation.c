@@ -6,11 +6,8 @@
 #include <stdint.h>
 
 #include "support/attach_table.h"
-
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-#include "mln_test_graphics.h"
-#endif
 #include "support/harness.h"
+#include "support/host_graphics.h"
 #include "support/test_support.h"
 #include "unity.h"
 
@@ -51,14 +48,12 @@ MLN_TEST_ATTACH_SUBMITTER(submit_owned_attach, mln_metal_owned_texture_attach)
 MLN_TEST_ATTACH_SUBMITTER(
   submit_borrowed_attach, mln_metal_borrowed_texture_attach
 )
-#if !defined(MLN_FFI_TEST_BACKEND_METAL)
 MLN_TEST_SET_TARGET_SUBMITTER(
   submit_surface_set_target, mln_metal_surface_set_target
 )
 MLN_TEST_SET_TARGET_SUBMITTER(
   submit_borrowed_set_target, mln_metal_borrowed_texture_set_target
 )
-#endif
 
 static mln_metal_surface_descriptor surface_descriptor(void) {
   mln_metal_surface_descriptor descriptor =
@@ -91,6 +86,7 @@ static void metal_attach_rejects_malformed_calls(void) {
   TEST_ASSERT_NOT_NULL_MESSAGE(graphics, mln_test_graphics_last_error());
   mln_test_graphics_texture* texture =
     mln_test_graphics_texture_create(graphics, 64, 64);
+  TEST_ASSERT_NOT_NULL_MESSAGE(texture, mln_test_graphics_last_error());
   mln_test_graphics_texture_info texture_info = {0};
   TEST_ASSERT_TRUE(mln_test_graphics_texture_get_info(texture, &texture_info));
   void* borrowed_texture = texture_info.metal_texture;
@@ -167,29 +163,58 @@ static void metal_attach_rejects_malformed_calls(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#if !defined(MLN_FFI_TEST_BACKEND_METAL)
-// A build without Metal checks a replacement descriptor before it reports the
-// missing backend, whatever the session. A Metal build checks the session
-// first; retarget.c covers its replacements.
-static void metal_set_target_checks_its_descriptor_first(void) {
+// set_target checks the session before the descriptor, and a build without
+// Metal reports the missing backend last, so there the rows name no session.
+// A Metal build submits them for a live session of the replacement's kind.
+static void metal_set_target_rejects_malformed_descriptors(void) {
   mln_test_target_call call = mln_test_target_call_default(
     MLN_HANDLE_NULL, MLN_RENDER_DRIVER_CORE_WORKER
   );
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_surface(map, &fixture),
+    mln_test_graphics_last_error()
+  );
+  call.session = fixture.session;
+#endif
   call.descriptor.metal_surface = surface_descriptor();
   static const mln_test_validation_case surface_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(metal_surface),
     {"null layer", surface_without_layer, MLN_STATUS_INVALID_ARGUMENT, NULL},
+#if !defined(MLN_FFI_TEST_BACKEND_METAL)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
+#endif
   };
   mln_test_run_validation_table(
     surface_rows, sizeof(surface_rows) / sizeof(surface_rows[0]), &call,
     sizeof(call), submit_surface_set_target, NULL
   );
 
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  mln_test_render_fixture_destroy(&fixture);
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_borrowed_texture(map, &fixture),
+    mln_test_graphics_last_error()
+  );
+  call.session = fixture.session;
+  mln_test_graphics_texture* replacement =
+    mln_test_render_fixture_new_texture(&fixture);
+  TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());
+  mln_test_graphics_texture_info replacement_info = {0};
+  TEST_ASSERT_TRUE(
+    mln_test_graphics_texture_get_info(replacement, &replacement_info)
+  );
+  call.descriptor.metal_borrowed =
+    borrowed_descriptor(replacement_info.metal_texture);
+#else
   call.descriptor.metal_borrowed = borrowed_descriptor(MLN_TEST_FAKE_HANDLE);
+#endif
   static const mln_test_validation_case borrowed_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
@@ -198,19 +223,27 @@ static void metal_set_target_checks_its_descriptor_first(void) {
      NULL},
     {"zero physical width", borrowed_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+    {"a physical size the texture does not have",
+     borrowed_with_another_physical_size, MLN_STATUS_INVALID_ARGUMENT,
+     "must match descriptor physical size"},
+#else
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
+#endif
   };
   mln_test_run_validation_table(
     borrowed_rows, sizeof(borrowed_rows) / sizeof(borrowed_rows[0]), &call,
     sizeof(call), submit_borrowed_set_target, NULL
   );
-}
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 #endif
+}
 
 MLN_TEST_GROUP {
   RUN_TEST(metal_attach_rejects_malformed_calls);
-#if !defined(MLN_FFI_TEST_BACKEND_METAL)
-  RUN_TEST(metal_set_target_checks_its_descriptor_first);
-#endif
+  RUN_TEST(metal_set_target_rejects_malformed_descriptors);
 }

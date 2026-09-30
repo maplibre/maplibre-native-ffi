@@ -229,7 +229,10 @@ attach shares: a null map, descriptor, options, output, or completion,
 undersized options, and an occupied output. A row that an attach rejects must
 leave its output session as it was. The header also defines the
 undersized-descriptor, undersized-extent, and overflowing-extent rows for any
-descriptor type.
+descriptor type. A set_target table runs on every build. A build without the
+backend checks the descriptor before it reports the missing backend, so its rows
+name no session. A build with the backend checks the session first, so its rows
+name a live session of the replacement's kind from `support/host_graphics.h`.
 
 The adapter cases also include `support/adapter.h` directly. It provides a
 completion listener that keeps its record, committed resource provider changes,
