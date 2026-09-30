@@ -13,6 +13,7 @@ private final class NativeCompletionState<Value: Sendable>:
   private let acceptErrorStatus: Bool
   private var result: Result<Value, Error>?
   private var waiter: CheckedContinuation<Value, Error>?
+  private var cancelled = false
 
   init(
     acceptErrorStatus: Bool = false,
@@ -53,18 +54,33 @@ private final class NativeCompletionState<Value: Sendable>:
     waiter?.resume(with: converted)
   }
 
+  /// Suspends until the completion runs. Cancelling the waiting task ends the
+  /// wait with `CancellationError`; the native work still finishes, and a
+  /// value it delivers afterwards, such as a created handle, is disposed with
+  /// this state when native releases it.
   func value() async throws -> Value {
-    try await withCheckedThrowingContinuation { continuation in
-      let completed = lock.withLock { () -> Result<Value, Error>? in
-        if let result {
-          self.result = nil
-          return result
+    try await withTaskCancellationHandler {
+      try await withCheckedThrowingContinuation { continuation in
+        let completed = lock.withLock { () -> Result<Value, Error>? in
+          if let result {
+            self.result = nil
+            return result
+          }
+          if cancelled { return .failure(CancellationError()) }
+          precondition(waiter == nil)
+          waiter = continuation
+          return nil
         }
-        precondition(waiter == nil)
-        waiter = continuation
-        return nil
+        if let completed { continuation.resume(with: completed) }
       }
-      if let completed { continuation.resume(with: completed) }
+    } onCancel: {
+      let waiter = lock.withLock { () -> CheckedContinuation<Value, Error>? in
+        cancelled = true
+        let waiter = self.waiter
+        self.waiter = nil
+        return waiter
+      }
+      waiter?.resume(throwing: CancellationError())
     }
   }
 
