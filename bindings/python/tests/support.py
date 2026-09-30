@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import threading
 import time
-from collections.abc import Callable
+import warnings
+from collections.abc import Callable, Iterator
 from concurrent.futures import Future
 from dataclasses import replace
 
@@ -33,6 +35,24 @@ def ok_response(data: bytes = EMPTY_STYLE) -> mln.ResourceResponse:
 
 def result[T](future: Future[T]) -> T:
     return future.result(timeout=TIMEOUT)
+
+
+@contextlib.contextmanager
+def leak_reports() -> Iterator[list[str]]:
+    """Collect the ResourceWarning messages that unclosed handles report.
+
+    The list fills when the block exits. A report can come from any thread,
+    such as a native callback thread that drops the last reference.
+    """
+    reports: list[str] = []
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", ResourceWarning)
+        yield reports
+    reports.extend(
+        str(warning.message)
+        for warning in caught
+        if issubclass(warning.category, ResourceWarning)
+    )
 
 
 class Signal:
