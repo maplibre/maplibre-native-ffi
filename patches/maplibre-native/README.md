@@ -145,6 +145,12 @@ the Metal, Vulkan, and OpenGL backends do. It also adds each draw to the total
 draw call count. The WebGPU frame count otherwise stayed at zero. The C suite's
 render lifecycle case covers it. Upstream: not yet filed.
 
+`0029-in-memory-database-reset.patch` keeps a reset of the in-memory database
+from deleting a file named `:memory:`. The reset removed that path relative to
+the working directory, which deleted any such file there and failed where the
+directory was read-only. The C suite's ambient cache reset case covers it.
+Upstream: not yet filed.
+
 Each patch is the squashed diff of its upstream branch, applied on top of the
 patches before it, so a patch that adds a test next to an earlier patch's test
 carries that placement rather than the branch's own context.
