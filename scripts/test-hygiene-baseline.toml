@@ -40,7 +40,6 @@
 "bindings/zig/tests/resources.zig" = 8
 "bindings/zig/tests/runtime.zig" = 6
 "bindings/zig/tests/support.zig" = 5
-"tests/native/abi/map/mlt_decode.c" = 1
 "tests/native/abi/render/render_thread.c" = 1
 "tests/native/support/render_webgpu.c" = 2
 "tests/native/support/wait.cpp" = 2
@@ -77,6 +76,5 @@
 "bindings/zig/tests/style_values.zig" = 1
 "src/platform/rust/src/http_client.rs" = 8
 "tests/native/abi/adapter/callback_adapter.c" = 12
-"tests/native/abi/map/mlt_decode.c" = 1
 "tests/native/abi/resources/resources.c" = 1
 "tests/native/abi/style/values.c" = 8

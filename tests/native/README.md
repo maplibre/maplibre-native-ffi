@@ -243,8 +243,6 @@ or a public fence:
 
 - `barrier_waits_for_a_demand_parked_by_a_full_ring`: a 50-iteration service
   loop in which a barrier must not complete.
-- `fast_pfor_option_gates_mlt_tile_decoding`: 600 render attempts spaced 1 ms
-  apart before it concludes that a tile decodes to nothing.
 
 ### Cases that work around a core defect
 
