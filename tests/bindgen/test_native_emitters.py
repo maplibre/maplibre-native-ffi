@@ -14,7 +14,7 @@ class NativeEmitterTests(unittest.TestCase):
         validate(api)
         return api
 
-    def test_keywords_and_runtime_parameter_names_use_separate_local_names(self):
+    def test_keyword_parameters_generate_for_commands(self):
         api = self.parse("""
 BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_map_defer(mln_map map, double defer, double self, double raw,
@@ -27,7 +27,7 @@ mln_status mln_map_defer(mln_map map, double defer, double self, double raw,
                     ["mln_map_defer", "mln_map_release"],
                 )
 
-    def test_keyword_fields_generate(self):
+    def test_keyword_fields_generate_for_borrowed_arrays(self):
         api = self.parse("""
 typedef struct mln_entry {
   mln_buffer_view type BIND("encoding=utf8");

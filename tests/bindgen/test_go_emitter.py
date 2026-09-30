@@ -19,14 +19,14 @@ from tools.bindgen.schema import validate
 
 
 class GoEmitterTests(unittest.TestCase):
-    def test_header_mutation_compiles_counted_arrays_and_optional_keyword_fields(self):
+    def test_header_mutation_compiles_counted_arrays_and_keyword_names(self):
         for scalar, literal in (("double", "3.25"), ("_Bool", "true")):
             with self.subTest(scalar=scalar), TemporaryDirectory() as directory:
                 root = Path(directory)
                 include = root / "include"
                 include.mkdir()
                 header = protocol_header(
-                    groups=("values",),
+                    groups=("values", "keywords"),
                     defines=(f"MLN_PROTOCOL_GAIN_TYPE {scalar}",),
                 )
                 (include / "api.h").write_text(header)
@@ -36,7 +36,11 @@ class GoEmitterTests(unittest.TestCase):
                 self.assertEqual(
                     go.coverage(api),
                     {
-                        "generated": ["mln_probe_nullable_text", "mln_probe_roundtrip"],
+                        "generated": [
+                            "mln_keyword_combine",
+                            "mln_probe_nullable_text",
+                            "mln_probe_roundtrip",
+                        ],
                         "unsupported": {},
                     },
                 )
@@ -54,7 +58,7 @@ class GoEmitterTests(unittest.TestCase):
                 )
                 (root / "generated.go").write_text(source)
                 (root / "generated_callbacks.h").write_text(
-                    "enum { binding_operation_mln_probe_roundtrip = 1, binding_operation_mln_probe_nullable_text = 2 };\n"
+                    "enum { binding_operation_mln_probe_roundtrip = 1, binding_operation_mln_probe_nullable_text = 2, binding_operation_mln_keyword_combine = 3 };\n"
                 )
                 (root / "go.mod").write_text("module fixture\n\ngo 1.24\n")
                 (root / "runtime.go").write_text(
@@ -103,6 +107,8 @@ func TestRoundtrip(t *testing.T) {
     if output.Left[0].Type != 9.5 { t.Fatal("result aliases input storage") }
     absent, err := ProbeRoundtrip(ProbeOptions{})
     if err != nil || absent.Title != nil || absent.Point != nil || len(absent.Left)!=0 || len(absent.Right)!=0 { t.Fatalf("absence: %+v, %v",absent,err) }
+    keywords, err := KeywordCombine(5, 2, 7, 11)
+    if err != nil || keywords != (KeywordEntry{Type: 3, Defer: 7, Raw: 11}) { t.Fatalf("keyword names: %+v, %v",keywords,err) }
 }
 """.replace("LITERAL", literal)
                 )
