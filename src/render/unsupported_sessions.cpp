@@ -131,6 +131,13 @@ auto metal_borrowed_texture_set_target_start(
     status != MLN_STATUS_OK
   )
     return status;
+  if (
+    const auto status = validate_borrowed_physical_size(
+      descriptor->physical_width, descriptor->physical_height
+    );
+    status != MLN_STATUS_OK
+  )
+    return status;
   return unsupported("Metal texture sessions are not supported by this build");
 }
 auto metal_surface_set_target_start(
@@ -230,6 +237,13 @@ auto vulkan_borrowed_texture_set_target_start(
 ) -> mln_status {
   if (
     const auto status = validate_vulkan_borrowed_texture_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_borrowed_physical_size(
+      descriptor->physical_width, descriptor->physical_height
+    );
     status != MLN_STATUS_OK
   )
     return status;
@@ -349,6 +363,13 @@ auto opengl_borrowed_texture_set_target_start(
     status != MLN_STATUS_OK
   )
     return status;
+  if (
+    const auto status = validate_borrowed_physical_size(
+      descriptor->physical_width, descriptor->physical_height
+    );
+    status != MLN_STATUS_OK
+  )
+    return status;
   return unsupported("OpenGL texture sessions are not supported by this build");
 }
 #endif
@@ -412,6 +433,13 @@ auto webgpu_borrowed_texture_set_target_start(
 ) -> mln_status {
   if (
     const auto status = validate_webgpu_borrowed_texture_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_borrowed_physical_size(
+      descriptor->physical_width, descriptor->physical_height
+    );
     status != MLN_STATUS_OK
   )
     return status;
