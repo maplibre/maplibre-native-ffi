@@ -489,6 +489,9 @@ MLN_API mln_status mln_metal_borrowed_texture_attach(
  * Completes with:
  * - MLN_STATUS_OK once the driver owns the target.
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
+ * - MLN_STATUS_INVALID_ARGUMENT when the driver finds the context
+ *   inconsistent, such as a physical device of another instance or a
+ *   graphics_queue_family_index that names no graphics queue family.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
@@ -527,6 +530,9 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
  * Completes with:
  * - MLN_STATUS_OK once the driver owns the target.
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
+ * - MLN_STATUS_INVALID_ARGUMENT when the driver finds the context
+ *   inconsistent, such as a physical device of another instance or a
+ *   graphics_queue_family_index that names no graphics queue family.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")

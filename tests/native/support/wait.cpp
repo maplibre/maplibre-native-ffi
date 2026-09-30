@@ -7,7 +7,6 @@
 #include <cstring>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "wait.h"
@@ -270,10 +269,6 @@ extern "C" auto mln_test_gate_completion(mln_test_gate* gate)
     .user_data = gate,
     .release_user_data = release_gate,
   };
-}
-
-extern "C" void mln_test_sleep_milliseconds(unsigned int milliseconds) {
-  std::this_thread::sleep_for(std::chrono::milliseconds{milliseconds});
 }
 
 extern "C" auto mln_test_completion_default(const size_t value_size)

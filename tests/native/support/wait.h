@@ -70,13 +70,11 @@ void mln_test_gate_init(mln_test_gate* gate);
 void mln_test_gate_park(mln_test_gate* gate);
 bool mln_test_gate_wait_entered(mln_test_gate* gate);
 void mln_test_gate_release(mln_test_gate* gate);
-// A completion that parks the thread that delivers it on `gate`. The gate must
+// A completion that parks the thread that delivers it on `gate`. That is the
+// submitting thread when the work finishes before the submission returns, so
+// the completion cannot be relied on to park a library worker. The gate must
 // outlive the delivery.
 mln_completion mln_test_gate_completion(mln_test_gate* gate);
-
-// A fixed delay, for the cases whose ordering still depends on one. Each use is
-// a case to rewrite with a gate or a sync point; see tests/native/README.md.
-void mln_test_sleep_milliseconds(unsigned int milliseconds);
 
 // Records one completion delivery and its release for a test to inspect.
 typedef struct mln_test_completion {

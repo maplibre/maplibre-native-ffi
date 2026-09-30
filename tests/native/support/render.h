@@ -35,6 +35,18 @@ bool mln_test_render_fixture_create(
 );
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture);
 
+// Submits the preset's owned-texture attach with the caller's options, whose
+// driver it replaces with the preset's, and the caller's completion, and
+// returns without waiting for the attach. Returns the submission's status, or
+// MLN_STATUS_NATIVE_ERROR, submitting nothing, when the backend cannot create
+// a context. On MLN_STATUS_OK the fixture holds the attaching session, which
+// the case retires; mln_test_render_fixture_destroy() then releases the
+// backend state, and detaches and destroys the session if it is still live.
+mln_status mln_test_render_fixture_start_attach(
+  mln_map map, const mln_render_session_attach_options* options,
+  const mln_completion* completion, mln_test_render_fixture* fixture
+);
+
 // Services driver work when the fixture's session uses the caller-driver, and
 // reports the service status. A core-worker session needs no service.
 mln_status mln_test_render_fixture_service(

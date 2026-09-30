@@ -40,10 +40,7 @@
 "bindings/zig/tests/resources.zig" = 8
 "bindings/zig/tests/runtime.zig" = 6
 "bindings/zig/tests/support.zig" = 5
-"tests/native/abi/render/render_thread.c" = 1
 "tests/native/support/render_webgpu.c" = 2
-"tests/native/support/wait.cpp" = 2
-"tests/native/support/wait.h" = 1
 
 [network-host]
 "bindings/dart/test/foundational_values_test.dart" = 2

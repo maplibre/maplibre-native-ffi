@@ -219,6 +219,32 @@ bool mln_test_render_fixture_create_with(
   return true;
 }
 
+mln_status mln_test_render_fixture_start_attach(
+  mln_map map, const mln_render_session_attach_options* options,
+  const mln_completion* completion, mln_test_render_fixture* fixture
+) {
+  mln_test_render_reserve_session();
+  *fixture = (mln_test_render_fixture){0};
+  fixture->driver = mln_test_backend_driver();
+  mln_render_session_attach_options attach = *options;
+  attach.driver = fixture->driver;
+  mln_status status = MLN_STATUS_INVALID_STATE;
+  if (!mln_test_backend_attach(
+        map, &attach, &fixture->backend_state, &fixture->session, completion,
+        &status
+      )) {
+    *fixture = (mln_test_render_fixture){0};
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  if (status != MLN_STATUS_OK) {
+    mln_test_backend_destroy(fixture->backend_state);
+    *fixture = (mln_test_render_fixture){0};
+    return status;
+  }
+  mln_test_render_track_session(fixture);
+  return MLN_STATUS_OK;
+}
+
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
   mln_test_release_drained_batch();
   if (fixture == NULL) {

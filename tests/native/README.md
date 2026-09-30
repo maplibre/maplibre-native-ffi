@@ -200,6 +200,13 @@ Test files include `support/test_support.h`, which brings in the helpers below.
 The host-target fixtures in `support/host_graphics.h` need their own include, as
 described under [GPU objects](#gpu-objects).
 
+The render files also include `support/frames.h`. It requests forced frames,
+waits until every pending demand has a result and one drain holds as many as the
+case expects, and renders and acquires one frame. A case that needs a negative
+check on the driver, such as a barrier that must still be pending, fences the
+driver first with a maintenance command, which runs after every work item the
+driver already holds.
+
 The map files also include `support/map.h`, which provides
 `mln_test_render_still_image`. That helper requests a still image from a static
 or tile map and keeps a forced frame demand in flight until the image completes.
@@ -233,13 +240,21 @@ Use the helper that matches what the case waits for:
 - A flag that another thread sets: `mln_test_flag_set` and
   `mln_test_wait_for_flag`.
 - A thread to park until the case releases it: `mln_test_gate`, with
-  `mln_test_gate_completion` to park the runtime worker inside a completion.
+  `mln_test_gate_completion` to park whichever thread delivers a completion. A
+  completion runs on the submitting thread when the work finishes before the
+  submission returns, so a case that must park the runtime worker belongs in the
+  internal suite, which posts a task to the worker directly.
 - An event: `mln_test_await_event` or `mln_test_await_event_matching`.
 - Render progress: `mln_test_render_step_until`, which services a caller-driver
   session's driver work between checks.
 - A static or tile map that has loaded and rendered everything it requested:
   `mln_test_render_still_image`.
 - Any other condition: `mln_test_await` with a predicate.
+
+A runtime barrier completes once every earlier submission has a terminal result.
+It does not wait for work that the runtime worker does on its own, such as
+handling a frame a render session finished, so it cannot fence that work. A map
+command queued after the work can: its completion runs after it.
 
 ### GPU objects
 
@@ -257,15 +272,6 @@ The browser presets have none of these. Their contexts come from JavaScript, so
 that uses `host_graphics.h` excludes its cases under `__EMSCRIPTEN__`.
 `support/render_egl.c` holds the dedicated EGL fixtures, whose sessions create
 their own context on a display from `tests/graphics`.
-
-### Cases that still wait on a fixed delay
-
-These cases order threads or open a negative window with a fixed delay, which
-the helpers cannot replace directly. Each needs a sync point, the render clock,
-or a public fence:
-
-- `barrier_waits_for_a_demand_parked_by_a_full_ring`: a 50-iteration service
-  loop in which a barrier must not complete.
 
 ### Cases that reach a race through timing
 

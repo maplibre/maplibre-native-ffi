@@ -108,7 +108,10 @@ typedef struct mln_render_frame_result {
    * MLN_RENDER_RESULT_RENDERED, and false for every other outcome. This is the
    * same signal that MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED carries in
    * its needs_repaint field, delivered with the frame result so a host can
-   * re-arm its frame loop without the runtime event round trip.
+   * re-arm its frame loop without the runtime event round trip. A camera
+   * transition does not set it by itself: the map publishes a new update
+   * after each of the transition's frames instead, which a render-if-needed
+   * demand renders.
    */
   bool needs_repaint;
 } mln_render_frame_result;
