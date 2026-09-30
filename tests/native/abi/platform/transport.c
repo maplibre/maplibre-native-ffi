@@ -321,7 +321,9 @@ static void a_remote_pmtiles_archive_is_read_in_ranges(void) {
 }
 
 // Releasing a map whose style request the server is still holding completes
-// without waiting for the response, and the late response reaches nothing.
+// without waiting for the response. The server answers only afterwards, and
+// the runtime then closes with nothing left open. Nothing fences the transport
+// thread against the late answer, so the case asserts no event for it.
 static void a_request_in_flight_does_not_hold_its_map_open(void) {
   static const mln_test_http_route routes[] = {
     {.path = "/held.json",

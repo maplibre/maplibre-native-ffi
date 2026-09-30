@@ -143,9 +143,11 @@ The build enforces the registration rather than trusting review:
 
 ## Running tests
 
-`mise run test [preset]` builds a preset and runs its suites. On desktop and
-simulator targets it first runs `cargo test` for the Rust platform crate's pure
-helpers, such as redirect resolution. The harness accepts Unity's options:
+`mise run test [preset]` builds a preset and runs its suites. On every target
+that runs its suites through CTest, which covers desktop, simulator, and
+Emscripten targets, it first runs `cargo test` on the host for the Rust platform
+crate's pure helpers, such as redirect resolution. The harness accepts Unity's
+options:
 
 | Option    | Effect                                                  |
 | --------- | ------------------------------------------------------- |
@@ -215,6 +217,12 @@ table and closes each connection after one response. A route can carry an ETag
 that it answers 304 for, serve byte ranges, or hold its response until the case
 releases it. The browser has no sockets, so its build leaves the server out, and
 its transport cases run against the runner's routes instead.
+
+The transport cases in `abi/platform/transport.c` check whichever HTTP client a
+target ships: the Rust transport on Linux, Windows, and Android, the
+`NSURLSession` client on Apple targets, and MapLibre's own `platform/ohos`
+client on OpenHarmony. OpenHarmony runs only under the `ci:ohos` label, so a
+change to the table's expectations needs that label to reach its client.
 `mln_test_temp_path` in `env.h` names a file in the temporary directory for a
 case that writes one.
 

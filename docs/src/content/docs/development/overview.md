@@ -271,12 +271,12 @@ Every feature needs automated CI coverage when practical. The root
 in `tests/native` through CTest and Unity. The ABI suite links the shipped
 library through its public headers. The internal suite links the static library
 and uses the library's sync points to order threads that no public fence can
-order. `tests/native/README.md` describes both suites. On desktop and simulator
-targets, `mise run test` also runs the host unit tests of the Rust platform
-crate in `src/platform/rust`, which cover its pure helpers such as redirect
-resolution. `mise run build` runs `mise run check-exports`, which fails when the
-installed library exports anything beyond the public C API. Language binding
-suites run through their binding-specific CI tasks.
+order. `tests/native/README.md` describes both suites. On desktop, simulator,
+and Emscripten targets, `mise run test` also runs the host unit tests of the
+Rust platform crate in `src/platform/rust`, which cover its pure helpers such as
+redirect resolution. `mise run build` runs `mise run check-exports`, which fails
+when the installed library exports anything beyond the public C API. Language
+binding suites run through their binding-specific CI tasks.
 `mise run bindings:test-generator` tests the binding generator;
 [Generate bindings](/maplibre-native-ffi/development/binding-generation/#test-the-generator)
 describes that suite.
