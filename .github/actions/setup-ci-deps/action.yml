@@ -134,9 +134,12 @@ runs:
           mesa-utils \
           mesa-utils-extra \
           mesa-vulkan-drivers
+        # Software rendering is slower than hardware, so the native suites
+        # stretch their waits and hang watchdog to match.
         {
           echo "EGL_PLATFORM=surfaceless"
           echo "LIBGL_ALWAYS_SOFTWARE=true"
+          echo "MLN_TEST_TIMEOUT_SCALE=3"
         } >> "$GITHUB_ENV"
 
     # The hosted runner image has Android build tools and KVM, but no system

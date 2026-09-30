@@ -2,6 +2,8 @@
 *.bat       text eol=crlf
 *.jar       binary
 *.patch     -whitespace
+*.mlt       binary
+*.db        binary
 
 # Vendored: third-party sources committed as-is.
 third_party/**                                              linguist-vendored=true

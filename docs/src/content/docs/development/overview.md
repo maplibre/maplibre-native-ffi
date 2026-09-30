@@ -254,9 +254,9 @@ primary failure once, including its dependent verification and required checks.
 ## Tests And Examples
 
 Every feature needs automated CI coverage when practical. The root
-`mise run test` command builds the native library and runs the direct C API
-suite through CTest and Unity. Language binding suites run through their
-binding-specific CI tasks.
+`mise run test` command builds the native library and runs the native C suites
+in `tests/native` through CTest and Unity. Language binding suites run through
+their binding-specific CI tasks.
 
 Use examples for demos and behavior that needs manual validation, such as visual
 output, interactive input, or host graphics integration.

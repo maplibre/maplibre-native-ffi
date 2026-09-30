@@ -68,7 +68,9 @@ fi
 # The Oniro guest's virtio GPU does not expose a reliable accelerated EGL
 # screen under QEMU. Mesa's surfaceless llvmpipe path provides deterministic
 # offscreen rendering for the test executables.
-graphics_environment="EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LIBGL_DRIVERS_PATH=/vendor/lib64/chipsetsdk "
+# Software rendering under QEMU is slow, so waits and the native hang watchdog
+# stretch by the timeout scale.
+graphics_environment="EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LIBGL_DRIVERS_PATH=/vendor/lib64/chipsetsdk MLN_TEST_TIMEOUT_SCALE='${MLN_TEST_TIMEOUT_SCALE:-3}' "
 
 for test_executable in "${test_executables[@]}"; do
   echo "Running $(basename "$test_executable") in the OpenHarmony emulator."

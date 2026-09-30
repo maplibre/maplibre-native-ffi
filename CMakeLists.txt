@@ -70,7 +70,7 @@ add_library(maplibre_native_ffi::c ALIAS maplibre_native_c)
 
 if(BUILD_TESTING AND MLN_FFI_ARTIFACT_NAME)
   include(cmake/mln_ffi_tests.cmake)
-  mln_ffi_add_c_api_test()
+  mln_ffi_add_native_tests()
 endif()
 
 if(MLN_FFI_ARTIFACT_NAME)

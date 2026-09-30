@@ -4,7 +4,12 @@
 //        [--timeout-seconds N] [--render-backend NAME] [--browser-arg FLAG]...
 //        [--module-arg ARG]...
 //
-// Backend-specific browser flags live here for both C and Rust suites.
+// Backend-specific browser flags live here for both C and Rust suites. Module
+// arguments reach a module page through its worker and an emcc page through its
+// query string, which the native suite's page shell reads.
+//
+// The browser is slower than a native run, so the page gets the timeout scale
+// the native suite stretches its waits by: MLN_TEST_TIMEOUT_SCALE, or 3.
 
 import { spawn } from "node:child_process";
 import {
@@ -125,6 +130,7 @@ for (let i = 0; i < rest.length; i += 1) {
   }
 }
 
+const timeoutScale = process.env.MLN_TEST_TIMEOUT_SCALE ?? "3";
 const root = path.dirname(path.resolve(targetPath));
 const pageName =
   path.extname(targetPath) === ".html"
@@ -214,7 +220,10 @@ worker.onerror = (event) =>
   report({ status: 70, output: "worker error: " + event.message });
 worker.postMessage({
   args: ${embed(moduleArgs)},
-  env: { MLN_FFI_TEST_FIXTURE_ORIGIN: location.origin },
+  env: {
+    MLN_FFI_TEST_FIXTURE_ORIGIN: location.origin,
+    MLN_TEST_TIMEOUT_SCALE: ${embed(timeoutScale)},
+  },
 });
     </script>
   </body>
@@ -284,7 +293,10 @@ const profile = await mkdtemp(path.join(tmpdir(), "mln-browser-test-"));
 
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const { port } = server.address();
-const pageUrl = `http://127.0.0.1:${port}/${pageName}`;
+const pageQuery = new URLSearchParams({ scale: timeoutScale });
+if (path.extname(targetPath) === ".html")
+  for (const argument of moduleArgs) pageQuery.append("arg", argument);
+const pageUrl = `http://127.0.0.1:${port}/${pageName}?${pageQuery}`;
 console.log(`running ${pageUrl} in ${browser}`);
 
 const child = spawn(

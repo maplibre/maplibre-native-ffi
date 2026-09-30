@@ -33,6 +33,7 @@ fi
 test_executables=("$@")
 
 serial=${ANDROID_SERIAL:-emulator-5554}
+timeout_scale=${MLN_TEST_TIMEOUT_SCALE:-3}
 remote_dir=/data/local/tmp/maplibre-native-ffi
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 adb="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}/platform-tools/adb"
@@ -96,7 +97,9 @@ for test_executable in "${test_executables[@]}"; do
 
   # Android has no /tmp, which is where a runtime library falls back to when
   # TMPDIR is unset, so a test that asks for a temporary directory gets one here.
-  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
+  # The emulator renders in software, so waits and the native hang watchdog
+  # stretch by the timeout scale.
+  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}MLN_TEST_TIMEOUT_SCALE='$timeout_scale' TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
   for argument in ${test_arguments[@]+"${test_arguments[@]}"}; do
     printf -v quoted_argument '%q' "$argument"
     remote_command+=" $quoted_argument"

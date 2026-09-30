@@ -9,6 +9,8 @@ interop or the popular MapLibre Android/iOS SDKs.
 - `include/` — Public C API headers (the stable ABI surface).
 - `src/` — C++ implementation behind the C headers, plus render backend adapters
   (Vulkan, Metal, OpenGL) and the Zig test support shim.
+- `tests/` — Native C test suites (`tests/native`), generator tests
+  (`tests/bindgen`), and the shared graphics test fixtures (`tests/graphics`).
 - `bindings/` — Language bindings (Kotlin, Rust, Swift, Zig, .NET, Python, Go,
   Dart) that wrap the C API in idiomatic target-language interfaces.
 - `examples/` — Small demo apps per language/backend (`c-map`, `zig-map`,
@@ -157,7 +159,7 @@ sentence-level style, page structure, and project terminology.
 - The bindings tests include broad integration coverage for the C/C++ layer on
   targets where they run.
 - For tests that _must_ reach below the bindings, there are dedicated C tests in
-  `src/c_api/tests`.
+  `tests/native`.
 - Each binding's test suite should stand on its own for the C API domains and
   targets it supports, using public binding APIs to validate both native
   workflows and binding-owned safety behavior.

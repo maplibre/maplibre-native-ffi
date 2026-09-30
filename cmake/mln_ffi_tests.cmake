@@ -1,40 +1,131 @@
-# Builds the C API suite as a page and registers the runner that drives it.
-#
-# The suite needs three things a native run gets for free:
-#
-#   * A canvas, because the OpenGL fixture creates a real WebGL2 context. emcc's
-#     default HTML shell supplies one, so the suite links to .html.
-#   * Its tile fixtures, which it opens through stdio. They are embedded in the
-#     module rather than served, so the suite reads them the same way it does
-#     everywhere else.
-#   * Cross-origin isolation. The build uses pthreads, so SharedArrayBuffer has
-#     to be available, which means COOP/COEP response headers and therefore a
-#     real HTTP origin rather than file://. The runner serves the directory.
-function(mln_ffi_configure_browser_c_api_test)
-  set(fixture_dir
-      "${PROJECT_SOURCE_DIR}/third_party/maplibre-native/test/fixtures")
-  # Embed only the fixtures that the suite reads. Embedding the whole fixture
-  # tree would carry 81MB of unrelated render-test images.
-  file(GLOB_RECURSE embedded_fixtures RELATIVE "${fixture_dir}"
-       CONFIGURE_DEPENDS "${fixture_dir}/*.mlt")
-  if(NOT embedded_fixtures)
-    message(FATAL_ERROR "no MLT tile fixtures found under ${fixture_dir}")
+# Builds the native suites under tests/native and registers how each target
+# runs them. See tests/native/README.md for the layout and the rules.
+
+set(MLN_NATIVE_TESTS_DIR "${PROJECT_SOURCE_DIR}/tests/native")
+
+# The ABI suite's domains, one directory each under tests/native/abi, in the
+# order the registry runs them. Plugin runs last: a plugin registration lasts
+# for the rest of the process.
+set(MLN_NATIVE_ABI_DOMAINS
+    base
+    completion
+    runtime
+    resources
+    map
+    projection
+    style
+    render
+    backend
+    adapter
+    platform
+    plugin)
+
+# The browser runs the ABI suite as four pages rather than one per file, which
+# would launch Chromium once per file. Each shard names its domains.
+set(MLN_NATIVE_BROWSER_SHARDS "base,completion,runtime"
+    "resources,map,projection,style" "render,backend" "adapter,platform,plugin")
+
+# Tags a test file can end its name with to build only on matching targets,
+# such as render/retarget_metal.c or platform/browser_http_emscripten.c.
+set(MLN_NATIVE_FILE_TAGS metal opengl vulkan webgpu egl wgl webgl emscripten)
+
+function(mln_native_active_file_tags out_var)
+  set(tags ${MLN_FFI_RENDER_BACKEND})
+  if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+    list(APPEND tags ${MLN_FFI_OPENGL_CONTEXT_PROVIDER})
   endif()
-  if(NOT EXISTS "${fixture_dir}/offline_database/corrupt-immediate.db")
-    message(FATAL_ERROR "offline database fixture is missing")
+  if(EMSCRIPTEN)
+    list(APPEND tags emscripten)
   endif()
-  list(APPEND embedded_fixtures "offline_database/corrupt-immediate.db")
-  # SHELL: keeps each flag with its value: CMake deduplicates repeated link
-  # options, which would otherwise collapse the second --embed-file and leave
-  # its path standing alone as an input file.
-  set(embed_options)
-  foreach(fixture IN LISTS embedded_fixtures)
-    list(APPEND embed_options
-         "SHELL:--embed-file ${fixture_dir}/${fixture}@/fixtures/${fixture}")
+  set(${out_var} ${tags} PARENT_SCOPE)
+endfunction()
+
+# Collects the ABI suite's test files for this target, in registry order, and
+# the group symbol each one defines.
+function(mln_native_collect_abi_tests out_sources out_symbols)
+  mln_native_active_file_tags(active_tags)
+  file(GLOB_RECURSE all_sources RELATIVE "${MLN_NATIVE_TESTS_DIR}/abi"
+       CONFIGURE_DEPENDS "${MLN_NATIVE_TESTS_DIR}/abi/*.c")
+  foreach(relative IN LISTS all_sources)
+    string(REGEX MATCH "^([^/]+)/[^/]+$" matched "${relative}")
+    if(NOT matched
+       OR NOT CMAKE_MATCH_1 IN_LIST MLN_NATIVE_ABI_DOMAINS)
+      message(
+        FATAL_ERROR
+          "tests/native/abi/${relative} is outside the domain directories; "
+          "move it under one of: ${MLN_NATIVE_ABI_DOMAINS}")
+    endif()
   endforeach()
-  set_target_properties(mln_ffi_c_api_tests PROPERTIES SUFFIX ".html")
+
+  set(sources)
+  set(symbols)
+  foreach(domain IN LISTS MLN_NATIVE_ABI_DOMAINS)
+    set(domain_sources ${all_sources})
+    list(FILTER domain_sources INCLUDE REGEX "^${domain}/")
+    list(SORT domain_sources)
+    foreach(relative IN LISTS domain_sources)
+      get_filename_component(stem "${relative}" NAME_WE)
+      string(REGEX MATCH "_([a-z0-9]+)$" tagged "${stem}")
+      if(
+        tagged
+        AND
+        CMAKE_MATCH_1
+        IN_LIST
+        MLN_NATIVE_FILE_TAGS
+        AND
+        NOT
+        CMAKE_MATCH_1
+        IN_LIST
+        active_tags)
+        continue()
+      endif()
+      string(MAKE_C_IDENTIFIER "${domain}_${stem}" identifier)
+      list(APPEND sources "${relative}")
+      list(APPEND symbols "mln_test_group_${identifier}")
+    endforeach()
+  endforeach()
+  set(${out_sources} ${sources} PARENT_SCOPE)
+  set(${out_symbols} ${symbols} PARENT_SCOPE)
+endfunction()
+
+function(mln_native_fetch_unity)
+  include(FetchContent)
+  fetchcontent_declare(
+    unity
+    URL https://github.com/ThrowTheSwitch/Unity/archive/refs/tags/v2.6.1.tar.gz
+    URL_HASH
+      SHA256=b41a66d45a6b99758fb3202ace6178177014d52fc524bf1f72687d93e9867292
+    EXCLUDE_FROM_ALL)
+  fetchcontent_makeavailable(unity)
+  # Unity's own translation unit and every test must agree on its options, so
+  # both read tests/native/support/unity_config.h.
+  target_compile_definitions(unity PUBLIC UNITY_INCLUDE_CONFIG_H)
+  # Unity's project installs an export set, so the path stays build-only.
+  target_include_directories(
+    unity
+    PUBLIC "$<BUILD_INTERFACE:${MLN_NATIVE_TESTS_DIR}/support>")
+  if(MSVC AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+    # Unity's Unix -Wall flag means -Weverything to clang-cl. Neutralize it to
+    # match the framework's MSVC warning behavior.
+    target_compile_options(unity PRIVATE -Wno-everything)
+  endif()
+endfunction()
+
+function(mln_native_configure_browser_abi_test)
+  # The suite runs as a page, which needs three things a native run gets for
+  # free:
+  #
+  #   * A canvas, because the OpenGL fixture creates a real WebGL2 context.
+  #   * Its fixtures, which it opens through stdio. They are embedded in the
+  #     module rather than served, so the suite reads them the same way it
+  #     does everywhere else.
+  #   * Cross-origin isolation. The build uses pthreads, so SharedArrayBuffer
+  #     has to be available, which means COOP/COEP response headers and
+  #     therefore a real HTTP origin rather than file://. The runner serves the
+  #     directory.
+  set_target_properties(mln_native_abi_tests PROPERTIES SUFFIX ".html")
   target_link_options(
-    mln_ffi_c_api_tests
+    mln_native_abi_tests
     PRIVATE
       "-sENVIRONMENT=web,worker"
       # main() runs on a worker, where blocking is legal. MapLibre blocks in
@@ -46,33 +137,118 @@ function(mln_ffi_configure_browser_c_api_test)
       # what resolves the selector, so that table has to be reachable from JS.
       "-sOFFSCREENCANVAS_SUPPORT=1"
       # GL for the canvas registry the fixtures resolve their selector through,
-      # ENV for the fixture origin the page shell hands the HTTP test.
+      # ENV for the fixture origin and timeout scale the page shell hands the
+      # suite.
       "-sEXPORTED_RUNTIME_METHODS=GL,ENV"
-      "SHELL:--shell-file ${PROJECT_SOURCE_DIR}/src/c_api/tests/browser_shell.html"
+      "SHELL:--shell-file ${MLN_NATIVE_TESTS_DIR}/support/browser_shell.html"
       # Unity reports through stdout and the process exit status, so the runner
       # needs the module to exit rather than keep its runtime alive.
       "-sEXIT_RUNTIME=1"
-      ${embed_options})
-  # Below the CTest timeout the browser test presets inherit, so a run that
-  # hangs ends at the runner rather than at CTest. The runner reports how far
-  # the suite got, kills the browser, and removes its profile, so letting CTest
-  # kill it first costs the diagnosis and leaves the profile behind.
-  set(runner_timeout_seconds 240)
-
-  # Keep backend-specific browser flags in the shared runner.
-  set(browser_args --render-backend ${MLN_FFI_RENDER_BACKEND})
+      "SHELL:--embed-file ${MLN_NATIVE_TESTS_DIR}/fixtures@/fixtures")
 
   find_program(MLN_FFI_NODE_EXECUTABLE node REQUIRED)
-  add_test(
-    NAME c-api
-    COMMAND
-      "${MLN_FFI_NODE_EXECUTABLE}"
-      "${PROJECT_SOURCE_DIR}/scripts/run-browser-test.mjs"
-      "$<TARGET_FILE:mln_ffi_c_api_tests>" --timeout-seconds
-      ${runner_timeout_seconds} ${browser_args})
+  set(shard_index 0)
+  foreach(shard IN LISTS MLN_NATIVE_BROWSER_SHARDS)
+    math(EXPR shard_index "${shard_index} + 1")
+    string(REPLACE "," ";" shard_domains "${shard}")
+    set(filter)
+    foreach(domain IN LISTS shard_domains)
+      list(APPEND filter "/abi/${domain}/")
+    endforeach()
+    list(JOIN filter "," filter)
+    set(test_name "native-abi/browser-shard-${shard_index}")
+    # The runner's timeout sits below the entry's, so a run that hangs ends at
+    # the runner, which reports how far the shard got and removes the browser
+    # profile, rather than at CTest.
+    add_test(
+      NAME ${test_name}
+      COMMAND
+        "${MLN_FFI_NODE_EXECUTABLE}"
+        "${PROJECT_SOURCE_DIR}/scripts/run-browser-test.mjs"
+        "$<TARGET_FILE:mln_native_abi_tests>"
+        --timeout-seconds
+        170
+        --render-backend
+        ${MLN_FFI_RENDER_BACKEND}
+        --module-arg
+        -f
+        --module-arg
+        "${filter}")
+    set_tests_properties(${test_name} PROPERTIES TIMEOUT 180)
+  endforeach()
 endfunction()
 
-function(mln_ffi_add_c_api_test)
+# Environment every native test process gets from CTest.
+function(mln_native_test_environment out_environment out_modifications)
+  get_target_property(dependency_runtime_dirs mln_ffi_render_dependencies
+                      MLN_FFI_RUNTIME_DIRS)
+  if("${dependency_runtime_dirs}" MATCHES "-NOTFOUND$")
+    set(dependency_runtime_dirs "")
+  endif()
+  set(modifications)
+  get_target_property(test_library_path_variable mln_ffi_platform_dependencies
+                      MLN_FFI_TEST_LIBRARY_PATH_VARIABLE)
+  get_target_property(platform_runtime_dirs mln_ffi_platform_dependencies
+                      MLN_FFI_TEST_RUNTIME_DIRS)
+  if(test_library_path_variable)
+    foreach(runtime_dir IN LISTS platform_runtime_dirs dependency_runtime_dirs)
+      list(APPEND modifications
+           "${test_library_path_variable}=path_list_prepend:${runtime_dir}")
+    endforeach()
+  endif()
+  # The directory arrives at run time, which keeps the checkout path out of the
+  # compiled objects: an object carrying it would send a second checkout reading
+  # fixtures out of the tree that happened to compile it first.
+  set(environment "MLN_FFI_TEST_FIXTURE_DIR=${MLN_NATIVE_TESTS_DIR}/fixtures")
+  mln_ffi_apple_is_maccatalyst(maccatalyst)
+  if(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
+    list(APPEND environment "MLN_FFI_SIMULATOR_RUNTIME=tvOS")
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT maccatalyst)
+    list(APPEND environment "MLN_FFI_SIMULATOR_RUNTIME=iOS")
+  endif()
+  get_target_property(vulkan_icd_file mln_ffi_render_dependencies
+                      MLN_FFI_VULKAN_ICD_FILE)
+  if(vulkan_icd_file)
+    list(APPEND environment "VK_ICD_FILENAMES=${vulkan_icd_file}")
+  endif()
+  set(${out_environment} ${environment} PARENT_SCOPE)
+  set(${out_modifications} ${modifications} PARENT_SCOPE)
+endfunction()
+
+# The fault-injection harness links statically so operator new replacements
+# apply to native disposal admission without altering the shipped library.
+function(mln_native_add_internal_tests)
+  if(NOT TARGET maplibre_native_c_static OR CMAKE_CROSSCOMPILING)
+    return()
+  endif()
+  add_executable(mln_ffi_disposal_allocation_test
+                 "${MLN_NATIVE_TESTS_DIR}/internal/disposal_allocation.cpp")
+  target_compile_features(mln_ffi_disposal_allocation_test PRIVATE cxx_std_20)
+  target_compile_definitions(
+    mln_ffi_disposal_allocation_test
+    PRIVATE $<TARGET_PROPERTY:maplibre_native_c_objects,COMPILE_DEFINITIONS>)
+  target_include_directories(
+    mln_ffi_disposal_allocation_test
+    PRIVATE
+      ${PROJECT_SOURCE_DIR}/src
+      $<TARGET_PROPERTY:maplibre_native_c_objects,INCLUDE_DIRECTORIES>)
+  target_include_directories(
+    mln_ffi_disposal_allocation_test
+    SYSTEM
+    PRIVATE
+      $<TARGET_PROPERTY:maplibre_native_c_objects,SYSTEM_INCLUDE_DIRECTORIES>)
+  target_link_libraries(
+    mln_ffi_disposal_allocation_test
+    PRIVATE maplibre_native_c_static)
+  add_test(
+    NAME native-internal/disposal-allocation
+    COMMAND mln_ffi_disposal_allocation_test)
+  set_tests_properties(
+    native-internal/disposal-allocation
+    PROPERTIES TIMEOUT 120)
+endfunction()
+
+function(mln_ffi_add_native_tests)
   find_program(MLN_FFI_UV_EXECUTABLE uv REQUIRED)
   add_test(
     NAME binding-contracts
@@ -92,17 +268,12 @@ function(mln_ffi_add_c_api_test)
   if(NOT test_supported)
     return()
   endif()
-  get_target_property(dependency_runtime_dirs mln_ffi_render_dependencies
-                      MLN_FFI_RUNTIME_DIRS)
   get_target_property(dependency_include_dirs mln_ffi_render_dependencies
                       MLN_FFI_INCLUDE_DIRS)
   # Libraries the harness links for the graphics API it drives itself, which the
   # C API resolves at runtime rather than linking.
   get_target_property(dependency_test_libraries mln_ffi_render_dependencies
                       MLN_FFI_TEST_LINK_LIBRARIES)
-  if("${dependency_runtime_dirs}" MATCHES "-NOTFOUND$")
-    set(dependency_runtime_dirs "")
-  endif()
   if("${dependency_include_dirs}" MATCHES "-NOTFOUND$")
     set(dependency_include_dirs "")
   endif()
@@ -110,109 +281,41 @@ function(mln_ffi_add_c_api_test)
     set(dependency_test_libraries "")
   endif()
 
-  include(FetchContent)
-  fetchcontent_declare(
-    unity
-    URL https://github.com/ThrowTheSwitch/Unity/archive/refs/tags/v2.6.1.tar.gz
-    URL_HASH
-      SHA256=b41a66d45a6b99758fb3202ace6178177014d52fc524bf1f72687d93e9867292
-    EXCLUDE_FROM_ALL)
-  fetchcontent_makeavailable(unity)
-  # Unity buffers its per-test lines when stdout is a pipe, so a run that never
-  # returns takes its progress with it and ctest reports a timeout with no
-  # output. Flushing each line leaves the last test it started in the log. The
-  # flush calls live in Unity's own translation unit, so the definition belongs
-  # on that target rather than on the tests that link it.
-  target_compile_definitions(unity PRIVATE UNITY_USE_FLUSH_STDOUT=1)
-  # Unity 2.6 makes double support opt-in: without this define TEST_ASSERT_*
-  # DOUBLE macros expand to an unconditional "Double Support Disabled" failure.
-  # Unity's own translation unit and every test that includes unity.h have to
-  # agree on it, so unlike UNITY_USE_FLUSH_STDOUT (which only affects calls
-  # inside Unity's sources) this one is PUBLIC.
-  target_compile_definitions(unity PUBLIC UNITY_INCLUDE_DOUBLE)
-  # Unity infers 64-bit assertion support from pointer width. Handles in this C
-  # API are 64 bits wherever they are, so a 32-bit target still needs the UINT64
-  # assertions. Like UNITY_INCLUDE_DOUBLE this has to be PUBLIC, because Unity's
-  # own translation unit and every test that includes unity.h must agree on it.
-  if(CMAKE_SIZEOF_VOID_P LESS 8)
-    target_compile_definitions(unity PUBLIC UNITY_SUPPORT_64)
-  endif()
-  if(MSVC AND CMAKE_C_COMPILER_ID MATCHES "Clang")
-    # Unity's Unix -Wall flag means -Weverything to clang-cl. Neutralize it to
-    # match the framework's MSVC warning behavior.
-    target_compile_options(unity PRIVATE -Wno-everything)
-  endif()
+  mln_native_fetch_unity()
+  mln_native_add_internal_tests()
 
-  # Globbing keeps a newly added *_abi.c in the build without a second edit
-  # here; CONFIGURE_DEPENDS reruns the glob when the directory changes.
-  file(GLOB test_abi_sources CONFIGURE_DEPENDS
-       ${PROJECT_SOURCE_DIR}/src/c_api/tests/*_abi.c)
-  set(test_sources
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.cpp ${test_abi_sources})
+  mln_native_collect_abi_tests(abi_sources abi_symbols)
+  set(registry "")
+  set(test_sources)
+  foreach(relative symbol IN ZIP_LISTS abi_sources abi_symbols)
+    set(source "${MLN_NATIVE_TESTS_DIR}/abi/${relative}")
+    list(APPEND test_sources "${source}")
+    set_property(
+      SOURCE "${source}"
+      APPEND
+      PROPERTY COMPILE_DEFINITIONS "MLN_TEST_GROUP_NAME=${symbol}")
+    string(APPEND registry
+           "MLN_TEST_REGISTRY_ENTRY(${symbol}, \"tests/native/abi/${relative}\")\n")
+  endforeach()
+  set(registry_dir "${CMAKE_CURRENT_BINARY_DIR}/tests/native")
+  file(
+    CONFIGURE
+    OUTPUT "${registry_dir}/mln_native_test_registry.inc"
+    CONTENT "${registry}")
+
+  set(support_dir "${MLN_NATIVE_TESTS_DIR}/support")
+  set(support_sources "${support_dir}/harness.c" "${support_dir}/watchdog.cpp"
+      "${support_dir}/test_support.c" "${support_dir}/test_support.cpp")
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
-    list(APPEND test_sources
-         ${PROJECT_SOURCE_DIR}/src/c_api/tests/metal_surface_test_support.mm)
+    list(APPEND support_sources "${support_dir}/metal_retarget.mm")
     set_source_files_properties(
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/metal_surface_test_support.mm
+      "${support_dir}/metal_retarget.mm"
       PROPERTIES COMPILE_OPTIONS -fobjc-arc)
   endif()
 
-  # Each *_abi.c reaches the runner through one run_<file>_tests() call in
-  # main.c. main.c carries no preprocessor guards, so a plain text match is
-  # exact here once comments are stripped -- otherwise a commented-out call
-  # would satisfy the guard while its tests never run. See
-  # src/c_api/tests/README.md for the full contract.
-  file(READ ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c test_main_contents)
-  string(REGEX REPLACE "/\\*([^*]|\\*+[^*/])*\\*+/" "" test_main_contents
-         "${test_main_contents}")
-  string(REGEX REPLACE "//[^\n]*" "" test_main_contents "${test_main_contents}")
-  # String literals too, so a runner named only inside a diagnostic message
-  # cannot stand in for the call that runs it.
-  string(REGEX REPLACE "\"([^\"\\\\]|\\\\.)*\"" "" test_main_contents
-         "${test_main_contents}")
-  foreach(test_abi_source IN LISTS test_abi_sources)
-    get_filename_component(test_abi_name ${test_abi_source} NAME_WE)
-    if(NOT test_main_contents MATCHES "run_${test_abi_name}_tests\\(\\)")
-      message(
-        FATAL_ERROR
-          "src/c_api/tests/${test_abi_name}.c defines tests that never run: "
-          "declare run_${test_abi_name}_tests(void) in "
-          "src/c_api/tests/abi_tests.h and call it from "
-          "src/c_api/tests/main.c.")
-    endif()
-  endforeach()
-
-  # The fault-injection harness links statically so operator new replacements
-  # apply to native disposal admission without altering the shipped library.
-  if(TARGET maplibre_native_c_static AND NOT CMAKE_CROSSCOMPILING)
-    add_executable(mln_ffi_disposal_allocation_test
-                   ${PROJECT_SOURCE_DIR}/src/c_api/tests/disposal_allocation.cpp)
-    target_compile_features(mln_ffi_disposal_allocation_test PRIVATE cxx_std_20)
-    target_compile_definitions(
-      mln_ffi_disposal_allocation_test
-      PRIVATE $<TARGET_PROPERTY:maplibre_native_c_objects,COMPILE_DEFINITIONS>)
-    target_include_directories(
-      mln_ffi_disposal_allocation_test
-      PRIVATE
-        ${PROJECT_SOURCE_DIR}/src
-        $<TARGET_PROPERTY:maplibre_native_c_objects,INCLUDE_DIRECTORIES>)
-    target_include_directories(
-      mln_ffi_disposal_allocation_test
-      SYSTEM
-      PRIVATE
-        $<TARGET_PROPERTY:maplibre_native_c_objects,SYSTEM_INCLUDE_DIRECTORIES>)
-    target_link_libraries(
-      mln_ffi_disposal_allocation_test
-      PRIVATE maplibre_native_c_static)
-    add_test(NAME disposal-allocation COMMAND mln_ffi_disposal_allocation_test)
-    set_property(TEST disposal-allocation PROPERTY TIMEOUT 60)
-  endif()
-
-  add_executable(mln_ffi_c_api_tests ${test_sources})
+  add_executable(mln_native_abi_tests ${support_sources} ${test_sources})
   set_target_properties(
-    mln_ffi_c_api_tests
+    mln_native_abi_tests
     PROPERTIES
       C_STANDARD
       23
@@ -234,135 +337,128 @@ function(mln_ffi_add_c_api_test)
     maplibre_native_c_objects
     PRIVATE MLN_FFI_ENABLE_TEST_HOOKS)
   target_link_libraries(
-    mln_ffi_c_api_tests
+    mln_native_abi_tests
     PRIVATE
       maplibre_native_c unity::framework MLN_FFI::RenderDependencies
       ${dependency_test_libraries})
   target_include_directories(
-    mln_ffi_c_api_tests
+    mln_native_abi_tests
     PRIVATE
-      ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/src/c_api/tests
-      ${dependency_include_dirs})
+      ${PROJECT_SOURCE_DIR}/src "${MLN_NATIVE_TESTS_DIR}" "${support_dir}"
+      "${registry_dir}" ${dependency_include_dirs})
   target_include_directories(
-    mln_ffi_c_api_tests
+    mln_native_abi_tests
     SYSTEM
     PRIVATE
       ${MLN_FFI_SOURCE_DIR}/include
       ${MLN_FFI_SOURCE_DIR}/vendor/maplibre-native-base/include)
 
-  # Enforce the registration contract at compile time. A test that no RUN_TEST
-  # references is an unused static function, and dropping `static` to dodge that
-  # trips the missing-prototype error instead, because abi_tests.h and
-  # test_support.h declare every function this suite legitimately exports.
+  # A case that no RUN_TEST references is an unused static function, and
+  # dropping `static` to dodge that trips the missing-prototype error instead,
+  # because the support headers declare every function the suite exports.
   # These stay off the vendored unity target.
   if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(
-      mln_ffi_c_api_tests
+      mln_native_abi_tests
       PRIVATE -Werror=unused-function -Werror=missing-prototypes)
   elseif(MSVC)
     # C4505: unreferenced function with internal linkage has been removed.
-    target_compile_options(mln_ffi_c_api_tests PRIVATE /we4505)
+    target_compile_options(mln_native_abi_tests PRIVATE /we4505)
   endif()
 
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
     target_compile_definitions(
-      mln_ffi_c_api_tests
+      mln_native_abi_tests
       PRIVATE MLN_FFI_TEST_BACKEND_METAL=1)
   elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
     target_compile_definitions(
-      mln_ffi_c_api_tests
+      mln_native_abi_tests
       PRIVATE MLN_FFI_TEST_BACKEND_OPENGL=1)
     if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
       target_compile_definitions(
-        mln_ffi_c_api_tests
+        mln_native_abi_tests
         PRIVATE MLN_FFI_TEST_OPENGL_WGL=1)
     elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
       target_compile_definitions(
-        mln_ffi_c_api_tests
+        mln_native_abi_tests
         PRIVATE MLN_FFI_TEST_OPENGL_WEBGL=1)
     else()
       target_compile_definitions(
-        mln_ffi_c_api_tests
+        mln_native_abi_tests
         PRIVATE MLN_FFI_TEST_OPENGL_EGL=1)
     endif()
   elseif(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
     target_compile_definitions(
-      mln_ffi_c_api_tests
+      mln_native_abi_tests
       PRIVATE MLN_FFI_TEST_BACKEND_VULKAN=1)
   elseif(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
     target_compile_definitions(
-      mln_ffi_c_api_tests
+      mln_native_abi_tests
       PRIVATE MLN_FFI_TEST_BACKEND_WEBGPU=1)
   endif()
 
   if(NOT WIN32)
     find_package(Threads REQUIRED)
-    target_link_libraries(mln_ffi_c_api_tests PRIVATE Threads::Threads)
+    target_link_libraries(mln_native_abi_tests PRIVATE Threads::Threads)
   endif()
   # The Metal test support defines an Objective-C class, which the iOS and
   # tvOS test app links against the runtime and Foundation directly.
   if(APPLE AND MLN_FFI_RENDER_BACKEND STREQUAL "metal")
     target_link_libraries(
-      mln_ffi_c_api_tests
+      mln_native_abi_tests
       PRIVATE "-framework Foundation" objc)
   endif()
 
   get_target_property(test_link_options mln_ffi_platform_dependencies
                       MLN_FFI_TEST_LINK_OPTIONS)
   if(test_link_options)
-    target_link_options(mln_ffi_c_api_tests PRIVATE ${test_link_options})
+    target_link_options(mln_native_abi_tests PRIVATE ${test_link_options})
   endif()
 
   if(EMSCRIPTEN)
-    mln_ffi_configure_browser_c_api_test()
+    mln_native_configure_browser_abi_test()
     return()
   endif()
 
-  mln_ffi_apple_is_maccatalyst(MLN_FFI_APPLE_MACCATALYST)
-  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$" AND NOT MLN_FFI_APPLE_MACCATALYST)
-    add_test(
-      NAME c-api
-      COMMAND
-        bash ${PROJECT_SOURCE_DIR}/scripts/run-ios-simulator-test.sh
-        $<TARGET_FILE:mln_ffi_c_api_tests>)
+  # Each registered test gets the same environment, so a new entry cannot miss
+  # the fixture directory or the loader path.
+  mln_native_test_environment(test_environment test_modifications)
+  set(registered_tests)
+  mln_ffi_apple_is_maccatalyst(maccatalyst)
+  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$" AND NOT maccatalyst)
+    # A simulator spawns one process per run, so the suite runs as one entry,
+    # with the plugin group in an invocation of its own after it.
+    set(runner bash "${PROJECT_SOURCE_DIR}/scripts/run-ios-simulator-test.sh"
+        "$<TARGET_FILE:mln_native_abi_tests>" 300)
+    add_test(NAME native-abi COMMAND ${runner} -- -x /abi/plugin/)
+    add_test(NAME native-abi/plugin COMMAND ${runner} -- -f /abi/plugin/)
+    set_tests_properties(native-abi PROPERTIES TIMEOUT 300)
+    set_tests_properties(
+      native-abi/plugin
+      PROPERTIES DEPENDS native-abi TIMEOUT 120)
+    list(APPEND registered_tests native-abi native-abi/plugin)
   else()
-    add_test(NAME c-api COMMAND mln_ffi_c_api_tests)
-  endif()
-  # The suite's own waits are bounded and name what never arrived, so a run
-  # that reaches this timeout has stalled somewhere they do not cover.
-  set_property(TEST c-api PROPERTY TIMEOUT 900)
-
-  get_target_property(test_library_path_variable mln_ffi_platform_dependencies
-                      MLN_FFI_TEST_LIBRARY_PATH_VARIABLE)
-  get_target_property(platform_runtime_dirs mln_ffi_platform_dependencies
-                      MLN_FFI_TEST_RUNTIME_DIRS)
-  if(test_library_path_variable)
-    set(runtime_environment "")
-    foreach(runtime_dir IN LISTS platform_runtime_dirs dependency_runtime_dirs)
-      list(APPEND runtime_environment
-           "${test_library_path_variable}=path_list_prepend:${runtime_dir}")
+    # One entry per file, so `ctest --parallel` spreads the suite across
+    # processes and a crash takes down one file rather than the run.
+    foreach(relative IN LISTS abi_sources)
+      string(REGEX REPLACE "\\.c$" "" test_path "${relative}")
+      set(test_name "native-abi/${test_path}")
+      add_test(
+        NAME ${test_name}
+        COMMAND mln_native_abi_tests -f "/abi/${relative}")
+      set_tests_properties(${test_name} PROPERTIES TIMEOUT 120)
+      list(APPEND registered_tests ${test_name})
     endforeach()
-    set_property(
-      TEST c-api
-      PROPERTY ENVIRONMENT_MODIFICATION ${runtime_environment})
   endif()
-  # Tile fixtures the suite feeds through a resource provider come from the
-  # MapLibre Native submodule rather than being duplicated here, so a submodule
-  # bump that moves one surfaces as a test failure instead of silent drift. The
-  # directory arrives at run time, which keeps the checkout path out of the
-  # compiled objects: an object carrying it would send a second checkout reading
-  # fixtures out of the tree that happened to compile it first.
-  set(test_environment
-      "MLN_FFI_TEST_FIXTURE_DIR=${PROJECT_SOURCE_DIR}/third_party/maplibre-native/test/fixtures")
-  if(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
-    list(APPEND test_environment "MLN_FFI_SIMULATOR_RUNTIME=tvOS")
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_APPLE_MACCATALYST)
-    list(APPEND test_environment "MLN_FFI_SIMULATOR_RUNTIME=iOS")
+  if(TARGET mln_ffi_disposal_allocation_test)
+    list(APPEND registered_tests native-internal/disposal-allocation)
   endif()
-  get_target_property(vulkan_icd_file mln_ffi_render_dependencies
-                      MLN_FFI_VULKAN_ICD_FILE)
-  if(vulkan_icd_file)
-    list(APPEND test_environment "VK_ICD_FILENAMES=${vulkan_icd_file}")
-  endif()
-  set_property(TEST c-api PROPERTY ENVIRONMENT ${test_environment})
+  foreach(test_name IN LISTS registered_tests)
+    set_property(TEST ${test_name} PROPERTY ENVIRONMENT ${test_environment})
+    if(test_modifications)
+      set_property(
+        TEST ${test_name}
+        PROPERTY ENVIRONMENT_MODIFICATION ${test_modifications})
+    endif()
+  endforeach()
 endfunction()
