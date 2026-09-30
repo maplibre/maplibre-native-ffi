@@ -52,6 +52,11 @@ final class _Library {
             Bool Function(Pointer<Void>, Pointer<_Context>),
             bool Function(Pointer<Void>, Pointer<_Context>)
           >('mln_test_graphics_get_context'),
+      makeCurrent = library
+          .lookupFunction<
+            Bool Function(Pointer<Void>),
+            bool Function(Pointer<Void>)
+          >('mln_test_graphics_make_current'),
       lastError = library
           .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
             'mln_test_graphics_last_error',
@@ -60,6 +65,7 @@ final class _Library {
   final Pointer<Void> Function(int) create;
   final void Function(Pointer<Void>) destroy;
   final bool Function(Pointer<Void>, Pointer<_Context>) getContext;
+  final bool Function(Pointer<Void>) makeCurrent;
   final Pointer<Utf8> Function() lastError;
 }
 
@@ -86,14 +92,18 @@ int _buildBackend() {
   throw StateError('no test graphics backend for $backends');
 }
 
-/// A device or context standing in for the host's, destroyed by a teardown
-/// that runs after every session the test attaches to it.
+/// Whether this build can attach an owned texture to a core worker. A WGL
+/// session shares the host's context, which only the caller driver can
+/// drive.
+bool get buildHasCoreWorkerTexture => _buildBackend() != _backendWgl;
+
+/// A device or context standing in for the host's.
 final class TestGraphics {
   TestGraphics._(this._handle, this._context);
 
-  /// Creates the build's backend context. A build whose backend has no
-  /// context here fails, rather than skipping.
-  factory TestGraphics.open() {
+  /// Creates the build's backend context, which [close] destroys. A build
+  /// whose backend has no context here fails, rather than skipping.
+  factory TestGraphics.create() {
     final handle = _library.create(_buildBackend());
     if (handle == nullptr) {
       fail('mln_test_graphics_create: ${_library.lastError().toDartString()}');
@@ -105,30 +115,47 @@ final class TestGraphics {
       _library.destroy(handle);
       fail('mln_test_graphics_get_context: $error');
     }
-    final graphics = TestGraphics._(handle, context);
-    addTearDown(graphics._close);
+    return TestGraphics._(handle, context);
+  }
+
+  /// Creates the build's backend context, destroyed by a teardown that runs
+  /// after every session the test attaches to it.
+  factory TestGraphics.open() {
+    final graphics = TestGraphics.create();
+    addTearDown(graphics.close);
     return graphics;
   }
 
   final Pointer<Void> _handle;
   final Pointer<_Context> _context;
+  var _closed = false;
 
-  /// Whether sessions share an OpenGL context with this host, which the
-  /// caller driver then services.
   bool get isOpengl =>
       _context.ref.backend == _backendEgl ||
       _context.ref.backend == _backendWgl;
 
+  /// Makes an OpenGL context current on the calling thread, as the host of a
+  /// caller-driven session does on its graphics thread.
+  void makeCurrent() {
+    if (!_library.makeCurrent(_handle)) {
+      fail(
+        'mln_test_graphics_make_current: '
+        '${_library.lastError().toDartString()}',
+      );
+    }
+  }
+
   /// Attaches a session-owned texture on this context.
   ///
-  /// An OpenGL session shares the host's context, as the C API requires on
-  /// WGL and as a host that acquires frames does on EGL, so it takes the
-  /// caller driver.
+  /// A [shared] OpenGL session joins the host's context and takes the caller
+  /// driver; otherwise an EGL session creates a dedicated context on the core
+  /// worker. WGL has only the shared form.
   RenderSessionAttachment attachOwnedTexture(
     MapHandle map,
     RenderTargetExtent extent,
-    RenderSessionAttachOptions options,
-  ) {
+    RenderSessionAttachOptions options, {
+    required bool shared,
+  }) {
     final context = _context.ref;
     NativePointer pointer(Pointer<Void> value) => NativePointer(value.address);
     switch (context.backend) {
@@ -163,12 +190,17 @@ final class TestGraphics {
           OpenglOwnedTextureDescriptor(
             extent: extent,
             context: OpenglContextDescriptor(
-              ownership: OpenglContextOwnership.shared,
+              ownership: shared
+                  ? OpenglContextOwnership.shared
+                  : OpenglContextOwnership.dedicated,
               data: OpenglContextDescriptorDataEgl(
                 EglContextDescriptor(
                   display: pointer(context.eglDisplay),
                   config: pointer(context.eglConfig),
-                  shareContext: pointer(context.eglContext),
+                  shareContext: shared
+                      ? pointer(context.eglContext)
+                      : NativePointer.nullPointer,
+                  clientApi: OpenglClientApi.gles,
                 ),
               ),
             ),
@@ -176,6 +208,7 @@ final class TestGraphics {
           options,
         );
       default:
+        if (!shared) fail('a WGL session always shares the host context');
         return map.openglOwnedTextureAttach(
           OpenglOwnedTextureDescriptor(
             extent: extent,
@@ -195,7 +228,11 @@ final class TestGraphics {
     }
   }
 
-  void _close() {
+  /// Destroys the context, on the thread that made it current when the
+  /// session was caller-driven. A second close does nothing.
+  void close() {
+    if (_closed) return;
+    _closed = true;
     _library.destroy(_handle);
     calloc.free(_context);
   }

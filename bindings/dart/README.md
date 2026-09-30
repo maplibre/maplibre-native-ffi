@@ -106,6 +106,13 @@ Runtime, map, camera, and projection calls remain valid when Dart resumes an
 isolate on another native thread after `await`. Attach a render session directly
 from its map on the isolate that will own the graphics session.
 
+A caller-driven render session is the exception: it belongs to the native thread
+that first services it, and `serviceDriverWork()` from any other thread throws
+`WrongThreadException`. Dart can resume an isolate on another thread after any
+`await`, so service such a session only within one synchronous stretch, from
+making its context current through its detach. A core-worker session has no such
+limit.
+
 Resource-request completion is one-shot. Calling `complete()` or `close()`
 releases the provider reference even when completion reports a native error.
 Closing a request without completing it fails the request, so the load reports
