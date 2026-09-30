@@ -776,7 +776,10 @@ static void a_download_completes_from_provider_served_resources(void) {
          .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
          .bytes = (const uint8_t*)offline_style_json,
          .byte_count = sizeof(offline_style_json) - 1,
-       }},
+       },
+     // A map's later requests stay unanswered until the case answers them,
+     // so no response lands in the cache after the invalidation.
+     .later_held = true},
     {.url = offline_tile_url,
      .response = {
        .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
@@ -854,6 +857,10 @@ static void a_download_completes_from_provider_served_resources(void) {
   TEST_ASSERT_NOT_NULL(revalidation);
   TEST_ASSERT_FALSE(revalidation->has_prior_expires);
   TEST_ASSERT_EQUAL_size_t(0, revalidation->prior_data_size);
+  // An answer would refresh the cached copy, and could land after the
+  // invalidation, so the revalidation ends unanswered with its map.
+  mln_test_destroy_map(before);
+  mln_resource_request_release(revalidation->handle);
 
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_runtime_offline_region_invalidate(
@@ -864,7 +871,9 @@ static void a_download_completes_from_provider_served_resources(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_map_set_style_url(after, offline_style_url)
   );
-  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, after));
+  TEST_ASSERT_TRUE(
+    mln_test_provider_wait_for_requests(provider, offline_style_url, 3)
+  );
   const mln_test_provider_request* refetch =
     mln_test_provider_request_at(provider, offline_style_url, 2);
   TEST_ASSERT_NOT_NULL(refetch);
@@ -873,9 +882,19 @@ static void a_download_completes_from_provider_served_resources(void) {
   TEST_ASSERT_EQUAL_size_t(
     sizeof(offline_style_json) - 1, refetch->prior_data_size
   );
+  const mln_resource_response style = {
+    .size = sizeof(mln_resource_response),
+    .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+    .bytes = (const uint8_t*)offline_style_json,
+    .byte_count = sizeof(offline_style_json) - 1,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_resource_request_complete(refetch->handle, &style, NULL)
+  );
+  mln_resource_request_release(refetch->handle);
+  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, after));
 
   mln_test_destroy_map(after);
-  mln_test_destroy_map(before);
   mln_test_destroy_runtime(runtime);
   mln_test_provider_destroy(provider);
 }
