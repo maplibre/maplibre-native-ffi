@@ -1,5 +1,6 @@
-import '../generated_workflows.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 
@@ -8,7 +9,7 @@ Future<void> closeRuntimes() async {
     await Future.wait(
       List.generate(2, (_) async {
         final runtime = runtimeCreate(runtimeOptionsDefault());
-        final map = await runtime.createMap();
+        final map = await runtime.mapCreate(mapOptionsDefault());
         try {
           await runtime.close();
           throw StateError('runtime closed with a live map');
@@ -24,10 +25,24 @@ Future<void> closeRuntimes() async {
   print('CLOSED_ALL_HANDLES');
 }
 
+/// Leaves a runtime and a map with a loaded style open, for the isolate's
+/// shutdown to finalize.
+Future<void> abandonHandles() async {
+  final runtime = runtimeCreate(runtimeOptionsDefault());
+  final map = await runtime.mapCreate(mapOptionsDefault());
+  await map.setStyleJson(
+    Uint8List.fromList(utf8.encode('{"version":8,"sources":{},"layers":[]}')),
+  );
+  print('ABANDONED_HANDLES');
+}
+
 Future<void> main(List<String> arguments) async {
-  if (arguments.single == 'unawaited') {
-    unawaited(closeRuntimes());
-  } else {
-    await closeRuntimes();
+  switch (arguments.single) {
+    case 'unawaited':
+      unawaited(closeRuntimes());
+    case 'awaited':
+      await closeRuntimes();
+    case 'abandoned':
+      await abandonHandles();
   }
 }

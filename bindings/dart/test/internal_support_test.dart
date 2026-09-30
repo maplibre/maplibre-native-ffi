@@ -9,6 +9,7 @@ import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
 import 'package:maplibre_native_ffi/src/internal/lifecycle/lifecycle.dart';
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
 import 'package:maplibre_native_ffi/src/internal/status/status.dart';
+import 'package:maplibre_native_ffi/src/render/native_pointer.dart';
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart';
 import 'package:ffi/ffi.dart';
 import 'package:test/test.dart';
@@ -143,6 +144,31 @@ void main() {
         expect(empty.data, isNot(nullptr));
       });
     });
+  });
+
+  test('scoped native values validate before exposing borrowed values', () {
+    var live = true;
+    void checkLive() {
+      if (!live) throw StateError('scope closed');
+    }
+
+    final pointer = ScopedNativePointer(
+      0x1234,
+      checkValid: checkLive,
+      debugName: 'test pointer',
+    );
+    final value = ScopedNativeInt(
+      7,
+      checkValid: checkLive,
+      debugName: 'test value',
+    );
+    expect(pointer.address, 0x1234);
+    expect(pointer.toNativePointer(), const NativePointer(0x1234));
+    expect(value.value, 7);
+
+    live = false;
+    expect(() => pointer.address, throwsStateError);
+    expect(() => value.value, throwsStateError);
   });
 
   group('native handle state', () {

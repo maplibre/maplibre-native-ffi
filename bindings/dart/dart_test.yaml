@@ -1,0 +1,5 @@
+tags:
+  # A suite that installs process-global native state, such as the log
+  # callback. Only one suite carries it, because dart test runs suites
+  # concurrently in one process.
+  global_state:

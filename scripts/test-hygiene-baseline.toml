@@ -3,7 +3,7 @@
 
 [sleep]
 "bindings/dart/test/callback_collection_test.dart" = 1
-"bindings/dart/test/maplibre_native_ffi_test.dart" = 5
+"bindings/dart/test/maplibre_native_ffi_test.dart" = 4
 "tests/native/support/render_webgpu.c" = 2
 
 [network-host]

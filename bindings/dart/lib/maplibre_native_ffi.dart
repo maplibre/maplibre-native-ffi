@@ -13,5 +13,11 @@ export 'src/projection/projection.dart';
 export 'src/query/query.dart';
 export 'src/render/render.dart';
 export 'src/resource/resource.dart';
-export 'src/runtime/runtime.dart' hide decodeRuntimeEventBatchForTesting;
+export 'src/runtime/runtime.dart'
+    hide
+        CallbackPortLifecycleProbe,
+        adoptOwnedForTesting,
+        decodeRuntimeEventBatchForTesting,
+        globalCallbackPortProbeForTesting,
+        singleCallbackPortProbeForTesting;
 export 'src/style/style.dart';

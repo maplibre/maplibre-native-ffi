@@ -4,35 +4,40 @@
 #   "ID" = { na = "reason" }
 
 [cases]
-"ERR-01" = { todo = true }
-"ERR-02" = { todo = true }
-"LIFE-01" = { todo = true }
-"LIFE-02" = { todo = true }
-"LIFE-03" = { todo = true }
-"LIFE-04" = { todo = true }
-"LIFE-05" = { todo = true }
-"COMP-01" = { todo = true }
-"COMP-02" = { todo = true }
-"COMP-03" = { todo = true }
-"COMP-04" = { todo = true }
-"COMP-05" = { todo = true }
-"CB-01" = { todo = true }
-"CB-02" = { todo = true }
-"CB-03" = { todo = true }
-"CB-04" = { todo = true }
-"CB-05" = { todo = true }
-"CB-06" = { todo = true }
-"CB-07" = { todo = true }
-"CB-08" = { todo = true }
-"VAL-01" = { todo = true }
-"VAL-02" = { todo = true }
-"VAL-03" = { todo = true }
-"VAL-04" = { todo = true }
-"VAL-05" = { todo = true }
-"VIEW-01" = { todo = true }
-"REND-01" = { todo = true }
-"REND-02" = { todo = true }
-"PLAT-01" = { todo = true }
-"PLAT-02" = { todo = true }
-"PLAT-03" = { todo = true }
-"EX-01" = { todo = true }
+"ERR-01" = "bindings/dart/test/internal_support_test.dart::unknown native status and copied diagnostic remain available"
+"ERR-02" = "bindings/dart/test/internal_support_test.dart::ABI mismatch has a stable public error category"
+"LIFE-01" = "bindings/dart/test/lifecycle_test.dart::closing a handle twice is safe and the second close does nothing"
+"LIFE-02" = "bindings/dart/test/lifecycle_test.dart::a refused close leaves the handle usable for a later close"
+"LIFE-03" = { na = "An isolate runs on one thread at a time and shares no objects with another isolate, so no borrow of a handle can be in progress on another thread; the borrow within an isolate is VIEW-01" }
+# Native finalizers dispose an abandoned owner at collection or isolate
+# shutdown. Dart reports only a finalization that fails, on stderr, which the
+# shutdown test checks stays silent.
+"LIFE-04" = "bindings/dart/test/runtime_shutdown_test.dart::isolate shutdown finalizes a runtime and map left open"
+"LIFE-05" = "bindings/dart/test/collection_test.dart::a map keeps its runtime reachable"
+"COMP-01" = "bindings/dart/test/completion_test.dart::a completion delivers once and disposes a value that fails to convert"
+"COMP-02" = "bindings/dart/test/completion_test.dart::a submission native rejects frees its completion state"
+"COMP-03" = "bindings/dart/test/collection_test.dart::a dropped creation is disposed once its owner is collected"
+"COMP-04" = "bindings/dart/test/completion_test.dart::a failed command reports its disposition as data"
+"COMP-05" = "bindings/dart/test/completion_test.dart::closing a map cancels the commands it still owes"
+"CB-01" = "bindings/dart/test/callback_ports_test.dart::a callback root is released by a removal, a map close, or a refusal"
+"CB-02" = "bindings/dart/test/collection_test.dart::callback registrations do not keep their owners reachable"
+"CB-03" = { na = "Every Dart callback reaches its isolate through a native port after the native callback has returned, so no binding call can run inside one and the binding has no admission policy" }
+"CB-04" = "bindings/dart/test/resource_provider_test.dart::a provider callback error reaches its zone and fails the request"
+"CB-05" = "bindings/dart/test/resource_provider_test.dart::a provider answers a request after its callback returns"
+"CB-06" = { na = "The Dart binding exposes no scoped response object: resource and header transforms are native rule tables, and a provider answers through the transferable ResourceRequestHandle of CB-05" }
+"CB-07" = "bindings/dart/test/log_test.dart::replacing the log callback releases the previous registration"
+"CB-08" = "bindings/dart/test/resource_provider_test.dart::a cancel registration on a cancelled request is refused and not rooted"
+"VAL-01" = "bindings/dart/test/values_test.dart::strings cross as NUL-terminated and explicit-length views"
+"VAL-02" = "bindings/dart/test/values_test.dart::presence fields keep a present zero apart from an absent one"
+"VAL-03" = "bindings/dart/test/internal_support_test.dart::a drained batch is indexed by its stride and copied field by field"
+# The open-enum half of this case is in the VAL-03 test, which decodes unknown
+# event types, source types, and payload tags without losing them.
+"VAL-04" = "bindings/dart/test/values_test.dart::integer narrowing is checked and 64-bit carriers round-trip"
+"VAL-05" = "bindings/dart/test/values_test.dart::an array input is copied when the call submits it"
+"VIEW-01" = "bindings/dart/test/render_test.dart::a frame view expires with its scope and holds off release inside it"
+"REND-01" = "bindings/dart/test/render_test.dart::an owned texture renders a frame that reads back as pixels"
+"REND-02" = "bindings/dart/test/render_test.dart::a caller driver is serviced from the isolate event loop on its wakes"
+"PLAT-01" = "bindings/dart/test/native_library_test.dart::loads the native library"
+"PLAT-02" = "bindings/dart/test/runtime_shutdown_test.dart::native callbacks permit process exit after unawaited cleanup"
+"PLAT-03" = "bindings/dart/test/collection_test.dart::an abandoned runtime is disposed when the collector reclaims it"
+"EX-01" = { na = "No example app is written in Dart; bindings/dart/example/example.dart is the package's API snippet and renders nothing" }

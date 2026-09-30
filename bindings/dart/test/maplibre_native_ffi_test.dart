@@ -10,6 +10,8 @@ import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart'
     show expectedCAbiVersion;
+import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
+    show CallbackPortLifecycleProbe, singleCallbackPortProbeForTesting;
 import 'package:test/test.dart';
 
 const _emptyStyleJson = '{"version":8,"sources":{},"layers":[]}';
@@ -31,9 +33,6 @@ Future<void> _expectCommandFailure(
   expect(completion.status, status);
   expect(completion.diagnostic, isNotEmpty);
 }
-
-/// Whether a log message is one of the rules around a debug-log dump.
-bool _isDebugDump(String message) => message.startsWith('-----');
 
 /// Registers a provider that claims the requests its routes match.
 ResourceProvider _routed({
@@ -282,10 +281,6 @@ void main() {
       isIn([NetworkStatus.online.rawValue, NetworkStatus.offline.rawValue]),
     );
     networkStatusSet(status);
-    logSetCallback((_, _, _, _) {});
-    logSetAsyncSeverityMask(LogSeverityMask.defaultValue);
-    logSetAsyncSeverityMask(LogSeverityMask.defaultValue);
-    logClearCallback();
   });
 
   test('render target extents report their physical size through native', () {
@@ -294,61 +289,6 @@ void main() {
     );
     expect(size.$1, 98);
     expect(size.$2, 50);
-  });
-
-  test('process-global log callbacks retire across isolates', () async {
-    final runtime = runtimeCreate(runtimeOptionsDefault());
-    addTearDown(runtime.close);
-    final map = await runtime.createMap();
-    addTearDown(map.close);
-
-    var retiredDumps = 0;
-    logSetCallback((_, _, _, message) {
-      if (_isDebugDump(message)) retiredDumps += 1;
-    });
-    // The registration is process-global, so another isolate clears the one
-    // this isolate installed.
-    await Isolate.run(_clearLogCallback);
-    await map.dumpDebugLogs();
-
-    // A later registration receives the dump the cleared one never sees.
-    final dumps = <String>[];
-    logSetCallback((_, _, _, message) {
-      if (_isDebugDump(message)) dumps.add(message);
-    });
-    await map.dumpDebugLogs();
-    await _waitUntil(() => dumps.length == 2);
-    logClearCallback();
-    expect(retiredDumps, 0);
-  });
-
-  test('log callback replacement and clear change native delivery', () async {
-    final runtime = runtimeCreate(runtimeOptionsDefault());
-    addTearDown(runtime.close);
-    final map = await runtime.createMap();
-    addTearDown(map.close);
-    final first = <(LogSeverity, LogEvent, String)>[];
-    final replacement = <(LogSeverity, LogEvent, String)>[];
-
-    logSetCallback((severity, event, _, message) {
-      if (_isDebugDump(message)) first.add((severity, event, message));
-    });
-    await map.dumpDebugLogs();
-    await _waitUntil(() => first.length == 2);
-    expect(first.first.$1, LogSeverity.info);
-    expect(first.first.$2, LogEvent.general);
-
-    logSetCallback((severity, event, _, message) {
-      if (_isDebugDump(message)) replacement.add((severity, event, message));
-    });
-    await map.dumpDebugLogs();
-    await _waitUntil(() => replacement.length == 2);
-    expect(first, hasLength(2));
-
-    logClearCallback();
-    await map.dumpDebugLogs();
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(replacement, hasLength(2));
   });
 
   test(
@@ -1898,20 +1838,6 @@ void main() {
       const LogicalExtent(width: 64, height: 32, scaleFactor: 1),
     );
 
-    var throwingLogCalls = 0;
-    final logErrors = <Object>[];
-    runZonedGuarded(
-      () => logSetCallback((_, _, _, _) {
-        throwingLogCalls += 1;
-        throw StateError('log callback failure');
-      }),
-      (error, _) => logErrors.add(error),
-    );
-    map.dumpDebugLogs();
-    await _waitUntil(() => throwingLogCalls > 0);
-    logClearCallback();
-    expect(logErrors, isNotEmpty);
-    expect(logErrors, everyElement(isA<StateError>()));
     final copiedEvents = runtime.drainCopiedEvents();
     final styleLoadedEvent = copiedEvents.firstWhere(
       (event) => event.type == RuntimeEventType.mapStyleLoaded,
@@ -3020,10 +2946,6 @@ void main() {
     await runtime.close();
     expect(runtime.isClosed, isTrue);
   });
-}
-
-void _clearLogCallback() {
-  logClearCallback();
 }
 
 Future<void> _expectCommandCommitted(

@@ -33,26 +33,42 @@ void main() {
     }
   });
 
-  for (final mode in ['awaited', 'unawaited']) {
-    test('native callbacks permit process exit after $mode cleanup', () async {
-      final process = await Process.start(Platform.resolvedExecutable, [
-        executable.path,
-        mode,
-      ]);
-      addTearDown(() => process.kill());
-      final output = process.stdout.transform(utf8.decoder).join();
-      final errors = process.stderr.transform(utf8.decoder).join();
-      try {
-        final exitCode = await process.exitCode.timeout(
-          const Duration(seconds: 20),
-        );
-        expect(exitCode, 0, reason: await errors);
-        expect(await output, contains('CLOSED_ALL_HANDLES'));
-      } on TimeoutException {
-        process.kill();
-        await process.exitCode;
-        fail('Process remained alive.\n${await output}\n${await errors}');
-      }
-    });
+  /// Runs the fixture in [mode] and expects a clean exit that printed
+  /// [marker] and reported no failed finalization.
+  Future<void> expectCleanExit(String mode, String marker) async {
+    final process = await Process.start(Platform.resolvedExecutable, [
+      executable.path,
+      mode,
+    ]);
+    addTearDown(() => process.kill());
+    final output = process.stdout.transform(utf8.decoder).join();
+    final errors = process.stderr.transform(utf8.decoder).join();
+    try {
+      final exitCode = await process.exitCode.timeout(
+        const Duration(seconds: 20),
+      );
+      expect(exitCode, 0, reason: await errors);
+      expect(await output, contains(marker));
+      expect(await errors, isNot(contains('finalization failed')));
+    } on TimeoutException {
+      process.kill();
+      await process.exitCode;
+      fail('Process remained alive.\n${await output}\n${await errors}');
+    }
   }
+
+  test(
+    'native callbacks permit process exit after awaited cleanup',
+    () => expectCleanExit('awaited', 'CLOSED_ALL_HANDLES'),
+  );
+
+  test(
+    'native callbacks permit process exit after unawaited cleanup',
+    () => expectCleanExit('unawaited', 'CLOSED_ALL_HANDLES'),
+  );
+
+  test(
+    'isolate shutdown finalizes a runtime and map left open',
+    () => expectCleanExit('abandoned', 'ABANDONED_HANDLES'),
+  );
 }

@@ -89,18 +89,18 @@ which the binding passes to its own descriptor types. The rows marked planned
 describe the mechanism a binding adopts when its GPU fixture moves here; until
 then, that binding keeps its own fixture.
 
-| Binding        | Status  | How it loads the library                                                                                                                                   |
-| -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C              | In use  | Links `mln_test_graphics_objects` in CMake.                                                                                                                |
-| Go             | In use  | `#cgo pkg-config: mln-test-graphics` in `internal/testsupport`, with `PKG_CONFIG_PATH` at the install's `share/pkgconfig`.                                 |
-| Swift          | In use  | The `GraphicsSupport` SwiftPM target, which compiles `graphics.c` from this directory.                                                                     |
-| Kotlin/Native  | In use  | A cinterop definition over `mln_test_graphics.h` for every native target, linking `graphics.c` that Gradle compiles for the target.                        |
-| Kotlin/Android | In use  | A JNI shim compiled with `graphics.c` by the NDK, loaded with `System.loadLibrary`.                                                                        |
-| Rust           | In use  | `libloading` in `tests/suite/support/graphics.rs`, from the install directory that `build.rs` records, or by name beside the tests a device runner pushes. |
-| Zig            | In use  | `build.zig` translates `mln_test_graphics.h` and links the installed `mln_test_graphics`.                                                                  |
-| Python         | In use  | `tests/graphics.py` opens the library with `ctypes.CDLL` from the install's `lib` or `bin`, with a `ctypes.Structure` for the context.                     |
-| .NET           | In use  | `[LibraryImport("mln_test_graphics")]` in `Support/TestGraphics.cs`, found beside the tests, where the build copies the install's libraries.               |
-| Dart           | Planned | `DynamicLibrary.open` on the library path, with `Struct` classes for the info structs.                                                                     |
+| Binding        | Status | How it loads the library                                                                                                                                   |
+| -------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C              | In use | Links `mln_test_graphics_objects` in CMake.                                                                                                                |
+| Go             | In use | `#cgo pkg-config: mln-test-graphics` in `internal/testsupport`, with `PKG_CONFIG_PATH` at the install's `share/pkgconfig`.                                 |
+| Swift          | In use | The `GraphicsSupport` SwiftPM target, which compiles `graphics.c` from this directory.                                                                     |
+| Kotlin/Native  | In use | A cinterop definition over `mln_test_graphics.h` for every native target, linking `graphics.c` that Gradle compiles for the target.                        |
+| Kotlin/Android | In use | A JNI shim compiled with `graphics.c` by the NDK, loaded with `System.loadLibrary`.                                                                        |
+| Rust           | In use | `libloading` in `tests/suite/support/graphics.rs`, from the install directory that `build.rs` records, or by name beside the tests a device runner pushes. |
+| Zig            | In use | `build.zig` translates `mln_test_graphics.h` and links the installed `mln_test_graphics`.                                                                  |
+| Python         | In use | `tests/graphics.py` opens the library with `ctypes.CDLL` from the install's `lib` or `bin`, with a `ctypes.Structure` for the context.                     |
+| .NET           | In use | `[LibraryImport("mln_test_graphics")]` in `Support/TestGraphics.cs`, found beside the tests, where the build copies the install's libraries.               |
+| Dart           | In use | `DynamicLibrary.open` on the install prefix's library in `test/support/graphics.dart`, with a `Struct` class for the context.                              |
 
 A binding that runs its tests on a device, such as through the Android or
 OpenHarmony emulator runners, pushes the library beside its test executables, as

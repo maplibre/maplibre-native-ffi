@@ -1,0 +1,110 @@
+import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
+import 'package:test/test.dart';
+
+import 'support/fixture.dart';
+import 'support/render.dart';
+
+const _redStyleJson =
+    '{"version":8,"sources":{},"layers":[{"id":"background",'
+    '"type":"background","paint":{"background-color":"#ff0000"}}]}';
+
+void main() {
+  test('an owned texture renders a frame that reads back as pixels', () async {
+    final fixture = await RenderFixture.open();
+    await expectCommitted(fixture.map.setStyleJson(jsonBytes(_redStyleJson)));
+
+    final result = await fixture.renderFrame();
+    expect(result.frameGeneration, greaterThan(BigInt.zero));
+
+    final image = await fixture.drive(
+      fixture.session.textureReadPremultipliedRgba8(),
+      'texture readback',
+    );
+    expect(image.info.width, renderSize);
+    expect(image.info.height, renderSize);
+    final center =
+        (renderSize ~/ 2) * image.info.stride + (renderSize ~/ 2) * 4;
+    expect(image.data.sublist(center, center + 4), [255, 0, 0, 255]);
+  });
+
+  test(
+    'a caller driver is serviced from the isolate event loop on its wakes',
+    () async {
+      final fixture = await RenderFixture.open(
+        driver: RenderDriverKind.callerGraphicsThread,
+      );
+      expect(
+        fixture.session.getCapabilities().driver,
+        RenderDriverKind.callerGraphicsThread,
+      );
+      await expectCommitted(fixture.map.setStyleJson(jsonBytes(_redStyleJson)));
+
+      // Every step below waits on a port-delivered wake, then services the
+      // work that wake announced on this isolate.
+      final result = await fixture.renderFrame();
+      expect(result.disposition, RenderResult.rendered);
+      await fixture.drive(fixture.session.detach(), 'detach');
+      expect(fixture.session.getSnapshot().state, RenderSessionState.detached);
+    },
+  );
+
+  test(
+    'a frame view expires with its scope and holds off release inside it',
+    () async {
+      final fixture = await RenderFixture.open();
+      await expectCommitted(
+        fixture.map.setStyleJson(jsonBytes(emptyStyleJson)),
+      );
+      await fixture.renderFrame();
+      final session = fixture.session;
+      final frame = session.acquireFrame();
+
+      final readEscapedWidth = _openFrameView(frame, (width) {
+        expect(width, renderSize);
+        // The view borrows the frame, so neither the frame nor its session
+        // can go away while it is open.
+        expect(
+          () => frame.release(gpuSyncDefault()),
+          throwsA(isA<BusyException>()),
+        );
+        expect(session.abandon, throwsA(isA<BusyException>()));
+      });
+      // A view that escapes its scope refuses every read.
+      expect(readEscapedWidth, throwsA(isA<MaplibreException>()));
+
+      frame.release(gpuSyncDefault());
+      expect(frame.getResult, throwsA(isA<MaplibreException>()));
+    },
+  );
+}
+
+/// Runs [inside] within the scope of the backend's texture view of [frame],
+/// and returns a reader of that view's width for use after the scope ends.
+int Function() _openFrameView(
+  AcquiredFrameHandle frame,
+  void Function(int width) inside,
+) {
+  final backends = supportedRenderBackendMask();
+  if (backends.contains(RenderBackendFlag.metal)) {
+    late ScopedMetalOwnedTextureFrame escaped;
+    frame.getMetalTexture().withView((view) {
+      escaped = view;
+      inside(view.width);
+    });
+    return () => escaped.width;
+  }
+  if (backends.contains(RenderBackendFlag.vulkan)) {
+    late ScopedVulkanOwnedTextureFrame escaped;
+    frame.getVulkanTexture().withView((view) {
+      escaped = view;
+      inside(view.width);
+    });
+    return () => escaped.width;
+  }
+  late ScopedOpenglOwnedTextureFrame escaped;
+  frame.getOpenglTexture().withView((view) {
+    escaped = view;
+    inside(view.width);
+  });
+  return () => escaped.width;
+}

@@ -41,6 +41,9 @@ final class CallbackPortLifecycleProbe {
   final _NativeCallbackPort _port;
   bool get retirementQueued => _port.retirementQueued;
   bool get closed => _port.closed;
+
+  /// Completes when native code releases the port, or the binding refuses it.
+  Future<void> get released => _port._released.future;
 }
 
 /// Returns an owner's single pending port, or null after its release.
@@ -51,6 +54,13 @@ CallbackPortLifecycleProbe? singleCallbackPortProbeForTesting(Object owner) {
     _ => throw ArgumentError.value(owner, 'owner', 'has no callback ports'),
   };
   return pending.isEmpty ? null : CallbackPortLifecycleProbe._(pending.single);
+}
+
+/// Returns the most recently registered process-global port that is still
+/// pending, such as the log callback's, or null when none is.
+CallbackPortLifecycleProbe? globalCallbackPortProbeForTesting() {
+  final pending = _globalCallbackPorts.pending;
+  return pending.isEmpty ? null : CallbackPortLifecycleProbe._(pending.last);
 }
 
 final class _NativeCallbackPorts {
@@ -148,6 +158,7 @@ final class _NativeCallbackPort {
   }
 
   var _closed = false;
+  final _released = Completer<void>();
   late final RawReceivePort _port;
   late final Pointer<Void> context;
   bool get closed => _closed;
@@ -158,6 +169,7 @@ final class _NativeCallbackPort {
     _port.close();
     _callbacks.clear();
     _onReleased(this);
+    _released.complete();
   }
 
   void reject() {
@@ -221,6 +233,14 @@ final class CommandCompletion {
   final MaplibreStatus status;
   final String diagnostic;
 }
+
+/// Runs the owned-output adoption that generated operations use, for tests of
+/// its failure paths.
+T adoptOwnedForTesting<T>(
+  int handle,
+  T Function() adopt,
+  void Function(int) dispose,
+) => _adoptOwned(handle, adopt, dispose);
 
 T _adoptOwned<T>(int handle, T Function() adopt, void Function(int) dispose) {
   try {

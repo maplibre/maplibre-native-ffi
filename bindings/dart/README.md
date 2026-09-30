@@ -25,6 +25,17 @@ private raw declarations are checked in so Git and pub package consumers receive
 a complete library; CI regenerates them and fails on any diff. Generation is
 configured in `tool/ffigen.dart`.
 
+The suite tests what the binding adds on top of the C API: handle ownership,
+completions, callback ports, generated value shapes, rendering through a
+session, and loading and shutdown. `tests/conformance/dart.toml` maps each
+shared conformance case to its test. Every test builds on the fixture in
+`test/support/fixture.dart`, which closes each handle it opens in a teardown and
+installs a resource provider that answers every request with an error, so no
+test reaches the network. Render tests take their GPU context from
+`mln_test_graphics` in `tests/graphics`. `test/log_test.dart` is the only suite
+that installs process-global state, because `dart test` runs suites concurrently
+in one process.
+
 The mobile build task creates a temporary Flutter host, builds the selected
 native preset, and verifies that Flutter packages its code asset. Device and
 simulator iOS use separate presets because their dynamic libraries target
