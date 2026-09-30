@@ -11,6 +11,7 @@ package maplibre
 import "C"
 
 import (
+	"fmt"
 	"runtime"
 	"runtime/cgo"
 	"strings"
@@ -19,6 +20,28 @@ import (
 	"unsafe"
 	"weak"
 )
+
+// bindingCABIVersion is the C ABI contract version that this binding's
+// generated code was written against.
+const bindingCABIVersion = 0
+
+// A native library with another C ABI version would misread every struct this
+// binding passes, so loading one fails before any call can reach it.
+func init() {
+	if err := checkCABIVersion(uint32(C.mln_c_version())); err != nil {
+		panic(err)
+	}
+}
+
+func checkCABIVersion(version uint32) error {
+	if version != bindingCABIVersion {
+		return newBindingError(ErrUnsupported, fmt.Sprintf(
+			"unsupported MapLibre Native C ABI version %d; this binding supports %d",
+			version, bindingCABIVersion,
+		))
+	}
+	return nil
+}
 
 // UnknownVariant preserves a discriminator whose payload this binding cannot interpret.
 type UnknownVariant struct{ Tag uint32 }

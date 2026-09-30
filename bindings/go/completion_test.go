@@ -1,122 +1,108 @@
+//go:build mlntest
+
 package maplibre
 
 import (
-	"math"
-	"runtime"
+	"context"
+	"errors"
 	"testing"
-	"time"
 )
 
-func TestAbandonedFutureStillCommitsItsCommand(t *testing.T) {
-	_, m := newRuntimeAndMap(t, nil)
-
-	if _, err := jumpForTest(m, CameraOptions{Center: pointerTo(LatLng{Latitude: 7, Longitude: 8}), Zoom: pointerTo(float64(5))}); err != nil {
-		t.Fatalf("JumpTo(): %v", err)
-	}
-	// The future above goes out of scope unawaited; the ordered query behind it
-	// observes what the abandoned command committed.
-	camera, err := awaitForTest(m.CameraQuery())
-	if err != nil {
-		t.Fatalf("CameraQuery completion: %v", err)
-	}
-	if camera.Camera.Center == nil ||
-		math.Abs(camera.Camera.Center.Latitude-7) > 1e-9 ||
-		math.Abs(camera.Camera.Center.Longitude-8) > 1e-9 {
-		t.Fatalf("camera center after an abandoned command = %#v, want 7, 8", camera.Camera.Center)
-	}
-	if camera.Camera.Zoom == nil || math.Abs(*camera.Camera.Zoom-5) > 1e-9 {
-		t.Fatalf("camera zoom after an abandoned command = %v, want 5", camera.Camera.Zoom)
-	}
-}
-
-func waitForCompletionCollection(t *testing.T, collected <-chan struct{}) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		runtime.GC()
-		select {
-		case <-collected:
-			return
-		default:
-			if time.Now().After(deadline) {
-				t.Fatal("owned completion was not collected")
-			}
-			runtime.Gosched()
+// The first terminal result wins, and a later one is ignored. A value that
+// fails to convert, whether by error or by panic, fails the future instead of
+// unwinding into native. Conversion adopts an owned value last, so a failed
+// conversion leaves nothing adopted to dispose.
+func TestCompletionDeliversExactlyOnce(t *testing.T) {
+	future, deliver := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
+	first, second := int32(7), int32(8)
+	deliver(0, &first)
+	deliver(0, &second)
+	for range 2 {
+		if value := await(t, future); value != 7 {
+			t.Fatalf("Await() = %d, want the first delivery", value)
 		}
 	}
+
+	missing, deliver := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
+	deliver(0, nil)
+	if _, err := missing.Await(context.Background()); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("a result with no value: %v, want ErrInvalidState", err)
+	}
+
+	panicking, deliver := int32CompletionForTest(func(int32) (int32, error) { panic("conversion failed") })
+	deliver(0, &first)
+	if _, err := panicking.Await(context.Background()); !errors.Is(err, ErrNative) {
+		t.Fatalf("a panicking conversion: %v, want ErrNative", err)
+	}
 }
 
-func discardMapCreationForTest(t *testing.T, host *RuntimeHandle) <-chan struct{} {
-	t.Helper()
-	future, err := host.MapCreate(DefaultMapOptions())
+// A submission native refuses returns its error at once, and the binding
+// deletes the handle it passed as the completion's user data, since native
+// never calls the completion or its release.
+func TestRejectedSubmissionFreesItsCompletionState(t *testing.T) {
+	handle, err := rejectedSubmissionForTest()
+	if !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("rejected submission: %v, want ErrInvalidState", err)
+	}
+	defer func() {
+		if recover() == nil {
+			t.Fatal("the rejected submission's handle is still live")
+		}
+	}()
+	handle.Value()
+}
+
+// A creation whose future nobody awaits still adopts the map it creates, and
+// the collector disposes that map, so its runtime can close.
+func TestDiscardedCreationFutureRetiresItsMap(t *testing.T) {
+	f := newRuntimeFixture(t)
+	future, err := f.runtime.MapCreate(DefaultMapOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
-	disposed := make(chan struct{})
 	<-future.Done()
 	future.state.mu.Lock()
-	state := future.state.result.value.state
-	original := state.dispose
-	state.dispose = func(raw uint64) { original(raw); close(disposed) }
+	disposed := disposalSignal(future.state.result.value.bindingOwner)
 	future.state.mu.Unlock()
-	return disposed
+	future = nil
+	awaitCollected(t, disposed, "the unclaimed map's disposal")
+	// The barrier orders the map's retirement, which disposal only schedules.
+	await(t, submitted(f.runtime.Barrier()))
+	await(t, submitted(f.runtime.Close()))
 }
 
-func TestUnclaimedMapCreationIsDisposed(t *testing.T) {
-	host, err := RuntimeCreate(DefaultRuntimeOptions())
-	if err != nil {
-		t.Fatal(err)
+// A failed command is a disposition in the result, not an error from Await,
+// and carries its status and diagnostic.
+func TestFailedCommandDispositionIsData(t *testing.T) {
+	f := newFixture(t)
+	awaitCommitted(t, submitted(f.m.SetStyleJson([]byte(emptyStyle))))
+	completion := await(t, submitted(f.m.RemoveStyleSource("missing")))
+	if completion.Disposition != CommandDispositionFailed || !errors.Is(kindForStatus(completion.RawStatus), ErrNotFound) {
+		t.Fatalf("RemoveStyleSource(missing) = %+v, want a failed NOT_FOUND disposition", completion)
 	}
-	disposed := discardMapCreationForTest(t, host)
-	if _, err := awaitForTest(host.Barrier()); err != nil {
-		t.Fatal(err)
-	}
-	waitForCompletionCollection(t, disposed)
-	if err := closeRuntimeForTest(host); err != nil {
-		t.Fatalf("runtime retained unclaimed map: %v", err)
+	if completion.Diagnostic == "" {
+		t.Fatal("the failed disposition carried no diagnostic")
 	}
 }
 
-func adoptCopiedCreationForTest(t *testing.T, host *RuntimeHandle) (*MapHandle, <-chan struct{}) {
-	t.Helper()
-	original, err := host.MapCreate(DefaultMapOptions())
-	if err != nil {
-		t.Fatal(err)
+// Await returns the context's error when the context ends first, and a nil
+// Future reports an error rather than blocking.
+func TestAwaitEndsWithItsContext(t *testing.T) {
+	pending, _ := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := pending.Await(cancelled); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Await(cancelled) = %v, want context.Canceled", err)
 	}
-	copied := *original
-	original = nil
-	runtime.GC()
-	runtime.GC()
-	first, err := copied.Await(t.Context())
-	if err != nil {
-		t.Fatalf("copied Future lost its value: %v", err)
+	expired, cancel := context.WithTimeout(context.Background(), 0)
+	defer cancel()
+	if _, err := pending.Await(expired); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Await(expired) = %v, want context.DeadlineExceeded", err)
 	}
-	second, err := copied.Await(t.Context())
-	if err != nil || first != second {
-		t.Fatalf("repeated Await = %p, %v; want %p", second, err, first)
-	}
-	collected := make(chan struct{})
-	runtime.SetFinalizer(copied.state, nil)
-	runtime.SetFinalizer(copied.state, func(state *futureState[*MapHandle]) {
-		close(collected)
-	})
-	return first, collected
-}
 
-func TestCopiedCreationFutureAdoptsOnceAndPermitsRepeatedAwait(t *testing.T) {
-	host, err := RuntimeCreate(DefaultRuntimeOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	owned, collected := adoptCopiedCreationForTest(t, host)
-	waitForCompletionCollection(t, collected)
-	if _, err := awaitForTest(owned.CameraQuery()); err != nil {
-		t.Fatalf("adopted map was disposed: %v", err)
-	}
-	if err := closeMapForTest(owned); err != nil {
-		t.Fatal(err)
-	}
-	if err := closeRuntimeForTest(host); err != nil {
-		t.Fatal(err)
+	var missing *Future[int32]
+	<-missing.Done()
+	if _, err := missing.Await(context.Background()); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("nil Future Await = %v, want ErrInvalidArgument", err)
 	}
 }

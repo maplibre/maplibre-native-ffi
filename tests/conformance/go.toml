@@ -2,37 +2,41 @@
 #   "ID" = "path/to/test_file::test_name"
 # or to why it does not apply:
 #   "ID" = { na = "reason" }
+#
+# The render tests, which LIFE-03, VIEW-01, REND-01, and REND-02 name, build
+# only with the backend tag that `mise run //bindings/go:test` passes for a
+# desktop EGL, Metal, or Vulkan preset.
 
 [cases]
-"ERR-01" = { todo = true }
-"ERR-02" = { todo = true }
-"LIFE-01" = { todo = true }
-"LIFE-02" = { todo = true }
-"LIFE-03" = { todo = true }
-"LIFE-04" = { todo = true }
-"LIFE-05" = { todo = true }
-"COMP-01" = { todo = true }
-"COMP-02" = { todo = true }
-"COMP-03" = { todo = true }
-"COMP-04" = { todo = true }
-"COMP-05" = { todo = true }
-"CB-01" = { todo = true }
-"CB-02" = { todo = true }
-"CB-03" = { todo = true }
-"CB-04" = { todo = true }
-"CB-05" = { todo = true }
-"CB-06" = { todo = true }
-"CB-07" = { todo = true }
-"CB-08" = { todo = true }
-"VAL-01" = { todo = true }
-"VAL-02" = { todo = true }
-"VAL-03" = { todo = true }
-"VAL-04" = { todo = true }
-"VAL-05" = { todo = true }
-"VIEW-01" = { todo = true }
-"REND-01" = { todo = true }
-"REND-02" = { todo = true }
-"PLAT-01" = { todo = true }
-"PLAT-02" = { todo = true }
-"PLAT-03" = { todo = true }
+"ERR-01" = "bindings/go/errors_test.go::TestNativeStatusMapsToTypedErrors"
+"ERR-02" = "bindings/go/errors_test.go::TestMismatchedCABIVersionIsRejected"
+"LIFE-01" = "bindings/go/lifecycle_test.go::TestClosingTwiceIsSafe"
+"LIFE-02" = "bindings/go/lifecycle_test.go::TestRefusedCloseLeavesTheHandleUsable"
+"LIFE-03" = "bindings/go/render_test.go::TestFrameViewIsScopedToItsCallback"
+"LIFE-04" = { na = "The Go binding has no leak reporter. runtime.AddCleanup disposes an abandoned handle on the runtime's cleanup goroutine, never on a callback stack, and PLAT-03's test covers that disposal." }
+"LIFE-05" = "bindings/go/lifecycle_test.go::TestChildKeepsItsParentAlive"
+"COMP-01" = "bindings/go/completion_test.go::TestCompletionDeliversExactlyOnce"
+"COMP-02" = "bindings/go/completion_test.go::TestRejectedSubmissionFreesItsCompletionState"
+"COMP-03" = "bindings/go/completion_test.go::TestDiscardedCreationFutureRetiresItsMap"
+"COMP-04" = "bindings/go/completion_test.go::TestFailedCommandDispositionIsData"
+"COMP-05" = "bindings/go/completion_test.go::TestAwaitEndsWithItsContext"
+"CB-01" = "bindings/go/callbacks_test.go::TestCallbackRootsFollowTheNativeRegistration"
+"CB-02" = "bindings/go/callbacks_test.go::TestCallbackDoesNotKeepItsReceiverAlive"
+"CB-03" = "bindings/go/callbacks_test.go::TestCallbackAdmissionPolicy"
+"CB-04" = "bindings/go/callbacks_test.go::TestCallbackPanicIsContained"
+"CB-05" = "bindings/go/callbacks_test.go::TestProviderAnswersADeferredRequest"
+"CB-06" = "bindings/go/callbacks_test.go::TestScopedResponseRejectsLateAndForeignUse"
+"CB-07" = "bindings/go/callbacks_test.go::TestReplacingAGlobalCallbackReleasesThePreviousOne"
+"CB-08" = "bindings/go/callbacks_test.go::TestCancelCallbackIsRootedOnlyWhenStored"
+"VAL-01" = "bindings/go/values_test.go::TestStringsCrossInTheirDeclaredShape"
+"VAL-02" = "bindings/go/values_test.go::TestPresenceFieldsRoundTrip"
+"VAL-03" = "bindings/go/events_test.go::TestEventDecoderReadsAStridedBatchWithUnknownValues"
+"VAL-04" = "bindings/go/binding_runtime_test.go::TestIntegerCarriersKeepTheirValues"
+"VAL-05" = "bindings/go/values_test.go::TestArrayInputsAreCopiedAtSubmission"
+"VIEW-01" = "bindings/go/render_test.go::TestFrameViewIsScopedToItsCallback"
+"REND-01" = "bindings/go/render_test.go::TestOwnedTextureFrameReadsBackAsPixels"
+"REND-02" = "bindings/go/render_test.go::TestCallerDriverIsServicedFromAGoroutine"
+"PLAT-01" = "bindings/go/platform_test.go::TestLinkedLibraryMatchesTheBuild"
+"PLAT-02" = "bindings/go/platform_test.go::TestProcessExitsCleanlyWithLiveHandles"
+"PLAT-03" = "bindings/go/platform_test.go::TestCollectorReclaimsAnAbandonedHandle"
 "EX-01" = { todo = true }

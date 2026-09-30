@@ -1,10 +1,10 @@
-//go:build darwin && cgo
+//go:build cgo && (mln_metal || mln_vulkan || mln_egl)
 
 package testsupport
 
-// The render tests run on darwin, so only darwin links tests/graphics. A target
-// whose runner pushes test binaries to a device, such as Android, also has to
-// push libmln_test_graphics beside them before this file builds there.
+// The test task passes the build tag of the preset's render backend, and only
+// a tagged build links tests/graphics. The emulator runners push no
+// libmln_test_graphics beside the test binaries, so they build untagged.
 
 /*
 #cgo pkg-config: mln-test-graphics
