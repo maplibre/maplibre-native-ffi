@@ -1,10 +1,33 @@
-//! Handle ownership: close, parent retention, discarded creations, and exit.
+//! Handle ownership: the ABI check at creation, close, parent retention,
+//! discarded creations, and exit.
 
 use std::sync::{Arc, mpsc};
 
 use maplibre_native_ffi::*;
 
 use crate::support::*;
+
+#[test]
+fn creation_checks_the_c_abi_version_before_it_reaches_native() {
+    // Each entry point that creates a root handle checks the version first,
+    // so a mismatch fails without a native status.
+    use maplibre_native_ffi_core::{EXPECTED_C_ABI_VERSION, set_abi_version_override};
+    set_abi_version_override(Some(EXPECTED_C_ABI_VERSION + 1));
+    let runtime = runtime_create(&RuntimeOptions::default());
+    let geojson =
+        geojson_source_data_create(br#"{"type":"FeatureCollection","features":[]}"#, None);
+    set_abi_version_override(None);
+
+    for error in [runtime.unwrap_err(), geojson.unwrap_err()] {
+        assert_eq!(error.kind(), ErrorKind::AbiVersionMismatch);
+        assert_eq!(error.raw_status(), None);
+        assert!(
+            error
+                .diagnostic()
+                .contains("unsupported MapLibre Native C ABI version")
+        );
+    }
+}
 
 #[test]
 fn closing_a_handle_twice_does_nothing() {

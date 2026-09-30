@@ -23,6 +23,8 @@ webgpu = ["maplibre-native-ffi-sys/webgpu"]
 bindgen = "0.72.1"
 
 [dev-dependencies]
+# The tests make the C ABI check see another version.
+maplibre-native-ffi-core = { path = "../maplibre-native-ffi-core", features = ["abi-version-override"] }
 static_assertions = "1.1.0"
 
 # Loads the GPU fixtures from tests/graphics.
