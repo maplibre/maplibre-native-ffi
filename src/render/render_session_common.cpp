@@ -1368,71 +1368,26 @@ auto start_attach_render_session(
   if (publish_status != MLN_STATUS_OK) {
     return publish_status;
   }
-  {
-    if (options->driver == MLN_RENDER_DRIVER_CORE_WORKER) {
-      if (session->start_worker) {
-        const auto worker_status =
-          session->start_worker([session]() { run_core_worker(session); });
-        if (worker_status != MLN_STATUS_OK) {
-          return worker_status;
-        }
-      } else {
-        session->worker =
-          mln::core::WorkerThread{[session]() { run_core_worker(session); }};
+  if (options->driver == MLN_RENDER_DRIVER_CORE_WORKER) {
+    if (session->start_worker) {
+      const auto worker_status =
+        session->start_worker([session]() { run_core_worker(session); });
+      if (worker_status != MLN_STATUS_OK) {
+        return worker_status;
       }
+    } else {
+      session->worker =
+        mln::core::WorkerThread{[session]() { run_core_worker(session); }};
     }
-    enqueue_work(
-      session,
-      RenderDriverWork{
-        [session, attach_operation = async.operation]() {
-          try {
-            if (session->initialize_backend) {
-              const auto initialize_status =
-                session->initialize_backend(*session);
-              if (initialize_status != MLN_STATUS_OK) {
-                {
-                  const auto lock = std::scoped_lock{session->control_mutex};
-                  session->state = MLN_RENDER_SESSION_STATE_TARGET_LOST;
-                  session->target_ready = false;
-                  ++session->generation;
-                }
-                attach_operation->complete(
-                  initialize_status, thread_last_error_message(), {}
-                );
-                return;
-              }
-            }
-            if (
-              auto* backend = renderer_backend(session.get());
-              backend != nullptr
-            ) {
-              const auto prime = mln::gfx::BackendScope{*backend};
-            }
-            {
-              const auto lock = std::scoped_lock{session->control_mutex};
-              session->state = MLN_RENDER_SESSION_STATE_ATTACHED;
-              ++session->generation;
-            }
-            // Wake the driver whenever a worker thread posts a scheduler
-            // task while the queue is idle, so queued results are delivered
-            // even when no demand renders. Detach and abandon clear the
-            // hook.
-            session->scheduler.set_work_available_callback(
-              [weak = std::weak_ptr<mln_render_session_object>{session}]() {
-                auto live = weak.lock();
-                if (live == nullptr) {
-                  return;
-                }
-                static_cast<void>(enqueue_work_if_attached(
-                  live, RenderDriverWork{
-                          [live]() { service_scheduler_work(live); }, {}
-                        }
-                ));
-              }
-            );
-            static_cast<void>(map_post_trigger_repaint(session->map));
-            attach_operation->complete(MLN_STATUS_OK, {}, {});
-          } catch (const std::exception& exception) {
+  }
+  // Built before the commit below, because building it allocates and may
+  // throw into the unwind.
+  auto attach_work = RenderDriverWork{
+    [session, attach_operation = async.operation]() {
+      try {
+        if (session->initialize_backend) {
+          const auto initialize_status = session->initialize_backend(*session);
+          if (initialize_status != MLN_STATUS_OK) {
             {
               const auto lock = std::scoped_lock{session->control_mutex};
               session->state = MLN_RENDER_SESSION_STATE_TARGET_LOST;
@@ -1440,25 +1395,69 @@ auto start_attach_render_session(
               ++session->generation;
             }
             attach_operation->complete(
-              MLN_STATUS_NATIVE_ERROR, exception.what(), {}
+              initialize_status, thread_last_error_message(), {}
             );
+            return;
           }
-        },
-        [attach_operation = async.operation]() {
-          attach_operation->complete(
-            MLN_STATUS_TARGET_LOST, "render target was abandoned", {}
-          );
         }
+        if (
+          auto* backend = renderer_backend(session.get()); backend != nullptr
+        ) {
+          const auto prime = mln::gfx::BackendScope{*backend};
+        }
+        {
+          const auto lock = std::scoped_lock{session->control_mutex};
+          session->state = MLN_RENDER_SESSION_STATE_ATTACHED;
+          ++session->generation;
+        }
+        // Wake the driver whenever a worker thread posts a scheduler
+        // task while the queue is idle, so queued results are delivered
+        // even when no demand renders. Detach and abandon clear the
+        // hook.
+        session->scheduler.set_work_available_callback(
+          [weak = std::weak_ptr<mln_render_session_object>{session}]() {
+            auto live = weak.lock();
+            if (live == nullptr) {
+              return;
+            }
+            static_cast<void>(enqueue_work_if_attached(
+              live,
+              RenderDriverWork{[live]() { service_scheduler_work(live); }, {}}
+            ));
+          }
+        );
+        static_cast<void>(map_post_trigger_repaint(session->map));
+        attach_operation->complete(MLN_STATUS_OK, {}, {});
+      } catch (const std::exception& exception) {
+        {
+          const auto lock = std::scoped_lock{session->control_mutex};
+          session->state = MLN_RENDER_SESSION_STATE_TARGET_LOST;
+          session->target_ready = false;
+          ++session->generation;
+        }
+        attach_operation->complete(
+          MLN_STATUS_NATIVE_ERROR, exception.what(), {}
+        );
       }
-    );
-  }
-  unwind.committed = true;
-  *out_session = session->self;
-  frame_wake->accept();
-  driver_wake->accept();
-  async.completion->accept();
-  if (options->driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
-    driver_wake->notify();
+    },
+    [attach_operation = async.operation]() {
+      attach_operation->complete(
+        MLN_STATUS_TARGET_LOST, "render target was abandoned", {}
+      );
+    }
+  };
+  {
+    // Nothing from here can fail, so the attachment commits under the queue
+    // lock. The wakes and the completion are accepted before the driver can
+    // take the work, so the driver, rather than this thread, delivers an
+    // attach that finishes early, and queueing the work wakes a caller driver.
+    const auto lock = std::scoped_lock{session->control_mutex};
+    unwind.committed = true;
+    *out_session = session->self;
+    frame_wake->accept();
+    driver_wake->accept();
+    async.completion->accept();
+    push_driver_work_locked(*session, std::move(attach_work));
   }
   return MLN_STATUS_OK;
 }

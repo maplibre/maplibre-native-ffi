@@ -604,6 +604,88 @@ static void abandon_from_a_driver_completion_is_busy(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// What abandon returned from inside an attach completion, which can run
+// before the attach call returns the session's handle.
+typedef struct attach_abandon_probe {
+  atomic_bool published;
+  mln_render_session session;
+  atomic_bool completed;
+  bool saw_session;
+  mln_status completion_status;
+  mln_status abandon_status;
+} attach_abandon_probe;
+
+static void abandon_once_attach_returns(
+  void* user_data, const mln_completion_result* result
+) {
+  attach_abandon_probe* probe = user_data;
+  probe->completion_status = result->status;
+  // The driver delivers the attach, so waiting here holds only the driver
+  // until the case publishes the handle. A delivery on the attaching thread,
+  // inside the attach call, would wait out the deadline.
+  probe->saw_session = mln_test_wait_for_flag(&probe->published);
+  if (probe->saw_session) {
+    mln_render_abandon_result abandoned = {
+      .size = sizeof(mln_render_abandon_result)
+    };
+    probe->abandon_status =
+      mln_render_session_abandon(probe->session, &abandoned, NULL);
+  }
+  mln_test_flag_set(&probe->completed);
+}
+
+static bool attach_abandon_settled(void* context) {
+  const attach_abandon_probe* probe = context;
+  return atomic_load(&probe->completed);
+}
+
+// The driver delivers an attach completion inside its driver call, like every
+// other command's, so abandon from it is busy and the session stays attached.
+static void abandon_from_an_attach_completion_is_busy(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  attach_abandon_probe probe = {.abandon_status = MLN_STATUS_INVALID_STATE};
+  atomic_init(&probe.published, false);
+  atomic_init(&probe.completed, false);
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.requested_texture_ring_depth = 2;
+  options.frame_wake = mln_test_pulse_wake();
+  options.driver_work_wake = mln_test_pulse_wake();
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = abandon_once_attach_returns,
+    .user_data = &probe,
+    .release_user_data = maintenance_released,
+  };
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_render_fixture_start_attach(map, &options, &completion, &fixture)
+  );
+  probe.session = fixture.session;
+  mln_test_flag_set(&probe.published);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_render_step_until(
+                     &fixture, attach_abandon_settled, &probe,
+                     mln_test_deadline_default(), "an attach that abandons"
+                   )
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    probe.saw_session, "the attach completed inside the attach call"
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.completion_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_BUSY, probe.abandon_status);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state
+  );
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void count_nothing(void* context) { (void)context; }
 
 static void flag_release(void* context) { mln_test_flag_set(context); }
@@ -706,6 +788,7 @@ MLN_TEST_GROUP {
   RUN_TEST(stale_and_null_sessions_reject_maintenance_commands);
   RUN_TEST(abandon_completes_pending_work_and_invalidates_accessors);
   RUN_TEST(abandon_from_a_driver_completion_is_busy);
+  RUN_TEST(abandon_from_an_attach_completion_is_busy);
   RUN_TEST(a_session_disposed_while_attaching_frees_the_map);
   RUN_TEST(parent_first_disposal_retires_a_native_render_attachment);
 }

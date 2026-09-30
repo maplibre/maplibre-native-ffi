@@ -13,9 +13,7 @@ namespace mln::native_tests {
 // A driver operation that parks inside the driver call until the case
 // releases it. A core worker runs it as soon as it is queued; a caller driver
 // runs it when the case services driver work. While it is parked the driver
-// call is in flight, which no public operation can hold open: a public
-// completion is delivered inline to its submitter when the work finishes
-// before submission returns.
+// call is in flight, before the work publishes anything.
 struct DriverBlocker {
   // Shared with the parked operation, so a case that fails while the driver
   // is parked does not leave it waiting on a dead stack frame.
