@@ -79,11 +79,11 @@ the objects under test are the shipped ones:
 - `src/testing/sync_point.hpp` names the points where a case can observe or park
   a thread, such as a map's pool shutdown, a writer about to take a resource
   registration exclusively, a release blocked on a running cancel callback, a
-  render driver call that has published its work and is about to end, or a
-  GeoJSON worker about to slice a tile. With no handler installed, reaching a
-  point costs one relaxed atomic load. A point that marks a wait fires only when
-  the thread has to wait. A case that waits for such a point fails at its
-  deadline when a change removes the wait.
+  render driver call that has published its work and is about to end, a GeoJSON
+  worker about to slice a tile, or a projection close waiting for a call. With
+  no handler installed, reaching a point costs one relaxed atomic load. A point
+  that marks a wait fires only when the thread has to wait. A case that waits
+  for such a point fails at its deadline when a change removes the wait.
 - `src/testing/render_clock.hpp` is the clock that frame demand deadlines run
   on. A case advances it rather than waiting for a deadline to pass.
 

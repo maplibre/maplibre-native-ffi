@@ -10,7 +10,7 @@ namespace mln::native_tests {
 namespace {
 
 constexpr auto point_count =
-  static_cast<std::size_t>(SyncPoint::GeoJsonTileSlice) + 1;
+  static_cast<std::size_t>(SyncPoint::ProjectionCloseWaits) + 1;
 
 // Process lifetime, because a thread can still be inside the handler, or
 // parked in it, after the scope that installed it ends.

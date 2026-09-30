@@ -62,6 +62,16 @@ enum class SyncPoint : std::uint8_t {
   // never reaches it. No lock is held, so a parked worker delays only the
   // slices queued behind it on the same worker.
   GeoJsonTileSlice,
+  // A standalone projection call has leased its handle and is about to take
+  // the projection's call lock. No lock is held.
+  ProjectionCallLeased,
+  // A standalone projection call holds the projection's call lock and is
+  // about to run. Parking here blocks only the calls, and the close, of that
+  // one projection.
+  ProjectionCallRunning,
+  // A projection close retired the handle and found a call running, and is
+  // about to wait for it. It fires only when the close has to wait.
+  ProjectionCloseWaits,
 };
 
 // Runs on whichever thread reaches the point, with no library lock held unless

@@ -2811,6 +2811,7 @@ auto with_projection(mln_map_projection projection, Work work) -> mln_status {
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  mln::testing::hit(mln::testing::SyncPoint::ProjectionCallLeased);
   const std::scoped_lock call_lock(live->call_mutex);
   if (live->projection == nullptr) {
     set_handle_fault_error(
@@ -2818,6 +2819,7 @@ auto with_projection(mln_map_projection projection, Work work) -> mln_status {
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  mln::testing::hit(mln::testing::SyncPoint::ProjectionCallRunning);
   work(*live->projection);
   return MLN_STATUS_OK;
 }
@@ -4536,7 +4538,11 @@ auto map_projection_close(mln_map_projection projection) -> mln_status {
     // Waits for projection calls already running on other threads, then
     // destroys the projection. A racing call that leased the handle before the
     // removal observes the null projection and reports a stale handle.
-    const std::scoped_lock call_lock(owned->call_mutex);
+    auto call_lock = std::unique_lock(owned->call_mutex, std::try_to_lock);
+    if (!call_lock.owns_lock()) {
+      mln::testing::hit(mln::testing::SyncPoint::ProjectionCloseWaits);
+      call_lock.lock();
+    }
     owned->projection.reset();
   }
   return MLN_STATUS_OK;
