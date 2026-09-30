@@ -425,7 +425,9 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
  * The result is the axis-aligned hull of all four screen corners and the
  * center, which encompasses the projected viewport. Longitudes unwrap onto
  * the shortest path through the center. A viewport that crosses the
- * antimeridian reports values outside -180 to 180. The completion borrows one
+ * antimeridian reports values outside -180 to 180. A center exactly on the
+ * antimeridian may resolve to 180 or -180 from floating-point rounding, so its
+ * hull may extend past either end of that range. The completion borrows one
  * mln_lat_lng_bounds.
  *
  * Returns:
