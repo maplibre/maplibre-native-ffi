@@ -355,7 +355,7 @@ static void frame_wake_runs_when_the_result_queue_becomes_nonempty(void) {
   const mln_status stepped = mln_test_render_step_until(
     &fixture, frame_woke, &wake, mln_test_deadline_default(), "a frame wake"
   );
-  TEST_ASSERT_TRUE(stepped == MLN_STATUS_OK || stepped == MLN_STATUS_NOT_READY);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, stepped);
   TEST_ASSERT_GREATER_THAN_UINT32(before, atomic_load(&fixture.frame_wakes));
   const unsigned int woke = atomic_load(&fixture.frame_wakes);
   mln_render_frame_batch results = MLN_HANDLE_NULL;
@@ -429,6 +429,19 @@ static void texture_ring_leases_apply_backpressure_until_cpu_release(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+typedef struct abandon_attempt {
+  mln_render_session session;
+  mln_render_abandon_result* result;
+  mln_status status;
+} abandon_attempt;
+
+static bool abandon_past_busy(void* context) {
+  abandon_attempt* attempt = context;
+  attempt->status =
+    mln_render_session_abandon(attempt->session, attempt->result, NULL);
+  return attempt->status != MLN_STATUS_BUSY;
+}
+
 static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -436,18 +449,24 @@ static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_acquired_frame frame = render_and_acquire(&fixture, 250);
+
   // The frame result publishes while the core worker's driver call is still
   // in flight, and abandon returns busy until that call ends, which nothing
-  // public observes. The delay covers it until the core fix for busy after a
-  // published result lands.
-  mln_test_sleep_milliseconds(5);
-
+  // public observes. Busy leaves the session unchanged, so the case retries
+  // abandon until the core stops reporting busy after a published result.
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_abandon(fixture.session, &abandoned, NULL)
-  );
+  abandon_attempt attempt = {
+    .session = fixture.session,
+    .result = &abandoned,
+    .status = MLN_STATUS_BUSY,
+  };
+  TEST_ASSERT_TRUE(mln_test_await(
+    abandon_past_busy, &attempt, mln_test_deadline_default(),
+    "abandon to stop reporting busy"
+  ));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, attempt.status);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, abandoned.disposition
   );

@@ -266,10 +266,11 @@ static void replacing_data_during_async_tiling_survives(void) {
   free(json);
 
   mln_test_flag_set(&probe.stop);
-  // A software-rendered runner can take far longer than one default wait to
-  // wind the render thread down, so this wait gets a longer deadline.
+  // A software-rendered runner can take longer than one default wait to wind
+  // the render thread down, so this wait gets a longer deadline, still short
+  // of the watchdog's 30 s budget for the case so the wait reports first.
   const bool finished = mln_test_wait_until_deadline(
-    runtime, &probe.finished, mln_test_deadline_after(30000)
+    runtime, &probe.finished, mln_test_deadline_after(20000)
   );
   // Join only a finished thread; a wedged one fails an assertion below
   // rather than hanging the suite, and the static probe stays valid for it.

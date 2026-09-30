@@ -712,7 +712,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   // Render until the map settles: the last frame asks for no repaint.
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
   bool settled = false;
-  const mln_test_deadline settle_deadline = mln_test_deadline_after(30000);
+  const mln_test_deadline settle_deadline = mln_test_deadline_default();
   while (!settled && !mln_test_deadline_passed(settle_deadline)) {
     mln_frame_demand demand = mln_frame_demand_default();
     demand.flags = 0;
@@ -749,7 +749,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   // rendering the same update again. A rendered result here only means a
   // fresh update slipped in, so keep demanding until one demand finds none.
   bool saw_no_update = false;
-  const mln_test_deadline no_update_deadline = mln_test_deadline_after(30000);
+  const mln_test_deadline no_update_deadline = mln_test_deadline_default();
   while (!saw_no_update && !mln_test_deadline_passed(no_update_deadline)) {
     mln_frame_demand demand = mln_frame_demand_default();
     TEST_ASSERT_EQUAL_INT(
@@ -796,7 +796,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   );
 
   bool saw_repaint_request = false;
-  const mln_test_deadline repaint_deadline = mln_test_deadline_after(30000);
+  const mln_test_deadline repaint_deadline = mln_test_deadline_default();
   while (!saw_repaint_request && !mln_test_deadline_passed(repaint_deadline)) {
     mln_frame_demand demand = mln_frame_demand_default();
     demand.flags = 0;

@@ -179,11 +179,15 @@ seam, or a fence:
   loop in which a barrier must not complete.
 - `fast_pfor_option_gates_mlt_tile_decoding`: 600 render attempts spaced 1 ms
   apart before it concludes that a tile decodes to nothing.
-- `acquired_frame_release_after_abandon_is_cpu_only`: a 5 ms delay before
-  abandon. A core-worker session publishes its frame result while the driver
-  call is still in flight, and abandon returns busy until the call ends. A
-  wake-driven wait reaches abandon inside that window about one run in eight on
-  Metal, so this case needs the core fix rather than a sync point.
+
+### Cases that work around a core defect
+
+- `acquired_frame_release_after_abandon_is_cpu_only` retries abandon while it
+  returns busy. A core-worker session publishes its frame result while the
+  driver call is still in flight, and abandon returns busy until the call ends.
+  A wake-driven wait reaches abandon inside that window about one run in eight
+  on Metal. The retry goes once the core stops reporting busy after a published
+  result.
 
 ## Handle hygiene
 

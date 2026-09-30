@@ -52,12 +52,10 @@ static uint32_t serve_recorded_tile(
 }
 // A tile whose encoding the map cannot decode yields no feature however long
 // the test waits, so the render loop below is bounded by its own attempt count.
-// The deadline caps the whole wait on top of that, which keeps the worst case
-// off the product of the two nested loops.
-enum {
-  mlt_render_attempts = 600,
-  mlt_render_deadline_milliseconds = 120000,
-};
+// The default deadline caps the whole wait on top of that, which keeps the
+// worst case off the product of the two nested loops and inside the watchdog's
+// budget for the case.
+enum { mlt_render_attempts = 600 };
 
 typedef struct frame_result_wait {
   const mln_test_render_fixture* fixture;
@@ -99,8 +97,7 @@ static size_t query_admin_feature_count(
   options.source_layer_id_count = 1;
 
   size_t count = 0;
-  const mln_test_deadline deadline =
-    mln_test_deadline_after(mlt_render_deadline_milliseconds);
+  const mln_test_deadline deadline = mln_test_deadline_default();
   for (unsigned int attempt = 0; count == 0 && attempt < mlt_render_attempts &&
                                  !mln_test_deadline_passed(deadline);
        attempt += 1) {
