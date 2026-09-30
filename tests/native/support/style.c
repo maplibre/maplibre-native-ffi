@@ -188,14 +188,23 @@ mln_test_feature_list mln_test_style_query_rendered(
       .min = {.x = -4096.0, .y = -4096.0},
       .max = {.x = 4096.0, .y = 4096.0},
     });
+  return mln_test_style_query_rendered_with(fixture, &geometry, NULL);
+}
+
+mln_test_feature_list mln_test_style_query_rendered_with(
+  const mln_test_render_fixture* fixture,
+  const mln_rendered_query_geometry* geometry,
+  const mln_rendered_feature_query_options* options
+) {
   mln_completion completion;
   feature_probe* probe = new_feature_probe(&completion);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_query_rendered_features(
-      fixture->session, &geometry, NULL, &completion, MLN_TEST_DIAGNOSTIC
-    )
+  const mln_status status = mln_render_session_query_rendered_features(
+    fixture->session, geometry, options, &completion, MLN_TEST_DIAGNOSTIC
   );
+  if (status != MLN_STATUS_OK) {
+    free(probe);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, status, mln_test_last_error());
+  }
   return finish_feature_probe(fixture, probe);
 }
 
@@ -213,16 +222,24 @@ mln_test_feature_list mln_test_style_query_source(
     options.source_layer_ids = &layer;
     options.source_layer_id_count = 1;
   }
+  return mln_test_style_query_source_with(fixture, source_id, &options);
+}
+
+mln_test_feature_list mln_test_style_query_source_with(
+  const mln_test_render_fixture* fixture, const char* source_id,
+  const mln_source_feature_query_options* options
+) {
   mln_completion completion;
   feature_probe* probe = new_feature_probe(&completion);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_query_source_features(
-      fixture->session,
-      (mln_buffer_view){.data = source_id, .size = strlen(source_id)}, &options,
-      &completion, MLN_TEST_DIAGNOSTIC
-    )
+  const mln_status status = mln_render_session_query_source_features(
+    fixture->session,
+    (mln_buffer_view){.data = source_id, .size = strlen(source_id)}, options,
+    &completion, MLN_TEST_DIAGNOSTIC
   );
+  if (status != MLN_STATUS_OK) {
+    free(probe);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, status, mln_test_last_error());
+  }
   return finish_feature_probe(fixture, probe);
 }
 

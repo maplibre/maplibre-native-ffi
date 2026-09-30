@@ -2124,6 +2124,21 @@ auto render_session_query_source_features(
   );
 }
 
+auto validate_feature_extension_query(
+  mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension,
+  mln_buffer_view extension_field, const mln_buffer_view* arguments
+) -> mln_status {
+  if (
+    !validate_non_empty_string(source_id, "source_id") ||
+    !validate_non_empty_string(extension, "extension") ||
+    !validate_non_empty_string(extension_field, "extension_field") ||
+    !to_native_feature(feature) || !to_feature_extension_arguments(arguments)
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 auto render_session_query_feature_extensions(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,

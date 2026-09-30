@@ -954,6 +954,12 @@ auto render_session_query_feature_extensions(
   mln_buffer_view extension_field, const mln_buffer_view* arguments,
   mln_buffer* out_result
 ) -> mln_status;
+// The checks render_session_query_feature_extensions() makes of its inputs,
+// for a submission to make before it queues the query.
+auto validate_feature_extension_query(
+  mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension,
+  mln_buffer_view extension_field, const mln_buffer_view* arguments
+) -> mln_status;
 
 auto render_session_query_rendered_features_start(
   mln_render_session session, const mln_rendered_query_geometry* geometry,

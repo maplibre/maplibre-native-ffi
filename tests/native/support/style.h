@@ -102,11 +102,25 @@ mln_test_feature_list mln_test_style_query_rendered(
   const mln_test_render_fixture* fixture
 );
 
+// Queries the features rendered along `geometry` with `options`, which may be
+// null.
+mln_test_feature_list mln_test_style_query_rendered_with(
+  const mln_test_render_fixture* fixture,
+  const mln_rendered_query_geometry* geometry,
+  const mln_rendered_feature_query_options* options
+);
+
 // Queries the features `source_id` holds. `source_layer` names the one source
 // layer to read from a vector source, or is null for any other source.
 mln_test_feature_list mln_test_style_query_source(
   const mln_test_render_fixture* fixture, const char* source_id,
   const char* source_layer
+);
+
+// The same with the caller's options, which may be null.
+mln_test_feature_list mln_test_style_query_source_with(
+  const mln_test_render_fixture* fixture, const char* source_id,
+  const mln_source_feature_query_options* options
 );
 
 // One resource that mln_test_style_serve() answers. `requests` counts the

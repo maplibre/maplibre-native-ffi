@@ -12,6 +12,7 @@
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
 #include "render/render_session_common.hpp"
+#include "style/style_value.hpp"
 
 namespace mln::core {
 namespace {
@@ -131,6 +132,18 @@ auto complete_query_buffer(
   });
 }
 
+// Copies a query filter once it parses, so the submission rejects a filter
+// that the driver could not apply.
+auto copy_filter(const mln_buffer_view* filter, std::optional<std::string>& out)
+  -> mln_status {
+  if (filter == nullptr) return MLN_STATUS_OK;
+  out.emplace();
+  const auto status = copy_view(*filter, *out);
+  if (status != MLN_STATUS_OK) return status;
+  if (!to_native_style_filter(filter)) return MLN_STATUS_INVALID_ARGUMENT;
+  return MLN_STATUS_OK;
+}
+
 struct CopiedRenderedOptions {
   mln_rendered_feature_query_options value{};
   std::vector<std::string> layer_ids;
@@ -171,11 +184,7 @@ auto copy_rendered_options(
       if (status != MLN_STATUS_OK) return status;
     }
   }
-  if (input->filter != nullptr) {
-    out->filter.emplace();
-    return copy_view(*input->filter, *out->filter);
-  }
-  return MLN_STATUS_OK;
+  return copy_filter(input->filter, out->filter);
 }
 
 struct CopiedSourceOptions {
@@ -218,11 +227,7 @@ auto copy_source_options(
       if (status != MLN_STATUS_OK) return status;
     }
   }
-  if (input->filter != nullptr) {
-    out->filter.emplace();
-    return copy_view(*input->filter, *out->filter);
-  }
-  return MLN_STATUS_OK;
+  return copy_filter(input->filter, out->filter);
 }
 
 auto make_views(const std::vector<std::string>& strings)
@@ -334,6 +339,10 @@ auto render_session_query_source_features_start(
   auto source = std::string{};
   const auto source_status = copy_view(source_id, source);
   if (source_status != MLN_STATUS_OK) return source_status;
+  if (source.empty()) {
+    set_thread_error("source_id must not be empty");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   auto copied_options = std::optional<CopiedSourceOptions>{};
   const auto options_status = copy_source_options(options, copied_options);
   if (options_status != MLN_STATUS_OK) return options_status;
@@ -374,6 +383,10 @@ auto render_session_query_feature_extensions_start(
   mln_buffer_view extension_field, const mln_buffer_view* arguments,
   const mln_completion* completion
 ) -> mln_status {
+  const auto input_status = validate_feature_extension_query(
+    source_id, feature, extension, extension_field, arguments
+  );
+  if (input_status != MLN_STATUS_OK) return input_status;
   auto copied = std::vector<std::string>(5);
   const mln_buffer_view inputs[] = {
     source_id, feature, extension, extension_field,
