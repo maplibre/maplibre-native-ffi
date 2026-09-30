@@ -101,7 +101,9 @@ the objects under test are the shipped ones:
 fails when it exports anything beyond the public C API, or any name that belongs
 to a seam. Every CI job that builds a library checks that library, because
 `mise run build` and `mise run archive-native` run the check. The hygiene job
-builds no library and has nothing to check.
+builds no library and has nothing to check. A coverage build, configured with
+`MLN_FFI_ENABLE_COVERAGE`, also exports `mln_ffi_coverage_write_profile`, and
+the check allows that one name when the preset's CMake cache enables coverage.
 
 A static archive keeps hidden symbols visible to a static link. For a preset
 that installs only an archive, such as Emscripten, the check compares the
