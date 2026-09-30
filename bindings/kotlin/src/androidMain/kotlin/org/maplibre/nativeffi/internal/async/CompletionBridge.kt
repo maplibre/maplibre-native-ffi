@@ -23,6 +23,10 @@ internal object CompletionBridge {
   }
 
   private val states = ConcurrentHashMap<Long, State<*>>()
+
+  /** Counts the completions native holds and has not yet released. */
+  fun pendingCountForTesting(): Int = states.size
+
   private val callback =
     object : MaplibreNativeC.mln_completion_callback() {
       override fun call(userData: Pointer?, result: MaplibreNativeC.mln_completion_result?) {

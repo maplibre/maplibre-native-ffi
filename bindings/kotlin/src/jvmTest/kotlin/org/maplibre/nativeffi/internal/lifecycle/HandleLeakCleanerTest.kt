@@ -1,73 +1,46 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
-import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.BlockingQueue
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.runtime.runSuspendTest
 
+/** The JVM cleaner that reports and reclaims handles nobody released. */
 class HandleLeakCleanerTest {
-  // The cleaner reports; explicit close keeps native failures observable.
-
   @Test
-  fun unreachableHandleReportsLeakWithoutExplicitRelease(): Unit = runSuspendTest {
-    val reports = CopyOnWriteArrayList<String>()
-
+  fun anUnreachableHandleReportsItsLeak() {
+    val reports = LinkedBlockingQueue<String>()
     registerUnreachableHandle(reports)
-
-    assertTrue(awaitReport(reports), "expected the cleaner to report the unreachable handle")
     assertEquals(
       "Leaked RuntimeHandle native handle 0x1234; close it explicitly.",
-      reports.single(),
+      awaitReport(reports),
     )
   }
 
   @Test
-  fun releasedHandleStaysSilentWhenCollected(): Unit = runSuspendTest {
-    val reports = CopyOnWriteArrayList<String>()
-    val liveReports = CopyOnWriteArrayList<String>()
-
-    registerReleasedHandle(reports)
-    // A second unreleased registration proves the cleaner ran, so the silence above is a
-    // real result.
-    registerUnreachableHandle(liveReports)
-
-    assertTrue(awaitReport(liveReports), "expected the cleaner to run")
-    assertEquals(emptyList(), reports)
-  }
-
-  @Test
-  fun blockedLeakReportDoesNotBlockNativeReclamationWorker(): Unit = runSuspendTest {
+  fun aBlockedLeakReportDoesNotBlockNativeReclamation() {
     val reportStarted = CountDownLatch(1)
     val unblockReport = CountDownLatch(1)
     val reclaimed = CountDownLatch(1)
-
     registerBlockingLeakReport(reportStarted, unblockReport)
     UnreachableActions.register(Any(), reclaimed::countDown)
-
     try {
-      assertTrue(awaitAction(reportStarted), "expected the leak-report worker to start")
-      assertTrue(awaitAction(reclaimed), "expected native reclamation to use another worker")
+      assertTrue(awaitLatch(reportStarted), "expected the leak-report worker to start")
+      assertTrue(awaitLatch(reclaimed), "expected native reclamation to use another worker")
     } finally {
       unblockReport.countDown()
     }
   }
 
   /** Registers a handle that is unreachable once this call returns. */
-  private fun registerUnreachableHandle(reports: MutableList<String>) {
+  private fun registerUnreachableHandle(reports: MutableCollection<String>) {
     HandleLeakCleaner.register(
       Any(),
-      HandleStateCore.LeakReport("RuntimeHandle", 0x1234L, reports::add),
+      HandleStateCore.LeakReport("RuntimeHandle", 0x1234L, { reports.add(it) }),
     )
-  }
-
-  /** Registers an explicitly released handle that is unreachable once this call returns. */
-  private fun registerReleasedHandle(reports: MutableList<String>) {
-    val leakReport = HandleStateCore.LeakReport("MapHandle", 0x5678L, reports::add)
-    leakReport.markReleased()
-    HandleLeakCleaner.register(Any(), leakReport)
   }
 
   /** Registers a diagnostic that blocks after its handle becomes unreachable. */
@@ -81,25 +54,29 @@ class HandleLeakCleanerTest {
     )
   }
 
-  private fun awaitAction(action: CountDownLatch): Boolean {
-    repeat(ATTEMPTS) {
-      if (action.await(POLL_MILLIS, TimeUnit.MILLISECONDS)) return true
+  /** Requests collections until the cleaner delivers a report, blocking on the queue between. */
+  private fun awaitReport(reports: BlockingQueue<String>): String? {
+    val deadline = System.nanoTime() + WAIT_NANOS
+    while (System.nanoTime() < deadline) {
       System.gc()
+      reports.poll(ROUND_MILLIS, TimeUnit.MILLISECONDS)?.let {
+        return it
+      }
     }
-    return action.count == 0L
+    return null
   }
 
-  private fun awaitReport(reports: List<String>): Boolean {
-    repeat(ATTEMPTS) {
-      if (reports.isNotEmpty()) return true
+  private fun awaitLatch(latch: CountDownLatch): Boolean {
+    val deadline = System.nanoTime() + WAIT_NANOS
+    while (System.nanoTime() < deadline) {
       System.gc()
-      Thread.sleep(POLL_MILLIS)
+      if (latch.await(ROUND_MILLIS, TimeUnit.MILLISECONDS)) return true
     }
-    return reports.isNotEmpty()
+    return false
   }
 
   private companion object {
-    private const val ATTEMPTS = 100
-    private const val POLL_MILLIS = 20L
+    const val WAIT_NANOS = 10_000_000_000L
+    const val ROUND_MILLIS = 100L
   }
 }

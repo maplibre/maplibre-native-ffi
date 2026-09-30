@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.log
 
-import java.nio.file.Files
-import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
@@ -13,56 +11,26 @@ import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogEvent
 import org.maplibre.nativeffi.generated.LogSeverity
 import org.maplibre.nativeffi.generated.LogSeverityMask
-import org.maplibre.nativeffi.runtime.runSuspendTest
+import org.maplibre.nativeffi.libraryProperties
+import org.maplibre.nativeffi.runChildJvm
+import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.use
+import org.maplibre.nativeffi.smallMapOptions
 
+/** A JVM that has received native log records exits, with or without the callback installed. */
 class LogProcessExitTest {
   @Test fun jvmExitsWithNativeLogCallbackInstalled() = assertProcessExits("installed")
 
   @Test fun jvmExitsAfterClearingNativeLogCallback() = assertProcessExits("cleared")
 
   private fun assertProcessExits(callbackState: String) {
-    val outputFile = Files.createTempFile("maplibre-log-exit-", ".log")
-    try {
-      val javaExecutable =
-        if (System.getProperty("os.name").startsWith("Windows")) "java.exe" else "java"
-      val command =
-        mutableListOf(
-          Path.of(System.getProperty("java.home"), "bin", javaExecutable).toString(),
-          "--enable-native-access=ALL-UNNAMED",
-          "-cp",
-          requireNotNull(System.getProperty("org.maplibre.nativeffi.test.classpath")),
-        )
-      for (property in
-        listOf("org.maplibre.nativeffi.library.path", "org.maplibre.nativeffi.library.dirs")) {
-        System.getProperty(property)?.let { command += "-D$property=$it" }
-      }
-      command += listOf(LogProcessExitProbe::class.java.name, callbackState)
-      val process =
-        ProcessBuilder(command)
-          .redirectErrorStream(true)
-          .redirectOutput(outputFile.toFile())
-          .start()
-      try {
-        val exited = process.waitFor(20, TimeUnit.SECONDS)
-        val output = Files.readString(outputFile)
-        assertTrue(
-          output.lineSequence().any { it == READY_TO_EXIT },
-          "Child did not finish the asynchronous log callback and cleanup ($callbackState):\n$output",
-        )
-        assertTrue(exited, "JVM did not exit after native logging ($callbackState):\n$output")
-        assertEquals(0, process.exitValue(), output)
-      } finally {
-        if (process.isAlive) {
-          process.destroyForcibly()
-          check(process.waitFor(10, TimeUnit.SECONDS)) {
-            "Could not stop log test child ${process.pid()}"
-          }
-        }
-      }
-    } finally {
-      Files.deleteIfExists(outputFile)
-    }
+    val child = runChildJvm(LogProcessExitProbe::class, listOf(callbackState), libraryProperties())
+    assertTrue(
+      child.output.lineSequence().any { it == READY_TO_EXIT },
+      "Child did not finish the asynchronous log callback and cleanup ($callbackState):\n" +
+        child.output,
+    )
+    assertEquals(0, child.exitCode, "JVM did not exit cleanly ($callbackState):\n${child.output}")
   }
 }
 
@@ -82,26 +50,15 @@ object LogProcessExitProbe {
     })
     runSuspendTest {
       GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
-        runtime
-          .mapCreate(
-            GeneratedApi.mapOptionsDefault()
-              .copy(
-                initialExtent =
-                  GeneratedApi.mapOptionsDefault().initialExtent.copy(width = 64u, height = 64u)
-              )
-          )
-          .await()
-          .use { map ->
-            // An invalid center emits a native parser warning without network or rendering work.
-            map
-              .setStyleJson(
-                """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray()
-              )
-              .await()
-            check(received.await(10, TimeUnit.SECONDS)) {
-              "Native parser warning never reached Java"
-            }
-          }
+        runtime.mapCreate(smallMapOptions()).await().use { map ->
+          // An invalid center emits a native parser warning without network or rendering work.
+          map
+            .setStyleJson(
+              """{"version":8,"center":false,"sources":{},"layers":[]}""".encodeToByteArray()
+            )
+            .await()
+          check(received.await(10, TimeUnit.SECONDS)) { "Native parser warning never reached Java" }
+        }
       }
     }
     if (callbackState == "cleared") {

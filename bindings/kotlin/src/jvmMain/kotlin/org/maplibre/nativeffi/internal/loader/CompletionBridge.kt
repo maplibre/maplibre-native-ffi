@@ -35,6 +35,10 @@ internal object CompletionBridge {
 
   private val nextId = AtomicLong(1)
   private val states = ConcurrentHashMap<Long, State<*>>()
+
+  /** Counts the completions native holds and has not yet released. */
+  fun pendingCountForTesting(): Int = states.size
+
   private val callback =
     mln_completion_callback.allocate(
       { userData, result -> complete(userData.address(), result) },

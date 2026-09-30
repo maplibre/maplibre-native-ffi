@@ -7,4 +7,4 @@
 # static calls, so R8 must retain those entry points.
 -keep,allowoptimization class org.maplibre.nativeffi.**Test { *; }
 
--keep class org.maplibre.nativeffi.render.TestVulkanDriver { native <methods>; }
+-keep class org.maplibre.nativeffi.render.TestGraphicsJni { native <methods>; }

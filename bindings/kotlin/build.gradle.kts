@@ -151,9 +151,48 @@ kotlin {
       }
     }
 
-    if (name == "linuxX64" || name == "linuxArm64" || name == "macosArm64") {
-      val linuxTarget = name.startsWith("linux")
-      val fixture = rootProject.file("tests/graphics")
+    // Every native test compiles against tests/graphics through cinterop. A target whose tests
+    // run links graphics.c, compiled here for that target; Android Kotlin/Native tests only
+    // compile, so their binaries never link it.
+    val fixture = rootProject.file("tests/graphics")
+    compilations.getByName("test") {
+      cinterops.create("testGraphics") {
+        defFile(project.file("src/nativeTest/cinterop/graphics.def"))
+        includeDirs(fixture.resolve("include"))
+      }
+    }
+    val graphicsCompiler =
+      when (name) {
+        "linuxX64" -> listOf("clang", "--target=x86_64-linux-gnu")
+        "linuxArm64" -> listOf("clang", "--target=aarch64-linux-gnu")
+        "macosArm64" ->
+          listOf("xcrun", "--sdk", "macosx", "clang", "-target", "arm64-apple-macos11.0")
+        "iosArm64" ->
+          listOf("xcrun", "--sdk", "iphoneos", "clang", "-target", "arm64-apple-ios14.0")
+        "iosSimulatorArm64" ->
+          listOf(
+            "xcrun",
+            "--sdk",
+            "iphonesimulator",
+            "clang",
+            "-target",
+            "arm64-apple-ios14.0-simulator",
+          )
+        "tvosArm64" ->
+          listOf("xcrun", "--sdk", "appletvos", "clang", "-target", "arm64-apple-tvos14.0")
+        "tvosSimulatorArm64" ->
+          listOf(
+            "xcrun",
+            "--sdk",
+            "appletvsimulator",
+            "clang",
+            "-target",
+            "arm64-apple-tvos14.0-simulator",
+          )
+        else -> null
+      }
+    if (graphicsCompiler != null) {
+      val linksDl = name.startsWith("linux")
       val vulkanHeaders =
         rootProject.file("third_party/maplibre-native/vendor/Vulkan-Headers/include")
       val objectFile = layout.buildDirectory.file("graphics-test/$name/graphics.o")
@@ -164,15 +203,17 @@ kotlin {
           outputs.file(objectFile)
           doFirst { objectFile.get().asFile.parentFile.mkdirs() }
           commandLine(
-            "clang",
-            "-std=c11",
-            "-fPIC",
-            "-c",
-            "-I${fixture.resolve("include")}",
-            "-I$vulkanHeaders",
-            fixture.resolve("graphics.c"),
-            "-o",
-            objectFile.get().asFile,
+            graphicsCompiler +
+              listOf(
+                "-std=c11",
+                "-fPIC",
+                "-c",
+                "-I${fixture.resolve("include")}",
+                "-I$vulkanHeaders",
+                fixture.resolve("graphics.c").absolutePath,
+                "-o",
+                objectFile.get().asFile.absolutePath,
+              )
           )
         }
       binaries.withType<TestExecutable>().configureEach {
@@ -181,13 +222,7 @@ kotlin {
           inputs.file(objectFile)
         }
         linkerOpts(objectFile.get().asFile.absolutePath)
-        if (linuxTarget) linkerOpts("-ldl")
-      }
-      compilations.getByName("test") {
-        cinterops.create("testGraphics") {
-          defFile(project.file("src/desktopNativeTest/cinterop/graphics.def"))
-          includeDirs(fixture.resolve("include"))
-        }
+        if (linksDl) linkerOpts("-ldl")
       }
     }
   }
@@ -207,8 +242,6 @@ kotlin {
     }
 
     commonTest.dependencies { implementation(kotlin("test")) }
-    matching { it.name == "linuxTest" || it.name == "macosTest" }
-      .configureEach { kotlin.srcDir("src/desktopNativeTest/kotlin") }
 
     configureEach {
       if (
@@ -265,18 +298,7 @@ configurations.register("javaCppTool") {
   isCanBeResolved = true
 }
 
-val lwjglNative = hostPlatform.lwjglNativeClassifier
-
-dependencies {
-  add("javaCppTool", libs.javacpp)
-  "jvmTestImplementation"(platform(libs.lwjgl.bom))
-  "jvmTestImplementation"(libs.lwjgl)
-  "jvmTestImplementation"(libs.lwjgl.egl)
-  "jvmTestImplementation"(libs.lwjgl.vulkan)
-  "jvmTestImplementation"(libs.lwjgl.glfw)
-  "jvmTestRuntimeOnly"(variantOf(libs.lwjgl.glfw) { classifier(lwjglNative) })
-  "jvmTestRuntimeOnly"(variantOf(libs.lwjgl) { classifier(lwjglNative) })
-}
+dependencies { add("javaCppTool", libs.javacpp) }
 
 apply(from = "gradle/jextract-jvm.gradle.kts")
 
@@ -337,15 +359,15 @@ class TestClasspathArguments(@get:Classpath val classpath: FileCollection) :
 }
 
 tasks.named<Test>("jvmTest") {
+  // Each test bounds its own waits; this catches a hang no test-level timeout can interrupt.
+  timeout.set(Duration.ofMinutes(5))
   jvmArgs("--enable-native-access=ALL-UNNAMED")
   jvmArgumentProviders.add(TestClasspathArguments(classpath))
-  if (maplibreNativeC.hostLibraryDirs.isNotEmpty()) {
-    systemProperty(
-      "org.lwjgl.librarypath",
-      maplibreNativeC.hostLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath },
-    )
-  }
   systemProperty("org.maplibre.nativeffi.library.path", maplibreNativeC.libraryPath.absolutePath)
+  systemProperty(
+    "org.maplibre.nativeffi.test.graphics.library",
+    maplibreNativeC.testGraphicsLibraryPath.absolutePath,
+  )
   systemProperty(
     "org.maplibre.nativeffi.library.dirs",
     maplibreNativeC.loaderLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath },

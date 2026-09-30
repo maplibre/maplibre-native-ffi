@@ -2,82 +2,54 @@ package org.maplibre.nativeffi.render
 
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
-import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.MapMode
-import org.maplibre.nativeffi.generated.RenderSessionHandle
-import org.maplibre.nativeffi.generated.RuntimeHandle
-import org.maplibre.nativeffi.runtime.runSuspendTest
+import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.runtime.assertCommitted
 
+/**
+ * A regression for the emulator's goldfish GL driver: a static map that reloads its style and
+ * re-adds a composed layer keeps rendering that layer.
+ */
 class GoldfishStyleReloadTest {
   @Test
   fun repeatedSnapshotStyleReloadRendersComposedLayer(): Unit = runSuspendTest {
-    withOwnedTextureSession(
-      width = SNAPSHOT_SIZE,
-      height = SNAPSHOT_SIZE,
-      mapWidth = SNAPSHOT_SIZE,
-      mapHeight = SNAPSHOT_SIZE,
-      mapMode = MapMode.STATIC,
-    ) { runtime, map, owned ->
-      val session = owned.session
-      loadBaseStyle(runtime, map, session, BASE_STYLE)
-      addComposition(runtime, map, session)
-      assertContentEquals(GREEN, captureCenterPixel(map, session))
+    withOwnedTexture(width = SNAPSHOT_SIZE, height = SNAPSHOT_SIZE) {
+      setStyle(BASE_STYLE)
+      addComposition()
+      assertContentEquals(GREEN, captureCenterPixel())
 
-      loadBaseStyle(runtime, map, session, ALTERNATE_STYLE)
-      loadBaseStyle(runtime, map, session, BASE_STYLE.copyOf())
-      addComposition(runtime, map, session)
-
-      assertContentEquals(GREEN, captureCenterPixel(map, session))
+      setStyle(ALTERNATE_STYLE)
+      setStyle(BASE_STYLE)
+      addComposition()
+      assertContentEquals(GREEN, captureCenterPixel())
     }
   }
 
-  private suspend fun loadBaseStyle(
-    runtime: RuntimeHandle,
-    map: MapHandle,
-    session: RenderSessionHandle,
-    style: ByteArray,
-  ) {
-    session.completeOnDriver(map.setStyleJson(style))
-    session.completeOnDriver(runtime.barrier())
+  private suspend fun OwnedTextureFixture.addComposition() {
+    val map = mapFixture.map
+    assertCommitted(
+      complete(map.addStyleSourceJson(COMPOSED_SOURCE_ID, COMPOSED_SOURCE.encodeToByteArray()))
+    )
+    assertCommitted(complete(map.addStyleLayerJson(COMPOSED_LAYER.encodeToByteArray(), "")))
   }
 
-  private suspend fun addComposition(
-    runtime: RuntimeHandle,
-    map: MapHandle,
-    session: RenderSessionHandle,
-  ) {
-    session.completeOnDriver(map.addStyleSourceJson(COMPOSED_SOURCE_ID, COMPOSED_SOURCE))
-    session.completeOnDriver(map.addStyleLayerJson(COMPOSED_LAYER, ""))
-    session.completeOnDriver(runtime.barrier())
-  }
-
-  /** Renders until the still image the map owes this test finishes, then reads its center pixel. */
-  private suspend fun captureCenterPixel(map: MapHandle, session: RenderSessionHandle): ByteArray {
-    val still = map.requestStillImage()
-    session.completeOnDriver(still) { renderOneFrame() }
-
-    val readback = session.completeOnDriver(session.textureReadPremultipliedRgba8())
+  /** Renders the still image the map owes this test, then reads its center pixel. */
+  private suspend fun OwnedTextureFixture.captureCenterPixel(): ByteArray {
+    renderStill()
+    val readback = complete(session.textureReadPremultipliedRgba8())
     val center = SNAPSHOT_SIZE / 2 * readback.info.stride.toInt() + SNAPSHOT_SIZE / 2 * 4
     return readback.data.copyOfRange(center, center + 4)
   }
 
   private companion object {
-    private const val SNAPSHOT_SIZE = 64
-    private const val COMPOSED_SOURCE_ID = "composed-point"
-    private val GREEN = byteArrayOf(0, -1, 0, -1)
-    private val BASE_STYLE =
-      jsonBytes(
-        """{"version":8,"sources":{},"layers":[{"id":"base","type":"background","paint":{"background-color":"#000000"}}]}"""
-      )
-    private val ALTERNATE_STYLE =
-      jsonBytes(
-        """{"version":8,"sources":{},"layers":[{"id":"alternate","type":"background","paint":{"background-color":"#0000ff"}}]}"""
-      )
-    private val COMPOSED_SOURCE =
-      jsonBytes("""{"type":"geojson","data":{"type":"Point","coordinates":[0,0]}}""")
-    private val COMPOSED_LAYER =
-      jsonBytes(
-        """{"id":"composed-circle","type":"circle","source":"composed-point","paint":{"circle-color":"#00ff00","circle-radius":20}}"""
-      )
+    const val SNAPSHOT_SIZE = 64
+    const val COMPOSED_SOURCE_ID = "composed-point"
+    val GREEN = byteArrayOf(0, -1, 0, -1)
+    const val BASE_STYLE =
+      """{"version":8,"sources":{},"layers":[{"id":"base","type":"background","paint":{"background-color":"#000000"}}]}"""
+    const val ALTERNATE_STYLE =
+      """{"version":8,"sources":{},"layers":[{"id":"alternate","type":"background","paint":{"background-color":"#0000ff"}}]}"""
+    const val COMPOSED_SOURCE = """{"type":"geojson","data":{"type":"Point","coordinates":[0,0]}}"""
+    const val COMPOSED_LAYER =
+      """{"id":"composed-circle","type":"circle","source":"composed-point","paint":{"circle-color":"#00ff00","circle-radius":20}}"""
   }
 }

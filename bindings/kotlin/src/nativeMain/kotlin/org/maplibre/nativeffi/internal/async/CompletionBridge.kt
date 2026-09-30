@@ -2,6 +2,8 @@
 
 package org.maplibre.nativeffi.internal.async
 
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -28,7 +30,16 @@ private interface CompletionState {
   fun complete(result: CPointer<mln_completion_result>)
 }
 
+@OptIn(ExperimentalAtomicApi::class)
 internal object CompletionBridge {
+  private val pending = AtomicInt(0)
+
+  /** Counts the completions native holds and has not yet released. */
+  fun pendingCountForTesting(): Int = pending.load()
+
+  internal fun released() {
+    pending.addAndFetch(-1)
+  }
 
   private class State<T>(
     private val convert: (CPointer<mln_completion_result>) -> T,
@@ -89,6 +100,7 @@ internal object CompletionBridge {
   ): Deferred<T> {
     val state = State(convert, acceptErrorStatus, closeDropped)
     val reference = StableRef.create<CompletionState>(state)
+    pending.addAndFetch(1)
     try {
       memScoped {
         val completion = alloc<mln_completion>()
@@ -102,6 +114,7 @@ internal object CompletionBridge {
       // Only a rejected submission reaches here, and a rejection never hands the reference to
       // native, so nothing else disposes it.
       reference.dispose()
+      pending.addAndFetch(-1)
       state.deferred.completeExceptionally(failure)
       if (rejectSynchronously) throw failure
     }
@@ -136,5 +149,7 @@ private fun completeNative(userData: COpaquePointer?, result: CPointer<mln_compl
 
 @OptIn(ExperimentalForeignApi::class)
 private fun releaseNative(userData: COpaquePointer?) {
-  userData?.asStableRef<CompletionState>()?.dispose()
+  userData ?: return
+  userData.asStableRef<CompletionState>().dispose()
+  CompletionBridge.released()
 }

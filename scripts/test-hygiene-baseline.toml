@@ -8,17 +8,9 @@
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs" = 1
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTestHelpers.cs" = 3
 "bindings/kotlin/src/androidDeviceTest/kotlin/org/maplibre/nativeffi/BackgroundThread.android.kt" = 2
-"bindings/kotlin/src/androidDeviceTest/kotlin/org/maplibre/nativeffi/resource/ResourceRequestHandleAndroidTest.kt" = 2
-"bindings/kotlin/src/androidDeviceTest/kotlin/org/maplibre/nativeffi/runtime/AndroidAssetStyleTest.kt" = 3
 "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/BackgroundThread.kt" = 1
-"bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/log/LogCallbackRegistrationTest.kt" = 2
-"bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureTestSupport.kt" = 3
-"bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/RenderSessionHandleTest.kt" = 3
 "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeHandleTest.kt" = 9
 "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/BackgroundThread.jvm.kt" = 2
-"bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/callback/GeneratedCallbackLifetimeTest.kt" = 1
-"bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/lifecycle/HandleLeakCleanerTest.kt" = 1
-"bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/resource/ResourceRequestHandleJvmTest.kt" = 2
 "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeEventsTest.kt" = 2
 "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/BackgroundThread.native.kt" = 2
 "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeEventsTest.kt" = 1

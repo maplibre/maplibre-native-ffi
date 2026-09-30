@@ -1600,6 +1600,15 @@ static void* egl_open_library(
   const char* what, const char* configured, const char* const* names,
   size_t count
 ) {
+#if !defined(_WIN32)
+  // A host that already loaded EGL, as the JVM binding's loader does beside
+  // the C library, shares its display with the core only through that copy,
+  // so an image the process holds wins over the path the build found.
+  for (size_t index = 0; index < count; index += 1) {
+    void* loaded = dlopen(names[index], RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+    if (loaded != NULL) return loaded;
+  }
+#endif
   const char* candidates[4] = {configured};
   for (size_t index = 0; index < count && index < 3; index += 1) {
     candidates[index + 1] = names[index];
