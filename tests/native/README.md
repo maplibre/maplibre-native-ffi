@@ -35,10 +35,10 @@ boundary that hosts link against. Its domain directories are `base`,
 that order. `cmake/mln_ffi_tests.cmake` lists them, and a test file outside them
 fails the configure step.
 
-The fixtures under `map/issue12432/` and `offline_database/` are copies of
-MapLibre Native's test fixtures at the same paths. The runner scripts push or
-embed `fixtures/` as a whole, and the suites find it through
-`MLN_FFI_TEST_FIXTURE_DIR`.
+The fixtures under `map/issue12432/`, `offline_database/`, and
+`storage/pmtiles/` are copies of MapLibre Native's test fixtures at the same
+paths. The runner scripts push or embed `fixtures/` as a whole, and the suites
+find it through `MLN_FFI_TEST_FIXTURE_DIR`.
 
 The plugin group registers `plugin/square_plugin.c` the way a host loads a
 plugin. The plugin is a shared library that includes only MapLibre Native's
@@ -143,8 +143,9 @@ The build enforces the registration rather than trusting review:
 
 ## Running tests
 
-`mise run test [preset]` builds a preset and runs its suites. The harness
-accepts Unity's options:
+`mise run test [preset]` builds a preset and runs its suites. On desktop and
+simulator targets it first runs `cargo test` for the Rust platform crate's pure
+helpers, such as redirect resolution. The harness accepts Unity's options:
 
 | Option    | Effect                                                  |
 | --------- | ------------------------------------------------------- |
@@ -199,6 +200,23 @@ Test files include `support/test_support.h`, which brings in the helpers below.
 | `env.h`    | Runtime and map fixtures, event draining and waits, fixture files    |
 | `render.h` | The render fixture, driver service, and `mln_test_render_step_until` |
 | `tables.h` | A runner for validation tables                                       |
+
+The resource and platform suites also include two headers of their own:
+
+| Header          | Provides                                                              |
+| --------------- | --------------------------------------------------------------------- |
+| `resources.h`   | Resource configuration commands, and a provider that records requests |
+| `http_server.h` | A scripted HTTP server on 127.0.0.1 that logs each request's headers  |
+
+The scripted provider answers the URLs that a case lists, fails every other
+request as not found, and copies each request it sees, including the prior cache
+metadata that a revalidation carries. The loopback server answers from a route
+table and closes each connection after one response. A route can carry an ETag
+that it answers 304 for, serve byte ranges, or hold its response until the case
+releases it. The browser has no sockets, so its build leaves the server out, and
+its transport cases run against the runner's routes instead.
+`mln_test_temp_path` in `env.h` names a file in the temporary directory for a
+case that writes one.
 
 The host-target fixtures in `support/host_graphics.h` need their own include, as
 described under [GPU objects](#gpu-objects).
@@ -305,6 +323,16 @@ the override on to reach the very next frame. Without the override, the
 asynchronous slice still lands before that frame about 3 runs in 20, so the case
 catches a lost override most of the time but not always. The same slicing sync
 point would let it park the worker and prove that the frame did not wait for it.
+
+### Cases that work around a core defect
+
+- The cache cases in `abi/resources/provider.c`,
+  `abi/resources/ambient_cache.c`, and `abi/platform/transport.c` keep their
+  first map until the second has loaded. Without a cache path, a runtime's
+  ambient cache is an in-memory database that lives only while a map or an
+  earlier offline or cache operation holds it, so releasing the only map empties
+  the cache. The workaround goes once the runtime holds its database for its
+  whole life, or `runtime.h` documents this lifetime.
 
 ## Process-global state
 
