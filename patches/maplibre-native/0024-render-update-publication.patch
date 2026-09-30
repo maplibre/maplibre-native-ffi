@@ -1,45 +1,8 @@
-diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
---- a/src/mln/style/style_impl.cpp
-+++ b/src/mln/style/style_impl.cpp
-@@ -160,7 +160,10 @@
- }
- 
- void Style::Impl::setTransitionOptions(const TransitionOptions& options) {
-+    if (transitionOptions.duration == options.duration && transitionOptions.delay == options.delay &&
-+        transitionOptions.enablePlacementTransitions == options.enablePlacementTransitions) return;
-     transitionOptions = options;
-+    observer->onUpdate();
- }
- 
- namespace {
-@@ -254,6 +257,7 @@
-     if (fileSource) {
-         item->loadDescription(*fileSource);
-     }
-+    observer->onUpdate();
- }
- 
- std::unique_ptr<Source> Style::Impl::removeSource(const std::string& id) {
-@@ -269,6 +273,7 @@
- 
-     if (source) {
-         source->setObserver(nullptr);
-+        observer->onUpdate();
-     }
- 
-     return source;
-@@ -410,6 +415,7 @@
-     }
-     newImages->erase(found);
-     images = std::move(newImages);
-+    observer->onUpdate();
- }
- 
- std::optional<Immutable<style::Image::Impl>> Style::Impl::getImage(const std::string& id) const {
 diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
+index 08160f6f3f55..ef034b4bd8b1 100644
 --- a/src/mln/map/map.cpp
 +++ b/src/mln/map/map.cpp
-@@ -529,7 +529,9 @@
+@@ -529,7 +529,9 @@ void Map::enableRenderingStatsView(bool value) {
  }
  
  void Map::setPrefetchZoomDelta(uint8_t delta) {
@@ -49,7 +12,7 @@ diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
  }
  
  uint8_t Map::getPrefetchZoomDelta() const {
-@@ -561,7 +563,9 @@
+@@ -561,7 +563,9 @@ FreeCameraOptions Map::getFreeCameraOptions() const {
  }
  
  void Map::setTileLodMinRadius(double radius) {
@@ -59,7 +22,7 @@ diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
  }
  
  double Map::getTileLodMinRadius() const {
-@@ -569,7 +573,9 @@
+@@ -569,7 +573,9 @@ double Map::getTileLodMinRadius() const {
  }
  
  void Map::setTileLodScale(double scale) {
@@ -69,7 +32,7 @@ diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
  }
  
  double Map::getTileLodScale() const {
-@@ -577,7 +583,9 @@
+@@ -577,7 +583,9 @@ double Map::getTileLodScale() const {
  }
  
  void Map::setTileLodPitchThreshold(double threshold) {
@@ -79,7 +42,7 @@ diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
  }
  
  double Map::getTileLodPitchThreshold() const {
-@@ -585,7 +593,9 @@
+@@ -585,7 +593,9 @@ double Map::getTileLodPitchThreshold() const {
  }
  
  void Map::setTileLodZoomShift(double shift) {
@@ -89,7 +52,7 @@ diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
  }
  
  double Map::getTileLodZoomShift() const {
-@@ -593,7 +603,9 @@
+@@ -593,7 +603,9 @@ double Map::getTileLodZoomShift() const {
  }
  
  void Map::setTileLodMode(TileLodMode mode) {
@@ -99,650 +62,11 @@ diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
  }
  
  TileLodMode Map::getTileLodMode() const {
-diff --git a/src/mln/style/layers/fill_layer.cpp b/src/mln/style/layers/fill_layer.cpp
---- a/src/mln/style/layers/fill_layer.cpp
-+++ b/src/mln/style/layers/fill_layer.cpp
-@@ -103,6 +103,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillAntialias>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillLayer::getFillAntialiasTransition() const {
-@@ -130,6 +131,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillLayer::getFillColorTransition() const {
-@@ -157,6 +159,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillOpacity>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillLayer::getFillOpacityTransition() const {
-@@ -184,6 +187,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillOutlineColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillLayer::getFillOutlineColorTransition() const {
-@@ -211,6 +215,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillPattern>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillLayer::getFillPatternTransition() const {
-@@ -238,6 +243,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillTranslate>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillLayer::getFillTranslateTransition() const {
-@@ -265,6 +271,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillTranslateAnchor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillLayer::getFillTranslateAnchorTransition() const {
-diff --git a/src/mln/style/layers/hillshade_layer.cpp b/src/mln/style/layers/hillshade_layer.cpp
---- a/src/mln/style/layers/hillshade_layer.cpp
-+++ b/src/mln/style/layers/hillshade_layer.cpp
-@@ -87,6 +87,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HillshadeAccentColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HillshadeLayer::getHillshadeAccentColorTransition() const {
-@@ -114,6 +115,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HillshadeExaggeration>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HillshadeLayer::getHillshadeExaggerationTransition() const {
-@@ -141,6 +143,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HillshadeHighlightColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HillshadeLayer::getHillshadeHighlightColorTransition() const {
-@@ -168,6 +171,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HillshadeIlluminationAltitude>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HillshadeLayer::getHillshadeIlluminationAltitudeTransition() const {
-@@ -195,6 +199,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HillshadeIlluminationAnchor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HillshadeLayer::getHillshadeIlluminationAnchorTransition() const {
-@@ -222,6 +227,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HillshadeIlluminationDirection>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HillshadeLayer::getHillshadeIlluminationDirectionTransition() const {
-@@ -249,6 +255,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HillshadeMethod>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HillshadeLayer::getHillshadeMethodTransition() const {
-@@ -276,6 +283,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HillshadeShadowColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HillshadeLayer::getHillshadeShadowColorTransition() const {
-diff --git a/src/mln/style/layers/circle_layer.cpp b/src/mln/style/layers/circle_layer.cpp
---- a/src/mln/style/layers/circle_layer.cpp
-+++ b/src/mln/style/layers/circle_layer.cpp
-@@ -103,6 +103,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<CircleBlur>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions CircleLayer::getCircleBlurTransition() const {
-@@ -130,6 +131,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<CircleColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions CircleLayer::getCircleColorTransition() const {
-@@ -157,6 +159,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<CircleOpacity>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions CircleLayer::getCircleOpacityTransition() const {
-@@ -184,6 +187,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<CirclePitchAlignment>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions CircleLayer::getCirclePitchAlignmentTransition() const {
-@@ -211,6 +215,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<CirclePitchScale>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions CircleLayer::getCirclePitchScaleTransition() const {
-@@ -238,6 +243,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<CircleRadius>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions CircleLayer::getCircleRadiusTransition() const {
-@@ -265,6 +271,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<CircleStrokeColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions CircleLayer::getCircleStrokeColorTransition() const {
-@@ -292,6 +299,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<CircleStrokeOpacity>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions CircleLayer::getCircleStrokeOpacityTransition() const {
-@@ -319,6 +327,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<CircleStrokeWidth>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions CircleLayer::getCircleStrokeWidthTransition() const {
-@@ -346,6 +355,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<CircleTranslate>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions CircleLayer::getCircleTranslateTransition() const {
-@@ -373,6 +383,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<CircleTranslateAnchor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions CircleLayer::getCircleTranslateAnchorTransition() const {
-diff --git a/src/mln/style/layers/heatmap_layer.cpp b/src/mln/style/layers/heatmap_layer.cpp
---- a/src/mln/style/layers/heatmap_layer.cpp
-+++ b/src/mln/style/layers/heatmap_layer.cpp
-@@ -89,6 +89,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HeatmapColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HeatmapLayer::getHeatmapColorTransition() const {
-@@ -116,6 +117,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HeatmapIntensity>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HeatmapLayer::getHeatmapIntensityTransition() const {
-@@ -143,6 +145,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HeatmapOpacity>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HeatmapLayer::getHeatmapOpacityTransition() const {
-@@ -170,6 +173,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HeatmapRadius>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HeatmapLayer::getHeatmapRadiusTransition() const {
-@@ -197,6 +201,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<HeatmapWeight>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions HeatmapLayer::getHeatmapWeightTransition() const {
-diff --git a/src/mln/style/layers/fill_extrusion_layer.cpp b/src/mln/style/layers/fill_extrusion_layer.cpp
---- a/src/mln/style/layers/fill_extrusion_layer.cpp
-+++ b/src/mln/style/layers/fill_extrusion_layer.cpp
-@@ -103,6 +103,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillExtrusionBase>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillExtrusionLayer::getFillExtrusionBaseTransition() const {
-@@ -130,6 +131,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillExtrusionColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillExtrusionLayer::getFillExtrusionColorTransition() const {
-@@ -157,6 +159,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillExtrusionHeight>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillExtrusionLayer::getFillExtrusionHeightTransition() const {
-@@ -184,6 +187,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillExtrusionOpacity>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillExtrusionLayer::getFillExtrusionOpacityTransition() const {
-@@ -211,6 +215,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillExtrusionPattern>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillExtrusionLayer::getFillExtrusionPatternTransition() const {
-@@ -238,6 +243,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillExtrusionTranslate>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillExtrusionLayer::getFillExtrusionTranslateTransition() const {
-@@ -265,6 +271,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillExtrusionTranslateAnchor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillExtrusionLayer::getFillExtrusionTranslateAnchorTransition() const {
-@@ -292,6 +299,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<FillExtrusionVerticalGradient>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions FillExtrusionLayer::getFillExtrusionVerticalGradientTransition() const {
-diff --git a/src/mln/style/layers/line_layer.cpp b/src/mln/style/layers/line_layer.cpp
---- a/src/mln/style/layers/line_layer.cpp
-+++ b/src/mln/style/layers/line_layer.cpp
-@@ -163,6 +163,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<LineBlur>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LineLayer::getLineBlurTransition() const {
-@@ -190,6 +191,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<LineColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LineLayer::getLineColorTransition() const {
-@@ -217,6 +219,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<LineDasharray>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LineLayer::getLineDasharrayTransition() const {
-@@ -244,6 +247,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<LineGapWidth>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LineLayer::getLineGapWidthTransition() const {
-@@ -271,6 +275,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<LineGradient>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LineLayer::getLineGradientTransition() const {
-@@ -298,6 +303,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<LineOffset>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LineLayer::getLineOffsetTransition() const {
-@@ -325,6 +331,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<LineOpacity>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LineLayer::getLineOpacityTransition() const {
-@@ -352,6 +359,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<LinePattern>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LineLayer::getLinePatternTransition() const {
-@@ -379,6 +387,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<LineTranslate>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LineLayer::getLineTranslateTransition() const {
-@@ -406,6 +415,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<LineTranslateAnchor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LineLayer::getLineTranslateAnchorTransition() const {
-@@ -434,6 +444,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<LineWidth>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LineLayer::getLineWidthTransition() const {
-diff --git a/src/mln/style/layers/symbol_layer.cpp b/src/mln/style/layers/symbol_layer.cpp
---- a/src/mln/style/layers/symbol_layer.cpp
-+++ b/src/mln/style/layers/symbol_layer.cpp
-@@ -733,6 +733,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<IconColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getIconColorTransition() const {
-@@ -760,6 +761,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<IconHaloBlur>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getIconHaloBlurTransition() const {
-@@ -787,6 +789,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<IconHaloColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getIconHaloColorTransition() const {
-@@ -814,6 +817,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<IconHaloWidth>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getIconHaloWidthTransition() const {
-@@ -841,6 +845,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<IconOpacity>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getIconOpacityTransition() const {
-@@ -868,6 +873,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<IconTranslate>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getIconTranslateTransition() const {
-@@ -895,6 +901,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<IconTranslateAnchor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getIconTranslateAnchorTransition() const {
-@@ -922,6 +929,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<TextColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getTextColorTransition() const {
-@@ -949,6 +957,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<TextHaloBlur>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getTextHaloBlurTransition() const {
-@@ -976,6 +985,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<TextHaloColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getTextHaloColorTransition() const {
-@@ -1003,6 +1013,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<TextHaloWidth>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getTextHaloWidthTransition() const {
-@@ -1030,6 +1041,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<TextOpacity>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getTextOpacityTransition() const {
-@@ -1057,6 +1069,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<TextTranslate>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getTextTranslateTransition() const {
-@@ -1084,6 +1097,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<TextTranslateAnchor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions SymbolLayer::getTextTranslateAnchorTransition() const {
-diff --git a/src/mln/style/layers/location_indicator_layer.cpp b/src/mln/style/layers/location_indicator_layer.cpp
---- a/src/mln/style/layers/location_indicator_layer.cpp
-+++ b/src/mln/style/layers/location_indicator_layer.cpp
-@@ -133,6 +133,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<AccuracyRadius>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getAccuracyRadiusTransition() const {
-@@ -160,6 +161,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<AccuracyRadiusBorderColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getAccuracyRadiusBorderColorTransition() const {
-@@ -187,6 +189,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<AccuracyRadiusColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getAccuracyRadiusColorTransition() const {
-@@ -214,6 +217,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<Bearing>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getBearingTransition() const {
-@@ -241,6 +245,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<BearingAccuracy>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getBearingAccuracyTransition() const {
-@@ -268,6 +273,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<BearingAccuracyColor>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getBearingAccuracyColorTransition() const {
-@@ -295,6 +301,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<BearingAccuracyRadius>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getBearingAccuracyRadiusTransition() const {
-@@ -322,6 +329,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<BearingImageSize>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getBearingImageSizeTransition() const {
-@@ -349,6 +357,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<ImageTiltDisplacement>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getImageTiltDisplacementTransition() const {
-@@ -376,6 +385,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<Location>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getLocationTransition() const {
-@@ -403,6 +413,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<PerspectiveCompensation>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getPerspectiveCompensationTransition() const {
-@@ -430,6 +441,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<ShadowImageSize>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getShadowImageSizeTransition() const {
-@@ -457,6 +469,7 @@
-     auto impl_ = mutableImpl();
-     impl_->paint.template get<TopImageSize>().options = options;
-     baseImpl = std::move(impl_);
-+    observer->onLayerChanged(*this);
- }
- 
- TransitionOptions LocationIndicatorLayer::getTopImageSizeTransition() const {
 diff --git a/src/mln/style/layers/background_layer.cpp b/src/mln/style/layers/background_layer.cpp
+index a20468ecdce2..cdc892db90f6 100644
 --- a/src/mln/style/layers/background_layer.cpp
 +++ b/src/mln/style/layers/background_layer.cpp
-@@ -87,6 +87,7 @@
+@@ -87,6 +87,7 @@ void BackgroundLayer::setBackgroundColorTransition(const TransitionOptions& opti
      auto impl_ = mutableImpl();
      impl_->paint.template get<BackgroundColor>().options = options;
      baseImpl = std::move(impl_);
@@ -750,7 +74,7 @@ diff --git a/src/mln/style/layers/background_layer.cpp b/src/mln/style/layers/ba
  }
  
  TransitionOptions BackgroundLayer::getBackgroundColorTransition() const {
-@@ -114,6 +115,7 @@
+@@ -114,6 +115,7 @@ void BackgroundLayer::setBackgroundOpacityTransition(const TransitionOptions& op
      auto impl_ = mutableImpl();
      impl_->paint.template get<BackgroundOpacity>().options = options;
      baseImpl = std::move(impl_);
@@ -758,7 +82,7 @@ diff --git a/src/mln/style/layers/background_layer.cpp b/src/mln/style/layers/ba
  }
  
  TransitionOptions BackgroundLayer::getBackgroundOpacityTransition() const {
-@@ -141,6 +143,7 @@
+@@ -141,6 +143,7 @@ void BackgroundLayer::setBackgroundPatternTransition(const TransitionOptions& op
      auto impl_ = mutableImpl();
      impl_->paint.template get<BackgroundPattern>().options = options;
      baseImpl = std::move(impl_);
@@ -766,77 +90,103 @@ diff --git a/src/mln/style/layers/background_layer.cpp b/src/mln/style/layers/ba
  }
  
  TransitionOptions BackgroundLayer::getBackgroundPatternTransition() const {
-diff --git a/src/mln/style/layers/raster_layer.cpp b/src/mln/style/layers/raster_layer.cpp
---- a/src/mln/style/layers/raster_layer.cpp
-+++ b/src/mln/style/layers/raster_layer.cpp
-@@ -87,6 +87,7 @@
+diff --git a/src/mln/style/layers/circle_layer.cpp b/src/mln/style/layers/circle_layer.cpp
+index 522f8a2030d7..cc4ba986b71a 100644
+--- a/src/mln/style/layers/circle_layer.cpp
++++ b/src/mln/style/layers/circle_layer.cpp
+@@ -103,6 +103,7 @@ void CircleLayer::setCircleBlurTransition(const TransitionOptions& options) {
      auto impl_ = mutableImpl();
-     impl_->paint.template get<RasterBrightnessMax>().options = options;
+     impl_->paint.template get<CircleBlur>().options = options;
      baseImpl = std::move(impl_);
 +    observer->onLayerChanged(*this);
  }
  
- TransitionOptions RasterLayer::getRasterBrightnessMaxTransition() const {
-@@ -114,6 +115,7 @@
+ TransitionOptions CircleLayer::getCircleBlurTransition() const {
+@@ -130,6 +131,7 @@ void CircleLayer::setCircleColorTransition(const TransitionOptions& options) {
      auto impl_ = mutableImpl();
-     impl_->paint.template get<RasterBrightnessMin>().options = options;
+     impl_->paint.template get<CircleColor>().options = options;
      baseImpl = std::move(impl_);
 +    observer->onLayerChanged(*this);
  }
  
- TransitionOptions RasterLayer::getRasterBrightnessMinTransition() const {
-@@ -141,6 +143,7 @@
+ TransitionOptions CircleLayer::getCircleColorTransition() const {
+@@ -157,6 +159,7 @@ void CircleLayer::setCircleOpacityTransition(const TransitionOptions& options) {
      auto impl_ = mutableImpl();
-     impl_->paint.template get<RasterContrast>().options = options;
+     impl_->paint.template get<CircleOpacity>().options = options;
      baseImpl = std::move(impl_);
 +    observer->onLayerChanged(*this);
  }
  
- TransitionOptions RasterLayer::getRasterContrastTransition() const {
-@@ -168,6 +171,7 @@
+ TransitionOptions CircleLayer::getCircleOpacityTransition() const {
+@@ -184,6 +187,7 @@ void CircleLayer::setCirclePitchAlignmentTransition(const TransitionOptions& opt
      auto impl_ = mutableImpl();
-     impl_->paint.template get<RasterFadeDuration>().options = options;
+     impl_->paint.template get<CirclePitchAlignment>().options = options;
      baseImpl = std::move(impl_);
 +    observer->onLayerChanged(*this);
  }
  
- TransitionOptions RasterLayer::getRasterFadeDurationTransition() const {
-@@ -195,6 +199,7 @@
+ TransitionOptions CircleLayer::getCirclePitchAlignmentTransition() const {
+@@ -211,6 +215,7 @@ void CircleLayer::setCirclePitchScaleTransition(const TransitionOptions& options
      auto impl_ = mutableImpl();
-     impl_->paint.template get<RasterHueRotate>().options = options;
+     impl_->paint.template get<CirclePitchScale>().options = options;
      baseImpl = std::move(impl_);
 +    observer->onLayerChanged(*this);
  }
  
- TransitionOptions RasterLayer::getRasterHueRotateTransition() const {
-@@ -222,6 +227,7 @@
+ TransitionOptions CircleLayer::getCirclePitchScaleTransition() const {
+@@ -238,6 +243,7 @@ void CircleLayer::setCircleRadiusTransition(const TransitionOptions& options) {
      auto impl_ = mutableImpl();
-     impl_->paint.template get<RasterOpacity>().options = options;
+     impl_->paint.template get<CircleRadius>().options = options;
      baseImpl = std::move(impl_);
 +    observer->onLayerChanged(*this);
  }
  
- TransitionOptions RasterLayer::getRasterOpacityTransition() const {
-@@ -249,6 +255,7 @@
+ TransitionOptions CircleLayer::getCircleRadiusTransition() const {
+@@ -265,6 +271,7 @@ void CircleLayer::setCircleStrokeColorTransition(const TransitionOptions& option
      auto impl_ = mutableImpl();
-     impl_->paint.template get<RasterResampling>().options = options;
+     impl_->paint.template get<CircleStrokeColor>().options = options;
      baseImpl = std::move(impl_);
 +    observer->onLayerChanged(*this);
  }
  
- TransitionOptions RasterLayer::getRasterResamplingTransition() const {
-@@ -276,6 +283,7 @@
+ TransitionOptions CircleLayer::getCircleStrokeColorTransition() const {
+@@ -292,6 +299,7 @@ void CircleLayer::setCircleStrokeOpacityTransition(const TransitionOptions& opti
      auto impl_ = mutableImpl();
-     impl_->paint.template get<RasterSaturation>().options = options;
+     impl_->paint.template get<CircleStrokeOpacity>().options = options;
      baseImpl = std::move(impl_);
 +    observer->onLayerChanged(*this);
  }
  
- TransitionOptions RasterLayer::getRasterSaturationTransition() const {
+ TransitionOptions CircleLayer::getCircleStrokeOpacityTransition() const {
+@@ -319,6 +327,7 @@ void CircleLayer::setCircleStrokeWidthTransition(const TransitionOptions& option
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<CircleStrokeWidth>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions CircleLayer::getCircleStrokeWidthTransition() const {
+@@ -346,6 +355,7 @@ void CircleLayer::setCircleTranslateTransition(const TransitionOptions& options)
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<CircleTranslate>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions CircleLayer::getCircleTranslateTransition() const {
+@@ -373,6 +383,7 @@ void CircleLayer::setCircleTranslateAnchorTransition(const TransitionOptions& op
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<CircleTranslateAnchor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions CircleLayer::getCircleTranslateAnchorTransition() const {
 diff --git a/src/mln/style/layers/color_relief_layer.cpp b/src/mln/style/layers/color_relief_layer.cpp
+index 7427f46b940f..cac7dd33b3ae 100644
 --- a/src/mln/style/layers/color_relief_layer.cpp
 +++ b/src/mln/style/layers/color_relief_layer.cpp
-@@ -87,6 +87,7 @@
+@@ -87,6 +87,7 @@ void ColorReliefLayer::setColorReliefColorTransition(const TransitionOptions& op
      auto impl_ = mutableImpl();
      impl_->paint.template get<ColorReliefColor>().options = options;
      baseImpl = std::move(impl_);
@@ -844,7 +194,7 @@ diff --git a/src/mln/style/layers/color_relief_layer.cpp b/src/mln/style/layers/
  }
  
  TransitionOptions ColorReliefLayer::getColorReliefColorTransition() const {
-@@ -114,6 +115,7 @@
+@@ -114,6 +115,7 @@ void ColorReliefLayer::setColorReliefOpacityTransition(const TransitionOptions&
      auto impl_ = mutableImpl();
      impl_->paint.template get<ColorReliefOpacity>().options = options;
      baseImpl = std::move(impl_);
@@ -852,10 +202,251 @@ diff --git a/src/mln/style/layers/color_relief_layer.cpp b/src/mln/style/layers/
  }
  
  TransitionOptions ColorReliefLayer::getColorReliefOpacityTransition() const {
+diff --git a/src/mln/style/layers/fill_extrusion_layer.cpp b/src/mln/style/layers/fill_extrusion_layer.cpp
+index 7f5580b9edbe..7fae3ceb1893 100644
+--- a/src/mln/style/layers/fill_extrusion_layer.cpp
++++ b/src/mln/style/layers/fill_extrusion_layer.cpp
+@@ -103,6 +103,7 @@ void FillExtrusionLayer::setFillExtrusionBaseTransition(const TransitionOptions&
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillExtrusionBase>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillExtrusionLayer::getFillExtrusionBaseTransition() const {
+@@ -130,6 +131,7 @@ void FillExtrusionLayer::setFillExtrusionColorTransition(const TransitionOptions
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillExtrusionColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillExtrusionLayer::getFillExtrusionColorTransition() const {
+@@ -157,6 +159,7 @@ void FillExtrusionLayer::setFillExtrusionHeightTransition(const TransitionOption
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillExtrusionHeight>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillExtrusionLayer::getFillExtrusionHeightTransition() const {
+@@ -184,6 +187,7 @@ void FillExtrusionLayer::setFillExtrusionOpacityTransition(const TransitionOptio
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillExtrusionOpacity>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillExtrusionLayer::getFillExtrusionOpacityTransition() const {
+@@ -211,6 +215,7 @@ void FillExtrusionLayer::setFillExtrusionPatternTransition(const TransitionOptio
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillExtrusionPattern>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillExtrusionLayer::getFillExtrusionPatternTransition() const {
+@@ -238,6 +243,7 @@ void FillExtrusionLayer::setFillExtrusionTranslateTransition(const TransitionOpt
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillExtrusionTranslate>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillExtrusionLayer::getFillExtrusionTranslateTransition() const {
+@@ -265,6 +271,7 @@ void FillExtrusionLayer::setFillExtrusionTranslateAnchorTransition(const Transit
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillExtrusionTranslateAnchor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillExtrusionLayer::getFillExtrusionTranslateAnchorTransition() const {
+@@ -292,6 +299,7 @@ void FillExtrusionLayer::setFillExtrusionVerticalGradientTransition(const Transi
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillExtrusionVerticalGradient>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillExtrusionLayer::getFillExtrusionVerticalGradientTransition() const {
+diff --git a/src/mln/style/layers/fill_layer.cpp b/src/mln/style/layers/fill_layer.cpp
+index 79d04339cd3f..5492ee35dbde 100644
+--- a/src/mln/style/layers/fill_layer.cpp
++++ b/src/mln/style/layers/fill_layer.cpp
+@@ -103,6 +103,7 @@ void FillLayer::setFillAntialiasTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillAntialias>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillLayer::getFillAntialiasTransition() const {
+@@ -130,6 +131,7 @@ void FillLayer::setFillColorTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillLayer::getFillColorTransition() const {
+@@ -157,6 +159,7 @@ void FillLayer::setFillOpacityTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillOpacity>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillLayer::getFillOpacityTransition() const {
+@@ -184,6 +187,7 @@ void FillLayer::setFillOutlineColorTransition(const TransitionOptions& options)
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillOutlineColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillLayer::getFillOutlineColorTransition() const {
+@@ -211,6 +215,7 @@ void FillLayer::setFillPatternTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillPattern>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillLayer::getFillPatternTransition() const {
+@@ -238,6 +243,7 @@ void FillLayer::setFillTranslateTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillTranslate>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillLayer::getFillTranslateTransition() const {
+@@ -265,6 +271,7 @@ void FillLayer::setFillTranslateAnchorTransition(const TransitionOptions& option
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<FillTranslateAnchor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions FillLayer::getFillTranslateAnchorTransition() const {
+diff --git a/src/mln/style/layers/heatmap_layer.cpp b/src/mln/style/layers/heatmap_layer.cpp
+index 2be73fe01458..f45d76bb7715 100644
+--- a/src/mln/style/layers/heatmap_layer.cpp
++++ b/src/mln/style/layers/heatmap_layer.cpp
+@@ -89,6 +89,7 @@ void HeatmapLayer::setHeatmapColorTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HeatmapColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HeatmapLayer::getHeatmapColorTransition() const {
+@@ -116,6 +117,7 @@ void HeatmapLayer::setHeatmapIntensityTransition(const TransitionOptions& option
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HeatmapIntensity>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HeatmapLayer::getHeatmapIntensityTransition() const {
+@@ -143,6 +145,7 @@ void HeatmapLayer::setHeatmapOpacityTransition(const TransitionOptions& options)
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HeatmapOpacity>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HeatmapLayer::getHeatmapOpacityTransition() const {
+@@ -170,6 +173,7 @@ void HeatmapLayer::setHeatmapRadiusTransition(const TransitionOptions& options)
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HeatmapRadius>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HeatmapLayer::getHeatmapRadiusTransition() const {
+@@ -197,6 +201,7 @@ void HeatmapLayer::setHeatmapWeightTransition(const TransitionOptions& options)
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HeatmapWeight>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HeatmapLayer::getHeatmapWeightTransition() const {
+diff --git a/src/mln/style/layers/hillshade_layer.cpp b/src/mln/style/layers/hillshade_layer.cpp
+index 1255f7a92cfc..bfc30362b59c 100644
+--- a/src/mln/style/layers/hillshade_layer.cpp
++++ b/src/mln/style/layers/hillshade_layer.cpp
+@@ -87,6 +87,7 @@ void HillshadeLayer::setHillshadeAccentColorTransition(const TransitionOptions&
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HillshadeAccentColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HillshadeLayer::getHillshadeAccentColorTransition() const {
+@@ -114,6 +115,7 @@ void HillshadeLayer::setHillshadeExaggerationTransition(const TransitionOptions&
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HillshadeExaggeration>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HillshadeLayer::getHillshadeExaggerationTransition() const {
+@@ -141,6 +143,7 @@ void HillshadeLayer::setHillshadeHighlightColorTransition(const TransitionOption
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HillshadeHighlightColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HillshadeLayer::getHillshadeHighlightColorTransition() const {
+@@ -168,6 +171,7 @@ void HillshadeLayer::setHillshadeIlluminationAltitudeTransition(const Transition
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HillshadeIlluminationAltitude>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HillshadeLayer::getHillshadeIlluminationAltitudeTransition() const {
+@@ -195,6 +199,7 @@ void HillshadeLayer::setHillshadeIlluminationAnchorTransition(const TransitionOp
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HillshadeIlluminationAnchor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HillshadeLayer::getHillshadeIlluminationAnchorTransition() const {
+@@ -222,6 +227,7 @@ void HillshadeLayer::setHillshadeIlluminationDirectionTransition(const Transitio
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HillshadeIlluminationDirection>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HillshadeLayer::getHillshadeIlluminationDirectionTransition() const {
+@@ -249,6 +255,7 @@ void HillshadeLayer::setHillshadeMethodTransition(const TransitionOptions& optio
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HillshadeMethod>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HillshadeLayer::getHillshadeMethodTransition() const {
+@@ -276,6 +283,7 @@ void HillshadeLayer::setHillshadeShadowColorTransition(const TransitionOptions&
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<HillshadeShadowColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions HillshadeLayer::getHillshadeShadowColorTransition() const {
 diff --git a/src/mln/style/layers/layer.cpp.ejs b/src/mln/style/layers/layer.cpp.ejs
+index 81748c5c68d9..1454b02e5c71 100644
 --- a/src/mln/style/layers/layer.cpp.ejs
 +++ b/src/mln/style/layers/layer.cpp.ejs
-@@ -212,6 +212,7 @@
+@@ -212,6 +212,7 @@ void <%- camelize(type) %>Layer::set<%- camelize(property.name) %>Transition(con
      auto impl_ = mutableImpl();
      impl_->paint.template get<<%- camelize(property.name) %>>().options = options;
      baseImpl = std::move(impl_);
@@ -863,21 +454,536 @@ diff --git a/src/mln/style/layers/layer.cpp.ejs b/src/mln/style/layers/layer.cpp
  }
  
  TransitionOptions <%- camelize(type) %>Layer::get<%- camelize(property.name) %>Transition() const {
+diff --git a/src/mln/style/layers/line_layer.cpp b/src/mln/style/layers/line_layer.cpp
+index 9e08e3d9458a..9410bbafa521 100644
+--- a/src/mln/style/layers/line_layer.cpp
++++ b/src/mln/style/layers/line_layer.cpp
+@@ -163,6 +163,7 @@ void LineLayer::setLineBlurTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<LineBlur>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LineLayer::getLineBlurTransition() const {
+@@ -190,6 +191,7 @@ void LineLayer::setLineColorTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<LineColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LineLayer::getLineColorTransition() const {
+@@ -217,6 +219,7 @@ void LineLayer::setLineDasharrayTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<LineDasharray>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LineLayer::getLineDasharrayTransition() const {
+@@ -244,6 +247,7 @@ void LineLayer::setLineGapWidthTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<LineGapWidth>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LineLayer::getLineGapWidthTransition() const {
+@@ -271,6 +275,7 @@ void LineLayer::setLineGradientTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<LineGradient>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LineLayer::getLineGradientTransition() const {
+@@ -298,6 +303,7 @@ void LineLayer::setLineOffsetTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<LineOffset>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LineLayer::getLineOffsetTransition() const {
+@@ -325,6 +331,7 @@ void LineLayer::setLineOpacityTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<LineOpacity>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LineLayer::getLineOpacityTransition() const {
+@@ -352,6 +359,7 @@ void LineLayer::setLinePatternTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<LinePattern>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LineLayer::getLinePatternTransition() const {
+@@ -379,6 +387,7 @@ void LineLayer::setLineTranslateTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<LineTranslate>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LineLayer::getLineTranslateTransition() const {
+@@ -406,6 +415,7 @@ void LineLayer::setLineTranslateAnchorTransition(const TransitionOptions& option
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<LineTranslateAnchor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LineLayer::getLineTranslateAnchorTransition() const {
+@@ -434,6 +444,7 @@ void LineLayer::setLineWidthTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<LineWidth>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LineLayer::getLineWidthTransition() const {
+diff --git a/src/mln/style/layers/location_indicator_layer.cpp b/src/mln/style/layers/location_indicator_layer.cpp
+index 06d020050a18..b89c32cf7342 100644
+--- a/src/mln/style/layers/location_indicator_layer.cpp
++++ b/src/mln/style/layers/location_indicator_layer.cpp
+@@ -133,6 +133,7 @@ void LocationIndicatorLayer::setAccuracyRadiusTransition(const TransitionOptions
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<AccuracyRadius>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getAccuracyRadiusTransition() const {
+@@ -160,6 +161,7 @@ void LocationIndicatorLayer::setAccuracyRadiusBorderColorTransition(const Transi
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<AccuracyRadiusBorderColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getAccuracyRadiusBorderColorTransition() const {
+@@ -187,6 +189,7 @@ void LocationIndicatorLayer::setAccuracyRadiusColorTransition(const TransitionOp
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<AccuracyRadiusColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getAccuracyRadiusColorTransition() const {
+@@ -214,6 +217,7 @@ void LocationIndicatorLayer::setBearingTransition(const TransitionOptions& optio
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<Bearing>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getBearingTransition() const {
+@@ -241,6 +245,7 @@ void LocationIndicatorLayer::setBearingAccuracyTransition(const TransitionOption
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<BearingAccuracy>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getBearingAccuracyTransition() const {
+@@ -268,6 +273,7 @@ void LocationIndicatorLayer::setBearingAccuracyColorTransition(const TransitionO
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<BearingAccuracyColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getBearingAccuracyColorTransition() const {
+@@ -295,6 +301,7 @@ void LocationIndicatorLayer::setBearingAccuracyRadiusTransition(const Transition
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<BearingAccuracyRadius>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getBearingAccuracyRadiusTransition() const {
+@@ -322,6 +329,7 @@ void LocationIndicatorLayer::setBearingImageSizeTransition(const TransitionOptio
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<BearingImageSize>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getBearingImageSizeTransition() const {
+@@ -349,6 +357,7 @@ void LocationIndicatorLayer::setImageTiltDisplacementTransition(const Transition
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<ImageTiltDisplacement>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getImageTiltDisplacementTransition() const {
+@@ -376,6 +385,7 @@ void LocationIndicatorLayer::setLocationTransition(const TransitionOptions& opti
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<Location>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getLocationTransition() const {
+@@ -403,6 +413,7 @@ void LocationIndicatorLayer::setPerspectiveCompensationTransition(const Transiti
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<PerspectiveCompensation>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getPerspectiveCompensationTransition() const {
+@@ -430,6 +441,7 @@ void LocationIndicatorLayer::setShadowImageSizeTransition(const TransitionOption
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<ShadowImageSize>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getShadowImageSizeTransition() const {
+@@ -457,6 +469,7 @@ void LocationIndicatorLayer::setTopImageSizeTransition(const TransitionOptions&
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<TopImageSize>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions LocationIndicatorLayer::getTopImageSizeTransition() const {
+diff --git a/src/mln/style/layers/raster_layer.cpp b/src/mln/style/layers/raster_layer.cpp
+index e9ae47813a7a..f848a28b8915 100644
+--- a/src/mln/style/layers/raster_layer.cpp
++++ b/src/mln/style/layers/raster_layer.cpp
+@@ -87,6 +87,7 @@ void RasterLayer::setRasterBrightnessMaxTransition(const TransitionOptions& opti
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<RasterBrightnessMax>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions RasterLayer::getRasterBrightnessMaxTransition() const {
+@@ -114,6 +115,7 @@ void RasterLayer::setRasterBrightnessMinTransition(const TransitionOptions& opti
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<RasterBrightnessMin>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions RasterLayer::getRasterBrightnessMinTransition() const {
+@@ -141,6 +143,7 @@ void RasterLayer::setRasterContrastTransition(const TransitionOptions& options)
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<RasterContrast>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions RasterLayer::getRasterContrastTransition() const {
+@@ -168,6 +171,7 @@ void RasterLayer::setRasterFadeDurationTransition(const TransitionOptions& optio
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<RasterFadeDuration>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions RasterLayer::getRasterFadeDurationTransition() const {
+@@ -195,6 +199,7 @@ void RasterLayer::setRasterHueRotateTransition(const TransitionOptions& options)
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<RasterHueRotate>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions RasterLayer::getRasterHueRotateTransition() const {
+@@ -222,6 +227,7 @@ void RasterLayer::setRasterOpacityTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<RasterOpacity>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions RasterLayer::getRasterOpacityTransition() const {
+@@ -249,6 +255,7 @@ void RasterLayer::setRasterResamplingTransition(const TransitionOptions& options
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<RasterResampling>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions RasterLayer::getRasterResamplingTransition() const {
+@@ -276,6 +283,7 @@ void RasterLayer::setRasterSaturationTransition(const TransitionOptions& options
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<RasterSaturation>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions RasterLayer::getRasterSaturationTransition() const {
+diff --git a/src/mln/style/layers/symbol_layer.cpp b/src/mln/style/layers/symbol_layer.cpp
+index dd5ccf081467..1ec9862a4aaf 100644
+--- a/src/mln/style/layers/symbol_layer.cpp
++++ b/src/mln/style/layers/symbol_layer.cpp
+@@ -733,6 +733,7 @@ void SymbolLayer::setIconColorTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<IconColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getIconColorTransition() const {
+@@ -760,6 +761,7 @@ void SymbolLayer::setIconHaloBlurTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<IconHaloBlur>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getIconHaloBlurTransition() const {
+@@ -787,6 +789,7 @@ void SymbolLayer::setIconHaloColorTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<IconHaloColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getIconHaloColorTransition() const {
+@@ -814,6 +817,7 @@ void SymbolLayer::setIconHaloWidthTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<IconHaloWidth>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getIconHaloWidthTransition() const {
+@@ -841,6 +845,7 @@ void SymbolLayer::setIconOpacityTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<IconOpacity>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getIconOpacityTransition() const {
+@@ -868,6 +873,7 @@ void SymbolLayer::setIconTranslateTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<IconTranslate>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getIconTranslateTransition() const {
+@@ -895,6 +901,7 @@ void SymbolLayer::setIconTranslateAnchorTransition(const TransitionOptions& opti
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<IconTranslateAnchor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getIconTranslateAnchorTransition() const {
+@@ -922,6 +929,7 @@ void SymbolLayer::setTextColorTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<TextColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getTextColorTransition() const {
+@@ -949,6 +957,7 @@ void SymbolLayer::setTextHaloBlurTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<TextHaloBlur>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getTextHaloBlurTransition() const {
+@@ -976,6 +985,7 @@ void SymbolLayer::setTextHaloColorTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<TextHaloColor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getTextHaloColorTransition() const {
+@@ -1003,6 +1013,7 @@ void SymbolLayer::setTextHaloWidthTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<TextHaloWidth>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getTextHaloWidthTransition() const {
+@@ -1030,6 +1041,7 @@ void SymbolLayer::setTextOpacityTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<TextOpacity>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getTextOpacityTransition() const {
+@@ -1057,6 +1069,7 @@ void SymbolLayer::setTextTranslateTransition(const TransitionOptions& options) {
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<TextTranslate>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getTextTranslateTransition() const {
+@@ -1084,6 +1097,7 @@ void SymbolLayer::setTextTranslateAnchorTransition(const TransitionOptions& opti
+     auto impl_ = mutableImpl();
+     impl_->paint.template get<TextTranslateAnchor>().options = options;
+     baseImpl = std::move(impl_);
++    observer->onLayerChanged(*this);
+ }
+ 
+ TransitionOptions SymbolLayer::getTextTranslateAnchorTransition() const {
+diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
+index 5c9634227e40..6240b4106283 100644
+--- a/src/mln/style/style_impl.cpp
++++ b/src/mln/style/style_impl.cpp
+@@ -160,7 +160,11 @@ std::string Style::Impl::getURL() const {
+ }
+ 
+ void Style::Impl::setTransitionOptions(const TransitionOptions& options) {
++    if (transitionOptions.duration == options.duration && transitionOptions.delay == options.delay &&
++        transitionOptions.enablePlacementTransitions == options.enablePlacementTransitions)
++        return;
+     transitionOptions = options;
++    observer->onUpdate();
+ }
+ 
+ namespace {
+@@ -254,6 +258,7 @@ void Style::Impl::addSource(std::unique_ptr<Source> source) {
+     if (fileSource) {
+         item->loadDescription(*fileSource);
+     }
++    observer->onUpdate();
+ }
+ 
+ std::unique_ptr<Source> Style::Impl::removeSource(const std::string& id) {
+@@ -269,6 +274,7 @@ std::unique_ptr<Source> Style::Impl::removeSource(const std::string& id) {
+ 
+     if (source) {
+         source->setObserver(nullptr);
++        observer->onUpdate();
+     }
+ 
+     return source;
+@@ -410,6 +416,7 @@ void Style::Impl::removeImage(const std::string& id) {
+     }
+     newImages->erase(found);
+     images = std::move(newImages);
++    observer->onUpdate();
+ }
+ 
+ std::optional<Immutable<style::Image::Impl>> Style::Impl::getImage(const std::string& id) const {
+diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
+index fb3fba226b51..1464d2bd7535 100644
+--- a/test/map/map.test.cpp
++++ b/test/map/map.test.cpp
+@@ -2466,3 +2466,37 @@ TEST(Map, LocationIndicatorAccuracyColorsTransition) {
+     }
+     EXPECT_GT(greenPixels, 0u) << "The accuracy border should finish transitioning to green";
+ }
++
++TEST(Map, TileSelectionOptionsPublishUpdates) {
++    util::RunLoop loop;
++    class Frontend final : public RendererFrontend {
++    public:
++        std::shared_ptr<UpdateParameters> parameters;
++        TaggedScheduler scheduler{Scheduler::GetBackground(), {}};
++        void reset() override {}
++        void setObserver(RendererObserver&) override {}
++        void update(std::shared_ptr<UpdateParameters> value) override { parameters = std::move(value); }
++        const TaggedScheduler& getThreadPool() const override { return scheduler; }
++    } frontend;
++    StubMapObserver observer;
++    MapAdapter map{
++        frontend, observer, std::make_shared<StubFileSource>(), MapOptions().withMapMode(MapMode::Continuous)};
++    map.getStyle().loadJSON(R"({"version":8,"sources":{},"layers":[]})");
++    ASSERT_TRUE(frontend.parameters);
++
++    const auto check = [&](auto setter, auto member, auto value) {
++        const auto before = frontend.parameters;
++        (map.*setter)(value);
++        EXPECT_NE(before, frontend.parameters);
++        EXPECT_EQ(value, frontend.parameters.get()->*member);
++        const auto after = frontend.parameters;
++        (map.*setter)(value);
++        EXPECT_EQ(after, frontend.parameters);
++    };
++    check(&Map::setPrefetchZoomDelta, &UpdateParameters::prefetchZoomDelta, uint8_t{2});
++    check(&Map::setTileLodMinRadius, &UpdateParameters::tileLodMinRadius, 4.0);
++    check(&Map::setTileLodScale, &UpdateParameters::tileLodScale, 2.0);
++    check(&Map::setTileLodPitchThreshold, &UpdateParameters::tileLodPitchThreshold, 0.5);
++    check(&Map::setTileLodZoomShift, &UpdateParameters::tileLodZoomShift, 1.0);
++    check(&Map::setTileLodMode, &UpdateParameters::tileLodMode, TileLodMode::Distance);
++}
 diff --git a/test/style/style.test.cpp b/test/style/style.test.cpp
+index 374109a281f0..b89c38f110c2 100644
 --- a/test/style/style.test.cpp
 +++ b/test/style/style.test.cpp
-@@ -4,6 +4,7 @@
- #include <mln/test/fixture_log_observer.hpp>
- 
- #include <mln/style/style_impl.hpp>
+@@ -1,4 +1,8 @@
+ #include <chrono>
++#include <mln/style/image.hpp>
 +#include <mln/style/layers/line_layer_impl.hpp>
- #include <mln/style/source_impl.hpp>
- #include <mln/style/sources/vector_source.hpp>
- #include <mln/style/layer.hpp>
-@@ -473,3 +474,22 @@
++#include <mln/style/observer.hpp>
++#include <mln/style/sources/geojson_source.hpp>
+ #include <mln/test/util.hpp>
+ #include <mln/test/stub_file_source.hpp>
+ #include <mln/test/fixture_log_observer.hpp>
+@@ -473,3 +477,100 @@ TEST(Style, AddRemoveRemoveImage) {
      EXPECT_FALSE(!!style.getImage("two"));
      EXPECT_FALSE(!!style.getImage("four"));
  }
++
++TEST(Style, SourceCollectionPublishesUpdates) {
++    util::RunLoop loop;
++    auto fileSource = std::make_shared<StubFileSource>();
++    Style::Impl style{fileSource, 1.0, {Scheduler::GetBackground(), {}}};
++    style.loadJSON(R"({"version":8,"sources":{},"layers":[]})");
++    style.addLayer(std::make_unique<LineLayer>("line", "late"));
++
++    struct Observer final : style::Observer {
++        Style::Impl& style;
++        Immutable<std::vector<Immutable<Source::Impl>>> sources;
++        explicit Observer(Style::Impl& style_)
++            : style(style_),
++              sources(style.getSourceImpls()) {}
++        void onUpdate() override { sources = style.getSourceImpls(); }
++    } observer{style};
++    style.setObserver(&observer);
++
++    style.addSource(std::make_unique<GeoJSONSource>("late"));
++    EXPECT_EQ(style.getSourceImpls(), observer.sources);
++
++    style.removeLayer("line");
++    ASSERT_TRUE(style.removeSource("late"));
++    EXPECT_TRUE(observer.sources->empty());
++}
++
++TEST(Style, ImageRemovalPublishesUpdates) {
++    util::RunLoop loop;
++    auto fileSource = std::make_shared<StubFileSource>();
++    Style::Impl style{fileSource, 1.0, {Scheduler::GetBackground(), {}}};
++    style.loadJSON(R"({"version":8,"sources":{},"layers":[]})");
++    style.addImage(std::make_unique<style::Image>("image", PremultipliedImage({1, 1}), 1.0f));
++
++    struct Observer final : style::Observer {
++        Style::Impl& style;
++        Immutable<std::vector<Immutable<style::Image::Impl>>> images;
++        explicit Observer(Style::Impl& style_)
++            : style(style_),
++              images(style.getImageImpls()) {}
++        void onUpdate() override { images = style.getImageImpls(); }
++    } observer{style};
++    style.setObserver(&observer);
++    ASSERT_EQ(1u, observer.images->size());
++
++    style.removeImage("image");
++    EXPECT_TRUE(observer.images->empty());
++}
 +
 +TEST(Style, LayerTransitionRefreshesImmutableCollection) {
 +    util::RunLoop loop;
@@ -888,6 +994,7 @@ diff --git a/test/style/style.test.cpp b/test/style/style.test.cpp
 +    auto* line = layer.get();
 +    style.addLayer(std::move(layer));
 +    const auto before = style.getLayerImpls();
++
 +    line->setLineColorTransition({Milliseconds(123), Milliseconds(45)});
 +    const auto after = style.getLayerImpls();
 +    EXPECT_NE(before, after);
@@ -896,4 +1003,34 @@ diff --git a/test/style/style.test.cpp b/test/style/style.test.cpp
 +    const auto& impl = static_cast<const LineLayer::Impl&>(*after->front());
 +    EXPECT_EQ(Milliseconds(123), impl.paint.get<LineColor>().options.duration);
 +    EXPECT_EQ(Milliseconds(45), impl.paint.get<LineColor>().options.delay);
++}
++
++TEST(Style, TransitionOptionsPublishUpdates) {
++    util::RunLoop loop;
++    auto fileSource = std::make_shared<StubFileSource>();
++    Style::Impl style{fileSource, 1.0, {Scheduler::GetBackground(), {}}};
++    style.loadJSON(R"({"version":8,"sources":{},"layers":[]})");
++    struct Observer final : style::Observer {
++        Style::Impl& style;
++        TransitionOptions options;
++        size_t updates = 0;
++        explicit Observer(Style::Impl& style_)
++            : style(style_),
++              options(style.getTransitionOptions()) {}
++        void onUpdate() override {
++            options = style.getTransitionOptions();
++            ++updates;
++        }
++    } observer{style};
++    style.setObserver(&observer);
++
++    style.setTransitionOptions({Milliseconds(123), Milliseconds(45)});
++    EXPECT_EQ(Milliseconds(123), observer.options.duration);
++    EXPECT_EQ(Milliseconds(45), observer.options.delay);
++    style.setTransitionOptions({Milliseconds(123), Milliseconds(45), false});
++    EXPECT_FALSE(observer.options.enablePlacementTransitions);
++
++    const auto updates = observer.updates;
++    style.setTransitionOptions({Milliseconds(123), Milliseconds(45), false});
++    EXPECT_EQ(updates, observer.updates);
 +}
