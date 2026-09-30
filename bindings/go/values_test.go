@@ -63,6 +63,18 @@ func TestPresenceFieldsRoundTrip(t *testing.T) {
 	if missing := await(t, submitted(f.m.GetStyleImageInfo("missing"))); missing != nil {
 		t.Fatalf("GetStyleImageInfo(missing) = %+v, want nil", missing)
 	}
+
+	// Go cannot default a struct field to true, so the placement switch is an
+	// optional field too: a literal that sets only a duration leaves it on.
+	duration := 250.0
+	awaitCommitted(t, submitted(f.m.SetStyleTransitionOptions(StyleTransitionOptions{DurationMs: &duration})))
+	transitions := await(t, submitted(f.m.GetStyleTransitionOptions()))
+	if transitions.DurationMs == nil || *transitions.DurationMs != duration || transitions.DelayMs != nil {
+		t.Fatalf("transition options = %+v, want only the duration set", transitions)
+	}
+	if transitions.EnablePlacementTransitions == nil || !*transitions.EnablePlacementTransitions {
+		t.Fatal("a duration-only literal turned the placement cross-fade off")
+	}
 }
 
 // Array and byte inputs are copied when the call submits them, so changing

@@ -43,8 +43,6 @@
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleJsonTests.cs" = 18
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleLayerTests.cs" = 1
 "bindings/go/resource_test.go" = 2
-"bindings/go/style_layers_test.go" = 2
-"bindings/go/style_sources_test.go" = 7
 "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/map/MapHandleTest.kt" = 19
 "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeHandleTest.kt" = 5
 "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/internal/status/StatusTest.kt" = 1
