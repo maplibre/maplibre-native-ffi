@@ -180,8 +180,8 @@ sentence-level style, page structure, and project terminology.
 - Example apps don't need tests.
 - Every test skip should be strictly justified. We do not skip rendering tests
   because the CI environment doesn't support them; we fix the environment.
-- The C tests call every exported function by name.
-  `mise run check-export-calls` enforces this against
+- The C ABI suite calls every exported function by name; calls from the internal
+  suite don't count. `mise run check-export-calls` enforces this against
   `tests/uncalled-exports.txt`, which only shrinks.
 - Before deleting a binding test, run `mise run coverage` for that binding and
   for `native`, then

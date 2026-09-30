@@ -1,5 +1,6 @@
-# Exported functions that no C test calls yet, one per line.
+# Exported functions that no C ABI test calls yet, one per line. Calls from
+# tests/native/internal do not count.
 # `mise run check-export-calls` fails when an exported function is uncalled and
 # missing here, and when a function listed here is called. This list only
-# shrinks: call a function from the C tests, then drop its line.
+# shrinks: call a function from the ABI suite, then drop its line.
 mln_android_init

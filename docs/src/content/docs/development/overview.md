@@ -337,7 +337,9 @@ checked.
 
 `mise run check-export-calls` runs with the other repository checks. It fails
 when a function that a public header declares with `MLN_API` appears by name in
-no C test source. A name inside a macro counts only when a test uses that macro.
-`tests/uncalled-exports.txt` lists the functions that no C test calls yet. The
+no source of the C ABI suite, which is `tests/native` outside `internal/`. The
+internal suite links the static library, so its calls prove nothing about the
+export. A name inside a macro counts only when a test uses that macro.
+`tests/uncalled-exports.txt` lists the functions that no ABI test calls yet. The
 check also fails when a listed function is called, so the list only shrinks;
 `mise run check-export-calls --prune` removes those names.
