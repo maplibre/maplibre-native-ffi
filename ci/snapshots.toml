@@ -84,6 +84,8 @@ shared = [
   "!tests/bindgen/**",
   "!tests/graphics/**",
   "!tests/native/**",
+  "!tests/conformance/**",
+  "!scripts/check-conformance.py",
   "!tests/uncalled-exports.txt",
   "!scripts/check-export-calls.py",
   "!scripts/check-exports.py",

@@ -1,0 +1,38 @@
+# Maps each case in cases.toml to the dotnet test that covers it:
+#   "ID" = "path/to/test_file::test_name"
+# or to why it does not apply:
+#   "ID" = { na = "reason" }
+
+[cases]
+"ERR-01" = { todo = true }
+"ERR-02" = { todo = true }
+"LIFE-01" = { todo = true }
+"LIFE-02" = { todo = true }
+"LIFE-03" = { todo = true }
+"LIFE-04" = { todo = true }
+"LIFE-05" = { todo = true }
+"COMP-01" = { todo = true }
+"COMP-02" = { todo = true }
+"COMP-03" = { todo = true }
+"COMP-04" = { todo = true }
+"COMP-05" = { todo = true }
+"CB-01" = { todo = true }
+"CB-02" = { todo = true }
+"CB-03" = { todo = true }
+"CB-04" = { todo = true }
+"CB-05" = { todo = true }
+"CB-06" = { todo = true }
+"CB-07" = { todo = true }
+"CB-08" = { todo = true }
+"VAL-01" = { todo = true }
+"VAL-02" = { todo = true }
+"VAL-03" = { todo = true }
+"VAL-04" = { todo = true }
+"VAL-05" = { todo = true }
+"VIEW-01" = { todo = true }
+"REND-01" = { todo = true }
+"REND-02" = { todo = true }
+"PLAT-01" = { todo = true }
+"PLAT-02" = { todo = true }
+"PLAT-03" = { todo = true }
+"EX-01" = { todo = true }
