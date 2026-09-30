@@ -126,6 +126,7 @@ runs:
       if: ${{ runner.os == 'Linux' && startsWith(inputs.target, 'linux-') }}
       shell: bash
       run: |
+        # xvfb-run needs xauth, which xvfb only recommends.
         sudo apt-get update
         sudo apt-get install --no-install-recommends --yes \
           libegl-mesa0 \
@@ -134,6 +135,7 @@ runs:
           mesa-utils \
           mesa-utils-extra \
           mesa-vulkan-drivers \
+          xauth \
           xvfb
         # Software rendering is slower than hardware, so the native suites
         # stretch their waits and hang watchdog to match.
