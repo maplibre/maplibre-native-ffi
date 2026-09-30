@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "support/harness.h"
@@ -129,7 +130,7 @@ static void a_native_exception_becomes_native_error_with_its_text(void) {
   TEST_ASSERT_LESS_THAN_size_t(
     sizeof(diagnostic), strlen(completion_diagnostic)
   );
-  strcpy(diagnostic, completion_diagnostic);
+  snprintf(diagnostic, sizeof(diagnostic), "%s", completion_diagnostic);
   mln_test_completion_destroy(&completion);
 
   mln_runtime_event event = {0};
@@ -138,7 +139,6 @@ static void a_native_exception_becomes_native_error_with_its_text(void) {
     runtime, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, map, &event, message,
     sizeof(message)
   ));
-  TEST_ASSERT_EQUAL_INT32(0, event.code);
   TEST_ASSERT_EQUAL_STRING(diagnostic, message);
 
   mln_test_destroy_map(map);

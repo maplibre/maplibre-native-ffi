@@ -98,6 +98,13 @@ static void runtime_creation_validates_its_options(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&defaults, NULL, NULL)
   );
+
+  // The output must point to the null handle, and a rejection leaves it as is.
+  runtime = (mln_runtime)1;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&defaults, &runtime, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT64(1, runtime);
 }
 
 // Every runtime entry point that takes a handle, called with one.
@@ -188,9 +195,9 @@ static void map_options_with_unknown_mode(void* descriptor) {
 
 static const mln_test_validation_case map_creation_cases[] = {
   {"undersized", map_options_with_small_size, MLN_STATUS_INVALID_ARGUMENT,
-   NULL},
+   "mln_map_options.size"},
   {"unknown map mode", map_options_with_unknown_mode,
-   MLN_STATUS_INVALID_ARGUMENT, NULL},
+   MLN_STATUS_INVALID_ARGUMENT, "map_mode"},
 };
 
 static mln_status create_map_from(

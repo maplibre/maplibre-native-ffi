@@ -173,19 +173,11 @@ static void a_fresh_map_and_runtime_select_every_event_type(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Creation rejects a mask the setters reject, so one value is not accepted at
-// creation and then refused on the way back through a read-modify-write.
+// Map creation rejects a mask the setter rejects, so one value is not accepted
+// at creation and then refused on the way back through a read-modify-write.
+// The runtime options have the same check in lifecycle.c.
 static void options_reject_unknown_event_mask_bits(void) {
   const uint64_t unknown = UINT64_C(1) << 40U;
-
-  mln_runtime_options runtime_options = mln_runtime_options_default();
-  runtime_options.event_mask = MLN_RUNTIME_EVENT_MASK_ALL | unknown;
-  mln_runtime bad_runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_create(&runtime_options, &bad_runtime, NULL)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, bad_runtime);
 
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options map_options = mln_map_options_default();

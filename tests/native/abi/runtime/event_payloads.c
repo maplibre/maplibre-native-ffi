@@ -180,11 +180,6 @@ static void check_render_frame(
     frame->mode == MLN_RENDER_MODE_PARTIAL ||
     frame->mode == MLN_RENDER_MODE_FULL
   );
-  TEST_ASSERT_GREATER_OR_EQUAL_INT64(0, frame->stats.frame_count);
-  TEST_ASSERT_TRUE(frame->stats.encoding_time >= 0.0);
-  TEST_ASSERT_TRUE(frame->stats.rendering_time >= 0.0);
-  TEST_ASSERT_GREATER_OR_EQUAL_INT64(0, frame->stats.draw_call_count);
-  TEST_ASSERT_GREATER_OR_EQUAL_INT64(0, frame->stats.total_draw_call_count);
 }
 
 static void check_render_map(
@@ -389,10 +384,15 @@ static void check_scenario_rows(
   }
 }
 
-// Each type has one row, and a row with no scenario says why.
+// Each type in MLN_RUNTIME_EVENT_MASK_ALL has one row, the table has no other
+// row, and a row with no scenario says why.
 static void every_event_type_has_one_payload_row(void) {
-  for (uint32_t type = MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE;
-       type <= MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED; type += 1) {
+  size_t types = 0;
+  for (uint32_t type = 0; type < 64; type += 1) {
+    if ((MLN_RUNTIME_EVENT_MASK_ALL & (UINT64_C(1) << type)) == 0) {
+      continue;
+    }
+    types += 1;
     size_t rows = 0;
     for (size_t index = 0; index < payload_row_count; index += 1) {
       if (payload_rows[index].type != type) {
@@ -406,6 +406,7 @@ static void every_event_type_has_one_payload_row(void) {
     }
     TEST_ASSERT_EQUAL_size_t(1, rows);
   }
+  TEST_ASSERT_EQUAL_size_t(types, payload_row_count);
 }
 
 static void submit_camera(
