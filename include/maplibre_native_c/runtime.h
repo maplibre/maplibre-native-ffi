@@ -308,6 +308,20 @@ typedef enum mln_resource_storage_policy : uint32_t {
   MLN_RESOURCE_STORAGE_POLICY_VOLATILE = 1,
 } mln_resource_storage_policy;
 
+/**
+ * How a resource provider answered a request.
+ *
+ * - OK carries the resource's bytes.
+ * - ERROR fails the request with mln_resource_response.error_reason. A tile
+ *   whose reason is NOT_FOUND renders as an empty tile; any other failed tile,
+ *   and any failed style, reaches the map as a loading error.
+ * - NO_CONTENT reports a resource that exists but is empty. A tile renders as
+ *   an empty tile.
+ * - NOT_MODIFIED answers a revalidation, a request that carries prior_etag or
+ *   prior_modified, and keeps the cached copy. When the request also carries
+ *   prior_data, the map has not received that copy yet, and this answer
+ *   delivers those bytes.
+ */
 typedef enum mln_resource_response_status : uint32_t {
   MLN_RESOURCE_RESPONSE_STATUS_OK = 0,
   MLN_RESOURCE_RESPONSE_STATUS_ERROR = 1,

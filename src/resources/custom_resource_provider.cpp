@@ -53,6 +53,9 @@ struct ResourceRequestObject {
   std::thread::id cancel_callback_thread;
   mln_resource_request_handle handle = MLN_HANDLE_NULL;
   mln::ActorRef<mln::FileSourceRequest> actor;
+  // The cached bytes MapLibre withheld from the requester until this request
+  // revalidates them. Set before the provider sees the handle, then only read.
+  std::shared_ptr<const std::string> prior_data;
 };
 
 // Host code may complete a request from any thread, and mbgl's cancel path runs
@@ -482,6 +485,7 @@ auto request_custom_resource(
   auto request =
     std::make_unique<mln::FileSourceRequest>(std::move(file_source_callback));
   auto object = std::make_shared<ResourceRequestObject>(request->actor());
+  object->prior_data = resource.priorData;
   const auto handle = handle_table<ResourceRequestObject>().insert(object);
   object->handle = handle;
   // mbgl runs this on every request destruction, including after a response
@@ -541,6 +545,13 @@ auto complete_resource_request(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto native_response = response_from_abi(*response);
+  // A requester whose cached copy had to be revalidated has not seen that copy
+  // yet, so NOT_MODIFIED delivers it, as MapLibre's online source does for a
+  // 304.
+  if (native_response.notModified && live->prior_data != nullptr) {
+    native_response.data = live->prior_data;
+    native_response.notModified = false;
+  }
   {
     const std::scoped_lock lock(live->mutex);
     if (live->retired) {

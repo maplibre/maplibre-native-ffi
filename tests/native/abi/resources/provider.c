@@ -778,6 +778,128 @@ static void a_style_error_reaches_the_loading_failure(void) {
   mln_test_provider_destroy(provider);
 }
 
+// Loads `url` on a new map and waits for its style, which puts the provider's
+// answer in the runtime's ambient cache. The default cache is in memory and
+// lives only while something holds it, so a case keeps this map until its
+// next load has read the cache.
+static mln_map load_style(mln_runtime runtime, const char* url) {
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
+  return map;
+}
+
+static const char cached_style_url[] = "custom://cached-style.json";
+// Whole seconds, since the cache stores timestamps at that precision.
+static const int64_t style_modified_unix_ms = 1700000000000;
+static const int64_t style_expired_unix_ms = 1700000060000;
+
+static mln_resource_response cacheable_style(bool must_revalidate) {
+  return (mln_resource_response){
+    .size = sizeof(mln_resource_response),
+    .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+    .bytes = (const uint8_t*)inline_style_json,
+    .byte_count = sizeof(inline_style_json) - 1,
+    .must_revalidate = must_revalidate,
+    .has_modified = true,
+    .modified_unix_ms = style_modified_unix_ms,
+    .has_expires = true,
+    .expires_unix_ms = style_expired_unix_ms,
+    .etag = "\"v1\"",
+  };
+}
+
+static void expect_revalidation_of_cached_style(
+  const mln_test_provider_request* request, bool carries_prior_data
+) {
+  TEST_ASSERT_NOT_NULL(request);
+  TEST_ASSERT_TRUE(request->has_prior_etag);
+  TEST_ASSERT_EQUAL_STRING("\"v1\"", request->prior_etag);
+  TEST_ASSERT_TRUE(request->has_prior_modified);
+  TEST_ASSERT_EQUAL_INT64(
+    style_modified_unix_ms, request->prior_modified_unix_ms
+  );
+  TEST_ASSERT_TRUE(request->has_prior_expires);
+  TEST_ASSERT_EQUAL_INT64(
+    style_expired_unix_ms, request->prior_expires_unix_ms
+  );
+  TEST_ASSERT_EQUAL_size_t(
+    carries_prior_data ? sizeof(inline_style_json) - 1 : 0,
+    request->prior_data_size
+  );
+}
+
+// A provider answer's metadata goes into the ambient cache, and the next
+// request for the resource carries it back. An expired entry that must be
+// revalidated is withheld from the map until the provider answers, so the
+// request also carries its bytes, and NOT_MODIFIED delivers them.
+static void a_not_modified_answer_delivers_the_cached_style(void) {
+  mln_test_provided_resource resources[] = {
+    {.url = cached_style_url, .response = cacheable_style(true)},
+  };
+  mln_test_provider* provider = mln_test_provider_create(resources, 1);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider_install(runtime, provider);
+  mln_map first = load_style(runtime, cached_style_url);
+  const mln_test_provider_request* initial =
+    mln_test_provider_request_at(provider, cached_style_url, 0);
+  TEST_ASSERT_NOT_NULL(initial);
+  TEST_ASSERT_FALSE(initial->has_prior_etag);
+  TEST_ASSERT_FALSE(initial->has_prior_modified);
+  TEST_ASSERT_EQUAL_size_t(0, initial->prior_data_size);
+
+  resources[0].response = (mln_resource_response){
+    .status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
+  };
+  mln_map second = load_style(runtime, cached_style_url);
+  expect_revalidation_of_cached_style(
+    mln_test_provider_request_at(provider, cached_style_url, 1), true
+  );
+  mln_test_destroy_map(second);
+  mln_test_destroy_map(first);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
+// An expired entry that need not be revalidated reaches the map straight from
+// the cache: the style loads while the provider still holds the revalidation,
+// which carries the entry's metadata but not its bytes.
+static void a_usable_cached_style_loads_before_the_provider_answers(void) {
+  mln_test_provided_resource resources[] = {
+    {.url = cached_style_url, .response = cacheable_style(false)},
+  };
+  mln_test_provider* provider = mln_test_provider_create(resources, 1);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_test_provider_install(runtime, provider);
+  mln_map first = load_style(runtime, cached_style_url);
+
+  resources[0].held = true;
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_set_style_url(map, cached_style_url)
+  );
+  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
+  TEST_ASSERT_TRUE(
+    mln_test_provider_wait_for_requests(provider, cached_style_url, 2)
+  );
+  const mln_test_provider_request* revalidation =
+    mln_test_provider_request_at(provider, cached_style_url, 1);
+  expect_revalidation_of_cached_style(revalidation, false);
+  const mln_resource_response not_modified = {
+    .size = sizeof(mln_resource_response),
+    .status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_resource_request_complete(revalidation->handle, &not_modified, NULL)
+  );
+  mln_resource_request_release(revalidation->handle);
+  mln_test_destroy_map(map);
+  mln_test_destroy_map(first);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(resource_provider_registration_validates_its_descriptor);
   RUN_TEST(resource_provider_registration_releases_owned_state);
@@ -795,4 +917,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_request_names_its_alias_and_its_resolved_url);
   RUN_TEST(a_tile_answer_decides_whether_the_map_renders);
   RUN_TEST(a_style_error_reaches_the_loading_failure);
+  RUN_TEST(a_not_modified_answer_delivers_the_cached_style);
+  RUN_TEST(a_usable_cached_style_loads_before_the_provider_answers);
 }
