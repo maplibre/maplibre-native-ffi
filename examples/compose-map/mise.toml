@@ -26,10 +26,10 @@ description = "Render one frame of an inline style, then exit."
 extends = "ffi:preset"
 dir = "../.."
 run = '''
+export MLN_EXAMPLE_SMOKE=1
 args=(
   -PmaplibreNativeCInstallDir="build/$usage_preset/install"
   :examples:compose-map:run
-  --args="--smoke"
 )
 if [[ "$(uname -s)" == Linux ]]; then
   # Skiko refuses OpenGL on a renderer named llvmpipe and falls back to a

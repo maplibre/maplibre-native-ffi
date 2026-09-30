@@ -60,14 +60,13 @@ Every example exposes the same task contract in its `mise.toml`:
   to `owned-texture`, so `mise run //examples/zig-map:run` works with no
   arguments, and a mode name overrides it, as in
   `mise run //examples/zig-map:run borrowed-texture`.
-- `smoke [preset]` builds the example, renders one frame of an inline style
-  without showing a window, and exits `0`. It fails if no frame renders within
-  60 seconds, and it needs no network. CI runs it on every target that can
-  render the preset's backend, with a software renderer where the runner has no
-  GPU. The C example enters this mode when `MLN_EXAMPLE_SMOKE=1` is set, so its
-  command-line contract stays the same. `dotnet-map` takes a `--smoke` flag,
-  which renders in a hidden window and, on a Linux host with no display, uses
-  GLFW's null platform.
+- `smoke [preset]` builds the example and runs it in [smoke mode](#smoke-mode).
+  The task SHOULD run each render-target mode that the example supports, and
+  MUST run `owned-texture` on desktop. It fails when any run fails, and it needs
+  no network. On a Linux host with no display server, the task provides a
+  display: a virtual X server where the toolkit needs one, or the toolkit's own
+  offscreen or null platform. CI runs the task on every target that can render
+  the preset's backend, with a software renderer where the runner has no GPU.
 
 An example that has not yet implemented every backend rejects an unsupported
 preset with an error that names what it supports: `go-map` drives OpenGL
@@ -102,7 +101,7 @@ contract is unchanged.
 #### What an example is not
 
 A `*-map` program is a focused map demo. It MUST NOT include automated tests or
-packaging/installer UX.
+packaging/installer UX. [Smoke mode](#smoke-mode) is its only self-check.
 
 ### Shared defaults
 
@@ -571,6 +570,37 @@ Profile sections define which host events trigger resize
 - On startup, emit the [startup status lines](#startup-status-lines) through the
   profile logging sink.
 
+### Smoke mode
+
+Smoke mode checks that an example renders, with no user, no visible window, and
+no network. The `smoke` task in [Mise tasks](#mise-tasks) runs it. A headless
+example outside this specification, such as one that reads back a still image,
+uses the same switch and the same inline style.
+
+- A desktop example MUST enter smoke mode when the environment variable
+  `MLN_EXAMPLE_SMOKE` is `1`. Any other value, or no value, runs the example
+  normally.
+- A mobile example MUST enter smoke mode when a platform launch option selects
+  it. On Android that option is the boolean intent extra `smoke`, set to `true`.
+- On desktop, the command line is the same in both modes. The render-target
+  argument, help, and invalid arguments behave as
+  [Render-target selection](#render-target-selection) describes.
+- The example MUST load an inline style that needs no network, in place of the
+  style URL in [Shared defaults](#shared-defaults). A style with one background
+  layer is enough.
+- The example renders where no one sees it: a hidden window, a window placed off
+  screen, or a layer that no window shows. A mobile example renders in its
+  normal view.
+- After the first frame that the render target reports as rendered, a desktop
+  example MUST run [Shutdown](#shutdown) and exit with status `0`. It SHOULD
+  first print one line that starts with `smoke:` and says that a frame rendered.
+- A mobile example MUST write that line through its platform log sink, where the
+  `smoke` task reads it, and then finish its view. The task bounds the wait from
+  the host.
+- When setup fails, or when no frame renders within 60 seconds, a desktop
+  example MUST print a message that names the failure and exit with a nonzero
+  status.
+
 ### Graphics API
 
 Attach descriptors and shared context handles for each graphics API the example
@@ -664,7 +694,8 @@ names and exit `1` before creating a window.
 #### Other flags
 
 The only permitted flag is `--help`. Implementations MUST NOT add other CLI
-flags.
+flags. The environment selects [smoke mode](#smoke-mode), so the command line
+stays the same in that mode.
 
 ### Shell and window
 

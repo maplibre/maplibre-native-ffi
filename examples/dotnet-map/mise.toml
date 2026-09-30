@@ -39,10 +39,11 @@ if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
   export DYLD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
   export LD_LIBRARY_PATH="$MLN_FFI_VULKAN_LOADER_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
-MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+MLN_EXAMPLE_SMOKE=1 \
+  MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet run \
     --project examples/dotnet-map/Maplibre.NativeFfi.Examples.DotnetMap.csproj \
     -p:Platform="Any CPU" \
     -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/dotnet/$usage_preset/" \
-    -- owned-texture --smoke
+    -- owned-texture
 '''

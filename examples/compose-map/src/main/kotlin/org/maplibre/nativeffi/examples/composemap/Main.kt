@@ -18,10 +18,10 @@ import org.maplibre.nativeffi.generated.GeneratedApi
 internal object Main {
   @JvmStatic
   fun main(args: Array<String>) {
-    // A smoke run renders an inline style, so it needs neither the network nor a user, and
-    // exits once the first frame reaches the window.
-    val smoke = args.contentEquals(arrayOf(SMOKE_FLAG))
-    require(smoke || args.isEmpty()) { "Usage: compose-map [$SMOKE_FLAG]" }
+    require(args.isEmpty()) { "Usage: compose-map" }
+    // A smoke run, which MLN_EXAMPLE_SMOKE=1 selects, renders an inline style, so it needs
+    // neither the network nor a user, and exits once the first frame reaches the window.
+    val smoke = System.getenv(SMOKE_VARIABLE) == "1"
     val rendered = CompletableDeferred<Unit>()
     val renderer =
       if (smoke) MapLibreSurfaceRenderer(SMOKE_STYLE) { rendered.complete(Unit) }
@@ -82,7 +82,7 @@ internal object Main {
 
   @Volatile private var smokeRendered = false
 
-  private const val SMOKE_FLAG = "--smoke"
+  private const val SMOKE_VARIABLE = "MLN_EXAMPLE_SMOKE"
   private val SMOKE_TIMEOUT = 60.seconds
   private val SMOKE_OFFSCREEN = (-4096).dp
   private val SMOKE_SIZE = 256.dp

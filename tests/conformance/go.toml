@@ -48,4 +48,4 @@
 "PLAT-01" = "bindings/go/platform_test.go::TestLinkedLibraryMatchesTheBuild"
 "PLAT-02" = "bindings/go/platform_test.go::TestProcessExitsCleanlyWithLiveHandles"
 "PLAT-03" = "bindings/go/platform_test.go::TestCollectorRetiresUnclosedMaps"
-"EX-01" = "examples/go-map/main.go::--smoke"
+"EX-01" = "examples/go-map/main.go::smokeMode"

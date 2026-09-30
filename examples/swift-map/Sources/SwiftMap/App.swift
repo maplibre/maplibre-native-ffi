@@ -1,20 +1,17 @@
 import AppKit
 import SwiftUI
 
-/// Runs the app, or with `--smoke <mode>`, renders one frame headless in that
-/// render-target mode and exits.
+/// Runs the app, or with `MLN_EXAMPLE_SMOKE=1` set, renders one frame headless
+/// in the requested render-target mode and exits.
 @main
 enum SwiftMapMain {
   static func main() {
-    let args = Array(CommandLine.arguments.dropFirst())
-    guard args.first == "--smoke" else {
+    guard ProcessInfo.processInfo.environment["MLN_EXAMPLE_SMOKE"] == "1" else {
       SwiftMapApp.main()
       return
     }
-    guard args.count == 2, let mode = RenderTargetMode(rawValue: args[1]) else {
-      fputs("Usage: swift-map --smoke <mode>\n", stderr)
-      exit(1)
-    }
+    // The configuration parses the same command line as the app does.
+    let mode = swiftMapConfiguration.mode
     Task { @MainActor in
       installCAPILogging()
       let status = await runSmoke(mode: mode)

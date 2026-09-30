@@ -48,7 +48,8 @@ export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH
 if [[ "$(uname -s)" == Linux && -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
   export SDL_VIDEO_DRIVER=offscreen
 fi
-exec "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map" --smoke owned-texture
+export MLN_EXAMPLE_SMOKE=1
+exec "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map" owned-texture
 '''
 
 [tasks.run]

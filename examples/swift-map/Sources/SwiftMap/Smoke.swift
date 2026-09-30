@@ -40,7 +40,7 @@ func runSmoke(mode: RenderTargetMode) async -> Int32 {
       try? await state.close()
       throw error
     }
-    let deadline = Date().addingTimeInterval(30)
+    let deadline = Date().addingTimeInterval(60)
     var rendered = false
     while !rendered, Date() < deadline {
       rendered = try await target.renderFrame()

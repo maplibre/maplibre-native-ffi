@@ -179,7 +179,7 @@ impl App {
             .expect("render target is open")
             .render_update(&self.graphics)?;
         if rendered && crate::smoke_test() {
-            println!("smoke test rendered a frame");
+            println!("smoke: rendered a frame");
             self.smoke_rendered = true;
             return Ok(());
         }

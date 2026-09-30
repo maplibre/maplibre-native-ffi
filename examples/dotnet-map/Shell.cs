@@ -68,7 +68,7 @@ internal static class Shell
         }
     }
 
-    private static readonly TimeSpan SmokeDeadline = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan SmokeDeadline = TimeSpan.FromSeconds(60);
 
     private static byte[] SmokeStyle =>
         """

@@ -109,7 +109,7 @@ impl ApplicationHandler for Shell {
             {
                 self.error = Some(
                     format!(
-                        "smoke test rendered no frame within {}s",
+                        "smoke: no frame rendered within {}s",
                         SMOKE_DEADLINE.as_secs()
                     )
                     .into(),

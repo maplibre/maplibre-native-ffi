@@ -26,7 +26,7 @@ depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 # network.
 run = '''
 for mode in owned-texture borrowed-texture native-surface; do
-  ".build/$usage_preset/debug/swift-map" --smoke "$mode" || exit 1
+  MLN_EXAMPLE_SMOKE=1 ".build/$usage_preset/debug/swift-map" "$mode" || exit 1
 done
 '''
 

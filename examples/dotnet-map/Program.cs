@@ -67,8 +67,7 @@ internal static class Program
             return new ParseResult(null, ShowedHelp: true, Smoke: false);
         }
 
-        var smoke = args is [_, "--smoke"];
-        if (args.Length != (smoke ? 2 : 1) || args[0].StartsWith("-", StringComparison.Ordinal))
+        if (args.Length != 1 || args[0].StartsWith("-", StringComparison.Ordinal))
         {
             PrintUsage(Console.Error);
             return new ParseResult(null, ShowedHelp: false, Smoke: false);
@@ -76,7 +75,7 @@ internal static class Program
 
         if (RenderTargetMode.TryParse(args[0], out var mode))
         {
-            return new ParseResult(mode, ShowedHelp: false, smoke);
+            return new ParseResult(mode, ShowedHelp: false, SmokeMode());
         }
 
         Console.Error.WriteLine($"Unknown render target mode: {args[0]}");
@@ -86,16 +85,20 @@ internal static class Program
 
     private static void PrintUsage(TextWriter writer)
     {
-        writer.WriteLine("Usage: dotnet-map <mode> [--smoke]");
+        writer.WriteLine("Usage: dotnet-map <mode>");
         writer.WriteLine();
         writer.WriteLine("Modes:");
         writer.WriteLine("  owned-texture     session-owned texture render target");
         writer.WriteLine("  borrowed-texture  caller-owned texture render target");
         writer.WriteLine("  native-surface    native surface render target");
-        writer.WriteLine();
-        writer.WriteLine("Options:");
-        writer.WriteLine("  --smoke           render one frame in a hidden window, then exit");
     }
+
+    /// <summary>
+    /// Whether <c>MLN_EXAMPLE_SMOKE=1</c> selects a smoke run, which renders one frame in a
+    /// hidden window and exits.
+    /// </summary>
+    private static bool SmokeMode() =>
+        Environment.GetEnvironmentVariable("MLN_EXAMPLE_SMOKE") == "1";
 
     private static bool SupportsUsableBackend(RenderBackendFlag backends)
     {

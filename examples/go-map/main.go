@@ -33,10 +33,6 @@ func parseArgs(args []string) (renderTargetMode, bool, bool) {
 		printUsage()
 		return 0, false, false
 	}
-	smoke := len(args) == 2 && args[0] == "--smoke"
-	if smoke {
-		args = args[1:]
-	}
 	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
 		printUsage()
 		os.Exit(1)
@@ -46,19 +42,22 @@ func parseArgs(args []string) (renderTargetMode, bool, bool) {
 		printUsage()
 		os.Exit(1)
 	}
-	return mode, smoke, true
+	return mode, smokeMode(), true
+}
+
+// smokeMode reports whether MLN_EXAMPLE_SMOKE=1 selects a smoke run, which
+// renders one frame of a local style in a hidden window and exits.
+func smokeMode() bool {
+	return os.Getenv("MLN_EXAMPLE_SMOKE") == "1"
 }
 
 func printUsage() {
-	fmt.Print(`Usage: go-map [--smoke] <mode>
+	fmt.Print(`Usage: go-map <mode>
 
 Modes:
   owned-texture     session-owned texture render target
   borrowed-texture  caller-owned texture render target
   native-surface    native surface render target
-
-Options:
-  --smoke  render one frame of a local style in a hidden window, then exit
 `)
 }
 
