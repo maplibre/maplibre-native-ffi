@@ -3,7 +3,12 @@ package org.maplibre.nativeffi.render
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.runBlocking
+import org.maplibre.nativeffi.TestThread
+import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.WrongThreadException
@@ -71,6 +76,37 @@ class OwnedTextureSessionTest {
         assertEquals(kind, sync.kind)
       }
       assertFailsWith<IllegalStateException> { escaped!!.kind }
+      frame.release()
+      assertTrue(frame.isClosed)
+    }
+  }
+
+  @Test
+  fun aBorrowOnAnotherThreadHoldsOffTheFramesReleaseUntilItEnds(): Unit = runSuspendTest {
+    withOwnedTexture {
+      setStyle(RED_BACKGROUND_STYLE)
+      renderStill()
+      assertEquals(RenderResult.RENDERED, renderFrame().disposition)
+      val frame = session.acquireFrame()
+      val entered = CompletableDeferred<Unit>()
+      val leave = CompletableDeferred<Unit>()
+      val borrower = TestThread {
+        frame.withGetProducerSync {
+          entered.complete(Unit)
+          runBlocking { leave.await() }
+        }
+      }
+      try {
+        entered.awaitWithin("the borrow to start on the other thread")
+        assertEquals(
+          MaplibreStatus.BUSY,
+          assertFailsWith<MaplibreException> { frame.release() }.status,
+        )
+        assertFalse(frame.isClosed)
+      } finally {
+        leave.complete(Unit)
+        borrower.join()
+      }
       frame.release()
       assertTrue(frame.isClosed)
     }

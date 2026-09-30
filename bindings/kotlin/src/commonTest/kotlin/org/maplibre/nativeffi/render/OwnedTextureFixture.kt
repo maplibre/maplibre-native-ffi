@@ -79,7 +79,6 @@ internal class OwnedTextureFixture(
     return last
   }
 
-  /** Renders one forced frame and returns its result. */
   /** Renders one forced frame, left for the test to acquire, and returns its result. */
   suspend fun renderFrame(): RenderFrameResult =
     renderUntil("one frame", keepLastFrame = true) { it != null }!!

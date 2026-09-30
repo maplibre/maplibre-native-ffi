@@ -23,7 +23,7 @@
 "ERR-02" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/loader/NativeAccessTest.kt::abiVersionMismatchReportsActualAndExpectedVersions"
 "LIFE-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::closingAHandleTwiceIsSafeAndLaterUseIsRefused"
 "LIFE-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds"
-"LIFE-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/internal/lifecycle/DecisionOwnerCoreTest.kt::aCloseOnAnotherThreadWaitsOutACompletionInProgress"
+"LIFE-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aBorrowOnAnotherThreadHoldsOffTheFramesReleaseUntilItEnds"
 "LIFE-04" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/lifecycle/AbandonedHandleJvmTest.kt::anAbandonedMapIsReportedOnTheLeakReportWorker"
 "LIFE-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::aMapKeepsItsRuntimeReachable"
 "COMP-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/internal/async/OwnedCompletionTest.kt::conversionFailureReleasesTheRawOwnerAndCompletesExceptionally"
@@ -48,7 +48,7 @@
 "REND-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::anOwnedTextureFrameReadsBackAsPixels"
 "REND-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aCallerDrivenSessionStaysOnTheGraphicsThreadItWasServicedFrom"
 "PLAT-01" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/loader/NativeLibraryTest.kt::theLibraryLoadsFromTheConfiguredPath"
-"PLAT-02" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/log/LogProcessExitTest.kt::jvmExitsWithNativeLogCallbackInstalled"
+"PLAT-02" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/log/LogProcessExitTest.kt::jvmExitsWithLiveHandlesAndCallbacks"
 "PLAT-03" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/resource/ResourceRequestHandleJvmTest.kt::anUnreachableRequestIsReleasedNatively"
 # Each example has a smoke task that renders one frame of an inline style and
 # exits: //examples/lwjgl-map:smoke and //examples/compose-map:smoke on desktop
