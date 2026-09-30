@@ -249,6 +249,21 @@ static void remove_the_swatch(
   );
 }
 
+// A layer paints from global state, so a new value repaints it.
+static void set_the_global_color(
+  mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture
+) {
+  (void)runtime;
+  (void)fixture;
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_set_global_state_property(
+      map, MLN_BUFFER_LITERAL("color"), MLN_BUFFER_LITERAL("\"#0000ff\""),
+      &completion.descriptor, NULL
+    )
+  );
+}
+
 typedef struct pixel_row {
   const char* label;
   const char* style;
@@ -289,6 +304,12 @@ static const pixel_row pixel_rows[] = {
    "{\"background-color\":\"#0000ff\"}},{\"id\":\"pattern\",\"type\":"
    "\"background\",\"paint\":{\"background-pattern\":\"swatch\"}}]}",
    add_swatch, red, remove_the_swatch, blue},
+  {"a global state change repaints what reads it",
+   "{\"version\":8,\"transition\":{\"duration\":0},\"state\":{\"color\":"
+   "{\"default\":\"#ff0000\"}},\"sources\":{},\"layers\":[{\"id\":"
+   "\"background\",\"type\":\"background\",\"paint\":{\"background-color\":"
+   "[\"global-state\",\"color\"]}}]}",
+   NULL, red, set_the_global_color, blue},
 };
 
 static void each_mutation_reaches_the_pixels_of_an_update_driven_host(void) {
