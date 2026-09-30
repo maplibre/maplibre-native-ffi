@@ -2,11 +2,7 @@
 # Counts only fall. Run the script with --update after removing some.
 
 [sleep]
-"bindings/dart/test/callback_collection_test.dart" = 1
-"bindings/dart/test/maplibre_native_ffi_test.dart" = 4
 "tests/native/support/render_webgpu.c" = 2
 
 [network-host]
-"bindings/dart/test/foundational_values_test.dart" = 2
-"bindings/dart/test/maplibre_native_ffi_test.dart" = 33
 "src/platform/rust/src/http_client.rs" = 8

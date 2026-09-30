@@ -39,7 +39,6 @@ final _globalCallbackPorts = _NativeCallbackPorts();
 final class CallbackPortLifecycleProbe {
   CallbackPortLifecycleProbe._(this._port);
   final _NativeCallbackPort _port;
-  bool get retirementQueued => _port.retirementQueued;
   bool get closed => _port.closed;
 
   /// Completes when native code releases the port, or the binding refuses it.
@@ -162,7 +161,6 @@ final class _NativeCallbackPort {
   late final RawReceivePort _port;
   late final Pointer<Void> context;
   bool get closed => _closed;
-  bool get retirementQueued => closed;
   void _finish() {
     if (closed) return;
     _closed = true;
