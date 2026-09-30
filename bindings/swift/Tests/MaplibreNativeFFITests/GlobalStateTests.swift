@@ -26,7 +26,7 @@ struct GlobalStateTests {
       // MapLibre logs the parse failure of a malformed document.
       _ = try? await fixture.map
         .setStyleJson(json: Data(#"{"version":8,"#.utf8))
-      try await awaitCondition("a logged parse failure") {
+      await awaitCondition("a logged parse failure") {
         records.value.contains(.error)
       }
     }

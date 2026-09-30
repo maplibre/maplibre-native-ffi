@@ -89,11 +89,11 @@ private func installProvider(
       return .handle
     }
     try await fixture.map.setStyleUrl(url: "custom://dropped.json")
-    try await awaitCondition("the provider call") { request.value != nil }
+    await awaitCondition("the provider call") { request.value != nil }
     weakRequest = request.value
     request.update { $0 = nil }
 
-    try await awaitCondition("the cancel registration's release") {
+    await awaitCondition("the cancel registration's release") {
       releases.value == 1
     }
     #expect(weakRequest == nil)
@@ -172,7 +172,7 @@ private struct ProviderFailure: Error {}
       return .handle
     }
     try await fixture.map.setStyleUrl(url: "custom://later.json")
-    try await awaitCondition("the provider to take the request") {
+    await awaitCondition("the provider to take the request") {
       taken.value != nil
     }
     let request = try #require(taken.value)
@@ -249,7 +249,7 @@ private struct ProviderFailure: Error {}
       return .handle
     }
     try await fixture.map.setStyleUrl(url: "custom://cancelled.json")
-    try await awaitCondition("the provider to take the request") {
+    await awaitCondition("the provider to take the request") {
       taken.value != nil
     }
     let request = try #require(taken.value)

@@ -79,7 +79,7 @@ import Testing
 /// while the map is live. The runtime goes once the map does.
 @Test func aMapKeepsItsRuntimeAlive() async throws {
   var runtime: RuntimeHandle? = try MapFixture.makeRuntime()
-  weak var weakRuntime = runtime
+  weak let weakRuntime = runtime
   var map: MapHandle? = try await runtime?.mapCreate(options: MapOptions(
     initialExtent: LogicalExtent(width: 8, height: 8, scaleFactor: 1)
   ))
