@@ -578,6 +578,44 @@ namespace {
 
 using mln::core::HeadlessObserver;
 
+// Keeps a pending still image from completing on a frame that rendered an
+// update older than its request. MapLibre completes a still image after any
+// fully loaded frame, but a render session re-renders the latest update on a
+// forced demand, and a frame can start before the request's own update is
+// published. Such a frame reaches mln::Map::Impl as a partial one, so the
+// image waits for a frame that renders its request. Runs on the map's run
+// loop, like the delegate.
+class StillImageFrameFilter {
+ public:
+  using RenderMode = mln::RendererObserver::RenderMode;
+
+  explicit StillImageFrameFilter(mln::RendererObserver& delegate)
+      : delegate_(delegate) {}
+
+  // The generation of the update the pending request published, or zero when
+  // no request is pending.
+  auto set_request_generation(uint64_t generation) noexcept -> void {
+    request_generation_ = generation;
+  }
+
+  void finish_frame(
+    RenderMode mode, bool repaint_needed, bool placement_changed,
+    std::shared_ptr<mln::gfx::RenderingStats> stats,
+    uint64_t rendered_generation
+  ) {
+    if (rendered_generation < request_generation_) {
+      mode = RenderMode::Partial;
+    }
+    delegate_.onDidFinishRenderingFrame(
+      mode, repaint_needed, placement_changed, std::move(stats)
+    );
+  }
+
+ private:
+  mln::RendererObserver& delegate_;
+  uint64_t request_generation_ = 0;
+};
+
 // Delivers mln::RendererObserver callbacks on the map's run loop instead of on
 // whichever thread rendered. The delegate is mln::Map::Impl, whose handlers
 // must not run concurrently. Every callback therefore becomes a mailbox message
@@ -589,7 +627,9 @@ class ForwardingRendererObserver final : public mln::RendererObserver {
     mln::Scheduler& map_scheduler, mln::RendererObserver& delegate
   )
       : mailbox_(std::make_shared<mln::Mailbox>(map_scheduler)),
-        delegate_(delegate, mailbox_) {}
+        delegate_(delegate, mailbox_),
+        still_image_frames_(delegate),
+        still_image_frames_ref_(still_image_frames_, mailbox_) {}
 
   ForwardingRendererObserver(const ForwardingRendererObserver&) = delete;
   auto operator=(const ForwardingRendererObserver&)
@@ -603,6 +643,17 @@ class ForwardingRendererObserver final : public mln::RendererObserver {
   // Waits out an in-flight receive and drops anything queued, so the delegate
   // can be torn down once this returns. Idempotent.
   auto close() -> void { mailbox_->close(); }
+
+  // Called on the rendering thread before each render with the generation of
+  // the update it renders.
+  auto begin_render(uint64_t update_generation) noexcept -> void {
+    rendering_generation_.store(update_generation, std::memory_order_relaxed);
+  }
+
+  // Called on the map's run loop.
+  [[nodiscard]] auto still_image_frames() -> StillImageFrameFilter& {
+    return still_image_frames_;
+  }
 
   void onInvalidate() override {
     delegate_.invoke(&mln::RendererObserver::onInvalidate);
@@ -625,12 +676,12 @@ class ForwardingRendererObserver final : public mln::RendererObserver {
     std::shared_ptr<mln::gfx::RenderingStats> stats
   ) override {
     // The name carries four overloads; mln::Map::Impl implements only this
-    // one, and it schedules the next update from it.
-    void (mln::RendererObserver::*method)(
-      RenderMode, bool, bool, std::shared_ptr<mln::gfx::RenderingStats>
-    ) = &mln::RendererObserver::onDidFinishRenderingFrame;
-    delegate_.invoke(
-      method, mode, repaint_needed, placement_changed, std::move(stats)
+    // one, and it schedules the next update from it. The filter shares the
+    // delegate's mailbox, so the frame keeps its place among the callbacks.
+    still_image_frames_ref_.invoke(
+      &StillImageFrameFilter::finish_frame, mode, repaint_needed,
+      placement_changed, std::move(stats),
+      rendering_generation_.load(std::memory_order_relaxed)
     );
   }
 
@@ -712,6 +763,9 @@ class ForwardingRendererObserver final : public mln::RendererObserver {
  private:
   std::shared_ptr<mln::Mailbox> mailbox_;
   mln::ActorRef<mln::RendererObserver> delegate_;
+  StillImageFrameFilter still_image_frames_;
+  mln::ActorRef<StillImageFrameFilter> still_image_frames_ref_;
+  std::atomic<uint64_t> rendering_generation_{0};
 };
 
 }  // namespace
@@ -827,6 +881,17 @@ class HeadlessFrontend final : public mln::RendererFrontend {
 
   [[nodiscard]] auto renderer_observer() const -> mln::RendererObserver* {
     return observer_.get();
+  }
+
+  auto begin_render(uint64_t update_generation) noexcept -> void {
+    if (observer_ != nullptr) observer_->begin_render(update_generation);
+  }
+
+  // Runs on the map's run loop. Zero means no still image is pending.
+  auto set_still_image_request_generation(uint64_t generation) -> void {
+    if (observer_ != nullptr) {
+      observer_->still_image_frames().set_request_generation(generation);
+    }
   }
 
   // Must run before the map that backs the delegate is torn down.
@@ -2098,6 +2163,7 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
     return;
   }
   live->still_image_request_pending = false;
+  live->frontend->set_still_image_request_generation(0);
   auto operation = std::exchange(live->still_image_operation, {});
   if (auto release = std::exchange(live->still_image_release_submission, {})) {
     release();
@@ -3365,6 +3431,13 @@ auto map_request_still_image_start(
             release_submission();
           }
         );
+        // renderStill() published the request's update before returning,
+        // unless the request already finished with an error.
+        if (live->still_image_request_pending) {
+          live->frontend->set_still_image_request_generation(
+            live->frontend->latest_update_generation()
+          );
+        }
       } catch (...) {
         live->still_image_request_pending = false;
         live->still_image_operation.reset();
@@ -3454,6 +3527,12 @@ auto map_set_render_session_publish_callback(
   }
   live->frontend->set_session_publish_callback(std::move(callback));
   return MLN_STATUS_OK;
+}
+
+auto map_begin_render(mln_map map, uint64_t update_generation) noexcept
+  -> void {
+  auto* live = handle_table<MapObject>().try_resolve(map);
+  if (live != nullptr) live->frontend->begin_render(update_generation);
 }
 
 auto map_renderer_observer(mln_map map) -> mln::RendererObserver* {

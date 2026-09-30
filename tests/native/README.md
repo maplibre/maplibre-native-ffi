@@ -202,7 +202,9 @@ described under [GPU objects](#gpu-objects).
 
 The map files also include `support/map.h`, which provides
 `mln_test_render_still_image`. That helper requests a still image from a static
-or tile map and keeps a frame demand in flight until the image completes.
+or tile map and keeps a forced frame demand in flight until the image completes.
+`mln_test_render_pending_still_image` does the same for a request the case
+already made.
 
 The style suites also include `support/style.h`. It renders one frame at a time
 until a condition holds, and copies rendered and source feature queries and list
@@ -277,19 +279,6 @@ the override on to reach the very next frame. Without the override, the
 asynchronous slice still lands before that frame about 3 runs in 20, so the case
 catches a lost override most of the time but not always. The same slicing sync
 point would let it park the worker and prove that the frame did not wait for it.
-
-### Cases that work around a core defect
-
-- `mln_test_render_still_image` in `support/map.c` sends only if-needed frame
-  demands, and `a_static_map_renders_still_images` and
-  `a_tile_map_renders_still_images` in `abi/map/still_image.c` rely on it. A
-  forced demand (`flags = 0`) can render the map update from before the still
-  image request again, and MapLibre completes a pending still image after any
-  fully loaded frame. The image then completes with the previous style, which
-  showed on Metal as a stale second readback. The restriction goes once the core
-  holds a still image until a frame renders the update its request followed, or
-  documents which demands may complete one, with a regression test that sends a
-  forced demand between two still images.
 
 ## Process-global state
 

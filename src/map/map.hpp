@@ -616,6 +616,10 @@ auto map_set_render_session_publish_callback(
 auto map_feature_state_snapshot(mln_map map)
   -> std::shared_ptr<const FeatureStateSnapshot>;
 auto map_renderer_observer(mln_map map) -> mln::RendererObserver*;
+// Tells the map which update generation the session is about to render, so a
+// frame of an update older than a pending still image request cannot complete
+// it. Called on the rendering thread.
+auto map_begin_render(mln_map map, uint64_t update_generation) noexcept -> void;
 auto map_run_render_jobs(mln_map map) -> void;
 // Blocks until the map's queued and running tile-worker jobs drain. Abandon
 // uses it so a host may destroy its graphics device as soon as abandon

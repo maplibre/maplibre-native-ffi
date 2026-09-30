@@ -1160,8 +1160,10 @@ MLN_API mln_status mln_map_remove_feature_state(
  * Submit frame demands with mln_render_session_request_frame() and drain their
  * terminal results with mln_render_session_drain_frame_results(). A
  * caller-graphics-thread driver also requires calls to
- * mln_render_session_service_driver_work() on its graphics thread. A rendered
- * frame may be acquired or read back after the completion runs.
+ * mln_render_session_service_driver_work() on its graphics thread. Any demand
+ * may complete the image, but only with a fully loaded frame that rendered
+ * the map as this request found it; a frame of an earlier update never does.
+ * That frame may be acquired or read back after the completion runs.
  *
  * Returns:
  * - MLN_STATUS_OK when the request was accepted.

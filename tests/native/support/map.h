@@ -20,6 +20,12 @@ mln_status mln_test_render_still_image(
   const mln_test_render_fixture* fixture, mln_map map
 );
 
+// The same for a still image the case already requested, whose completion is
+// `still`. The case still destroys the completion.
+mln_status mln_test_render_pending_still_image(
+  const mln_test_render_fixture* fixture, mln_test_completion* still
+);
+
 #ifdef __cplusplus
 }
 #endif

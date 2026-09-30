@@ -1799,6 +1799,7 @@ auto render_session_render_update_on_driver(
   }
   remember_rendered_sources(live->rendered_source_ids, *update);
 
+  map_begin_render(live->map, update_generation);
   if (const auto early = render_once()) {
     return *early;
   }
