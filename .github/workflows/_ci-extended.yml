@@ -2538,7 +2538,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/compose-map:smoke windows-x64-vulkan
+        run: mise run //examples/compose-map:build windows-x64-vulkan
       - id: suite-10
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
@@ -2731,7 +2731,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/compose-map:smoke windows-arm64-vulkan
+        run: mise run //examples/compose-map:build windows-arm64-vulkan
       - id: suite-7
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:

@@ -54,11 +54,15 @@ commands = [
   { task = "//examples/zig-readback:smoke" },
 ]
 
+# compose-map on Windows Vulkan shares its frames with Skiko's Direct3D 12
+# through VK_KHR_external_memory_win32, which Lavapipe, the runners' only Vulkan
+# driver, does not offer, so no driver there can render it and it only builds.
 [[suites]]
 platforms = ["linux-gnu", "macos", "windows"]
 commands = [
   { task = "//bindings/kotlin:test" },
-  { task = "//examples/compose-map:smoke", display = true },
+  { task = "//examples/compose-map:smoke", exclude = ["windows-x64-vulkan", "windows-arm64-vulkan"], display = true },
+  { task = "//examples/compose-map:build", include = ["windows-x64-vulkan", "windows-arm64-vulkan"] },
   { task = "//examples/lwjgl-map:smoke", display = true },
 ]
 

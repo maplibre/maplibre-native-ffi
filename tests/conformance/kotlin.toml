@@ -56,4 +56,7 @@
 # Android emulator and waits for its first rendered frame (MainActivity).
 # Compose draws only into a window, so its smoke run parks a borderless one off
 # screen; a Linux host without a display runs both desktop smokes under xvfb.
+# compose-map only builds on the Windows Vulkan presets: it shares frames with
+# Skiko's Direct3D 12 through VK_KHR_external_memory_win32, which Lavapipe, the
+# runners' only Vulkan driver, does not offer.
 "EX-01" = "examples/lwjgl-map/src/main/kotlin/org/maplibre/nativeffi/examples/lwjglmap/Shell.kt::smoke: rendered a frame"
