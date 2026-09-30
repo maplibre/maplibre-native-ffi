@@ -257,6 +257,94 @@ void wait_until_retired_waits_for_a_self_releasing_cancel_callback() {
   run_release_waits_for_in_flight_cancel_callback(probe);
 }
 
+// A claimed request whose cancel callback never runs, released on a host thread
+// whose release_user_data returns only once a drain is blocked on it.
+struct BlockingRegistrationRelease {
+  const SyncPointScope* sync_points = nullptr;
+  std::atomic_bool provider_entered = false;
+  std::atomic_int register_status = MLN_STATUS_NATIVE_ERROR;
+  std::atomic<mln_resource_request_handle> handle = MLN_HANDLE_NULL;
+  std::atomic_bool release_entered = false;
+  std::atomic_bool drain_returned = false;
+  std::atomic_bool drain_returned_during_release = false;
+  std::atomic_bool release_returned = false;
+};
+
+void never_cancelled(void* user_data) { static_cast<void>(user_data); }
+
+void block_in_registration_release(void* user_data) {
+  auto& probe = *static_cast<BlockingRegistrationRelease*>(user_data);
+  mln_test_flag_set(&probe.release_entered);
+  static_cast<void>(
+    probe.sync_points->wait_for_hits(SyncPoint::ResourceRequestCancelWait, 1)
+  );
+  probe.drain_returned_during_release = probe.drain_returned.load();
+  mln_test_flag_set(&probe.release_returned);
+}
+
+auto blocking_registration_provider(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) -> uint32_t {
+  static_cast<void>(request);
+  auto& probe = *static_cast<BlockingRegistrationRelease*>(user_data);
+  probe.handle = handle;
+  auto cancelled = true;
+  probe.register_status = mln_resource_request_set_cancel_callback(
+    handle, never_cancelled, &probe, block_in_registration_release, &cancelled,
+    nullptr
+  );
+  mln_test_flag_set(&probe.provider_entered);
+  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+}
+
+void release_request_on_this_thread(void* argument) {
+  mln_resource_request_release(
+    static_cast<BlockingRegistrationRelease*>(argument)->handle.load()
+  );
+}
+
+// A host frees what release_user_data uses once a drain returns, so the drain
+// also waits for the release of a registration whose callback never ran.
+void wait_until_retired_waits_for_an_unrun_registrations_release() {
+  auto sync_points = SyncPointScope{};
+  auto probe = BlockingRegistrationRelease{.sync_points = &sync_points};
+  auto runtime = mln_test_create_runtime();
+  const auto provider = mln_resource_provider{
+    .size = sizeof(mln_resource_provider),
+    .callback = blocking_registration_provider,
+    .user_data = &probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln::native_tests::set_resource_provider(runtime, provider)
+  );
+  auto map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_map_set_style_url(map, "custom://blocking-registration.json")
+  );
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.provider_entered));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.register_status.load());
+
+  auto* releaser =
+    mln_test_thread_start(release_request_on_this_thread, &probe);
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.release_entered));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_resource_request_wait_until_retired(probe.handle.load(), nullptr)
+  );
+  const auto release_returned_before_drain = probe.release_returned.load();
+  mln_test_flag_set(&probe.drain_returned);
+  mln_test_thread_join(releaser);
+  TEST_ASSERT_FALSE_MESSAGE(
+    probe.drain_returned_during_release.load(),
+    "the drain returned while release_user_data was running"
+  );
+  TEST_ASSERT_TRUE(release_returned_before_drain);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
@@ -264,4 +352,5 @@ MLN_TEST_GROUP {
   RUN_TEST(release_waits_for_in_flight_cancel_callback);
   RUN_TEST(release_waits_for_a_cancel_callback_that_released_itself);
   RUN_TEST(wait_until_retired_waits_for_a_self_releasing_cancel_callback);
+  RUN_TEST(wait_until_retired_waits_for_an_unrun_registrations_release);
 }

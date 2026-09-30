@@ -47,6 +47,10 @@ struct ResourceRequestObject {
   void* cancel_user_data = nullptr;
   bool cancel_callback_registered = false;
   bool cancel_callback_running = false;
+  // The release is invoking release_user_data for a registration whose
+  // callback never ran. The request is not retired to a waiter until it
+  // returns.
+  bool releasing_cancel_user_data = false;
   // Set when the callback released its own request: the callback wrapper
   // removes the table entry once the callback returns.
   bool remove_after_cancel_callback = false;
@@ -304,6 +308,7 @@ void retire_request(mln_resource_request_handle handle) noexcept {
     object->cancel_callback = nullptr;
     release = std::exchange(object->cancel_release, nullptr);
     user_data = std::exchange(object->cancel_user_data, nullptr);
+    object->releasing_cancel_user_data = release != nullptr;
     if (object->cancel_callback_running) {
       if (object->cancel_callback_thread == std::this_thread::get_id()) {
         object->remove_after_cancel_callback = true;
@@ -324,6 +329,11 @@ void retire_request(mln_resource_request_handle handle) noexcept {
     } catch (...) {
       // Host callbacks must not unwind through the release path.
     }
+    {
+      const std::scoped_lock lock(object->mutex);
+      object->releasing_cancel_user_data = false;
+    }
+    object->state_changed.notify_all();
   }
   handle_table<ResourceRequestObject>().remove(handle);
 }
@@ -648,12 +658,17 @@ auto wait_for_resource_request_retired(mln_resource_request_handle handle)
     return MLN_STATUS_OK;
   }
   // A callback that released its own request leaves the entry in place until
-  // it returns, so a drained request is one whose callback has also returned.
+  // it returns, so a drained request is one whose callback has also returned,
+  // and whose registration's user data has been released.
   auto lock = std::unique_lock{live->mutex};
   const auto drained = [&live] {
-    return live->retired && !live->cancel_callback_running;
+    return live->retired && !live->cancel_callback_running &&
+           !live->releasing_cancel_user_data;
   };
-  if (!drained() && live->cancel_callback_running) {
+  if (
+    !drained() &&
+    (live->cancel_callback_running || live->releasing_cancel_user_data)
+  ) {
     mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelWait);
   }
   live->state_changed.wait(lock, drained);

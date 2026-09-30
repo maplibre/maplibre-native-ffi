@@ -1120,8 +1120,9 @@ MLN_API void mln_resource_request_release(
 ) MLN_NOEXCEPT;
 
 /**
- * Blocks until a resource request is released and its cancellation callback
- * has finished. Completing a request does not release its owner.
+ * Blocks until a resource request is released and its cancel callback
+ * registration has retired: the callback, if it ran, and release_user_data
+ * have both returned. Completing a request does not release its owner.
  *
  * Hosts that hand a request to another execution context use this to drain
  * outstanding requests during teardown. Call it from a context that is not
