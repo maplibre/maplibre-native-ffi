@@ -73,13 +73,26 @@ the objects under test are the shipped ones:
 - `src/testing/sync_point.hpp` names the points where a case can observe or park
   a thread, such as a map's pool shutdown, a writer about to take a resource
   registration exclusively, or a release blocked on a running cancel callback.
-  With no handler installed, reaching a point costs one relaxed atomic load.
+  With no handler installed, reaching a point costs one relaxed atomic load. A
+  point that marks a wait fires only when the thread has to wait. A case that
+  waits for such a point fails at its deadline when a change removes the wait.
 - `src/testing/render_clock.hpp` is the clock that frame demand deadlines run
   on. A case advances it rather than waiting for a deadline to pass.
 
 `mise run check-exports [preset]` reads the installed library's symbol table and
 fails when it exports anything beyond the public C API, or any name that belongs
-to a seam. `mise run build` and `mise run archive-native` run it.
+to a seam. Every CI job that builds a library checks that library, because
+`mise run build` and `mise run archive-native` run the check. The hygiene job
+builds no library and has nothing to check.
+
+A static archive keeps hidden symbols visible to a static link. For a preset
+that installs only an archive, such as Emscripten, the check compares the
+archive's `mln_` C names alone. The seams have C++ names outside that set, so
+the seam check covers shared libraries only.
+
+The resource cases start an offline download of a `custom://` style to make the
+library call a provider or transform. The download needs no map and no network.
+The sync points then order the callback against the thread that it races.
 
 The suite's replacement `operator new` covers the static library's own
 allocations, and throws only on a thread inside an `AllocationFaults` scope.

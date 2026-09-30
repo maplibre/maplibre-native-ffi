@@ -268,9 +268,14 @@ retried.
 
 Every feature needs automated CI coverage when practical. The root
 `mise run test` command builds the native library and runs the native C suites
-in `tests/native` through CTest and Unity. Language binding suites run through
-their binding-specific CI tasks. `mise run bindings:test-generator` tests the
-binding generator;
+in `tests/native` through CTest and Unity. The ABI suite links the shipped
+library through its public headers. The internal suite links the static library
+and uses the library's sync points to order threads that no public fence can
+order. `tests/native/README.md` describes both suites. `mise run build` runs
+`mise run check-exports`, which fails when the installed library exports
+anything beyond the public C API. Language binding suites run through their
+binding-specific CI tasks. `mise run bindings:test-generator` tests the binding
+generator;
 [Generate bindings](/maplibre-native-ffi/development/binding-generation/#test-the-generator)
 describes that suite.
 

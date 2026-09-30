@@ -35,6 +35,10 @@ LIBRARY_STEM = "maplibre-native-c"
 # it for include/maplibre_native_c/plugin.h; see cmake/mln_ffi_c_api.cmake.
 EXTRA_EXPORTS = frozenset({"mln_plugin_register_v1"})
 FORBIDDEN = re.compile(r"mln_test|testing|sync_point", re.IGNORECASE)
+# Symbols a linker can define in a shared library's dynamic table on its own.
+# The version script keeps them local with GNU ld, and the check ignores them in
+# case another linker exports them anyway.
+LINKER_DEFINED = frozenset({"_end", "_edata", "__bss_start", "_init", "_fini"})
 PE_EXPORT = re.compile(r"^\s*Name: (?P<name>\S+)$")
 DUMPBIN_EXPORT = re.compile(r"^\s+\d+\s+[0-9A-Fa-f]+\s+[0-9A-Fa-f]+\s+(?P<name>\S+)")
 
@@ -51,7 +55,10 @@ def declared_functions() -> set[str]:
 
 
 def run(command: list[str]) -> str:
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+    except FileNotFoundError:
+        raise SystemExit(f"error: {command[0]} is not installed") from None
     if result.returncode != 0:
         raise SystemExit(
             f"error: {command[0]} failed for {command[-1]}:\n{result.stderr.strip()}"
@@ -101,17 +108,40 @@ def nm_symbols(tool: str, library: pathlib.Path, dynamic: bool) -> set[str]:
         # An archive lists each member as `member.o:` before its symbols.
         if len(fields) < 2 or line.endswith(":"):
             continue
-        names.add(fields[-1])
+        # A versioned ELF symbol prints as `name@@VERSION`.
+        names.add(fields[-1].split("@", 1)[0])
+    if dynamic:
+        names -= LINKER_DEFINED
     return names
 
 
+def readobj_tool() -> str | None:
+    found = shutil.which("llvm-readobj")
+    if found:
+        return found
+    # The Windows presets compile with clang-cl from the LLVM installer, which
+    # does not always put its tools on PATH.
+    program_files = os.environ.get("ProgramFiles")
+    if program_files:
+        candidate = pathlib.Path(program_files) / "LLVM" / "bin" / "llvm-readobj.exe"
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
 def pe_symbols(library: pathlib.Path) -> set[str]:
-    if shutil.which("llvm-readobj"):
-        output = run(["llvm-readobj", "--coff-exports", str(library)])
+    readobj = readobj_tool()
+    if readobj:
+        output = run([readobj, "--coff-exports", str(library)])
         pattern = PE_EXPORT
-    else:
+    elif shutil.which("dumpbin"):
         output = run(["dumpbin", "/nologo", "/exports", str(library)])
         pattern = DUMPBIN_EXPORT
+    else:
+        raise SystemExit(
+            "error: reading a DLL's exports needs llvm-readobj, on PATH or in "
+            "%ProgramFiles%\\LLVM\\bin, or dumpbin from a Visual Studio shell"
+        )
     return {
         match.group("name")
         for line in output.splitlines()
