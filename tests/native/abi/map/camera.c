@@ -952,13 +952,16 @@ static void visible_bounds_unwrap_across_the_antimeridian(void) {
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
   camera.latitude = 0.0;
-  camera.longitude = 180.0;
+  // A center on the antimeridian itself unprojects to 180 or -180 depending
+  // on floating-point rounding, which flips the hull to the other side, so the
+  // center sits just west of it.
+  camera.longitude = 170.0;
   camera.zoom = 1.0;
 
   // At zoom 1 the world is 1024 pixels wide, so 512 pixels span 180 degrees.
   const mln_lat_lng_bounds hull = bounds_for_camera(map, &camera, true);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 90.0, hull.southwest.longitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 270.0, hull.northeast.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 80.0, hull.southwest.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 260.0, hull.northeast.longitude);
 
   const mln_lat_lng_bounds wrapped = bounds_for_camera(map, &camera, false);
   TEST_ASSERT_TRUE(wrapped.southwest.longitude >= -180.0);
