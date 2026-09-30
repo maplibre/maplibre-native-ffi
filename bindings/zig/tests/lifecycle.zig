@@ -66,6 +66,10 @@ test "a child map keeps its disposed runtime's callbacks alive" {
     runtime.deinit();
     try testing.expectError(error.InvalidState, maplibre.runtimeGetEventMask(runtime, null));
     _ = try maplibre.mapSnapshotGet(map, null);
+    // No fence can follow the disposal: native refuses the map's commands
+    // once its runtime is disposed. The count stays zero without one because
+    // native releases the wake only when it retires the runtime, which this
+    // live map holds off, and the binding never releases it on its own.
     try testing.expectEqual(@as(usize, 0), wake_releases.get());
 
     map.deinit();

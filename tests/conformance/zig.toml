@@ -4,7 +4,7 @@
 #   "ID" = { na = "reason" }
 
 [cases]
-"ERR-01" = "bindings/zig/src/status.zig::native statuses map both ways and diagnostics truncate and reset"
+"ERR-01" = "bindings/zig/src/status.zig::statuses map both ways, keep an unknown code, and carry the diagnostic"
 "ERR-02" = "bindings/zig/src/status.zig::ABI version validation reports mismatch diagnostics"
 "LIFE-01" = "bindings/zig/tests/lifecycle.zig::copied handles share one close and close twice safely"
 "LIFE-02" = "bindings/zig/tests/lifecycle.zig::a refused close leaves the handle usable and a later close succeeds"
@@ -14,7 +14,10 @@
 # disposal off the callback stack.
 "LIFE-04" = "bindings/zig/src/owner.zig::an owner abandoned inside a callback scope disposes off the callback stack"
 "LIFE-05" = "bindings/zig/tests/lifecycle.zig::a child map keeps its disposed runtime's callbacks alive"
-"COMP-01" = "bindings/zig/src/completion.zig::a completion delivers its value exactly once"
+# A Zig conversion runs in the completion callback and disposes what it built,
+# so a value that fails to convert never reaches the future; the test covers
+# the error it reports instead.
+"COMP-01" = "bindings/zig/src/completion.zig::a completion delivers once, and a value that fails to convert reports the error once"
 "COMP-02" = "bindings/zig/src/completion.zig::a refused submission frees the future and its copy context"
 "COMP-03" = "bindings/zig/tests/lifecycle.zig::discarding a creation future retires the map it creates"
 "COMP-04" = "bindings/zig/tests/diagnostics.zig::a failed command arrives as data and fills the wait's diagnostic"

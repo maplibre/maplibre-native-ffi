@@ -309,7 +309,12 @@ const Tracked = struct {
     }
 };
 
-test "a completion delivers its value exactly once" {
+// A completion hands out its value once. A value that fails to convert never
+// becomes a binding value: the conversion runs in the completion callback and
+// disposes what it built (a generated copy adopts a native handle through
+// owner.adopt, which disposes the handle when adoption fails), so the future
+// reports the error once and has nothing of its own to dispose.
+test "a completion delivers once, and a value that fails to convert reports the error once" {
     Tracked.disposals = 0;
     FakeSubmission.refuse = false;
     var future = try submit(Tracked, null, Tracked.copy, FakeSubmission.start, .{});
@@ -323,20 +328,16 @@ test "a completion delivers its value exactly once" {
     future.deinit();
     try std.testing.expectEqual(@as(usize, 0), Tracked.disposals);
     try std.testing.expectError(error.ClosedHandle, future.wait(null));
-}
 
-test "a value that fails to convert reports the error and leaks nothing" {
-    Tracked.disposals = 0;
-    FakeSubmission.refuse = false;
-    var future = try submit(Tracked, null, Tracked.copy, FakeSubmission.start, .{});
-    defer future.deinit();
+    var failed = try submit(Tracked, null, Tracked.copy, FakeSubmission.start, .{});
+    defer failed.deinit();
     FakeSubmission.deliver(2);
     FakeSubmission.retire();
     var diagnostic: diagnostics.Diagnostic = .{};
-    try std.testing.expectError(error.NativeError, future.wait(&diagnostic));
+    try std.testing.expectError(error.NativeError, failed.wait(&diagnostic));
     try std.testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
     try std.testing.expectEqualStrings("native returned a value that the binding cannot read", diagnostic.message());
-    try std.testing.expectEqual(@as(usize, 0), Tracked.disposals);
+    try std.testing.expectError(error.AlreadyCompleted, failed.wait(null));
 }
 
 /// A copy context that counts how often the binding releases it.

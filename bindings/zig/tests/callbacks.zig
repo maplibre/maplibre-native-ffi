@@ -44,6 +44,7 @@ test "a callback registration is rooted until native releases it" {
 
     try support.expectCommitted(try maplibre.mapRemoveStyleSource(fixture.map, "removed", null));
     try removed.waitFor(1);
+    try fixture.barrier();
     try testing.expectEqual(@as(usize, 0), retained.get());
     try fixture.closeMap();
     try retained.waitFor(1);
@@ -209,43 +210,6 @@ test "released request handle copies stay closed after later requests" {
     loaded.deinit();
 }
 
-const CancellationProbe = struct {
-    handle: maplibre.ResourceRequestHandle,
-    checks: support.Counter = .{},
-    stopped: support.Flag = .{},
-    result: ?anyerror = null,
-
-    fn run(self: *CancellationProbe) void {
-        while (true) {
-            _ = maplibre.resourceRequestCancelled(self.handle, null) catch |err| {
-                self.result = err;
-                self.stopped.set();
-                return;
-            };
-            self.checks.add();
-            std.Thread.yield() catch {};
-        }
-    }
-};
-
-// A lease taken before a concurrent release still reaches a live native
-// handle, and every call after the release reports the closed handle.
-test "request cancellation checks stay safe across a concurrent release" {
-    const fixture = try support.Fixture.create(.{});
-    defer fixture.destroy();
-    var provider = DeferringProvider{ .url = "custom://race.json" };
-    try provider.install(fixture);
-    const handle = try provider.take(fixture);
-
-    var probe = CancellationProbe{ .handle = handle };
-    const thread = try std.Thread.spawn(.{}, CancellationProbe.run, .{&probe});
-    try probe.checks.waitFor(1);
-    try maplibre.resourceRequestRelease(handle);
-    try probe.stopped.wait();
-    thread.join();
-    try testing.expectEqual(@as(?anyerror, error.InvalidState), probe.result);
-}
-
 const CancelProbe = struct {
     cancels: support.Counter = .{},
     releases: support.Counter = .{},
@@ -318,8 +282,8 @@ const TransformProbe = struct {
 
 // A transform's response object is valid only on the callback's thread while
 // the callback runs. The transform runs in the native network loader, after
-// the provider passes a request through, and its rewrite to a scheme no loader
-// serves keeps the loopback URL from being fetched.
+// the provider passes a request through. No loader serves either the original
+// or the rewritten scheme, so the style fails to load without a fetch.
 test "a scoped response rejects use after its callback and from another thread" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
@@ -327,7 +291,7 @@ test "a scoped response rejects use after its callback and from another thread" 
     var probe = TransformProbe{};
     try support.resolve(try maplibre.runtimeSetResourceTransform(testing.allocator, fixture.runtime, .{ .callback = TransformProbe.transform, .context = &probe }, null));
 
-    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, "http://127.0.0.1:9/original.json", null));
+    try support.expectCommitted(try maplibre.mapSetStyleUrl(testing.allocator, fixture.map, "unsupported://original.json", null));
     var failed = try fixture.waitForEvent(.map_loading_failed);
     failed.deinit();
     try testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));

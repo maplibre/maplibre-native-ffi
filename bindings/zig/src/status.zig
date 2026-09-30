@@ -140,20 +140,7 @@ fn nativeStatusError(raw_status: i32) NativeStatusError {
     };
 }
 
-test "unknown status preserves raw status" {
-    var diagnostic: diagnostics.Diagnostic = .{};
-    const unknown_raw_status: i32 = -9999;
-    const unknown = struct {
-        fn function(out_diagnostic: [*c]c.mln_diagnostic) callconv(.c) c.mln_status {
-            out_diagnostic[0].message[0] = 0;
-            return unknown_raw_status;
-        }
-    }.function;
-    try std.testing.expectError(error.UnknownStatus, call(unknown, .{}, &diagnostic));
-    try std.testing.expectEqual(@as(?i32, unknown_raw_status), diagnostic.raw_status);
-}
-
-test "native statuses map both ways and diagnostics truncate and reset" {
+test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
     const table = .{
         .{ c.MLN_STATUS_INVALID_ARGUMENT, error.InvalidArgument },
         .{ c.MLN_STATUS_INVALID_STATE, error.InvalidState },
@@ -173,7 +160,19 @@ test "native statuses map both ways and diagnostics truncate and reset" {
     // A host callback's error that has no native status reports a native error.
     try std.testing.expectEqual(@as(c.mln_status, c.MLN_STATUS_NATIVE_ERROR), rawStatus(error.OutOfMemory));
 
+    // A status the binding does not name keeps its code and the call's message.
     var diagnostic: diagnostics.Diagnostic = .{};
+    const unknown_raw_status: i32 = -9999;
+    const unknown = struct {
+        fn function(out_diagnostic: [*c]c.mln_diagnostic) callconv(.c) c.mln_status {
+            @memcpy(out_diagnostic[0].message[0..8], "unknown\x00");
+            return unknown_raw_status;
+        }
+    }.function;
+    try std.testing.expectError(error.UnknownStatus, call(unknown, .{}, &diagnostic));
+    try std.testing.expectEqual(@as(?i32, unknown_raw_status), diagnostic.raw_status);
+    try std.testing.expectEqualStrings("unknown", diagnostic.message());
+
     record(&diagnostic, -1, "x" ** 8192);
     try std.testing.expectEqual(diagnostic.native.message.len - 1, diagnostic.message().len);
     begin(&diagnostic);
