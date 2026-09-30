@@ -2,16 +2,11 @@
 # `mise run check-export-calls` fails when an exported function is uncalled and
 # missing here, and when a function listed here is called. This list only
 # shrinks: call a function from the C tests, then drop its line.
-mln_acquired_frame_get_metal_texture
-mln_acquired_frame_get_opengl_texture
-mln_acquired_frame_get_vulkan_texture
-mln_acquired_frame_get_webgpu_texture
 mln_android_init
 mln_metal_borrowed_texture_set_target
 mln_opengl_borrowed_texture_set_target
 mln_opengl_supported_context_provider_mask
 mln_opengl_surface_set_target
-mln_render_target_extent_physical_size
 mln_texture_image_info_default
 mln_vulkan_borrowed_texture_set_target
 mln_vulkan_surface_set_target
