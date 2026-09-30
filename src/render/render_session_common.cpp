@@ -3241,18 +3241,23 @@ auto render_session_resize_start(
   }
   // A detach that starts after the checks above must not find this resize
   // queued behind its own work, where it would run against released backends.
-  if (!enqueue_work_if_attached(
-        live, make_ordered_resize_work(live, async.operation, copied, ticket)
-      )) {
-    {
-      const auto lock = std::scoped_lock{live->control_mutex};
-      live->pending_extent.reset();
+  {
+    const auto lock = std::scoped_lock{live->control_mutex};
+    if (live->state == MLN_RENDER_SESSION_STATE_ATTACHED) {
+      // Accepted before the driver can take the work, so the driver, rather
+      // than this thread, delivers a completion that finishes early.
+      async.completion->accept();
+      push_driver_work_locked(
+        *live, make_ordered_resize_work(live, async.operation, copied, ticket)
+      );
+      return MLN_STATUS_OK;
     }
-    async.operation->complete(
-      MLN_STATUS_INVALID_STATE,
-      "render session detached before the resize applied", {}
-    );
+    live->pending_extent.reset();
   }
+  async.operation->complete(
+    MLN_STATUS_INVALID_STATE,
+    "render session detached before the resize applied", {}
+  );
   async.completion->accept();
   return MLN_STATUS_OK;
 }
@@ -3364,6 +3369,9 @@ auto render_session_detach_start(
     ++live->barrier_epoch;
     ++live->generation;
   }
+  // Accepted before the driver can take the work, so the driver, rather than
+  // this thread, delivers the detach completion.
+  async.completion->accept();
   enqueue_work(
     live,
     RenderDriverWork{
@@ -3401,7 +3409,6 @@ auto render_session_detach_start(
       }
     }
   );
-  async.completion->accept();
   return MLN_STATUS_OK;
 }
 
