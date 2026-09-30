@@ -271,6 +271,12 @@ Every feature needs automated CI coverage when practical. The root
 in `tests/native` through CTest and Unity. Language binding suites run through
 their binding-specific CI tasks.
 
+Tests wait on signals rather than elapsed time, and serve every request from a
+local fixture. The `test-hygiene` check in hk runs
+`scripts/check-test-hygiene.py`, which fails on a sleep or on a public or
+reserved host in test code. Its baseline, `scripts/test-hygiene-baseline.toml`,
+counts the violations that predate the check, and a count may only fall.
+
 Use examples for demos and behavior that needs manual validation, such as visual
 output, interactive input, or host graphics integration.
 

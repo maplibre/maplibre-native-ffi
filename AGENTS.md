@@ -177,6 +177,14 @@ sentence-level style, page structure, and project terminology.
   `mise run coverage-diff --only-in <binding> --not-in native` to find the
   `src/` lines only the binding reaches. See
   [Code coverage](docs/src/content/docs/development/overview.md#code-coverage).
+- Tests wait on signals rather than elapsed time, and serve every request from a
+  local fixture. `scripts/check-test-hygiene.py` fails on a sleep or on a public
+  or reserved host, such as `example.com` or a `.test` name, in test code.
+  Violations that predate it are counted per file in
+  `scripts/test-hygiene-baseline.toml`, and those counts only fall: run the
+  script with `--update` after removing some. Mark a URL that a test only
+  rewrites or rejects with a `lint: not-fetched` comment on its line or the line
+  above.
 
 ## Project Docs
 

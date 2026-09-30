@@ -37,12 +37,16 @@ local lintSteps = new Mapping<String, Step> {
   ["export-calls"] {
     glob = List(
       "include/**/*.h",
-      "src/c_api/tests/**",
       "tests/native/**",
       "tests/uncalled-exports.txt",
       "scripts/check-export-calls.py",
     )
     check = "mise run check-export-calls"
+  }
+  // Whole-repository check: the baseline counts violations per file, so a
+  // count that falls in one file has to fail the check until it is lowered.
+  ["test-hygiene"] {
+    check = "uv run --no-sync python scripts/check-test-hygiene.py"
   }
   ["jvl"] {
     glob = List("**/*.json", "**/*.jsonc")
