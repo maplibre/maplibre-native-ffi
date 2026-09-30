@@ -321,8 +321,13 @@ void mln_test_temp_path(const char* name, char* out_path, size_t capacity) {
 #else
   const unsigned long process = (unsigned long)getpid();
 #endif
+  // Absolute, because cases name these files in file:// URLs.
   if (directory == NULL || directory[0] == '\0') {
+#if defined(_WIN32)
     directory = ".";
+#else
+    directory = "/tmp";
+#endif
   }
   const size_t length = strlen(directory);
   const bool has_separator = length > 0 && (directory[length - 1] == '/' ||

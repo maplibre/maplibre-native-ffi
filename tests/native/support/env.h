@@ -91,7 +91,7 @@ bool mln_test_fixture_path(
 );
 
 // Writes a path for `name` in the temporary directory: TMPDIR, the Windows
-// temporary directory, or the working directory when neither is set. The path
+// temporary directory, or /tmp elsewhere when TMPDIR is unset. The path
 // carries the process ID, so the files a case writes do not collide with
 // another suite's run of the same case. Removes any file already at the path.
 // Fails the case when the path does not fit.
