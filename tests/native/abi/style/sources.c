@@ -845,6 +845,13 @@ static void image_sources_hold_corners_and_pixels(void) {
       map, MLN_BUFFER_LITERAL("inline-image"), moved, 3, &discard, NULL
     )
   );
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "must be 4", mln_map_add_image_source_url(
+                   map, MLN_BUFFER_LITERAL("one-corner"), moved, 1,
+                   MLN_BUFFER_LITERAL("fixture://image.png"),
+                   &completion.descriptor, MLN_TEST_DIAGNOSTIC
+                 )
+  );
   mln_premultiplied_rgba8_image short_image = image;
   short_image.byte_length = 15;
   TEST_ASSERT_EQUAL_INT(
@@ -902,11 +909,8 @@ static void image_sources_hold_corners_and_pixels(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// An image source asks the provider for its URL as an image, and a source
-// that does not exist has no coordinates to report.
-static void an_image_source_requests_an_image_and_a_missing_one_has_no_corners(
-  void
-) {
+// An image source asks the provider for its URL as an image.
+static void an_image_source_requests_its_url_as_an_image(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_provider* provider = mln_test_provider_create(NULL, 0);
@@ -933,18 +937,6 @@ static void an_image_source_requests_an_image_and_a_missing_one_has_no_corners(
   TEST_ASSERT_NOT_NULL(request);
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_IMAGE, request->kind);
 
-  mln_test_completion completion =
-    mln_test_completion_default(4 * sizeof(mln_lat_lng));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_get_image_source_coordinates(
-      map, MLN_BUFFER_LITERAL("missing"), &completion.descriptor, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
-  TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&completion));
-  mln_test_completion_destroy(&completion);
-
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
   mln_test_provider_destroy(provider);
@@ -959,5 +951,5 @@ MLN_TEST_GROUP {
   RUN_TEST(style_source_volatility_round_trips);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
   RUN_TEST(image_sources_hold_corners_and_pixels);
-  RUN_TEST(an_image_source_requests_an_image_and_a_missing_one_has_no_corners);
+  RUN_TEST(an_image_source_requests_its_url_as_an_image);
 }

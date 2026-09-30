@@ -670,15 +670,6 @@ static mln_status set_indicator_shadow_image(
   );
 }
 
-static mln_status set_indicator_top_image(
-  mln_map map, mln_buffer_view layer, const mln_completion* completion
-) {
-  return mln_map_set_location_indicator_image_name(
-    map, layer, MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP,
-    MLN_BUFFER_LITERAL("puck-top"), completion, NULL
-  );
-}
-
 // The typed setters write location-indicator properties in the renderer's
 // order and units, and refuse every other layer type.
 static void location_indicator_setters_write_its_properties(void) {
@@ -707,8 +698,6 @@ static void location_indicator_setters_write_its_properties(void) {
     {"accuracy radius", set_indicator_radius, "accuracy-radius", "25.0"},
     {"bearing image", set_indicator_image, "bearing-image",
      "\"name\":\"arrow\""},
-    {"top image", set_indicator_top_image, "top-image",
-     "\"name\":\"puck-top\""},
     {"top image", set_indicator_top_image, "top-image", "\"name\":\"dot\""},
     {"shadow image", set_indicator_shadow_image, "shadow-image",
      "\"name\":\"halo\""},

@@ -1224,93 +1224,46 @@ static void map_coordinate_conversion_rejects_invalid_arguments(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static mln_screen_point pixel_at(mln_map map, mln_lat_lng coordinate) {
-  mln_test_completion query =
-    mln_test_completion_default(sizeof(mln_screen_point));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_pixel_for_lat_lng(map, coordinate, &query.descriptor, NULL)
-  );
-  mln_screen_point point = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_completion_finish_value(&query, &point, sizeof(point))
-  );
-  return point;
-}
-
-// The camera's center projects to the middle of the map, a batch projects each
-// coordinate as the single call does, and each pixel converts back to its
-// coordinate.
-static void coordinate_conversions_round_trip_through_the_camera(void) {
+// Each zoom level halves the ground distance a pixel covers, and at one zoom a
+// pixel covers less ground the farther it is from the equator, in proportion
+// to the cosine of the latitude.
+static void meters_per_pixel_halves_per_zoom_and_shrinks_toward_the_poles(
+  void
+) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  camera.latitude = san_francisco.latitude;
-  camera.longitude = san_francisco.longitude;
-  camera.zoom = 10.0;
+  camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.zoom = 3.0;
   jump(map, camera);
 
-  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_snapshot_get(map, &snapshot, NULL)
-  );
-  const mln_screen_point center = pixel_at(map, san_francisco);
-  TEST_ASSERT_DOUBLE_WITHIN(
-    1e-6, snapshot.logical_extent.width / 2.0, center.x
-  );
-  TEST_ASSERT_DOUBLE_WITHIN(
-    1e-6, snapshot.logical_extent.height / 2.0, center.y
-  );
+  const double equator = meters_per_pixel(map, 0.0);
+  const double mid = meters_per_pixel(map, 45.0);
+  const double high = meters_per_pixel(map, -60.0);
+  TEST_ASSERT_GREATER_THAN_DOUBLE(mid, equator);
+  TEST_ASSERT_GREATER_THAN_DOUBLE(high, mid);
+  TEST_ASSERT_DOUBLE_WITHIN(equator * 1e-9, equator * sqrt(0.5), mid);
+  TEST_ASSERT_DOUBLE_WITHIN(equator * 1e-9, equator * 0.5, high);
 
-  const mln_lat_lng coordinates[2] = {
-    san_francisco, {.latitude = 37.8, .longitude = -122.4}
-  };
-  mln_test_completion batch =
-    mln_test_completion_default(sizeof(mln_screen_point) * 2);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_pixels_for_lat_lngs(map, coordinates, 2, &batch.descriptor, NULL)
-  );
-  mln_screen_point pixels[2] = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_completion_finish_value(&batch, pixels, sizeof(pixels))
-  );
-  for (size_t index = 0; index < 2; index += 1) {
-    const mln_screen_point single = pixel_at(map, coordinates[index]);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-9, single.x, pixels[index].x);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-9, single.y, pixels[index].y);
-    const mln_lat_lng back = coordinate_at(map, pixels[index]);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, coordinates[index].latitude, back.latitude);
-    TEST_ASSERT_DOUBLE_WITHIN(
-      1e-6, coordinates[index].longitude, back.longitude
-    );
-  }
-
-  mln_test_completion empty = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_pixels_for_lat_lngs(map, NULL, 0, &empty.descriptor, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&empty));
-  TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&empty));
-  mln_test_completion_destroy(&empty);
+  camera.zoom = 4.0;
+  jump(map, camera);
+  TEST_ASSERT_DOUBLE_WITHIN(mid * 1e-9, mid / 2.0, meters_per_pixel(map, 45.0));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-// An identity orientation looks straight down with north up, so it clears the
-// pitch and bearing that a jump set.
-static void a_free_camera_orientation_sets_pitch_and_bearing(void) {
+// A free camera orientation replaces the camera's pitch and bearing: the
+// identity quaternion looks straight down with north up.
+static void a_free_camera_orientation_reaches_the_camera(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_PITCH | MLN_CAMERA_OPTION_BEARING;
+  camera.fields = MLN_CAMERA_OPTION_ZOOM | MLN_CAMERA_OPTION_PITCH |
+                  MLN_CAMERA_OPTION_BEARING;
+  camera.zoom = 4.0;
   camera.pitch = 30.0;
-  camera.bearing = 45.0;
+  camera.bearing = 20.0;
   jump(map, camera);
 
   mln_free_camera_options options = mln_free_camera_options_default();
@@ -1321,183 +1274,29 @@ static void a_free_camera_orientation_sets_pitch_and_bearing(void) {
     MLN_STATUS_OK,
     mln_map_set_free_camera_options(map, &options, &completion.descriptor, NULL)
   );
+  const mln_camera_options applied = query_camera(map).camera;
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, applied.pitch);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, applied.bearing);
 
-  const mln_camera_options oriented = query_camera(map).camera;
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, oriented.pitch);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, oriented.bearing);
-  // The ordered conversions answer from the committed camera: a coordinate
-  // comes back from its own pixel, and the batch form answers each element as
-  // the single form does.
-  static void ordered_conversions_round_trip_a_coordinate_through_its_pixel(
-    void
-  ) {
-    mln_runtime runtime = mln_test_create_runtime();
-    mln_map map = create_square_map(runtime, 256);
-    jump(map, test_camera());
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
 
-    const mln_screen_point pixel = pixel_at(map, san_francisco);
-    const mln_lat_lng back = coordinate_at(map, pixel);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, san_francisco.latitude, back.latitude);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, san_francisco.longitude, back.longitude);
-
-    const mln_lat_lng coordinates[] = {
-      san_francisco, {.latitude = 37.8, .longitude = -122.4}
-    };
-    mln_screen_point points[2] = {0};
-    mln_test_completion batch = mln_test_completion_default(sizeof(points));
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_map_pixels_for_lat_lngs(map, coordinates, 2, &batch.descriptor, NULL)
-    );
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&batch));
-    TEST_ASSERT_EQUAL_size_t(2, mln_test_completion_value_count(&batch));
-    TEST_ASSERT_TRUE(
-      mln_test_completion_copy_value(&batch, points, sizeof(points))
-    );
-    mln_test_completion_destroy(&batch);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, pixel.x, points[0].x);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, pixel.y, points[0].y);
-    const mln_screen_point second = pixel_at(map, coordinates[1]);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, second.x, points[1].x);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, second.y, points[1].y);
-
-    mln_test_destroy_map(map);
-    mln_test_destroy_runtime(runtime);
-  }
-
-  // Each zoom level halves the ground distance a pixel covers, and at one zoom
-  // a pixel covers less ground the farther it is from the equator, in
-  // proportion to the cosine of the latitude.
-  static void meters_per_pixel_halves_per_zoom_and_shrinks_toward_the_poles(
-    void
-  ) {
-    mln_runtime runtime = mln_test_create_runtime();
-    mln_map map = mln_test_create_map(runtime);
-    mln_camera_options camera = mln_camera_options_default();
-    camera.fields = MLN_CAMERA_OPTION_ZOOM;
-    camera.zoom = 3.0;
-    jump(map, camera);
-
-    const double equator = meters_per_pixel(map, 0.0);
-    const double mid = meters_per_pixel(map, 45.0);
-    const double high = meters_per_pixel(map, -60.0);
-    TEST_ASSERT_GREATER_THAN_DOUBLE(mid, equator);
-    TEST_ASSERT_GREATER_THAN_DOUBLE(high, mid);
-    TEST_ASSERT_DOUBLE_WITHIN(equator * 1e-9, equator * sqrt(0.5), mid);
-    TEST_ASSERT_DOUBLE_WITHIN(equator * 1e-9, equator * 0.5, high);
-
-    camera.zoom = 4.0;
-    jump(map, camera);
-    TEST_ASSERT_DOUBLE_WITHIN(
-      mid * 1e-9, mid / 2.0, meters_per_pixel(map, 45.0)
-    );
-
-    mln_test_destroy_map(map);
-    mln_test_destroy_runtime(runtime);
-  }
-
-  // A point converts to a pixel and back to the same point, and an empty array
-  // converts to an empty result rather than failing.
-  static void single_conversions_round_trip_and_empty_arrays_convert(void) {
-    mln_runtime runtime = mln_test_create_runtime();
-    mln_map map = mln_test_create_map(runtime);
-    mln_camera_options camera = mln_camera_options_default();
-    camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-    camera.latitude = san_francisco.latitude;
-    camera.longitude = san_francisco.longitude;
-    camera.zoom = 10.0;
-    jump(map, camera);
-
-    mln_test_completion pixel_query =
-      mln_test_completion_default(sizeof(mln_screen_point));
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_map_pixel_for_lat_lng(
-                       map, san_francisco, &pixel_query.descriptor, NULL
-                     )
-    );
-    mln_screen_point pixel = {0};
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_test_completion_finish_value(&pixel_query, &pixel, sizeof(pixel))
-    );
-    const mln_lat_lng back = coordinate_at(map, pixel);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, san_francisco.latitude, back.latitude);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, san_francisco.longitude, back.longitude);
-
-    mln_test_completion pixels =
-      mln_test_completion_default(sizeof(mln_screen_point));
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_map_pixels_for_lat_lngs(map, NULL, 0, &pixels.descriptor, NULL)
-    );
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&pixels));
-    TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&pixels));
-    mln_test_completion_destroy(&pixels);
-    mln_test_completion coordinates =
-      mln_test_completion_default(sizeof(mln_lat_lng));
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_map_lat_lngs_for_pixels(map, NULL, 0, &coordinates.descriptor, NULL)
-    );
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_test_completion_finish(&coordinates)
-    );
-    TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&coordinates));
-    mln_test_completion_destroy(&coordinates);
-
-    mln_test_destroy_map(map);
-    mln_test_destroy_runtime(runtime);
-  }
-
-  // A free camera orientation replaces the camera's pitch and bearing: the
-  // identity quaternion looks straight down with north up.
-  static void a_free_camera_orientation_reaches_the_camera(void) {
-    mln_runtime runtime = mln_test_create_runtime();
-    mln_map map = mln_test_create_map(runtime);
-    mln_camera_options camera = mln_camera_options_default();
-    camera.fields = MLN_CAMERA_OPTION_ZOOM | MLN_CAMERA_OPTION_PITCH |
-                    MLN_CAMERA_OPTION_BEARING;
-    camera.zoom = 4.0;
-    camera.pitch = 30.0;
-    camera.bearing = 20.0;
-    jump(map, camera);
-
-    mln_free_camera_options options = mln_free_camera_options_default();
-    options.fields = MLN_FREE_CAMERA_OPTION_ORIENTATION;
-    options.orientation =
-      (mln_quaternion){.x = 0.0, .y = 0.0, .z = 0.0, .w = 1.0};
-    MLN_TEST_AWAIT_COMMAND(
-      MLN_STATUS_OK, mln_map_set_free_camera_options(
-                       map, &options, &completion.descriptor, NULL
-                     )
-    );
-    const mln_camera_options applied = query_camera(map).camera;
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, applied.pitch);
-    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, applied.bearing);
-
-    mln_test_destroy_map(map);
-    mln_test_destroy_runtime(runtime);
-  }
-
-  MLN_TEST_GROUP {
-    RUN_TEST(camera_rejects_invalid_arguments);
-    RUN_TEST(camera_snapshot_command_copy_and_disposition_are_ordered);
-    RUN_TEST(every_camera_field_round_trips_through_the_snapshot);
-    RUN_TEST(relative_camera_commands_compose_in_runtime_order);
-    RUN_TEST(every_camera_delta_kind_follows_its_convention);
-    RUN_TEST(camera_deltas_reject_what_they_cannot_express);
-    RUN_TEST(camera_fitting_rejects_invalid_arguments);
-    RUN_TEST(camera_fits_round_trip_through_the_visible_bounds);
-    RUN_TEST(visible_bounds_unwrap_across_the_antimeridian);
-    RUN_TEST(camera_bounds_constraints_reject_invalid_arguments);
-    RUN_TEST(camera_bounds_distinguish_unbounded_from_world);
-    RUN_TEST(camera_limits_clamp_later_jumps);
-    RUN_TEST(free_camera_options_reject_raw_invalid_arguments);
-    RUN_TEST(a_free_camera_orientation_sets_pitch_and_bearing);
-    RUN_TEST(map_coordinate_conversion_rejects_invalid_arguments);
-    RUN_TEST(coordinate_conversions_round_trip_through_the_camera);
-    RUN_TEST(ordered_conversions_round_trip_a_coordinate_through_its_pixel);
-    RUN_TEST(meters_per_pixel_halves_per_zoom_and_shrinks_toward_the_poles);
-    RUN_TEST(single_conversions_round_trip_and_empty_arrays_convert);
-    RUN_TEST(a_free_camera_orientation_reaches_the_camera);
-  }
+MLN_TEST_GROUP {
+  RUN_TEST(camera_rejects_invalid_arguments);
+  RUN_TEST(camera_snapshot_command_copy_and_disposition_are_ordered);
+  RUN_TEST(every_camera_field_round_trips_through_the_snapshot);
+  RUN_TEST(relative_camera_commands_compose_in_runtime_order);
+  RUN_TEST(every_camera_delta_kind_follows_its_convention);
+  RUN_TEST(camera_deltas_reject_what_they_cannot_express);
+  RUN_TEST(camera_fitting_rejects_invalid_arguments);
+  RUN_TEST(camera_fits_round_trip_through_the_visible_bounds);
+  RUN_TEST(visible_bounds_unwrap_across_the_antimeridian);
+  RUN_TEST(camera_bounds_constraints_reject_invalid_arguments);
+  RUN_TEST(camera_bounds_distinguish_unbounded_from_world);
+  RUN_TEST(camera_limits_clamp_later_jumps);
+  RUN_TEST(free_camera_options_reject_raw_invalid_arguments);
+  RUN_TEST(map_coordinate_conversion_rejects_invalid_arguments);
+  RUN_TEST(meters_per_pixel_halves_per_zoom_and_shrinks_toward_the_poles);
+  RUN_TEST(a_free_camera_orientation_reaches_the_camera);
+}

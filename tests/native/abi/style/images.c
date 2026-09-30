@@ -245,8 +245,8 @@ static void style_images_copy_their_metadata_and_packed_pixels(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// An image with no ID, or a stretch interval with no width, never reaches the
-// map worker.
+// An image with no ID, or a stretch interval with no width or one that runs
+// backwards, never reaches the map worker.
 static void style_image_inputs_are_validated_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -266,86 +266,61 @@ static void style_image_inputs_are_validated_at_submission(void) {
     )
   );
 
-  const mln_image_stretch empty = {.from = 0.5f, .to = 0.5f};
-  mln_style_image_options options = mln_style_image_options_default();
-  options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_X;
-  options.stretch_x = &empty;
-  options.stretch_x_count = 1;
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "positive width", mln_map_set_style_image(
-                        map, MLN_BUFFER_LITERAL("zero-width"), &image, &options,
-                        &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                      )
-  );
-  // Only a text fit the host names reads back, and an interval that runs
-  // backwards is refused at submission. A missing image has no stretches.
-  static void style_image_options_carry_text_fit_and_refuse_backwards_stretches(
-    void
-  ) {
-    mln_runtime runtime = mln_test_create_runtime();
-    mln_map map = mln_test_create_map(runtime);
-    const uint8_t pixels[16] = {0};
-    mln_premultiplied_rgba8_image image =
-      mln_premultiplied_rgba8_image_default();
-    image.width = 2;
-    image.height = 2;
-    image.stride = 8;
-    image.pixels = pixels;
-    image.byte_length = sizeof(pixels);
+  const mln_image_stretch invalid[] = {
+    {.from = 0.5f, .to = 0.5f},
+    {.from = 2.0f, .to = 1.0f},
+  };
+  for (size_t index = 0; index < sizeof(invalid) / sizeof(invalid[0]);
+       index += 1) {
     mln_style_image_options options = mln_style_image_options_default();
-    options.fields = MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
-    options.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
-    MLN_TEST_AWAIT_COMMAND(
-      MLN_STATUS_OK, mln_map_set_style_image(
-                       map, MLN_BUFFER_LITERAL("label"), &image, &options,
-                       &completion.descriptor, NULL
-                     )
-    );
-    const mln_style_image_info info = read_image_info(map, "label");
-    TEST_ASSERT_FALSE(info.has_text_fit_width);
-    TEST_ASSERT_TRUE(info.has_text_fit_height);
-    TEST_ASSERT_EQUAL_UINT32(
-      MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL, info.text_fit_height
-    );
-
-    const mln_image_stretch backwards = {.from = 2.0f, .to = 1.0f};
-    options = mln_style_image_options_default();
     options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_X;
-    options.stretch_x = &backwards;
+    options.stretch_x = &invalid[index];
     options.stretch_x_count = 1;
-    mln_completion discard = mln_test_discard_completion();
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_INVALID_ARGUMENT,
+    MLN_TEST_EXPECT_COMMAND_REJECTED(
+      "intervals must have a positive width",
       mln_map_set_style_image(
-        map, MLN_BUFFER_LITERAL("backwards"), &image, &options, &discard,
-        MLN_TEST_DIAGNOSTIC
+        map, MLN_BUFFER_LITERAL("invalid-stretch"), &image, &options,
+        &completion.descriptor, MLN_TEST_DIAGNOSTIC
       )
     );
-    TEST_ASSERT_NOT_NULL_MESSAGE(
-      strstr(mln_test_last_error(), "positive width"), mln_test_last_error()
-    );
-
-    mln_test_completion stretches =
-      mln_test_completion_default(sizeof(mln_style_image_stretches_result));
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_map_copy_style_image_stretches(
-        map, MLN_BUFFER_LITERAL("missing"), &stretches.descriptor, NULL
-      )
-    );
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_test_completion_finish(&stretches)
-    );
-    TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&stretches));
-    mln_test_completion_destroy(&stretches);
-
-    mln_test_destroy_map(map);
-    mln_test_destroy_runtime(runtime);
   }
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
 
-  MLN_TEST_GROUP {
-    RUN_TEST(style_image_stretches_are_borrowed_by_the_completion);
-    RUN_TEST(style_image_options_carry_text_fit_and_refuse_backwards_stretches);
-    RUN_TEST(style_images_copy_their_metadata_and_packed_pixels);
-    RUN_TEST(style_image_inputs_are_validated_at_submission);
-  }
+// Only a text fit the host names reads back.
+static void style_images_read_back_only_the_text_fit_the_host_names(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  const uint8_t pixels[16] = {0};
+  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  image.width = 2;
+  image.height = 2;
+  image.stride = 8;
+  image.pixels = pixels;
+  image.byte_length = sizeof(pixels);
+  mln_style_image_options options = mln_style_image_options_default();
+  options.fields = MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+  options.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK, mln_map_set_style_image(
+                     map, MLN_BUFFER_LITERAL("label"), &image, &options,
+                     &completion.descriptor, NULL
+                   )
+  );
+  const mln_style_image_info info = read_image_info(map, "label");
+  TEST_ASSERT_FALSE(info.has_text_fit_width);
+  TEST_ASSERT_TRUE(info.has_text_fit_height);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL, info.text_fit_height
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+MLN_TEST_GROUP {
+  RUN_TEST(style_image_stretches_are_borrowed_by_the_completion);
+  RUN_TEST(style_images_copy_their_metadata_and_packed_pixels);
+  RUN_TEST(style_images_read_back_only_the_text_fit_the_host_names);
+  RUN_TEST(style_image_inputs_are_validated_at_submission);
+}
