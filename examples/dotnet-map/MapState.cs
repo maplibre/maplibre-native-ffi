@@ -20,7 +20,11 @@ internal sealed class MapState : IDisposable
 
     public MapHandle Map { get; }
 
-    public static MapState Create(Viewport viewport)
+    /// <summary>
+    /// Creates the map with the example's style, or with <paramref name="styleJson" /> in its
+    /// place, which the smoke run passes so that it needs no network.
+    /// </summary>
+    public static MapState Create(Viewport viewport, byte[]? styleJson = null)
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default with { CachePath = ":memory:" });
         MapHandle? map = null;
@@ -41,9 +45,12 @@ internal sealed class MapState : IDisposable
                 )
                 .GetAwaiter()
                 .GetResult();
-            map.SetStyleUrlAsync(StyleUrl).GetAwaiter().GetResult();
+            var style = styleJson is null
+                ? map.SetStyleUrlAsync(StyleUrl)
+                : map.SetStyleJsonAsync(styleJson);
+            style.GetAwaiter().GetResult();
             map.UpdateCameraAsync(
-                    new CameraUpdate
+                    CameraUpdate.Default with
                     {
                         Mode = CameraUpdateMode.Jump,
                         Camera = new CameraOptions
@@ -75,7 +82,10 @@ internal sealed class MapState : IDisposable
     public void SetGestureInProgress(bool inProgress)
     {
         _ = Map.UpdateCameraAsync(
-            new CameraUpdate { GesturePhase = inProgress ? GesturePhase.Begin : GesturePhase.End }
+            CameraUpdate.Default with
+            {
+                GesturePhase = inProgress ? GesturePhase.Begin : GesturePhase.End,
+            }
         );
     }
 
@@ -166,7 +176,7 @@ internal sealed class MapState : IDisposable
     private void Update(CameraOptions camera, AnimationOptions? animation)
     {
         _ = Map.UpdateCameraAsync(
-            new CameraUpdate
+            CameraUpdate.Default with
             {
                 Mode = animation is null ? CameraUpdateMode.Jump : CameraUpdateMode.Ease,
                 Camera = camera,

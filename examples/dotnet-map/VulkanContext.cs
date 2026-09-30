@@ -62,7 +62,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
     public uint GraphicsQueueFamilyIndex => graphicsQueueFamilyIndex;
 
-    public static VulkanContext Create(string title, int width, int height)
+    public static VulkanContext Create(string title, int width, int height, bool visible)
     {
         SelectWaylandOnLinux();
         var vk = new Vk(Vk.CreateDefaultContext(NativeLibraryResolver.VulkanLibraryCandidates()));
@@ -75,6 +75,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
                 title,
                 width,
                 height,
+                visible,
                 glfw =>
                 {
                     if (!glfw.VulkanSupported())

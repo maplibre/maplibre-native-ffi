@@ -65,7 +65,9 @@ Every example exposes the same task contract in its `mise.toml`:
   60 seconds, and it needs no network. CI runs it on every target that can
   render the preset's backend, with a software renderer where the runner has no
   GPU. The C example enters this mode when `MLN_EXAMPLE_SMOKE=1` is set, so its
-  command-line contract stays the same.
+  command-line contract stays the same. `dotnet-map` takes a `--smoke` flag,
+  which renders in a hidden window and, on a Linux host with no display, uses
+  GLFW's null platform.
 
 An example that has not yet implemented every backend rejects an unsupported
 preset with an error that names what it supports: `go-map` drives OpenGL

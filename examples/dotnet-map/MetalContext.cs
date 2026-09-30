@@ -37,7 +37,7 @@ internal sealed unsafe class MetalContext : IGraphicsContext
 
     public bool CanRenderFrame => window.CanRenderFrame();
 
-    public static MetalContext Create(string title, int width, int height)
+    public static MetalContext Create(string title, int width, int height, bool visible)
     {
         if (!OperatingSystem.IsMacOS())
         {
@@ -48,6 +48,7 @@ internal sealed unsafe class MetalContext : IGraphicsContext
             title,
             width,
             height,
+            visible,
             glfw => glfw.WindowHint(WindowHintClientApi.ClientApi, ClientApi.NoApi)
         );
         nint retainedView = 0;

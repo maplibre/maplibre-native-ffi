@@ -30,22 +30,23 @@ internal static class GraphicsContext
         string title,
         int width,
         int height,
-        RenderBackendFlag backends
+        RenderBackendFlag backends,
+        bool visible
     )
     {
         if (backends.HasFlag(RenderBackendFlag.Metal))
         {
-            return MetalContext.Create(title, width, height);
+            return MetalContext.Create(title, width, height, visible);
         }
 
         if (backends.HasFlag(RenderBackendFlag.Opengl))
         {
-            return OpenGLContext.Create(title, width, height);
+            return OpenGLContext.Create(title, width, height, visible);
         }
 
         if (backends.HasFlag(RenderBackendFlag.Vulkan))
         {
-            return VulkanContext.Create(title, width, height);
+            return VulkanContext.Create(title, width, height, visible);
         }
 
         throw new InvalidOperationException(

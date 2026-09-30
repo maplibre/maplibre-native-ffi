@@ -4,6 +4,8 @@ namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal sealed unsafe class GlfwWindow : IDisposable
 {
+    private const int GlfwPlatform = 0x00050003;
+    private const int GlfwPlatformNull = 0x00060005;
     private static readonly Dictionary<nint, GlfwWindow> Windows = new();
     private readonly GlfwCallbacks.WindowSizeCallback windowSizeCallback;
     private readonly GlfwCallbacks.FramebufferSizeCallback framebufferSizeCallback;
@@ -36,14 +38,26 @@ internal sealed unsafe class GlfwWindow : IDisposable
 
     public event Action<Viewport>? ViewportChanged;
 
+    /// <summary>Opens a window, hidden when <paramref name="visible" /> is false.</summary>
+    /// <remarks>
+    /// A hidden window on a Linux host with no display uses GLFW's null platform, which creates
+    /// surfaceless EGL contexts and headless Vulkan surfaces, so the smoke run needs no display
+    /// server.
+    /// </remarks>
     public static GlfwWindow Create(
         string title,
         int width,
         int height,
+        bool visible,
         Action<Glfw> configureHints
     )
     {
         var glfw = Glfw.GetApi();
+        if (!visible && OperatingSystem.IsLinux() && !HasDisplay())
+        {
+            GlfwNativeAccess.InitHint(GlfwPlatform, GlfwPlatformNull);
+        }
+
         if (!glfw.Init())
         {
             throw new InvalidOperationException("GLFW initialization failed.");
@@ -53,6 +67,7 @@ internal sealed unsafe class GlfwWindow : IDisposable
         {
             glfw.DefaultWindowHints();
             glfw.WindowHint(WindowHintBool.Resizable, true);
+            glfw.WindowHint(WindowHintBool.Visible, visible);
             configureHints(glfw);
 
             var handle = glfw.CreateWindow(width, height, title, null, null);
@@ -179,6 +194,10 @@ internal sealed unsafe class GlfwWindow : IDisposable
         CurrentViewport.Log(label);
         ViewportChanged?.Invoke(CurrentViewport);
     }
+
+    private static bool HasDisplay() =>
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DISPLAY"))
+        || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
 
     private static float ViewportScale(int logicalSize, int physicalSize, float fallbackScale)
     {
