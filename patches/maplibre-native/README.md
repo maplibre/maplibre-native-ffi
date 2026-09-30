@@ -139,6 +139,12 @@ source-feature query that reached a fetched tile before the host delivered its
 data otherwise dereferenced null. The C suite's custom source cases cover it.
 Upstream: not yet filed.
 
+`0028-webgpu-frame-stats.patch` counts frames in the WebGPU backend's rendering
+stats and resets its per-frame draw call count at the start of each frame, as
+the Metal, Vulkan, and OpenGL backends do. It also adds each draw to the total
+draw call count. The WebGPU frame count otherwise stayed at zero. The C suite's
+render lifecycle case covers it. Upstream: not yet filed.
+
 Each patch is the squashed diff of its upstream branch, applied on top of the
 patches before it, so a patch that adds a test next to an earlier patch's test
 carries that placement rather than the branch's own context.
