@@ -17,18 +17,32 @@ internal object Shell {
   // loop.
   private const val IDLE_WAIT_SECONDS = 0.004
 
-  fun run(mode: RenderTargetMode, backends: RenderBackendFlag) {
-    GraphicsContext.create("MapLibre LWJGL Map", INITIAL_WIDTH, INITIAL_HEIGHT, backends).use {
-      graphics ->
-      val initialViewport = Viewport.read(graphics.window())
-      val viewport = ViewportHolder(initialViewport)
-      initialViewport.log("initial viewport")
-      val renderRequest = RenderRequest()
+  /** How long the smoke check waits for its first frame before it fails. */
+  private const val SMOKE_TIMEOUT_NANOS = 60_000_000_000L
 
-      MapState.create(initialViewport).use { state ->
-        renderLoop(graphics, mode, viewport, state, renderRequest)
+  /**
+   * Runs the example until its window closes. A smoke run instead renders an inline style in a
+   * hidden window, so it needs neither the network nor a user, and returns after the first frame
+   * that reaches the window.
+   */
+  fun run(mode: RenderTargetMode, backends: RenderBackendFlag, smoke: Boolean = false) {
+    GraphicsContext.create(
+        "MapLibre LWJGL Map",
+        INITIAL_WIDTH,
+        INITIAL_HEIGHT,
+        backends,
+        visible = !smoke,
+      )
+      .use { graphics ->
+        val initialViewport = Viewport.read(graphics.window())
+        val viewport = ViewportHolder(initialViewport)
+        initialViewport.log("initial viewport")
+        val renderRequest = RenderRequest()
+
+        MapState.create(initialViewport, if (smoke) MapState.SMOKE_STYLE else null).use { state ->
+          renderLoop(graphics, mode, viewport, state, renderRequest, smoke)
+        }
       }
-    }
   }
 
   private fun renderLoop(
@@ -37,7 +51,9 @@ internal object Shell {
     viewport: ViewportHolder,
     state: MapState,
     renderRequest: RenderRequest,
+    smoke: Boolean,
   ) {
+    val smokeDeadline = System.nanoTime() + SMOKE_TIMEOUT_NANOS
     val target = RenderTarget.attach(graphics, state.map, viewport.value, mode)
     try {
       InputController(graphics.window(), state, renderRequest) { viewport.value }
@@ -67,6 +83,13 @@ internal object Shell {
             if (renderRequest.consume()) {
               settled = render(target)
               if (!settled) renderRequest.set()
+            }
+            if (smoke) {
+              if (settled) {
+                println("smoke: rendered a frame")
+                return
+              }
+              check(System.nanoTime() < smokeDeadline) { "smoke: no frame reached the window" }
             }
             if (!settled) glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
           }

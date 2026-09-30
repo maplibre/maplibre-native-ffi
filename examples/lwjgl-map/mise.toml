@@ -19,3 +19,21 @@ run = '''
   :examples:lwjgl-map:run \
   --args="$usage_render_target"
 '''
+
+[tasks.smoke]
+description = "Render one frame of an inline style in a hidden window, then exit."
+extends = "ffi:preset"
+dir = "../.."
+run = '''
+args=(
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install"
+  :examples:lwjgl-map:run
+  --args="owned-texture --smoke"
+)
+# GLFW needs a display server even for a hidden window. A Linux host without
+# one runs the example on a virtual X server, where Mesa renders in software.
+if [[ "$(uname -s)" == Linux && -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
+  exec xvfb-run -a ./gradlew "${args[@]}"
+fi
+exec ./gradlew "${args[@]}"
+'''

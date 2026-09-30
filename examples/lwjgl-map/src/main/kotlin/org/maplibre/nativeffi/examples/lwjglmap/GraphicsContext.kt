@@ -18,15 +18,16 @@ internal interface GraphicsContext : AutoCloseable {
       width: Int,
       height: Int,
       backends: RenderBackendFlag,
+      visible: Boolean = true,
     ): GraphicsContext {
       if (backends.contains(RenderBackendFlag.METAL)) {
-        return MetalContext.create(title, width, height)
+        return MetalContext.create(title, width, height, visible)
       }
       if (backends.contains(RenderBackendFlag.OPENGL)) {
-        return OpenGLContext.create(title, width, height)
+        return OpenGLContext.create(title, width, height, visible)
       }
       if (backends.contains(RenderBackendFlag.VULKAN)) {
-        return VulkanContext.create(title, width, height)
+        return VulkanContext.create(title, width, height, visible)
       }
       throw IllegalStateException(
         "The loaded MapLibre native library does not support a backend usable by lwjgl-map"

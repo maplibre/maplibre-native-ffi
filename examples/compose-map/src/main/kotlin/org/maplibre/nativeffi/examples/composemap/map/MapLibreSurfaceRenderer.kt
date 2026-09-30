@@ -20,7 +20,10 @@ import org.maplibre.nativeffi.generated.ScreenPoint
  * [render] runs on the bridge's producer thread, which owns the graphics context, borrowed texture,
  * and render session. Runtime and map updates are submitted directly to the core-owned worker.
  */
-internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
+internal class MapLibreSurfaceRenderer(
+  private val styleJson: String? = null,
+  private val onRendered: () -> Unit = {},
+) : NativeSurfaceRenderer {
   override val backend: ProducerBackend = MapLibreNativeSurfaceAdapter.backend
 
   private val renderRequest = RenderRequest()
@@ -90,6 +93,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
       // The result carries the map's own follow-up demand, so an ongoing transition needs no
       // runtime event round trip.
       if (result.needsRepaint) requestRender()
+      onRendered()
       return NativeSurfaceRenderResult.Rendered
     }
     // A newly accepted map or target update may not have reached the render session yet.
@@ -188,7 +192,9 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     mapState?.let {
       return it
     }
-    return MapState(extent, ::requestRender).also { synchronized(mapStateLock) { mapState = it } }
+    return MapState(extent, ::requestRender, styleJson).also {
+      synchronized(mapStateLock) { mapState = it }
+    }
   }
 
   private fun stopMapState() {

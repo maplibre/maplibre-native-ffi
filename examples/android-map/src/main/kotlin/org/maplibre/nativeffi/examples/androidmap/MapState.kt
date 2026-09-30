@@ -20,8 +20,11 @@ import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.ScreenPoint
 
 /** Runtime and map state driven by the core-owned runtime worker. */
-internal class MapState(initialViewport: Viewport, private val startLoop: () -> Unit) :
-  AutoCloseable {
+internal class MapState(
+  initialViewport: Viewport,
+  private val startLoop: () -> Unit,
+  styleJson: String? = null,
+) : AutoCloseable {
   private var closed = false
   private val initialCamera =
     CameraOptions(center = LatLng(37.7749, -122.4194), zoom = 13.0, bearing = 12.0, pitch = 30.0)
@@ -53,7 +56,8 @@ internal class MapState(initialViewport: Viewport, private val startLoop: () -> 
           )
           .await()
       }
-      map.setStyleUrl(STYLE_URL)
+      if (styleJson != null) map.setStyleJson(styleJson.encodeToByteArray())
+      else map.setStyleUrl(STYLE_URL)
       map.updateCamera(CameraUpdate(camera = initialCamera))
     } catch (error: Throwable) {
       runBlocking {

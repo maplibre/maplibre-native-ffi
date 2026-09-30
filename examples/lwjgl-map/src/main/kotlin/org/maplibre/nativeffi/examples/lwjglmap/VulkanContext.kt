@@ -4,11 +4,13 @@ import java.util.LinkedHashSet
 import java.util.Locale
 import org.lwjgl.PointerBuffer
 import org.lwjgl.glfw.GLFW.GLFW_CLIENT_API
+import org.lwjgl.glfw.GLFW.GLFW_FALSE
 import org.lwjgl.glfw.GLFW.GLFW_NO_API
 import org.lwjgl.glfw.GLFW.GLFW_PLATFORM
 import org.lwjgl.glfw.GLFW.GLFW_PLATFORM_WAYLAND
 import org.lwjgl.glfw.GLFW.GLFW_RESIZABLE
 import org.lwjgl.glfw.GLFW.GLFW_TRUE
+import org.lwjgl.glfw.GLFW.GLFW_VISIBLE
 import org.lwjgl.glfw.GLFW.glfwCreateWindow
 import org.lwjgl.glfw.GLFW.glfwDefaultWindowHints
 import org.lwjgl.glfw.GLFW.glfwDestroyWindow
@@ -257,7 +259,7 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   }
 
   internal companion object {
-    fun create(title: String, width: Int, height: Int): VulkanContext {
+    fun create(title: String, width: Int, height: Int, visible: Boolean): VulkanContext {
       selectWaylandOnLinux()
       check(glfwInit()) { "GLFW initialization failed" }
       val window: Long
@@ -267,6 +269,7 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
         glfwDefaultWindowHints()
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API)
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE)
+        glfwWindowHint(GLFW_VISIBLE, if (visible) GLFW_TRUE else GLFW_FALSE)
         window = glfwCreateWindow(width, height, title, NULL, NULL)
         check(window != NULL) { "GLFW window creation failed" }
       } catch (error: RuntimeException) {

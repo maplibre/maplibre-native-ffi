@@ -5,10 +5,12 @@ import org.lwjgl.glfw.GLFW.GLFW_CONTEXT_CREATION_API
 import org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MAJOR
 import org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MINOR
 import org.lwjgl.glfw.GLFW.GLFW_EGL_CONTEXT_API
+import org.lwjgl.glfw.GLFW.GLFW_FALSE
 import org.lwjgl.glfw.GLFW.GLFW_OPENGL_API
 import org.lwjgl.glfw.GLFW.GLFW_OPENGL_ES_API
 import org.lwjgl.glfw.GLFW.GLFW_RESIZABLE
 import org.lwjgl.glfw.GLFW.GLFW_TRUE
+import org.lwjgl.glfw.GLFW.GLFW_VISIBLE
 import org.lwjgl.glfw.GLFW.glfwCreateWindow
 import org.lwjgl.glfw.GLFW.glfwDefaultWindowHints
 import org.lwjgl.glfw.GLFW.glfwDestroyWindow
@@ -103,11 +105,11 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
   }
 
   internal companion object {
-    fun create(title: String, width: Int, height: Int): OpenGLContext {
+    fun create(title: String, width: Int, height: Int, visible: Boolean): OpenGLContext {
       val providers = GeneratedApi.openglSupportedContextProviderMask()
       return when {
-        OpenglContextProviderFlag.EGL in providers -> createEgl(title, width, height)
-        OpenglContextProviderFlag.WGL in providers -> createWgl(title, width, height)
+        OpenglContextProviderFlag.EGL in providers -> createEgl(title, width, height, visible)
+        OpenglContextProviderFlag.WGL in providers -> createWgl(title, width, height, visible)
         else ->
           error(
             "The loaded MapLibre native library does not support an OpenGL context provider usable by lwjgl-map"
@@ -115,7 +117,7 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
       }
     }
 
-    private fun createEgl(title: String, width: Int, height: Int): OpenGLContext {
+    private fun createEgl(title: String, width: Int, height: Int, visible: Boolean): OpenGLContext {
       check(OpenglContextProviderFlag.EGL in GeneratedApi.openglSupportedContextProviderMask()) {
         "Native library does not support EGL"
       }
@@ -130,6 +132,7 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
           glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
           glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0)
           glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE)
+          glfwWindowHint(GLFW_VISIBLE, if (visible) GLFW_TRUE else GLFW_FALSE)
           window = glfwCreateWindow(width, height, title, NULL, NULL)
           check(window != NULL) { "GLFW EGL window creation failed" }
           context = OpenGLContext(isGles = true, window = window)
@@ -159,7 +162,7 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
       }
     }
 
-    private fun createWgl(title: String, width: Int, height: Int): OpenGLContext {
+    private fun createWgl(title: String, width: Int, height: Int, visible: Boolean): OpenGLContext {
       check(OpenglContextProviderFlag.WGL in GeneratedApi.openglSupportedContextProviderMask()) {
         "Native library does not support WGL"
       }
@@ -171,6 +174,7 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0)
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE)
+        glfwWindowHint(GLFW_VISIBLE, if (visible) GLFW_TRUE else GLFW_FALSE)
         val window = glfwCreateWindow(width, height, title, NULL, NULL)
         check(window != NULL) { "GLFW WGL window creation failed" }
         context = OpenGLContext(isGles = false, window = window)

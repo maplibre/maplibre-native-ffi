@@ -20,8 +20,11 @@ import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.ScreenPoint
 
 /** Runtime and map state driven by the core-owned runtime worker. */
-internal class MapState(initialExtent: SurfaceExtent, private val requestRender: () -> Unit) :
-  AutoCloseable {
+internal class MapState(
+  initialExtent: SurfaceExtent,
+  private val requestRender: () -> Unit,
+  styleJson: String? = null,
+) : AutoCloseable {
   private var closed = false
   private var currentSize =
     LogicalExtent(
@@ -57,7 +60,8 @@ internal class MapState(initialExtent: SurfaceExtent, private val requestRender:
           )
           .await()
       }
-      map.setStyleUrl(STYLE_URL)
+      if (styleJson != null) map.setStyleJson(styleJson.encodeToByteArray())
+      else map.setStyleUrl(STYLE_URL)
       map.updateCamera(CameraUpdate(camera = initialCamera))
     } catch (error: Throwable) {
       runBlocking {

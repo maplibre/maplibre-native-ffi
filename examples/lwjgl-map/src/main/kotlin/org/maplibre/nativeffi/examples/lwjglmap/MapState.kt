@@ -109,7 +109,14 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   companion object {
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
 
-    fun create(viewport: Viewport): MapState {
+    /** An inline style the smoke run renders, which requests no resources. */
+    const val SMOKE_STYLE =
+      """{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#2a6f97"}}]}"""
+
+    /**
+     * Creates the runtime and map, loading [styleJson] when given and the default URL otherwise.
+     */
+    fun create(viewport: Viewport, styleJson: String? = null): MapState {
       val runtime =
         GeneratedApi.runtimeCreate(
           GeneratedApi.runtimeOptionsDefault().copy(cachePath = ":memory:")
@@ -148,7 +155,8 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
         }
       try {
         val state = MapState(runtime, map)
-        map.setStyleUrl(STYLE_URL)
+        if (styleJson != null) map.setStyleJson(styleJson.encodeToByteArray())
+        else map.setStyleUrl(STYLE_URL)
         map.updateCamera(CameraUpdate(camera = initialCamera))
         return state
       } catch (error: Throwable) {

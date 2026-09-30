@@ -20,3 +20,21 @@ run = '''
   -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
   :examples:compose-map:run
 '''
+
+[tasks.smoke]
+description = "Render one frame of an inline style, then exit."
+extends = "ffi:preset"
+dir = "../.."
+run = '''
+args=(
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install"
+  :examples:compose-map:run
+  --args="--smoke"
+)
+# Compose draws only into a window on a display server. A Linux host without
+# one runs the example on a virtual X server, where Mesa renders in software.
+if [[ "$(uname -s)" == Linux && -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
+  exec xvfb-run -a ./gradlew "${args[@]}"
+fi
+exec ./gradlew "${args[@]}"
+'''

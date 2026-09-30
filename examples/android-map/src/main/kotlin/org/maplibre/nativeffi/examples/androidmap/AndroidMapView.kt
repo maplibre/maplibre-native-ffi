@@ -14,8 +14,11 @@ import org.maplibre.nativeffi.generated.RenderResult
  * The UI thread owns the surface, touch input, viewport, graphics context, and render session.
  * Runtime and map updates are submitted directly to the core-owned runtime worker.
  */
-internal class AndroidMapView(context: Context) :
-  SurfaceView(context), SurfaceHolder.Callback2, Choreographer.FrameCallback, AutoCloseable {
+internal class AndroidMapView(
+  context: Context,
+  private val styleJson: String? = null,
+  private val onRendered: () -> Unit = {},
+) : SurfaceView(context), SurfaceHolder.Callback2, Choreographer.FrameCallback, AutoCloseable {
   private val input = InputController(context) { mapState }
   private var graphics: GraphicsContext? = null
   private var renderTarget: SurfaceRenderTarget? = null
@@ -101,6 +104,7 @@ internal class AndroidMapView(context: Context) :
           if (result?.disposition == RenderResult.RENDERED) {
             contextRebuildSpent = false
             finishPendingDrawing()
+            onRendered()
             // The result carries the map's own follow-up demand, so an ongoing transition needs no
             // runtime event round trip.
             if (result.needsRepaint) state.renderRequest.set()
@@ -149,7 +153,7 @@ internal class AndroidMapView(context: Context) :
       Log.i(TAG, "render-target=native-surface status=${nextGraphics.backendName}")
     }
     if (mapState == null) {
-      mapState = MapState(nextViewport, ::startLoopIfReady)
+      mapState = MapState(nextViewport, ::startLoopIfReady, styleJson)
     } else if (renderTarget == null) {
       // With no session attached the map is the only extent authority; a live session carries the
       // extent through followSurface below.
