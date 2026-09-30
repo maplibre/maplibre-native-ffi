@@ -66,7 +66,9 @@ mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("ki
         validate(api)
         return api
 
-    def test_reserved_parameter_names_are_escaped_or_rejected(self):
+    def test_reserved_parameter_names_are_rejected_by_dotnet_and_generate_elsewhere(
+        self,
+    ):
         for name in ("class", "completion_value", "arena"):
             parameter = "completion" if name == "completion_value" else name
             source = f"""
@@ -112,7 +114,7 @@ mln_status mln_measurement_change(mln_measurement measurement, const mln_complet
 """)
         self.assertIn("mln_measurement_change", dart.coverage(api)["generated"])
 
-    def test_dart_registers_deferred_callbacks_through_the_generated_adapter(self):
+    def test_dart_generates_callback_registrations_only_when_deferred(self):
         source = """
 typedef void (*mln_notice_release)(void *context BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
 typedef unsigned (*mln_notice_callback)(void *context BIND("kind=context;lifetime=owner"), int code, const char *text BIND("length=nul;encoding=utf8;lifetime=call")) BIND("thread=native;failure=0;deferred=1");
@@ -127,7 +129,7 @@ mln_status mln_notice_set_callback(mln_notice_callback callback, void *context B
             "mln_notice_set_callback", dart.coverage(synchronous)["unsupported"]
         )
 
-    def test_reserved_method_identifiers_are_escaped(self):
+    def test_reserved_method_identifiers_generate(self):
         source = """
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
 mln_status mln_map_class(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
@@ -137,7 +139,7 @@ mln_status mln_map_class(mln_map map, const mln_completion *completion, mln_diag
             with self.subTest(emitter=emitter.__name__):
                 self.assertIn("mln_map_class", emitter.coverage(owned)["generated"])
 
-    def test_nullable_input_cannot_be_silently_required(self):
+    def test_nullable_input_is_rejected_by_dotnet_and_generates_elsewhere(self):
         header = """
 BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_map_set_label(mln_map map,
@@ -153,7 +155,7 @@ mln_status mln_map_set_label(mln_map map,
             with self.subTest(emitter=emitter.__name__):
                 self.assertIn("mln_map_set_label", emitter.coverage(owned)["generated"])
 
-    def test_optional_buffer_array_cannot_silently_erase_absence(self):
+    def test_optional_buffer_array_is_rejected_by_dotnet_and_generates_elsewhere(self):
         for absence in ("nullable=true", "optional=empty"):
             api = self.parse(f"""
 BIND("execution=query;result=mln_buffer_view;shape=array;ownership=borrowed;encoding=utf8;{absence}")
@@ -172,7 +174,7 @@ mln_status mln_map_labels(mln_map map, const mln_completion *completion, mln_dia
             with self.subTest(emitter=emitter.__name__):
                 self.assertIn("mln_map_labels", emitter.coverage(owned)["generated"])
 
-    def test_binary_optional_result_requires_empty_conversion(self):
+    def test_binary_optional_result_is_rejected_by_dotnet_and_generates_elsewhere(self):
         header = """
 BIND("execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;encoding=bytes;optional=empty")
 mln_status mln_map_bytes(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
@@ -258,10 +260,18 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
 """)
         self.assertNotIn("mln_map_metric", dotnet.coverage(api)["generated"])
 
-    def test_dotnet_nested_values_preserve_grouped_presence_and_override_defaults(self):
-        api = self.parse(groups=("presence_mask",))
+    def test_dotnet_values_preserve_grouped_presence_defaults_and_keyword_fields(self):
+        api = self.parse(
+            """
+typedef struct mln_metric { double event; } mln_metric;
+BIND("execution=query;result=mln_metric;shape=value;ownership=borrowed")
+mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+""",
+            groups=("presence_mask",),
+        )
         values = Values(api)
         values.record("mln_snapshot")
+        values.record("mln_metric")
         plans = list(values.plans.values())
         declarations = "\n".join(values.declaration(plan) for plan in plans)
         methods = "\n".join(
@@ -303,6 +313,7 @@ enum mln_camera_field : ulong { MLN_CAMERA_CENTER = 1UL << 40, MLN_CAMERA_ZOOM =
 struct mln_lat_lng { public double latitude, longitude; }
 struct mln_camera { public uint abi_size; public ulong fields; public double latitude, longitude, zoom; }
 unsafe struct mln_snapshot { public mln_camera camera; public ulong generation; public mln_lat_lng* coordinates; public nuint coordinate_count; }
+struct mln_metric { public double @event; }
 static class NativeMethods {
   public static mln_camera mln_camera_default() => new() {
     fields = (1UL << 40) | 2, latitude = 80, longitude = 90, zoom = 99
@@ -335,6 +346,9 @@ static class NativeMethods {
     using var scope = new NativeCallScope();
     var encoded = NativeSnapshot(copy, scope);
     Check(encoded.coordinate_count == 2 && encoded.coordinates[0].latitude == 4);
+    // A field named after a C# keyword keeps its value in both directions.
+    Check(CopyMetric(new mln_metric { @event = 4 }).Event == 4);
+    Check(NativeMetric(new Metric(5)).@event == 5);
   }
 }
 """
