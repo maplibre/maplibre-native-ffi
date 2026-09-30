@@ -12,6 +12,10 @@
 #include "maplibre_native_c.h"
 #include "render.h"
 
+#if !defined(__EMSCRIPTEN__)
+#include "mln_test_graphics.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -37,6 +41,36 @@ bool mln_test_render_fixture_create_surface(
 // mln_test_graphics_texture_read_rgba8().
 bool mln_test_render_fixture_read_texture(
   const mln_test_render_fixture* fixture, uint8_t* pixels, size_t size
+);
+
+// The graphics object whose context a fixture from this header or from
+// mln_test_render_fixture_create() attached with.
+mln_test_graphics* mln_test_render_fixture_graphics(
+  const mln_test_render_fixture* fixture
+);
+
+// Creates another texture or surface of the host size on the fixture's
+// graphics object, for a case to hand the session. The fixture destroys it
+// after its session, and holds two of each at most. Returns null when the
+// graphics object cannot create one or the fixture holds two already.
+mln_test_graphics_texture* mln_test_render_fixture_new_texture(
+  const mln_test_render_fixture* fixture
+);
+mln_test_graphics_surface* mln_test_render_fixture_new_surface(
+  const mln_test_render_fixture* fixture
+);
+
+// Submits the backend's borrowed-texture or surface set_target for the
+// fixture's session, naming `texture` or `surface` and the context of
+// `graphics`, which created it. Returns the submission status, or
+// MLN_STATUS_NATIVE_ERROR when the target cannot be described.
+mln_status mln_test_render_fixture_set_texture(
+  const mln_test_render_fixture* fixture, mln_test_graphics* graphics,
+  const mln_test_graphics_texture* texture, const mln_completion* completion
+);
+mln_status mln_test_render_fixture_set_surface(
+  const mln_test_render_fixture* fixture, mln_test_graphics* graphics,
+  const mln_test_graphics_surface* surface, const mln_completion* completion
 );
 #endif
 

@@ -25,11 +25,16 @@
 #define HOST_OPENGL 1
 #endif
 
+// How many more targets a case can make on one fixture's graphics object.
+#define EXTRA_TARGETS 2
+
 typedef struct host_state {
   mln_test_graphics* graphics;
   mln_test_graphics_context context;
   mln_test_graphics_texture* texture;
   mln_test_graphics_surface* surface;
+  mln_test_graphics_texture* extra_textures[EXTRA_TARGETS];
+  mln_test_graphics_surface* extra_surfaces[EXTRA_TARGETS];
 } host_state;
 
 static void report(const char* what) {
@@ -69,6 +74,10 @@ void mln_test_backend_destroy(void* opaque_state) {
   if (state == NULL) {
     return;
   }
+  for (size_t index = 0; index < EXTRA_TARGETS; index += 1) {
+    mln_test_graphics_surface_destroy(state->extra_surfaces[index]);
+    mln_test_graphics_texture_destroy(state->extra_textures[index]);
+  }
   mln_test_graphics_surface_destroy(state->surface);
   mln_test_graphics_texture_destroy(state->texture);
   mln_test_graphics_destroy(state->graphics);
@@ -95,15 +104,18 @@ static mln_render_target_extent host_extent(void) {
 }
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-static mln_metal_context_descriptor host_context(const host_state* state) {
+static mln_metal_context_descriptor host_context(
+  const mln_test_graphics_context* context
+) {
   return (mln_metal_context_descriptor){
     .size = sizeof(mln_metal_context_descriptor),
-    .device = state->context.metal_device,
+    .device = context->metal_device,
   };
 }
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-static mln_vulkan_context_descriptor host_context(const host_state* state) {
-  const mln_test_graphics_context* context = &state->context;
+static mln_vulkan_context_descriptor host_context(
+  const mln_test_graphics_context* context
+) {
   return (mln_vulkan_context_descriptor){
     .size = sizeof(mln_vulkan_context_descriptor),
     .instance = context->vulkan_instance,
@@ -116,8 +128,9 @@ static mln_vulkan_context_descriptor host_context(const host_state* state) {
   };
 }
 #elif defined(MLN_FFI_TEST_OPENGL_WGL)
-static mln_opengl_context_descriptor host_context(const host_state* state) {
-  const mln_test_graphics_context* context = &state->context;
+static mln_opengl_context_descriptor host_context(
+  const mln_test_graphics_context* context
+) {
   return (mln_opengl_context_descriptor){
     .size = sizeof(mln_opengl_context_descriptor),
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL,
@@ -132,8 +145,9 @@ static mln_opengl_context_descriptor host_context(const host_state* state) {
   };
 }
 #else
-static mln_opengl_context_descriptor host_context(const host_state* state) {
-  const mln_test_graphics_context* context = &state->context;
+static mln_opengl_context_descriptor host_context(
+  const mln_test_graphics_context* context
+) {
   return (mln_opengl_context_descriptor){
     .size = sizeof(mln_opengl_context_descriptor),
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
@@ -163,7 +177,7 @@ bool mln_test_backend_attach(
   mln_metal_owned_texture_descriptor descriptor =
     mln_metal_owned_texture_descriptor_default();
   descriptor.extent = host_extent();
-  descriptor.context = host_context(state);
+  descriptor.context = host_context(&state->context);
   *out_status = mln_metal_owned_texture_attach(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
@@ -171,7 +185,7 @@ bool mln_test_backend_attach(
   mln_vulkan_owned_texture_descriptor descriptor =
     mln_vulkan_owned_texture_descriptor_default();
   descriptor.extent = host_extent();
-  descriptor.context = host_context(state);
+  descriptor.context = host_context(&state->context);
   *out_status = mln_vulkan_owned_texture_attach(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
@@ -179,11 +193,82 @@ bool mln_test_backend_attach(
   mln_opengl_owned_texture_descriptor descriptor =
     mln_opengl_owned_texture_descriptor_default();
   descriptor.extent = host_extent();
-  descriptor.context = host_context(state);
+  descriptor.context = host_context(&state->context);
   *out_status = mln_opengl_owned_texture_attach(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
+  return true;
+}
+
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+typedef mln_metal_borrowed_texture_descriptor borrowed_descriptor;
+typedef mln_metal_surface_descriptor surface_descriptor;
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+typedef mln_vulkan_borrowed_texture_descriptor borrowed_descriptor;
+typedef mln_vulkan_surface_descriptor surface_descriptor;
+#else
+typedef mln_opengl_borrowed_texture_descriptor borrowed_descriptor;
+typedef mln_opengl_surface_descriptor surface_descriptor;
+#endif
+
+// Describes `texture`, which the graphics object with `context` created, as a
+// borrowed target of the host size.
+static bool describe_texture(
+  const mln_test_graphics_context* context,
+  const mln_test_graphics_texture* texture, borrowed_descriptor* out
+) {
+  mln_test_graphics_texture_info info = {0};
+  if (!mln_test_graphics_texture_get_info(texture, &info)) {
+    report("the render fixture could not describe a texture");
+    return false;
+  }
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  (void)context;
+  *out = mln_metal_borrowed_texture_descriptor_default();
+  out->texture = info.metal_texture;
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  *out = mln_vulkan_borrowed_texture_descriptor_default();
+  out->context = host_context(context);
+  out->image = info.vulkan_image;
+  out->image_view = info.vulkan_image_view;
+  out->format = info.format;
+  out->initial_layout = info.vulkan_initial_layout;
+  out->final_layout = info.vulkan_final_layout;
+#else
+  *out = mln_opengl_borrowed_texture_descriptor_default();
+  out->context = host_context(context);
+  out->texture = info.opengl_texture;
+  out->target = info.opengl_target;
+#endif
+  // Physical and logical sizes agree at a scale factor of 1.
+  out->extent = host_extent();
+  out->physical_width = info.width;
+  out->physical_height = info.height;
+  return true;
+}
+
+static bool describe_surface(
+  const mln_test_graphics_context* context,
+  const mln_test_graphics_surface* surface, surface_descriptor* out
+) {
+  mln_test_graphics_surface_info info = {0};
+  if (!mln_test_graphics_surface_get_info(surface, &info)) {
+    report("the render fixture could not describe a surface");
+    return false;
+  }
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  *out = mln_metal_surface_descriptor_default();
+  out->layer = info.metal_layer;
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  *out = mln_vulkan_surface_descriptor_default();
+  out->surface = info.vulkan_surface;
+#else
+  *out = mln_opengl_surface_descriptor_default();
+  out->surface = info.opengl_surface;
+#endif
+  out->extent = host_extent();
+  out->context = host_context(context);
   return true;
 }
 
@@ -199,40 +284,16 @@ static bool attach_borrowed_texture(
   state->texture = mln_test_graphics_texture_create(
     state->graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
   );
-  mln_test_graphics_texture_info texture = {0};
+  borrowed_descriptor descriptor;
   if (
     state->texture == NULL ||
-    !mln_test_graphics_texture_get_info(state->texture, &texture)
+    !describe_texture(&state->context, state->texture, &descriptor)
   ) {
     report("the render fixture could not create a borrowed texture");
     mln_test_backend_destroy(state);
     return false;
   }
   *out_state = state;
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  mln_metal_borrowed_texture_descriptor descriptor =
-    mln_metal_borrowed_texture_descriptor_default();
-  descriptor.texture = texture.metal_texture;
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  mln_vulkan_borrowed_texture_descriptor descriptor =
-    mln_vulkan_borrowed_texture_descriptor_default();
-  descriptor.context = host_context(state);
-  descriptor.image = texture.vulkan_image;
-  descriptor.image_view = texture.vulkan_image_view;
-  descriptor.format = texture.format;
-  descriptor.initial_layout = texture.vulkan_initial_layout;
-  descriptor.final_layout = texture.vulkan_final_layout;
-#else
-  mln_opengl_borrowed_texture_descriptor descriptor =
-    mln_opengl_borrowed_texture_descriptor_default();
-  descriptor.context = host_context(state);
-  descriptor.texture = texture.opengl_texture;
-  descriptor.target = texture.opengl_target;
-#endif
-  // Physical and logical sizes agree at a scale factor of 1.
-  descriptor.extent = host_extent();
-  descriptor.physical_width = texture.width;
-  descriptor.physical_height = texture.height;
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   *out_status = mln_metal_borrowed_texture_attach(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
@@ -261,10 +322,10 @@ static bool attach_surface(
   state->surface = mln_test_graphics_surface_create(
     state->graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
   );
-  mln_test_graphics_surface_info surface = {0};
+  surface_descriptor descriptor;
   if (
     state->surface == NULL ||
-    !mln_test_graphics_surface_get_info(state->surface, &surface)
+    !describe_surface(&state->context, state->surface, &descriptor)
   ) {
     report("the render fixture could not create a surface");
     mln_test_backend_destroy(state);
@@ -272,29 +333,14 @@ static bool attach_surface(
   }
   *out_state = state;
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  mln_metal_surface_descriptor descriptor =
-    mln_metal_surface_descriptor_default();
-  descriptor.extent = host_extent();
-  descriptor.context = host_context(state);
-  descriptor.layer = surface.metal_layer;
   *out_status = mln_metal_surface_attach(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  mln_vulkan_surface_descriptor descriptor =
-    mln_vulkan_surface_descriptor_default();
-  descriptor.extent = host_extent();
-  descriptor.context = host_context(state);
-  descriptor.surface = surface.vulkan_surface;
   *out_status = mln_vulkan_surface_attach(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
-  mln_opengl_surface_descriptor descriptor =
-    mln_opengl_surface_descriptor_default();
-  descriptor.extent = host_extent();
-  descriptor.context = host_context(state);
-  descriptor.surface = surface.opengl_surface;
   *out_status = mln_opengl_surface_attach(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
@@ -328,4 +374,101 @@ bool mln_test_render_fixture_read_texture(
     return false;
   }
   return true;
+}
+
+mln_test_graphics* mln_test_render_fixture_graphics(
+  const mln_test_render_fixture* fixture
+) {
+  const host_state* state = fixture->backend_state;
+  return state == NULL ? NULL : state->graphics;
+}
+
+mln_test_graphics_texture* mln_test_render_fixture_new_texture(
+  const mln_test_render_fixture* fixture
+) {
+  host_state* state = fixture->backend_state;
+  for (size_t index = 0; state != NULL && index < EXTRA_TARGETS; index += 1) {
+    if (state->extra_textures[index] == NULL) {
+      state->extra_textures[index] = mln_test_graphics_texture_create(
+        state->graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
+      );
+      if (state->extra_textures[index] == NULL) {
+        report("the render fixture could not create another texture");
+      }
+      return state->extra_textures[index];
+    }
+  }
+  return NULL;
+}
+
+mln_test_graphics_surface* mln_test_render_fixture_new_surface(
+  const mln_test_render_fixture* fixture
+) {
+  host_state* state = fixture->backend_state;
+  for (size_t index = 0; state != NULL && index < EXTRA_TARGETS; index += 1) {
+    if (state->extra_surfaces[index] == NULL) {
+      state->extra_surfaces[index] = mln_test_graphics_surface_create(
+        state->graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
+      );
+      if (state->extra_surfaces[index] == NULL) {
+        report("the render fixture could not create another surface");
+      }
+      return state->extra_surfaces[index];
+    }
+  }
+  return NULL;
+}
+
+mln_status mln_test_render_fixture_set_texture(
+  const mln_test_render_fixture* fixture, mln_test_graphics* graphics,
+  const mln_test_graphics_texture* texture, const mln_completion* completion
+) {
+  mln_test_graphics_context context = {0};
+  borrowed_descriptor descriptor;
+  if (
+    !mln_test_graphics_get_context(graphics, &context) ||
+    !describe_texture(&context, texture, &descriptor)
+  ) {
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  return mln_metal_borrowed_texture_set_target(
+    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+  );
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  return mln_vulkan_borrowed_texture_set_target(
+    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+  );
+#else
+  return mln_opengl_borrowed_texture_set_target(
+    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+  );
+#endif
+}
+
+mln_status mln_test_render_fixture_set_surface(
+  const mln_test_render_fixture* fixture, mln_test_graphics* graphics,
+  const mln_test_graphics_surface* surface, const mln_completion* completion
+) {
+  mln_test_graphics_context context = {0};
+  surface_descriptor descriptor;
+  if (
+    !mln_test_graphics_get_context(graphics, &context) ||
+    !describe_surface(&context, surface, &descriptor)
+  ) {
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  return mln_metal_surface_set_target(
+    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+  );
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  return mln_vulkan_surface_set_target(
+    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+  );
+#else
+  return mln_opengl_surface_set_target(
+    fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
+  );
+#endif
 }
