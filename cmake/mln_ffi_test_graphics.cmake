@@ -31,10 +31,14 @@ function(mln_ffi_test_graphics_loader_definitions out_var)
          "MLN_TEST_GRAPHICS_VULKAN_LOADER=\"${MLN_FFI_VULKAN_LOADER_LIBRARY}\"")
   endif()
   if(TARGET MLN_FFI::EGL AND TARGET MLN_FFI::GLESv2)
+    # A target that sets only per-configuration locations has none here, and
+    # the library then relies on the platform's search.
     get_target_property(egl_library MLN_FFI::EGL IMPORTED_LOCATION)
     get_target_property(gles_library MLN_FFI::GLESv2 IMPORTED_LOCATION)
-    list(APPEND definitions "MLN_TEST_GRAPHICS_EGL_LIBRARY=\"${egl_library}\""
-         "MLN_TEST_GRAPHICS_GLES_LIBRARY=\"${gles_library}\"")
+    if(egl_library AND gles_library)
+      list(APPEND definitions "MLN_TEST_GRAPHICS_EGL_LIBRARY=\"${egl_library}\""
+           "MLN_TEST_GRAPHICS_GLES_LIBRARY=\"${gles_library}\"")
+    endif()
   elseif(OPENGL_egl_LIBRARY AND OPENGL_gles3_LIBRARY)
     list(
       APPEND definitions

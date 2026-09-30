@@ -535,7 +535,8 @@ static void metal_surface_destroy(mln_test_graphics_surface* surface) {
 static const char* vulkan_loader_name(void) {
 #if defined(__APPLE__)
   return "libvulkan.1.dylib";
-#elif defined(__ANDROID__)
+#elif defined(__ANDROID__) || defined(__OHOS__)
+  // Neither platform's loader carries a versioned soname.
   return "libvulkan.so";
 #elif defined(_WIN32)
   return "vulkan-1.dll";
@@ -1682,9 +1683,11 @@ static HWND wgl_create_window(uint32_t width, uint32_t height) {
   // A second registration fails with ERROR_CLASS_ALREADY_EXISTS, which leaves
   // the first one in place.
   RegisterClassA(&window_class);
+  // A pop-up window has no frame, so its client area, which is what a surface
+  // on it reports as its extent, is the requested size.
   HWND window = CreateWindowExA(
-    0, wgl_window_class, wgl_window_class, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
-    CW_USEDEFAULT, (int)width, (int)height, NULL, NULL, instance, NULL
+    0, wgl_window_class, wgl_window_class, WS_POPUP, 0, 0, (int)width,
+    (int)height, NULL, NULL, instance, NULL
   );
   if (window == NULL) {
     set_error("CreateWindowExA failed (%lu)", GetLastError());
