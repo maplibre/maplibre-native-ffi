@@ -8,25 +8,21 @@ case "$preset" in
     abi=arm64-v8a
     cibw_arch=arm64_v8a
     system_graphics_library=libGLESv3.so
-    test_requirements='pytest>=9,<10 pyopengl>=3.1.10,<4'
     ;;
   android-arm64-vulkan)
     abi=arm64-v8a
     cibw_arch=arm64_v8a
     system_graphics_library=libvulkan.so
-    test_requirements='pytest>=9,<10'
     ;;
   android-x64-egl)
     abi=x86_64
     cibw_arch=x86_64
     system_graphics_library=libGLESv3.so
-    test_requirements='pytest>=9,<10 pyopengl>=3.1.10,<4'
     ;;
   android-x64-vulkan)
     abi=x86_64
     cibw_arch=x86_64
     system_graphics_library=libvulkan.so
-    test_requirements='pytest>=9,<10'
     ;;
   *)
     echo "The Python Android device suite does not support $preset." >&2
@@ -87,11 +83,15 @@ export CIBW_ENVIRONMENT_ANDROID="MAPLIBRE_NATIVE_C_INSTALL_DIR=$native_install_d
 # The graphics loader comes from Android, so wheel repair leaves it external.
 export CIBW_REPAIR_WHEEL_COMMAND_ANDROID="auditwheel repair --exclude $system_graphics_library --ldpaths {ldpaths} -w {dest_dir} {wheel}"
 export CIBW_TEST_COMMAND_ANDROID='python -m pytest tests'
-export CIBW_TEST_REQUIRES_ANDROID="$test_requirements"
+export CIBW_TEST_REQUIRES_ANDROID='pytest>=9,<10'
 export CIBW_TEST_RUNTIME="args: --connected $serial"
-export CIBW_TEST_SOURCES_ANDROID=tests
+# The render tests load tests/graphics from build/graphics beside the tests,
+# since the testbed carries only the test sources onto the device.
+export CIBW_TEST_SOURCES_ANDROID='tests build/graphics'
 
 cd "$MISE_MONOREPO_ROOT/bindings/python"
+mkdir -p build/graphics
+cp "$native_install_dir/lib/libmln_test_graphics.so" build/graphics/
 python_test_status=0
 uv run --project . --group android --no-sync \
   cibuildwheel --platform android \
