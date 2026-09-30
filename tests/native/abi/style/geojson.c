@@ -374,66 +374,14 @@ static void prepared_data_must_match_the_source_options(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// With the override on, a source slices tiles inline during the update pass,
-// so data installed after one frame is what the next frame's tiles hold.
-static void the_synchronous_tiling_override_reaches_the_next_frame(void) {
+// The synchronous tiling override belongs to GeoJSON sources alone.
+// internal/geojson_tiling.cpp shows that it reaches the next frame.
+static void the_synchronous_tiling_override_rejects_other_sources(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(
     runtime, map, MLN_BUFFER_LITERAL(point_style_json)
   );
-  mln_geojson_source_data first = prepare(POINT_COLLECTION("first"), NULL);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("points"), first, &completion.descriptor, NULL
-    )
-  );
-  mln_geojson_source_data_destroy(first);
-  draw_source(map, "points");
-
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  static const char* const sources[] = {"points"};
-  source_query query = {
-    .fixture = &fixture,
-    .sources = sources,
-    .source_count = 1,
-    .name = "first",
-  };
-  TEST_ASSERT_TRUE(mln_test_style_render_until(
-    &fixture, sources_hold_the_name, &query, "the first dataset"
-  ));
-
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_geojson_source_synchronous_tiling(
-      map, MLN_BUFFER_LITERAL("points"), true, &completion.descriptor, NULL
-    )
-  );
-  mln_geojson_source_data second = prepare(POINT_COLLECTION("second"), NULL);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("points"), second, &completion.descriptor, NULL
-    )
-  );
-  mln_geojson_source_data_destroy(second);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, mln_test_style_render_frame(&fixture)
-  );
-  query.name = "second";
-  TEST_ASSERT_TRUE(sources_hold_the_name(&query));
-
-  // Turning the override off restores the source's own option, which the
-  // command accepts like any other.
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_geojson_source_synchronous_tiling(
-      map, MLN_BUFFER_LITERAL("points"), false, &completion.descriptor, NULL
-    )
-  );
-  // The override belongs to GeoJSON sources alone.
   const mln_buffer_view tiles[] = {
     MLN_BUFFER_LITERAL("fixture://tiles/{z}/{x}/{y}.mvt"),
   };
@@ -450,7 +398,6 @@ static void the_synchronous_tiling_override_reaches_the_next_frame(void) {
     )
   );
 
-  mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -548,6 +495,6 @@ MLN_TEST_GROUP {
   RUN_TEST(clustered_geojson_data_requires_a_feature_collection);
   RUN_TEST(one_prepared_handle_serves_many_sources_and_outlives_itself);
   RUN_TEST(prepared_data_must_match_the_source_options);
-  RUN_TEST(the_synchronous_tiling_override_reaches_the_next_frame);
+  RUN_TEST(the_synchronous_tiling_override_rejects_other_sources);
   RUN_TEST(a_url_source_loads_through_the_resource_provider);
 }

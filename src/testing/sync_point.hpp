@@ -57,6 +57,11 @@ enum class SyncPoint : std::uint8_t {
   // may already be destroyed. Keep this point last: the suite sizes its tables
   // from it.
   EmscriptenRunLoopStopSubmitted,
+  // A GeoJSON data's sequenced worker holds the data and is about to slice one
+  // tile for an asynchronous request. Synchronous tiling slices inline and
+  // never reaches it. No lock is held, so a parked worker delays only the
+  // slices queued behind it on the same worker.
+  GeoJsonTileSlice,
 };
 
 // Runs on whichever thread reaches the point, with no library lock held unless

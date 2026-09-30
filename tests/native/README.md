@@ -78,11 +78,12 @@ the objects under test are the shipped ones:
 
 - `src/testing/sync_point.hpp` names the points where a case can observe or park
   a thread, such as a map's pool shutdown, a writer about to take a resource
-  registration exclusively, a release blocked on a running cancel callback, or a
-  render driver call that has published its work and is about to end. With no
-  handler installed, reaching a point costs one relaxed atomic load. A point
-  that marks a wait fires only when the thread has to wait. A case that waits
-  for such a point fails at its deadline when a change removes the wait.
+  registration exclusively, a release blocked on a running cancel callback, a
+  render driver call that has published its work and is about to end, or a
+  GeoJSON worker about to slice a tile. With no handler installed, reaching a
+  point costs one relaxed atomic load. A point that marks a wait fires only when
+  the thread has to wait. A case that waits for such a point fails at its
+  deadline when a change removes the wait.
 - `src/testing/render_clock.hpp` is the clock that frame demand deadlines run
   on. A case advances it rather than waiting for a deadline to pass.
 
@@ -318,19 +319,6 @@ The browser presets have none of these. Their contexts come from JavaScript, so
 that uses `host_graphics.h` excludes its cases under `__EMSCRIPTEN__`.
 `support/render_egl.c` holds the dedicated EGL fixtures, whose sessions create
 their own context on a display from `tests/graphics`.
-
-### Cases that reach a race through timing
-
-`replacing_data_during_async_tiling_survives` replaces prepared GeoJSON data in
-back-to-back batches while a render thread requests frames. Whether a
-replacement lands while a tile slice is in flight depends on timing. A sync
-point that parks the GeoJSON slicing worker makes the case deterministic.
-
-`the_synchronous_tiling_override_reaches_the_next_frame` expects data set with
-the override on to reach the very next frame. Without the override, the
-asynchronous slice still lands before that frame about 3 runs in 20, so the case
-catches a lost override most of the time but not always. The same slicing sync
-point would let it park the worker and prove that the frame did not wait for it.
 
 ### Cases that work around a core defect
 
