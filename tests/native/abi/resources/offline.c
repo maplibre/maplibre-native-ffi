@@ -844,6 +844,11 @@ static void a_download_completes_from_provider_served_resources(void) {
     MLN_STATUS_OK, mln_test_map_set_style_url(before, offline_style_url)
   );
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, before));
+  // The style loads from the cached copy before the revalidation reaches the
+  // provider.
+  TEST_ASSERT_TRUE(
+    mln_test_provider_wait_for_requests(provider, offline_style_url, 2)
+  );
   const mln_test_provider_request* revalidation =
     mln_test_provider_request_at(provider, offline_style_url, 1);
   TEST_ASSERT_NOT_NULL(revalidation);
