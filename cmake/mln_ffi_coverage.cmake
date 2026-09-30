@@ -6,9 +6,10 @@
 # the path in LLVM_PROFILE_FILE. `mise run coverage` sets that path, merges the
 # profiles, and writes the report.
 #
-# The coverage presets live in cmake/presets/coverage.json. They are local
-# tools, so CI, which targets the presets in CMakePresets.json, never builds
-# them.
+# The coverage presets in CMakePresets.json are local tools. Their `vendor`
+# settings set `maplibre-native-ffi.ci` to false, and ci/workflow.py leaves
+# every
+# preset with that setting out of the generated CI jobs.
 
 option(MLN_FFI_ENABLE_COVERAGE
        "Instrument the C API sources for source-based code coverage" OFF)
@@ -20,11 +21,13 @@ set(MLN_FFI_COVERAGE_FLAGS -fprofile-instr-generate -fcoverage-mapping
     -fcoverage-compilation-dir=. "-fcoverage-prefix-map=${PROJECT_SOURCE_DIR}=.")
 
 # Returns the clang profile runtime archive, which a static consumer's linker
-# needs next to the instrumented objects. Only the Apple archive is bundled,
-# because its name and location are fixed per platform.
+# needs next to the instrumented objects. Only the macOS archive is bundled,
+# because its name and location are fixed there. The iOS, Mac Catalyst, and
+# tvOS presets configure for iOS or tvOS, whose archives have other names, so
+# they get none.
 function(mln_ffi_coverage_runtime out_var)
   set(${out_var} "" PARENT_SCOPE)
-  if(NOT APPLE)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     return()
   endif()
   execute_process(

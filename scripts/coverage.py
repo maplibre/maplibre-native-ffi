@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -19,7 +20,14 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BINDINGS = ("dart", "dotnet", "go", "kotlin", "python", "rust", "swift", "zig")
 # Test sources under src/, such as the C suite before it moves to tests/native.
-IGNORED = r"/tests/"
+# The report names sources by absolute path, so the pattern starts at the
+# checkout and a `tests` directory above it excludes nothing. llvm-cov reads
+# POSIX extended regular expressions, which re.escape over-escapes.
+IGNORED = (
+    "^"
+    + re.sub(r"([.^$|?*+()\[\]{}\\])", r"\\\1", ROOT.as_posix())
+    + "/src/(.+/)?tests/"
+)
 
 
 def tool(name: str) -> str:
