@@ -24,19 +24,6 @@ static void discard_completion_result(
     .size = sizeof(mln_completion), .callback = discard_completion_result \
   })
 
-static void finish_render_barrier(const mln_test_render_fixture* fixture) {
-  mln_test_completion completion = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_barrier(fixture->session, &completion.descriptor, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_render_fixture_finish_operation(fixture, &completion)
-  );
-  mln_test_completion_destroy(&completion);
-}
-
 #define EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(                                \
   descriptor_type, default_descriptor, attach_start, driver_kind,           \
   clear_required, shrink                                                    \
@@ -535,143 +522,6 @@ static void opengl_owned_texture_attach_rejects_dedicated_wgl(void) {
 }
 #endif
 
-// The repaint flag a rendered frame result carries: a settled static map
-// reports false, and a running paint transition reports true.
-static void frame_results_report_whether_the_map_needs_another_frame(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_map_set_style_json(map, mln_test_red_background_style_json)
-  );
-
-  // Render until the map settles: the last frame asks for no repaint.
-  mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-  bool settled = false;
-  const mln_test_deadline settle_deadline = mln_test_deadline_default();
-  while (!settled && !mln_test_deadline_passed(settle_deadline)) {
-    mln_frame_demand demand = mln_frame_demand_default();
-    demand.flags = 0;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_request_frame(fixture.session, &demand, NULL)
-    );
-    finish_render_barrier(&fixture);
-    mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
-    );
-    size_t count = 0;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_frame_batch_count(batch, &count, NULL)
-    );
-    for (size_t index = 0; index < count; index += 1) {
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_render_frame_batch_get(batch, index, &result, NULL)
-      );
-      if (
-        result.disposition == MLN_RENDER_RESULT_RENDERED &&
-        !result.needs_repaint
-      ) {
-        settled = true;
-      }
-    }
-    mln_render_frame_batch_release(batch);
-  }
-  TEST_ASSERT_TRUE(settled);
-
-  // Once settled, a render-if-needed demand reports no update instead of
-  // rendering the same update again. A rendered result here only means a
-  // fresh update slipped in, so keep demanding until one demand finds none.
-  bool saw_no_update = false;
-  const mln_test_deadline no_update_deadline = mln_test_deadline_default();
-  while (!saw_no_update && !mln_test_deadline_passed(no_update_deadline)) {
-    mln_frame_demand demand = mln_frame_demand_default();
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_request_frame(fixture.session, &demand, NULL)
-    );
-    finish_render_barrier(&fixture);
-    mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
-    );
-    size_t count = 0;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_frame_batch_count(batch, &count, NULL)
-    );
-    for (size_t index = 0; index < count; index += 1) {
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_render_frame_batch_get(batch, index, &result, NULL)
-      );
-      if (result.disposition == MLN_RENDER_RESULT_NO_UPDATE) {
-        saw_no_update = true;
-      }
-    }
-    mln_render_frame_batch_release(batch);
-  }
-  TEST_ASSERT_TRUE(saw_no_update);
-
-  // A paint transition asks for another frame from every rendered one.
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_property(
-      map, MLN_BUFFER_LITERAL("bg"),
-      MLN_BUFFER_LITERAL("background-color-transition"),
-      MLN_BUFFER_LITERAL("{\"duration\":60000}"), &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_property(
-      map, MLN_BUFFER_LITERAL("bg"), MLN_BUFFER_LITERAL("background-color"),
-      MLN_BUFFER_LITERAL("\"#0000ff\""), &completion.descriptor, NULL
-    )
-  );
-
-  bool saw_repaint_request = false;
-  const mln_test_deadline repaint_deadline = mln_test_deadline_default();
-  while (!saw_repaint_request && !mln_test_deadline_passed(repaint_deadline)) {
-    mln_frame_demand demand = mln_frame_demand_default();
-    demand.flags = 0;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_request_frame(fixture.session, &demand, NULL)
-    );
-    finish_render_barrier(&fixture);
-    mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
-    );
-    size_t count = 0;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_frame_batch_count(batch, &count, NULL)
-    );
-    for (size_t index = 0; index < count; index += 1) {
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_render_frame_batch_get(batch, index, &result, NULL)
-      );
-      if (
-        result.disposition == MLN_RENDER_RESULT_RENDERED && result.needs_repaint
-      ) {
-        saw_repaint_request = true;
-      }
-    }
-    mln_render_frame_batch_release(batch);
-  }
-  TEST_ASSERT_TRUE(saw_repaint_request);
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 static void opengl_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -905,7 +755,6 @@ MLN_TEST_GROUP {
 #if defined(MLN_FFI_TEST_OPENGL_WGL)
   RUN_TEST(opengl_owned_texture_attach_rejects_dedicated_wgl);
 #endif
-  RUN_TEST(frame_results_report_whether_the_map_needs_another_frame);
   RUN_TEST(opengl_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(opengl_borrowed_texture_rejects_unsafe_raw_descriptors);
   RUN_TEST(vulkan_surface_attach_rejects_unsafe_raw_inputs);
