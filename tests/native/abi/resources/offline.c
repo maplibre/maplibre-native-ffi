@@ -382,8 +382,9 @@ static mln_status get_region_status(
   return status;
 }
 
-// Every region operation, in the order a host uses them, ending with the
-// region gone and each operation that names it reporting so.
+// A region from creation through listing, lookup, a metadata update, and its
+// status to deletion, ending with the region gone and its status reporting
+// so. The download case covers observation, download state, and invalidation.
 static void an_offline_region_lives_from_creation_to_deletion(void) {
   static const uint8_t metadata[] = {1, 2, 3};
   static const uint8_t updated_metadata[] = {9, 8};
@@ -448,27 +449,6 @@ static void an_offline_region_lives_from_creation_to_deletion(void) {
   );
   TEST_ASSERT_FALSE(status.complete);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_observed(
-                     runtime, id, true, &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_observed(
-                     runtime, id, false, &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_download_state(
-                     runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
-                     &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_invalidate(
-                     runtime, id, &completion.descriptor, NULL
-                   )
-  );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK,
     mln_runtime_offline_region_delete(runtime, id, &completion.descriptor, NULL)
@@ -787,7 +767,7 @@ static bool download_completed(
 
 // An observed download fetches the region's style and tiles through the
 // provider, reports its progress until the region is complete, and leaves a
-// status that says so.
+// status that says so. Invalidating the region then expires what it stored.
 static void a_download_completes_from_provider_served_resources(void) {
   static const mln_test_provided_resource resources[] = {
     {.url = offline_style_url,
@@ -855,6 +835,42 @@ static void a_download_completes_from_provider_served_resources(void) {
                      &completion.descriptor, NULL
                    )
   );
+
+  // A map reads the downloaded style as a usable cached copy, and only asks
+  // the provider to revalidate it. Once the region is invalidated, the copy
+  // has expired, so the map asks for the style again and offers that copy.
+  mln_map before = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_set_style_url(before, offline_style_url)
+  );
+  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, before));
+  const mln_test_provider_request* revalidation =
+    mln_test_provider_request_at(provider, offline_style_url, 1);
+  TEST_ASSERT_NOT_NULL(revalidation);
+  TEST_ASSERT_FALSE(revalidation->has_prior_expires);
+  TEST_ASSERT_EQUAL_size_t(0, revalidation->prior_data_size);
+
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK, mln_runtime_offline_region_invalidate(
+                     runtime, id, &completion.descriptor, NULL
+                   )
+  );
+  mln_map after = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_set_style_url(after, offline_style_url)
+  );
+  TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, after));
+  const mln_test_provider_request* refetch =
+    mln_test_provider_request_at(provider, offline_style_url, 2);
+  TEST_ASSERT_NOT_NULL(refetch);
+  TEST_ASSERT_TRUE(refetch->has_prior_expires);
+  TEST_ASSERT_EQUAL_INT64(0, refetch->prior_expires_unix_ms);
+  TEST_ASSERT_EQUAL_size_t(
+    sizeof(offline_style_json) - 1, refetch->prior_data_size
+  );
+
+  mln_test_destroy_map(after);
+  mln_test_destroy_map(before);
   mln_test_destroy_runtime(runtime);
   mln_test_provider_destroy(provider);
 }
