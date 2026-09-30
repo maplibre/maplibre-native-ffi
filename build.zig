@@ -764,11 +764,10 @@ pub fn build(b: *std.Build) void {
     _ = addMaplibreNativeModule(b, options);
     const test_binding_module = addTestBindingModule(b, options);
 
-    // Each hand-written runtime module's inline tests, and those of the modules
-    // it imports, build and run on their own.
+    // The hand-written runtime modules' inline tests build and run on their
+    // own, from one root that reaches each module once.
     const test_sources = [_]std.Build.LazyPath{
-        b.path("bindings/zig/src/owner.zig"),
-        b.path("bindings/zig/src/completion.zig"),
+        b.path("bindings/zig/src/runtime_tests.zig"),
     };
 
     const test_step = b.step("test", "Run Zig binding tests");
