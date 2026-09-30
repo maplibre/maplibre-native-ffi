@@ -34,7 +34,9 @@ final class MapState {
   private var isClosed = false
   private let eventRelay: EventRelay
 
-  init(viewport: Viewport) async throws {
+  /// Creates the map and loads `styleJSON`, or the example's network style
+  /// when it is nil.
+  init(viewport: Viewport, styleJSON: Data? = nil) async throws {
     precondition(
       !viewport.isEmpty,
       "cannot create MapState with an empty viewport"
@@ -65,8 +67,12 @@ final class MapState {
     self.runtime = runtime
     self.map = map
     try await map.setEventMask(mask: [.mapRenderUpdateAvailable])
-    _ = try await map.setStyleUrl(url:
-      "https://tiles.openfreemap.org/styles/bright")
+    if let styleJSON {
+      _ = try await map.setStyleJson(json: styleJSON)
+    } else {
+      _ = try await map.setStyleUrl(url:
+        "https://tiles.openfreemap.org/styles/bright")
+    }
     _ = try await map.updateCamera(update: CameraUpdate(camera: CameraOptions(
       center: LatLng(latitude: 37.7749, longitude: -122.4194),
       zoom: 13.0,

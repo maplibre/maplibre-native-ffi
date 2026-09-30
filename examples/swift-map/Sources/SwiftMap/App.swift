@@ -1,7 +1,33 @@
 import AppKit
 import SwiftUI
 
+/// Runs the app, or with `--smoke <mode>`, renders one frame headless in that
+/// render-target mode and exits.
 @main
+enum SwiftMapMain {
+  static func main() {
+    let args = Array(CommandLine.arguments.dropFirst())
+    guard args.first == "--smoke" else {
+      SwiftMapApp.main()
+      return
+    }
+    guard args.count == 2, let mode = RenderTargetMode(rawValue: args[1]) else {
+      fputs("Usage: swift-map --smoke <mode>\n", stderr)
+      exit(1)
+    }
+    Task { @MainActor in
+      installCAPILogging()
+      let status = await runSmoke(mode: mode)
+      clearCAPILogging()
+      exit(status)
+    }
+    // The run loop drains the main queue on the main thread, which the caller
+    // driver keeps as its graphics thread. dispatchMain() would drain it on
+    // pool threads instead.
+    RunLoop.main.run()
+  }
+}
+
 struct SwiftMapApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
