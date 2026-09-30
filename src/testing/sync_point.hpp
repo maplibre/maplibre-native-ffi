@@ -32,8 +32,10 @@ enum class SyncPoint : std::uint8_t {
   // shared lock to run the transform.
   ResourceTransformLookup,
   // Releasing a resource request, or waiting for its retirement, is about to
-  // block until the request's running cancel callback returns. The request's
-  // lock is held, so a handler must not park here.
+  // block until the request's running cancel callback returns, or until
+  // another release finishes releasing the user data of a registration whose
+  // callback never ran. The request's lock is held, so a handler must not park
+  // here.
   ResourceRequestCancelWait,
   // MapLibre's cancel hook for a custom provider request has returned, having
   // run the request's cancel callback when one applied.

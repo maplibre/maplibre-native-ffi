@@ -47,10 +47,11 @@ struct ResourceRequestObject {
   void* cancel_user_data = nullptr;
   bool cancel_callback_registered = false;
   bool cancel_callback_running = false;
-  // The release is invoking release_user_data for a registration whose
-  // callback never ran. The request is not retired to a waiter until it
-  // returns.
+  // A release took a registration whose callback never ran and is invoking
+  // its release_user_data. The request is not retired to a waiter, and no
+  // other release removes the table entry, until it returns.
   bool releasing_cancel_user_data = false;
+  std::thread::id releasing_cancel_user_data_thread;
   // Set when the callback released its own request: the callback wrapper
   // removes the table entry once the callback returns.
   bool remove_after_cancel_callback = false;
@@ -288,12 +289,14 @@ void run_cancel_callback(ResourceRequestObject& object) noexcept {
   }
 }
 
-// Retires the id so no later call can reach this request. Idempotent.
+// Retires the id so no later call can reach this request. Idempotent, and
+// safe to run on several threads at once.
 //
-// The table entry stays until a running cancel callback returns, so a release
-// on any other thread finds the object and waits, whether or not an earlier
-// release already retired it. Release from inside the callback returns without
-// waiting and leaves the removal to the callback wrapper.
+// The table entry stays until a running cancel callback returns, and until
+// the release_user_data of a registration whose callback never ran returns. A
+// release on any other thread finds the object and waits, whether or not an
+// earlier release already retired it. A release from inside either callback
+// returns without waiting and leaves the removal to the call running it.
 void retire_request(mln_resource_request_handle handle) noexcept {
   auto object = handle_table<ResourceRequestObject>().try_lease(handle);
   if (object == nullptr) {
@@ -308,7 +311,10 @@ void retire_request(mln_resource_request_handle handle) noexcept {
     object->cancel_callback = nullptr;
     release = std::exchange(object->cancel_release, nullptr);
     user_data = std::exchange(object->cancel_user_data, nullptr);
-    object->releasing_cancel_user_data = release != nullptr;
+    if (release != nullptr) {
+      object->releasing_cancel_user_data = true;
+      object->releasing_cancel_user_data_thread = std::this_thread::get_id();
+    }
     if (object->cancel_callback_running) {
       if (object->cancel_callback_thread == std::this_thread::get_id()) {
         object->remove_after_cancel_callback = true;
@@ -319,6 +325,19 @@ void retire_request(mln_resource_request_handle handle) noexcept {
       mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelWait);
       object->state_changed.wait(lock, [&object] {
         return !object->cancel_callback_running;
+      });
+    } else if (release == nullptr && object->releasing_cancel_user_data) {
+      // Another release took the registration and is releasing its user
+      // data. Removing the entry now would retire the request to a waiter
+      // before that release returns.
+      if (
+        object->releasing_cancel_user_data_thread == std::this_thread::get_id()
+      ) {
+        return;
+      }
+      mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelWait);
+      object->state_changed.wait(lock, [&object] {
+        return !object->releasing_cancel_user_data;
       });
     }
   }
