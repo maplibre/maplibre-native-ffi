@@ -334,6 +334,7 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-arm64-* ||
       300
       "$build_dir/install/lib/libmaplibre-native-c.so"
       "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so"
+      --library "$build_dir/libmln-native-test-plugin.so"
     )
   else
     case "$usage_preset" in
@@ -345,6 +346,7 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-arm64-* ||
       300
       "$abi"
       "$build_dir/install/lib/libmaplibre-native-c.so"
+      --library "$build_dir/libmln-native-test-plugin.so"
     )
     if [[ "$usage_preset" == android-x64-egl ]]; then
       mise run //:android-emulator:boot "$abi" --api 26

@@ -20,6 +20,7 @@ style edits.
 | `internal/` | White-box tests that link the static library and include `src/`        |
 | `support/`  | The harness and the helpers that the suites share                      |
 | `fixtures/` | Files that the suites read at run time                                 |
+| `plugin/`   | The test plugin, built as a shared library of its own                  |
 
 The ABI suite, `mln_native_abi_tests`, includes public headers only and links
 the shared library where the platform builds one, so it exercises the export
@@ -33,6 +34,13 @@ The fixtures under `map/issue12432/` and `offline_database/` are copies of
 MapLibre Native's test fixtures at the same paths. The runner scripts push or
 embed `fixtures/` as a whole, and the suites find it through
 `MLN_FFI_TEST_FIXTURE_DIR`.
+
+The plugin group registers `plugin/square_plugin.c` the way a host loads a
+plugin. The plugin is a shared library that includes only MapLibre Native's
+plugin header and links nothing of this library. The suite passes the function
+that `mln_plugin_get_register_function_v1()` returns to the plugin's entry
+point, and the plugin registers its layer type through that pointer. Emscripten
+builds link the plugin statically, as they do the library.
 
 `internal/` holds `disposal_allocation.cpp`, a fault-injection executable with
 its own runner. It links the static library so that its `operator new`

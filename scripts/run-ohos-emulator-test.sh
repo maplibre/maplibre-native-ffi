@@ -5,7 +5,7 @@
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
-  echo "usage: $0 <timeout-seconds> <native-library> <c++-library> [test-argument ...] -- <test-executable ...>" >&2
+  echo "usage: $0 <timeout-seconds> <native-library> <c++-library> [--library <shared-library>]... [test-argument ...] -- <test-executable ...>" >&2
   exit 2
 fi
 
@@ -13,6 +13,13 @@ timeout_seconds=$1
 native_library=$2
 cxx_library=$3
 shift 3
+# Further shared libraries a test executable loads, such as a plugin, travel
+# beside the C API library.
+extra_libraries=()
+while [[ ${1:-} == --library ]]; do
+  extra_libraries+=("${2:?--library requires a shared library}")
+  shift 2
+done
 test_arguments=()
 while (($#)) && [[ $1 != -- ]]; do
   test_arguments+=("$1")
@@ -31,7 +38,7 @@ connect_key=${MLN_FFI_OHOS_EMULATOR_CONNECT_KEY:-127.0.0.1:55555}
 remote_dir=/data/local/tmp/maplibre-native-ffi
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 
-for local_file in "$native_library" "$cxx_library" "${test_executables[@]}"; do
+for local_file in "$native_library" "$cxx_library" ${extra_libraries[@]+"${extra_libraries[@]}"} "${test_executables[@]}"; do
   if [[ ! -f "$local_file" ]]; then
     echo "OpenHarmony emulator test input does not exist: $local_file" >&2
     exit 2
@@ -54,6 +61,9 @@ fi
 hdc -t "$connect_key" shell "rm -rf '$remote_dir' && mkdir -p '$remote_dir'"
 hdc -t "$connect_key" file send "$native_library" "$remote_dir/libmaplibre-native-c.so"
 hdc -t "$connect_key" file send "$cxx_library" "$remote_dir/libc++_shared.so"
+for library in ${extra_libraries[@]+"${extra_libraries[@]}"}; do
+  hdc -t "$connect_key" file send "$library" "$remote_dir/$(basename "$library")"
+done
 
 fixture_environment=
 if [[ -n "$fixture_dir" ]]; then

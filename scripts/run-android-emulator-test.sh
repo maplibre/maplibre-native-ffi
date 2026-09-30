@@ -5,7 +5,7 @@
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then
-  echo "usage: $0 <timeout-seconds> <abi> <native-library> [--api <api>] [test-argument ...] -- <test-executable ...>" >&2
+  echo "usage: $0 <timeout-seconds> <abi> <native-library> [--api <api>] [--library <shared-library>]... [test-argument ...] -- <test-executable ...>" >&2
   exit 2
 fi
 
@@ -14,10 +14,22 @@ abi=$2
 native_library=$3
 shift 3
 emulator_api=
-if [[ ${1:-} == --api ]]; then
-  emulator_api=${2:?--api requires an Android API level}
-  shift 2
-fi
+# Further shared libraries a test executable loads, such as a plugin, travel
+# beside the C API library.
+extra_libraries=()
+while (($#)); do
+  case $1 in
+    --api)
+      emulator_api=${2:?--api requires an Android API level}
+      shift 2
+      ;;
+    --library)
+      extra_libraries+=("${2:?--library requires a shared library}")
+      shift 2
+      ;;
+    *) break ;;
+  esac
+done
 test_arguments=()
 while (($#)) && [[ $1 != -- ]]; do
   test_arguments+=("$1")
@@ -38,7 +50,7 @@ remote_dir=/data/local/tmp/maplibre-native-ffi
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 adb="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}/platform-tools/adb"
 
-for local_file in "$native_library" "${test_executables[@]}"; do
+for local_file in "$native_library" ${extra_libraries[@]+"${extra_libraries[@]}"} "${test_executables[@]}"; do
   if [[ ! -f "$local_file" ]]; then
     echo "Android test input does not exist: $local_file" >&2
     exit 2
@@ -84,6 +96,9 @@ fi
 # executable is the only one it loads from here.
 "$adb" -s "$serial" shell "rm -rf '$remote_dir' && mkdir -p '$remote_dir/tmp'"
 "$adb" -s "$serial" push "$native_library" "$remote_dir/libmaplibre-native-c.so" >/dev/null
+for library in ${extra_libraries[@]+"${extra_libraries[@]}"}; do
+  "$adb" -s "$serial" push "$library" "$remote_dir/$(basename "$library")" >/dev/null
+done
 
 fixture_environment=
 if [[ -n "$fixture_dir" ]]; then

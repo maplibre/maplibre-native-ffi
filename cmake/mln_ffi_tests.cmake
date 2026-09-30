@@ -111,6 +111,48 @@ function(mln_native_fetch_unity)
   endif()
 endfunction()
 
+# The plugin the plugin group registers. It is its own shared library that
+# includes only upstream's plugin header and registers through the function
+# pointer the host passes in, which is how a plugin reaches this library in a
+# real deployment.
+function(mln_native_add_test_plugin)
+  get_target_property(shared_supported mln_ffi_platform_dependencies
+                      MLN_FFI_SHARED_SUPPORTED)
+  if(shared_supported)
+    add_library(mln_native_test_plugin SHARED)
+  else()
+    add_library(mln_native_test_plugin STATIC)
+  endif()
+  target_sources(
+    mln_native_test_plugin
+    PRIVATE "${MLN_NATIVE_TESTS_DIR}/plugin/square_plugin.c")
+  set_target_properties(
+    mln_native_test_plugin
+    PROPERTIES
+      OUTPUT_NAME
+      mln-native-test-plugin
+      C_STANDARD
+      23
+      C_STANDARD_REQUIRED
+      YES
+      C_EXTENSIONS
+      OFF
+      C_VISIBILITY_PRESET
+      hidden)
+  target_include_directories(
+    mln_native_test_plugin
+    PUBLIC "${MLN_NATIVE_TESTS_DIR}/plugin"
+    PRIVATE "${MLN_FFI_SOURCE_DIR}/include")
+  target_compile_definitions(
+    mln_native_test_plugin
+    PRIVATE MLN_NATIVE_TEST_PLUGIN_BUILDING)
+  if(NOT shared_supported)
+    target_compile_definitions(
+      mln_native_test_plugin
+      PUBLIC MLN_NATIVE_TEST_PLUGIN_STATIC)
+  endif()
+endfunction()
+
 function(mln_native_configure_browser_abi_test)
   # The suite runs as a page, which needs three things a native run gets for
   # free:
@@ -283,6 +325,7 @@ function(mln_ffi_add_native_tests)
 
   mln_native_fetch_unity()
   mln_native_add_internal_tests()
+  mln_native_add_test_plugin()
 
   mln_native_collect_abi_tests(abi_sources abi_symbols)
   set(registry "")
@@ -352,7 +395,7 @@ function(mln_ffi_add_native_tests)
     mln_native_abi_tests
     PRIVATE
       maplibre_native_c unity::framework MLN_FFI::RenderDependencies
-      ${dependency_test_libraries})
+      mln_native_test_plugin ${dependency_test_libraries})
   target_include_directories(
     mln_native_abi_tests
     PRIVATE
