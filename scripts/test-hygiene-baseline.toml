@@ -45,9 +45,6 @@
 "bindings/swift/Tests/MaplibreNativeFFITests/OfflineTests.swift" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/RuntimeTests.swift" = 3
 "bindings/swift/Tests/MaplibreNativeFFITests/StyleTests.swift" = 17
-"bindings/zig/tests/geojson.zig" = 3
 "bindings/zig/tests/map_lifecycle.zig" = 2
 "bindings/zig/tests/resources.zig" = 5
-"bindings/zig/tests/style_sources.zig" = 19
-"bindings/zig/tests/style_values.zig" = 1
 "src/platform/rust/src/http_client.rs" = 8
