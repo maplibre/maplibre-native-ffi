@@ -1903,6 +1903,16 @@ auto render_session_projection_create(
 ) -> mln_status {
   auto live = lease_render_session(session);
   if (!live) return MLN_STATUS_INVALID_ARGUMENT;
+  // An output error takes precedence over a missing frame, as it does for
+  // every other call.
+  if (out_projection == nullptr) {
+    set_thread_error("out_projection must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (*out_projection != MLN_HANDLE_NULL) {
+    set_thread_error("out_projection must point to the null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   const auto lock = std::scoped_lock{live->control_mutex};
   if (
     live->state != MLN_RENDER_SESSION_STATE_ATTACHED ||
