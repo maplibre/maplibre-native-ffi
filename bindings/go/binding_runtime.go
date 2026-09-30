@@ -293,8 +293,11 @@ var bindingGlobalRoots = struct {
 var bindingCallbackCount atomic.Int64
 
 type bindingCallbackTicket struct {
-	mu       sync.Mutex
-	id       cgo.Handle
+	mu sync.Mutex
+	id cgo.Handle
+	// cell is the C memory holding id, whose address native stores as the
+	// registration's user data.
+	cell     unsafe.Pointer
 	value    any
 	owner    weak.Pointer[bindingOwner]
 	identity uint64
@@ -304,16 +307,33 @@ type bindingCallbackTicket struct {
 func (arena *bindingArena) register(value any, identity uint64) unsafe.Pointer {
 	ticket := &bindingCallbackTicket{value: value, identity: identity}
 	ticket.id = cgo.NewHandle(weak.Make(ticket))
+	ticket.cell = bindingHandleCell(ticket.id)
 	bindingCallbackCount.Add(1)
 	arena.callbacks = append(arena.callbacks, ticket)
-	return C.binding_address(C.uintptr_t(ticket.id))
+	return ticket.cell
+}
+
+// bindingHandleCell copies a handle into C memory, whose address is what a
+// native user_data field holds. See binding_handle_cell in binding_callback.h.
+func bindingHandleCell(handle cgo.Handle) unsafe.Pointer {
+	cell := C.binding_handle_cell(C.uintptr_t(handle))
+	if cell == nil {
+		handle.Delete()
+		panic(bindingFailure{newBindingError(ErrNative, "native handle cell allocation failed")})
+	}
+	return cell
+}
+
+// bindingHandleOf reads the handle that a cell from bindingHandleCell holds.
+func bindingHandleOf(cell unsafe.Pointer) cgo.Handle {
+	return cgo.Handle(uintptr(C.binding_handle_value(cell)))
 }
 
 func bindingTicket(pointer unsafe.Pointer) *bindingCallbackTicket {
 	if pointer == nil {
 		return nil
 	}
-	return cgo.Handle(uintptr(pointer)).Value().(weak.Pointer[bindingCallbackTicket]).Value()
+	return bindingHandleOf(pointer).Value().(weak.Pointer[bindingCallbackTicket]).Value()
 }
 
 func (ticket *bindingCallbackTicket) release() {
@@ -324,6 +344,7 @@ func (ticket *bindingCallbackTicket) release() {
 	}
 	ticket.retired = true
 	ticket.id.Delete()
+	C.binding_handle_free(ticket.cell)
 	bindingCallbackCount.Add(-1)
 	if owner := ticket.owner.Value(); owner != nil {
 		owner.rootsMu.Lock()
@@ -361,7 +382,9 @@ func mlnGoCallbackRelease(pointer unsafe.Pointer) {
 	if ticket := bindingTicket(pointer); ticket != nil {
 		ticket.release()
 	} else if pointer != nil {
-		cgo.Handle(uintptr(pointer)).Delete()
+		// The collector reclaimed the ticket, whose cell native still held.
+		bindingHandleOf(pointer).Delete()
+		C.binding_handle_free(pointer)
 		bindingCallbackCount.Add(-1)
 	}
 }

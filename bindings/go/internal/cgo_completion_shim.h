@@ -14,6 +14,8 @@ static inline void mln_go_completion_trampoline(
   mln_go_completion_callback(user_data, (mln_completion_result*)result);
 }
 
+// user_data is a cell from binding_handle_cell() that holds the completion's
+// cgo.Handle.
 static inline mln_completion mln_go_make_completion(void* user_data) {
   mln_completion completion = {
     .size = sizeof(mln_completion),
@@ -22,12 +24,6 @@ static inline mln_completion mln_go_make_completion(void* user_data) {
     .release_user_data = mln_go_completion_release,
   };
   return completion;
-}
-
-static inline mln_completion mln_go_make_completion_from_handle(
-  uintptr_t handle
-) {
-  return mln_go_make_completion((void*)handle);
 }
 
 #endif

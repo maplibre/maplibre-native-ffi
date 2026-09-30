@@ -1,6 +1,7 @@
 package maplibre
 
 /*
+#include "binding_callback.h"
 #include "internal/cgo_completion_shim.h"
 */
 import "C"
@@ -120,9 +121,12 @@ func startCompletion[T any](start func(*C.mln_completion, *C.mln_diagnostic) int
 	_, deliversStatus := any(*new(T)).(CommandCompletion)
 	bridge := &completionBridge[T]{state: state, deliversStatus: deliversStatus, convert: convert}
 	handle := cgo.NewHandle(completionReceiver(bridge))
-	completion := C.mln_go_make_completion_from_handle(C.uintptr_t(handle))
+	cell := bindingHandleCell(handle)
+	completion := C.mln_go_make_completion(cell)
 	if err := checkNative(func(diagnostic *C.mln_diagnostic) int32 { return start(&completion, diagnostic) }); err != nil {
+		// Native never calls a refused completion or its release.
 		handle.Delete()
+		C.binding_handle_free(cell)
 		return nil, err
 	}
 	return &Future[T]{state: state}, nil
@@ -180,13 +184,13 @@ func mln_go_completion_callback(userData unsafe.Pointer, result *C.mln_completio
 	// startCompletion is the only writer of this handle, so a value of another
 	// type is a binding defect and the assertion panics rather than dropping a
 	// terminal result.
-	cgo.Handle(uintptr(userData)).Value().(completionReceiver).complete(result)
+	bindingHandleOf(userData).Value().(completionReceiver).complete(result)
 }
 
 //export mln_go_completion_release
 func mln_go_completion_release(userData unsafe.Pointer) {
 	if userData != nil {
-		handle := cgo.Handle(uintptr(userData))
-		handle.Delete()
+		bindingHandleOf(userData).Delete()
+		C.binding_handle_free(userData)
 	}
 }
