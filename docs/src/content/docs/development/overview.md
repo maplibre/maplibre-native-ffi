@@ -280,7 +280,7 @@ redirect resolution. `mise run build` runs `mise run check-exports`, which fails
 when the installed library exports anything beyond the public C API.
 
 Native behavior is tested once, in those C suites. Each binding suite covers
-what its binding adds to the C API: the hand-written runtime, the generated
+what its binding adds to the C API: the handwritten runtime, the generated
 shapes, and the platform integration. `tests/conformance/cases.toml` lists the
 cases that every binding covers, and each binding's file beside it maps every
 case to a test or to the reason that it does not apply. The `conformance` check
@@ -299,12 +299,15 @@ server on 127.0.0.1. The `test-hygiene` check in hk runs
 reserved host in test code. Its baseline, `scripts/test-hygiene-baseline.toml`,
 counts the violations that predate the check, and a count may only fall. The
 `export-calls` check runs `mise run check-export-calls`, which fails when the
-ABI suite leaves an exported function uncalled by name. Its baseline,
-`tests/uncalled-exports.txt`, also only shrinks.
+ABI suite leaves an exported function uncalled by name, and calls from the
+internal suite do not count. Its baseline, `tests/uncalled-exports.txt`, also
+only shrinks.
 
-A test that cannot run on a target is left out when the suite is built, never
-skipped at run time. Rendering tests run on every target that can render, and a
-CI runner that lacks a renderer gets one rather than a skip.
+A test that cannot run on a target is skipped by that target or its build, never
+by what the environment provides. Most suites leave such a test out when they
+are built; a few mark it skipped for the platform or backend they were built
+for. Rendering tests run on every target that can render, and a CI runner that
+lacks a renderer gets one rather than a skip.
 
 Tests take their GPU objects from `tests/graphics`, a small C library that
 creates a device or context, a borrowed texture, and a presentation surface for

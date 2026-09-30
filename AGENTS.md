@@ -163,7 +163,7 @@ sentence-level style, page structure, and project terminology.
   `mise run check-exports` checks. See
   [tests/native/README.md](tests/native/README.md).
 - Each binding suite covers the cases in `tests/conformance/cases.toml` for what
-  the binding adds: its hand-written runtime, its generated shapes, and its
+  the binding adds: its handwritten runtime, its generated shapes, and its
   platform integration. The binding's file in `tests/conformance` maps every
   case to a test or to a reason it does not apply, and
   `scripts/check-conformance.py --strict` checks that mapping.
@@ -177,17 +177,19 @@ sentence-level style, page structure, and project terminology.
   [tests/graphics/README.md](tests/graphics/README.md).
 - Tests wait on signals rather than elapsed time, and serve every request from a
   local fixture.
-- A skip is decided at build time and needs a strict justification. Rendering
-  tests run on every target: fix the CI environment rather than skip them.
+- A skip is decided by the target or the build, never by the environment, and
+  needs a strict justification. Rendering tests run on every target: fix the CI
+  environment rather than skip them.
 - Avoid trivial tests, tests of constants or third-party code, and negative
   assertions unless they are valuable.
 - Checkers enforce these rules against baselines that only shrink.
   `mise run check-export-calls` requires the ABI suite to call every exported
-  function by name, except those in `tests/uncalled-exports.txt`.
-  `scripts/check-test-hygiene.py` fails on a sleep or a public or reserved host
-  in test code beyond `scripts/test-hygiene-baseline.toml`; run it with
-  `--update` after removing violations. Mark a URL that a test never fetches
-  with a `lint: not-fetched` comment on its line or the line above.
+  function by name, except those in `tests/uncalled-exports.txt`. Calls from the
+  internal suite do not count. `scripts/check-test-hygiene.py` fails on a sleep
+  or a public or reserved host in test code beyond
+  `scripts/test-hygiene-baseline.toml`; run it with `--update` after removing
+  violations. Mark a URL that a test never fetches with a `lint: not-fetched`
+  comment on its line or the line above.
 - Before deleting a binding test, run `mise run coverage` for that binding and
   for `native`, then
   `mise run coverage-diff --only-in <binding> --not-in native` to find the

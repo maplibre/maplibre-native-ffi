@@ -30,5 +30,10 @@ run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
 export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+# A Linux host without a display server renders through SDL's offscreen
+# driver, which needs no X or Wayland connection.
+if [[ "$(uname -s)" == Linux && -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
+  export SDL_VIDEO_DRIVER=offscreen
+fi
 MLN_EXAMPLE_SMOKE=1 "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map/c-map" owned-texture
 '''
