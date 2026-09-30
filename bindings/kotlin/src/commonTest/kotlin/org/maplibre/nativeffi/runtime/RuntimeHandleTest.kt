@@ -486,22 +486,23 @@ class RuntimeHandleTest {
   fun releasingANeverCancelledRequestReleasesItsCancelCallback(): Unit = runSuspendTest {
     GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault()).use { runtime ->
       val handledRequest = captureHandledRequest(runtime, "custom://released-cancel-style.json")
-      val map = createSmallMap(runtime)
-      map.setStyleUrl("custom://released-cancel-style.json").await()
-      val handle = waitForHandledRequest(runtime, handledRequest)
-      val cancels = AtomicInt(0)
-      assertFalse(handle.resourceRequestSetCancelCallback { cancels.addAndFetch(1) })
-      assertEquals(1, handle.bindingCallbacks.rootCountForTesting())
+      // The runtime refuses to close while the map is live, so the map closes first even when an
+      // assertion fails, and the runtime's close cannot hide that failure.
+      createSmallMap(runtime).use { map ->
+        map.setStyleUrl("custom://released-cancel-style.json").await()
+        val handle = waitForHandledRequest(runtime, handledRequest)
+        val cancels = AtomicInt(0)
+        assertFalse(handle.resourceRequestSetCancelCallback { cancels.addAndFetch(1) })
+        assertEquals(1, handle.bindingCallbacks.rootCountForTesting())
 
-      handle.close()
+        // Releasing the unanswered request fails it and retires its callback, which can no longer
+        // run once native has released it. The failure still on its way to the map is not a child
+        // of the runtime, so both close without waiting for it.
+        handle.close()
 
-      assertEquals(0, handle.bindingCallbacks.rootCountForTesting())
-      map.release().await()
-      repeat(CANCEL_SETTLE_ROUNDS) {
-        runtime.barrier().await()
-        sleepMillis(1)
+        assertEquals(0, handle.bindingCallbacks.rootCountForTesting())
+        assertEquals(0, cancels.load())
       }
-      assertEquals(0, cancels.load())
     }
   }
 

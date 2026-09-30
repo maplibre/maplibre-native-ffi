@@ -305,6 +305,94 @@ static void releasing_a_request_inside_its_callback_then_claiming_fails_it(
   expect_dropped_request_fails(true);
 }
 
+// A resource request is not a child of its runtime. Releasing a claimed request
+// unanswered sends its failure to the map on the runtime's worker, and that
+// failure still being queued holds neither the map nor the runtime open: both
+// releases are accepted while the worker is parked in front of it.
+static void a_released_request_does_not_hold_its_runtime_open(void) {
+  dropped_request_probe probe = {0};
+  // The case releases both handles itself, so it creates them untracked.
+  mln_runtime runtime = MLN_HANDLE_NULL;
+  mln_runtime_options options = mln_runtime_options_default();
+  options.event_wake = mln_test_pulse_wake();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC)
+  );
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = claim_and_drop_resource_provider,
+    .user_data = &probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_set_resource_provider(runtime, &provider)
+  );
+  mln_map map = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_create_status(runtime, NULL, &map)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_map_set_style_url(map, "custom://dropped-request-style.json")
+  );
+  TEST_ASSERT_TRUE(mln_test_await(
+    dropped_request_claimed, &probe, mln_test_deadline_default(),
+    "the provider to claim the request"
+  ));
+
+  mln_test_gate gate;
+  mln_test_gate_init(&gate);
+  const mln_completion hold = mln_test_gate_completion(&gate);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_debug_options(map, 0, &hold, NULL)
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+  );
+
+  // The failure goes to the parked worker's queue.
+  mln_resource_request_release(atomic_load(&probe.handle));
+  mln_test_completion map_release = mln_test_completion_default(0);
+  const mln_status map_status =
+    mln_map_release(map, &map_release.descriptor, MLN_TEST_DIAGNOSTIC);
+  mln_test_completion runtime_release = mln_test_completion_default(0);
+  const mln_status runtime_status = mln_runtime_release(
+    runtime, &runtime_release.descriptor, MLN_TEST_DIAGNOSTIC
+  );
+  mln_test_gate_release(&gate);
+
+  TEST_ASSERT_EQUAL_INT_MESSAGE(
+    MLN_STATUS_OK, map_status, mln_test_last_error()
+  );
+  TEST_ASSERT_EQUAL_INT_MESSAGE(
+    MLN_STATUS_OK, runtime_status, mln_test_last_error()
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&map_release)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&runtime_release)
+  );
+  mln_test_completion_destroy(&map_release);
+  mln_test_completion_destroy(&runtime_release);
+}
+
+// A claimed request that the provider keeps holding does not hold the map or
+// the runtime open either, and the provider can still release its handle
+// once both are gone.
+static void a_held_request_does_not_hold_its_runtime_open(void) {
+  dropped_request_probe probe = {0};
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = start_claimed_request(runtime, &probe);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+
+  const mln_resource_request_handle handle = atomic_load(&probe.handle);
+  mln_resource_request_release(handle);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_resource_request_wait_until_retired(handle, NULL)
+  );
+}
+
 static void unsupported_style_url_scheme_names_scheme_and_url(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -907,6 +995,8 @@ MLN_TEST_GROUP {
   RUN_TEST(resource_provider_command_copies_cross_thread_descriptor);
   RUN_TEST(releasing_a_claimed_request_without_a_response_fails_it);
   RUN_TEST(releasing_a_request_inside_its_callback_then_claiming_fails_it);
+  RUN_TEST(a_released_request_does_not_hold_its_runtime_open);
+  RUN_TEST(a_held_request_does_not_hold_its_runtime_open);
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);
   RUN_TEST(unsupported_style_url_diagnostic_redacts_credentials);
   RUN_TEST(unsupported_style_url_names_declining_provider);

@@ -17,7 +17,7 @@
 "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/log/LogCallbackRegistrationTest.kt" = 2
 "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureTestSupport.kt" = 3
 "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/RenderSessionHandleTest.kt" = 3
-"bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeHandleTest.kt" = 10
+"bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeHandleTest.kt" = 9
 "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/BackgroundThread.jvm.kt" = 2
 "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/callback/GeneratedCallbackLifetimeTest.kt" = 1
 "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/lifecycle/HandleLeakCleanerTest.kt" = 1

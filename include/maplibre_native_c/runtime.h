@@ -1097,7 +1097,11 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
  * MLN_RESOURCE_PROVIDER_DECISION_HANDLE may release the handle inline.
  * Releasing a handled request that is neither completed nor cancelled fails it
  * with an MLN_RESOURCE_ERROR_REASON_OTHER error, so MapLibre never waits on a
- * request its provider dropped. Passing
+ * request its provider dropped. That failure reaches the map later, on the
+ * runtime's worker. A request handle is not a child of its runtime, whether the
+ * provider still holds it or its failure is still queued, so it never makes
+ * mln_runtime_release() or mln_map_release() return MLN_STATUS_INVALID_STATE.
+ * Passing
  * MLN_HANDLE_NULL is a no-op, as is passing a handle this call already
  * released. A released handle reports MLN_STATUS_INVALID_ARGUMENT from every
  * other request entry point except wait_until_retired, including from a copy
@@ -1314,7 +1318,11 @@ MLN_API mln_status mln_runtime_barrier(
  * Releases a runtime after synchronous child preflight.
  *
  * The call rejects a runtime that has live or pending children and leaves it
- * open. A successful call consumes the public handle before returning.
+ * open. A runtime's children are its maps, including a map whose creation was
+ * accepted but has not completed. Resource request handles are not children:
+ * one that a provider still holds, or has released with its failure still
+ * queued, leaves this call free to succeed. A successful call consumes the
+ * public handle before returning.
  * Previously accepted work and native teardown continue in submission order;
  * callback user data remains native-owned until its release callback runs.
  * This function may be called from any thread.
