@@ -7,6 +7,7 @@ import itertools
 import json
 import os
 import pathlib
+import re
 import subprocess
 import tempfile
 import unittest
@@ -25,8 +26,8 @@ from ci.coverage import (
 )
 from ci.generate_workflow import ROOT, caller, serialize, suite, workflows
 from ci.plan import plan
+from ci.retry import INFRASTRUCTURE_STEPS, retryable
 from ci.retry import main as retry_main
-from ci.retry import retryable
 from ci.workflow import load_configuration, preset_sets
 
 ENV = {
@@ -390,6 +391,29 @@ class WorkflowTest(unittest.TestCase):
         self.assertFalse(full["kotlin-maven"]["with"]["publish"])
         self.assertEqual(self.workflows["ci.yml"]["name"], "CI")
 
+    def test_suites_run_past_a_failed_suite_and_the_last_step_fails_the_job(self):
+        for group in GROUPS:
+            for name, job in self.workflows[f"_ci-{group}.yml"]["jobs"].items():
+                if not name.startswith("target-"):
+                    continue
+                with self.subTest(job=name):
+                    steps = job["steps"]
+                    ids = [step.get("id") for step in steps]
+                    suites = [i for i in ids if i and i.startswith("suite-")]
+                    self.assertTrue(suites)
+                    for step in steps[ids.index("build") + 1 :]:
+                        if step.get("id") in {"archive", "install", *suites}:
+                            self.assertTrue(
+                                step["if"].startswith("${{ !cancelled() && "),
+                                step,
+                            )
+                    gate = steps[-1]
+                    self.assertEqual(gate["name"], "Fail if any suite failed")
+                    self.assertEqual(
+                        re.findall(r"steps\.(suite-\d+)\.outcome", gate["if"]),
+                        suites,
+                    )
+
     def test_events_keep_baseline_stable_and_main_runs_independent(self):
         baseline = caller("baseline")["on"]["pull_request"]["types"]
         self.assertEqual(set(baseline), {"opened", "synchronize", "reopened"})
@@ -501,7 +525,11 @@ class RetryTest(unittest.TestCase):
     def test_api_failures_retry_with_backoff_and_recheck_run_attempt(self):
         jobs = {
             "jobs": [
-                {"name": "plan", "conclusion": "failure"},
+                {
+                    "name": "plan",
+                    "conclusion": "failure",
+                    "steps": [{"name": "Plan coverage", "conclusion": "failure"}],
+                },
                 {"name": "ci-required", "conclusion": "failure"},
             ]
         }
@@ -552,24 +580,79 @@ class RetryTest(unittest.TestCase):
             self.assertEqual(get.call_count, 4)
             self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, 4, 8])
 
-    def test_one_primary_failure_retries_with_both_aggregates(self):
-        jobs = [
-            {"name": "coverage / target / linux-gnu-x64-egl", "conclusion": "failure"},
+    def test_only_infrastructure_step_failures_retry(self):
+        def job(name, *failed):
+            return {
+                "name": name,
+                "conclusion": "failure",
+                "steps": [
+                    {"name": "Set up job", "conclusion": "success"},
+                    *({"name": step, "conclusion": "failure"} for step in failed),
+                ],
+            }
+
+        aggregates = [
             {"name": "coverage / verified (sha)", "conclusion": "failure"},
             {"name": "ci-required", "conclusion": "failure"},
             {"name": "coverage / Kotlin Maven / verify", "conclusion": "skipped"},
         ]
-        self.assertTrue(retryable(jobs))
-        self.assertFalse(retryable(jobs[1:]))
-        self.assertFalse(retryable(jobs + [{"name": "other", "conclusion": "failure"}]))
+        target = "coverage / target / android-x64-egl"
+        for failed in (
+            ["Set up CI dependencies"],
+            ["Boot Android emulator"],
+            ["Resolve Swift packages"],
+            ["Post Set up CI dependencies"],
+        ):
+            with self.subTest(failed=failed):
+                self.assertTrue(retryable([job(target, *failed), *aggregates]))
+        suite = "Run mise run //bindings/kotlin:test android-x64-egl"
+        for jobs in (
+            [job(target, suite)],
+            [job(target, suite, "Fail if any suite failed")],
+            [job(target, "Boot Android emulator", suite)],
+            # A job that failed without a failed step timed out, possibly in a
+            # hung test.
+            [job(target)],
+            [job(target, "Boot Android emulator"), job("coverage / hygiene", suite)],
+        ):
+            with self.subTest(jobs=jobs):
+                self.assertFalse(retryable([*jobs, *aggregates]))
+        self.assertTrue(
+            retryable(
+                [
+                    job(target, "Boot Android emulator"),
+                    job("coverage / target / ohos-x64-egl", "Set up CI dependencies"),
+                    *aggregates,
+                ]
+            )
+        )
+        self.assertFalse(retryable(aggregates))
+        self.assertFalse(retryable([job(target, "Set up CI dependencies")]))
         self.assertFalse(
-            retryable(jobs + [{"name": "other", "conclusion": "cancelled"}])
+            retryable(
+                [
+                    job(target, "Set up CI dependencies"),
+                    *aggregates,
+                    {"name": "other", "conclusion": "cancelled"},
+                ]
+            )
         )
         self.assertTrue(
             retryable(
                 [
-                    {"name": "plan", "conclusion": "failure"},
-                    {"name": "ci-required (ready)", "conclusion": "failure"},
+                    job("plan", "Plan coverage"),
+                    job("ci-required (ready)", "Check coverage result"),
                 ]
             )
         )
+
+    def test_generated_workflows_name_every_infrastructure_step(self):
+        source, presets = load_configuration(ROOT)
+        names = {
+            step.get("name")
+            for document in workflows(source, presets).values()
+            for job in document["jobs"].values()
+            for step in job.get("steps", [])
+        }
+        # GitHub names its own setup and teardown steps.
+        self.assertEqual(INFRASTRUCTURE_STEPS - names, {"Set up job", "Complete job"})

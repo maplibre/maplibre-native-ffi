@@ -251,8 +251,18 @@ alongside the existing `ci-required` before merging these workflows. An
 unrequested tier passes its check without running targets.
 
 `mise run ci:test` exercises coverage transitions, result reuse, generated job
-dependencies, required checks, retries, and release tooling. CI retries one
-primary failure once, including its dependent verification and required checks.
+dependencies, required checks, retries, and release tooling.
+
+Each target job builds the native library in its own step, then runs the C suite
+and every binding suite. A suite runs even after an earlier suite failed, as
+long as the build and any device boot succeeded, so one run reports every failed
+suite. A final step fails the job when any suite failed.
+
+CI reruns a failed run once, with its dependent verification and required
+checks, only when every failed job failed in an infrastructure step: runner
+setup, checkout, coverage planning, `setup-ci-deps`, SwiftPM resolution, or a
+device boot. `ci/retry.py` lists those step names, and a failed test is never
+retried.
 
 ## Tests And Examples
 

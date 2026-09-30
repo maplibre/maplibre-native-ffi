@@ -19,10 +19,12 @@ jobs:
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
@@ -50,10 +52,12 @@ jobs:
     timeout-minutes: 60
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
@@ -69,10 +73,12 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
@@ -80,55 +86,98 @@ jobs:
           target: linux-gnu-x64-egl
           zig: true
           save-toolchains: true
-      - run: mise run test linux-gnu-x64-egl
-      - run: mise run check-glibc-floor linux-gnu-x64-egl
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build linux-gnu-x64-egl
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test linux-gnu-x64-egl
+      - id: suite-2
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run check-glibc-floor linux-gnu-x64-egl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native linux-gnu-x64-egl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-gnu-x64-egl build/packages/native/dist/maplibre-native-c-linux-gnu-x64-egl.tar.gz
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-gnu-x64-egl
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check linux-gnu-x64-egl
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-x64-egl
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build linux-gnu-x64-egl
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:run linux-gnu-x64-egl
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test linux-gnu-x64-egl
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build linux-gnu-x64-egl
-      - env:
+      - id: suite-10
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:build linux-gnu-x64-egl
-      - env:
+      - id: suite-11
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test linux-gnu-x64-egl
-      - env:
+      - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-gnu-x64-egl
-      - env:
+      - id: suite-13
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-gnu-x64-egl
-      - env:
+      - id: suite-14
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/go-map:check linux-gnu-x64-egl
-      - env:
+      - id: suite-15
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/c-map:build linux-gnu-x64-egl
-      - env:
+      - id: suite-16
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test linux-gnu-x64-egl
-      - env:
+      - id: suite-17
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test linux-gnu-x64-egl
       - name: Save Zig packages
@@ -146,6 +195,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-gnu-x64-egl')
   target-linux-gnu-x64-vulkan:
     name: target / linux-gnu-x64-vulkan
@@ -153,68 +206,115 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: linux-gnu-x64-vulkan
           zig: true
-      - run: mise run test linux-gnu-x64-vulkan
-      - run: mise run check-glibc-floor linux-gnu-x64-vulkan
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build linux-gnu-x64-vulkan
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test linux-gnu-x64-vulkan
+      - id: suite-2
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run check-glibc-floor linux-gnu-x64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native linux-gnu-x64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-gnu-x64-vulkan build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-gnu-x64-vulkan release
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check linux-gnu-x64-vulkan
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test:download linux-gnu-x64-vulkan
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test:download linux-gnu-x64-vulkan
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-x64-vulkan
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build linux-gnu-x64-vulkan
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:run linux-gnu-x64-vulkan
-      - env:
+      - id: suite-10
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test linux-gnu-x64-vulkan
-      - env:
+      - id: suite-11
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build linux-gnu-x64-vulkan
-      - env:
+      - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:build linux-gnu-x64-vulkan
-      - env:
+      - id: suite-13
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test linux-gnu-x64-vulkan release
-      - env:
+      - id: suite-14
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-gnu-x64-vulkan
-      - env:
+      - id: suite-15
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-gnu-x64-vulkan
-      - env:
+      - id: suite-16
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/c-map:build linux-gnu-x64-vulkan
-      - env:
+      - id: suite-17
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test linux-gnu-x64-vulkan
-      - env:
+      - id: suite-18
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test linux-gnu-x64-vulkan
       - name: Save Zig packages
@@ -232,6 +332,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-gnu-x64-vulkan')
   target-linux-gnu-arm64-egl:
     name: target / linux-gnu-arm64-egl
@@ -239,10 +343,12 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
@@ -250,55 +356,98 @@ jobs:
           target: linux-gnu-arm64-egl
           zig: true
           save-toolchains: true
-      - run: mise run test linux-gnu-arm64-egl
-      - run: mise run check-glibc-floor linux-gnu-arm64-egl
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build linux-gnu-arm64-egl
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test linux-gnu-arm64-egl
+      - id: suite-2
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run check-glibc-floor linux-gnu-arm64-egl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native linux-gnu-arm64-egl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-gnu-arm64-egl build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-egl.tar.gz
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-gnu-arm64-egl
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check linux-gnu-arm64-egl
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-arm64-egl
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build linux-gnu-arm64-egl
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:run linux-gnu-arm64-egl
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test linux-gnu-arm64-egl
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build linux-gnu-arm64-egl
-      - env:
+      - id: suite-10
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:build linux-gnu-arm64-egl
-      - env:
+      - id: suite-11
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test linux-gnu-arm64-egl
-      - env:
+      - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-gnu-arm64-egl
-      - env:
+      - id: suite-13
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-gnu-arm64-egl
-      - env:
+      - id: suite-14
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/go-map:check linux-gnu-arm64-egl
-      - env:
+      - id: suite-15
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/c-map:build linux-gnu-arm64-egl
-      - env:
+      - id: suite-16
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test linux-gnu-arm64-egl
-      - env:
+      - id: suite-17
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test linux-gnu-arm64-egl
       - name: Save Zig packages
@@ -316,6 +465,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-gnu-arm64-egl')
   target-linux-gnu-arm64-vulkan:
     name: target / linux-gnu-arm64-vulkan
@@ -323,62 +476,105 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: linux-gnu-arm64-vulkan
           zig: true
-      - run: mise run test linux-gnu-arm64-vulkan
-      - run: mise run check-glibc-floor linux-gnu-arm64-vulkan
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build linux-gnu-arm64-vulkan
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test linux-gnu-arm64-vulkan
+      - id: suite-2
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run check-glibc-floor linux-gnu-arm64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native linux-gnu-arm64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-gnu-arm64-vulkan build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-vulkan.tar.gz
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:run linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-10
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:build linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-11
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-13
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-14
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/c-map:build linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-15
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test linux-gnu-arm64-vulkan
-      - env:
+      - id: suite-16
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test linux-gnu-arm64-vulkan
       - name: Save Zig packages
@@ -396,6 +592,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-gnu-arm64-vulkan')
   target-linux-musl-x64-egl:
     name: target / linux-musl-x64-egl
@@ -403,26 +603,42 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: linux-musl-x64-egl
           gradle: false
-      - run: mise run test linux-musl-x64-egl
-      - run: mise run check-musl-abi linux-musl-x64-egl
+      - id: build
+        run: mise run build linux-musl-x64-egl
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test linux-musl-x64-egl
+      - id: suite-2
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run check-musl-abi linux-musl-x64-egl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native linux-musl-x64-egl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-musl-x64-egl build/packages/native/dist/maplibre-native-c-linux-musl-x64-egl.tar.gz
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-musl-x64-egl
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-musl-x64-egl
       - name: Upload native artifact
@@ -432,6 +648,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-musl-x64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-musl-x64-egl')
   target-linux-musl-x64-vulkan:
     name: target / linux-musl-x64-vulkan
@@ -439,26 +659,42 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: linux-musl-x64-vulkan
           gradle: false
-      - run: mise run test linux-musl-x64-vulkan
-      - run: mise run check-musl-abi linux-musl-x64-vulkan
+      - id: build
+        run: mise run build linux-musl-x64-vulkan
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test linux-musl-x64-vulkan
+      - id: suite-2
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run check-musl-abi linux-musl-x64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native linux-musl-x64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-musl-x64-vulkan build/packages/native/dist/maplibre-native-c-linux-musl-x64-vulkan.tar.gz
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-musl-x64-vulkan
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-musl-x64-vulkan
       - name: Upload native artifact
@@ -468,6 +704,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-musl-x64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-musl-x64-vulkan')
   target-linux-musl-arm64-egl:
     name: target / linux-musl-arm64-egl
@@ -475,26 +715,42 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: linux-musl-arm64-egl
           gradle: false
-      - run: mise run test linux-musl-arm64-egl
-      - run: mise run check-musl-abi linux-musl-arm64-egl
+      - id: build
+        run: mise run build linux-musl-arm64-egl
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test linux-musl-arm64-egl
+      - id: suite-2
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run check-musl-abi linux-musl-arm64-egl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native linux-musl-arm64-egl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-musl-arm64-egl build/packages/native/dist/maplibre-native-c-linux-musl-arm64-egl.tar.gz
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-musl-arm64-egl
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-musl-arm64-egl
       - name: Upload native artifact
@@ -504,6 +760,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-musl-arm64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-musl-arm64-egl')
   target-linux-musl-arm64-vulkan:
     name: target / linux-musl-arm64-vulkan
@@ -511,26 +771,42 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: linux-musl-arm64-vulkan
           gradle: false
-      - run: mise run test linux-musl-arm64-vulkan
-      - run: mise run check-musl-abi linux-musl-arm64-vulkan
+      - id: build
+        run: mise run build linux-musl-arm64-vulkan
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test linux-musl-arm64-vulkan
+      - id: suite-2
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run check-musl-abi linux-musl-arm64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native linux-musl-arm64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-musl-arm64-vulkan build/packages/native/dist/maplibre-native-c-linux-musl-arm64-vulkan.tar.gz
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-musl-arm64-vulkan
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-musl-arm64-vulkan
       - name: Upload native artifact
@@ -540,6 +816,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-musl-arm64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-musl-arm64-vulkan')
   target-emscripten-wasm32-webgl:
     name: target / emscripten-wasm32-webgl
@@ -547,10 +827,12 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
@@ -558,12 +840,22 @@ jobs:
           target: emscripten-wasm32-webgl
           gradle: false
           save-toolchains: true
-      - run: mise run test emscripten-wasm32-webgl
+      - id: build
+        run: mise run build emscripten-wasm32-webgl
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test emscripten-wasm32-webgl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native emscripten-wasm32-webgl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package emscripten-wasm32-webgl build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgl.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test emscripten-wasm32-webgl
       - name: Upload native artifact
@@ -573,6 +865,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-emscripten-wasm32-webgl')
   target-emscripten-wasm32-webgpu:
     name: target / emscripten-wasm32-webgpu
@@ -580,22 +876,34 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: emscripten-wasm32-webgpu
           gradle: false
-      - run: mise run test emscripten-wasm32-webgpu
+      - id: build
+        run: mise run build emscripten-wasm32-webgpu
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test emscripten-wasm32-webgpu
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native emscripten-wasm32-webgpu
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package emscripten-wasm32-webgpu build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgpu.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test emscripten-wasm32-webgpu
       - name: Upload native artifact
@@ -605,6 +913,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgpu.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-emscripten-wasm32-webgpu')
   target-macos-arm64-metal:
     name: target / macos-arm64-metal
@@ -612,10 +924,12 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
@@ -623,51 +937,90 @@ jobs:
           target: macos-arm64-metal
           zig: true
           save-toolchains: true
-      - run: mise run test macos-arm64-metal
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build macos-arm64-metal
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test macos-arm64-metal
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native macos-arm64-metal
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package macos-arm64-metal build/packages/native/dist/maplibre-native-c-macos-arm64-metal.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test macos-arm64-metal
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check macos-arm64-metal
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test macos-arm64-metal
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build macos-arm64-metal
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:run macos-arm64-metal
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test macos-arm64-metal
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build macos-arm64-metal
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:build macos-arm64-metal
-      - env:
+      - id: suite-10
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test macos-arm64-metal
-      - env:
+      - id: suite-11
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/swift-map:build macos-arm64-metal
-      - env:
+      - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test macos-arm64-metal
-      - env:
+      - id: suite-13
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test macos-arm64-metal
-      - env:
+      - id: suite-14
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test macos-arm64-metal
-      - env:
+      - id: suite-15
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test macos-arm64-metal
       - name: Save Zig packages
@@ -685,6 +1038,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-macos-arm64-metal.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-macos-arm64-metal')
   target-macos-arm64-vulkan:
     name: target / macos-arm64-vulkan
@@ -692,58 +1049,97 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: macos-arm64-vulkan
           zig: true
-      - run: mise run test macos-arm64-vulkan
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build macos-arm64-vulkan
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test macos-arm64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native macos-arm64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package macos-arm64-vulkan build/packages/native/dist/maplibre-native-c-macos-arm64-vulkan.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test macos-arm64-vulkan
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check macos-arm64-vulkan
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test macos-arm64-vulkan
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build macos-arm64-vulkan
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:run macos-arm64-vulkan
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test macos-arm64-vulkan
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build macos-arm64-vulkan
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:build macos-arm64-vulkan
-      - env:
+      - id: suite-10
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test macos-arm64-vulkan
-      - env:
+      - id: suite-11
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test macos-arm64-vulkan
-      - env:
+      - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test macos-arm64-vulkan
-      - env:
+      - id: suite-13
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test macos-arm64-vulkan
-      - env:
+      - id: suite-14
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test macos-arm64-vulkan
       - name: Save Zig packages
@@ -761,6 +1157,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-macos-arm64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-macos-arm64-vulkan')
   target-macos-arm64-egl:
     name: target / macos-arm64-egl
@@ -768,55 +1168,92 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: macos-arm64-egl
           zig: true
-      - run: mise run test macos-arm64-egl
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build macos-arm64-egl
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test macos-arm64-egl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native macos-arm64-egl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package macos-arm64-egl build/packages/native/dist/maplibre-native-c-macos-arm64-egl.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test macos-arm64-egl
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test macos-arm64-egl
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build macos-arm64-egl
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:run macos-arm64-egl
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test macos-arm64-egl
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build macos-arm64-egl
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:build macos-arm64-egl
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test macos-arm64-egl
-      - env:
+      - id: suite-10
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test macos-arm64-egl
-      - env:
+      - id: suite-11
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test macos-arm64-egl
-      - env:
+      - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test macos-arm64-egl
-      - env:
+      - id: suite-13
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test macos-arm64-egl
       - name: Save Zig packages
@@ -834,6 +1271,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-macos-arm64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-macos-arm64-egl')
   target-ios-arm64-metal:
     name: target / ios-arm64-metal
@@ -841,33 +1282,53 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: ios-arm64-metal
-      - run: mise run build ios-arm64-metal
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build ios-arm64-metal
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native ios-arm64-metal
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ios-arm64-metal build/packages/native/dist/maplibre-native-c-ios-arm64-metal.tar.gz
-      - env:
+      - id: suite-1
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:ios-build ios-arm64-metal
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:build ios-arm64-metal
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:build ios-arm64-metal
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/swift-map:build:ios
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:build:mobile ios-arm64-metal
       - name: Upload native artifact
@@ -877,6 +1338,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-ios-arm64-metal.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-ios-arm64-metal')
   target-ios-simulator-arm64-metal:
     name: target / ios-simulator-arm64-metal
@@ -884,33 +1349,59 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: ios-simulator-arm64-metal
-      - run: mise run test ios-simulator-arm64-metal
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build ios-simulator-arm64-metal
+      - name: Boot iOS simulator
+        id: boot
+        run: mise run //:ios-simulator:boot
+      - id: suite-1
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        run: mise run test ios-simulator-arm64-metal
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run archive-native ios-simulator-arm64-metal
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ios-simulator-arm64-metal build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test ios-simulator-arm64-metal
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test ios-simulator-arm64-metal
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test ios-simulator-arm64-metal
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/swift-map:build:ios-simulator
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:build:mobile ios-simulator-arm64-metal
       - name: Upload native artifact
@@ -920,6 +1411,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-ios-simulator-arm64-metal')
   target-ios-maccatalyst-arm64-metal:
     name: target / ios-maccatalyst-arm64-metal
@@ -927,22 +1422,37 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: ios-maccatalyst-arm64-metal
           gradle: false
-      - run: mise run test ios-maccatalyst-arm64-metal
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build ios-maccatalyst-arm64-metal
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test ios-maccatalyst-arm64-metal
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native ios-maccatalyst-arm64-metal
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ios-maccatalyst-arm64-metal build/packages/native/dist/maplibre-native-c-ios-maccatalyst-arm64-metal.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test ios-maccatalyst-arm64-metal
       - name: Upload native artifact
@@ -952,6 +1462,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-ios-maccatalyst-arm64-metal.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-ios-maccatalyst-arm64-metal')
   target-tvos-arm64-metal:
     name: target / tvos-arm64-metal
@@ -959,27 +1473,43 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: tvos-arm64-metal
-      - run: mise run build tvos-arm64-metal
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build tvos-arm64-metal
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native tvos-arm64-metal
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package tvos-arm64-metal build/packages/native/dist/maplibre-native-c-tvos-arm64-metal.tar.gz
-      - env:
+      - id: suite-1
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:ios-build tvos-arm64-metal
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:build tvos-arm64-metal
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:build tvos-arm64-metal
       - name: Upload native artifact
@@ -989,6 +1519,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-tvos-arm64-metal.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-tvos-arm64-metal')
   target-tvos-simulator-arm64-metal:
     name: target / tvos-simulator-arm64-metal
@@ -996,27 +1530,49 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: tvos-simulator-arm64-metal
-      - run: mise run test tvos-simulator-arm64-metal
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build tvos-simulator-arm64-metal
+      - name: Boot tvOS simulator
+        id: boot
+        run: mise run //:tvos-simulator:boot
+      - id: suite-1
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        run: mise run test tvos-simulator-arm64-metal
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run archive-native tvos-simulator-arm64-metal
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package tvos-simulator-arm64-metal build/packages/native/dist/maplibre-native-c-tvos-simulator-arm64-metal.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test tvos-simulator-arm64-metal
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test tvos-simulator-arm64-metal
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test tvos-simulator-arm64-metal
       - name: Upload native artifact
@@ -1026,6 +1582,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-tvos-simulator-arm64-metal.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-tvos-simulator-arm64-metal')
   target-android-arm-egl:
     name: target / android-arm-egl
@@ -1033,39 +1593,60 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: android-arm-egl
-      - run: mise run build android-arm-egl
+      - id: build
+        run: mise run build android-arm-egl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native android-arm-egl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-arm-egl build/packages/native/dist/maplibre-native-c-android-arm-egl.tar.gz
-      - env:
+      - id: suite-1
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-arm-egl
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:android-build opengl armeabi-v7a --prebuilt
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build android-arm-egl
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build android-arm-egl
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:build android-arm-egl
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/android-map:build opengl armeabi-v7a --prebuilt
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:build:mobile android-arm-egl
       - name: Upload native artifact
@@ -1075,6 +1656,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-android-arm-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-android-arm-egl')
   target-android-arm-vulkan:
     name: target / android-arm-vulkan
@@ -1082,39 +1667,60 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: android-arm-vulkan
-      - run: mise run build android-arm-vulkan
+      - id: build
+        run: mise run build android-arm-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native android-arm-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-arm-vulkan build/packages/native/dist/maplibre-native-c-android-arm-vulkan.tar.gz
-      - env:
+      - id: suite-1
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-arm-vulkan
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:android-build vulkan armeabi-v7a --prebuilt
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build android-arm-vulkan
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build android-arm-vulkan
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:build android-arm-vulkan
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/android-map:build vulkan armeabi-v7a --prebuilt
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:build:mobile android-arm-vulkan
       - name: Upload native artifact
@@ -1124,6 +1730,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-android-arm-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-android-arm-vulkan')
   target-android-arm64-egl:
     name: target / android-arm64-egl
@@ -1131,39 +1741,60 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: android-arm64-egl
-      - run: mise run build android-arm64-egl
+      - id: build
+        run: mise run build android-arm64-egl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native android-arm64-egl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-arm64-egl build/packages/native/dist/maplibre-native-c-android-arm64-egl.tar.gz
-      - env:
+      - id: suite-1
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-arm64-egl
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:android-build opengl arm64-v8a --prebuilt
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build android-arm64-egl
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build android-arm64-egl
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:build android-arm64-egl
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/android-map:build opengl arm64-v8a --prebuilt
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:build:mobile android-arm64-egl
       - name: Upload native artifact
@@ -1173,6 +1804,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-android-arm64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-android-arm64-egl')
   target-android-arm64-vulkan:
     name: target / android-arm64-vulkan
@@ -1180,39 +1815,60 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: android-arm64-vulkan
-      - run: mise run build android-arm64-vulkan
+      - id: build
+        run: mise run build android-arm64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native android-arm64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-arm64-vulkan build/packages/native/dist/maplibre-native-c-android-arm64-vulkan.tar.gz
-      - env:
+      - id: suite-1
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-arm64-vulkan
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:android-build vulkan arm64-v8a --prebuilt
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build android-arm64-vulkan
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build android-arm64-vulkan
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:build android-arm64-vulkan
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/android-map:build vulkan arm64-v8a --prebuilt
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:build:mobile android-arm64-vulkan
       - name: Upload native artifact
@@ -1222,6 +1878,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-android-arm64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-android-arm64-vulkan')
   target-android-x64-egl:
     name: target / android-x64-egl
@@ -1229,42 +1889,71 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: android-x64-egl
-      - run: mise run test android-x64-egl
+      - id: build
+        run: mise run build android-x64-egl
+      - name: Boot Android emulator
+        id: boot
+        run: mise run //:android-emulator:boot x86_64 --api 26
+      - id: suite-1
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        run: mise run test android-x64-egl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run archive-native android-x64-egl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-x64-egl build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-x64-egl
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test android-x64-egl
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test android-x64-egl
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test android-x64-egl
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test android-x64-egl
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test android-x64-egl
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/android-map:build opengl x86_64 --prebuilt
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:build:mobile android-x64-egl
       - name: Upload native artifact
@@ -1274,6 +1963,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-android-x64-egl')
   target-android-x64-vulkan:
     name: target / android-x64-vulkan
@@ -1281,42 +1974,71 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: android-x64-vulkan
-      - run: mise run test android-x64-vulkan
+      - id: build
+        run: mise run build android-x64-vulkan
+      - name: Boot Android emulator
+        id: boot
+        run: mise run //:android-emulator:boot x86_64
+      - id: suite-1
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        run: mise run test android-x64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run archive-native android-x64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package android-x64-vulkan build/packages/native/dist/maplibre-native-c-android-x64-vulkan.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:build android-x64-vulkan
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test android-x64-vulkan
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test android-x64-vulkan
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test android-x64-vulkan
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test android-x64-vulkan
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test android-x64-vulkan
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/android-map:build vulkan x86_64 --prebuilt
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:build:mobile android-x64-vulkan
       - name: Upload native artifact
@@ -1326,6 +2048,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-android-x64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-android-x64-vulkan')
   target-ohos-arm64-egl:
     name: target / ohos-arm64-egl
@@ -1333,25 +2059,36 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: ohos-arm64-egl
           gradle: false
-      - run: mise run build ohos-arm64-egl
+      - id: build
+        run: mise run build ohos-arm64-egl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native ohos-arm64-egl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ohos-arm64-egl build/packages/native/dist/maplibre-native-c-ohos-arm64-egl.tar.gz
-      - env:
+      - id: suite-1
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build ohos-arm64-egl
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build ohos-arm64-egl
       - name: Upload native artifact
@@ -1361,6 +2098,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-ohos-arm64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-ohos-arm64-egl')
   target-ohos-arm64-vulkan:
     name: target / ohos-arm64-vulkan
@@ -1368,25 +2109,36 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: ohos-arm64-vulkan
           gradle: false
-      - run: mise run build ohos-arm64-vulkan
+      - id: build
+        run: mise run build ohos-arm64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native ohos-arm64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ohos-arm64-vulkan build/packages/native/dist/maplibre-native-c-ohos-arm64-vulkan.tar.gz
-      - env:
+      - id: suite-1
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build ohos-arm64-vulkan
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build ohos-arm64-vulkan
       - name: Upload native artifact
@@ -1396,6 +2148,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-ohos-arm64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-ohos-arm64-vulkan')
   target-ohos-x64-egl:
     name: target / ohos-x64-egl
@@ -1403,25 +2159,42 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: ohos-x64-egl
           gradle: false
-      - run: mise run test ohos-x64-egl
+      - id: build
+        run: mise run build ohos-x64-egl
+      - name: Boot OpenHarmony emulator
+        id: boot
+        run: mise run //:ohos-emulator:boot
+      - id: suite-1
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
+        run: mise run test ohos-x64-egl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.boot.outcome == 'success' }}
         run: mise run archive-native ohos-x64-egl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ohos-x64-egl build/packages/native/dist/maplibre-native-c-ohos-x64-egl.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test ohos-x64-egl
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test ohos-x64-egl
       - name: Upload native artifact
@@ -1431,6 +2204,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-ohos-x64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-ohos-x64-egl')
   target-ohos-x64-vulkan:
     name: target / ohos-x64-vulkan
@@ -1438,25 +2215,36 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: ohos-x64-vulkan
           gradle: false
-      - run: mise run build ohos-x64-vulkan
+      - id: build
+        run: mise run build ohos-x64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native ohos-x64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package ohos-x64-vulkan build/packages/native/dist/maplibre-native-c-ohos-x64-vulkan.tar.gz
-      - env:
+      - id: suite-1
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:build ohos-x64-vulkan
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:build ohos-x64-vulkan
       - name: Upload native artifact
@@ -1466,6 +2254,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-ohos-x64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-ohos-x64-vulkan')
   target-windows-x64-wgl:
     name: target / windows-x64-wgl
@@ -1473,10 +2265,12 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
@@ -1484,42 +2278,72 @@ jobs:
           target: windows-x64-wgl
           zig: true
           save-toolchains: true
-      - run: mise run test windows-x64-wgl
+      - id: build
+        run: mise run build windows-x64-wgl
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test windows-x64-wgl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native windows-x64-wgl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package windows-x64-wgl build/packages/native/dist/maplibre-native-c-windows-x64-wgl.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test windows-x64-wgl
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check windows-x64-wgl
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test windows-x64-wgl
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build windows-x64-wgl
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:run windows-x64-wgl
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test windows-x64-wgl
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build windows-x64-wgl
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:build windows-x64-wgl
-      - env:
+      - id: suite-10
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test windows-x64-wgl
-      - env:
+      - id: suite-11
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test windows-x64-wgl
-      - env:
+      - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test windows-x64-wgl
       - name: Save Zig packages
@@ -1537,6 +2361,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-windows-x64-wgl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-windows-x64-wgl')
   target-windows-x64-vulkan:
     name: target / windows-x64-vulkan
@@ -1544,52 +2372,84 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: windows-x64-vulkan
           zig: true
-      - run: mise run test windows-x64-vulkan
+      - id: build
+        run: mise run build windows-x64-vulkan
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test windows-x64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native windows-x64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package windows-x64-vulkan build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test windows-x64-vulkan
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check windows-x64-vulkan
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test windows-x64-vulkan
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-map:build windows-x64-vulkan
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/zig-readback:run windows-x64-vulkan
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test windows-x64-vulkan
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build windows-x64-vulkan
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:build windows-x64-vulkan
-      - env:
+      - id: suite-10
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test windows-x64-vulkan
-      - env:
+      - id: suite-11
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test windows-x64-vulkan
-      - env:
+      - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test windows-x64-vulkan
       - name: Save Zig packages
@@ -1607,6 +2467,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-windows-x64-vulkan')
   target-windows-arm64-wgl:
     name: target / windows-arm64-wgl
@@ -1614,43 +2478,69 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: windows-arm64-wgl
           save-toolchains: true
-      - run: mise run test windows-arm64-wgl
+      - id: build
+        run: mise run build windows-arm64-wgl
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test windows-arm64-wgl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native windows-arm64-wgl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package windows-arm64-wgl build/packages/native/dist/maplibre-native-c-windows-arm64-wgl.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test windows-arm64-wgl
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check windows-arm64-wgl
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test windows-arm64-wgl
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build windows-arm64-wgl
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:build windows-arm64-wgl
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test windows-arm64-wgl
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test windows-arm64-wgl
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test windows-arm64-wgl
       - name: Upload native artifact
@@ -1660,6 +2550,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-windows-arm64-wgl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-windows-arm64-wgl')
   target-windows-arm64-vulkan:
     name: target / windows-arm64-vulkan
@@ -1667,42 +2561,68 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: windows-arm64-vulkan
-      - run: mise run test windows-arm64-vulkan
+      - id: build
+        run: mise run build windows-arm64-vulkan
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test windows-arm64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native windows-arm64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package windows-arm64-vulkan build/packages/native/dist/maplibre-native-c-windows-arm64-vulkan.tar.gz
-      - env:
+      - id: suite-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test windows-arm64-vulkan
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check windows-arm64-vulkan
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test windows-arm64-vulkan
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/compose-map:build windows-arm64-vulkan
-      - env:
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/lwjgl-map:build windows-arm64-vulkan
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test windows-arm64-vulkan
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test windows-arm64-vulkan
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test windows-arm64-vulkan
       - name: Upload native artifact
@@ -1712,6 +2632,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-windows-arm64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-windows-arm64-vulkan')
   android-multi:
     name: Android multi-ABI packaging
@@ -1726,10 +2650,12 @@ jobs:
       - target-android-x64-egl
       - target-android-x64-vulkan
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}

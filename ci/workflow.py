@@ -137,6 +137,36 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     return commands
 
 
+def device_boot(preset: str) -> tuple[str, str] | None:
+    """The named step that boots the device a target's suites run on, if any.
+
+    The suites boot the device themselves when it is not ready, and every boot
+    task reuses a ready device. Booting in a step of its own lets CI tell a
+    device that never came up from a suite that failed on it.
+    """
+    target_platform = platform(preset)
+    if target_platform == "android" and preset in EMULATOR_TESTED:
+        # The EGL target's suites run on API 26, as the root `test` task and
+        # the device test scripts boot it.
+        api = " --api 26" if backend(preset) == "egl" else ""
+        return "Boot Android emulator", f"mise run //:android-emulator:boot x86_64{api}"
+    if target_platform == "ohos" and preset in EMULATOR_TESTED:
+        return "Boot OpenHarmony emulator", "mise run //:ohos-emulator:boot"
+    if target_platform == "ios-simulator":
+        return "Boot iOS simulator", "mise run //:ios-simulator:boot"
+    if target_platform == "tvos-simulator":
+        return "Boot tvOS simulator", "mise run //:tvos-simulator:boot"
+    return None
+
+
+SWIFT_PROJECTS = ("mise run //bindings/swift:", "mise run //examples/swift-map:")
+
+
+def uses_swift(commands: list[str]) -> bool:
+    """Whether a row builds a Swift package, which resolves its dependencies."""
+    return any(command.startswith(SWIFT_PROJECTS) for command in commands)
+
+
 def ohos_commands(preset: str) -> list[str]:
     # The emulator executes x64 EGL. Other OpenHarmony targets still prove that
     # each binding links against its backend-specific native artifact.
@@ -148,10 +178,13 @@ def ohos_commands(preset: str) -> list[str]:
 
 
 def native_commands(preset: str, tested: set[str]) -> list[str]:
+    """The build, then the checks against its tree. The build always comes first."""
     target_platform = platform(preset)
-    commands = [
-        f"mise run {'test' if runtime_tested(preset, tested) else 'build'} {preset}"
-    ]
+    # The build is its own step so that a failing C suite leaves the binding
+    # suites a tree to run against.
+    commands = [f"mise run build {preset}"]
+    if runtime_tested(preset, tested):
+        commands.append(f"mise run test {preset}")
     if target_platform == "linux-gnu":
         commands.append(f"mise run check-glibc-floor {preset}")
     elif target_platform == "linux-musl":
@@ -315,6 +348,8 @@ def target_rows(
             "package": preset in packaged,
             "zig": uses_zig(native + consumers),
             "gradle": uses_gradle(native + consumers),
+            "swift": uses_swift(native + consumers),
+            "boot": device_boot(preset),
             "save_toolchains": row_runner not in claimed_runners,
             "native_commands": native if preset in packaged else native + consumers,
         }
