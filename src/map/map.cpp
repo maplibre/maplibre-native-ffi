@@ -603,12 +603,14 @@ class StillImageFrameFilter {
     std::shared_ptr<mln::gfx::RenderingStats> stats,
     uint64_t rendered_generation
   ) {
-    if (rendered_generation < request_generation_) {
-      mode = RenderMode::Partial;
-    }
+    const auto held_back = rendered_generation < request_generation_;
+    if (held_back) mode = RenderMode::Partial;
     delegate_.onDidFinishRenderingFrame(
       mode, repaint_needed, placement_changed, std::move(stats)
     );
+    if (held_back) {
+      mln::testing::hit(mln::testing::SyncPoint::StillImageFrameHeldBack);
+    }
   }
 
  private:

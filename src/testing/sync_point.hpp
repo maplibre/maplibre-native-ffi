@@ -49,6 +49,10 @@ enum class SyncPoint : std::uint8_t {
   // Abandoning a core-worker session found a driver call in flight and is
   // about to wait for it to end. It fires only when abandon has to wait.
   RenderAbandonWaits,
+  // A map's run loop handed MapLibre a finished frame of an update older than
+  // the map's pending still-image request, reported as partial so that it
+  // cannot complete the image.
+  StillImageFrameHeldBack,
   // An Emscripten run loop's stop() has submitted its stop task, and the loop
   // may already be destroyed. Keep this point last: the suite sizes its tables
   // from it.
