@@ -271,9 +271,11 @@ Every feature needs automated CI coverage when practical. The root
 in `tests/native` through CTest and Unity. The ABI suite links the shipped
 library through its public headers. The internal suite links the static library
 and uses the library's sync points to order threads that no public fence can
-order. `tests/native/README.md` describes both suites. On desktop, simulator,
-and Emscripten targets, `mise run test` also runs the host unit tests of the
-Rust platform crate in `src/platform/rust`, which cover its pure helpers such as
+order. On targets that run through CTest, each program in `tests/native/exit` is
+a test of its own whose process exit is the check. `tests/native/README.md`
+describes the suites and the exit programs. On desktop, simulator, and
+Emscripten targets, `mise run test` also runs the host unit tests of the Rust
+platform crate in `src/platform/rust`, which cover its pure helpers such as
 redirect resolution. `mise run build` runs `mise run check-exports`, which fails
 when the installed library exports anything beyond the public C API. Language
 binding suites run through their binding-specific CI tasks.

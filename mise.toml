@@ -318,12 +318,13 @@ description = "Build and run the native C tests for a CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # Desktop and simulator targets run the suites through ctest, with one entry per
-# test file. The Emscripten suites run as pages in headless Chromium, four for
-# the ABI suite and one for the internal suite; see scripts/run-browser-test.mjs
-# for how a browser is located. Every target that runs through ctest first runs
-# the Rust platform crate's host unit tests with cargo. Emulator and musl
-# targets run each executable once instead, with the ABI suite's plugin group in
-# an invocation of its own after the rest, since a plugin registration lasts for
+# test file and one per program in tests/native/exit. The Emscripten suites run
+# as pages in headless Chromium, four for the ABI suite and one for the internal
+# suite; see scripts/run-browser-test.mjs for how a browser is located. Every
+# target that runs through ctest first runs the Rust platform crate's host unit
+# tests with cargo. Emulator and musl targets run each executable once instead,
+# with the ABI suite's plugin group in an invocation of its own after the rest,
+# since a plugin registration lasts for
 # the rest of the process.
 run = '''
 build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset"
