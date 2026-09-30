@@ -442,194 +442,261 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
   TEST_ASSERT_TRUE(
     mln_test_http_server_wait_for_requests(server, overlay_path, 1)
   );
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-  mln_test_http_server_stop(server);
-}
+  // Records that the transform saw an image request, and keeps every URL.
+  typedef struct kind_probe {
+    atomic_bool saw_image;
+  } kind_probe;
 
-#endif
-
-#if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
-
-static const char token_header[] = "X-Test-Token";
-static const char token_value[] = "secret-token";
-
-// Adds the token header to every request, and records the kinds and the last
-// URL it saw.
-typedef struct token_transform {
-  atomic_int calls;
-  atomic_uint last_kind;
-} token_transform;
-
-static mln_status add_token(
-  void* user_data, uint32_t kind, const char* url,
-  mln_http_header_transform_response* out_response
-) {
-  (void)url;
-  token_transform* transform = user_data;
-  atomic_fetch_add(&transform->calls, 1);
-  atomic_store(&transform->last_kind, kind);
-  return mln_http_header_transform_response_set(
-    out_response, token_header, sizeof(token_header) - 1, token_value,
-    sizeof(token_value) - 1, NULL
-  );
-}
-
-static void install_token_transform(
-  mln_runtime runtime, token_transform* probe
-) {
-  atomic_init(&probe->calls, 0);
-  atomic_init(&probe->last_kind, 0);
-  const mln_http_header_transform transform = {
-    .size = sizeof(mln_http_header_transform),
-    .callback = add_token,
-    .user_data = probe,
-  };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_http_header_transform(runtime, &transform)
-  );
-}
-
-static bool request_carried_token(
-  mln_test_http_server* server, const char* path
-) {
-  char value[128];
-  return mln_test_http_server_request_header(
-           server, path, 0, token_header, value, sizeof(value)
-         ) &&
-         strcmp(value, token_value) == 0;
-}
-
-// The transform's headers go out on HTTP requests until it is cleared.
-static void a_header_transform_adds_headers_until_cleared(void) {
-  static const mln_test_http_route routes[] = {
-    {.path = "/with-token.json",
-     .body = empty_style_json,
-     .body_size = sizeof(empty_style_json) - 1},
-    {.path = "/after-clear.json",
-     .body = empty_style_json,
-     .body_size = sizeof(empty_style_json) - 1},
-  };
-  mln_test_http_server* server = mln_test_http_server_start(routes, 2);
-  mln_runtime runtime = mln_test_create_runtime();
-  token_transform probe;
-  install_token_transform(runtime, &probe);
-
-  load_from_server(runtime, server, "/with-token.json", true);
-  TEST_ASSERT_TRUE(request_carried_token(server, "/with-token.json"));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RESOURCE_KIND_STYLE, atomic_load(&probe.last_kind)
-  );
-  const int calls = atomic_load(&probe.calls);
-
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_clear_http_header_transform(runtime)
-  );
-  load_from_server(runtime, server, "/after-clear.json", true);
-  TEST_ASSERT_EQUAL_INT(
-    1, mln_test_http_server_requests(server, "/after-clear.json")
-  );
-  TEST_ASSERT_FALSE(request_carried_token(server, "/after-clear.json"));
-  TEST_ASSERT_EQUAL_INT(calls, atomic_load(&probe.calls));
-  mln_test_destroy_runtime(runtime);
-  mln_test_http_server_stop(server);
-}
-
-// A file:// style never reaches the HTTP client, so the transform is not
-// called for it.
-static void a_header_transform_skips_requests_that_are_not_http(void) {
-  char path[1024];
-  mln_test_temp_path("header-transform-style.json", path, sizeof(path));
-  FILE* file = fopen(path, "wb");
-  TEST_ASSERT_NOT_NULL(file);
-  TEST_ASSERT_EQUAL_size_t(
-    sizeof(empty_style_json) - 1,
-    fwrite(empty_style_json, 1, sizeof(empty_style_json) - 1, file)
-  );
-  TEST_ASSERT_EQUAL_INT(0, fclose(file));
-  char url[1100];
-  (void)snprintf(
-    url, sizeof(url), "file://%s%s", path[0] == '/' ? "" : "/", path
-  );
-  for (char* cursor = url; *cursor != '\0'; cursor += 1) {
-    if (*cursor == '\\') *cursor = '/';
+  static mln_status note_image_requests(
+    void* user_data, uint32_t kind, const char* url,
+    mln_resource_transform_response* out_response
+  ) {
+    (void)url;
+    (void)out_response;
+    if (kind == MLN_RESOURCE_KIND_IMAGE) {
+      mln_test_flag_set(&((kind_probe*)user_data)->saw_image);
+    }
+    return MLN_STATUS_OK;
   }
 
-  mln_runtime runtime = mln_test_create_runtime();
-  token_transform probe;
-  install_token_transform(runtime, &probe);
-  mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
-  TEST_ASSERT_TRUE_MESSAGE(mln_test_await_style_loaded(runtime, map), url);
-  TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.calls));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-  (void)remove(path);
-}
+  // An image source's URL reaches the transform as an image request.
+  static void a_transform_sees_an_image_source_as_an_image_request(void) {
+    static const mln_test_http_route routes[] = {
+      {.path = "/style.json",
+       .body = empty_style_json,
+       .body_size = sizeof(empty_style_json) - 1},
+    };
+    mln_test_http_server* server = mln_test_http_server_start(routes, 1);
+    kind_probe probe;
+    atomic_init(&probe.saw_image, false);
+    mln_runtime runtime = mln_test_create_runtime();
+    const mln_resource_transform transform = {
+      .size = sizeof(mln_resource_transform),
+      .callback = note_image_requests,
+      .user_data = &probe,
+    };
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_test_set_resource_transform(runtime, &transform)
+    );
+    char style_url[256];
+    mln_test_http_server_url(
+      server, "/style.json", style_url, sizeof(style_url)
+    );
+    mln_map map = mln_test_create_map(runtime);
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_test_map_set_style_url(map, style_url)
+    );
+    TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
 
-// A redirect to the same origin keeps the transform's headers, and one to
-// another origin drops them before the request leaves.
-static void a_redirect_keeps_headers_only_within_the_origin(void) {
-  static const mln_test_http_route other_routes[] = {
-    {.path = "/elsewhere.json",
-     .body = empty_style_json,
-     .body_size = sizeof(empty_style_json) - 1},
-  };
-  mln_test_http_server* other = mln_test_http_server_start(other_routes, 1);
-  static char cross_origin_location[256];
-  char elsewhere[200];
-  mln_test_http_server_url(
-    other, "/elsewhere.json", elsewhere, sizeof(elsewhere)
-  );
-  (void)snprintf(
-    cross_origin_location, sizeof(cross_origin_location), "Location: %s\r\n",
-    elsewhere
-  );
-  const mln_test_http_route routes[] = {
-    {.path = "/same-origin.json",
-     .status = 302,
-     .headers = "Location: /redirected.json\r\n"},
-    {.path = "/redirected.json",
-     .body = empty_style_json,
-     .body_size = sizeof(empty_style_json) - 1},
-    {.path = "/cross-origin.json",
-     .status = 302,
-     .headers = cross_origin_location},
-  };
-  mln_test_http_server* server = mln_test_http_server_start(routes, 3);
-  mln_runtime runtime = mln_test_create_runtime();
-  token_transform probe;
-  install_token_transform(runtime, &probe);
+    char image_url[256];
+    mln_test_http_server_url(
+      server, "/image.png", image_url, sizeof(image_url)
+    );
+    const mln_lat_lng corners[4] = {
+      {.latitude = 1.0, .longitude = 0.0},
+      {.latitude = 1.0, .longitude = 1.0},
+      {.latitude = 0.0, .longitude = 1.0},
+      {.latitude = 0.0, .longitude = 0.0},
+    };
+    MLN_TEST_AWAIT_COMMAND(
+      MLN_STATUS_OK,
+      mln_map_add_image_source_url(
+        map, MLN_BUFFER_LITERAL("image"), corners, 4,
+        (mln_buffer_view){.data = image_url, .size = strlen(image_url)},
+        &completion.descriptor, NULL
+      )
+    );
+    TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.saw_image));
 
-  load_from_server(runtime, server, "/same-origin.json", true);
-  TEST_ASSERT_TRUE(request_carried_token(server, "/same-origin.json"));
-  TEST_ASSERT_TRUE(request_carried_token(server, "/redirected.json"));
-
-  load_from_server(runtime, server, "/cross-origin.json", true);
-  TEST_ASSERT_TRUE(request_carried_token(server, "/cross-origin.json"));
-  TEST_ASSERT_EQUAL_INT(
-    1, mln_test_http_server_requests(other, "/elsewhere.json")
-  );
-  TEST_ASSERT_FALSE(request_carried_token(other, "/elsewhere.json"));
-  mln_test_destroy_runtime(runtime);
-  mln_test_http_server_stop(server);
-  mln_test_http_server_stop(other);
-}
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+    mln_test_http_server_stop(server);
+  }
 
 #endif
 
-MLN_TEST_GROUP {
-  RUN_TEST(resource_transform_registration_validates_its_descriptor);
-  RUN_TEST(a_replacement_url_needs_a_transform_invocation);
-  RUN_TEST(header_transform_registration_validates_its_descriptor);
-  RUN_TEST(a_header_needs_a_transform_invocation_and_a_valid_field);
+#if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+
+  static const char token_header[] = "X-Test-Token";
+  static const char token_value[] = "secret-token";
+
+  // Adds the token header to every request, and records the kinds and the last
+  // URL it saw.
+  typedef struct token_transform {
+    atomic_int calls;
+    atomic_uint last_kind;
+  } token_transform;
+
+  static mln_status add_token(
+    void* user_data, uint32_t kind, const char* url,
+    mln_http_header_transform_response* out_response
+  ) {
+    (void)url;
+    token_transform* transform = user_data;
+    atomic_fetch_add(&transform->calls, 1);
+    atomic_store(&transform->last_kind, kind);
+    return mln_http_header_transform_response_set(
+      out_response, token_header, sizeof(token_header) - 1, token_value,
+      sizeof(token_value) - 1, NULL
+    );
+  }
+
+  static void install_token_transform(
+    mln_runtime runtime, token_transform * probe
+  ) {
+    atomic_init(&probe->calls, 0);
+    atomic_init(&probe->last_kind, 0);
+    const mln_http_header_transform transform = {
+      .size = sizeof(mln_http_header_transform),
+      .callback = add_token,
+      .user_data = probe,
+    };
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_test_set_http_header_transform(runtime, &transform)
+    );
+  }
+
+  static bool request_carried_token(
+    mln_test_http_server * server, const char* path
+  ) {
+    char value[128];
+    return mln_test_http_server_request_header(
+             server, path, 0, token_header, value, sizeof(value)
+           ) &&
+           strcmp(value, token_value) == 0;
+  }
+
+  // The transform's headers go out on HTTP requests until it is cleared.
+  static void a_header_transform_adds_headers_until_cleared(void) {
+    static const mln_test_http_route routes[] = {
+      {.path = "/with-token.json",
+       .body = empty_style_json,
+       .body_size = sizeof(empty_style_json) - 1},
+      {.path = "/after-clear.json",
+       .body = empty_style_json,
+       .body_size = sizeof(empty_style_json) - 1},
+    };
+    mln_test_http_server* server = mln_test_http_server_start(routes, 2);
+    mln_runtime runtime = mln_test_create_runtime();
+    token_transform probe;
+    install_token_transform(runtime, &probe);
+
+    load_from_server(runtime, server, "/with-token.json", true);
+    TEST_ASSERT_TRUE(request_carried_token(server, "/with-token.json"));
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RESOURCE_KIND_STYLE, atomic_load(&probe.last_kind)
+    );
+    const int calls = atomic_load(&probe.calls);
+
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_test_clear_http_header_transform(runtime)
+    );
+    load_from_server(runtime, server, "/after-clear.json", true);
+    TEST_ASSERT_EQUAL_INT(
+      1, mln_test_http_server_requests(server, "/after-clear.json")
+    );
+    TEST_ASSERT_FALSE(request_carried_token(server, "/after-clear.json"));
+    TEST_ASSERT_EQUAL_INT(calls, atomic_load(&probe.calls));
+    mln_test_destroy_runtime(runtime);
+    mln_test_http_server_stop(server);
+  }
+
+  // A file:// style never reaches the HTTP client, so the transform is not
+  // called for it.
+  static void a_header_transform_skips_requests_that_are_not_http(void) {
+    char path[1024];
+    mln_test_temp_path("header-transform-style.json", path, sizeof(path));
+    FILE* file = fopen(path, "wb");
+    TEST_ASSERT_NOT_NULL(file);
+    TEST_ASSERT_EQUAL_size_t(
+      sizeof(empty_style_json) - 1,
+      fwrite(empty_style_json, 1, sizeof(empty_style_json) - 1, file)
+    );
+    TEST_ASSERT_EQUAL_INT(0, fclose(file));
+    char url[1100];
+    (void)snprintf(
+      url, sizeof(url), "file://%s%s", path[0] == '/' ? "" : "/", path
+    );
+    for (char* cursor = url; *cursor != '\0'; cursor += 1) {
+      if (*cursor == '\\') *cursor = '/';
+    }
+
+    mln_runtime runtime = mln_test_create_runtime();
+    token_transform probe;
+    install_token_transform(runtime, &probe);
+    mln_map map = mln_test_create_map(runtime);
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+    TEST_ASSERT_TRUE_MESSAGE(mln_test_await_style_loaded(runtime, map), url);
+    TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.calls));
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+    (void)remove(path);
+  }
+
+  // A redirect to the same origin keeps the transform's headers, and one to
+  // another origin drops them before the request leaves.
+  static void a_redirect_keeps_headers_only_within_the_origin(void) {
+    static const mln_test_http_route other_routes[] = {
+      {.path = "/elsewhere.json",
+       .body = empty_style_json,
+       .body_size = sizeof(empty_style_json) - 1},
+    };
+    mln_test_http_server* other = mln_test_http_server_start(other_routes, 1);
+    static char cross_origin_location[256];
+    char elsewhere[200];
+    mln_test_http_server_url(
+      other, "/elsewhere.json", elsewhere, sizeof(elsewhere)
+    );
+    (void)snprintf(
+      cross_origin_location, sizeof(cross_origin_location), "Location: %s\r\n",
+      elsewhere
+    );
+    const mln_test_http_route routes[] = {
+      {.path = "/same-origin.json",
+       .status = 302,
+       .headers = "Location: /redirected.json\r\n"},
+      {.path = "/redirected.json",
+       .body = empty_style_json,
+       .body_size = sizeof(empty_style_json) - 1},
+      {.path = "/cross-origin.json",
+       .status = 302,
+       .headers = cross_origin_location},
+    };
+    mln_test_http_server* server = mln_test_http_server_start(routes, 3);
+    mln_runtime runtime = mln_test_create_runtime();
+    token_transform probe;
+    install_token_transform(runtime, &probe);
+
+    load_from_server(runtime, server, "/same-origin.json", true);
+    TEST_ASSERT_TRUE(request_carried_token(server, "/same-origin.json"));
+    TEST_ASSERT_TRUE(request_carried_token(server, "/redirected.json"));
+
+    load_from_server(runtime, server, "/cross-origin.json", true);
+    TEST_ASSERT_TRUE(request_carried_token(server, "/cross-origin.json"));
+    TEST_ASSERT_EQUAL_INT(
+      1, mln_test_http_server_requests(other, "/elsewhere.json")
+    );
+    TEST_ASSERT_FALSE(request_carried_token(other, "/elsewhere.json"));
+    mln_test_destroy_runtime(runtime);
+    mln_test_http_server_stop(server);
+    mln_test_http_server_stop(other);
+  }
+
+#endif
+
+  MLN_TEST_GROUP {
+    RUN_TEST(resource_transform_registration_validates_its_descriptor);
+    RUN_TEST(a_replacement_url_needs_a_transform_invocation);
+    RUN_TEST(header_transform_registration_validates_its_descriptor);
+    RUN_TEST(a_header_needs_a_transform_invocation_and_a_valid_field);
 #if !defined(__EMSCRIPTEN__)
-  RUN_TEST(a_resource_transform_rewrites_until_cleared);
-  RUN_TEST(an_image_source_request_reaches_the_transforms_as_an_image);
+    RUN_TEST(a_resource_transform_rewrites_until_cleared);
+    RUN_TEST(an_image_source_request_reaches_the_transforms_as_an_image);
+    RUN_TEST(a_transform_sees_an_image_source_as_an_image_request);
 #endif
 #if !defined(__EMSCRIPTEN__) && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
-  RUN_TEST(a_header_transform_adds_headers_until_cleared);
-  RUN_TEST(a_header_transform_skips_requests_that_are_not_http);
-  RUN_TEST(a_redirect_keeps_headers_only_within_the_origin);
+    RUN_TEST(a_header_transform_adds_headers_until_cleared);
+    RUN_TEST(a_header_transform_skips_requests_that_are_not_http);
+    RUN_TEST(a_redirect_keeps_headers_only_within_the_origin);
 #endif
-}
+  }

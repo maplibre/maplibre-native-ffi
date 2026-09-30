@@ -132,6 +132,14 @@ static void terrarium_encoding(mln_style_tile_source_options* options) {
   options->fields |= MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
   options->raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM;
 }
+static void mapbox_encoding(mln_style_tile_source_options* options) {
+  options->fields |= MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
+  options->raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
+}
+static void xyz_scheme(mln_style_tile_source_options* options) {
+  options->fields |= MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
+  options->scheme = MLN_STYLE_TILE_SCHEME_XYZ;
+}
 
 // One source a row adds and the metadata it must then report. A zero field
 // in `absent` is not checked; every bit in it must be missing from fields.
@@ -166,6 +174,10 @@ static void tile_sources_report_their_effective_options(void) {
   terrarium_encoding(&terrarium);
   mln_style_tile_source_options url_mlt = defaults;
   url_zoom_and_mlt(&url_mlt);
+  mln_style_tile_source_options mapbox = defaults;
+  mapbox_encoding(&mapbox);
+  mln_style_tile_source_options xyz = defaults;
+  xyz_scheme(&xyz);
 
   const uint32_t tilejson =
     MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_TILE_SIZE;
@@ -197,6 +209,11 @@ static void tile_sources_report_their_effective_options(void) {
     {"raster DEM tiles, Terrarium", TILE_SOURCE_RASTER_DEM, false,
      terrarium_encoding, MLN_STYLE_SOURCE_TYPE_RASTER_DEM,
      tilejson | MLN_STYLE_SOURCE_INFO_RASTER_ENCODING, 0, terrarium},
+    {"raster DEM tiles, Mapbox", TILE_SOURCE_RASTER_DEM, false, mapbox_encoding,
+     MLN_STYLE_SOURCE_TYPE_RASTER_DEM,
+     tilejson | MLN_STYLE_SOURCE_INFO_RASTER_ENCODING, 0, mapbox},
+    {"raster tiles, explicit XYZ", TILE_SOURCE_RASTER, false, xyz_scheme,
+     MLN_STYLE_SOURCE_TYPE_RASTER, tilejson, 0, xyz},
     {"vector URL, null options", TILE_SOURCE_VECTOR, true, NULL,
      MLN_STYLE_SOURCE_TYPE_VECTOR,
      MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_TILE_SIZE |
@@ -868,6 +885,18 @@ static void image_sources_hold_corners_and_pixels(void) {
       map, MLN_BUFFER_LITERAL("geojson"), &completion.descriptor, NULL
     )
   );
+  // A missing source has no coordinates to report, which is not a failure.
+  mln_test_completion missing =
+    mln_test_completion_default(4 * sizeof(mln_lat_lng));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_image_source_coordinates(
+      map, MLN_BUFFER_LITERAL("missing"), &missing.descriptor, NULL
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&missing));
+  TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&missing));
+  mln_test_completion_destroy(&missing);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

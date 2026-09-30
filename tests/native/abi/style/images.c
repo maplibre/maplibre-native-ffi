@@ -12,6 +12,7 @@
 typedef struct stretch_probe {
   atomic_bool done;
   mln_status status;
+  size_t value_count;
   mln_image_stretch x;
   mln_image_stretch y;
   size_t x_count;
@@ -23,6 +24,7 @@ static void copy_stretches(
 ) {
   stretch_probe* probe = user_data;
   probe->status = result->status;
+  probe->value_count = result->value_count;
   if (result->value_count == 1) {
     const mln_style_image_stretches_result* stretches = result->value;
     probe->x_count = stretches->stretch_x_count;
@@ -79,6 +81,27 @@ static void style_image_stretches_are_borrowed_by_the_completion(void) {
   TEST_ASSERT_EQUAL_size_t(1, probe.y_count);
   TEST_ASSERT_EQUAL_MEMORY(&stretch_x, &probe.x, sizeof(stretch_x));
   TEST_ASSERT_EQUAL_MEMORY(&stretch_y, &probe.y, sizeof(stretch_y));
+
+  // A missing image is no value, not a failure.
+  stretch_probe missing = {
+    .status = MLN_STATUS_INVALID_STATE, .value_count = 1
+  };
+  atomic_init(&missing.done, false);
+  const mln_completion missing_completion = {
+    .size = sizeof(mln_completion),
+    .callback = copy_stretches,
+    .user_data = &missing,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_style_image_stretches(
+      map, MLN_BUFFER_LITERAL("missing"), &missing_completion, NULL
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_TRUE(atomic_load(&missing.done));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, missing.status);
+  TEST_ASSERT_EQUAL_size_t(0, missing.value_count);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -146,13 +169,15 @@ static void style_images_copy_their_metadata_and_packed_pixels(void) {
   mln_style_image_options options = mln_style_image_options_default();
   options.fields = MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO |
                    MLN_STYLE_IMAGE_OPTION_SDF | MLN_STYLE_IMAGE_OPTION_CONTENT |
-                   MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
+                   MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH |
+                   MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
   options.pixel_ratio = 2.0f;
   options.sdf = true;
   options.content = (mln_image_content){
     .left = 0.0f, .top = 0.0f, .right = 2.0f, .bottom = 1.0f
   };
   options.text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
+  options.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY;
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_set_style_image(
                      map, MLN_BUFFER_LITERAL("marker"), &image, &options,
@@ -167,10 +192,12 @@ static void style_images_copy_their_metadata_and_packed_pixels(void) {
   expected.byte_length = sizeof(packed);
   expected.content = options.content;
   expected.text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
+  expected.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY;
   expected.pixel_ratio = 2.0f;
   expected.sdf = true;
   expected.has_content = true;
   expected.has_text_fit_width = true;
+  expected.has_text_fit_height = true;
   const mln_style_image_info info = read_image_info(map, "marker");
   TEST_ASSERT_EQUAL_UINT32(expected.width, info.width);
   TEST_ASSERT_EQUAL_UINT32(expected.height, info.height);
@@ -185,6 +212,7 @@ static void style_images_copy_their_metadata_and_packed_pixels(void) {
   TEST_ASSERT_EQUAL(expected.has_text_fit_width, info.has_text_fit_width);
   TEST_ASSERT_EQUAL_UINT32(expected.text_fit_width, info.text_fit_width);
   TEST_ASSERT_EQUAL(expected.has_text_fit_height, info.has_text_fit_height);
+  TEST_ASSERT_EQUAL_UINT32(expected.text_fit_height, info.text_fit_height);
   TEST_ASSERT_EQUAL_size_t(0, info.stretch_x_count);
 
   uint8_t copied[16] = {0};
@@ -217,7 +245,44 @@ static void style_images_copy_their_metadata_and_packed_pixels(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// An image with no ID, or a stretch interval with no width, never reaches the
+// map worker.
+static void style_image_inputs_are_validated_at_submission(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  const uint8_t pixel[4] = {0, 0, 0, 0};
+  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  image.width = 1;
+  image.height = 1;
+  image.stride = 4;
+  image.pixels = pixel;
+  image.byte_length = sizeof(pixel);
+  mln_completion discard = mln_test_discard_completion();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_image(
+      map, (mln_buffer_view){.data = "", .size = 0}, &image, NULL, &discard,
+      NULL
+    )
+  );
+
+  const mln_image_stretch empty = {.from = 0.5f, .to = 0.5f};
+  mln_style_image_options options = mln_style_image_options_default();
+  options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_X;
+  options.stretch_x = &empty;
+  options.stretch_x_count = 1;
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "positive width", mln_map_set_style_image(
+                        map, MLN_BUFFER_LITERAL("zero-width"), &image, &options,
+                        &completion.descriptor, MLN_TEST_DIAGNOSTIC
+                      )
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(style_image_stretches_are_borrowed_by_the_completion);
   RUN_TEST(style_images_copy_their_metadata_and_packed_pixels);
+  RUN_TEST(style_image_inputs_are_validated_at_submission);
 }

@@ -248,6 +248,26 @@ static void the_http_transport_follows_each_status(void) {
   mln_test_http_server_stop(server);
 }
 
+// A port that nothing listens on refuses the connection, which reaches the map
+// as a loading failure rather than a hang. The port is one a server just gave
+// up, so nothing else on the host is listening there.
+static void a_refused_connection_fails_the_load(void) {
+  mln_test_http_server* server = mln_test_http_server_start(NULL, 0);
+  char url[256];
+  mln_test_http_server_url(server, "/refused.json", url, sizeof(url));
+  mln_test_http_server_stop(server);
+
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  char message[512];
+  TEST_ASSERT_TRUE(
+    mln_test_await_loading_failure(runtime, map, message, sizeof(message))
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // A cached response that must be revalidated goes out again with its ETag, and
 // a 304 answer delivers the cached bytes.
 static void a_not_modified_response_revalidates_the_cached_style(void) {
@@ -388,6 +408,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_local_pmtiles_archive_renders);
 #if !defined(__EMSCRIPTEN__)
   RUN_TEST(the_http_transport_follows_each_status);
+  RUN_TEST(a_refused_connection_fails_the_load);
   RUN_TEST(a_not_modified_response_revalidates_the_cached_style);
   RUN_TEST(a_remote_pmtiles_archive_is_read_in_ranges);
   RUN_TEST(a_request_in_flight_does_not_hold_its_map_open);

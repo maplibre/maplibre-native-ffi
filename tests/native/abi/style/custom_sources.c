@@ -670,6 +670,100 @@ static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static uint32_t source_type(mln_map map, const char* id) {
+  mln_test_completion info =
+    mln_test_completion_default(sizeof(mln_style_source_result));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_source_info(
+                     map, mln_test_view_of(id), &info.descriptor, NULL
+                   )
+  );
+  mln_style_source_result result = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_completion_finish_value(&info, &result, sizeof(result))
+  );
+  return result.info.type;
+}
+
+// Each kind takes every option it declares, and rejects a maximum zoom that
+// is not a tile zoom before the call returns.
+static void custom_sources_take_every_option_they_declare(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  custom_probe geometry_probe;
+  init_probe(&geometry_probe);
+  custom_probe mvt_probe;
+  init_probe(&mvt_probe);
+
+  mln_custom_geometry_source_options geometry =
+    mln_custom_geometry_source_options_default();
+  geometry.fields = MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM |
+                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM |
+                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE |
+                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE |
+                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER |
+                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP |
+                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
+  geometry.min_zoom = 1;
+  geometry.max_zoom = 12;
+  geometry.tolerance = 0.5;
+  geometry.tile_size = 256;
+  geometry.buffer = 64;
+  geometry.clip = true;
+  geometry.wrap = true;
+  geometry.fetch_tile = probe_fetch_tile;
+  geometry.user_data = &geometry_probe;
+  geometry.release_user_data = probe_release;
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK, mln_map_add_custom_geometry_source(
+                     map, MLN_BUFFER_LITERAL("every-geometry-option"),
+                     &geometry, &completion.descriptor, NULL
+                   )
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR,
+    source_type(map, "every-geometry-option")
+  );
+
+  mln_custom_mvt_vector_source_options mvt =
+    mln_custom_mvt_vector_source_options_default();
+  mvt.fields = MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM |
+               MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+  mvt.min_zoom = 2;
+  mvt.max_zoom = 10;
+  mvt.fetch_tile = probe_fetch_tile;
+  mvt.user_data = &mvt_probe;
+  mvt.release_user_data = probe_release;
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK, mln_map_add_custom_mvt_vector_source(
+                     map, MLN_BUFFER_LITERAL("every-mvt-option"), &mvt,
+                     &completion.descriptor, NULL
+                   )
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR,
+    source_type(map, "every-mvt-option")
+  );
+
+  mln_custom_mvt_vector_source_options past_the_last_zoom = mvt;
+  past_the_last_zoom.max_zoom = 33;
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "max_zoom",
+    mln_map_add_custom_mvt_vector_source(
+      map, MLN_BUFFER_LITERAL("past-the-last-zoom"), &past_the_last_zoom,
+      &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    )
+  );
+
+  mln_test_destroy_map(map);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&geometry_probe.release_count));
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&mvt_probe.release_count));
+  mln_test_destroy_runtime(runtime);
+}
+
 static void tile_operations_reject_the_other_custom_source_kind(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -747,4 +841,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_region_invalidation_refetches_only_the_tiles_inside_it);
   RUN_TEST(tile_delivery_and_invalidate_accept_an_empty_tile);
   RUN_TEST(tile_operations_reject_the_other_custom_source_kind);
+  RUN_TEST(custom_sources_take_every_option_they_declare);
 }

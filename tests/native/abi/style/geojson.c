@@ -123,6 +123,28 @@ static void geojson_source_data_create_rejects_unsafe_raw_values(void) {
     )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, short_size_data);
+
+  // Cluster properties are expressions, so a JSON object of plain values
+  // fails MapLibre Native's conversion.
+  mln_geojson_source_options unconvertible =
+    mln_geojson_source_options_default();
+  unconvertible.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
+                         MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+  unconvertible.cluster = true;
+  unconvertible.cluster_properties = MLN_BUFFER_LITERAL("{\"total\":5}");
+  mln_geojson_source_data unconvertible_data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(empty_collection), &unconvertible, &unconvertible_data,
+      MLN_TEST_DIAGNOSTIC
+    )
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "GeoJSON source options"),
+    mln_test_last_error()
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, unconvertible_data);
 }
 
 // Supercluster reads every feature geometry as a point, so data preparation
@@ -354,6 +376,24 @@ static void prepared_data_must_match_the_source_options(void) {
     );
     mln_geojson_source_data_destroy(data);
   }
+
+  // The cluster zoom, radius, and minimum size are source options too.
+  mln_geojson_source_options tuned = clustered;
+  tuned.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
+                  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
+                  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+  tuned.cluster_max_zoom = 10.0;
+  tuned.cluster_radius = 80;
+  tuned.cluster_min_points = 3;
+  mln_geojson_source_data tuned_data = prepare(points, &tuned);
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "do not match",
+    mln_map_set_geojson_source_data(
+      map, MLN_BUFFER_LITERAL("clustered"), tuned_data, &completion.descriptor,
+      NULL
+    )
+  );
+  mln_geojson_source_data_destroy(tuned_data);
 
   // Synchronous tiling is a source option like any other, so data prepared
   // with it does not match a source added without it.

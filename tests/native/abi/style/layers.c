@@ -149,6 +149,12 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
       &completion.descriptor, NULL
     )
   );
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "visibility is invalid",
+    mln_map_set_layer_visibility(
+      map, MLN_BUFFER_LITERAL("info-layer"), 7, &completion.descriptor, NULL
+    )
+  );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_set_layer_source_layer(
                      map, MLN_BUFFER_LITERAL("info-layer"),
@@ -648,6 +654,15 @@ static mln_status set_indicator_image(
   );
 }
 
+static mln_status set_indicator_top_image(
+  mln_map map, mln_buffer_view layer, const mln_completion* completion
+) {
+  return mln_map_set_location_indicator_image_name(
+    map, layer, MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP,
+    MLN_BUFFER_LITERAL("puck-top"), completion, NULL
+  );
+}
+
 // The typed setters write location-indicator properties in the renderer's
 // order and units, and refuse every other layer type.
 static void location_indicator_setters_write_its_properties(void) {
@@ -676,6 +691,8 @@ static void location_indicator_setters_write_its_properties(void) {
     {"accuracy radius", set_indicator_radius, "accuracy-radius", "25.0"},
     {"bearing image", set_indicator_image, "bearing-image",
      "\"name\":\"arrow\""},
+    {"top image", set_indicator_top_image, "top-image",
+     "\"name\":\"puck-top\""},
   };
   for (size_t index = 0; index < sizeof(setters) / sizeof(setters[0]);
        index += 1) {
