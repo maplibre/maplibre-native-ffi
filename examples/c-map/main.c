@@ -50,10 +50,18 @@ static app_error drain_events(
   return APP_OK;
 }
 
+/// Smoke mode, selected by MLN_EXAMPLE_SMOKE=1, renders one frame into a
+/// hidden window and exits, so CI can run the example without a display.
+static bool smoke_mode(void) {
+  const char* value = getenv("MLN_EXAMPLE_SMOKE");
+  return value != nullptr && strcmp(value, "1") == 0;
+}
+
 static app_error render_loop_iteration(
   SDL_Window* window, render_target* target, viewport* current_viewport,
   bool* viewport_dirty, map_state* state, bool* render_request,
-  wake_receiver* receiver, input_controller* controller, bool* running
+  wake_receiver* receiver, input_controller* controller, bool* running,
+  bool* frame_rendered
 ) {
   // The runtime raises its wake only when the queue goes from empty to
   // non-empty, so a dropped push has to be recovered here.
@@ -120,6 +128,7 @@ static app_error render_loop_iteration(
     if (!outcome.rendered || outcome.needs_repaint) {
       *render_request = true;
     }
+    *frame_rendered = outcome.rendered;
   }
   MAP_TRY(render_target_finish_frame(target));
 
@@ -141,19 +150,25 @@ static app_error render_loop(
   printf("render target status: %s\n", render_target_mode_status_line(mode));
   input_log_controls();
 
+  const bool smoke = smoke_mode();
   bool running = true;
   bool render_request = true;
   bool viewport_dirty = false;
   input_controller controller = {};
   while (running) {
+    bool frame_rendered = false;
     void* frame_scope = render_target_frame_scope_open();
     error = render_loop_iteration(
       window, target, current_viewport, &viewport_dirty, state, &render_request,
-      receiver, &controller, &running
+      receiver, &controller, &running, &frame_rendered
     );
     render_target_frame_scope_close(frame_scope);
     if (error != APP_OK) {
       return error;
+    }
+    if (smoke && frame_rendered) {
+      puts("smoke: rendered one frame");
+      running = false;
     }
   }
   return APP_OK;
@@ -231,9 +246,9 @@ int main(int argc, char** argv) {
     goto out_sdl;
   }
 
-  const SDL_WindowFlags window_flags = render_target_window_flags() |
-                                       SDL_WINDOW_RESIZABLE |
-                                       SDL_WINDOW_HIGH_PIXEL_DENSITY;
+  const SDL_WindowFlags window_flags =
+    render_target_window_flags() | SDL_WINDOW_RESIZABLE |
+    SDL_WINDOW_HIGH_PIXEL_DENSITY | (smoke_mode() ? SDL_WINDOW_HIDDEN : 0);
   SDL_Window* window = SDL_CreateWindow(
     "MapLibre SDL3 Map", viewport_window_width, viewport_window_height,
     window_flags
@@ -242,7 +257,9 @@ int main(int argc, char** argv) {
     fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
     goto out_sdl;
   }
-  SDL_RaiseWindow(window);
+  if (!smoke_mode()) {
+    SDL_RaiseWindow(window);
+  }
 
   viewport current_viewport = viewport_get(window);
   viewport_log("initial viewport", current_viewport);

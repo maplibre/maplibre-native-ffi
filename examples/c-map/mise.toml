@@ -21,3 +21,14 @@ sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
 export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map/c-map" "$usage_render_target"
 '''
+
+[tasks.smoke]
+description = "Render one frame in a hidden window and exit."
+extends = "ffi:preset"
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
+export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+MLN_EXAMPLE_SMOKE=1 "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map/c-map" owned-texture
+'''
