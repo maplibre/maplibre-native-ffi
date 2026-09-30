@@ -188,36 +188,44 @@ class SerializedGeoJsonData final : public mln::style::GeoJSONData {
 //
 // A pinned thread outlives static destruction, so it must not be starting up
 // when the process exits: a MapLibre worker reads the platform settings
-// singleton as its first step. Pinning a scheduler that GetSequenced() has
-// just created therefore waits for its thread to run one task. The caller's
-// reference is then the only one, so no work of the caller's own can be
-// running on that thread.
+// singleton as its first step. Pinning a scheduler therefore records a future
+// that its thread has run one task, and every caller that pins the scheduler
+// waits on it, including a caller that shares a fresh slot with a concurrent
+// one. Host threads never run on a sequenced scheduler, so the wait cannot
+// block the thread it waits for.
 auto pin_sequenced_scheduler(const std::shared_ptr<mln::Scheduler>& scheduler)
   -> void {
+  struct PinnedScheduler {
+    std::shared_ptr<mln::Scheduler> scheduler;
+    std::shared_future<void> started;
+  };
   struct PinnedSchedulers {
     std::mutex mutex;
-    std::vector<std::shared_ptr<mln::Scheduler>> schedulers;
+    std::vector<PinnedScheduler> schedulers;
   };
   // Leaked so process exit, not a static destructor joining worker threads
   // mid-teardown, reclaims the pinned threads.
   static auto* pinned = new PinnedSchedulers();
-  const auto created = scheduler.use_count() == 1;
+  auto started = std::shared_future<void>{};
   {
     const std::scoped_lock lock(pinned->mutex);
     auto& schedulers = pinned->schedulers;
-    if (
-      std::find(schedulers.begin(), schedulers.end(), scheduler) !=
-      schedulers.end()
-    ) {
-      return;
+    const auto found = std::find_if(
+      schedulers.begin(), schedulers.end(),
+      [&scheduler](const PinnedScheduler& entry) {
+        return entry.scheduler == scheduler;
+      }
+    );
+    if (found != schedulers.end()) {
+      started = found->started;
+    } else {
+      auto first_task = std::make_shared<std::promise<void>>();
+      started = first_task->get_future().share();
+      schedulers.push_back({scheduler, started});
+      scheduler->schedule([first_task]() { first_task->set_value(); });
     }
-    schedulers.push_back(scheduler);
   }
-  if (!created) return;
-  auto started = std::make_shared<std::promise<void>>();
-  auto running = started->get_future();
-  scheduler->schedule([started]() { started->set_value(); });
-  running.wait();
+  started.wait();
 }
 
 }  // namespace
