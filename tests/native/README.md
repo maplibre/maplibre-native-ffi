@@ -78,10 +78,11 @@ the objects under test are the shipped ones:
 
 - `src/testing/sync_point.hpp` names the points where a case can observe or park
   a thread, such as a map's pool shutdown, a writer about to take a resource
-  registration exclusively, or a release blocked on a running cancel callback.
-  With no handler installed, reaching a point costs one relaxed atomic load. A
-  point that marks a wait fires only when the thread has to wait. A case that
-  waits for such a point fails at its deadline when a change removes the wait.
+  registration exclusively, a release blocked on a running cancel callback, or a
+  render driver call that has published its work and is about to end. With no
+  handler installed, reaching a point costs one relaxed atomic load. A point
+  that marks a wait fires only when the thread has to wait. A case that waits
+  for such a point fails at its deadline when a change removes the wait.
 - `src/testing/render_clock.hpp` is the clock that frame demand deadlines run
   on. A case advances it rather than waiting for a deadline to pass.
 
@@ -279,12 +280,6 @@ point would let it park the worker and prove that the frame did not wait for it.
 
 ### Cases that work around a core defect
 
-- `acquired_frame_release_after_abandon_is_cpu_only` retries abandon while it
-  returns busy. A core-worker session publishes its frame result while the
-  driver call is still in flight, and abandon returns busy until the call ends.
-  A wake-driven wait reaches abandon inside that window about one run in eight
-  on Metal. The retry goes once the core stops reporting busy after a published
-  result.
 - `mln_test_render_still_image` in `support/map.c` sends only if-needed frame
   demands, and `a_static_map_renders_still_images` and
   `a_tile_map_renders_still_images` in `abi/map/still_image.c` rely on it. A

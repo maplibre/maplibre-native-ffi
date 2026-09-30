@@ -617,6 +617,9 @@ struct mln_render_session_object
   uint32_t acquired_frame_count = 0;
   bool driver_call_in_flight = false;
   std::optional<mln::core::OwnerThreadToken> driver_call_thread;
+  // Abandons waiting for a core worker's call to end. The worker starts no
+  // call while any wait.
+  std::size_t abandon_waiters = 0;
   bool stop_worker = false;
   bool destruction_started = false;
   bool attached = false;

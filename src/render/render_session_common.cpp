@@ -52,6 +52,7 @@
 #include "runtime/runtime.hpp"
 #include "style/style_value.hpp"
 #include "testing/render_clock.hpp"
+#include "testing/sync_point.hpp"
 
 namespace mln::core {
 
@@ -1054,8 +1055,11 @@ auto run_core_worker(
     auto work = RenderDriverWork{};
     {
       auto lock = std::unique_lock{session->control_mutex};
+      // An abandon waiting for the previous call to end holds the next one
+      // back, so the call it waited out is the last this worker makes.
       session->worker_condition.wait(lock, [&]() noexcept {
-        return session->stop_worker || !session->driver_work.empty();
+        return session->abandon_waiters == 0 &&
+               (session->stop_worker || !session->driver_work.empty());
       });
       if (
         session->views_invalidated || session->disposal_requested ||
@@ -1067,6 +1071,7 @@ auto run_core_worker(
       session->driver_call_in_flight = true;
       session->driver_call_thread = current_owner_thread();
     }
+    mln::testing::hit(mln::testing::SyncPoint::RenderDriverEntered);
     try {
       auto execute = [&]() -> mln_status {
         if (work.execute) work.execute();
@@ -1076,6 +1081,7 @@ auto run_core_worker(
     } catch (...) {
       if (work.abandon) work.abandon();
     }
+    mln::testing::hit(mln::testing::SyncPoint::RenderDriverExited);
     {
       const auto lock = std::scoped_lock{session->control_mutex};
       session->driver_call_in_flight = false;
@@ -2634,6 +2640,7 @@ auto render_session_service_driver_work(
   struct DriverCallGuard {
     std::shared_ptr<mln_render_session_object> session;
     ~DriverCallGuard() {
+      mln::testing::hit(mln::testing::SyncPoint::RenderDriverExited);
       const auto lock = std::scoped_lock{session->control_mutex};
       session->driver_call_in_flight = false;
       session->driver_call_thread.reset();
@@ -2644,6 +2651,7 @@ auto render_session_service_driver_work(
       }
     }
   } guard{live};
+  mln::testing::hit(mln::testing::SyncPoint::RenderDriverEntered);
   while (max_work == 0 || *out_serviced < max_work) {
     auto item = RenderDriverWork{};
     {
@@ -3385,22 +3393,55 @@ auto abandon_render_session(
   auto driver_wake = std::shared_ptr<Wake>{};
   auto quarantined = uint32_t{0};
   {
-    const auto lock = std::scoped_lock{live->control_mutex};
-    if (live->active_views) {
-      set_thread_error("render session has active borrowed views");
-      return MLN_STATUS_BUSY;
+    auto lock = std::unique_lock{live->control_mutex};
+    // A core worker's call can still be running after it published the frame
+    // result or completion the host acted on, and nothing public observes its
+    // end, so abandon waits it out. The worker takes no further call while an
+    // abandon waits. A caller driver's call belongs to the host, which sees it
+    // return, so abandon during one is busy, as is abandon from inside the
+    // session's own driver call.
+    auto waiting_for_call = false;
+    const auto stop_waiting = [&]() noexcept {
+      if (!waiting_for_call) return;
+      waiting_for_call = false;
+      --live->abandon_waiters;
+      live->worker_condition.notify_all();
+    };
+    while (true) {
+      if (live->active_views) {
+        stop_waiting();
+        set_thread_error("render session has active borrowed views");
+        return MLN_STATUS_BUSY;
+      }
+      if (
+        live->state == MLN_RENDER_SESSION_STATE_DETACHED ||
+        live->state == MLN_RENDER_SESSION_STATE_ABANDONED
+      ) {
+        stop_waiting();
+        set_thread_error("render session has already released its target");
+        return MLN_STATUS_INVALID_STATE;
+      }
+      if (!live->driver_call_in_flight) break;
+      if (
+        live->capabilities.driver != MLN_RENDER_DRIVER_CORE_WORKER ||
+        live->driver_call_thread == current_owner_thread()
+      ) {
+        stop_waiting();
+        set_thread_error("render session driver work is already in flight");
+        return MLN_STATUS_BUSY;
+      }
+      if (!waiting_for_call) {
+        waiting_for_call = true;
+        ++live->abandon_waiters;
+        lock.unlock();
+        mln::testing::hit(mln::testing::SyncPoint::RenderAbandonWaits);
+        lock.lock();
+      }
+      live->worker_condition.wait(lock, [&] {
+        return !live->driver_call_in_flight;
+      });
     }
-    if (live->driver_call_in_flight) {
-      set_thread_error("render session driver work is already in flight");
-      return MLN_STATUS_BUSY;
-    }
-    if (
-      live->state == MLN_RENDER_SESSION_STATE_DETACHED ||
-      live->state == MLN_RENDER_SESSION_STATE_ABANDONED
-    ) {
-      set_thread_error("render session has already released its target");
-      return MLN_STATUS_INVALID_STATE;
-    }
+    stop_waiting();
     live->views_invalidated = true;
     live->abandonment_thread = current_owner_thread();
     live->state = MLN_RENDER_SESSION_STATE_ABANDONED;

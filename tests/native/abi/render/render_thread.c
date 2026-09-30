@@ -314,19 +314,6 @@ static void texture_ring_leases_apply_backpressure_until_cpu_release(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-typedef struct abandon_attempt {
-  mln_render_session session;
-  mln_render_abandon_result* result;
-  mln_status status;
-} abandon_attempt;
-
-static bool abandon_past_busy(void* context) {
-  abandon_attempt* attempt = context;
-  attempt->status =
-    mln_render_session_abandon(attempt->session, attempt->result, NULL);
-  return attempt->status != MLN_STATUS_BUSY;
-}
-
 static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -335,23 +322,14 @@ static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_acquired_frame frame = render_and_acquire(&fixture, 250);
 
-  // The frame result publishes while the core worker's driver call is still
-  // in flight, and abandon returns busy until that call ends, which nothing
-  // public observes. Busy leaves the session unchanged, so the case retries
-  // abandon until the core stops reporting busy after a published result.
+  // A core worker can still be inside the call that published the frame, and
+  // abandon waits that call out rather than reporting busy.
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };
-  abandon_attempt attempt = {
-    .session = fixture.session,
-    .result = &abandoned,
-    .status = MLN_STATUS_BUSY,
-  };
-  TEST_ASSERT_TRUE(mln_test_await(
-    abandon_past_busy, &attempt, mln_test_deadline_default(),
-    "abandon to stop reporting busy"
-  ));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, attempt.status);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_session_abandon(fixture.session, &abandoned, NULL)
+  );
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, abandoned.disposition
   );

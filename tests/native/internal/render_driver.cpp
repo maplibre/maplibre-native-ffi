@@ -1,11 +1,14 @@
 // A render session's driver while it is busy: demands that arrive during a
 // driver call, deadlines measured on the render clock, and abandon.
 
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 
+#include "internal/support/checks.hpp"
 #include "internal/support/driver_blocker.hpp"
+#include "internal/support/sync_points.hpp"
 #include "maplibre_native_c.h"
 #include "support/harness.h"
 #include "support/test_support.h"
@@ -14,7 +17,10 @@
 
 namespace {
 
+using mln::native_tests::await;
 using mln::native_tests::DriverBlocker;
+using mln::native_tests::SyncPoint;
+using mln::native_tests::SyncPointScope;
 
 struct Fixture {
   mln_runtime runtime = MLN_HANDLE_NULL;
@@ -218,60 +224,125 @@ void a_demand_misses_a_deadline_that_passes_while_the_driver_is_busy() {
   destroy_fixture(fixture);
 }
 
-struct AbandonProbe {
-  mln_render_session session;
-  mln_test_gate* gate;
-  mln_status status;
-};
-
-void abandon_when_driver_enters(void* argument) {
-  auto& probe = *static_cast<AbandonProbe*>(argument);
-  static_cast<void>(mln_test_gate_wait_entered(probe.gate));
-  auto result =
-    mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
-  probe.status = mln_render_session_abandon(probe.session, &result, nullptr);
-  mln_test_gate_release(probe.gate);
+// Requests a forced frame for a case that holds RenderDriverExited, so the
+// driver call that renders it publishes its result and then stays in flight:
+// the window in which a host that acted on the result reaches abandon before
+// the call ends, which no public fence can hold open.
+void request_frame_and_hold_the_call(const Fixture& fixture, uint64_t token) {
+  auto demand = mln_frame_demand_default();
+  demand.flags = 0;
+  demand.token = token;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, request_frame(fixture, demand));
 }
 
-// Abandon during a driver call reports busy and leaves the session attached.
-void abandon_is_busy_during_a_driver_call_and_changes_nothing() {
+// Holds once a frame result is published, releasing the batch it drained.
+auto frame_published(void* context) -> bool {
+  const auto& fixture = *static_cast<const Fixture*>(context);
+  auto batch = mln_render_frame_batch{MLN_HANDLE_NULL};
+  if (
+    mln_render_session_drain_frame_results(
+      fixture.render.session, &batch, nullptr
+    ) != MLN_STATUS_OK
+  ) {
+    return false;
+  }
+  mln_render_frame_batch_release(batch);
+  return true;
+}
+
+struct DriverRelease {
+  SyncPointScope* points;
+  mln_render_session session;
+  std::atomic_bool abandon_returned{false};
+  bool abandon_waited = false;
+  mln_status abandon_status = MLN_STATUS_NATIVE_ERROR;
+};
+
+// Releases the held core worker once abandon waits for it, or once abandon
+// returned without waiting, so a failing case does not strand the worker.
+void release_when_abandon_waits(void* argument) {
+  auto& release = *static_cast<DriverRelease*>(argument);
+  static_cast<void>(await(
+    [&] {
+      return release.points->hits(SyncPoint::RenderAbandonWaits) > 0 ||
+             release.abandon_returned.load();
+    },
+    "abandon to wait for the driver call"
+  ));
+  release.abandon_waited =
+    release.points->hits(SyncPoint::RenderAbandonWaits) > 0;
+  release.points->release(SyncPoint::RenderDriverExited);
+}
+
+// Abandons from outside the caller driver's call, which the case's own thread
+// holds open, then lets the call end.
+void abandon_inside_the_call(void* argument) {
+  auto& release = *static_cast<DriverRelease*>(argument);
+  static_cast<void>(
+    release.points->wait_for_hits(SyncPoint::RenderDriverExited, 1)
+  );
+  auto result =
+    mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
+  release.abandon_status =
+    mln_render_session_abandon(release.session, &result, nullptr);
+  release.points->release(SyncPoint::RenderDriverExited);
+}
+
+// A core worker's driver call can still be running after the host has read the
+// frame result it published, and nothing public observes the call's end, so
+// abandon waits it out and succeeds. A caller driver's call is the host's own,
+// so abandon from another thread during it is busy and changes nothing.
+void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
   auto fixture = Fixture{};
   create_fixture(fixture);
-  auto blocker = DriverBlocker{};
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, blocker.submit(fixture.render.session));
+  auto points = SyncPointScope{};
+  points.hold(SyncPoint::RenderDriverExited);
+  auto release =
+    DriverRelease{.points = &points, .session = fixture.render.session};
+  request_frame_and_hold_the_call(fixture, 107);
 
-  auto abandon_status = MLN_STATUS_NATIVE_ERROR;
-  if (fixture.render.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
-    // The case's own thread parks inside the driver call it services, so
-    // abandon comes from another thread.
-    auto probe = AbandonProbe{
-      fixture.render.session, blocker.gate.get(), MLN_STATUS_NATIVE_ERROR
-    };
-    auto* thread = mln_test_thread_start(abandon_when_driver_enters, &probe);
+  auto result =
+    mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
+  if (fixture.render.driver == MLN_RENDER_DRIVER_CORE_WORKER) {
+    TEST_ASSERT_TRUE(mln_test_await(
+      frame_published, &fixture, mln_test_deadline_default(),
+      "the held call to publish its frame"
+    ));
+    auto* thread = mln_test_thread_start(release_when_abandon_waits, &release);
+    release.abandon_status =
+      mln_render_session_abandon(fixture.render.session, &result, nullptr);
+    release.abandon_returned.store(true);
+    mln_test_pulse();
+    mln_test_thread_join(thread);
+    TEST_ASSERT_TRUE(release.abandon_waited);
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, release.abandon_status);
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, result.disposition
+    );
+  } else {
+    auto* thread = mln_test_thread_start(abandon_inside_the_call, &release);
     auto serviced = std::size_t{0};
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_service_driver_work(
-                       fixture.render.session, SIZE_MAX, &serviced, nullptr
+                       fixture.render.session, 0, &serviced, nullptr
                      )
     );
     mln_test_thread_join(thread);
-    abandon_status = probe.status;
-  } else {
-    TEST_ASSERT_TRUE(mln_test_gate_wait_entered(blocker.gate.get()));
-    auto result =
-      mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
-    abandon_status =
-      mln_render_session_abandon(fixture.render.session, &result, nullptr);
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_BUSY, release.abandon_status);
+    TEST_ASSERT_EQUAL_INT(0, points.hits(SyncPoint::RenderAbandonWaits));
   }
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, blocker.finish(fixture.render));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_BUSY, abandon_status);
   auto snapshot =
     mln_render_session_snapshot{.size = sizeof(mln_render_session_snapshot)};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_render_session_get_snapshot(fixture.render.session, &snapshot, nullptr)
   );
-  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_ATTACHED, snapshot.state);
+  TEST_ASSERT_EQUAL_UINT32(
+    fixture.render.driver == MLN_RENDER_DRIVER_CORE_WORKER
+      ? MLN_RENDER_SESSION_STATE_ABANDONED
+      : MLN_RENDER_SESSION_STATE_ATTACHED,
+    snapshot.state
+  );
   destroy_fixture(fixture);
 }
 
@@ -280,5 +351,5 @@ void abandon_is_busy_during_a_driver_call_and_changes_nothing() {
 MLN_TEST_GROUP {
   RUN_TEST(demand_coalescing_preserves_boundaries_and_generations);
   RUN_TEST(a_demand_misses_a_deadline_that_passes_while_the_driver_is_busy);
-  RUN_TEST(abandon_is_busy_during_a_driver_call_and_changes_nothing);
+  RUN_TEST(abandon_after_a_published_frame_waits_for_a_core_worker_call);
 }

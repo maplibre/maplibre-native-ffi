@@ -532,19 +532,26 @@ MLN_API mln_status mln_render_session_detach(
 ) MLN_NOEXCEPT;
 
 /**
- * Irreversibly closes control and mailboxes without graphics calls. The call
- * returns MLN_STATUS_BUSY while a driver call or borrowed view scope is active.
+ * Irreversibly closes control and mailboxes without graphics calls.
  *
- * Before returning, the call waits for the map's in-flight tile work, which
- * can still reference quarantined renderer resources and through them the
- * host's graphics objects. After it returns, no library thread touches the
+ * A core worker can still be inside the driver call that published a frame
+ * result or completion the host already observed. The call waits for that
+ * driver call to end, and the worker starts no other. A caller-graphics-thread
+ * driver call belongs to the host, so abandon during one returns
+ * MLN_STATUS_BUSY instead, as does abandon from inside any of the session's
+ * driver calls, such as from a completion that the core worker delivers.
+ *
+ * Before returning, the call also waits for the map's in-flight tile work,
+ * which can still reference quarantined renderer resources and through them
+ * the host's graphics objects. After it returns, no library thread touches the
  * session's target or device, so the host may destroy them immediately. Do
  * not call from a MapLibre worker callback.
  *
  * Returns:
  * - MLN_STATUS_OK when control is abandoned and *out_result describes what was
  *   quarantined.
- * - MLN_STATUS_BUSY when a driver call or borrowed view scope is active.
+ * - MLN_STATUS_BUSY when a borrowed view scope is active, a caller-driver call
+ *   is in flight, or the caller is inside one of the session's driver calls.
  *   Nothing changes.
  * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or out_result is null
  *   or undersized.

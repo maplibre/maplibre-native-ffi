@@ -3519,22 +3519,6 @@ fn session_maintenance_commands_complete_in_order() {
     runtime.close_and_wait();
 }
 
-/// Abandons a session, retrying while a driver call is still in flight. Abandon
-/// reports busy then and changes nothing, so the host retries.
-fn abandon_when_idle(session: &RenderSessionHandle) {
-    let deadline = Instant::now() + Duration::from_secs(5);
-    loop {
-        match session.abandon() {
-            Ok(_) => return,
-            Err(error) if error.kind() == ErrorKind::Busy => {
-                assert!(Instant::now() < deadline, "abandon stayed busy");
-                std::thread::yield_now();
-            }
-            Err(error) => panic!("failed to abandon the session: {error}"),
-        }
-    }
-}
-
 #[test]
 fn abandoning_a_live_session_retires_it_and_releases_the_map() {
     if !has_test_owned_texture_session_backend() {
@@ -3554,7 +3538,7 @@ fn abandoning_a_live_session_retires_it_and_releases_the_map() {
         FrameDisposition::Rendered
     );
 
-    abandon_when_idle(&session);
+    session.abandon().unwrap();
     assert_eq!(
         session.get_snapshot().unwrap().state,
         crate::RenderSessionState::Abandoned
@@ -3830,9 +3814,8 @@ fn a_failed_attachment_still_owns_the_session_it_published() {
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
 
     // The failed attachment still published a session, so the host abandons it
-    // before destroying it and the map's session slot comes back. The failure
-    // completes from inside the driver call, so abandon can still report busy.
-    abandon_when_idle(&attachment.0);
+    // before destroying it and the map's session slot comes back.
+    attachment.0.abandon().unwrap();
     attachment.0.destroy().unwrap();
     map.close_and_wait();
     drop(context);

@@ -90,8 +90,12 @@ thread.
 
 Abandon is the failure path for an owner that can no longer service graphics
 work. It closes control and mailboxes, invalidates graphics accessors, detaches
-the map in CPU state, and performs no graphics calls. It returns busy while a
-driver call is in flight. Resources that require graphics access enter a
+the map in CPU state, and performs no graphics calls. On a core-worker session
+it first waits for the worker's current driver call to end, since that call can
+outlive the frame result or completion it published. It returns busy while a
+borrowed view scope is active, while a caller driver's service call is in
+flight, or when called from inside one of the session's own driver calls.
+Resources that require graphics access enter a
 process-lifetime quarantine and the result reports their count. Releasing an
 acquired frame after abandon remains CPU-only, consumes the frame handle, and
 does not touch quarantined graphics resources. Destroy the abandoned session
