@@ -99,7 +99,7 @@ then, that binding keeps its own fixture.
 | Rust           | In use  | `libloading` in `tests/suite/support/graphics.rs`, from the install directory that `build.rs` records, or by name beside the tests a device runner pushes. |
 | Zig            | In use  | `build.zig` translates `mln_test_graphics.h` and links the installed `mln_test_graphics`.                                                                  |
 | Python         | In use  | `tests/graphics.py` opens the library with `ctypes.CDLL` from the install's `lib` or `bin`, with a `ctypes.Structure` for the context.                     |
-| .NET           | Planned | `[LibraryImport("mln_test_graphics")]`, resolved through the same `NativeLibrary` import resolver as the C API.                                            |
+| .NET           | In use  | `[LibraryImport("mln_test_graphics")]` in `Support/TestGraphics.cs`, found beside the tests, where the build copies the install's libraries.               |
 | Dart           | Planned | `DynamicLibrary.open` on the library path, with `Struct` classes for the info structs.                                                                     |
 
 A binding that runs its tests on a device, such as through the Android or

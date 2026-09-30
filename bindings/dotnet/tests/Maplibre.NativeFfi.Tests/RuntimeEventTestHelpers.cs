@@ -35,27 +35,6 @@ internal static unsafe class RuntimeEventTestHelpers
         return batch.Get().Events;
     }
 
-    internal static IReadOnlyList<global::Maplibre.NativeFfi.Render.RenderFrameResult> DrainFrameCopies(
-        this global::Maplibre.NativeFfi.Render.RenderSessionHandle session
-    )
-    {
-        try
-        {
-            using var batch = session.DrainFrameResults();
-            var count = batch.Count();
-            var values = new global::Maplibre.NativeFfi.Render.RenderFrameResult[
-                checked((int)count)
-            ];
-            for (ulong index = 0; index < count; index++)
-                values[(int)index] = batch.Get(index);
-            return values;
-        }
-        catch (MaplibreException error) when (error.Status == MaplibreStatus.NotReady)
-        {
-            return [];
-        }
-    }
-
     /// <summary>The event stride this binding compiled against.</summary>
     internal static uint EventStride => (uint)Unsafe.SizeOf<mln_runtime_event>();
 

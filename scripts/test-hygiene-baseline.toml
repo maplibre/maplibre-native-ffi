@@ -4,7 +4,6 @@
 [sleep]
 "bindings/dart/test/callback_collection_test.dart" = 1
 "bindings/dart/test/maplibre_native_ffi_test.dart" = 5
-"bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderSessionTests.cs" = 1
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs" = 1
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTestHelpers.cs" = 3
 "tests/native/support/render_webgpu.c" = 2
