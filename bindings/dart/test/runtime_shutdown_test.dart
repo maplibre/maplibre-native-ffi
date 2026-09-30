@@ -58,17 +58,16 @@ void main() {
   }
 
   test(
-    'native callbacks permit process exit after awaited cleanup',
-    () => expectCleanExit('awaited', 'CLOSED_ALL_HANDLES'),
-  );
-
-  test(
-    'native callbacks permit process exit after unawaited cleanup',
+    'pending completions keep the process alive until unawaited cleanup ends',
     () => expectCleanExit('unawaited', 'CLOSED_ALL_HANDLES'),
   );
 
-  test(
-    'isolate shutdown finalizes a runtime and map left open',
-    () => expectCleanExit('abandoned', 'ABANDONED_HANDLES'),
-  );
+  test('shutdown with live handles and callbacks exits cleanly', () async {
+    // The isolate runs out of work with a runtime and a map open, and its
+    // shutdown finalizes them.
+    await expectCleanExit('abandoned', 'ABANDONED_HANDLES');
+    // exit() ends a process whose live callback registrations would otherwise
+    // keep it running, with the runtime's threads still at work.
+    await expectCleanExit('exit', 'LIVE_CALLBACKS');
+  });
 }

@@ -113,6 +113,11 @@ that first services it, and `serviceDriverWork()` from any other thread throws
 making its context current through its detach. A core-worker session has no such
 limit.
 
+A live callback registration, such as a wake, a resource provider, or the log
+callback, keeps its isolate alive as an open `ReceivePort` does. Close its owner
+or clear the callback to let the isolate finish, or end the process with
+`exit()`.
+
 Resource-request completion is one-shot. Calling `complete()` or `close()`
 releases the provider reference even when completion reports a native error.
 Closing a request without completing it fails the request, so the load reports

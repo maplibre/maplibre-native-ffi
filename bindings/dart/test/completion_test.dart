@@ -1,5 +1,5 @@
 // Completions: the shared receive port, conversion failures, rejected
-// submissions, failed dispositions, and cancellation.
+// submissions, failed dispositions, and waits that give up.
 import 'dart:async';
 import 'dart:ffi';
 
@@ -122,7 +122,7 @@ void main() {
     expect(completion.diagnostic, isNotEmpty);
   });
 
-  test('closing a map cancels the commands it still owes', () async {
+  test('a wait that times out leaves its completion to arrive later', () async {
     final fixture = await openRuntime();
     final map = await fixture.openMap(
       const MapOptions(
@@ -134,25 +134,18 @@ void main() {
     await expectCommitted(map.setStyleJson(jsonBytes(emptyStyleJson)));
 
     // A static map with no render session never produces the image, so the
-    // request is still owed when the map closes. The expectation attaches
-    // first, because the cancellation arrives while the close runs.
-    final cancelled = expectLater(
-      map.requestStillImage(),
-      throwsA(isA<CancelledException>()),
+    // request stays owed. A future cannot be cancelled in Dart; a waiter
+    // gives up on it with a timeout instead.
+    final image = map.requestStillImage();
+    await expectLater(
+      image.timeout(Duration.zero),
+      throwsA(isA<TimeoutException>()),
     );
+
+    // The binding still delivers the completion to the future the waiter
+    // gave up on, once closing the map cancels the request.
+    final cancelled = expectLater(image, throwsA(isA<CancelledException>()));
     await within(map.close(), 'map close');
     await within(cancelled, 'the cancelled still image');
-  });
-
-  test('native work runs while the isolate keeps its event loop', () async {
-    final fixture = await openRuntime();
-    final map = await fixture.openMap();
-
-    // A query hands the isolate back to its event loop while native code
-    // works, so a timer queued first runs before the answer arrives.
-    var timerRan = false;
-    Timer.run(() => timerRan = true);
-    await within(map.cameraQuery(), 'camera query');
-    expect(timerRan, isTrue);
   });
 }

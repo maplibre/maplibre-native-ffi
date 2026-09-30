@@ -12,7 +12,13 @@ import 'package:test/test.dart';
 import 'support/collection.dart';
 import 'support/fixture.dart';
 
-WeakReference<RuntimeHandle> _unreachableRuntimeWithWake() {
+/// A runtime, by identity and weak reference, that only its callbacks name.
+typedef _Unreachable = (int, WeakReference<RuntimeHandle>);
+
+_Unreachable _unreachable(RuntimeHandle runtime) =>
+    (runtime.identity.toSigned(64).toInt(), WeakReference(runtime));
+
+_Unreachable _unreachableRuntimeWithWake() {
   late final RuntimeHandle runtime;
   runtime = runtimeCreate(
     RuntimeOptions(
@@ -23,10 +29,10 @@ WeakReference<RuntimeHandle> _unreachableRuntimeWithWake() {
       ),
     ),
   );
-  return WeakReference(runtime);
+  return _unreachable(runtime);
 }
 
-Future<WeakReference<RuntimeHandle>> _unreachableRuntimeWithProvider() async {
+Future<_Unreachable> _unreachableRuntimeWithProvider() async {
   final runtime = runtimeCreate(runtimeOptionsDefault());
   await runtime.setResourceProvider(
     routedProvider([styleRoute('capture://style')], (_, request) {
@@ -34,7 +40,7 @@ Future<WeakReference<RuntimeHandle>> _unreachableRuntimeWithProvider() async {
       request.close();
     }),
   );
-  return WeakReference(runtime);
+  return _unreachable(runtime);
 }
 
 /// Creates a runtime and a map on it, and keeps only the map.
@@ -65,10 +71,8 @@ Future<WeakReference<MapHandle>> _droppedMapCreation(
 }
 
 /// Creates a runtime and keeps only its identity and a weak reference to it.
-(int, WeakReference<RuntimeHandle>) _abandonedRuntime() {
-  final runtime = runtimeCreate(runtimeOptionsDefault());
-  return (runtime.identity.toSigned(64).toInt(), WeakReference(runtime));
-}
+_Unreachable _abandonedRuntime() =>
+    _unreachable(runtimeCreate(runtimeOptionsDefault()));
 
 /// Whether native still knows [runtime], asked through the raw C API, which
 /// is the only way to name a runtime that no owner holds.
@@ -97,14 +101,22 @@ void main() {
   );
 
   test('callback registrations do not keep their owners reachable', () async {
-    final references = [
+    final runtimes = [
       _unreachableRuntimeWithWake(),
       await _unreachableRuntimeWithProvider(),
     ];
+    for (final (identity, _) in runtimes) {
+      expect(_runtimeIsLive(identity), isTrue);
+    }
+    // Each runtime and the callback that captures it form a cycle through
+    // the registration, which the collector reclaims as a whole.
     await collectGarbageUntil(
-      () => references.every((reference) => reference.target == null),
+      () => runtimes.every((runtime) => runtime.$2.target == null),
       'runtimes whose callbacks capture them',
     );
+    for (final (identity, _) in runtimes) {
+      expect(_runtimeIsLive(identity), isFalse);
+    }
   });
 
   test('a map keeps its runtime reachable', () async {

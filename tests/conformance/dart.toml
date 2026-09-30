@@ -5,20 +5,25 @@
 
 [cases]
 "ERR-01" = "bindings/dart/test/internal_support_test.dart::unknown native status and copied diagnostic remain available"
+# The test covers the mismatch error only. That the check runs before any
+# other call rests on the generated entry points, each of which calls
+# ensureAbiVersion() first; no library with another ABI version is at hand to
+# load in its place.
 "ERR-02" = "bindings/dart/test/internal_support_test.dart::ABI mismatch has a stable public error category"
 "LIFE-01" = "bindings/dart/test/lifecycle_test.dart::closing a handle twice is safe and the second close does nothing"
 "LIFE-02" = "bindings/dart/test/lifecycle_test.dart::a refused close leaves the handle usable for a later close"
 "LIFE-03" = { na = "An isolate runs on one thread at a time and shares no objects with another isolate, so no borrow of a handle can be in progress on another thread; the borrow within an isolate is VIEW-01" }
-# Native finalizers dispose an abandoned owner at collection or isolate
-# shutdown. Dart reports only a finalization that fails, on stderr, which the
-# shutdown test checks stays silent.
-"LIFE-04" = "bindings/dart/test/runtime_shutdown_test.dart::isolate shutdown finalizes a runtime and map left open"
+# A native finalizer disposes an abandoned owner at collection, with no Dart
+# code on the stack, and the test observes that native no longer knows the
+# runtime. The binding has no public leak report, so the case's leak-report
+# half is not covered: an open owner question.
+"LIFE-04" = "bindings/dart/test/collection_test.dart::an abandoned runtime is disposed when the collector reclaims it"
 "LIFE-05" = "bindings/dart/test/collection_test.dart::a map keeps its runtime reachable"
 "COMP-01" = "bindings/dart/test/completion_test.dart::a completion delivers once and disposes a value that fails to convert"
 "COMP-02" = "bindings/dart/test/completion_test.dart::a submission native rejects frees its completion state"
 "COMP-03" = "bindings/dart/test/collection_test.dart::a dropped creation is disposed once its owner is collected"
 "COMP-04" = "bindings/dart/test/completion_test.dart::a failed command reports its disposition as data"
-"COMP-05" = "bindings/dart/test/completion_test.dart::closing a map cancels the commands it still owes"
+"COMP-05" = "bindings/dart/test/completion_test.dart::a wait that times out leaves its completion to arrive later"
 "CB-01" = "bindings/dart/test/callback_ports_test.dart::a callback root is released by a removal, a map close, or a refusal"
 "CB-02" = "bindings/dart/test/collection_test.dart::callback registrations do not keep their owners reachable"
 "CB-03" = { na = "Every Dart callback reaches its isolate through a native port after the native callback has returned, so no binding call can run inside one and the binding has no admission policy" }
@@ -47,6 +52,13 @@
 # past it, which is an open owner question.
 "REND-02" = "bindings/dart/test/render_test.dart::a caller driver is serviced within one synchronous stretch of the isolate"
 "PLAT-01" = "bindings/dart/test/native_library_test.dart::loads the native library"
-"PLAT-02" = "bindings/dart/test/runtime_shutdown_test.dart::native callbacks permit process exit after unawaited cleanup"
-"PLAT-03" = "bindings/dart/test/collection_test.dart::an abandoned runtime is disposed when the collector reclaims it"
+# A live callback registration keeps its isolate alive, as an open receive
+# port does, so a program that leaves one open never runs out of work and ends
+# through exit(). The test runs both endings: an isolate that runs out of work
+# with a runtime and a map open, and exit() with an event wake, a resource
+# provider, and the log callback registered.
+"PLAT-02" = "bindings/dart/test/runtime_shutdown_test.dart::shutdown with live handles and callbacks exits cleanly"
+# Each runtime is held only by a callback that captures it, a cycle through
+# its registration, and the test checks that native disposed both.
+"PLAT-03" = "bindings/dart/test/collection_test.dart::callback registrations do not keep their owners reachable"
 "EX-01" = { na = "No example app is written in Dart; bindings/dart/example/example.dart is the package's API snippet and renders nothing" }
