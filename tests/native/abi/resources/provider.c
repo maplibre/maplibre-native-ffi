@@ -922,8 +922,13 @@ static void expect_revalidation_of_cached_style(
 // revalidated is withheld from the map until the provider answers, so the
 // request also carries its bytes, and NOT_MODIFIED delivers them.
 static void a_not_modified_answer_delivers_the_cached_style(void) {
-  mln_test_provided_resource resources[] = {
-    {.url = cached_style_url, .response = cacheable_style(true)},
+  const mln_test_provided_resource resources[] = {
+    {.url = cached_style_url,
+     .response = cacheable_style(true),
+     .has_later_response = true,
+     .later_response = {
+       .status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
+     }},
   };
   mln_test_provider* provider = mln_test_provider_create(resources, 1);
   mln_runtime runtime = mln_test_create_runtime();
@@ -936,9 +941,6 @@ static void a_not_modified_answer_delivers_the_cached_style(void) {
   TEST_ASSERT_FALSE(initial->has_prior_modified);
   TEST_ASSERT_EQUAL_size_t(0, initial->prior_data_size);
 
-  resources[0].response = (mln_resource_response){
-    .status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
-  };
   mln_map second = load_style(runtime, cached_style_url);
   expect_revalidation_of_cached_style(
     mln_test_provider_request_at(provider, cached_style_url, 1), true
@@ -953,15 +955,16 @@ static void a_not_modified_answer_delivers_the_cached_style(void) {
 // the cache: the style loads while the provider still holds the revalidation,
 // which carries the entry's metadata but not its bytes.
 static void a_usable_cached_style_loads_before_the_provider_answers(void) {
-  mln_test_provided_resource resources[] = {
-    {.url = cached_style_url, .response = cacheable_style(false)},
+  const mln_test_provided_resource resources[] = {
+    {.url = cached_style_url,
+     .response = cacheable_style(false),
+     .later_held = true},
   };
   mln_test_provider* provider = mln_test_provider_create(resources, 1);
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_provider_install(runtime, provider);
   mln_map first = load_style(runtime, cached_style_url);
 
-  resources[0].held = true;
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_map_set_style_url(map, cached_style_url)

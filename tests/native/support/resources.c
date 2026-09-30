@@ -168,15 +168,18 @@ static uint32_t scripted_provider(
 ) {
   mln_test_provider* provider = user_data;
   const mln_test_provided_resource* match = NULL;
+  bool repeat = false;
   for (size_t index = 0; index < provider->resource_count; index += 1) {
     if (
       request->requested_url != NULL &&
       strcmp(provider->resources[index].url, request->requested_url) == 0
     ) {
       match = &provider->resources[index];
+      repeat = atomic_fetch_add(&provider->matches[index], 1) > 0;
       break;
     }
   }
+  const bool held = match != NULL && (repeat ? match->later_held : match->held);
 
   const int slot = atomic_fetch_add(&provider->request_count, 1);
   if (slot < MLN_TEST_PROVIDER_REQUEST_CAPACITY) {
@@ -202,20 +205,25 @@ static uint32_t scripted_provider(
       request->prior_etag, record->prior_etag, sizeof(record->prior_etag)
     );
     record->prior_data_size = request->prior_data_size;
-    record->handle = match != NULL && match->held ? handle : MLN_HANDLE_NULL;
+    record->handle = held ? handle : MLN_HANDLE_NULL;
     atomic_store(&record->recorded, true);
   }
   mln_test_pulse();
 
-  if (match != NULL && match->held) {
+  if (held) {
     return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
   }
-  mln_resource_response response =
-    match != NULL ? match->response
-                  : mln_test_error_response(
-                      MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
-                      "the test provider has no route for this URL"
-                    );
+  mln_resource_response response;
+  if (match == NULL) {
+    response = mln_test_error_response(
+      MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
+      "the test provider has no route for this URL"
+    );
+  } else if (repeat && match->has_later_response) {
+    response = match->later_response;
+  } else {
+    response = match->response;
+  }
   response.size = sizeof(response);
   (void)mln_resource_request_complete(handle, &response, NULL);
   mln_resource_request_release(handle);
@@ -229,6 +237,12 @@ mln_test_provider* mln_test_provider_create(
   TEST_ASSERT_NOT_NULL(provider);
   provider->resources = resources;
   provider->resource_count = resource_count;
+  // One spare slot keeps an empty table's allocation non-null.
+  provider->matches = calloc(resource_count + 1, sizeof(atomic_int));
+  TEST_ASSERT_NOT_NULL(provider->matches);
+  for (size_t index = 0; index < resource_count; index += 1) {
+    atomic_init(&provider->matches[index], 0);
+  }
   atomic_init(&provider->request_count, 0);
   for (size_t index = 0; index < MLN_TEST_PROVIDER_REQUEST_CAPACITY;
        index += 1) {
@@ -237,7 +251,12 @@ mln_test_provider* mln_test_provider_create(
   return provider;
 }
 
-void mln_test_provider_destroy(mln_test_provider* provider) { free(provider); }
+void mln_test_provider_destroy(mln_test_provider* provider) {
+  if (provider != NULL) {
+    free(provider->matches);
+  }
+  free(provider);
+}
 
 void mln_test_provider_install(
   mln_runtime runtime, mln_test_provider* provider

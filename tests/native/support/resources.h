@@ -41,11 +41,18 @@ bool mln_test_await_style_loaded(mln_runtime runtime, mln_map map);
 
 // One resource the scripted provider answers. `response` is the answer; its
 // size field is filled in for the case. A held resource is claimed and left
-// unanswered for the case to complete through its recorded handle.
+// unanswered for the case to complete through its recorded handle. A case that
+// answers a repeat request differently, such as a revalidation, scripts that
+// answer as `later_response` and `later_held`, which apply to every request for
+// the URL after the first; the table stays unchanged while the provider reads
+// it from file source threads.
 typedef struct mln_test_provided_resource {
   const char* url;
   mln_resource_response response;
   bool held;
+  bool has_later_response;
+  mln_resource_response later_response;
+  bool later_held;
 } mln_test_provided_resource;
 
 // What the provider saw of one request, copied out of the callback.
@@ -79,6 +86,8 @@ typedef struct mln_test_provider_request {
 typedef struct mln_test_provider {
   const mln_test_provided_resource* resources;
   size_t resource_count;
+  // How many requests each listed resource has answered or held.
+  atomic_int* matches;
   atomic_int request_count;
   mln_test_provider_request requests[MLN_TEST_PROVIDER_REQUEST_CAPACITY];
 } mln_test_provider;
