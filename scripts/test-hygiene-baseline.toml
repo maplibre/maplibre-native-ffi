@@ -4,11 +4,9 @@
 [sleep]
 "bindings/dart/test/callback_collection_test.dart" = 1
 "bindings/dart/test/maplibre_native_ffi_test.dart" = 5
-"bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTestHelpers.cs" = 3
 "tests/native/support/render_webgpu.c" = 2
 
 [network-host]
 "bindings/dart/test/foundational_values_test.dart" = 2
 "bindings/dart/test/maplibre_native_ffi_test.dart" = 33
-"bindings/dotnet/tests/Maplibre.NativeFfi.Tests/BufferValueEqualityTests.cs" = 3
 "src/platform/rust/src/http_client.rs" = 8
