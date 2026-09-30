@@ -371,6 +371,7 @@ function(mln_native_configure_suite target registry_dir)
       "${support_dir}/env.c"
       "${support_dir}/render.c"
       "${support_dir}/map.c"
+      "${support_dir}/style.c"
       ${render_backend_files})
   if(TARGET mln_test_graphics_objects)
     target_link_libraries(${target} PRIVATE mln_test_graphics_objects)
