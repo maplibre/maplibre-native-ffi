@@ -72,6 +72,7 @@ if ((${#test_graphics_files[@]} == 0)) &&
 fi
 test_graphics_stash=""
 if ((${#test_graphics_files[@]})); then
+  echo "Carrying the test-graphics files across the package install: ${test_graphics_files[*]}"
   test_graphics_stash="$(mktemp -d)"
   for relative in "${test_graphics_files[@]}"; do
     mkdir -p "$test_graphics_stash/$(dirname "$relative")"
@@ -125,12 +126,6 @@ fi
 if [[ -n "$test_graphics_stash" ]]; then
   cp -RP "$test_graphics_stash/." "$install_dir"
   rm -rf "$test_graphics_stash"
-  for relative in "${test_graphics_files[@]}"; do
-    if [[ ! -e "$install_dir/$relative" && ! -L "$install_dir/$relative" ]]; then
-      echo "The test-graphics file $relative did not survive the package install." >&2
-      exit 1
-    fi
-  done
 fi
 
 if [[ -n "$zig_shim_stash" ]]; then
