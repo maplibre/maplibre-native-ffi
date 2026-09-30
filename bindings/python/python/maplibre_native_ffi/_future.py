@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import traceback
 from collections import deque
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -73,11 +74,21 @@ def map_future[T, U](
     def complete(completed: Future[T]) -> None:
         nonlocal retained
         try:
-            value = transform(completed.result())
+            try:
+                raw = completed.result()
+            except BaseException as error:  # noqa: BLE001 - preserve every terminal failure.
+                result.set_exception(error)
+            else:
+                result.set_result(transform(raw))
         except BaseException as error:  # noqa: BLE001 - preserve every terminal failure.
+            # A traceback keeps its frames alive, and they hold the value that
+            # failed to convert. Carrying the trace as text instead disposes an
+            # owned native value now rather than when this future is collected.
+            trace = error.__traceback__
+            error.__traceback__ = None
+            error.add_note("".join(traceback.format_tb(trace)).rstrip())
+            del trace
             result.set_exception(error)
-        else:
-            result.set_result(value)
         finally:
             # Future keeps its callbacks after completion; release the owner now.
             retained = None
