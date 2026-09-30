@@ -15,10 +15,6 @@ comptime {
     _ = @import("callbacks.zig");
     _ = @import("values.zig");
     _ = @import("rendering.zig");
-    _ = @import("runtime.zig");
-    _ = @import("map_lifecycle.zig");
-    _ = @import("resources.zig");
-    _ = @import("logging.zig");
 }
 
 // The suite links the library the way the package does, through build.zig, and

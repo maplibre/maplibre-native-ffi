@@ -25,9 +25,6 @@
 "bindings/swift/Tests/MaplibreNativeFFITests/RenderTests.swift" = 1
 "bindings/swift/Tests/MaplibreNativeFFITests/RuntimeEventTestSupport.swift" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/StyleTests.swift" = 1
-"bindings/zig/tests/resources.zig" = 8
-"bindings/zig/tests/runtime.zig" = 6
-"bindings/zig/tests/support.zig" = 5
 "tests/native/support/render_webgpu.c" = 2
 
 [network-host]
@@ -45,6 +42,4 @@
 "bindings/swift/Tests/MaplibreNativeFFITests/OfflineTests.swift" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/RuntimeTests.swift" = 3
 "bindings/swift/Tests/MaplibreNativeFFITests/StyleTests.swift" = 17
-"bindings/zig/tests/map_lifecycle.zig" = 2
-"bindings/zig/tests/resources.zig" = 5
 "src/platform/rust/src/http_client.rs" = 8
