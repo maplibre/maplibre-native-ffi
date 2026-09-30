@@ -723,15 +723,15 @@ MLN_API mln_status mln_webgpu_borrowed_texture_attach(
  *   the stated physical size is not positive.
  * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
  *   frame is still acquired.
- * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, the
- *   session does not render into a caller-owned texture, or the replacement
- * does not have the pixel format this session compiled its pipeline states for.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or the
+ *   session does not render into a caller-owned texture.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders into the new texture.
- * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
- *   compiled for the old one.
+ * - MLN_STATUS_INVALID_ARGUMENT when the replacement belongs to another device.
+ * - MLN_STATUS_UNSUPPORTED when the replacement does not have the pixel format
+ *   this session compiled its pipeline states for.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
@@ -756,15 +756,15 @@ MLN_API mln_status mln_metal_borrowed_texture_set_target(
  *   the stated physical size is not positive.
  * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
  *   frame is still acquired.
- * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, the
- *   session does not render into a caller-owned texture, or the replacement
- * does not have the format and layouts this session built its render pass for.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, or the
+ *   session does not render into a caller-owned texture.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders into the new texture.
- * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
- *   compiled for the old one.
+ * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another context.
+ * - MLN_STATUS_UNSUPPORTED when the replacement does not have the format and
+ *   layouts this session built its render pass for.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
@@ -795,8 +795,7 @@ MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders into the new texture.
- * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
- *   compiled for the old one.
+ * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another context.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
@@ -821,15 +820,16 @@ MLN_API mln_status mln_opengl_borrowed_texture_set_target(
  *   the stated physical size is not positive.
  * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
  *   frame is still acquired.
- * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, the
- *   session does not render into a caller-owned texture, or the replacement
- * does not have the format this session built its render pipelines for.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
+ *   session does not render into a caller-owned texture.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders into the new texture.
- * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
- *   compiled for the old one.
+ * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another device or
+ *   queue.
+ * - MLN_STATUS_UNSUPPORTED when the replacement does not have the format this
+ *   session built its render pipelines for.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")

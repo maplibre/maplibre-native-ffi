@@ -284,8 +284,7 @@ MLN_API mln_status mln_webgpu_surface_attach(
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders through the new target.
- * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
- *   compiled for the old one.
+ * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another device.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
@@ -308,16 +307,17 @@ MLN_API mln_status mln_metal_surface_set_target(
  *   completion is null or undersized; or a required backend handle is null.
  * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
  *   frame is still acquired.
- * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, the
- *   session does not render through a native surface, or the replacement
- * surface does not report the color format and transform this session compiled
- * for.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, or the
+ *   session does not render through a native surface.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders through the new target.
- * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
- *   compiled for the old one.
+ * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another context, or
+ *   its surface cannot present from the context's graphics queue.
+ * - MLN_STATUS_UNSUPPORTED when the replacement surface does not report the
+ *   color format and transform this session compiled for.
+ * - MLN_STATUS_NATIVE_ERROR when querying the replacement surface fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
@@ -346,8 +346,7 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders through the new target.
- * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
- *   compiled for the old one.
+ * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another share group.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
@@ -376,8 +375,10 @@ MLN_API mln_status mln_opengl_surface_set_target(
  *
  * Completes with:
  * - MLN_STATUS_OK once the driver renders through the new target.
- * - MLN_STATUS_UNSUPPORTED when the backend cannot keep the GPU state it
- *   compiled for the old one.
+ * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another device or
+ *   queue.
+ * - MLN_STATUS_UNSUPPORTED when the replacement does not have the format this
+ *   session built its render pipelines for.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")

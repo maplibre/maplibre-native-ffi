@@ -335,7 +335,10 @@ typedef struct refusal_row {
   enum target_kind session;
   enum target_kind replacement;
   enum target_origin origin;
-  // The submission's status, and when that is OK, the completion's.
+  // The submission's status, and when that is OK, the completion's. The
+  // driver compares a replacement's context and format with the session's
+  // own, so those refusals arrive as completions, as each set_target's
+  // Completes-with list says.
   mln_status submission;
   mln_status completion;
   const char* diagnostic;
