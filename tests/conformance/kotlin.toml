@@ -54,4 +54,6 @@
 # exits: //examples/lwjgl-map:smoke and //examples/compose-map:smoke on desktop
 # presets, and //examples/android-map:smoke, which installs the app on the
 # Android emulator and waits for its first rendered frame (MainActivity).
+# Compose draws only into a window, so its smoke run parks a borderless one off
+# screen; a Linux host without a display runs both desktop smokes under xvfb.
 "EX-01" = "examples/lwjgl-map/src/main/kotlin/org/maplibre/nativeffi/examples/lwjglmap/Shell.kt::smoke: rendered a frame"

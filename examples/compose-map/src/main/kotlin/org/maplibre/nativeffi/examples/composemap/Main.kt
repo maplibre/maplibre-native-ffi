@@ -1,8 +1,12 @@
 package org.maplibre.nativeffi.examples.composemap
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
@@ -39,8 +43,26 @@ internal object Main {
 
     try {
       application(exitProcessOnExit = false) {
-        Window(onCloseRequest = { exitApplication() }, title = "MapLibre Compose Map") {
-          ComposeMapApp(renderer)
+        if (smoke) {
+          // Compose draws only into a window, so the smoke run parks a borderless one that takes
+          // no focus beyond the screen's edge, where it renders without appearing.
+          Window(
+            onCloseRequest = { exitApplication() },
+            state =
+              rememberWindowState(
+                position = WindowPosition(SMOKE_OFFSCREEN, SMOKE_OFFSCREEN),
+                size = DpSize(SMOKE_SIZE, SMOKE_SIZE),
+              ),
+            title = "MapLibre Compose Map smoke",
+            undecorated = true,
+            focusable = false,
+          ) {
+            ComposeMapApp(renderer)
+          }
+        } else {
+          Window(onCloseRequest = { exitApplication() }, title = "MapLibre Compose Map") {
+            ComposeMapApp(renderer)
+          }
         }
         if (smoke) {
           LaunchedEffect(rendered) {
@@ -62,6 +84,8 @@ internal object Main {
 
   private const val SMOKE_FLAG = "--smoke"
   private val SMOKE_TIMEOUT = 60.seconds
+  private val SMOKE_OFFSCREEN = (-4096).dp
+  private val SMOKE_SIZE = 256.dp
   private const val SMOKE_STYLE =
     """{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#2a6f97"}}]}"""
 
