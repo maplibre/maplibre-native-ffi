@@ -44,10 +44,16 @@ local lintSteps = new Mapping<String, Step> {
     check = "mise run check-export-calls"
   }
   // Every binding maps every conformance case to a test that exists or to a
-  // reason it does not apply, so it reruns when any binding test changes.
+  // reason it does not apply, so it reruns when any binding test changes. No
+  // case is left as todo, so a new one fails until a binding maps it.
   ["conformance"] {
-    glob = List("tests/conformance/**", "bindings/**", "examples/**")
-    check = "uv run --no-sync python scripts/check-conformance.py"
+    glob = List(
+      "tests/conformance/**",
+      "bindings/**",
+      "examples/**",
+      "scripts/check-conformance.py",
+    )
+    check = "uv run --no-sync python scripts/check-conformance.py --strict"
   }
   // Whole-repository check: the baseline counts violations per file, so a
   // count that falls in one file has to fail the check until it is lowered.
