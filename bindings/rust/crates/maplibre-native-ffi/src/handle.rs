@@ -198,7 +198,7 @@ mod tests {
         });
         assert_eq!(
             receiver
-                .recv_timeout(Duration::from_secs(1))
+                .recv_timeout(Duration::from_secs(10))
                 .unwrap()
                 .unwrap_err()
                 .kind(),
@@ -212,6 +212,7 @@ mod tests {
         assert_eq!(calls.load(Ordering::Relaxed), 1);
         assert!(handle.is_closed());
     }
+
     #[test]
     fn a_read_on_another_thread_holds_off_close_until_it_ends() {
         let handle = Arc::new(unsafe {

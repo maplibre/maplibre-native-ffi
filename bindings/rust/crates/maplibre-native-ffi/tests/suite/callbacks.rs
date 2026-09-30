@@ -82,9 +82,16 @@ fn a_callback_may_answer_its_request_but_not_fence_or_close_its_runtime() {
                     return deny(request, handle);
                 }
                 let runtime = runtime.upgrade().unwrap();
+                let refusal = |error: Error| {
+                    (
+                        error.kind(),
+                        error.raw_status(),
+                        error.diagnostic().to_owned(),
+                    )
+                };
                 let outcome = (
-                    runtime.barrier().map(drop).map_err(|error| error.kind()),
-                    runtime.release().map(drop).map_err(|error| error.kind()),
+                    runtime.barrier().map(drop).map_err(refusal),
+                    runtime.release().map(drop).map_err(refusal),
                     handle
                         .complete(&ok_response(BACKGROUND_STYLE_JSON))
                         .map_err(|error| error.kind()),
@@ -97,8 +104,16 @@ fn a_callback_may_answer_its_request_but_not_fence_or_close_its_runtime() {
     fixture.map().set_style_url("custom://style.json").unwrap();
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
     let (barrier, release, completed) = outcomes.recv_timeout(timeout()).unwrap();
-    assert_eq!(barrier, Err(ErrorKind::InvalidState));
-    assert_eq!(release, Err(ErrorKind::InvalidState));
+    // The binding's callback policy refuses both calls before they reach
+    // native, so neither carries a native status. Native would refuse the
+    // release too, because the fixture's map is live, but with a status.
+    let refused_by_policy = Err((
+        ErrorKind::InvalidState,
+        None,
+        "native operation is unavailable from this callback".to_owned(),
+    ));
+    assert_eq!(barrier, refused_by_policy);
+    assert_eq!(release, refused_by_policy);
     assert_eq!(completed, Ok(()));
 }
 
@@ -112,7 +127,9 @@ fn a_panicking_callback_is_contained_and_its_request_fails() {
             .runtime()
             .set_resource_provider(ResourceProvider::new(move |_, _| {
                 counted.fetch_add(1, Ordering::SeqCst);
-                panic!("the provider panicked");
+                // resume_unwind unwinds like a panic but skips the panic hook,
+                // which would print a message on every run.
+                std::panic::resume_unwind(Box::new("the provider panicked"));
             })),
     );
 

@@ -18,6 +18,18 @@ const BACKEND_VULKAN: u32 = 2;
 const BACKEND_EGL: u32 = 3;
 const BACKEND_WGL: u32 = 4;
 
+// Without the native install's artifact descriptor, the build script sets no
+// backend, and the attach would fail far from the cause.
+#[cfg(not(any(
+    mln_render_backend = "metal",
+    mln_render_backend = "vulkan",
+    mln_render_backend = "opengl"
+)))]
+compile_error!(
+    "the native install names no render backend these tests can drive; \
+     check the artifact descriptor under MAPLIBRE_NATIVE_C_INSTALL_DIR"
+);
+
 /// The tests/graphics backend that provides this build's render backend.
 const BACKEND: u32 = if cfg!(mln_render_backend = "metal") {
     BACKEND_METAL
@@ -190,7 +202,7 @@ impl Graphics {
                             data: OpenglContextDescriptorData::Wgl(WglContextDescriptor {
                                 device_context: context.wgl_device_context,
                                 share_context: context.wgl_context,
-                                ..Default::default()
+                                get_proc_address: context.get_proc_address,
                             }),
                         },
                     },

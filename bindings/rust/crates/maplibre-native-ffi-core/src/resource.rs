@@ -453,6 +453,17 @@ mod tests {
     }
 
     #[test]
+    fn a_request_keeps_all_64_bits_of_its_native_handle() {
+        let fixture = Fixture::new();
+        let native =
+            ResourceRequestHandleState::native_handle(&fixture.state.lock_inner().unwrap());
+        // The fixture's id sets the high bits, and only the whole id finds
+        // this fixture's fake.
+        assert_ne!(native.0 >> 32, 0);
+        assert!(Arc::ptr_eq(&fake_for(native), &fixture.fake));
+    }
+
+    #[test]
     fn last_request_reference_releases_off_the_callback_stack() {
         let Fixture { fake, state } = Fixture::handled();
         let (sender, receiver) = channel();

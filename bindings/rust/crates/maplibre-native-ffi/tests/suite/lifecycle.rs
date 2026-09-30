@@ -93,16 +93,42 @@ fn a_process_that_exits_with_live_handles_and_callbacks_exits_cleanly() {
     }
     // The test runs itself again in a child process, which exits while its
     // handles, callbacks, and native threads are all still live.
-    let status = std::process::Command::new(std::env::current_exe().unwrap())
+    let mut child = std::process::Command::new(std::env::current_exe().unwrap())
         .args([
             "lifecycle::a_process_that_exits_with_live_handles_and_callbacks_exits_cleanly",
             "--exact",
             "--test-threads=1",
         ])
         .env(EXIT_CHILD, "1")
-        .status()
+        .spawn()
         .unwrap();
+    // A hang at exit is the regression this test catches, so the wait is
+    // bounded. The waiter thread reaps the child, so its id stays valid for
+    // the kill until the wait returns.
+    let id = child.id();
+    let (sender, exited) = mpsc::channel();
+    std::thread::spawn(move || sender.send(child.wait()));
+    let Ok(status) = exited.recv_timeout(timeout()) else {
+        kill(id);
+        panic!("the child process did not exit within {:?}", timeout());
+    };
+    let status = status.unwrap();
     assert!(status.success(), "the child process ended with {status}");
+}
+
+/// Kills the process with this id, which the caller has not reaped.
+fn kill(id: u32) {
+    let id = id.to_string();
+    let mut command = if cfg!(windows) {
+        let mut command = std::process::Command::new("taskkill");
+        command.args(["/F", "/PID", &id]);
+        command
+    } else {
+        let mut command = std::process::Command::new("kill");
+        command.args(["-KILL", &id]);
+        command
+    };
+    let _ = command.status();
 }
 
 fn exit_with_live_handles_and_callbacks() -> ! {

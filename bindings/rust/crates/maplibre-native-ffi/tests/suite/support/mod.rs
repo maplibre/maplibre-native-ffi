@@ -85,8 +85,13 @@ impl Wake for Signal {
 }
 
 /// Blocks until `condition` holds, for state that changes with no wake to
-/// announce it, such as a request that MapLibre cancels. As in the C suite's
-/// harness, the thread parks between checks until the deadline.
+/// announce it. As in the C suite's harness, the thread parks between checks
+/// until the deadline.
+///
+/// This poll is for CB-08 only: a request takes a single cancel registration,
+/// which that test spends, so nothing is left to wake the test when MapLibre
+/// cancels the request. Every other wait uses a wake, through [`Signal`] or a
+/// channel.
 pub fn await_condition(what: &str, mut condition: impl FnMut() -> bool) {
     const RECHECK: Duration = Duration::from_millis(5);
     let deadline = Instant::now() + timeout();
