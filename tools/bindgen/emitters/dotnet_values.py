@@ -639,6 +639,46 @@ class Values:
             declaration += "        }\n        return copied;\n    }\n"
         return declaration
 
+    def required_reference_checks(self, plan: ValuePlan) -> list[str]:
+        """Rejects a null in a member whose type does not admit one.
+
+        A record struct's default value, or an initializer that skips a
+        member, leaves a reference-typed member null although its type is
+        non-nullable. Encoding it would dereference the null. Array members
+        need no check, because their storage reads back an empty array.
+        """
+        checks = []
+        for name, fields in self.members(plan):
+            value = fields[0].value
+            if (
+                len(fields) != 1
+                or value.kind in {"callback", "union"}
+                or (fields[0].presence and fields[0].presence.mask)
+            ):
+                continue
+            type_ = self.member_type(plan, name, fields)
+            reference = type_ == "string" or (
+                value.kind == "record" and self.declares_class(value)
+            )
+            if not reference or self.union_only(plan):
+                continue
+            message = f"{public_name(plan.native)}.{name} must not be null."
+            checks.append(
+                f"        if (value.{name} is null) throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException("
+                f'global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument, null, "{message}", null);'
+            )
+        return checks
+
+    def declares_class(self, plan: ValuePlan) -> bool:
+        """Whether declaration() emits the record as a class rather than a
+        record struct."""
+        return bool(plan.response) or (
+            self.union_only(plan)
+            or any(
+                field.presence and field.presence.mask for field in self.fields(plan)
+            )
+        )
+
     def encoder(self, plan: ValuePlan) -> str:
         if not self.can_encode(plan):
             raise Unsupported(f"{plan.native}: input requires an allocation scope")
@@ -646,6 +686,7 @@ class Values:
             f"    private static {plan.native} Native{public_name(plan.native)}({public_name(plan.native)} value{', NativeCallScope scope' if self.needs_scope(plan) else ''})",
             "    {",
         ]
+        lines.extend(self.required_reference_checks(plan))
         initial = (
             f"NativeMethods.{plan.default}()"
             if plan.default

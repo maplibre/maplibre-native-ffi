@@ -303,6 +303,13 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
             (root / "ValueEquality.cs").write_text(
                 (runtime.parent.parent / "ValueEquality.cs").read_text()
             )
+            errors = runtime.parent.parent.parent / "Error"
+            for name in (
+                "MaplibreStatus.cs",
+                "MaplibreException.cs",
+                "InvalidArgumentException.cs",
+            ):
+                (root / name).write_text((errors / name).read_text())
             (root / "Raw.cs").write_text(
                 "namespace Maplibre.NativeFfi.Internal.C { internal unsafe struct mln_buffer_view { public void* data; public nuint size; } }"
             )
@@ -346,6 +353,13 @@ static class NativeMethods {
     using var scope = new NativeCallScope();
     var encoded = NativeSnapshot(copy, scope);
     Check(encoded.coordinate_count == 2 && encoded.coordinates[0].latitude == 4);
+    // A record struct's reference member can still be null, which encoding rejects.
+    try {
+      NativeSnapshot(copy with { Camera = null! }, scope);
+      Check(false);
+    } catch (Maplibre.NativeFfi.Error.InvalidArgumentException error) {
+      Check(error.Diagnostic == "Snapshot.Camera must not be null.");
+    }
     // A field named after a C# keyword keeps its value in both directions.
     Check(CopyMetric(new mln_metric { @event = 4 }).Event == 4);
     Check(NativeMetric(new Metric(5)).@event == 5);

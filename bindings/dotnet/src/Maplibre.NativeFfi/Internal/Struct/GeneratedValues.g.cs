@@ -155,6 +155,13 @@ internal static unsafe class GeneratedValues
 
     internal static mln_camera_delta NativeCameraDelta(CameraDelta value)
     {
+        if (value.Animation is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "CameraDelta.Animation must not be null.",
+                null
+            );
         var native = NativeMethods.mln_camera_delta_default();
         native.@has_anchor = 0;
         native.@size = (uint)sizeof(mln_camera_delta);
@@ -313,6 +320,13 @@ internal static unsafe class GeneratedValues
 
     internal static mln_camera_query_result NativeCameraQueryResult(CameraQueryResult value)
     {
+        if (value.Camera is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "CameraQueryResult.Camera must not be null.",
+                null
+            );
         var native = new mln_camera_query_result();
         native.@size = (uint)sizeof(mln_camera_query_result);
         native.@generation = value.Generation;
@@ -330,6 +344,20 @@ internal static unsafe class GeneratedValues
 
     internal static mln_camera_update NativeCameraUpdate(CameraUpdate value)
     {
+        if (value.Camera is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "CameraUpdate.Camera must not be null.",
+                null
+            );
+        if (value.Animation is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "CameraUpdate.Animation must not be null.",
+                null
+            );
         var native = NativeMethods.mln_camera_update_default();
         native.@size = (uint)sizeof(mln_camera_update);
         native.@mode = (uint)value.Mode;
@@ -701,6 +729,13 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        if (value.SourceId is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "FeatureStateSelector.SourceId must not be null.",
+                null
+            );
         var native = new mln_feature_state_selector();
         native.@fields = 0;
         native.@size = (uint)sizeof(mln_feature_state_selector);
@@ -1133,6 +1168,48 @@ internal static unsafe class GeneratedValues
 
     internal static mln_map_snapshot NativeMapSnapshot(MapSnapshot value)
     {
+        if (value.Camera is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "MapSnapshot.Camera must not be null.",
+                null
+            );
+        if (value.ProjectionMode is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "MapSnapshot.ProjectionMode must not be null.",
+                null
+            );
+        if (value.Viewport is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "MapSnapshot.Viewport must not be null.",
+                null
+            );
+        if (value.Tile is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "MapSnapshot.Tile must not be null.",
+                null
+            );
+        if (value.Bounds is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "MapSnapshot.Bounds must not be null.",
+                null
+            );
+        if (value.FreeCamera is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "MapSnapshot.FreeCamera must not be null.",
+                null
+            );
         var native = new mln_map_snapshot();
         native.@size = (uint)sizeof(mln_map_snapshot);
         native.@debug_options = (uint)value.DebugOptions;
@@ -1417,6 +1494,13 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        if (value.StyleUrl is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "OfflineGeometryRegionDefinition.StyleUrl must not be null.",
+                null
+            );
         var native = new mln_offline_geometry_region_definition();
         native.@size = (uint)sizeof(mln_offline_geometry_region_definition);
         native.@style_url = scope.CString(value.StyleUrl);
@@ -1491,6 +1575,13 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        if (value.Definition is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "OfflineRegionInfo.Definition must not be null.",
+                null
+            );
         var native = new mln_offline_region_info();
         native.@size = (uint)sizeof(mln_offline_region_info);
         native.@id = value.Id;
@@ -1549,6 +1640,13 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        if (value.StyleUrl is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "OfflineTilePyramidRegionDefinition.StyleUrl must not be null.",
+                null
+            );
         var native = new mln_offline_tile_pyramid_region_definition();
         native.@size = (uint)sizeof(mln_offline_tile_pyramid_region_definition);
         native.@style_url = scope.CString(value.StyleUrl);
@@ -2903,6 +3001,13 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        if (value.Info is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "StyleImageResult.Info must not be null.",
+                null
+            );
         var native = new mln_style_image_result();
         native.@size = (uint)sizeof(mln_style_image_result);
         native.@info = NativeStyleImageInfo(value.Info);
@@ -2977,6 +3082,20 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        if (value.Id is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "StyleLayerEntry.Id must not be null.",
+                null
+            );
+        if (value.Type is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "StyleLayerEntry.Type must not be null.",
+                null
+            );
         var native = new mln_style_layer_entry();
         native.@size = (uint)sizeof(mln_style_layer_entry);
         native.@id = scope.Utf8(value.Id);
@@ -2999,6 +3118,13 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        if (value.Type is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "StyleLayerInfo.Type must not be null.",
+                null
+            );
         var native = new mln_style_layer_info();
         native.@size = (uint)sizeof(mln_style_layer_info);
         native.@type = scope.Utf8(value.Type);
@@ -3168,6 +3294,13 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        if (value.Info is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "StyleSourceResult.Info must not be null.",
+                null
+            );
         var native = new mln_style_source_result();
         native.@size = (uint)sizeof(mln_style_source_result);
         native.@info = NativeStyleSourceInfo(value.Info);
@@ -3683,6 +3816,13 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        if (value.CanvasSelector is null)
+            throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException(
+                global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument,
+                null,
+                "WebglContextDescriptor.CanvasSelector must not be null.",
+                null
+            );
         var native = new mln_webgl_context_descriptor();
         native.@size = (uint)sizeof(mln_webgl_context_descriptor);
         native.@kind = (uint)value.Kind;
