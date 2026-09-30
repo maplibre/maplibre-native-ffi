@@ -83,12 +83,20 @@ keeps session resources alive if another frame is finalized. Native retirement
 invalidates future views and waits for active scopes before releasing resources.
 Explicit release and abandon report busy while a conflicting scope is active.
 
+Each layer of a change has one place where it is tested:
+
+| Layer                                        | Tested in                                                                                                       |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Native behavior of the declaration           | The C ABI suite in `tests/native`, which calls every exported function by name                                  |
+| The protocol shape and its rejection         | A group in `tests/bindgen/fixtures/protocols.h`, and compiler tests in `tests/bindgen`                          |
+| Generated code for the shape                 | The [shape table test](#test-the-generator) for every emitter, and an executed probe where the language has one |
+| Handwritten runtime mechanism                | Each binding suite, through the conformance cases for callbacks, completions, and handles                       |
+| One representative generated value per shape | Each binding suite, through the value conformance cases, against the native library                             |
+
 Test the protocol through a public binding API, including its rejection and
-retirement paths. Use compiler fixtures to prove that adding or changing a C
-field changes the generated API, and that an incomplete contract fails before
-emission. Native tests cover invariants that a binding cannot directly observe,
-such as allocation-free retirement. Integration tests exercise the generated API
-against the native library on each supported target.
+retirement paths. A protocol that no case in `tests/conformance/cases.toml`
+covers adds a case there, and the conformance check fails until every binding
+maps it to a test or to a reason that it does not apply.
 
 Generated files include their source notice and are formatted by the generation
 task. Review the header, compiler rule, handwritten runtime mechanism, and
@@ -108,6 +116,10 @@ for the C API's shared types. A new protocol adds its group there. The shape
 table test runs every group through every emitter. It lists each declaration
 that an emitter reports unsupported and requires every other declaration to
 generate, so an emitter that loses a shape fails the suite.
+
+`tests/bindgen/test_cli.py` runs the compiler's command line and checks that
+`--check` and `--require-complete` fail when they should, and that invalid
+headers fail before any output is written.
 
 An executed probe builds generated code with the binding's handwritten runtime
 and runs it. The Go, Swift, Zig, and Dart probes generate bindings for the

@@ -156,46 +156,43 @@ sentence-level style, page structure, and project terminology.
 
 ### Testing
 
-- The bindings tests include broad integration coverage for the C/C++ layer on
-  targets where they run.
-- For tests that _must_ reach below the bindings, there are dedicated C tests in
-  `tests/native`.
-- C tests exercise the public ABI by default. The internal suite in
-  `tests/native/internal` and the seams in `src/testing` are a fallback for
-  orderings that no public fence reaches. The seams stay unexported, which
-  `mise run check-exports` checks.
-- Each binding's test suite should stand on its own for the C API domains and
-  targets it supports, using public binding APIs to validate both native
-  workflows and binding-owned safety behavior.
+- Native behavior is tested once, in C, under `tests/native`. The ABI suite in
+  `abi/` links the shipped library through public headers. The internal suite in
+  `internal/` links the static library and uses the seams in `src/testing` only
+  for orderings that no public fence reaches. The seams stay unexported, which
+  `mise run check-exports` checks. See
+  [tests/native/README.md](tests/native/README.md).
+- Each binding suite covers the cases in `tests/conformance/cases.toml` for what
+  the binding adds: its hand-written runtime, its generated shapes, and its
+  platform integration. The binding's file in `tests/conformance` maps every
+  case to a test or to a reason it does not apply, and
+  `scripts/check-conformance.py --strict` checks that mapping.
 - Generator tests in `tests/bindgen` assert on semantic plans, coverage reports,
   or generated code that they compile and run. They never search emitted source
   for fragments, though they may compare two whole outputs. Protocol fixtures
   live in `tests/bindgen/fixtures/protocols.h`.
-- Avoid trivial tests, tests that verify constants, tests that assert a negative
-  (unless valuable), tests that simply test third party code; we want to keep
-  our test suite robust and high-value.
-- GPU contexts, textures, and surfaces in tests come from `tests/graphics`,
-  which the C suite links and each binding loads over its FFI. See
+- Each example has a `smoke` task that renders one frame headless and exits.
+  Examples need no other tests.
+- GPU contexts, textures, and surfaces in tests come from `tests/graphics`. See
   [tests/graphics/README.md](tests/graphics/README.md).
-- Example apps don't need tests.
-- Every test skip should be strictly justified. We do not skip rendering tests
-  because the CI environment doesn't support them; we fix the environment.
-- The C ABI suite calls every exported function by name; calls from the internal
-  suite don't count. `mise run check-export-calls` enforces this against
-  `tests/uncalled-exports.txt`, which only shrinks.
+- Tests wait on signals rather than elapsed time, and serve every request from a
+  local fixture.
+- A skip is decided at build time and needs a strict justification. Rendering
+  tests run on every target: fix the CI environment rather than skip them.
+- Avoid trivial tests, tests of constants or third-party code, and negative
+  assertions unless they are valuable.
+- Checkers enforce these rules against baselines that only shrink.
+  `mise run check-export-calls` requires the ABI suite to call every exported
+  function by name, except those in `tests/uncalled-exports.txt`.
+  `scripts/check-test-hygiene.py` fails on a sleep or a public or reserved host
+  in test code beyond `scripts/test-hygiene-baseline.toml`; run it with
+  `--update` after removing violations. Mark a URL that a test never fetches
+  with a `lint: not-fetched` comment on its line or the line above.
 - Before deleting a binding test, run `mise run coverage` for that binding and
   for `native`, then
   `mise run coverage-diff --only-in <binding> --not-in native` to find the
   `src/` lines only the binding reaches. See
   [Code coverage](docs/src/content/docs/development/overview.md#code-coverage).
-- Tests wait on signals rather than elapsed time, and serve every request from a
-  local fixture. `scripts/check-test-hygiene.py` fails on a sleep or on a public
-  or reserved host, such as `example.com` or a `.test` name, in test code.
-  Violations that predate it are counted per file in
-  `scripts/test-hygiene-baseline.toml`, and those counts only fall: run the
-  script with `--update` after removing some. Mark a URL that a test only
-  rewrites or rejects with a `lint: not-fetched` comment on its line or the line
-  above.
 
 ## Project Docs
 

@@ -277,9 +277,18 @@ describes the suites and the exit programs. On desktop, simulator, and
 Emscripten targets, `mise run test` also runs the host unit tests of the Rust
 platform crate in `src/platform/rust`, which cover its pure helpers such as
 redirect resolution. `mise run build` runs `mise run check-exports`, which fails
-when the installed library exports anything beyond the public C API. Language
-binding suites run through their binding-specific CI tasks.
-`mise run bindings:test-generator` tests the binding generator;
+when the installed library exports anything beyond the public C API.
+
+Native behavior is tested once, in those C suites. Each binding suite covers
+what its binding adds to the C API: the hand-written runtime, the generated
+shapes, and the platform integration. `tests/conformance/cases.toml` lists the
+cases that every binding covers, and each binding's file beside it maps every
+case to a test or to the reason that it does not apply. The `conformance` check
+in hk runs `scripts/check-conformance.py --strict`, which fails on an unmapped
+case, on a test name that its file does not contain, and on a case still marked
+todo. A binding suite runs through its own task, such as
+`mise run //bindings/rust:test [preset]`. `mise run bindings:test-generator`
+tests the binding generator;
 [Generate bindings](/maplibre-native-ffi/development/binding-generation/#test-the-generator)
 describes that suite.
 
@@ -288,7 +297,14 @@ local fixture: a resource provider, a file, or the native suite's loopback HTTP
 server on 127.0.0.1. The `test-hygiene` check in hk runs
 `scripts/check-test-hygiene.py`, which fails on a sleep or on a public or
 reserved host in test code. Its baseline, `scripts/test-hygiene-baseline.toml`,
-counts the violations that predate the check, and a count may only fall.
+counts the violations that predate the check, and a count may only fall. The
+`export-calls` check runs `mise run check-export-calls`, which fails when the
+ABI suite leaves an exported function uncalled by name. Its baseline,
+`tests/uncalled-exports.txt`, also only shrinks.
+
+A test that cannot run on a target is left out when the suite is built, never
+skipped at run time. Rendering tests run on every target that can render, and a
+CI runner that lacks a renderer gets one rather than a skip.
 
 Tests take their GPU objects from `tests/graphics`, a small C library that
 creates a device or context, a borrowed texture, and a presentation surface for
@@ -302,9 +318,13 @@ restores the default when it ends, whether it passed or failed.
 
 Use examples for demos and behavior that needs manual validation, such as visual
 output, interactive input, or host graphics integration. CI runs each example's
-`smoke` task, which renders one frame and exits, on every target whose backend
-the runner can render. Linux runners have no display server, so an example that
-opens a window runs under Xvfb there, drawing with Mesa's software drivers.
+`smoke` task on every target whose backend the runner can render. The task runs
+the example in
+[smoke mode](/maplibre-native-ffi/development/map-example-specification/#smoke-mode),
+which renders one frame of an inline style where no one sees it and exits. Linux
+runners have no display server, so an example that opens a window runs there
+under Xvfb or its toolkit's offscreen platform, drawing with Mesa's software
+drivers.
 
 Keep examples small. This repository includes low-level language bindings and
 focused integration examples. Full application SDKs live outside this
