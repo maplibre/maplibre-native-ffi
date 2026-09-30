@@ -1169,11 +1169,7 @@ auto submit_driver_work(
 auto lease_render_session(mln_render_session session)
   -> std::shared_ptr<mln_render_session_object> {
   auto live = handle_table<mln_render_session_object>().lease(session);
-  if (live != nullptr && live->disposal_requested.load()) {
-    set_thread_error("render session handle has been disposed");
-    return nullptr;
-  }
-  return live;
+  return live && !live->disposal_requested.load() ? live : nullptr;
 }
 
 auto enqueue_driver_operation(
@@ -1287,6 +1283,7 @@ auto start_attach_render_session(
   }
 
   const auto map = handle_table<MapObject>().lease(session->map);
+  // A failed lease has recorded the handle fault.
   if (map == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
   if (
     map->runtime_state == nullptr || map->runtime_state->event_queue == nullptr

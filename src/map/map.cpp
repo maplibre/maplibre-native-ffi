@@ -2420,6 +2420,7 @@ struct MapSubmissionContext {
 auto acquire_map_submission(mln_map map, MapSubmissionContext& out_context)
   -> mln_status {
   auto live = handle_table<MapObject>().lease(map);
+  // A failed lease has recorded the handle fault.
   if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
   if (live->disposal_requested.load()) {
     set_thread_error("map handle has been disposed");
@@ -3014,6 +3015,7 @@ auto map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto live = handle_table<MapObject>().lease(map);
+  // A failed lease has recorded the handle fault.
   if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
   if (live->disposal_requested.load()) {
     set_thread_error("map handle has been disposed");
@@ -3603,6 +3605,7 @@ auto map_attach_render_target_session(mln_map map, void* session)
 auto map_detach_render_target_session(mln_map map, void* session)
   -> mln_status {
   auto live = handle_table<MapObject>().lease(map);
+  // A failed lease has recorded the handle fault.
   if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
   {
     const auto lock = std::scoped_lock{handle_table<MapObject>().mutex()};
@@ -3677,6 +3680,7 @@ auto start_map_string_operation(
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = handle_table<MapObject>().lease(map);
+  // A failed lease has recorded the handle fault.
   if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
   if (live->disposal_requested.load()) {
     set_thread_error("map handle has been disposed");
@@ -4113,6 +4117,7 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = handle_table<MapObject>().lease(map);
+  // A failed lease has recorded the handle fault.
   if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
   if (live->disposal_requested.load()) {
     set_thread_error("map handle has been disposed");
