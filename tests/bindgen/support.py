@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -33,6 +34,16 @@ def protocol_header(
     lines = [f"#define MLN_PROTOCOL_{group.upper()}" for group in groups]
     lines.extend(f"#define {define}" for define in defines)
     return "\n".join([*lines, PROTOCOLS.read_text(), source, ""])
+
+
+def protocol_groups() -> tuple[str, ...]:
+    """The fixture's declaration groups, in file order."""
+    names = re.findall(
+        r"^#ifdef MLN_PROTOCOL_(\w+)$", PROTOCOLS.read_text(), re.MULTILINE
+    )
+    return tuple(
+        dict.fromkeys(name.lower() for name in names if name != "STANDARD_TYPES")
+    )
 
 
 def parse(

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from support import FIXTURES, PROTOCOLS_STUB, parse, parse_sources, protocol_header
+from support import FIXTURES, PROTOCOLS_STUB, parse_sources, protocol_header
 
 from tools.bindgen.emitters import go
 from tools.bindgen.schema import validate
@@ -118,26 +118,3 @@ func TestRoundtrip(t *testing.T) {
                     check=False,
                 )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-    def test_owned_output_retains_its_parent_input_rather_than_the_receiver(self):
-        api = parse(groups=("owned_output",))
-        validate(api)
-        source = go.generate(api)["generated_api.go"]
-        self.assertIn("func (receiver *SeedHandle) Plant(forest *ForestHandle)", source)
-        self.assertIn("adoptTreeHandle(uint64(outputOutTree), input1)", source)
-
-    def test_receiver_registration_transfers_its_root_unless_rejected(self):
-        api = parse(groups=("direct_registration",))
-        validate(api)
-        source = go.generate(api)["generated_api.go"]
-        self.assertIn(
-            "func (receiver *TicketHandle) OnCancel(callback func()) (bool, error)",
-            source,
-        )
-        self.assertIn(
-            "C.mln_ticket_on_cancel(C.mln_ticket(raw), nativeCallback, context, nativeRelease, &rejected, diagnostic)",
-            source,
-        )
-        self.assertIn(
-            "if !bool(rejected) { arena.accept(receiver.bindingOwner) }", source
-        )

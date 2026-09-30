@@ -116,6 +116,8 @@ PRIMITIVES = {
     "uint32_t": "uint",
     "int64_t": "long",
     "uint64_t": "ulong",
+    "int16_t": "short",
+    "uint16_t": "ushort",
     "size_t": "nuint",
     "int": "int",
     "unsigned int": "uint",

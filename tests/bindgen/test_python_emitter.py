@@ -4,7 +4,7 @@ import enum
 import sys
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from support import parse
 
@@ -18,25 +18,53 @@ class PythonEmitterTests(unittest.TestCase):
         validate(api)
         return api
 
-    def materialize(self, api):
+    def materialize(self, api, native=None):
+        """Execute the generated modules over fakes of the handwritten runtime."""
         files = python.generate(api)
         for path, source in files.items():
             if path.endswith((".py", ".pyi")):
                 compile(source, path, "exec")
-        package = types.ModuleType("fixture")
-        enums = types.ModuleType("fixture._enum")
-        enums.UnknownIntEnum = enum.IntEnum
-        values = types.ModuleType("fixture.values")
-        values.__package__ = "fixture"
-        with patch.dict(
-            sys.modules,
-            {"fixture": package, "fixture._enum": enums, "fixture.values": values},
-        ):
-            exec(  # noqa: S102 -- Exercise generated record conversions.
-                files["python/maplibre_native_ffi/_generated_values.py"],
-                values.__dict__,
-            )
-        return files, values
+
+        def module(name, **attributes):
+            result = types.ModuleType(f"fixture.{name}")
+            result.__package__ = "fixture"
+            result.__dict__.update(attributes)
+            return result
+
+        class GeneratedOperations:
+            pass
+
+        class NativeHandleMixin:
+            pass
+
+        modules = {
+            "fixture": types.ModuleType("fixture"),
+            "fixture._enum": module("_enum", UnknownIntEnum=enum.IntEnum),
+            "fixture._native": native or MagicMock(),
+            "fixture._completion": module("_completion", CommandCompletion=object),
+            "fixture._future": module("_future", map_future=None),
+            "fixture._operation": module(
+                "_operation",
+                GeneratedOperations=GeneratedOperations,
+                _adopt_future=None,
+                _adopt_value=None,
+                _with_view=None,
+            ),
+            "fixture._lifecycle": module(
+                "_lifecycle", NativeHandleMixin=NativeHandleMixin
+            ),
+        }
+        generated = types.SimpleNamespace(NativeHandleMixin=NativeHandleMixin)
+        with patch.dict(sys.modules, modules):
+            for name in ("values", "operations", "owners"):
+                loaded = module(f"_generated_{name}")
+                sys.modules[loaded.__name__] = loaded
+                exec(  # noqa: S102 -- Exercise the generated modules.
+                    files[f"python/maplibre_native_ffi/_generated_{name}.py"],
+                    loaded.__dict__,
+                )
+                setattr(generated, name, loaded)
+        return generated
 
     def test_nested_copied_values_keep_absence_and_escape_keyword_fields(self):
         api = self.parse("""
@@ -50,7 +78,7 @@ BIND("execution=query;result=mln_new_entry;shape=array;ownership=borrowed")
 mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         self.assertEqual(python.coverage(api)["generated"], ["mln_map_new_entries"])
-        _, values = self.materialize(api)
+        values = self.materialize(api).values
         raw = {
             "title": None,
             "position": {"latitude": 3.25, "longitude": -8.5},
@@ -69,18 +97,11 @@ mln_status mln_map_match(mln_map map, double self, double input_self, double py,
                        mln_buffer_view title BIND("encoding=utf8"), double title_view,
                        const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
-        files, _ = self.materialize(api)
         self.assertEqual(python.coverage(api)["generated"], ["mln_map_match"])
-        facade = files["python/maplibre_native_ffi/_generated_operations.py"]
-        self.assertIn(
-            "def map_match(map: int, input_self_: float, input_self: float, input_py: float",
-            facade,
-        )
-        native = files["src/generated_operations.rs"]
-        self.assertIn(
-            "sys::mln_map_match(map, input_self_, input_self, input_py, title_value, title_view, completion, diagnostic)",
-            native,
-        )
+        native = MagicMock()
+        operations = self.materialize(api, native).operations
+        operations.map_match(7, 1.0, 2.0, 3.0, "title", 4.0)
+        native.map_match.assert_called_once_with(7, 1.0, 2.0, 3.0, "title", 4.0)
 
     def test_escaped_field_collisions_fail_before_generating_an_api(self):
         api = self.parse("""
@@ -105,7 +126,7 @@ BIND("execution=immediate") mln_status mln_host_closed(mln_host host, bool *out 
 
     def test_tagged_union_wrapper_keeps_payload_record_and_unknown_tag(self):
         api = self.parse(groups=("tagged_union",))
-        _, values = self.materialize(api)
+        values = self.materialize(api).values
         event = values.Event._from_native(
             {"payload": {"kind": "frame", "value": {"timestamp": 12.5}}}
         )
@@ -118,22 +139,24 @@ BIND("execution=immediate") mln_status mln_host_closed(mln_host host, bool *out 
     def test_decision_handle_owner_takes_its_name_from_the_issued_handle(self):
         api = self.parse(groups=("decision",))
         self.assertEqual(python.coverage(api)["unsupported"], {})
-        files, values = self.materialize(api)
-        native = files["src/generated_operations.rs"]
-        self.assertIn('#[pyclass(name = "_TicketHandle")]', native)
-        self.assertIn("module.add_class::<TicketHandle>()?;", native)
-        self.assertIn("Py::new(py, TicketHandle {", native)
-        # The core registration owns the cancel callback's native release.
-        self.assertIn("self.state.on_cancel(Box::new(", native)
-        self.assertIn(
-            "_wrap_response(ticket, 'TicketHandle')",
-            files["python/maplibre_native_ffi/_generated_values.py"],
-        )
+        generated = self.materialize(api)
+        owners, values = generated.owners, generated.values
         self.assertEqual(
             values.TicketProvider.__annotations__["callback"],
             "Callable[[TicketHandle], Decision] | None",
         )
-        self.assertIn(
-            "class TicketHandle(_TicketHandleOperations, NativeHandleMixin):",
-            files["python/maplibre_native_ffi/_generated_owners.py"],
+        # The provider hands its callback the issued handle's owner.
+        values._wrap_response = lambda native, owner: (owner, native)
+        received = []
+        provider = values.TicketProvider(
+            callback=lambda ticket: received.append(ticket) or values.Decision.CLAIM
         )
+        self.assertEqual(provider._invoke_callback(41), values.Decision.CLAIM)
+        self.assertEqual(received, [("TicketHandle", 41)])
+        self.assertTrue(issubclass(owners.TicketHandle, generated.NativeHandleMixin))
+        with self.assertRaises(TypeError):
+            owners.TicketHandle()
+        native = MagicMock()
+        ticket = owners.TicketHandle._from_native(native)
+        ticket.on_cancel(print)
+        native.on_cancel.assert_called_once_with(print)

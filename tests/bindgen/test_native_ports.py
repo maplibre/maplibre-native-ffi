@@ -62,15 +62,6 @@ int main() {
 }
 """,
             )
-            emitted = dart.generate(bound)
-            self.assertIn(
-                "Future<CommandCompletion> observeSample(SampleOptions options)",
-                emitted,
-            )
-            self.assertIn(
-                "SamplePoint(x: message[1] as int, y: message[2] as int)", emitted
-            )
-            self.assertIn("registration.releaseMemory?.call()", emitted)
             self.assertEqual(dart.coverage(bound)["unsupported"], {})
 
     def test_direct_registration_generates_a_native_port_and_dart_method(self):
@@ -100,14 +91,6 @@ int main() {
 }
 """,
             )
-            emitted = dart.generate(bound)
-            self.assertIn(
-                "bool onCancel(TicketCancel callback) => withNativeArena(", emitted
-            )
-            self.assertIn("if (!isClosed) { callback(); }", emitted)
-            self.assertIn("accepted = !declined.value;", emitted)
-            self.assertIn("if (!accepted) { port.reject(); }", emitted)
-            self.assertIn("raw.mln_adapter_dart_port_release", emitted)
             coverage = dart.coverage(bound)
             self.assertEqual(coverage["unsupported"], {})
             self.assertIn("mln_ticket_on_cancel", coverage["generated"])

@@ -96,7 +96,7 @@ typedef struct mln_probe_options {
 } mln_probe_options;
 BIND("execution=immediate")
 mln_status mln_probe_roundtrip(
-  mln_probe_options input, mln_probe_options* out BIND("direction=out"),
+  mln_probe_options input, mln_probe_options* out_options BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
 typedef struct mln_probe_text_result {
@@ -107,7 +107,7 @@ mln_status mln_probe_nullable_text(
   const char* text
     BIND("length=text_size;encoding=utf8;nullable=true;ownership=borrowed"),
   uint16_t text_size BIND("kind=count"),
-  mln_probe_text_result* out BIND("direction=out"),
+  mln_probe_text_result* out_result BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
 #endif
@@ -123,7 +123,8 @@ typedef struct mln_keyword_entry {
 BIND("execution=immediate")
 mln_status mln_keyword_combine(
   double defer, double self, double raw, double bindingArg0,
-  mln_keyword_entry* out BIND("direction=out"), mln_diagnostic* out_diagnostic
+  mln_keyword_entry* out_entry BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
 );
 #endif
 
@@ -268,9 +269,21 @@ typedef unsigned long long mln_ticket
 typedef void (*mln_runtime_callback_release)(
   void* context BIND("kind=context;lifetime=owner")
 ) BIND("thread=native;failure=contain");
+// The cancel callback may call back into the ticket's own protocol.
+#ifdef MLN_PROTOCOL_DECISION
+#define MLN_PROTOCOL_TICKET_CALLS                                \
+  "mln_ticket_answer,mln_ticket_cancelled,mln_ticket_on_cancel," \
+  "mln_ticket_release"
+#else
+#define MLN_PROTOCOL_TICKET_CALLS "mln_ticket_on_cancel,mln_ticket_release"
+#endif
 typedef void (*mln_ticket_cancel)(
   void* context BIND("kind=context;lifetime=owner")
-) BIND("thread=native;failure=contain");
+)
+  BIND(
+    "reentry=protocol;reentry_owner=registration;"
+    "reentry_calls=" MLN_PROTOCOL_TICKET_CALLS ";thread=native;failure=contain"
+  );
 BIND("execution=immediate") void mln_ticket_release(mln_ticket ticket);
 BIND(
   "execution=immediate;registration=callback;user_data=context;"
@@ -286,12 +299,16 @@ mln_status mln_ticket_on_cancel(
 
 #ifdef MLN_PROTOCOL_DECISION
 // A provider callback that claims or passes through an issued decision handle.
-typedef unsigned long long mln_host
-  BIND("kind=handle;release=mln_host_destroy;parent=none");
+typedef unsigned long long mln_host BIND(
+  "kind=handle;release=mln_host_destroy;dispose=mln_host_destroy;parent=none"
+);
 typedef enum mln_decision : unsigned {
   MLN_DECISION_DELEGATE = 0,
   MLN_DECISION_CLAIM = 1
 } mln_decision;
+typedef struct mln_ticket_response {
+  unsigned code;
+} mln_ticket_response;
 typedef unsigned (*mln_ticket_provider_callback)(void* context BIND("kind=context;lifetime=owner"), mln_ticket ticket) BIND(
   "thread=native;enum=mln_decision;failure=MLN_DECISION_DELEGATE;"
   "decision_handle=ticket;decision_accept=MLN_DECISION_CLAIM;"
@@ -315,7 +332,8 @@ mln_status mln_host_set_provider(
 );
 BIND("execution=immediate")
 mln_status mln_ticket_answer(
-  mln_ticket ticket, unsigned response, mln_diagnostic* out_diagnostic
+  mln_ticket ticket, const mln_ticket_response* response BIND("length=1"),
+  mln_diagnostic* out_diagnostic
 );
 BIND("execution=immediate")
 mln_status mln_ticket_cancelled(

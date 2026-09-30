@@ -692,6 +692,30 @@ mln_status query(const mln_completion *completion BIND("length=1"), mln_diagnost
         self.assertTrue(result.nullable)
         self.assertFalse(result.element.nullable)
 
+    def test_owned_output_retains_its_parent_input_rather_than_the_receiver(self):
+        model = bind(parse(groups=("owned_output",)), require_complete=True)
+        operation = model.operations_by_name["mln_seed_plant"]
+        self.assertEqual(operation.receiver, "seed")
+        (output,) = operation.owned_outputs
+        self.assertEqual(
+            (output.parameter, output.parent_parameter, output.handle.parent),
+            ("out_tree", "forest", "mln_forest"),
+        )
+
+    def test_receiver_registration_transfers_its_root_unless_declined(self):
+        model = bind(parse(groups=("direct_registration",)), require_complete=True)
+        operation = model.operations_by_name["mln_ticket_on_cancel"]
+        self.assertEqual(operation.receiver, "ticket")
+        (registration,) = operation.direct_registrations
+        self.assertEqual(
+            (
+                registration.release_callback,
+                registration.accepted_unless,
+                registration.transfer,
+            ),
+            ("release", "cancelled", "acceptance"),
+        )
+
     def test_disposal_support_requires_a_handle_consumer(self):
         source = """
 typedef unsigned long owner BIND("kind=handle;release=close_owner;dispose=discard_owner;parent=none");

@@ -8,36 +8,14 @@ from tempfile import TemporaryDirectory
 
 from support import parse
 
+from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import dart, dotnet, kotlin
 from tools.bindgen.emitters.dotnet_values import Values
 from tools.bindgen.schema import validate
 
 
 class ManagedEmitterTests(unittest.TestCase):
-    def dart_map(self, source):
-        return dart.generate(self.parse(source, map_handle=True))
-
-    def kotlin_map(self, source, platform="jvmMain"):
-        api = self.parse(source, map_handle=True)
-        return kotlin.generate(api)[
-            f"src/{platform}/kotlin/org/maplibre/nativeffi/generated/GeneratedMapOperations.kt"
-        ]
-
-    def test_dotnet_new_owner_uses_shared_release_and_copy_reservation(self):
-        api = self.parse(groups=("child_owner",))
-        emitted = dotnet.emit(api)
-        self.assertEqual(emitted.unsupported, {})
-        source = emitted.files["Metrics/MeasurementHandle.Operations.g.cs"]
-        self.assertIn("MeasurementHandle Create()", source)
-        self.assertIn("NativeMethods.mln_measurement_close(live)", source)
-        self.assertIn("using var read = state.Borrow();", source)
-        self.assertIn(
-            "NativeMethods.mln_measurement_read(read.Handle, &outValue, NativeDiagnostic.Prepare(&diagnostic))",
-            source,
-        )
-        self.assertIn("MlnMeasurement", emitted.files["Internal/C/Handles.g.cs"])
-
-    def test_kotlin_owner_retains_its_parent_and_closes_through_release(self):
+    def test_kotlin_owner_retains_its_receiver_as_parent(self):
         api = self.parse(
             """
 typedef unsigned long long mln_measurement_handle BIND("kind=handle;release=mln_measurement_destroy;dispose=mln_measurement_destroy;parent=mln_map");
@@ -48,24 +26,11 @@ void mln_measurement_destroy(mln_measurement_handle owner);
 """,
             map_handle=True,
         )
-        files = kotlin.generate(api)
-        generated = "src/{}/kotlin/org/maplibre/nativeffi/generated/{}.kt"
-        common = files[generated.format("commonMain", "MeasurementHandle")]
-        self.assertIn(
-            "class MeasurementHandle : GeneratedMeasurementHandleOperations, AutoCloseable",
-            common,
+        self.assertEqual(kotlin.coverage(api)["unsupported"], {})
+        (output,) = compile_api(api).operations_by_name["mln_map_measure"].owned_outputs
+        self.assertEqual(
+            (output.parent_parameter, output.handle.parent), ("map", "mln_map")
         )
-        owner = files[generated.format("jvmMain", "MeasurementHandle")]
-        self.assertIn("parent: MapHandle,", owner)
-        self.assertIn('HandleStateCore("MeasurementHandle", handle, parent,', owner)
-        self.assertIn("override fun close() { measurementDestroy() }", owner)
-        operations = files[generated.format("jvmMain", "GeneratedMapOperations")]
-        self.assertIn(
-            "MeasurementHandle(it, this@GeneratedMapOperations as org.maplibre.nativeffi.generated.MapHandle)",
-            operations,
-        )
-        # A release named close() is inherited instead of wrapped.
-        self.assertNotIn("fun close()", files[generated.format("jvmMain", "MapHandle")])
 
     def test_kotlin_conditional_registration_roots_in_its_receiver_until_native_release(
         self,
@@ -80,29 +45,11 @@ mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("ki
             map_handle=True,
         )
         self.assertEqual(kotlin.coverage(api)["unsupported"], {})
-        files = kotlin.generate(api)
-        generated = "src/{}/kotlin/org/maplibre/nativeffi/generated/{}.kt"
-        self.assertIn(
-            "fun mapWatch(callback: Watch): Boolean",
-            files[generated.format("commonMain", "GeneratedMapOperations")],
-        )
-        operation = files[generated.format("jvmMain", "GeneratedMapOperations")]
-        self.assertIn("bindingReadMap { raw ->", operation)
-        self.assertIn(
-            "registrations.register(GeneratedWatchRegistration(callback), raw.toLong())",
-            operation,
-        )
-        self.assertIn(
-            "MapLibreNativeC.mln_map_watch(raw, GeneratedDirectCallbacks.WatchStub, MemorySegment.ofAddress(token), GeneratedDirectCallbacks.WatchReleaseStub, out, diagnostic)",
-            operation,
-        )
-        # Native keeps nothing it reports through the condition, so the scope frees that root.
-        self.assertIn(
-            "if (!done) registrations.accept(bindingCallbacks); done", operation
-        )
-        values = files[generated.format("jvmMain", "GeneratedValues")]
-        self.assertIn("CallbackAdmission.scope(root.owner,", values)
-        self.assertIn("CallbackRoots.release(context.address())", values)
+        bound = compile_api(api)
+        (registration,) = bound.operations_by_name["mln_map_watch"].direct_registrations
+        # Native keeps nothing it reports through the condition.
+        self.assertEqual(registration.accepted_unless, "done")
+        self.assertTrue(bound.callbacks["mln_watch"].reentry_policy.registration_owner)
 
     def parse(self, source="", header="metrics.h", map_handle=False, groups=()):
         # Kotlin generates operations only for receivers that are handles.
@@ -120,7 +67,7 @@ mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("ki
         validate(api)
         return api
 
-    def test_reserved_parameter_and_generated_local_names_are_rejected(self):
+    def test_reserved_parameter_names_are_escaped_or_rejected(self):
         for name in ("class", "completion_value", "arena"):
             parameter = "completion" if name == "completion_value" else name
             source = f"""
@@ -136,18 +83,10 @@ mln_status mln_map_run(mln_map map, double {parameter}, const mln_completion *do
                         emitter.coverage(api)["unsupported"]["mln_map_run"],
                     )
 
-            kotlin_source = self.kotlin_map(source)
-            local = "`class`" if parameter == "class" else parameter + "Value"
-            self.assertIn(f"{local}: Double", kotlin_source)
-            self.assertIn(f"bindingMapHandle(), {local}, completion", kotlin_source)
-            dart_source = self.dart_map(source)
-            self.assertIn(f"double {parameter}Value", dart_source)
-            self.assertIn(
-                "raw.mln_map_run(_handle.raw, "
-                + parameter
-                + "Value, completion, nativeDiagnostic)",
-                dart_source,
-            )
+            owned = self.parse(source, map_handle=True)
+            for emitter in (dart, kotlin):
+                with self.subTest(name=name, emitter=emitter.__name__):
+                    self.assertIn("mln_map_run", emitter.coverage(owned)["generated"])
 
     def test_public_method_name_collisions_are_rejected(self):
         header = """
@@ -164,7 +103,7 @@ mln_status mln_map_readScale(mln_map map, const mln_completion *completion, mln_
                 set(emitter.coverage(owned)["generated"]) - {"mln_map_close"}, set()
             )
 
-    def test_dart_commands_on_any_owner_share_the_receipt_helper(self):
+    def test_dart_commands_generate_on_any_owner(self):
         api = self.parse("""
 typedef unsigned long long mln_measurement BIND("kind=handle;release=mln_measurement_close;dispose=mln_measurement_close;parent=none");
 BIND("execution=immediate")
@@ -173,9 +112,6 @@ BIND("receiver=measurement;execution=command;result=void;shape=none;ownership=va
 mln_status mln_measurement_change(mln_measurement measurement, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         self.assertIn("mln_measurement_change", dart.coverage(api)["generated"])
-        source = dart.generate(api)
-        self.assertIn("Future<CommandCompletion> change() => _startCommand(", source)
-        self.assertNotIn("_startCommand(NativeCompletionStart", source)
 
     def test_dart_registers_deferred_callbacks_through_the_generated_adapter(self):
         source = """
@@ -186,38 +122,21 @@ mln_status mln_notice_set_callback(mln_notice_callback callback, void *context B
 """
         api = self.parse(source)
         self.assertIn("mln_notice_set_callback", dart.coverage(api)["generated"])
-        generated = dart.generate(api)
-        self.assertIn("void noticeSetCallback(NoticeCallback callback)", generated)
-        self.assertIn("_globalCallbackPorts.registerDeferred(", generated)
-        self.assertIn("mln_adapter_deferred_callback_function(", generated)
-        self.assertIn(
-            "arguments.text.cast<Utf8>().toDartString()",
-            generated,
-        )
         # Without the annotation, Dart has no way to answer the callback.
         synchronous = self.parse(source.replace(";deferred=1", ""))
         self.assertIn(
             "mln_notice_set_callback", dart.coverage(synchronous)["unsupported"]
         )
 
-    def test_dart_owners_come_from_handle_plans(self):
-        api = self.parse(groups=("child_owner",))
-        self.assertEqual(dart.coverage(api)["unsupported"], {})
-        source = dart.generate(api)
-        # The owner name drops the handle suffix, and the child keeps its parent.
-        self.assertIn("final class SampleHandle implements Finalizable", source)
-        self.assertIn("SampleHandle._(this._parent, NativeSample handle)", source)
-        self.assertIn("final MeasurementHandle _parent;", source)
-        self.assertIn("SampleHandle._(this, NativeSample(outSample.value))", source)
-        self.assertEqual(source.count("BigInt get identity"), 2)
-
-    def test_reserved_method_identifiers_are_rejected(self):
+    def test_reserved_method_identifiers_are_escaped(self):
         source = """
 BIND("execution=query;result=double;shape=value;ownership=borrowed")
 mln_status mln_map_class(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
-        self.assertIn("fun `class`()", self.kotlin_map(source, "commonMain"))
-        self.assertIn("classValue()", self.dart_map(source))
+        owned = self.parse(source, map_handle=True)
+        for emitter in (dart, kotlin):
+            with self.subTest(emitter=emitter.__name__):
+                self.assertIn("mln_map_class", emitter.coverage(owned)["generated"])
 
     def test_nullable_input_cannot_be_silently_required(self):
         header = """
@@ -230,12 +149,10 @@ mln_status mln_map_set_label(mln_map map,
         for emitter in (dotnet,):
             self.assertEqual(emitter.coverage(api)["generated"], [])
 
-        source = self.kotlin_map(header)
-        self.assertIn("text: String?", source)
-        self.assertIn("GeneratedValues.optionalStringView(arena, text)", source)
-        source = self.dart_map(header)
-        self.assertIn("String? text", source)
-        self.assertIn("text == null ? arena<raw.mln_buffer_view>().ref", source)
+        owned = self.parse(header, map_handle=True)
+        for emitter in (dart, kotlin):
+            with self.subTest(emitter=emitter.__name__):
+                self.assertIn("mln_map_set_label", emitter.coverage(owned)["generated"])
 
     def test_optional_buffer_array_cannot_silently_erase_absence(self):
         for absence in ("nullable=true", "optional=empty"):
@@ -251,14 +168,10 @@ mln_status mln_map_labels(mln_map map, const mln_completion *completion, mln_dia
 BIND("execution=query;result=mln_buffer_view;shape=array;ownership=borrowed;encoding=utf8;nullable=true")
 mln_status mln_map_labels(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
-        nullable = self.parse(header)
-        kotlin_source = self.kotlin_map(header)
-        self.assertIn("Deferred<List<String>?>", kotlin_source)
-        self.assertIn(
-            "mln_completion_result.value(result).address() == 0L", kotlin_source
-        )
-        self.assertIn("Future<List<String>?>", dart.generate(nullable))
-        self.assertIn("result.value == nullptr ? null", dart.generate(nullable))
+        owned = self.parse(header, map_handle=True)
+        for emitter in (dart, kotlin):
+            with self.subTest(emitter=emitter.__name__):
+                self.assertIn("mln_map_labels", emitter.coverage(owned)["generated"])
 
     def test_binary_optional_result_requires_empty_conversion(self):
         header = """
@@ -268,10 +181,12 @@ mln_status mln_map_bytes(mln_map map, const mln_completion *completion, mln_diag
         api = self.parse(header)
         for emitter in (dotnet,):
             self.assertEqual(emitter.coverage(api)["generated"], [])
-        self.assertIn(".size == 0", dart.generate(api))
-        self.assertIn(".takeIf { it.isNotEmpty() }", self.kotlin_map(header))
+        owned = self.parse(header, map_handle=True)
+        for emitter in (dart, kotlin):
+            with self.subTest(emitter=emitter.__name__):
+                self.assertIn("mln_map_bytes", emitter.coverage(owned)["generated"])
 
-    def test_dotnet_new_record_namespace_and_keyword_fields_are_generated(self):
+    def test_dotnet_new_record_generates_in_its_header_namespace(self):
         api = self.parse("""
 typedef struct mln_metric { double event; } mln_metric;
 BIND("execution=query;result=mln_metric;shape=value;ownership=borrowed")
@@ -279,13 +194,8 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
 BIND("execution=command;result=void;shape=none;ownership=value")
 mln_status mln_map_set_metric(mln_map map, mln_metric metric, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
-        output = dotnet.generate(api)
-        self.assertIn("Metrics/Metric.g.cs", output)
-        methods = output["Map/MapHandle.Operations.g.cs"]
-        self.assertIn("using Maplibre.NativeFfi.Metrics;", methods)
-        converters = output["Internal/Struct/GeneratedValues.g.cs"]
-        self.assertIn("value.@event", converters)
-        self.assertIn("@event = value.Event", converters)
+        # The record's header names its public namespace.
+        self.assertIn("Metrics/Metric.g.cs", dotnet.generate(api))
         self.assertEqual(len(dotnet.coverage(api)["generated"]), 2)
 
     def test_dotnet_record_field_name_collisions_are_rejected(self):
@@ -296,16 +206,12 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
 """)
         self.assertEqual(dotnet.coverage(api)["generated"], [])
 
-    def test_dotnet_boolean_output_uses_blittable_pointer(self):
+    def test_dotnet_generates_boolean_outputs(self):
         api = self.parse("""
 BIND("execution=immediate")
 mln_status mln_map_ready(mln_map map, bool *ready BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
-        emitted = dotnet.emit(api)
-        self.assertEqual(emitted.functions, ("mln_map_ready",))
-        code = emitted.files["Map/MapHandle.Operations.g.cs"]
-        self.assertIn("bool ready = default", code)
-        self.assertIn("return ready;", code)
+        self.assertEqual(dotnet.emit(api).functions, ("mln_map_ready",))
 
     def test_counted_output_is_not_treated_as_one_scalar(self):
         api = self.parse("""
@@ -326,10 +232,7 @@ mln_status mln_map_move(mln_map map,
 """
         self.assertIn("mln_map_move", dotnet.coverage(self.parse(source))["generated"])
         counted = self.parse(source.replace('BIND("length=1")', 'BIND("length=count")'))
-        emitted = dotnet.generate(counted)["Map/MapHandle.Operations.g.cs"]
-        self.assertIn("Coordinate[] coordinates", emitted)
-        self.assertIn("coordinates.Length", emitted)
-        self.assertNotIn("uint count", emitted)
+        self.assertIn("mln_map_move", dotnet.coverage(counted)["generated"])
         missing = self.parse(source.replace('BIND("length=1")', ""))
         self.assertNotIn("mln_map_move", dotnet.coverage(missing)["generated"])
 

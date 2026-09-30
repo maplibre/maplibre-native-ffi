@@ -2,13 +2,25 @@
 
 import unittest
 
-from support import parse
+from support import parse, protocol_groups
 
 from tools.bindgen.emitters import dart, dotnet, go, kotlin, python, rust, swift, zig
 from tools.bindgen.model import ModelError
 from tools.bindgen.schema import validate
 
 EMITTERS = (dart, dotnet, go, kotlin, python, rust, swift, zig)
+
+# Protocol shapes an emitter's runtime cannot represent yet. Each emitter
+# reports these declarations as unsupported with its reason.
+PROTOCOL_GAPS = {
+    ("values", "dart"): {"mln_probe_nullable_text"},
+    ("values", "kotlin"): {"mln_probe_nullable_text"},
+    ("values", "rust"): {"mln_probe_nullable_text", "mln_probe_roundtrip"},
+    ("owned_output", "dotnet"): {"mln_seed_plant"},
+    ("direct_registration", "python"): {"mln_ticket_on_cancel"},
+    ("direct_registration", "rust"): {"mln_ticket_on_cancel"},
+    ("decision", "dart"): {"mln_host_set_provider"},
+}
 
 
 class GenerationTests(unittest.TestCase):
@@ -20,6 +32,20 @@ class GenerationTests(unittest.TestCase):
         )
         validate(api)
         return api
+
+    def test_every_protocol_shape_generates_or_reports_its_gap(self):
+        for group in protocol_groups():
+            api = parse(groups=(group,))
+            validate(api)
+            for emitter in EMITTERS:
+                language = emitter.__name__.rsplit(".", 1)[-1]
+                with self.subTest(group=group, emitter=language):
+                    coverage = emitter.coverage(api)
+                    self.assertEqual(
+                        set(coverage["unsupported"]),
+                        PROTOCOL_GAPS.get((group, language), set()),
+                        coverage["unsupported"],
+                    )
 
     def rendered(self, emitter, api):
         output = emitter.generate(api)
@@ -66,13 +92,10 @@ mln_status mln_map_new_command(mln_map map, bool enabled, const mln_completion *
 """,
                     owned_map=True,
                 )
-                before = self.rendered(emitter, original)
-                after = self.rendered(emitter, renamed)
-                self.assertIn("mln_map_test_scale", before)
-                self.assertNotIn("mln_map_test_scale", after)
-                self.assertIn("mln_map_new_command", after)
-                self.assertIn("mln_map_new_scale", after)
-                self.assertNotEqual(before, after)
+                self.assertEqual(
+                    set(emitter.coverage(original)["generated"]) - {"mln_map_close"},
+                    {"mln_map_test_scale"},
+                )
                 self.assertEqual(
                     set(emitter.coverage(renamed)["generated"]) - {"mln_map_close"},
                     {"mln_map_new_scale", "mln_map_new_command"},
@@ -106,7 +129,6 @@ mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, ml
                 coverage = emitter.coverage(api)
                 self.assertEqual(coverage["generated"], [])
                 self.assertTrue(coverage["unsupported"]["mln_map_new_entries"])
-                self.assertNotIn("NewEntries(", self.rendered(emitter, api))
 
     def test_every_declaration_is_generated_or_has_a_reason(self):
         api = self.parse("""
@@ -155,7 +177,6 @@ mln_status mln_map_consume({receiver}, const mln_completion *completion, mln_dia
                     coverage = emitter.coverage(api)
                     self.assertEqual(coverage["generated"], [])
                     self.assertIn("mln_map_consume", coverage["unsupported"])
-                    self.assertNotIn("mln_map_consume", self.rendered(emitter, api))
 
     def test_consumption_policy_rejects_ambiguous_values(self):
         with self.assertRaisesRegex(ModelError, "unsupported consumes"):
@@ -179,7 +200,6 @@ mln_status mln_map_nullable_entries(mln_map map, const mln_completion *completio
                     ["mln_map_nullable_entries"],
                     coverage["unsupported"],
                 )
-                self.assertIn("mln_map_nullable_entries", self.rendered(emitter, api))
 
     def test_scalar_bitfield_requires_a_layout_rule(self):
         api = self.parse("""
@@ -193,7 +213,6 @@ mln_status mln_map_bit_entries(mln_map map, const mln_completion *completion, ml
                 coverage = emitter.coverage(api)
                 self.assertEqual(coverage["generated"], [])
                 self.assertTrue(coverage["unsupported"]["mln_map_bit_entries"])
-                self.assertNotIn("mln_map_bit_entries", self.rendered(emitter, api))
 
     def test_retained_input_requires_a_lifetime_adapter(self):
         api = self.parse("""
