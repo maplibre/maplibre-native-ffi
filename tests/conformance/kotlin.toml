@@ -2,37 +2,48 @@
 #   "ID" = "path/to/test_file::test_name"
 # or to why it does not apply:
 #   "ID" = { na = "reason" }
+#
+# The commonTest files run on every emitter: FFM on the JVM, JavaCPP in the
+# Android device suite, and cinterop on Kotlin/Native. Cases whose code differs
+# per emitter name one test here and keep a copy per platform: the ABI check
+# (nativeTest MaplibreNativeTest), the unknown union arm (RuntimeEventJvmTest,
+# RuntimeEventNativeTest, RuntimeEventAndroidTest), and unreachable-request
+# reclamation (ResourceRequestHandleAndroidTest).
 
 [cases]
-"ERR-01" = { todo = true }
-"ERR-02" = { todo = true }
-"LIFE-01" = { todo = true }
-"LIFE-02" = { todo = true }
-"LIFE-03" = { todo = true }
-"LIFE-04" = { todo = true }
-"LIFE-05" = { todo = true }
-"COMP-01" = { todo = true }
-"COMP-02" = { todo = true }
-"COMP-03" = { todo = true }
-"COMP-04" = { todo = true }
-"COMP-05" = { todo = true }
-"CB-01" = { todo = true }
-"CB-02" = { todo = true }
-"CB-03" = { todo = true }
-"CB-04" = { todo = true }
-"CB-05" = { todo = true }
-"CB-06" = { todo = true }
-"CB-07" = { todo = true }
-"CB-08" = { todo = true }
-"VAL-01" = { todo = true }
-"VAL-02" = { todo = true }
-"VAL-03" = { todo = true }
-"VAL-04" = { todo = true }
-"VAL-05" = { todo = true }
-"VIEW-01" = { todo = true }
-"REND-01" = { todo = true }
-"REND-02" = { todo = true }
-"PLAT-01" = { todo = true }
-"PLAT-02" = { todo = true }
-"PLAT-03" = { todo = true }
-"EX-01" = { todo = true }
+"ERR-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/error/StatusMappingTest.kt::everyStatusMapsToItsExceptionAndAnUnknownCodeSurvives"
+"ERR-02" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/loader/NativeAccessTest.kt::abiVersionMismatchReportsActualAndExpectedVersions"
+"LIFE-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::closingAHandleTwiceIsSafeAndLaterUseIsRefused"
+"LIFE-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds"
+"LIFE-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/internal/lifecycle/DecisionOwnerCoreTest.kt::aCloseOnAnotherThreadWaitsOutACompletionInProgress"
+"LIFE-04" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/lifecycle/HandleLeakCleanerTest.kt::anUnreachableHandleReportsItsLeak"
+"LIFE-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::aMapKeepsItsRuntimeReachable"
+"COMP-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/internal/async/OwnedCompletionTest.kt::conversionFailureReleasesTheRawOwnerAndCompletesExceptionally"
+"COMP-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/completion/CompletionTest.kt::aSubmissionNativeRejectsLeavesNoCompletionBehind"
+"COMP-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::droppingAMapCreationRetiresTheMapItCreates"
+"COMP-04" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/completion/CompletionTest.kt::aFailedCommandArrivesAsDataRatherThanAnException"
+"COMP-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/completion/CompletionTest.kt::waitingOnACompletionTimesOutOrIsCancelledWithoutEndingIt"
+"CB-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aCancelCallbackIsRootedUntilNativeReleasesIt"
+"CB-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/CallbackLifetimeTest.kt::aCallbackCapturingItsReceiverDoesNotKeepItReachable"
+"CB-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aForbiddenCallInsideACallbackFailsAndAnAllowedOneSucceeds"
+"CB-04" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aProviderThatThrowsFailsItsRequestAndLeavesTheRuntimeWorking"
+"CB-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aClaimedRequestCanBeAnsweredAfterTheProviderReturns"
+"CB-06" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aTransformResponseRefusesUseAfterItsCallbackAndFromAnotherThread"
+"CB-07" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/LogCallbackTest.kt::replacingTheLogCallbackReleasesThePreviousRegistration"
+"CB-08" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aCancelRegistrationNativeDoesNotStoreIsNotRooted"
+"VAL-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::terminatedStringsRejectAnEmbeddedNulAndExplicitLengthsKeepIt"
+"VAL-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::presenceFieldsRoundTripSetAndAbsentValues"
+"VAL-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::aStridedImageCopiesItsRowsAndReadsBackUnpadded"
+"VAL-04" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::openEnumsKeepUnknownValuesAnd64BitCarriersKeepTheirHighBits"
+"VAL-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::arrayInputsAreCopiedAtSubmission"
+"VIEW-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aBorrowedFrameViewExpiresWithItsBlockAndHoldsOffItsRelease"
+"REND-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::anOwnedTextureFrameReadsBackAsPixels"
+"REND-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aCallerDrivenSessionStaysOnTheGraphicsThreadItWasServicedFrom"
+"PLAT-01" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/loader/NativeLibraryTest.kt::theLibraryLoadsFromTheConfiguredPath"
+"PLAT-02" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/log/LogProcessExitTest.kt::jvmExitsWithNativeLogCallbackInstalled"
+"PLAT-03" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/resource/ResourceRequestHandleJvmTest.kt::anUnreachableRequestIsReleasedNatively"
+# Each example has a smoke task that renders one frame of an inline style and
+# exits: //examples/lwjgl-map:smoke and //examples/compose-map:smoke on desktop
+# presets, and //examples/android-map:smoke, which installs the app on the
+# Android emulator and waits for its first rendered frame (MainActivity).
+"EX-01" = "examples/lwjgl-map/src/main/kotlin/org/maplibre/nativeffi/examples/lwjglmap/Shell.kt::smoke: rendered a frame"

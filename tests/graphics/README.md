@@ -94,14 +94,13 @@ then, that binding keeps its own fixture.
 | C              | In use  | Links `mln_test_graphics_objects` in CMake.                                                                                                                |
 | Go             | In use  | `#cgo pkg-config: mln-test-graphics` in `internal/testsupport`, with `PKG_CONFIG_PATH` at the install's `share/pkgconfig`.                                 |
 | Swift          | In use  | The `GraphicsSupport` SwiftPM target, which compiles `graphics.c` from this directory.                                                                     |
-| Kotlin/Native  | In use  | A cinterop definition over `mln_test_graphics.h`, linking `graphics.c` compiled by Gradle.                                                                 |
+| Kotlin/Native  | In use  | A cinterop definition over `mln_test_graphics.h` for every native target, linking `graphics.c` that Gradle compiles for the target.                        |
 | Kotlin/Android | In use  | A JNI shim compiled with `graphics.c` by the NDK, loaded with `System.loadLibrary`.                                                                        |
 | Rust           | In use  | `libloading` in `tests/suite/support/graphics.rs`, from the install directory that `build.rs` records, or by name beside the tests a device runner pushes. |
 | Zig            | In use  | `build.zig` translates `mln_test_graphics.h` and links the installed `mln_test_graphics`.                                                                  |
 | Python         | In use  | `tests/graphics.py` opens the library with `ctypes.CDLL` from the install's `lib` or `bin`, with a `ctypes.Structure` for the context.                     |
 | .NET           | Planned | `[LibraryImport("mln_test_graphics")]`, resolved through the same `NativeLibrary` import resolver as the C API.                                            |
 | Dart           | Planned | `DynamicLibrary.open` on the library path, with `Struct` classes for the info structs.                                                                     |
-| Kotlin/JVM     | Planned | FFM `SymbolLookup.libraryLookup` on the library path.                                                                                                      |
 
 A binding that runs its tests on a device, such as through the Android or
 OpenHarmony emulator runners, pushes the library beside its test executables, as
