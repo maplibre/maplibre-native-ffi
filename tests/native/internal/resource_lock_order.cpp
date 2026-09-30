@@ -25,9 +25,14 @@ namespace {
 using mln::native_tests::SyncPoint;
 using mln::native_tests::SyncPointScope;
 
-// The styles these cases download never reach a network: a provider answers
+// The styles these cases request never reach a network: a provider answers
 // them with an error, or a transform keeps the custom scheme, which the HTTP
 // stack rejects without a connection.
+//
+// A map's style request reaches a file source thread wherever a live map may
+// overlap the callback. The teardown cases download the style for an offline
+// region instead: a runtime releases only once its maps are released, and a
+// download requests the style with no map, so teardown can overlap it.
 constexpr auto offline_style_url = "custom://offline-style.json";
 constexpr auto lookup_blocking_style_url = "custom://lookup-blocking.json";
 constexpr auto lookup_probe_style_url = "custom://lookup-probe.json";
@@ -212,16 +217,18 @@ void resource_transform_lookup_leaves_other_runtimes_responsive() {
     MLN_STATUS_OK, mln::native_tests::set_resource_transform(runtime, transform)
   );
 
-  // The first download parks a transform callback inside the shared lock.
-  TEST_ASSERT_TRUE(
-    mln::native_tests::start_offline_download(
-      runtime, lookup_blocking_style_url
-    )
+  // The first map's style request parks a transform callback inside the
+  // shared lock.
+  auto blocking_map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_map_set_style_url(blocking_map, lookup_blocking_style_url)
   );
   TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &transform_probe.entered));
-  // The second parks a file source thread one step ahead of the lookup.
-  TEST_ASSERT_TRUE(
-    mln::native_tests::start_offline_download(runtime, lookup_probe_style_url)
+  // The second map's parks a file source thread one step ahead of the lookup.
+  auto probe_map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_set_style_url(probe_map, lookup_probe_style_url)
   );
   TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &provider_probe.entered));
 
@@ -244,6 +251,8 @@ void resource_transform_lookup_leaves_other_runtimes_responsive() {
     "a call on an unrelated runtime stalled behind a transform lookup"
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, other.status.load());
+  mln_test_destroy_map(probe_map);
+  mln_test_destroy_map(blocking_map);
   mln_test_destroy_runtime(runtime);
 }
 
@@ -305,8 +314,9 @@ void clearing_resource_provider_waits_for_in_flight_callback() {
   auto runtime = mln_test_create_runtime();
   auto probe = ParkedProvider{.sync_points = &sync_points};
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, install_parked_provider(runtime, probe));
-  TEST_ASSERT_TRUE(
-    mln::native_tests::start_offline_download(runtime, offline_style_url)
+  auto map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_set_style_url(map, offline_style_url)
   );
   TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.entered));
 
@@ -322,6 +332,7 @@ void clearing_resource_provider_waits_for_in_flight_callback() {
     probe.callback_returned.load(),
     "the clear completed while a provider callback was still running"
   );
+  mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 

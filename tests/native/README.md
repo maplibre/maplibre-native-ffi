@@ -97,9 +97,12 @@ that installs only an archive, such as Emscripten, the check compares the
 archive's `mln_` C names alone. The seams have C++ names outside that set, so
 the seam check covers shared libraries only.
 
-The resource cases start an offline download of a `custom://` style to make the
-library call a provider or transform. The download needs no map and no network.
-The sync points then order the callback against the thread that it races.
+The resource cases set a `custom://` style URL on a map to make the library call
+a provider or transform on a file source thread, with no network. The cases in
+which runtime teardown races the callback start an offline download of that
+style instead: a runtime releases only once its maps are released, and a
+download requests the style with no map. The sync points then order the callback
+against the thread that it races.
 
 The suite's replacement `operator new` covers the static library's own
 allocations, and throws only on a thread inside an `AllocationFaults` scope.
