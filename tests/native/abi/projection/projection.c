@@ -169,6 +169,17 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
   );
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 20.0, round_trip.latitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 40.0, round_trip.longitude);
+  // A coordinate off the globe is refused and leaves the output untouched.
+  mln_screen_point untouched = center_pixel;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_pixel_for_lat_lng(
+      projection, (mln_lat_lng){.latitude = NAN, .longitude = 40.0}, &untouched,
+      NULL
+    )
+  );
+  TEST_ASSERT_EQUAL_DOUBLE(center_pixel.x, untouched.x);
+  TEST_ASSERT_EQUAL_DOUBLE(center_pixel.y, untouched.y);
 
   const mln_lat_lng origin = {.latitude = 0.0, .longitude = 0.0};
   mln_screen_point origin_before_fit = {0};

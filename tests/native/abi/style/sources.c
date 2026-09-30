@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "support/harness.h"
+#include "support/resources.h"
 #include "support/style.h"
 #include "support/test_support.h"
 #include "unity.h"
@@ -116,6 +117,17 @@ static void small_tiles(mln_style_tile_source_options* options) {
   options->fields |= MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
   options->tile_size = 256;
 }
+// A URL source takes its zoom range and encoding from the options, since its
+// TileJSON has not loaded when the source is added.
+static void url_zoom_and_mlt(mln_style_tile_source_options* options) {
+  options->fields |= MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM |
+                     MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM |
+                     MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
+  options->min_zoom = 2.0;
+  options->max_zoom = 12.0;
+  options->scheme = MLN_STYLE_TILE_SCHEME_XYZ;
+  mlt_encoding(options);
+}
 static void terrarium_encoding(mln_style_tile_source_options* options) {
   options->fields |= MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
   options->raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM;
@@ -152,6 +164,8 @@ static void tile_sources_report_their_effective_options(void) {
   mlt_encoding(&mlt);
   mln_style_tile_source_options terrarium = defaults;
   terrarium_encoding(&terrarium);
+  mln_style_tile_source_options url_mlt = defaults;
+  url_zoom_and_mlt(&url_mlt);
 
   const uint32_t tilejson =
     MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_TILE_SIZE;
@@ -188,6 +202,11 @@ static void tile_sources_report_their_effective_options(void) {
      MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_TILE_SIZE |
        MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING,
      MLN_STYLE_SOURCE_INFO_TILEJSON, defaults},
+    {"vector URL, zoom range and MLT", TILE_SOURCE_VECTOR, true,
+     url_zoom_and_mlt, MLN_STYLE_SOURCE_TYPE_VECTOR,
+     MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_TILE_SIZE |
+       MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING,
+     MLN_STYLE_SOURCE_INFO_TILEJSON, url_mlt},
     {"raster URL, 256 px", TILE_SOURCE_RASTER, true, small_tiles,
      MLN_STYLE_SOURCE_TYPE_RASTER,
      MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_TILE_SIZE,
@@ -854,6 +873,54 @@ static void image_sources_hold_corners_and_pixels(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// An image source asks the provider for its URL as an image, and a source
+// that does not exist has no coordinates to report.
+static void an_image_source_requests_an_image_and_a_missing_one_has_no_corners(
+  void
+) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_provider* provider = mln_test_provider_create(NULL, 0);
+  mln_test_provider_install(runtime, provider);
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  const mln_lat_lng corners[4] = {
+    {.latitude = 1.0, .longitude = 2.0},
+    {.latitude = 1.0, .longitude = 3.0},
+    {.latitude = 0.0, .longitude = 3.0},
+    {.latitude = 0.0, .longitude = 2.0},
+  };
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_add_image_source_url(
+      map, MLN_BUFFER_LITERAL("remote-image"), corners, 4,
+      MLN_BUFFER_LITERAL("fixture://image.png"), &completion.descriptor, NULL
+    )
+  );
+  TEST_ASSERT_TRUE(
+    mln_test_provider_wait_for_requests(provider, "fixture://image.png", 1)
+  );
+  const mln_test_provider_request* request =
+    mln_test_provider_request_at(provider, "fixture://image.png", 0);
+  TEST_ASSERT_NOT_NULL(request);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_IMAGE, request->kind);
+
+  mln_test_completion completion =
+    mln_test_completion_default(4 * sizeof(mln_lat_lng));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_image_source_coordinates(
+      map, MLN_BUFFER_LITERAL("missing"), &completion.descriptor, NULL
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&completion));
+  mln_test_completion_destroy(&completion);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+  mln_test_provider_destroy(provider);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(tile_sources_report_their_effective_options);
   RUN_TEST(tile_source_options_are_validated_at_submission);
@@ -863,4 +930,5 @@ MLN_TEST_GROUP {
   RUN_TEST(style_source_volatility_round_trips);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
   RUN_TEST(image_sources_hold_corners_and_pixels);
+  RUN_TEST(an_image_source_requests_an_image_and_a_missing_one_has_no_corners);
 }

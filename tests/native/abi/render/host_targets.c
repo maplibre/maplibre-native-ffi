@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "support/harness.h"
 #include "support/host_graphics.h"
@@ -99,11 +100,73 @@ static void a_surface_presents_the_rendered_frame(void) {
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
+
+// Reads back the fixture's texture, and returns the status of the submission
+// when it is refused or of the completion when it is accepted.
+static mln_status read_back(const mln_test_render_fixture* fixture) {
+  mln_test_completion readback = mln_test_completion_readback();
+  const mln_status submitted = mln_texture_read_premultiplied_rgba8(
+    fixture->session, &readback.descriptor, NULL
+  );
+  if (submitted != MLN_STATUS_OK) {
+    mln_test_completion_reject(&readback);
+    mln_test_completion_destroy(&readback);
+    return submitted;
+  }
+  const mln_status status =
+    mln_test_render_fixture_finish_operation(fixture, &readback);
+  mln_test_completion_destroy(&readback);
+  return status;
+}
+
+// Only a session-owned texture ring reads back, and a borrowed texture takes
+// its size from its owner, so the session refuses a resize for it.
+static void host_targets_refuse_readback_and_a_borrowed_texture_resize(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(
+    mln_test_render_fixture_create_borrowed_texture(map, &fixture)
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_red_frame(runtime, map, &fixture, 0)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
+  const mln_render_target_extent smaller = {
+    .size = sizeof(mln_render_target_extent),
+    .width = MLN_TEST_HOST_TARGET_SIZE / 2,
+    .height = MLN_TEST_HOST_TARGET_SIZE / 2,
+    .scale_factor = 1.0,
+  };
+  mln_test_completion resize = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
+    mln_render_session_resize(
+      fixture.session, &smaller, &resize.descriptor, MLN_TEST_DIAGNOSTIC
+    )
+  );
+  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "sized by its owner"));
+  mln_test_completion_reject(&resize);
+  mln_test_completion_destroy(&resize);
+  mln_test_render_fixture_destroy(&fixture);
+
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create_surface(map, &fixture));
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED,
+    render_red_frame(runtime, map, &fixture, MLN_FRAME_DEMAND_PRESENT)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
+  mln_test_render_fixture_destroy(&fixture);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
 #endif
 
 MLN_TEST_GROUP {
 #if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_borrowed_texture_holds_the_rendered_frame);
   RUN_TEST(a_surface_presents_the_rendered_frame);
+  RUN_TEST(host_targets_refuse_readback_and_a_borrowed_texture_resize);
 #endif
 }

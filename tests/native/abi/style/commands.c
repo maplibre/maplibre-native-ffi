@@ -374,6 +374,92 @@ static void global_state_checks_views_and_completion(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Reads the style's global state as JSON.
+static void read_global_state(mln_map map, char* out, size_t capacity) {
+  mln_test_completion completion = mln_test_completion_buffer_view();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_global_state(map, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_style_finish_text(&completion, out, capacity, NULL)
+  );
+}
+
+// The global state starts from the style's defaults, a set replaces one
+// property, a value that is not JSON fails the command, and a new style
+// resets the state to its own defaults.
+static void global_state_starts_from_style_defaults_and_takes_sets(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  static const char stateful_style[] =
+    "{\"version\":8,\"state\":{\"theme\":{\"default\":\"light\"}},"
+    "\"sources\":{},\"layers\":[]}";
+  mln_test_load_style_and_wait(
+    runtime, map, MLN_BUFFER_LITERAL(stateful_style)
+  );
+  char state[128];
+  read_global_state(map, state, sizeof(state));
+  TEST_ASSERT_EQUAL_STRING("{\"theme\":\"light\"}", state);
+
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_set_global_state_property(
+      map, MLN_BUFFER_LITERAL("theme"), MLN_BUFFER_LITERAL("\"dark\""),
+      &completion.descriptor, NULL
+    )
+  );
+  read_global_state(map, state, sizeof(state));
+  TEST_ASSERT_EQUAL_STRING("{\"theme\":\"dark\"}", state);
+
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "",
+    mln_map_set_global_state_property(
+      map, MLN_BUFFER_LITERAL("theme"), MLN_BUFFER_LITERAL("{not json"),
+      &completion.descriptor, NULL
+    )
+  );
+  read_global_state(map, state, sizeof(state));
+  TEST_ASSERT_EQUAL_STRING("{\"theme\":\"dark\"}", state);
+
+  mln_test_load_style_and_wait(
+    runtime, map, MLN_BUFFER_LITERAL(stateful_style)
+  );
+  read_global_state(map, state, sizeof(state));
+  TEST_ASSERT_EQUAL_STRING("{\"theme\":\"light\"}", state);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// The loaded style reads back as the document the map loaded, which later
+// edits to the style do not rewrite.
+static void the_loaded_style_reads_back_as_the_loaded_document(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  static const char named_style[] =
+    "{\"version\":8,\"name\":\"loaded\",\"sources\":{},\"layers\":[]}";
+  mln_test_load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(named_style));
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK, mln_map_add_style_source_json(
+                     map, MLN_BUFFER_LITERAL("added"),
+                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
+                     &completion.descriptor, NULL
+                   )
+  );
+  mln_test_completion completion = mln_test_completion_buffer_view();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_loaded_style_json(map, &completion.descriptor, NULL)
+  );
+  char json[512];
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_style_finish_text(&completion, json, sizeof(json), NULL)
+  );
+  TEST_ASSERT_EQUAL_STRING(named_style, json);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // Reads the style's transition configuration back through the ordered query.
 static mln_style_transition_options read_transition_options(mln_map map) {
   mln_test_completion completion =
@@ -434,10 +520,12 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   mln_map map = mln_test_create_map(runtime);
 
   mln_style_transition_options applied = mln_style_transition_options_default();
-  applied.fields =
-    MLN_STYLE_TRANSITION_OPTION_DURATION | MLN_STYLE_TRANSITION_OPTION_DELAY;
+  applied.fields = MLN_STYLE_TRANSITION_OPTION_DURATION |
+                   MLN_STYLE_TRANSITION_OPTION_DELAY |
+                   MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
   applied.duration_ms = 250.0;
   applied.delay_ms = 75.0;
+  applied.enable_placement_transitions = false;
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_set_style_transition_options(
                      map, &applied, &completion.descriptor, NULL
@@ -446,6 +534,7 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   mln_style_transition_options read = read_transition_options(map);
   TEST_ASSERT_EQUAL_DOUBLE(250.0, read.duration_ms);
   TEST_ASSERT_EQUAL_DOUBLE(75.0, read.delay_ms);
+  TEST_ASSERT_FALSE(read.enable_placement_transitions);
 
   // A null or undersized struct never reaches the map worker.
   mln_completion discard = mln_test_discard_completion();
@@ -577,6 +666,8 @@ MLN_TEST_GROUP {
   RUN_TEST(remove_commands_commit_and_report_missing_ids);
   RUN_TEST(missing_style_ids_report_not_found);
   RUN_TEST(global_state_checks_views_and_completion);
+  RUN_TEST(global_state_starts_from_style_defaults_and_takes_sets);
+  RUN_TEST(the_loaded_style_reads_back_as_the_loaded_document);
   RUN_TEST(a_loaded_style_reports_the_300_ms_transition_default);
   RUN_TEST(style_transition_options_reject_unsafe_raw_input);
   RUN_TEST(the_style_light_round_trips_through_json);
