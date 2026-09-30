@@ -13,27 +13,6 @@ let testDependencies: [Target.Dependency] = [
   "GraphicsSupport",
 ]
 
-let testSourceFiles = [
-  "MaplibreNativeFFITests/CameraAdvancedTests.swift",
-  "MaplibreNativeFFITests/HandleIdentityTests.swift",
-  "MaplibreNativeFFITests/LoggingTests.swift",
-  "MaplibreNativeFFITests/MapHandleTests.swift",
-  "MaplibreNativeFFITests/MaplibreTests.swift",
-  "MaplibreNativeFFITests/NativeHandleLeakTestSupport.swift",
-  "MaplibreNativeFFITests/OfflineTests.swift",
-  "MaplibreNativeFFITests/OwnedTextureFixture.swift",
-  "MaplibreNativeFFITests/ProjectionTests.swift",
-  "MaplibreNativeFFITests/QueryTests.swift",
-  "MaplibreNativeFFITests/RenderTests.swift",
-  "MaplibreNativeFFITests/RuntimeEventTestSupport.swift",
-  "MaplibreNativeFFITests/RuntimeEventTests.swift",
-  "MaplibreNativeFFITests/RuntimeTests.swift",
-  "MaplibreNativeFFITests/StyleTests.swift",
-  "MaplibreNativeFFITests/SupportHelperTests.swift",
-  "MaplibreNativeFFITests/SyntheticHandles.swift",
-  "MaplibreNativeFFITests/ValueTests.swift",
-]
-
 let products: [Product] = [
   .library(name: "MaplibreNativeFFI", targets: ["MaplibreNativeFFI"]),
   .executable(
@@ -81,12 +60,7 @@ let targets: [Target] = [
   .target(
     name: "MaplibreNativeFFITestCases",
     dependencies: testDependencies,
-    path: "bindings/swift/Tests",
-    exclude: [
-      "MaplibreNativeFFIIOSSimulatorTests",
-      "MaplibreNativeFFITestsHost",
-    ],
-    sources: testSourceFiles
+    path: "bindings/swift/Tests/MaplibreNativeFFITests"
   ),
   .testTarget(
     name: "MaplibreNativeFFITests",

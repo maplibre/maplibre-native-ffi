@@ -1,0 +1,155 @@
+import CMaplibreNativeC
+import Foundation
+@testable import MaplibreNativeFFI
+import Testing
+
+/// A completion descriptor that a fake native call kept, so a test delivers
+/// its result and releases its user data by hand, as native would.
+private final class HeldCompletion: @unchecked Sendable {
+  private var descriptor: mln_completion?
+
+  func keep(_ completion: UnsafePointer<mln_completion>) {
+    descriptor = completion.pointee
+  }
+
+  func deliver(status: mln_status = MLN_STATUS_OK, value: Int32 = 0) {
+    guard let descriptor else {
+      Issue.record("the fake call kept no completion")
+      return
+    }
+    withUnsafePointer(to: value) { value in
+      var result = mln_completion_result()
+      result.size = UInt32(MemoryLayout<mln_completion_result>.size)
+      result.status = status
+      result.value = UnsafeRawPointer(value)
+      result.value_count = 1
+      descriptor.callback?(descriptor.user_data, &result)
+    }
+  }
+
+  func release() {
+    guard let descriptor else { return }
+    self.descriptor = nil
+    descriptor.release_user_data?(descriptor.user_data)
+  }
+}
+
+private struct ConversionFailure: Error {}
+
+/// A completion delivers its value to the one waiter exactly once, and when
+/// the conversion of a delivered value fails, the waiter gets the conversion's
+/// error and the bridge state, with everything the converter holds, is freed
+/// once native releases it.
+@Test func aCompletionDeliversOnceAndAFailedConversionIsDisposed() async throws {
+  let held = HeldCompletion()
+  let converted = LockedBox(0)
+  let delivered = try NativeCompletion.start({ completion, _ in
+    held.keep(completion)
+    return MLN_STATUS_OK
+  }) { result in
+    converted.update { $0 += 1 }
+    return try NativeCompletion.value(result, as: Int32.self)
+  }
+  held.deliver(value: 42)
+  held.release()
+  #expect(try await delivered.value() == 42)
+  #expect(converted.value == 1)
+
+  let failingHeld = HeldCompletion()
+  let releases = LockedBox(0)
+  let failing = try NativeCompletion.start({ completion, _ in
+    failingHeld.keep(completion)
+    return MLN_STATUS_OK
+  }) { [sentinel = ReleaseProbe(releases)] _ -> Int32 in
+    withExtendedLifetime(sentinel) {}
+    throw ConversionFailure()
+  }
+  failingHeld.deliver()
+  failingHeld.release()
+  await #expect(throws: ConversionFailure.self) { try await failing.value() }
+  // The future is the last reference to the state and the converter.
+  _ = consume failing
+  await awaitCondition("the failed conversion's state to be freed") {
+    releases.value == 1
+  }
+}
+
+/// A submission native rejects throws its status, and the bridge state it
+/// never handed over, with the converter's captures, is freed before the
+/// throw reaches the caller.
+@Test func aRejectedSubmissionFreesItsCompletionState() throws {
+  let releases = LockedBox(0)
+  #expect(throws: NativeStatusFailure.self) {
+    try NativeCompletion.start({ _, _ in MLN_STATUS_INVALID_ARGUMENT }) {
+      [sentinel = ReleaseProbe(releases)] _ in
+      withExtendedLifetime(sentinel) {}
+    }
+  }
+  #expect(releases.value == 1)
+}
+
+/// Cancelling a task that awaits a map creation abandons the creation: the
+/// map native creates anyway is disposed with the bridge state, so the runtime
+/// is left with no child and closes.
+@Test func cancellingACreationWaitRetiresTheCreatedMap() async throws {
+  let runtime = try MapFixture.makeRuntime()
+  let creation = Task {
+    try await runtime.mapCreate(options: MapOptions(
+      initialExtent: LogicalExtent(width: 8, height: 8, scaleFactor: 1)
+    ))
+  }
+  creation.cancel()
+  // A creation that finished before the cancellation reached it returns its
+  // map, which this test drops at once.
+  _ = try? await creation.value
+
+  var teardown: NativeFuture<Void>?
+  try await awaitCondition("the abandoned map to retire") {
+    do {
+      teardown = try runtime.startClose()
+      return true
+    } catch let error as MaplibreError where error.kind == .invalidState {
+      return false
+    }
+  }
+  try await teardown?.value()
+  #expect(runtime.isClosed)
+}
+
+/// A command that native accepts and then fails reports the failure as its
+/// completion's disposition, status, and diagnostic, instead of throwing.
+@Test func aFailedCommandDispositionArrivesAsData() async throws {
+  try await withMapFixture { fixture in
+    try await fixture.map.setStyleJson(json: emptyStyle)
+    let removal = try await fixture.map.removeStyleSource(sourceId: "missing")
+    #expect(removal.disposition == .failed)
+    #expect(removal.rawStatus == MLN_STATUS_NOT_FOUND.rawValue)
+    #expect(!removal.diagnostic.isEmpty)
+  }
+}
+
+/// Cancelling the task that awaits a completion ends the wait with
+/// `CancellationError`, and a result native delivers afterwards is disposed
+/// with the bridge state.
+@Test func cancellingAWaitEndsItAndDisposesTheLateResult() async throws {
+  let held = HeldCompletion()
+  let releases = LockedBox(0)
+  let future = try NativeCompletion.start({ completion, _ in
+    held.keep(completion)
+    return MLN_STATUS_OK
+  }) { [sentinel = ReleaseProbe(releases)] result in
+    withExtendedLifetime(sentinel) {}
+    return try NativeCompletion.value(result, as: Int32.self)
+  }
+  let waiting = Task { try await future.value() }
+  waiting.cancel()
+  await #expect(throws: CancellationError.self) { try await waiting.value }
+
+  held.deliver(value: 7)
+  held.release()
+  _ = consume future
+  _ = consume waiting
+  await awaitCondition("the late result's state to be freed") {
+    releases.value == 1
+  }
+}

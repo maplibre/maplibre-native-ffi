@@ -86,14 +86,6 @@ final class OwnedTextureFixture {
   }
 }
 
-struct FixtureError: Error, CustomStringConvertible {
-  let description: String
-
-  init(_ description: String) {
-    self.description = description
-  }
-}
-
 /// EGL display initialization is shared by a driver process.
 @Suite(.serialized)
 struct OwnedTextureTests {}
