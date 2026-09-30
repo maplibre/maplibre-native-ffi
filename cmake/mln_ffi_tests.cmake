@@ -304,8 +304,20 @@ function(mln_ffi_add_native_tests)
     CONTENT "${registry}")
 
   set(support_dir "${MLN_NATIVE_TESTS_DIR}/support")
-  set(support_sources "${support_dir}/harness.c" "${support_dir}/watchdog.cpp"
-      "${support_dir}/test_support.c" "${support_dir}/test_support.cpp")
+  # The render fixture's context comes from the file for this preset's backend.
+  if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+    set(render_backend_file "render_${MLN_FFI_OPENGL_CONTEXT_PROVIDER}.c")
+  else()
+    set(render_backend_file "render_${MLN_FFI_RENDER_BACKEND}.c")
+  endif()
+  set(support_sources
+      "${support_dir}/harness.c"
+      "${support_dir}/watchdog.cpp"
+      "${support_dir}/wait.cpp"
+      "${support_dir}/env.c"
+      "${support_dir}/render.c"
+      "${support_dir}/${render_backend_file}"
+      "${support_dir}/hooks.cpp")
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
     list(APPEND support_sources "${support_dir}/metal_retarget.mm")
     set_source_files_properties(

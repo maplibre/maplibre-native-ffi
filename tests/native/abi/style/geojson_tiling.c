@@ -93,12 +93,50 @@ typedef struct tiling_render_probe {
 // valid state; the test fails its assertion instead of dangling.
 static tiling_render_probe probe;
 
+typedef struct settle_state {
+  const mln_test_render_fixture* fixture;
+  mln_status status;
+} settle_state;
+
+// Holds once the demand in flight has produced its result, or the test asked
+// the thread to stop.
+static bool demand_settled(void* context) {
+  settle_state* settle = context;
+  if (atomic_load(&probe.stop)) {
+    return true;
+  }
+  mln_render_session_snapshot snapshot = {
+    .size = sizeof(mln_render_session_snapshot)
+  };
+  settle->status =
+    mln_render_session_get_snapshot(settle->fixture->session, &snapshot, NULL);
+  if (settle->status != MLN_STATUS_OK) {
+    return true;
+  }
+  if (snapshot.pending_demand_count != 0) {
+    return false;
+  }
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  const mln_status drain_status = mln_render_session_drain_frame_results(
+    settle->fixture->session, &batch, NULL
+  );
+  if (drain_status == MLN_STATUS_OK) {
+    mln_render_frame_batch_release(batch);
+    return true;
+  }
+  if (drain_status != MLN_STATUS_NOT_READY) {
+    settle->status = drain_status;
+    return true;
+  }
+  return false;
+}
+
 static void render_until_stopped(void* argument) {
   (void)argument;
   mln_test_render_fixture fixture = {0};
   probe.attached = mln_test_render_fixture_create(probe.map, &fixture);
   if (!probe.attached) {
-    atomic_store(&probe.finished, true);
+    mln_test_flag_set(&probe.finished);
     return;
   }
 
@@ -112,41 +150,14 @@ static void render_until_stopped(void* argument) {
     demand.flags = 0;
     mln_status status =
       mln_render_session_request_frame(fixture.session, &demand, NULL);
-    if (status != MLN_STATUS_OK) {
-      probe.render_status = status;
-      break;
-    }
-    bool settled = false;
-    while (!settled && status == MLN_STATUS_OK && !atomic_load(&probe.stop)) {
-      if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
-        size_t serviced = 0;
-        status = mln_render_session_service_driver_work(
-          fixture.session, SIZE_MAX, &serviced, NULL
-        );
-        if (status != MLN_STATUS_OK) {
-          break;
-        }
-      }
-      mln_render_session_snapshot snapshot = {
-        .size = sizeof(mln_render_session_snapshot)
-      };
-      status =
-        mln_render_session_get_snapshot(fixture.session, &snapshot, NULL);
-      if (status != MLN_STATUS_OK) {
-        break;
-      }
-      if (snapshot.pending_demand_count != 0) {
-        mln_test_sleep_millisecond();
-        continue;
-      }
-      mln_render_frame_batch batch = MLN_HANDLE_NULL;
-      const mln_status drain_status =
-        mln_render_session_drain_frame_results(fixture.session, &batch, NULL);
-      if (drain_status == MLN_STATUS_OK) {
-        mln_render_frame_batch_release(batch);
-        settled = true;
-      } else if (drain_status != MLN_STATUS_NOT_READY) {
-        status = drain_status;
+    if (status == MLN_STATUS_OK) {
+      settle_state settle = {.fixture = &fixture, .status = MLN_STATUS_OK};
+      status = mln_test_render_step_until(
+        &fixture, demand_settled, &settle, mln_test_deadline_default(),
+        "a frame result"
+      );
+      if (status == MLN_STATUS_OK) {
+        status = settle.status;
       }
     }
     if (status != MLN_STATUS_OK) {
@@ -156,7 +167,7 @@ static void render_until_stopped(void* argument) {
   }
 
   mln_test_render_fixture_destroy(&fixture);
-  atomic_store(&probe.finished, true);
+  mln_test_flag_set(&probe.finished);
 }
 
 // Default options tile asynchronously, so every replacement schedules slice
@@ -254,15 +265,12 @@ static void replacing_data_during_async_tiling_survives(void) {
   }
   free(json);
 
-  atomic_store(&probe.stop, true);
-  // One wait budget is enough on a hardware backend, but a software-rendered
-  // CI runner can take far longer to wind the render thread down, so wait on
-  // a deadline instead.
-  const uint64_t deadline = mln_test_monotonic_milliseconds() + 30000;
-  bool finished = false;
-  while (!(finished = mln_test_wait_until(runtime, &probe.finished)) &&
-         mln_test_monotonic_milliseconds() < deadline) {
-  }
+  mln_test_flag_set(&probe.stop);
+  // A software-rendered runner can take far longer than one default wait to
+  // wind the render thread down, so this wait gets a longer deadline.
+  const bool finished = mln_test_wait_until_deadline(
+    runtime, &probe.finished, mln_test_deadline_after(30000)
+  );
   // Join only a finished thread; a wedged one fails an assertion below
   // rather than hanging the suite, and the static probe stays valid for it.
   if (finished) {
@@ -279,6 +287,4 @@ static void replacing_data_during_async_tiling_survives(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-MLN_TEST_GROUP {
-  RUN_TEST(replacing_data_during_async_tiling_survives);
-}
+MLN_TEST_GROUP { RUN_TEST(replacing_data_during_async_tiling_survives); }

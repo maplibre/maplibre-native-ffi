@@ -157,7 +157,7 @@ static void copy_stretches(
     if (probe->x_count != 0) probe->x = stretches->stretch_x[0];
     if (probe->y_count != 0) probe->y = stretches->stretch_y[0];
   }
-  atomic_store(&probe->done, true);
+  mln_test_flag_set(&probe->done);
 }
 
 static void style_image_stretches_are_borrowed_by_the_completion(void) {
@@ -342,7 +342,7 @@ static void copy_layer_result(
       &probe->source_layer_size
     );
   }
-  atomic_store(&probe->done, true);
+  mln_test_flag_set(&probe->done);
 }
 
 static layer_probe take_layer_result(
@@ -576,7 +576,7 @@ static void copy_tile_urls(
       );
     }
   }
-  atomic_store(&probe->done, true);
+  mln_test_flag_set(&probe->done);
 }
 
 static void read_tile_urls(

@@ -524,8 +524,8 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
   static uint8_t pixels[64 * 64 * 4];
   const uint8_t* center = pixels + ((32 * 64) + 32) * 4;
   bool square_rendered = false;
-  for (unsigned int attempt = 0; attempt < 2000 && !square_rendered;
-       attempt += 1) {
+  const mln_test_deadline deadline = mln_test_deadline_default();
+  while (!square_rendered && !mln_test_deadline_passed(deadline)) {
     mln_frame_demand demand = mln_frame_demand_default();
     demand.flags = 0;
     TEST_ASSERT_EQUAL_INT(
@@ -573,9 +573,6 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
       memcpy(pixels, image.data.data, sizeof(pixels));
       mln_test_completion_destroy(&readback);
       square_rendered = center[1] == 255;
-    }
-    if (!square_rendered) {
-      mln_test_sleep_millisecond();
     }
   }
   TEST_ASSERT_TRUE_MESSAGE(

@@ -40,12 +40,7 @@ static void close_preflight_leaves_a_runtime_with_a_live_child_open(void) {
 }
 
 static bool wait_for_entry(const atomic_bool* entered) {
-  const uint64_t deadline = mln_test_monotonic_milliseconds() + 5000;
-  while (!atomic_load(entered) &&
-         mln_test_monotonic_milliseconds() < deadline) {
-    mln_test_sleep_milliseconds(1);
-  }
-  return atomic_load(entered);
+  return mln_test_wait_for_flag_until(entered, mln_test_deadline_after(5000));
 }
 
 static void a_barrier_completes_after_preceding_work(void) {
@@ -108,7 +103,7 @@ static void runtime_release_waits_for_retired_map_cleanup(void) {
     mln_runtime_release(runtime, &runtime_close.descriptor, NULL);
   const bool runtime_completed_early =
     mln_test_completion_wait(&runtime_close, 100);
-  atomic_store(&release, true);
+  mln_test_flag_set(&release);
   const mln_status map_terminal = mln_test_completion_settle(&map_close);
   const mln_status runtime_terminal =
     mln_test_completion_settle(&runtime_close);

@@ -5,18 +5,51 @@
 // origin comes from the browser runner, which serves the style document, so
 // this covers the browser target alone.
 
-#include "support/harness.h"
-#include "support/test_support.h"
-#include "unity.h"
-
 #include <maplibre_native_c.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "support/harness.h"
+#include "support/test_support.h"
+#include "unity.h"
+
 // The layer id the runner's document carries, which identifies the response as
 // the served one.
 static const char fixture_layer_id[] = "http-fixture";
+
+typedef struct style_outcome {
+  mln_map map;
+  bool loaded;
+  char* message;
+  size_t capacity;
+} style_outcome;
+
+// Accepts the map's style-loaded event, or its loading failure with the
+// message copied out.
+static bool style_settled(
+  const mln_runtime_event* event, const char* messages, void* context
+) {
+  style_outcome* outcome = context;
+  if (event->source != outcome->map) {
+    return false;
+  }
+  if (event->type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {
+    outcome->loaded = true;
+    return true;
+  }
+  if (
+    event->type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED &&
+    event->message_size < outcome->capacity
+  ) {
+    memcpy(
+      outcome->message, messages + event->message_offset, event->message_size
+    );
+    outcome->message[event->message_size] = '\0';
+    return true;
+  }
+  return false;
+}
 
 // Waits for the style to load, or reports the failure the map produced instead.
 // A transport that never answers reports neither, so the timeout is the failure
@@ -25,49 +58,20 @@ static bool wait_for_style_loaded(
   mln_runtime runtime, mln_map map, char* out_message, size_t capacity
 ) {
   out_message[0] = '\0';
-  for (unsigned int attempt = 0; attempt < 600; attempt += 1) {
-    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
-      return false;
-    }
-    while (true) {
-      mln_test_event_batch batch = mln_test_event_batch_default();
-      if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
-        return false;
-      }
-      if (batch.event_count == 0) {
-        break;
-      }
-      for (size_t index = 0; index < batch.event_count; index += 1) {
-        const mln_runtime_event* event =
-          (const mln_runtime_event*)((const char*)batch.events +
-                                     (index * batch.event_size));
-        if (event->source != map) {
-          continue;
-        }
-        if (event->type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {
-          return true;
-        }
-        if (
-          event->type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED &&
-          event->message_size < capacity
-        ) {
-          memcpy(
-            out_message, batch.messages + event->message_offset,
-            event->message_size
-          );
-          out_message[event->message_size] = '\0';
-          return false;
-        }
-      }
-    }
-    mln_test_sleep_millisecond();
+  style_outcome outcome = {
+    .map = map, .message = out_message, .capacity = capacity
+  };
+  if (!mln_test_await_event_matching(
+        runtime, style_settled, &outcome, mln_test_deadline_default()
+      )) {
+    snprintf(
+      out_message, capacity,
+      "no style-loaded or loading-failed event arrived; the transport "
+      "answered nothing"
+    );
+    return false;
   }
-  snprintf(
-    out_message, capacity,
-    "no style-loaded or loading-failed event arrived; the transport answered "
-    "nothing"
-  );
-  return false;
+  return outcome.loaded;
 }
 
 static void style_loads_over_http_from_the_runner_origin(void) {
@@ -126,6 +130,4 @@ static void style_loads_over_http_from_the_runner_origin(void) {
   }
 }
 
-MLN_TEST_GROUP {
-  RUN_TEST(style_loads_over_http_from_the_runner_origin);
-}
+MLN_TEST_GROUP { RUN_TEST(style_loads_over_http_from_the_runner_origin); }

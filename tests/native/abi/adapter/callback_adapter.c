@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "maplibre_native_c/callback_adapter.h"
+
 #include "support/harness.h"
 #include "support/test_support.h"
 #include "unity.h"
@@ -391,7 +392,7 @@ static void deferred_listener(
   } else {
     mln_adapter_deferred_call_record_destroy(record);
   }
-  atomic_store(&probe->delivered, true);
+  mln_test_flag_set(&probe->delivered);
 }
 
 static void* deferred_context(uint32_t callback, deferred_probe* probe) {
@@ -528,17 +529,10 @@ static bool wait_for_map_event(
   mln_runtime runtime, uint32_t type, mln_map map, char* message,
   size_t message_capacity
 ) {
-  for (size_t attempt = 0; attempt < 5000; attempt += 1) {
-    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) return false;
-    mln_runtime_event event = {0};
-    if (
-      mln_test_drain_find(runtime, type, map, &event, message, message_capacity)
-    ) {
-      return true;
-    }
-    mln_test_sleep_millisecond();
-  }
-  return false;
+  mln_runtime_event event = {0};
+  return mln_test_await_event(
+    runtime, type, map, &event, message, message_capacity
+  );
 }
 
 static mln_status set_provider_committed(

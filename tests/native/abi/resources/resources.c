@@ -101,22 +101,12 @@ static bool wait_for_map_loading_failure(
   mln_runtime runtime, const mln_map map, char* out_message,
   size_t out_message_capacity
 ) {
-  for (size_t attempt = 0; attempt < 5000; attempt += 1) {
-    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
-      return false;
-    }
-    mln_runtime_event event = {0};
-    if (
-      mln_test_drain_find(
-        runtime, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, map, &event, out_message,
-        out_message_capacity
-      )
-    ) {
-      return event.message_size < out_message_capacity;
-    }
-    mln_test_sleep_millisecond();
-  }
-  return false;
+  mln_runtime_event event = {0};
+  return mln_test_await_event(
+           runtime, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, map, &event,
+           out_message, out_message_capacity
+         ) &&
+         event.message_size < out_message_capacity;
 }
 
 static mln_offline_region_definition offline_tile_definition_for_style(
@@ -228,6 +218,7 @@ static uint32_t resource_provider_stub(
 
 static void count_runtime_callback_release(void* user_data) {
   atomic_fetch_add((atomic_int*)user_data, 1);
+  mln_test_pulse();
 }
 
 static void resource_provider_registration_releases_owned_state(void) {
@@ -265,10 +256,7 @@ static void resource_provider_registration_releases_owned_state(void) {
     MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
   );
   mln_test_destroy_runtime(runtime);
-  for (size_t attempt = 0; attempt < 10000 && atomic_load(&release_count) < 3;
-       attempt += 1) {
-    mln_test_sleep_millisecond();
-  }
+  (void)mln_test_wait_for_count(&release_count, 3);
   TEST_ASSERT_EQUAL_INT(3, atomic_load(&release_count));
 }
 
@@ -295,7 +283,7 @@ static uint32_t inline_release_resource_provider(
     mln_resource_request_complete(handle, &response, NULL)
   );
   mln_resource_request_release(handle);
-  atomic_store(&state->callback_finished, true);
+  mln_test_flag_set(&state->callback_finished);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
@@ -519,15 +507,13 @@ typedef struct offline_reentry_probe {
 // worker is occupied by the probe's completion.
 static void submit_offline_list(void* argument) {
   offline_reentry_probe* probe = argument;
-  while (!atomic_load(&probe->entered)) {
-    mln_test_sleep_millisecond();
-  }
+  (void)mln_test_wait_for_flag(&probe->entered);
   atomic_store(
     &probe->offline_status, mln_runtime_offline_regions_list(
                               probe->runtime, &probe->list->descriptor, NULL
                             )
   );
-  atomic_store(&probe->offline_accepted, true);
+  mln_test_flag_set(&probe->offline_accepted);
 }
 
 // Occupies whichever thread delivers this completion until the offline
@@ -537,16 +523,14 @@ static void occupy_until_offline_accepted(
 ) {
   offline_reentry_probe* probe = user_data;
   (void)result;
-  atomic_store(&probe->entered, true);
-  while (!atomic_load(&probe->offline_accepted)) {
-    mln_test_sleep_millisecond();
-  }
+  mln_test_flag_set(&probe->entered);
+  (void)mln_test_wait_for_flag(&probe->offline_accepted);
   const mln_completion discard = mln_test_discard_completion();
   atomic_store(
     &probe->reentrant_status,
     mln_runtime_barrier(probe->runtime, &discard, NULL)
   );
-  atomic_store(&probe->finished, true);
+  mln_test_flag_set(&probe->finished);
 }
 
 static void offline_submission_never_waits_for_the_runtime_worker(void) {
@@ -572,14 +556,12 @@ static void offline_submission_never_waits_for_the_runtime_worker(void) {
     mln_runtime_clear_resource_provider(runtime, &occupied, NULL);
   if (accepted != MLN_STATUS_OK) {
     // The completion will never run, so release the waiting thread by hand.
-    atomic_store(&probe.entered, true);
+    mln_test_flag_set(&probe.entered);
   }
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, accepted);
   mln_test_thread_join(thread);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe.offline_status));
-  while (!atomic_load(&probe.finished)) {
-    mln_test_sleep_millisecond();
-  }
+  (void)mln_test_wait_for_flag(&probe.finished);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe.reentrant_status));
 
   TEST_ASSERT_TRUE(mln_test_completion_wait(&list, 5000));
@@ -813,14 +795,13 @@ typedef struct teardown_probe {
 
 static void mark_transform_released(void* user_data) {
   teardown_probe* probe = user_data;
-  atomic_store(&probe->transform_released, true);
+  mln_test_flag_set(&probe->transform_released);
 }
 
 // Wait budgets are generous on purpose: a slow machine delays the passing run
 // instead of turning it red.
 enum {
-  teardown_probe_wait_attempts = 10000,
-  teardown_transform_block_attempts = 3000,
+  teardown_transform_block_milliseconds = 3000,
   teardown_call_delay_milliseconds = 200,
   provider_callback_block_milliseconds = 200,
 };
@@ -842,14 +823,11 @@ static mln_status blocking_resource_transform(
   (void)kind;
   (void)url;
   teardown_probe* probe = user_data;
-  atomic_store(&probe->transform_entered, true);
-  for (size_t attempt = 0; attempt < teardown_transform_block_attempts;
-       attempt += 1) {
-    if (atomic_load(&probe->other_runtime_call_done)) {
-      break;
-    }
-    mln_test_sleep_millisecond();
-  }
+  mln_test_flag_set(&probe->transform_entered);
+  (void)mln_test_wait_for_flag_until(
+    &probe->other_runtime_call_done,
+    mln_test_deadline_after(teardown_transform_block_milliseconds)
+  );
   atomic_store(
     &probe->other_runtime_call_observed,
     atomic_load(&probe->other_runtime_call_done)
@@ -869,16 +847,16 @@ static void other_runtime_entry(void* argument) {
   const mln_status create_status = mln_runtime_create(&options, &runtime, NULL);
   if (create_status != MLN_STATUS_OK) {
     atomic_store(&probe->other_runtime_status, create_status);
-    atomic_store(&probe->other_runtime_call_done, true);
+    mln_test_flag_set(&probe->other_runtime_call_done);
     return;
   }
 
-  atomic_store(&probe->other_runtime_ready, true);
+  mln_test_flag_set(&probe->other_runtime_ready);
   mln_test_wait_for_flag(&probe->teardown_started);
   // Give the teardown thread time to reach the transform wait.
   mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
   atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
-  atomic_store(&probe->other_runtime_call_done, true);
+  mln_test_flag_set(&probe->other_runtime_call_done);
   (void)mln_test_runtime_close(runtime);
 }
 
@@ -924,7 +902,7 @@ static void runtime_teardown_leaves_other_runtimes_responsive(void) {
   );
   TEST_ASSERT_TRUE(start_offline_region_download(runtime, &probe));
 
-  atomic_store(&probe.teardown_started, true);
+  mln_test_flag_set(&probe.teardown_started);
   // Teardown blocks here until the transform callback returns.
   mln_test_destroy_runtime(runtime);
   mln_test_thread_join(other_thread);
@@ -968,14 +946,11 @@ static mln_status lookup_blocking_transform(
     return MLN_STATUS_OK;
   }
 
-  atomic_store(&probe->transform_entered, true);
-  for (size_t attempt = 0; attempt < teardown_transform_block_attempts;
-       attempt += 1) {
-    if (atomic_load(&probe->other_runtime_call_done)) {
-      break;
-    }
-    mln_test_sleep_millisecond();
-  }
+  mln_test_flag_set(&probe->transform_entered);
+  (void)mln_test_wait_for_flag_until(
+    &probe->other_runtime_call_done,
+    mln_test_deadline_after(teardown_transform_block_milliseconds)
+  );
   atomic_store(
     &probe->other_runtime_call_observed,
     atomic_load(&probe->other_runtime_call_done)
@@ -1000,12 +975,12 @@ static uint32_t lookup_probe_resource_provider(
     return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
   }
 
-  atomic_store(&probe->provider_entered, true);
+  mln_test_flag_set(&probe->provider_entered);
   mln_test_wait_for_flag(&probe->writer_pending);
   // Give the runtime worker time to reach the exclusive transform lock, so the
   // lookup this thread is about to make queues behind a waiting writer.
   mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
-  atomic_store(&probe->lookup_reached, true);
+  mln_test_flag_set(&probe->lookup_reached);
   return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
 }
 
@@ -1018,16 +993,16 @@ static void lookup_other_runtime_entry(void* argument) {
   const mln_status create_status = mln_runtime_create(&options, &runtime, NULL);
   if (create_status != MLN_STATUS_OK) {
     atomic_store(&probe->other_runtime_status, create_status);
-    atomic_store(&probe->other_runtime_call_done, true);
+    mln_test_flag_set(&probe->other_runtime_call_done);
     return;
   }
 
-  atomic_store(&probe->other_runtime_ready, true);
+  mln_test_flag_set(&probe->other_runtime_ready);
   mln_test_wait_for_flag(&probe->lookup_reached);
   // Give the file source thread time to reach the lookup itself.
   mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
   atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
-  atomic_store(&probe->other_runtime_call_done, true);
+  mln_test_flag_set(&probe->other_runtime_call_done);
   (void)mln_test_runtime_close(runtime);
 }
 
@@ -1069,7 +1044,7 @@ static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
   TEST_ASSERT_TRUE(activate_style_download(runtime, lookup_probe_style_url));
   TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.provider_entered));
 
-  atomic_store(&probe.writer_pending, true);
+  mln_test_flag_set(&probe.writer_pending);
   // Clearing waits for the in-flight transform callback to return, so it is
   // the pending writer the lookup queues behind.
   TEST_ASSERT_EQUAL_INT(
@@ -1126,12 +1101,12 @@ static uint32_t blocking_resource_provider_for_clear(
   (void)request;
   (void)handle;
   provider_quiescence_probe* probe = user_data;
-  atomic_store(&probe->entered, true);
+  mln_test_flag_set(&probe->entered);
   mln_test_wait_for_flag(&probe->clear_started);
   // Keep running after clear submission so an implementation that emits the
   // terminal event too early exposes callback-owned state.
   mln_test_sleep_milliseconds(provider_callback_block_milliseconds);
-  atomic_store(&probe->callback_returned, true);
+  mln_test_flag_set(&probe->callback_returned);
   return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
 }
 
@@ -1170,7 +1145,7 @@ static uint32_t recording_resource_provider(
   (void)request;
   (void)handle;
   provider_quiescence_probe* probe = user_data;
-  atomic_store(&probe->entered, true);
+  mln_test_flag_set(&probe->entered);
   return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
 }
 
@@ -1223,7 +1198,7 @@ static void clearing_resource_provider_waits_for_in_flight_callback(void) {
   );
   TEST_ASSERT_TRUE(wait_for_clear_provider_callback(runtime, &probe));
 
-  atomic_store(&probe.clear_started, true);
+  mln_test_flag_set(&probe.clear_started);
   // The terminal event waits until the provider callback returns.
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, clear_resource_provider_committed(runtime)
@@ -1248,10 +1223,16 @@ static uint32_t claim_and_drop_resource_provider(
   (void)request;
   dropped_request_probe* probe = user_data;
   atomic_store(&probe->handle, handle);
+  mln_test_pulse();
   if (atomic_load(&probe->release_inline)) {
     mln_resource_request_release(handle);
   }
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+}
+
+static bool dropped_request_claimed(void* context) {
+  dropped_request_probe* probe = context;
+  return atomic_load(&probe->handle) != MLN_HANDLE_NULL;
 }
 
 static void expect_dropped_request_fails(bool release_inline) {
@@ -1272,11 +1253,10 @@ static void expect_dropped_request_fails(bool release_inline) {
     mln_test_map_set_style_url(map, "custom://dropped-request-style.json")
   );
   if (!release_inline) {
-    for (size_t attempt = 0; atomic_load(&probe.handle) == MLN_HANDLE_NULL &&
-                             attempt < teardown_probe_wait_attempts;
-         attempt += 1) {
-      mln_test_sleep_millisecond();
-    }
+    (void)mln_test_await(
+      dropped_request_claimed, &probe, mln_test_deadline_default(),
+      "the provider to claim the request"
+    );
     TEST_ASSERT_NOT_EQUAL(MLN_HANDLE_NULL, atomic_load(&probe.handle));
     mln_resource_request_release(atomic_load(&probe.handle));
   }
@@ -1383,11 +1363,7 @@ static void resource_provider_defers_inline_release_until_callback_returns(
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_map_set_style_url(map, "custom://inline-style.json")
   );
-  for (size_t attempt = 0;
-       attempt < 5000 && !atomic_load(&state.callback_finished); attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-    mln_test_sleep_millisecond();
-  }
+  (void)mln_test_wait_for_flag(&state.callback_finished);
   TEST_ASSERT_TRUE(atomic_load(&state.callback_finished));
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&state.completion_status));
   mln_test_destroy_map(map);
@@ -1403,11 +1379,10 @@ typedef struct provider_teardown_probe {
 
 static void mark_provider_released(void* user_data) {
   provider_teardown_probe* probe = user_data;
-  atomic_store(&probe->released, true);
+  mln_test_flag_set(&probe->released);
 }
 
 enum {
-  provider_teardown_wait_attempts = 10000,
   provider_teardown_block_milliseconds = 200,
 };
 
@@ -1420,16 +1395,10 @@ static uint32_t blocking_resource_provider(
   (void)request;
   (void)handle;
   provider_teardown_probe* probe = user_data;
-  atomic_store(&probe->entered, true);
-  for (size_t attempt = 0; attempt < provider_teardown_wait_attempts;
-       attempt += 1) {
-    if (atomic_load(&probe->teardown_started)) {
-      break;
-    }
-    mln_test_sleep_millisecond();
-  }
+  mln_test_flag_set(&probe->entered);
+  (void)mln_test_wait_for_flag(&probe->teardown_started);
   mln_test_sleep_milliseconds(provider_teardown_block_milliseconds);
-  atomic_store(&probe->callback_returned, true);
+  mln_test_flag_set(&probe->callback_returned);
   // An unknown decision becomes a handled provider error, which keeps the
   // request off the native network teardown path.
   return UINT32_MAX;
@@ -1445,17 +1414,7 @@ static bool wait_for_provider_callback(
     return false;
   }
 
-  for (size_t attempt = 0; attempt < provider_teardown_wait_attempts;
-       attempt += 1) {
-    if (atomic_load(&probe->entered)) {
-      return true;
-    }
-    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
-      return false;
-    }
-    mln_test_sleep_millisecond();
-  }
-  return false;
+  return mln_test_wait_for_flag(&probe->entered);
 }
 
 // Native retains provider user_data until every in-flight callback returns,
@@ -1474,7 +1433,7 @@ static void runtime_teardown_waits_for_in_flight_provider_callback(void) {
   );
   TEST_ASSERT_TRUE(wait_for_provider_callback(runtime, &probe));
 
-  atomic_store(&probe.teardown_started, true);
+  mln_test_flag_set(&probe.teardown_started);
   mln_test_destroy_runtime(runtime);
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.released));
   TEST_ASSERT_TRUE_MESSAGE(
@@ -1499,17 +1458,19 @@ typedef struct cancel_probe {
 static void count_cancel(void* user_data) {
   cancel_probe* probe = user_data;
   if (atomic_load(&probe->release_count) != 0) {
-    atomic_store(&probe->released_before_cancel, true);
+    mln_test_flag_set(&probe->released_before_cancel);
   }
   atomic_fetch_add(&probe->cancel_count, 1);
   if (atomic_load(&probe->release_inside_callback)) {
     mln_resource_request_release(atomic_load(&probe->handle));
   }
+  mln_test_pulse();
 }
 
 static void count_cancel_release(void* user_data) {
   cancel_probe* probe = user_data;
   atomic_fetch_add(&probe->release_count, 1);
+  mln_test_pulse();
 }
 
 static uint32_t cancel_probe_resource_provider(
@@ -1539,7 +1500,7 @@ static uint32_t cancel_probe_resource_provider(
     };
     (void)mln_resource_request_complete(handle, &response, NULL);
   }
-  atomic_store(&probe->provider_entered, true);
+  mln_test_flag_set(&probe->provider_entered);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
@@ -1566,16 +1527,23 @@ static mln_map start_cancel_probe_request(
   return map;
 }
 
+typedef struct cancel_count_target {
+  cancel_probe* probe;
+  int expected;
+} cancel_count_target;
+
+static bool cancel_count_reached(void* context) {
+  const cancel_count_target* target = context;
+  return atomic_load(&target->probe->cancel_count) >= target->expected;
+}
+
 static bool wait_for_cancel_count(
-  cancel_probe* probe, int expected, size_t attempts
+  cancel_probe* probe, int expected, mln_test_deadline deadline
 ) {
-  for (size_t attempt = 0; attempt < attempts; attempt += 1) {
-    if (atomic_load(&probe->cancel_count) >= expected) {
-      return true;
-    }
-    mln_test_sleep_millisecond();
-  }
-  return false;
+  cancel_count_target target = {.probe = probe, .expected = expected};
+  return mln_test_await(
+    cancel_count_reached, &target, deadline, "the cancel callback"
+  );
 }
 
 // Destroying the map discards its pending style request. MapLibre then cancels
@@ -1589,15 +1557,11 @@ static void cancel_callback_runs_when_map_discards_request(void) {
 
   mln_test_destroy_map(map);
   TEST_ASSERT_TRUE(
-    wait_for_cancel_count(&probe, 1, teardown_probe_wait_attempts)
+    wait_for_cancel_count(&probe, 1, mln_test_deadline_default())
   );
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
   // The context retires as the callback returns, before the request does.
-  for (size_t attempt = 0; atomic_load(&probe.release_count) == 0 &&
-                           attempt < teardown_probe_wait_attempts;
-       attempt += 1) {
-    mln_test_sleep_millisecond();
-  }
+  (void)mln_test_wait_for_count(&probe.release_count, 1);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.release_count));
   TEST_ASSERT_FALSE(atomic_load(&probe.released_before_cancel));
 
@@ -1636,25 +1600,36 @@ static void cancel_callback_runs_when_map_discards_request(void) {
 
 // A registration that arrives after cancellation stores nothing and reports
 // the cancellation through out_cancelled instead of invoking the callback.
+typedef struct cancelled_poll {
+  mln_resource_request_handle handle;
+  bool cancelled;
+  mln_status status;
+} cancelled_poll;
+
+// Cancellation lands on a MapLibre thread with no callback registered to
+// report it, so the wait re-checks the request's cancelled state.
+static bool request_reports_cancelled(void* context) {
+  cancelled_poll* poll = context;
+  poll->status =
+    mln_resource_request_cancelled(poll->handle, &poll->cancelled, NULL);
+  return poll->status != MLN_STATUS_OK || poll->cancelled;
+}
+
 static void late_cancel_callback_registration_reports_cancelled(void) {
   cancel_probe probe = {0};
-  atomic_store(&probe.skip_register, true);
+  mln_test_flag_set(&probe.skip_register);
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = start_cancel_probe_request(runtime, &probe);
   mln_test_destroy_map(map);
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
 
-  bool cancelled = false;
-  for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
-       attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled, NULL)
-    );
-    if (cancelled) {
-      break;
-    }
-    mln_test_sleep_millisecond();
-  }
+  cancelled_poll poll = {.handle = handle, .status = MLN_STATUS_OK};
+  (void)mln_test_await(
+    request_reports_cancelled, &poll, mln_test_deadline_default(),
+    "the request to report cancelled"
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, poll.status);
+  bool cancelled = poll.cancelled;
   TEST_ASSERT_TRUE(cancelled);
 
   cancelled = false;
@@ -1678,13 +1653,13 @@ static void late_cancel_callback_registration_reports_cancelled(void) {
 // retires the request without deadlocking.
 static void cancel_callback_may_release_the_request(void) {
   cancel_probe probe = {0};
-  atomic_store(&probe.release_inside_callback, true);
+  mln_test_flag_set(&probe.release_inside_callback);
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = start_cancel_probe_request(runtime, &probe);
 
   mln_test_destroy_map(map);
   TEST_ASSERT_TRUE(
-    wait_for_cancel_count(&probe, 1, teardown_probe_wait_attempts)
+    wait_for_cancel_count(&probe, 1, mln_test_deadline_default())
   );
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
   TEST_ASSERT_EQUAL_INT(
@@ -1706,7 +1681,7 @@ static void cancel_callback_may_release_the_request(void) {
 // provider has not completed.
 static void cancel_callback_skips_a_completed_request(void) {
   cancel_probe probe = {0};
-  atomic_store(&probe.complete_inline, true);
+  mln_test_flag_set(&probe.complete_inline);
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = start_cancel_probe_request(runtime, &probe);
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
@@ -1714,7 +1689,10 @@ static void cancel_callback_skips_a_completed_request(void) {
   // Let the response reach the style before the map goes away.
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   mln_test_destroy_map(map);
-  TEST_ASSERT_FALSE(wait_for_cancel_count(&probe, 1, 200));
+  // A window in which no cancel may arrive; a fence replaces it.
+  TEST_ASSERT_FALSE(
+    wait_for_cancel_count(&probe, 1, mln_test_deadline_after(200))
+  );
   bool cancelled = true;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled, NULL)
@@ -1764,14 +1742,14 @@ static void block_in_cancel(void* user_data) {
       mln_resource_request_complete(handle, &response, NULL)
     );
   }
-  atomic_store(&probe->callback_entered, true);
+  mln_test_flag_set(&probe->callback_entered);
   mln_test_wait_for_flag(&probe->release_started);
   mln_test_sleep_milliseconds(provider_teardown_block_milliseconds);
   atomic_store(
     &probe->release_returned_during_callback,
     atomic_load(&probe->release_returned)
   );
-  atomic_store(&probe->callback_returned, true);
+  mln_test_flag_set(&probe->callback_returned);
 }
 
 static uint32_t blocking_cancel_resource_provider(
@@ -1789,7 +1767,7 @@ static uint32_t blocking_cancel_resource_provider(
     )
   );
   atomic_store(&probe->base.register_reported_cancelled, cancelled);
-  atomic_store(&probe->base.provider_entered, true);
+  mln_test_flag_set(&probe->base.provider_entered);
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
@@ -1820,7 +1798,7 @@ static void run_release_waits_for_in_flight_cancel_callback(
   // runtime worker while this thread does the release it must wait for.
   mln_test_destroy_map(map);
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->callback_entered));
-  atomic_store(&probe->release_started, true);
+  mln_test_flag_set(&probe->release_started);
   if (atomic_load(&probe->waiter_drains_instead_of_releasing)) {
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_resource_request_wait_until_retired(
@@ -1834,7 +1812,7 @@ static void run_release_waits_for_in_flight_cancel_callback(
     &probe->callback_returned_before_release,
     atomic_load(&probe->callback_returned)
   );
-  atomic_store(&probe->release_returned, true);
+  mln_test_flag_set(&probe->release_returned);
   TEST_ASSERT_FALSE_MESSAGE(
     atomic_load(&probe->release_returned_during_callback),
     "releasing the request returned while the cancel callback was running"
@@ -1875,7 +1853,7 @@ static void release_waits_for_in_flight_cancel_callback(void) {
 // window the released handle already rejects every other entry point.
 static void release_waits_for_a_cancel_callback_that_released_itself(void) {
   blocking_cancel_probe probe = {0};
-  atomic_store(&probe.self_release, true);
+  mln_test_flag_set(&probe.self_release);
   run_release_waits_for_in_flight_cancel_callback(&probe);
 }
 
@@ -1886,8 +1864,8 @@ static void wait_until_retired_waits_for_a_self_releasing_cancel_callback(
   void
 ) {
   blocking_cancel_probe probe = {0};
-  atomic_store(&probe.self_release, true);
-  atomic_store(&probe.waiter_drains_instead_of_releasing, true);
+  mln_test_flag_set(&probe.self_release);
+  mln_test_flag_set(&probe.waiter_drains_instead_of_releasing);
   run_release_waits_for_in_flight_cancel_callback(&probe);
 }
 

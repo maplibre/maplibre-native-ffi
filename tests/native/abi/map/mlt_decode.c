@@ -59,32 +59,30 @@ enum {
   mlt_render_deadline_milliseconds = 120000,
 };
 
+typedef struct frame_result_wait {
+  const mln_test_render_fixture* fixture;
+  mln_render_frame_batch* out_batch;
+  bool failed;
+} frame_result_wait;
+
+static bool frame_result_drained(void* context) {
+  frame_result_wait* wait = context;
+  const mln_status status = mln_render_session_drain_frame_results(
+    wait->fixture->session, wait->out_batch, NULL
+  );
+  wait->failed = status != MLN_STATUS_OK && status != MLN_STATUS_NOT_READY;
+  return status != MLN_STATUS_NOT_READY;
+}
+
 static bool wait_for_frame_result(
   const mln_test_render_fixture* fixture, mln_render_frame_batch* out_batch,
-  uint64_t deadline
+  mln_test_deadline deadline
 ) {
-  while (mln_test_monotonic_milliseconds() <= deadline) {
-    if (fixture->driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
-      size_t serviced = 0;
-      if (
-        mln_render_session_service_driver_work(
-          fixture->session, SIZE_MAX, &serviced, NULL
-        ) != MLN_STATUS_OK
-      ) {
-        return false;
-      }
-    }
-    const mln_status status =
-      mln_render_session_drain_frame_results(fixture->session, out_batch, NULL);
-    if (status == MLN_STATUS_OK) {
-      return true;
-    }
-    if (status != MLN_STATUS_NOT_READY) {
-      return false;
-    }
-    mln_test_sleep_millisecond();
-  }
-  return false;
+  frame_result_wait wait = {.fixture = fixture, .out_batch = out_batch};
+  return mln_test_render_step_until(
+           fixture, frame_result_drained, &wait, deadline, "a frame result"
+         ) == MLN_STATUS_OK &&
+         !wait.failed;
 }
 
 // Renders until the source reports features or the attempts run out. Tiles
@@ -101,10 +99,10 @@ static size_t query_admin_feature_count(
   options.source_layer_id_count = 1;
 
   size_t count = 0;
-  const uint64_t deadline =
-    mln_test_monotonic_milliseconds() + mlt_render_deadline_milliseconds;
+  const mln_test_deadline deadline =
+    mln_test_deadline_after(mlt_render_deadline_milliseconds);
   for (unsigned int attempt = 0; count == 0 && attempt < mlt_render_attempts &&
-                                 mln_test_monotonic_milliseconds() <= deadline;
+                                 !mln_test_deadline_passed(deadline);
        attempt += 1) {
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
     mln_frame_demand demand = mln_frame_demand_default();
@@ -165,7 +163,9 @@ static size_t query_admin_feature_count(
       mln_test_completion_destroy(&query);
     }
     if (count == 0) {
-      mln_test_sleep_millisecond();
+      // The disabled case expects no feature, so each attempt spaces out the
+      // next one; the positive-signal rewrite removes this.
+      mln_test_sleep_milliseconds(1);
     }
   }
   return count;
@@ -180,8 +180,7 @@ static size_t decode_recorded_tile(
   uint8_t* tile_bytes =
     mln_test_read_fixture(fixture_relative_path, &tile_size);
   TEST_ASSERT_NOT_NULL_MESSAGE(
-    tile_bytes,
-    "MLT fixture missing; check third_party/maplibre-native/test/fixtures"
+    tile_bytes, "MLT fixture missing; check tests/native/fixtures"
   );
   TEST_ASSERT_GREATER_THAN_UINT32(0, (uint32_t)tile_size);
 
@@ -256,6 +255,4 @@ static void fast_pfor_option_gates_mlt_tile_decoding(void) {
   );
 }
 
-MLN_TEST_GROUP {
-  RUN_TEST(fast_pfor_option_gates_mlt_tile_decoding);
-}
+MLN_TEST_GROUP { RUN_TEST(fast_pfor_option_gates_mlt_tile_decoding); }

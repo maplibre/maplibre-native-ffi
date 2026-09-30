@@ -842,22 +842,6 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
   destroy_map_fixture(fixture);
 }
 
-// Holds the runtime worker inside a completion callback so a test can queue
-// several commands behind it and control which one the worker reaches first.
-typedef struct worker_gate {
-  atomic_bool entered;
-  atomic_bool release;
-} worker_gate;
-
-static void hold_worker(void* user_data, const mln_completion_result* result) {
-  (void)result;
-  worker_gate* gate = user_data;
-  atomic_store(&gate->entered, true);
-  mln_test_wait_for_flag(&gate->release);
-}
-
-static void discard_gate_user_data(void* user_data) { (void)user_data; }
-
 // A resize a later resize replaces never reaches the map: it completes
 // MLN_STATUS_OK with MLN_COMMAND_DISPOSITION_SUPERSEDED and no generation,
 // while the newest one commits and publishes the extent.
@@ -865,20 +849,16 @@ static void a_replaced_resize_completes_superseded(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
-  worker_gate gate;
-  atomic_init(&gate.entered, false);
-  atomic_init(&gate.release, false);
-  const mln_completion hold = {
-    .size = sizeof(mln_completion),
-    .callback = hold_worker,
-    .user_data = &gate,
-    .release_user_data = discard_gate_user_data,
-  };
+  // Holds the runtime worker inside a completion callback, so the two resizes
+  // queue behind it and the worker reaches them together.
+  mln_test_gate gate;
+  mln_test_gate_init(&gate);
+  const mln_completion hold = mln_test_gate_completion(&gate);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_debug_options(map, 0, &hold, NULL)
   );
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_wait_for_flag(&gate.entered), "the runtime worker never parked"
+    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
   );
 
   mln_test_completion replaced = mln_test_completion_default(0);
@@ -897,7 +877,7 @@ static void a_replaced_resize_completes_superseded(void) {
       &newest.descriptor, NULL
     )
   );
-  atomic_store(&gate.release, true);
+  mln_test_gate_release(&gate);
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&replaced));
   TEST_ASSERT_EQUAL_UINT32(

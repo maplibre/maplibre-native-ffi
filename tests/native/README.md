@@ -113,6 +113,69 @@ simulators, the browser, and software renderers.
 CTest bounds each desktop entry at 120 seconds and each browser shard at 180
 seconds. The emulator runners bound each executable at 300 seconds.
 
+## Support helpers
+
+Test files include `support/test_support.h`, which brings in the helpers below.
+
+| Header     | Provides                                                             |
+| ---------- | -------------------------------------------------------------------- |
+| `wait.h`   | Deadlines, the pulse, flags, gates, and the completion probe         |
+| `env.h`    | Runtime and map fixtures, event draining and waits, fixture files    |
+| `render.h` | The render fixture, driver service, and `mln_test_render_step_until` |
+| `tables.h` | A runner for validation tables                                       |
+| `hooks.h`  | The library's test hooks and the browser run-loop probes             |
+
+Every wait blocks on a signal and gives up at a deadline: 10 seconds times the
+timeout scale unless the wait names another. The signal is the pulse, a
+process-wide counter that flags, gates, completions, and the fixtures' wakes all
+bump. The runtime fixture installs an event wake and the render fixture installs
+frame and driver-work wakes, so event and render waits wake as soon as the
+library publishes. A waiter also re-checks every few milliseconds, which covers
+state that the library publishes without a wake.
+
+Use the helper that matches what the case waits for:
+
+- A flag that another thread sets: `mln_test_flag_set` and
+  `mln_test_wait_for_flag`.
+- A thread to park until the case releases it: `mln_test_gate`, with
+  `mln_test_gate_completion` to park the runtime worker inside a completion.
+- An event: `mln_test_await_event` or `mln_test_await_event_matching`.
+- Render progress: `mln_test_render_step_until`, which services a caller-driver
+  session's driver work between checks.
+- Any other condition: `mln_test_await` with a predicate.
+
+The render fixture's context comes from `support/render_<backend>.c`, which
+CMake selects for the preset's backend and OpenGL context provider.
+
+### Cases that still wait on a fixed delay
+
+These cases order threads or open a negative window with a fixed delay, which
+the helpers cannot replace directly. Each needs a sync point, the render clock
+seam, or a fence:
+
+- `runtime_teardown_leaves_other_runtimes_responsive`,
+  `resource_transform_lookup_leaves_other_runtimes_responsive`,
+  `clearing_resource_provider_waits_for_in_flight_callback`,
+  `runtime_teardown_waits_for_in_flight_provider_callback`, and the three cases
+  that run `run_release_waits_for_in_flight_cancel_callback`: 200 ms delays
+  inside provider, transform, and cancel callbacks.
+- `cancel_callback_skips_a_completed_request`: a 200 ms window in which no
+  cancel may arrive.
+- `a_barrier_completes_after_preceding_work` and
+  `runtime_release_waits_for_retired_map_cleanup`: 100 ms windows in which a
+  completion must not arrive.
+- `demand_coalescing_preserves_boundaries_and_generations`: a 1 ms delay that
+  lets a 1 ns frame deadline pass on the real clock.
+- `barrier_waits_for_a_demand_parked_by_a_full_ring`: a 50-iteration service
+  loop in which a barrier must not complete.
+- `fast_pfor_option_gates_mlt_tile_decoding`: 600 render attempts spaced 1 ms
+  apart before it concludes that a tile decodes to nothing.
+- `acquired_frame_release_after_abandon_is_cpu_only`: a 5 ms delay before
+  abandon. A core-worker session publishes its frame result while the driver
+  call is still in flight, and abandon returns busy until the call ends. A
+  wake-driven wait reaches abandon inside that window about one run in eight on
+  Metal, so this case needs the core fix rather than a sync point.
+
 ## Handle hygiene
 
 `mln_test_create_runtime`, `mln_test_create_map`,

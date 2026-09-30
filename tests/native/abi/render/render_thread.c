@@ -17,53 +17,63 @@ static void prepare_renderable_map(mln_runtime runtime, mln_map map) {
 }
 
 static bool service_fixture(const mln_test_render_fixture* fixture) {
-  if (fixture->driver != MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+  return mln_test_render_fixture_service(fixture) == MLN_STATUS_OK;
+}
+
+typedef struct results_wait {
+  const mln_test_render_fixture* fixture;
+  size_t minimum;
+  mln_render_frame_batch* out_batch;
+  bool failed;
+} results_wait;
+
+// Holds once every pending demand has settled and one drain yields at least
+// `minimum` results. A drain with fewer is released and the wait goes on.
+static bool results_ready(void* context) {
+  results_wait* wait = context;
+  mln_render_session_snapshot snapshot = {
+    .size = sizeof(mln_render_session_snapshot)
+  };
+  if (
+    mln_render_session_get_snapshot(wait->fixture->session, &snapshot, NULL) !=
+      MLN_STATUS_OK ||
+    snapshot.pending_demand_count != 0
+  ) {
+    return false;
+  }
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  const mln_status status = mln_render_session_drain_frame_results(
+    wait->fixture->session, &batch, NULL
+  );
+  if (status == MLN_STATUS_OK) {
+    size_t count = 0;
+    if (
+      mln_render_frame_batch_count(batch, &count, NULL) == MLN_STATUS_OK &&
+      count >= wait->minimum
+    ) {
+      *wait->out_batch = batch;
+      return true;
+    }
+    mln_render_frame_batch_release(batch);
+  } else if (status != MLN_STATUS_NOT_READY) {
+    wait->failed = true;
     return true;
   }
-  size_t serviced = 0;
-  return mln_render_session_service_driver_work(
-           fixture->session, SIZE_MAX, &serviced, NULL
-         ) == MLN_STATUS_OK;
+  return false;
 }
 
 static bool wait_for_results(
   const mln_test_render_fixture* fixture, size_t minimum,
   mln_render_frame_batch* out_batch
 ) {
-  for (unsigned int attempt = 0; attempt < 10000; attempt += 1) {
-    if (!service_fixture(fixture)) {
-      return false;
-    }
-    mln_render_session_snapshot snapshot = {
-      .size = sizeof(mln_render_session_snapshot)
-    };
-    if (
-      mln_render_session_get_snapshot(fixture->session, &snapshot, NULL) !=
-        MLN_STATUS_OK ||
-      snapshot.pending_demand_count != 0
-    ) {
-      mln_test_sleep_millisecond();
-      continue;
-    }
-    mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    const mln_status status =
-      mln_render_session_drain_frame_results(fixture->session, &batch, NULL);
-    if (status == MLN_STATUS_OK) {
-      size_t count = 0;
-      if (
-        mln_render_frame_batch_count(batch, &count, NULL) == MLN_STATUS_OK &&
-        count >= minimum
-      ) {
-        *out_batch = batch;
-        return true;
-      }
-      mln_render_frame_batch_release(batch);
-    } else if (status != MLN_STATUS_NOT_READY) {
-      return false;
-    }
-    mln_test_sleep_millisecond();
-  }
-  return false;
+  results_wait wait = {
+    .fixture = fixture, .minimum = minimum, .out_batch = out_batch
+  };
+  return mln_test_render_step_until(
+           fixture, results_ready, &wait, mln_test_deadline_default(),
+           "frame results"
+         ) == MLN_STATUS_OK &&
+         !wait.failed;
 }
 
 static mln_render_frame_result batch_result(
@@ -198,7 +208,7 @@ static void demand_coalescing_preserves_boundaries_and_generations(void) {
     if (!mln_test_wait_for_flag(&entered)) {
       // The operation still holds &release, so it has to finish before this
       // frame's atomics go out of scope with the failing assertion.
-      atomic_store(&release, true);
+      mln_test_flag_set(&release);
       mln_test_render_fixture_finish_operation(&fixture, &blocker);
       mln_test_completion_destroy(&blocker);
       TEST_FAIL_MESSAGE("the blocking driver operation never ran");
@@ -226,7 +236,7 @@ static void demand_coalescing_preserves_boundaries_and_generations(void) {
     MLN_STATUS_OK,
     mln_render_session_request_frame(fixture.session, &separate, NULL)
   );
-  atomic_store(&release, true);
+  mln_test_flag_set(&release);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &blocker)
   );
@@ -276,7 +286,9 @@ static void demand_coalescing_preserves_boundaries_and_generations(void) {
     MLN_STATUS_OK,
     mln_render_session_request_frame(fixture.session, &timed_out, NULL)
   );
-  mln_test_sleep_millisecond();
+  // Lets the 1 ns deadline pass on the real clock; the render clock seam
+  // replaces this.
+  mln_test_sleep_milliseconds(1);
   batch = MLN_HANDLE_NULL;
   TEST_ASSERT_TRUE(wait_for_results(&fixture, 1, &batch));
   const mln_render_frame_result missed = batch_result(batch, 0);
@@ -314,6 +326,16 @@ static mln_acquired_frame render_and_acquire(
   TEST_ASSERT_NOT_EQUAL(MLN_HANDLE_NULL, frame);
   return frame;
 }
+typedef struct frame_wake_wait {
+  const mln_test_render_fixture* fixture;
+  unsigned int before;
+} frame_wake_wait;
+
+static bool frame_woke(void* context) {
+  const frame_wake_wait* wait = context;
+  return atomic_load(&wait->fixture->frame_wakes) != wait->before;
+}
+
 static void frame_wake_runs_when_the_result_queue_becomes_nonempty(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -326,15 +348,14 @@ static void frame_wake_runs_when_the_result_queue_becomes_nonempty(void) {
     MLN_STATUS_OK,
     mln_render_session_request_frame(fixture.session, &demand, NULL)
   );
-  const unsigned int before = atomic_load(&fixture.frame_wakes);
-  for (unsigned int attempt = 0;
-       attempt < 10000 && atomic_load(&fixture.frame_wakes) == before;
-       attempt += 1) {
-    TEST_ASSERT_TRUE(service_fixture(&fixture));
-    if (atomic_load(&fixture.frame_wakes) == before) {
-      mln_test_sleep_millisecond();
-    }
-  }
+  frame_wake_wait wake = {
+    .fixture = &fixture, .before = atomic_load(&fixture.frame_wakes)
+  };
+  const unsigned int before = wake.before;
+  const mln_status stepped = mln_test_render_step_until(
+    &fixture, frame_woke, &wake, mln_test_deadline_default(), "a frame wake"
+  );
+  TEST_ASSERT_TRUE(stepped == MLN_STATUS_OK || stepped == MLN_STATUS_NOT_READY);
   TEST_ASSERT_GREATER_THAN_UINT32(before, atomic_load(&fixture.frame_wakes));
   const unsigned int woke = atomic_load(&fixture.frame_wakes);
   mln_render_frame_batch results = MLN_HANDLE_NULL;
@@ -415,6 +436,11 @@ static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_acquired_frame frame = render_and_acquire(&fixture, 250);
+  // The frame result publishes while the core worker's driver call is still
+  // in flight, and abandon returns busy until that call ends, which nothing
+  // public observes. The delay covers it until the core fix for busy after a
+  // published result lands.
+  mln_test_sleep_milliseconds(5);
 
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
@@ -693,9 +719,10 @@ static void barrier_waits_for_a_demand_parked_by_a_full_ring(void) {
     mln_render_session_barrier(fixture.session, &barrier.descriptor, NULL)
   );
 
+  // A window in which the barrier must not complete; a fence replaces it.
   for (unsigned int attempt = 0; attempt < 50; attempt += 1) {
     TEST_ASSERT_TRUE(service_fixture(&fixture));
-    mln_test_sleep_millisecond();
+    mln_test_sleep_milliseconds(1);
   }
   TEST_ASSERT_FALSE(mln_test_completion_poll(&barrier));
 
@@ -806,7 +833,7 @@ static void service_from_foreign_thread(void* argument) {
   size_t serviced = 0;
   probe->status =
     mln_render_session_service_driver_work(probe->session, 1, &serviced, NULL);
-  atomic_store(&probe->done, true);
+  mln_test_flag_set(&probe->done);
 }
 
 static void driver_service_fixes_and_enforces_graphics_thread_identity(void) {
@@ -842,9 +869,7 @@ typedef struct abandon_busy_probe {
 
 static void abandon_when_driver_enters(void* argument) {
   abandon_busy_probe* probe = argument;
-  while (!atomic_load(probe->entered)) {
-    mln_test_sleep_millisecond();
-  }
+  (void)mln_test_wait_for_flag(probe->entered);
   mln_render_abandon_result result = {
     .size = sizeof(mln_render_abandon_result)
   };
@@ -887,7 +912,7 @@ static void abandon_is_busy_during_a_driver_call_and_changes_nothing(void) {
     if (!mln_test_wait_for_flag(&entered)) {
       // The operation still holds &release, so it has to finish before this
       // frame's atomics go out of scope with the failing assertion.
-      atomic_store(&release, true);
+      mln_test_flag_set(&release);
       mln_test_render_fixture_finish_operation(&fixture, &operation);
       mln_test_completion_destroy(&operation);
       TEST_FAIL_MESSAGE("the blocking driver operation never ran");
@@ -896,7 +921,7 @@ static void abandon_is_busy_during_a_driver_call_and_changes_nothing(void) {
       .size = sizeof(mln_render_abandon_result)
     };
     abandon_status = mln_render_session_abandon(fixture.session, &result, NULL);
-    atomic_store(&release, true);
+    mln_test_flag_set(&release);
   }
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_BUSY, abandon_status);
   TEST_ASSERT_EQUAL_INT(
@@ -1005,9 +1030,6 @@ static void still_image_completes_under_if_needed_keepalive_demands(void) {
     TEST_ASSERT_TRUE(wait_for_results(&fixture, 1, &batch));
     mln_render_frame_batch_release(batch);
     completed = mln_test_completion_wait(&still, 0);
-    if (!completed) {
-      mln_test_sleep_millisecond();
-    }
   }
   TEST_ASSERT_TRUE(completed);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&still));
