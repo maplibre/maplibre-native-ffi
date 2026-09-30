@@ -545,7 +545,12 @@ extern "C" MLN_API auto mln_adapter_dart_completion_create(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!post_cobject || !port) return MLN_STATUS_INVALID_ARGUMENT;
+    if (!post_cobject || !port) {
+      mln::core::set_thread_error(
+        "post_cobject and port must name a Dart receive port"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     const auto status = mln_adapter_completion_create(
       copy_kind, element_size, [](void*, mln_adapter_completion_record*) {},
       nullptr, out_completion, nullptr
@@ -684,7 +689,10 @@ extern "C" MLN_API auto mln_adapter_arena_adopt_handle(
 ) noexcept -> mln_status {
   const auto status =
     mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-      if (!arena) return MLN_STATUS_INVALID_ARGUMENT;
+      if (!arena) {
+        mln::core::set_thread_error("arena must not be null");
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
       static_cast<AdapterArena*>(arena)->handles.push_back(handle);
       return MLN_STATUS_OK;
     });
@@ -700,16 +708,22 @@ extern "C" MLN_API auto mln_adapter_arena_adopt_release(
   void* arena, mln_runtime_callback_release release, void* context,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
-  if (release == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
   const auto status =
     mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-      if (!arena) return MLN_STATUS_INVALID_ARGUMENT;
+      if (release == nullptr) {
+        mln::core::set_thread_error("release must not be null");
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      if (!arena) {
+        mln::core::set_thread_error("arena must not be null");
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
       static_cast<AdapterArena*>(arena)->releases.emplace_back(
         release, context
       );
       return MLN_STATUS_OK;
     });
-  if (status != MLN_STATUS_OK) release(context);
+  if (status != MLN_STATUS_OK && release != nullptr) release(context);
   return status;
 }
 

@@ -1,8 +1,9 @@
 // Inputs the style functions reject that no other case sends: invalid GeoJSON
-// data and cluster properties, empty source and layer IDs, an empty tile list,
-// images without pixels, invalid light JSON, and style JSON with an embedded
-// NUL. Some are refused at submission and some by the command, so each row
-// reads the status from whichever stage refused it.
+// data and cluster properties, empty source, layer, and image IDs, an empty
+// image source URL, an empty or missing tile list, images without pixels,
+// invalid light JSON, and style JSON with an embedded NUL. Some are refused at
+// submission and some by the command, so each row reads the status from
+// whichever stage refused it.
 
 #include <stdbool.h>
 #include <string.h>
@@ -142,6 +143,32 @@ static mln_status add_vector_source_without_tiles(
   );
 }
 
+static mln_status add_vector_source_with_missing_tiles(
+  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
+) {
+  return mln_map_add_vector_source_tiles(
+    map, MLN_BUFFER_LITERAL("missing"), NULL, 1, NULL, completion, diagnostic
+  );
+}
+
+static mln_status add_unnamed_image_source(
+  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
+) {
+  return mln_map_add_image_source_url(
+    map, MLN_BUFFER_LITERAL(""), image_corners, 4,
+    MLN_BUFFER_LITERAL("fixture://image.png"), completion, diagnostic
+  );
+}
+
+static mln_status add_image_source_without_a_url(
+  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
+) {
+  return mln_map_add_image_source_url(
+    map, MLN_BUFFER_LITERAL("image"), image_corners, 4, MLN_BUFFER_LITERAL(""),
+    completion, diagnostic
+  );
+}
+
 static mln_status set_image_without_pixels(
   mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
 ) {
@@ -200,6 +227,12 @@ static void style_commands_reject_invalid_inputs(void) {
      "layer_id must not be empty"},
     {"a vector source without tiles", add_vector_source_without_tiles,
      "tile_count must be greater than 0"},
+    {"a vector source whose tile list is missing",
+     add_vector_source_with_missing_tiles, "tiles must not be null"},
+    {"an unnamed image source", add_unnamed_image_source,
+     "source_id must not be empty"},
+    {"an image source without a URL", add_image_source_without_a_url,
+     "url must not be empty"},
     {"an image without pixels", set_image_without_pixels,
      "pixels must not be null"},
     {"an image source without pixels", add_image_source_without_pixels,

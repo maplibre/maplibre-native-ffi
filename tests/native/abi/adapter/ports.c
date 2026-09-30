@@ -243,8 +243,11 @@ static void a_rejected_dart_completion_posts_nothing(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_adapter_dart_completion_create(
       MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), NULL, 23, 31,
-      &completion, NULL
+      &completion, MLN_TEST_DIAGNOSTIC
     )
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "Dart receive port"), mln_test_last_error()
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_adapter_dart_completion_create(

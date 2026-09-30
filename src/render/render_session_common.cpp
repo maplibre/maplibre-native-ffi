@@ -1169,7 +1169,11 @@ auto submit_driver_work(
 auto lease_render_session(mln_render_session session)
   -> std::shared_ptr<mln_render_session_object> {
   auto live = handle_table<mln_render_session_object>().lease(session);
-  return live && !live->disposal_requested.load() ? live : nullptr;
+  if (live != nullptr && live->disposal_requested.load()) {
+    set_thread_error("render session handle has been disposed");
+    return nullptr;
+  }
+  return live;
 }
 
 auto enqueue_driver_operation(
@@ -1283,10 +1287,11 @@ auto start_attach_render_session(
   }
 
   const auto map = handle_table<MapObject>().lease(session->map);
+  if (map == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
   if (
-    map == nullptr || map->runtime_state == nullptr ||
-    map->runtime_state->event_queue == nullptr
+    map->runtime_state == nullptr || map->runtime_state->event_queue == nullptr
   ) {
+    set_thread_error("map has no live runtime to report events to");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto frame_wake_status = validate_wake(&options->frame_wake);
@@ -2870,19 +2875,27 @@ auto lease_valid_acquired_frame(
 
 auto acquired_frame_view_begin(mln_acquired_frame frame, void** out_scope)
   -> mln_status {
-  if (!out_scope) return MLN_STATUS_INVALID_ARGUMENT;
+  if (!out_scope) {
+    set_thread_error("out_scope must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   *out_scope = nullptr;
   auto live = handle_table<mln_acquired_frame_object>().lease(frame);
   if (!live) return MLN_STATUS_INVALID_ARGUMENT;
   const auto lock = std::scoped_lock{live->session->control_mutex};
-  if (!live->valid.load()) return MLN_STATUS_INVALID_ARGUMENT;
+  if (!live->valid.load()) {
+    set_thread_error("acquired frame handle is not live");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   if (
     live->session->views_invalidated ||
     live->session->disposal_requested.load() ||
     live->session->state == MLN_RENDER_SESSION_STATE_ABANDONED ||
     live->session->state == MLN_RENDER_SESSION_STATE_TARGET_LOST
-  )
+  ) {
+    set_thread_error("render session no longer owns this frame's target");
     return MLN_STATUS_TARGET_LOST;
+  }
   if (live->active_views++ == 0) live->view_owner = live;
   ++live->session->active_views;
   *out_scope = live.get();

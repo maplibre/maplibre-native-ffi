@@ -265,8 +265,15 @@ static void style_functions_reject_null_inputs(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_test_map_set_style_json(map, (mln_buffer_view){0})
   );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "style JSON must not be empty"),
+    mln_test_last_error()
+  );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_test_map_set_style_url(map, NULL)
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "url must not be null"), mln_test_last_error()
   );
 
   // A rejected style read never invokes or releases the completion, so the

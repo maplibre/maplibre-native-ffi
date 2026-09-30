@@ -257,12 +257,11 @@ static void style_image_inputs_are_validated_at_submission(void) {
   image.stride = 4;
   image.pixels = pixel;
   image.byte_length = sizeof(pixel);
-  mln_completion discard = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "image_id must not be empty",
     mln_map_set_style_image(
-      map, (mln_buffer_view){.data = "", .size = 0}, &image, NULL, &discard,
-      NULL
+      map, (mln_buffer_view){.data = "", .size = 0}, &image, NULL,
+      &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
 

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "maplibre_native_c/callback_adapter.h"
 #include "support/harness.h"
@@ -57,7 +58,11 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_acquired_frame_view_begin(frame, NULL, NULL)
+    mln_adapter_acquired_frame_view_begin(frame, NULL, MLN_TEST_DIAGNOSTIC)
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "out_scope must not be null"),
+    mln_test_last_error()
   );
   void* scopes[2] = {NULL, NULL};
   for (size_t index = 0; index < 2; index += 1) {
@@ -128,7 +133,10 @@ static void disposing_a_frame_abandons_its_session_after_open_views(void) {
   void* rejected = NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_TARGET_LOST,
-    mln_adapter_acquired_frame_view_begin(kept, &rejected, NULL)
+    mln_adapter_acquired_frame_view_begin(kept, &rejected, MLN_TEST_DIAGNOSTIC)
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "no longer owns"), mln_test_last_error()
   );
   TEST_ASSERT_NULL(rejected);
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};

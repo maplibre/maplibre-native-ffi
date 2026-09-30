@@ -587,16 +587,19 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
   );
 
   // A null or undersized struct never reaches the map worker.
-  mln_completion discard = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_style_transition_options(map, NULL, &discard, NULL)
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "options must not be null",
+    mln_map_set_style_transition_options(
+      map, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    )
   );
   mln_style_transition_options undersized = applied;
   undersized.size = sizeof(mln_style_transition_options) - 1;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_style_transition_options(map, &undersized, &discard, NULL)
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "size is too small",
+    mln_map_set_style_transition_options(
+      map, &undersized, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    )
   );
 
   // Unknown bits and unusable durations are the command's rejections.

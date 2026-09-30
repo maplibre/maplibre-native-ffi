@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "maplibre_native_c/callback_adapter.h"
 #include "support/adapter.h"
@@ -68,11 +69,30 @@ static void a_failed_arena_adoption_releases_at_once(void) {
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_arena_adopt_release(NULL, count_release, &probe, NULL)
+    mln_adapter_arena_adopt_release(
+      NULL, count_release, &probe, MLN_TEST_DIAGNOSTIC
+    )
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "arena must not be null"),
+    mln_test_last_error()
   );
   TEST_ASSERT_EQUAL_UINT(1, probe.calls);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_adapter_arena_adopt_handle(NULL, map, NULL)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_adapter_arena_adopt_release(NULL, NULL, &probe, MLN_TEST_DIAGNOSTIC)
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "release must not be null"),
+    mln_test_last_error()
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_adapter_arena_adopt_handle(NULL, map, MLN_TEST_DIAGNOSTIC)
+  );
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "arena must not be null"),
+    mln_test_last_error()
   );
   TEST_ASSERT_FALSE(mln_test_adapter_map_is_live(map));
   mln_test_destroy_runtime(runtime);

@@ -948,6 +948,7 @@ auto submit_runtime_command(
   {
     const std::scoped_lock commit_lock(runtime->submission_mutex);
     if (!runtime->control.acquire()) {
+      set_thread_error("runtime is closing");
       return MLN_STATUS_INVALID_STATE;
     }
     auto lease = ControlLease{&runtime->control};
@@ -2543,6 +2544,7 @@ auto runtime_barrier_start(
   {
     const std::scoped_lock commit_lock(live->submission_mutex);
     if (!live->control.acquire()) {
+      set_thread_error("runtime is closing");
       completion_state->reject();
       return MLN_STATUS_INVALID_STATE;
     }
@@ -2743,6 +2745,7 @@ auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (!live->control.acquire()) {
+    set_thread_error("runtime is closing");
     return MLN_STATUS_INVALID_STATE;
   }
   auto control_lease = ControlLease{&live->control};
@@ -2793,6 +2796,7 @@ auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (!live->control.acquire()) {
+    set_thread_error("runtime is closing");
     return MLN_STATUS_INVALID_STATE;
   }
   auto control_lease = ControlLease{&live->control};
@@ -2817,6 +2821,7 @@ auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (!live->control.acquire()) {
+    set_thread_error("runtime is closing");
     return MLN_STATUS_INVALID_STATE;
   }
   auto control_lease = ControlLease{&live->control};

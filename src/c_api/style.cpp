@@ -157,6 +157,29 @@ auto valid_view(mln_buffer_view view, const char* name) -> bool {
   return true;
 }
 
+// Checks a view that must name at least one byte, and records which way it
+// failed.
+auto valid_non_empty_view(mln_buffer_view view, const char* name) -> bool {
+  if (view.size == 0) {
+    mln::core::set_thread_error(
+      (std::string{name} + " must not be empty").c_str()
+    );
+    return false;
+  }
+  return valid_view(view, (std::string{name} + " is invalid").c_str());
+}
+
+// Checks that a tile URL list is present when it has entries.
+auto valid_tile_urls(const mln_buffer_view* tiles, size_t tile_count) -> bool {
+  if (tile_count != 0 && tiles == nullptr) {
+    mln::core::set_thread_error(
+      "tiles must not be null when tile_count is nonzero"
+    );
+    return false;
+  }
+  return true;
+}
+
 auto take_buffer(mln_buffer buffer, std::string& out) -> mln_status {
   mln_buffer_view view{};
   const auto status = mln::core::buffer_get(buffer, &view);
@@ -292,6 +315,7 @@ auto mln_map_set_style_url(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (url == nullptr) {
+      mln::core::set_thread_error("url must not be null");
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto owned = std::string{url};
@@ -310,7 +334,7 @@ auto mln_map_set_style_json(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (json.size == 0 || !valid_view(json, "style JSON is invalid")) {
+    if (!valid_non_empty_view(json, "style JSON")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto owned = OwnedView{json};
@@ -581,7 +605,7 @@ auto mln_map_list_style_source_ids(
     return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status { \
       if (                                                                   \
         !valid_view(source_id, "source_id is invalid") ||                    \
-        (tile_count != 0 && tiles == nullptr) ||                             \
+        !valid_tile_urls(tiles, tile_count) ||                               \
         mln::core::validate_tile_command_options(options, KIND) !=           \
           MLN_STATUS_OK                                                      \
       ) {                                                                    \
@@ -945,7 +969,7 @@ auto mln_map_set_style_image(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(image_id, "image_id is invalid") || image_id.size == 0 ||
+      !valid_non_empty_view(image_id, "image_id") ||
       mln::core::validate_style_image_command_input(image, options) !=
         MLN_STATUS_OK
     ) {
@@ -1067,8 +1091,8 @@ auto mln_map_add_image_source_url(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(source_id, "source_id is invalid") || source_id.size == 0 ||
-      !valid_view(url, "url is invalid") || url.size == 0 ||
+      !valid_non_empty_view(source_id, "source_id") ||
+      !valid_non_empty_view(url, "url") ||
       mln::core::validate_image_source_command_coordinates(
         coordinates, coordinate_count
       ) != MLN_STATUS_OK
@@ -1099,7 +1123,7 @@ auto mln_map_add_image_source_image(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(source_id, "source_id is invalid") || source_id.size == 0 ||
+      !valid_non_empty_view(source_id, "source_id") ||
       mln::core::validate_image_source_command_coordinates(
         coordinates, coordinate_count
       ) != MLN_STATUS_OK ||
@@ -1133,8 +1157,8 @@ auto mln_map_set_image_source_url(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(source_id, "source_id is invalid") || source_id.size == 0 ||
-      !valid_view(url, "url is invalid") || url.size == 0
+      !valid_non_empty_view(source_id, "source_id") ||
+      !valid_non_empty_view(url, "url")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -1160,7 +1184,7 @@ auto mln_map_set_image_source_image(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(source_id, "source_id is invalid") || source_id.size == 0 ||
+      !valid_non_empty_view(source_id, "source_id") ||
       mln::core::validate_style_image_command_input(image, nullptr) !=
         MLN_STATUS_OK
     ) {
@@ -1190,7 +1214,7 @@ auto mln_map_set_image_source_coordinates(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(source_id, "source_id is invalid") || source_id.size == 0 ||
+      !valid_non_empty_view(source_id, "source_id") ||
       mln::core::validate_image_source_command_coordinates(
         coordinates, coordinate_count
       ) != MLN_STATUS_OK
@@ -1668,9 +1692,14 @@ auto mln_map_set_style_transition_options(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (
-      options == nullptr || options->size < sizeof(mln_style_transition_options)
-    ) {
+    if (options == nullptr) {
+      mln::core::set_thread_error("options must not be null");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (options->size < sizeof(mln_style_transition_options)) {
+      mln::core::set_thread_error(
+        "mln_style_transition_options.size is too small"
+      );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     const auto owned = *options;

@@ -2210,8 +2210,10 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
 // without the handle being retired in between.
 auto validate_map_live_locked(mln_map map, MapObject*& out_map) -> mln_status {
   out_map = handle_table<MapObject>().resolve_locked(map);
-  if (out_map != nullptr && out_map->disposal_requested.load())
+  if (out_map != nullptr && out_map->disposal_requested.load()) {
     out_map = nullptr;
+    set_thread_error("map handle has been disposed");
+  }
   return out_map == nullptr ? MLN_STATUS_INVALID_ARGUMENT : MLN_STATUS_OK;
 }
 
@@ -2418,10 +2420,13 @@ struct MapSubmissionContext {
 auto acquire_map_submission(mln_map map, MapSubmissionContext& out_context)
   -> mln_status {
   auto live = handle_table<MapObject>().lease(map);
-  if (live == nullptr || live->disposal_requested.load()) {
+  if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
+  if (live->disposal_requested.load()) {
+    set_thread_error("map handle has been disposed");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (!live->control.acquire()) {
+    set_thread_error("map is closing");
     return MLN_STATUS_INVALID_STATE;
   }
   auto guard = ControlLease{&live->control};
@@ -2851,6 +2856,7 @@ auto create_map(
 
   auto owned_map = std::make_shared<MapObject>();
   if (!live_runtime->control.acquire()) {
+    set_thread_error("runtime is closing");
     return MLN_STATUS_INVALID_STATE;
   }
   owned_map->runtime_cleanup_lease = ControlLease{&live_runtime->control};
@@ -3008,13 +3014,14 @@ auto map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto live = handle_table<MapObject>().lease(map);
-  if (
-    live == nullptr || live->disposal_requested.load() ||
-    live->control.is_closing()
-  ) {
-    return live == nullptr || live->disposal_requested.load()
-             ? MLN_STATUS_INVALID_ARGUMENT
-             : MLN_STATUS_INVALID_STATE;
+  if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
+  if (live->disposal_requested.load()) {
+    set_thread_error("map handle has been disposed");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (live->control.is_closing()) {
+    set_thread_error("map is closing");
+    return MLN_STATUS_INVALID_STATE;
   }
   const std::scoped_lock lock(live->snapshot_mutex);
   *out_snapshot = live->snapshot;
@@ -3670,10 +3677,13 @@ auto start_map_string_operation(
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = handle_table<MapObject>().lease(map);
-  if (live == nullptr || live->disposal_requested.load()) {
+  if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
+  if (live->disposal_requested.load()) {
+    set_thread_error("map handle has been disposed");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (!live->control.acquire()) {
+    set_thread_error("map is closing");
     return MLN_STATUS_INVALID_STATE;
   }
   auto submission = std::make_shared<ControlLease>(&live->control);
@@ -4103,10 +4113,13 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = handle_table<MapObject>().lease(map);
-  if (live == nullptr || live->disposal_requested.load()) {
+  if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
+  if (live->disposal_requested.load()) {
+    set_thread_error("map handle has been disposed");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (!live->control.acquire()) {
+    set_thread_error("map is closing");
     return MLN_STATUS_INVALID_STATE;
   }
   auto submission = std::make_shared<ControlLease>(&live->control);
