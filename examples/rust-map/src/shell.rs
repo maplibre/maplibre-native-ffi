@@ -12,6 +12,8 @@ use crate::render_target::Mode;
 
 const INITIAL_WIDTH: u32 = 960;
 const INITIAL_HEIGHT: u32 = 640;
+/// How long a smoke test waits for its first rendered frame before it fails.
+const SMOKE_DEADLINE: Duration = Duration::from_secs(60);
 
 pub fn run(
     mode: Mode,
@@ -20,7 +22,7 @@ pub fn run(
     let event_loop = EventLoop::new()?;
     let mut shell = Shell::new(mode, backends);
     let run_result = event_loop.run_app(&mut shell);
-    if let Some(error) = shell.startup_error {
+    if let Some(error) = shell.error {
         return Err(error);
     }
     run_result.map_err(Into::into)
@@ -30,7 +32,8 @@ struct Shell {
     mode: Mode,
     backends: maplibre_native_ffi::RenderBackendFlag,
     app: Option<App>,
-    startup_error: Option<Box<dyn Error>>,
+    error: Option<Box<dyn Error>>,
+    smoke_deadline: Option<Instant>,
 }
 
 impl Shell {
@@ -39,7 +42,8 @@ impl Shell {
             mode,
             backends,
             app: None,
-            startup_error: None,
+            error: None,
+            smoke_deadline: crate::smoke_test().then(|| Instant::now() + SMOKE_DEADLINE),
         }
     }
 
@@ -63,11 +67,11 @@ impl ApplicationHandler for Shell {
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.app.is_some() || self.startup_error.is_some() {
+        if self.app.is_some() || self.error.is_some() {
             return;
         }
         if let Err(error) = self.startup(event_loop) {
-            self.startup_error = Some(error);
+            self.error = Some(error);
             event_loop.exit();
         }
     }
@@ -95,6 +99,21 @@ impl ApplicationHandler for Shell {
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         if let Some(app) = self.app.as_mut() {
             if app.smoke_rendered() {
+                app.close_or_abort();
+                event_loop.exit();
+                return;
+            }
+            if self
+                .smoke_deadline
+                .is_some_and(|deadline| Instant::now() >= deadline)
+            {
+                self.error = Some(
+                    format!(
+                        "smoke test rendered no frame within {}s",
+                        SMOKE_DEADLINE.as_secs()
+                    )
+                    .into(),
+                );
                 app.close_or_abort();
                 event_loop.exit();
                 return;
