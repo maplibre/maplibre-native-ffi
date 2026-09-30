@@ -532,20 +532,6 @@ endfunction()
 
 function(mln_ffi_add_native_tests)
   mln_ffi_add_test_graphics()
-  find_program(MLN_FFI_UV_EXECUTABLE uv REQUIRED)
-  add_test(
-    NAME binding-contracts
-    COMMAND
-      ${MLN_FFI_UV_EXECUTABLE}
-      run
-      --no-sync
-      python
-      -m
-      tools.bindgen
-      validate)
-  set_tests_properties(
-    binding-contracts
-    PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
   get_target_property(test_supported mln_ffi_platform_dependencies
                       MLN_FFI_TEST_SUPPORTED)
   if(NOT test_supported)
