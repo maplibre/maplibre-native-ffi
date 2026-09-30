@@ -122,6 +122,7 @@ typedef struct vulkan_functions {
   PFN_vkCreateHeadlessSurfaceEXT create_headless_surface;
   PFN_vkVoidFunction create_metal_surface;
   PFN_vkVoidFunction create_win32_surface;
+  PFN_vkVoidFunction create_android_surface;
   PFN_vkDestroyDevice destroy_device;
   PFN_vkDeviceWaitIdle device_wait_idle;
   PFN_vkCreateImage create_image;
@@ -200,6 +201,34 @@ typedef struct metal_runtime {
   void (*pool_pop)(void*);
 } metal_runtime;
 
+#if defined(__ANDROID__)
+// The NDK's AImageReader, which hands out an ANativeWindow with no view or
+// activity behind it. Loaded from libmediandk.so, so the declarations here
+// stand in for <media/NdkImageReader.h>.
+typedef struct android_image_reader android_image_reader;
+typedef struct android_image android_image;
+typedef struct android_image_listener {
+  void* context;
+  void (*on_image_available)(void* context, android_image_reader* reader);
+} android_image_listener;
+
+typedef struct android_media_functions {
+  int32_t (*new_with_usage)(
+    int32_t width, int32_t height, int32_t format, uint64_t usage,
+    int32_t max_images, android_image_reader** reader
+  );
+  int32_t (*get_window)(android_image_reader* reader, void** window);
+  int32_t (*set_image_listener)(
+    android_image_reader* reader, android_image_listener* listener
+  );
+  int32_t (*acquire_next_image)(
+    android_image_reader* reader, android_image** image
+  );
+  void (*image_delete)(android_image* image);
+  void (*reader_delete)(android_image_reader* reader);
+} android_media_functions;
+#endif
+
 struct mln_test_graphics {
   mln_test_graphics_context context;
   void* library;
@@ -210,6 +239,11 @@ struct mln_test_graphics {
   bool vulkan_headless_surface;
   bool vulkan_metal_surface;
   bool vulkan_win32_surface;
+  bool vulkan_android_surface;
+#if defined(__ANDROID__)
+  void* media_library;
+  android_media_functions media;
+#endif
   egl_functions egl;
   void* egl_pbuffer;
   void* gles_library;
@@ -240,6 +274,10 @@ struct mln_test_graphics_surface {
   void* vulkan_layer;
 #if defined(MLN_TG_HAS_WGL)
   HWND window;
+#endif
+#if defined(__ANDROID__)
+  android_image_reader* image_reader;
+  android_image_listener image_listener;
 #endif
 };
 
@@ -599,7 +637,7 @@ static bool vulkan_create_instance(mln_test_graphics* graphics) {
 
   // Surface extensions are optional: a host without them still gets texture
   // contexts, and mln_test_graphics_surface_create() reports the gap.
-  const char* enabled[5];
+  const char* enabled[6];
   uint32_t enabled_count = 0;
   const bool portability =
     has_extension(available, available_count, "VK_KHR_portability_enumeration");
@@ -617,6 +655,12 @@ static bool vulkan_create_instance(mln_test_graphics* graphics) {
       has_extension(available, available_count, "VK_KHR_win32_surface");
     if (graphics->vulkan_win32_surface) {
       enabled[enabled_count++] = "VK_KHR_win32_surface";
+    }
+#elif defined(__ANDROID__)
+    graphics->vulkan_android_surface =
+      has_extension(available, available_count, "VK_KHR_android_surface");
+    if (graphics->vulkan_android_surface) {
+      enabled[enabled_count++] = "VK_KHR_android_surface";
     }
 #endif
     graphics->vulkan_headless_surface =
@@ -704,6 +748,8 @@ static bool vulkan_load_functions(mln_test_graphics* graphics) {
     vulkan_proc(graphics, "vkCreateHeadlessSurfaceEXT");
   vk->create_metal_surface = vulkan_proc(graphics, "vkCreateMetalSurfaceEXT");
   vk->create_win32_surface = vulkan_proc(graphics, "vkCreateWin32SurfaceKHR");
+  vk->create_android_surface =
+    vulkan_proc(graphics, "vkCreateAndroidSurfaceKHR");
   return true;
 }
 
@@ -1171,6 +1217,94 @@ typedef struct vulkan_win32_surface_info {
 static HWND wgl_create_window(uint32_t width, uint32_t height);
 #endif
 
+#if defined(__ANDROID__)
+typedef struct vulkan_android_surface_info {
+  VkStructureType sType;
+  const void* pNext;
+  VkFlags flags;
+  void* window;
+} vulkan_android_surface_info;
+
+enum {
+  android_image_format_rgba_8888 = 1,
+  android_media_ok = 0,
+};
+// AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE |
+// AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT
+static const uint64_t android_gpu_usage = (1ULL << 8) | (1ULL << 9);
+
+static bool android_media_load(mln_test_graphics* graphics) {
+  if (graphics->media_library != NULL) return true;
+  static const char* const names[] = {"libmediandk.so"};
+  void* library = library_open_first("the NDK media library", names, 1);
+  if (library == NULL) return false;
+  android_media_functions* media = &graphics->media;
+#define MLN_TG_LOAD(field, name)                          \
+  *(void**)&media->field = library_symbol(library, name); \
+  if (media->field == NULL) {                             \
+    set_error("libmediandk.so lacks %s", name);           \
+    return false;                                         \
+  }
+  MLN_TG_LOAD(new_with_usage, "AImageReader_newWithUsage");
+  MLN_TG_LOAD(get_window, "AImageReader_getWindow");
+  MLN_TG_LOAD(set_image_listener, "AImageReader_setImageListener");
+  MLN_TG_LOAD(acquire_next_image, "AImageReader_acquireNextImage");
+  MLN_TG_LOAD(image_delete, "AImage_delete");
+  MLN_TG_LOAD(reader_delete, "AImageReader_delete");
+#undef MLN_TG_LOAD
+  graphics->media_library = library;
+  return true;
+}
+
+// Consumes each presented image, so the swapchain never runs out of buffers to
+// dequeue. The reader calls this on a thread of its own.
+static void android_release_presented_image(
+  void* context, android_image_reader* reader
+) {
+  const android_media_functions* media = context;
+  android_image* image = NULL;
+  if (media->acquire_next_image(reader, &image) == android_media_ok) {
+    media->image_delete(image);
+  }
+}
+
+// An image reader's window stands in for a view's: the swapchain presents
+// into its buffer queue, and the listener above consumes each frame.
+static void* android_window_create(
+  mln_test_graphics* graphics, mln_test_graphics_surface* surface
+) {
+  if (!android_media_load(graphics)) return NULL;
+  const android_media_functions* media = &graphics->media;
+  int32_t status = media->new_with_usage(
+    (int32_t)surface->info.width, (int32_t)surface->info.height,
+    android_image_format_rgba_8888, android_gpu_usage, 4, &surface->image_reader
+  );
+  if (status != android_media_ok) {
+    surface->image_reader = NULL;
+    set_error("AImageReader_newWithUsage failed with %d", (int)status);
+    return NULL;
+  }
+  surface->image_listener = (android_image_listener){
+    .context = &graphics->media,
+    .on_image_available = android_release_presented_image,
+  };
+  status =
+    media->set_image_listener(surface->image_reader, &surface->image_listener);
+  if (status != android_media_ok) {
+    set_error("AImageReader_setImageListener failed with %d", (int)status);
+    return NULL;
+  }
+  // The reader owns the window and releases it with the reader.
+  void* window = NULL;
+  status = media->get_window(surface->image_reader, &window);
+  if (status != android_media_ok || window == NULL) {
+    set_error("AImageReader_getWindow failed with %d", (int)status);
+    return NULL;
+  }
+  return window;
+}
+#endif
+
 // Prefers the platform's own surface kind, which a real window would use, and
 // falls back to VK_EXT_headless_surface.
 static bool vulkan_surface_create(
@@ -1220,6 +1354,23 @@ static bool vulkan_surface_create(
     ))vk->create_win32_surface)(instance, &info, NULL, &handle);
   }
 #endif
+#if defined(__ANDROID__)
+  if (
+    handle == VK_NULL_HANDLE && graphics->vulkan_android_surface &&
+    vk->create_android_surface != NULL
+  ) {
+    void* window = android_window_create(graphics, surface);
+    if (window == NULL) return false;
+    const vulkan_android_surface_info info = {
+      .sType = (VkStructureType)1000008000,
+      .window = window,
+    };
+    result = ((VkResult(VKAPI_PTR*)(
+      VkInstance, const vulkan_android_surface_info*,
+      const VkAllocationCallbacks*, VkSurfaceKHR*
+    ))vk->create_android_surface)(instance, &info, NULL, &handle);
+  }
+#endif
   if (
     handle == VK_NULL_HANDLE && graphics->vulkan_headless_surface &&
     vk->create_headless_surface != NULL
@@ -1264,6 +1415,12 @@ static void vulkan_surface_destroy(mln_test_graphics_surface* surface) {
 #if defined(MLN_TG_HAS_METAL)
   if (surface->vulkan_layer != NULL) {
     objc_send_void(graphics, surface->vulkan_layer, "release");
+  }
+#endif
+#if defined(__ANDROID__)
+  // After the surface, which holds the reader's window.
+  if (surface->image_reader != NULL) {
+    graphics->media.reader_delete(surface->image_reader);
   }
 #endif
 }

@@ -6,12 +6,16 @@ that the render target descriptors take. The C suite and the binding suites take
 their GPU objects from here, so one implementation stands in for the host on
 every backend.
 
-| Backend | Context                                                  | Borrowed texture                     | Surface                                          |
-| ------- | -------------------------------------------------------- | ------------------------------------ | ------------------------------------------------ |
-| Metal   | The system default `MTLDevice`                           | A BGRA8 `MTLTexture`                 | A `CAMetalLayer` with no window                  |
-| Vulkan  | An instance, device, and graphics queue on the first GPU | An RGBA8 `VkImage` and `VkImageView` | A Metal-layer, Win32, or headless `VkSurfaceKHR` |
-| EGL     | An OpenGL ES 3 context on a pbuffer config               | An RGBA8 texture in that context     | A pbuffer                                        |
-| WGL     | A context on the device context of a hidden window       | An RGBA8 texture in that context     | The device context of another hidden window      |
+| Backend | Context                                                  | Borrowed texture                     | Surface                                                   |
+| ------- | -------------------------------------------------------- | ------------------------------------ | --------------------------------------------------------- |
+| Metal   | The system default `MTLDevice`                           | A BGRA8 `MTLTexture`                 | A `CAMetalLayer` with no window                           |
+| Vulkan  | An instance, device, and graphics queue on the first GPU | An RGBA8 `VkImage` and `VkImageView` | A Metal-layer, Win32, Android, or headless `VkSurfaceKHR` |
+| EGL     | An OpenGL ES 3 context on a pbuffer config               | An RGBA8 texture in that context     | A pbuffer                                                 |
+| WGL     | A context on the device context of a hidden window       | An RGBA8 texture in that context     | The device context of another hidden window               |
+
+An Android Vulkan surface presents into the window of an `AImageReader` from
+`libmediandk.so`, which discards each frame it receives, so a test presents
+without a view or an activity.
 
 WebGL and WebGPU have no entry here. Their contexts come from JavaScript in the
 browser build, so the browser suite keeps its own fixtures in
