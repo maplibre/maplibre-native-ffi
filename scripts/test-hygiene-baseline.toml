@@ -32,7 +32,6 @@
 "bindings/python/tests/test_render_vulkan_owned.py" = 3
 "bindings/rust/crates/maplibre-native-ffi/src/tests/map.rs" = 3
 "bindings/rust/crates/maplibre-native-ffi/src/tests/render.rs" = 2
-"bindings/rust/crates/maplibre-native-ffi/src/tests/runtime.rs" = 4
 "bindings/swift/Tests/MaplibreNativeFFITests/RenderTests.swift" = 1
 "bindings/swift/Tests/MaplibreNativeFFITests/RuntimeEventTestSupport.swift" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/StyleTests.swift" = 1
@@ -62,7 +61,6 @@
 "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/internal/status/StatusTest.kt" = 1
 "bindings/python/tests/test_package.py" = 33
 "bindings/rust/crates/maplibre-native-ffi/src/tests/map.rs" = 22
-"bindings/rust/crates/maplibre-native-ffi/src/tests/runtime.rs" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/OfflineTests.swift" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/RuntimeTests.swift" = 3
 "bindings/swift/Tests/MaplibreNativeFFITests/StyleTests.swift" = 17
