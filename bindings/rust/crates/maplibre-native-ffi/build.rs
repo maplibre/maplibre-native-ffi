@@ -2,10 +2,33 @@ use std::env;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-/// Builds platform render fixture support.
+/// Tells the tests which render backend the native library compiled in, and
+/// builds platform render fixture support.
 fn main() {
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
     println!("cargo:rustc-check-cfg=cfg(mln_webgpu_backend)");
+    println!(
+        "cargo:rustc-check-cfg=cfg(mln_render_backend, values(\"metal\", \"opengl\", \"vulkan\", \"webgpu\"))"
+    );
+    // The sys crate reads the backend from the native install's descriptor.
+    if let Ok(backend) = env::var("DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND") {
+        println!("cargo:rustc-cfg=mln_render_backend=\"{backend}\"");
+    }
+    // The GPU fixtures that the tests load from tests/graphics install beside
+    // the C API library.
+    println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_INSTALL_DIR");
+    if let Some(install) = env::var_os("MAPLIBRE_NATIVE_C_INSTALL_DIR") {
+        let directory = if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+            "bin"
+        } else {
+            "lib"
+        };
+        let directory = PathBuf::from(install).join(directory);
+        println!(
+            "cargo:rustc-env=MLN_FFI_TEST_GRAPHICS_DIR={}",
+            directory.display()
+        );
+    }
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         generate_macos_egl_bindings();
     }
