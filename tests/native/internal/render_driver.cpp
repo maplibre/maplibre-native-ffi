@@ -279,9 +279,15 @@ void abandon_inside_the_call(void* argument) {
 // abandon waits it out and succeeds. A caller driver's call is the host's own,
 // so abandon from another thread during it is busy and changes nothing.
 void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
+  auto points = SyncPointScope{};
   auto fixture = Fixture{};
   create_fixture(fixture);
-  auto points = SyncPointScope{};
+  // A core worker delivers the attach completion inside the attach call, so
+  // that call can still be short of its exit. Holding the exit before it
+  // passes would park the attach call rather than the frame's.
+  if (fixture.render.driver == MLN_RENDER_DRIVER_CORE_WORKER) {
+    TEST_ASSERT_TRUE(points.wait_for_hits(SyncPoint::RenderDriverExited, 1));
+  }
   points.hold(SyncPoint::RenderDriverExited);
   auto release =
     DriverRelease{.points = &points, .session = fixture.render.session};

@@ -64,8 +64,8 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_render_session_get_snapshot(session, &snapshot, NULL)
   );
-  TEST_ASSERT_NOT_EQUAL_UINT32(
-    MLN_RENDER_SESSION_STATE_ATTACHED, snapshot.state
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_SESSION_STATE_TARGET_LOST, snapshot.state
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_STATE, mln_render_session_destroy(session, NULL)
