@@ -77,4 +77,3 @@
 "src/platform/rust/src/http_client.rs" = 8
 "tests/native/abi/adapter/callback_adapter.c" = 12
 "tests/native/abi/resources/resources.c" = 1
-"tests/native/abi/style/values.c" = 8

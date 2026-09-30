@@ -250,6 +250,13 @@ or a public fence:
 - `barrier_waits_for_a_demand_parked_by_a_full_ring`: a 50-iteration service
   loop in which a barrier must not complete.
 
+### Cases that reach a race through timing
+
+`replacing_data_during_async_tiling_survives` replaces prepared GeoJSON data in
+back-to-back batches while a render thread requests frames. Whether a
+replacement lands while a tile slice is in flight depends on timing. A sync
+point that parks the GeoJSON slicing worker makes the case deterministic.
+
 ### Cases that work around a core defect
 
 - `acquired_frame_release_after_abandon_is_cpu_only` retries abandon while it

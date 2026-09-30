@@ -1897,10 +1897,14 @@ MLN_API mln_status mln_map_set_image_source_url(
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, image is invalid, image pixels are null, image dimensions
- *   or stride are invalid, image byte_length is too small, the source does not
- *   exist, or the source is not an image source.
+ *   or stride are invalid, image byte_length is too small, or completion is
+ *   invalid.
  * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not an image source.
  */
 MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
 MLN_API mln_status mln_map_set_image_source_image(
@@ -1950,10 +1954,13 @@ MLN_API mln_status mln_map_set_image_source_coordinates(
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, completion is invalid, or the source exists and is not
- *   an image source.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when the source exists and is not an image
+ *   source.
  */
 MLN_BINDING(
   "execution=query;result=mln_lat_lng;shape=array;ownership=borrowed;nullable="
