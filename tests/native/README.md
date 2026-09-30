@@ -107,8 +107,9 @@ Each target runs the ABI suite in the shape that suits it:
 - **Android, OpenHarmony, and musl:** the runner script runs the executable
   once, then again for the plugin group.
 
-The plugin group runs last, in an invocation of its own, because a plugin
-registration lasts for the rest of the process.
+The plugin group runs last because a plugin registration lasts for the rest of
+the process. Every target except the browser also runs it in an invocation of
+its own; the browser runs it at the end of the fourth shard.
 
 ## Timeouts
 
