@@ -8,9 +8,10 @@
 #include <memory>
 #include <thread>
 
-#include <emscripten/heap.h>
 #include <mln/util/async_task.hpp>
 #include <mln/util/run_loop.hpp>
+
+#include <emscripten/heap.h>
 
 #include "platform/emscripten/run_loop_wake.hpp"
 #include "support/harness.h"

@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "completion/completion.hpp"
+
 #include "maplibre_native_c.h"
 #include "support/harness.h"
 #include "unity.h"
