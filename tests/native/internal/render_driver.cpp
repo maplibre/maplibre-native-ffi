@@ -237,6 +237,8 @@ auto frame_published(void* context) -> bool {
 struct DriverRelease {
   SyncPointScope* points;
   mln_render_session session;
+  // The caller driver's exits before the held call, such as the attach's.
+  int exits_before_the_call = 0;
   std::atomic_bool abandon_returned{false};
   bool abandon_waited = false;
   mln_status abandon_status = MLN_STATUS_NATIVE_ERROR;
@@ -262,9 +264,9 @@ void release_when_abandon_waits(void* argument) {
 // holds open, then lets the call end.
 void abandon_inside_the_call(void* argument) {
   auto& release = *static_cast<DriverRelease*>(argument);
-  static_cast<void>(
-    release.points->wait_for_hits(SyncPoint::RenderDriverExited, 1)
-  );
+  static_cast<void>(release.points->wait_for_hits(
+    SyncPoint::RenderDriverExited, release.exits_before_the_call + 1
+  ));
   auto result =
     mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
   release.abandon_status =
@@ -325,6 +327,9 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
       MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, result.disposition
     );
   } else {
+    // Servicing the attach already passed the exit point, so the held call is
+    // the next exit.
+    release.exits_before_the_call = points.hits(SyncPoint::RenderDriverExited);
     auto* thread = mln_test_thread_start(abandon_inside_the_call, &release);
     auto serviced = std::size_t{0};
     TEST_ASSERT_EQUAL_INT(
