@@ -67,6 +67,13 @@ static_assert(
   MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED < 64,
   "an event type value past 63 needs a wider subscription mask"
 );
+// runtime.h promises that a later payload member widens the event stride
+// without moving any field, which holds only while the payload is last.
+static_assert(
+  offsetof(mln_runtime_event, payload) + sizeof(mln_runtime_event_payload) ==
+    sizeof(mln_runtime_event),
+  "the payload must stay the last member of mln_runtime_event"
+);
 
 // One relaxed load, one shift, one test. No handle-table lock, no event_mutex.
 // Relaxed ordering is correct because the mask is policy rather than a

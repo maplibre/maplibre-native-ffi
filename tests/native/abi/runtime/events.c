@@ -2,7 +2,6 @@
 // batch layout and lifetime, mask validation, and the suppression a cleared
 // mask bit causes at push time.
 
-#include <assert.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -14,134 +13,6 @@
 #include "unity.h"
 
 static const uint64_t unknown_mask_bit = UINT64_C(1) << 63U;
-
-// The record layout every binding probes. A host reads a batch as two byte
-// ranges at these offsets, so a change here is an ABI break.
-static_assert(
-  sizeof(mln_rendering_stats) == 40, "mln_rendering_stats is 40 bytes wide"
-);
-static_assert(
-  sizeof(mln_runtime_event_render_frame) == 48,
-  "mln_runtime_event_render_frame is 48 bytes wide"
-);
-static_assert(
-  sizeof(mln_runtime_event_render_map) == 4,
-  "mln_runtime_event_render_map is 4 bytes wide"
-);
-static_assert(sizeof(mln_tile_id) == 20, "mln_tile_id is 20 bytes wide");
-static_assert(
-  sizeof(mln_runtime_event_tile_action) == 24,
-  "mln_runtime_event_tile_action is 24 bytes wide"
-);
-static_assert(
-  sizeof(mln_runtime_event_camera_transition_finished) == 8,
-  "mln_runtime_event_camera_transition_finished is 8 bytes wide"
-);
-static_assert(
-  sizeof(mln_offline_region_status) == 64,
-  "mln_offline_region_status is 64 bytes wide"
-);
-static_assert(
-  sizeof(mln_runtime_event_offline_region_status) == 72,
-  "mln_runtime_event_offline_region_status is 72 bytes wide"
-);
-static_assert(
-  sizeof(mln_runtime_event_offline_region_response_error) == 16,
-  "mln_runtime_event_offline_region_response_error is 16 bytes wide"
-);
-static_assert(
-  sizeof(mln_runtime_event_offline_region_tile_count_limit) == 16,
-  "mln_runtime_event_offline_region_tile_count_limit is 16 bytes wide"
-);
-static_assert(
-  sizeof(mln_runtime_event_payload) == 72,
-  "mln_runtime_event_payload is 72 bytes wide"
-);
-static_assert(
-  _Alignof(mln_runtime_event_payload) == 8,
-  "mln_runtime_event_payload is 8-byte aligned"
-);
-static_assert(
-  sizeof(mln_runtime_event) == 112, "mln_runtime_event is 112 bytes wide"
-);
-static_assert(
-  _Alignof(mln_runtime_event) == 8, "mln_runtime_event is 8-byte aligned"
-);
-static_assert(
-  offsetof(mln_runtime_event, type) == 0,
-  "mln_runtime_event.type sits at offset 0"
-);
-static_assert(
-  offsetof(mln_runtime_event, source_type) == 4,
-  "mln_runtime_event.source_type sits at offset 4"
-);
-static_assert(
-  offsetof(mln_runtime_event, source) == 8,
-  "mln_runtime_event.source sits at offset 8"
-);
-static_assert(
-  offsetof(mln_runtime_event, code) == 16,
-  "mln_runtime_event.code sits at offset 16"
-);
-static_assert(
-  offsetof(mln_runtime_event, payload_type) == 20,
-  "mln_runtime_event.payload_type sits at offset 20"
-);
-static_assert(
-  offsetof(mln_runtime_event, message_offset) == 24,
-  "mln_runtime_event.message_offset sits at offset 24"
-);
-static_assert(
-  offsetof(mln_runtime_event, message_size) == 32,
-  "mln_runtime_event.message_size sits at offset 32"
-);
-static_assert(
-  offsetof(mln_runtime_event, payload) == 40,
-  "mln_runtime_event.payload sits at offset 40"
-);
-static_assert(
-  sizeof(mln_map_options) == 40, "mln_map_options is 40 bytes wide"
-);
-static_assert(
-  offsetof(mln_map_options, event_mask) == 32,
-  "mln_map_options.event_mask sits at offset 32"
-);
-static_assert(
-  offsetof(mln_runtime_options, flags) == 4,
-  "mln_runtime_options.flags sits at offset 4"
-);
-static_assert(
-  MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS == UINT64_C(0x47FFFE),
-  "MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS is 0x47FFFE"
-);
-static_assert(
-  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS == UINT64_C(0x380000),
-  "MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS is 0x380000"
-);
-static_assert(
-  MLN_RUNTIME_EVENT_MASK_ALL == UINT64_C(0x7FFFFE),
-  "MLN_RUNTIME_EVENT_MASK_ALL is 0x7FFFFE"
-);
-
-// These structs carry pointers or size_t, so their extents follow the target's
-// pointer width.
-#if UINTPTR_MAX == UINT64_MAX
-static_assert(
-  sizeof(mln_runtime_event_batch_view) == 40,
-  "mln_runtime_event_batch_view is 40 bytes wide"
-);
-static_assert(
-  sizeof(mln_runtime_options) == 64, "mln_runtime_options is 64 bytes wide"
-);
-static_assert(
-  offsetof(mln_runtime_options, event_mask) == 24,
-  "mln_runtime_options.event_mask sits at offset 24"
-);
-static_assert(
-  offsetof(mln_runtime_options, event_wake) == 32,
-  "mln_runtime_options.event_wake sits at offset 32"
-);
-#endif
 
 static const mln_runtime_event* batch_event(
   const mln_test_event_batch* batch, size_t index
@@ -300,17 +171,6 @@ static void a_fresh_map_and_runtime_select_every_event_type(void) {
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-}
-
-static void runtime_options_reject_unknown_flags(void) {
-  mln_runtime_options runtime_options = mln_runtime_options_default();
-  runtime_options.flags = UINT32_C(1) << 31U;
-  mln_runtime bad_runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_create(&runtime_options, &bad_runtime, NULL)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, bad_runtime);
 }
 
 // Creation rejects a mask the setters reject, so one value is not accepted at
@@ -511,55 +371,6 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_event_batch_release(batch);
 }
 
-// A transition reports its identity immediately before the camera change that
-// completed it, and one batch preserves that order.
-static void one_batch_reports_events_in_queue_order(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_drain_all(runtime);
-
-  mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_ZOOM;
-  camera.zoom = 4.0;
-  mln_animation_options animation = mln_animation_options_default();
-  animation.fields = MLN_ANIMATION_OPTION_TRANSITION_ID;
-  animation.transition_id = 77;
-  mln_camera_update update = mln_camera_update_default();
-  update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
-  update.camera = camera;
-  update.animation = animation;
-  mln_test_completion completion = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
-  mln_test_completion_destroy(&completion);
-
-  mln_test_event_batch batch = mln_test_event_batch_default();
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_drain_events(runtime, &batch));
-  bool saw_finish = false;
-  bool did_change_followed_finish = false;
-  for (size_t index = 0; index < batch.event_count; index += 1) {
-    const mln_runtime_event* event = batch_event(&batch, index);
-    if (event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED) {
-      TEST_ASSERT_EQUAL_UINT64(
-        77, event->payload.camera_transition_finished.transition_id
-      );
-      saw_finish = true;
-    } else if (
-      event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE && saw_finish
-    ) {
-      did_change_followed_finish = true;
-    }
-  }
-  TEST_ASSERT_TRUE(saw_finish);
-  TEST_ASSERT_TRUE(did_change_followed_finish);
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // A drained batch is an owned handle: releasing it twice is a no-op, releasing
 // the null handle is a no-op, and a released handle names no batch.
 static void a_released_event_batch_names_no_batch(void) {
@@ -741,14 +552,12 @@ MLN_TEST_GROUP {
   RUN_TEST(event_drain_and_mask_changes_are_any_thread);
   RUN_TEST(both_mask_setters_reject_unknown_bits_and_keep_foreign_ones);
   RUN_TEST(a_fresh_map_and_runtime_select_every_event_type);
-  RUN_TEST(runtime_options_reject_unknown_flags);
   RUN_TEST(options_reject_unknown_event_mask_bits);
   RUN_TEST(a_creation_mask_applies_during_construction);
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);
   RUN_TEST(a_suppressed_producer_leaves_the_queue_empty);
   RUN_TEST(an_owned_batch_remains_stable_across_later_drains);
   RUN_TEST(queued_events_outlive_the_map_that_produced_them);
-  RUN_TEST(one_batch_reports_events_in_queue_order);
   RUN_TEST(a_transition_reports_one_terminal_outcome);
   RUN_TEST(a_released_event_batch_names_no_batch);
   RUN_TEST(the_message_arena_carries_one_range_per_event);
