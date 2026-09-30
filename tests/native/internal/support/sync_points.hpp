@@ -16,6 +16,12 @@ using mln::testing::SyncPoint;
 //
 // Some points run with a library lock held; see sync_point.hpp. Hold only the
 // points that document no lock.
+//
+// The counts are process-wide, and a thread still finishing an earlier case's
+// work would add to them. Single-process runners run every case in one
+// process, so each case has to end only after its runtimes' releases have
+// completed. A completed release has waited for its maps' cleanup and its
+// in-flight resource callbacks, so no earlier case can reach a point later.
 class SyncPointScope {
  public:
   SyncPointScope() noexcept;

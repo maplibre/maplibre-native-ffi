@@ -1141,14 +1141,17 @@ auto replace_registration(
   State& state, Registration State::* member,
   std::type_identity_t<Registration> next
 ) -> void {
-  if constexpr (std::is_same_v<State, ResourceTransformState>) {
-    mln::testing::hit(mln::testing::SyncPoint::ResourceTransformExclusive);
-  } else if constexpr (std::is_same_v<State, ResourceProviderState>) {
-    mln::testing::hit(mln::testing::SyncPoint::ResourceProviderExclusive);
-  }
   auto previous = Registration{};
   {
-    const std::unique_lock lock(state.mutex);
+    auto lock = std::unique_lock(state.mutex, std::try_to_lock);
+    if (!lock.owns_lock()) {
+      if constexpr (std::is_same_v<State, ResourceTransformState>) {
+        mln::testing::hit(mln::testing::SyncPoint::ResourceTransformExclusive);
+      } else if constexpr (std::is_same_v<State, ResourceProviderState>) {
+        mln::testing::hit(mln::testing::SyncPoint::ResourceProviderExclusive);
+      }
+      lock.lock();
+    }
     previous = std::exchange(state.*member, std::move(next));
   }
 }
@@ -2687,7 +2690,9 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
       }
       auto live = std::move(gate->live);
       wait_for_prior_runtime_submissions(live, gate->sequence);
-      live->control.wait_for_submissions();
+      live->control.wait_for_submissions([]() noexcept -> void {
+        mln::testing::hit(mln::testing::SyncPoint::RuntimeReleaseWaits);
+      });
       unregister_platform_context(live->platform_context);
       try {
         live->executor.invoke_sync([live]() -> void {

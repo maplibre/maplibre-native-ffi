@@ -17,9 +17,14 @@ enum class SyncPoint : std::uint8_t {
   // A map's teardown lane is about to shut down the map's worker pool, which
   // is the last cleanup a released map holds its runtime open for.
   MapPoolShutdown,
-  // A writer is about to take the runtime's resource transform or resource
-  // provider registration exclusively: setting or clearing it, or runtime
-  // teardown releasing it. The writer waits there for in-flight callbacks.
+  // A runtime release's teardown found submission leases outstanding, such as
+  // a released map's cleanup, and is about to wait for them. It fires only
+  // when the teardown has to wait.
+  RuntimeReleaseWaits,
+  // A writer found the runtime's resource transform or resource provider
+  // registration in use by a callback and is about to wait for its exclusive
+  // lock: setting or clearing the registration, or runtime teardown releasing
+  // it. It fires only when the writer has to wait.
   ResourceTransformExclusive,
   ResourceProviderExclusive,
   // A MapLibre thread holds a lease on a runtime's resource transform state,

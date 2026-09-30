@@ -97,8 +97,16 @@ class ControlState {
     if (ready) callback(context);
   }
 
-  auto wait_for_submissions() noexcept -> void {
+  // Blocks until no submission lease is outstanding. When one is, it first
+  // calls `before_wait` once, outside the control lock.
+  auto wait_for_submissions(void (*before_wait)() noexcept = nullptr) noexcept
+    -> void {
     auto lock = std::unique_lock{mutex_};
+    if (before_wait != nullptr && submissions_ != 0) {
+      lock.unlock();
+      before_wait();
+      lock.lock();
+    }
     condition_.wait(lock, [this]() noexcept -> bool {
       return submissions_ == 0;
     });

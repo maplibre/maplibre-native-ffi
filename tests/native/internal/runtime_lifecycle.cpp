@@ -13,8 +13,9 @@ using mln::native_tests::SyncPoint;
 using mln::native_tests::SyncPointScope;
 
 // A released map completes before its worker pool shuts down, and the runtime
-// release waits for that shutdown. The parked shutdown is the fence for the
-// runtime's pending completion.
+// release waits for that shutdown. The case parks the shutdown, then waits for
+// the runtime's teardown to report that it is waiting on outstanding cleanup,
+// which it reports only when it has to wait.
 void runtime_release_waits_for_retired_map_cleanup() {
   auto sync_points = SyncPointScope{};
   sync_points.hold(SyncPoint::MapPoolShutdown);
@@ -44,6 +45,8 @@ void runtime_release_waits_for_retired_map_cleanup() {
   auto runtime_close = mln_test_completion_default(0);
   const auto runtime_accepted =
     mln_runtime_release(runtime, &runtime_close.descriptor, nullptr);
+  const auto runtime_waited =
+    sync_points.wait_for_hits(SyncPoint::RuntimeReleaseWaits, 1);
   const auto runtime_closed_early = mln_test_completion_poll(&runtime_close);
   sync_points.release(SyncPoint::MapPoolShutdown);
   const auto map_status = mln_test_completion_settle(&map_close);
@@ -52,6 +55,10 @@ void runtime_release_waits_for_retired_map_cleanup() {
   TEST_ASSERT_TRUE(cleanup_parked);
   TEST_ASSERT_TRUE(map_closed);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, runtime_accepted);
+  TEST_ASSERT_TRUE_MESSAGE(
+    runtime_waited,
+    "the runtime release never waited for a map's parked cleanup"
+  );
   TEST_ASSERT_FALSE_MESSAGE(
     runtime_closed_early,
     "the runtime release completed while a map's cleanup was parked"

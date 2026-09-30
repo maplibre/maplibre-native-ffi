@@ -5,7 +5,9 @@
 // stalls every other runtime.
 //
 // The sync points order the threads: each case releases a callback once the
-// thread it races has reached the lock under test.
+// thread it races is waiting at the lock under test. The writer points fire
+// only when a writer finds the lock in use, so a writer that skips the wait
+// never fires one, and its case fails at the deadline.
 
 #include <atomic>
 #include <cstdint>
@@ -246,12 +248,13 @@ void resource_transform_lookup_leaves_other_runtimes_responsive() {
 }
 
 // A provider callback that returns only once a writer is waiting for it on the
-// provider's exclusive lock.
+// provider's exclusive lock, or once the deadline passes without one.
 struct ParkedProvider {
   const SyncPointScope* sync_points = nullptr;
   std::atomic_bool entered = false;
   std::atomic_bool writer_started = false;
   std::atomic_int writer_hits = 0;
+  std::atomic_bool writer_waited = false;
   std::atomic_bool callback_returned = false;
   std::atomic_bool released = false;
 };
@@ -265,9 +268,9 @@ auto parked_provider(
   auto& provider = *static_cast<ParkedProvider*>(user_data);
   mln_test_flag_set(&provider.entered);
   static_cast<void>(mln_test_wait_for_flag(&provider.writer_started));
-  static_cast<void>(provider.sync_points->wait_for_hits(
+  provider.writer_waited = provider.sync_points->wait_for_hits(
     SyncPoint::ResourceProviderExclusive, provider.writer_hits.load()
-  ));
+  );
   mln_test_flag_set(&provider.callback_returned);
   return provider_error_decision;
 }
@@ -312,6 +315,10 @@ void clearing_resource_provider_waits_for_in_flight_callback() {
     MLN_STATUS_OK, mln::native_tests::clear_resource_provider(runtime)
   );
   TEST_ASSERT_TRUE_MESSAGE(
+    probe.writer_waited.load(),
+    "the clear never waited for the running provider callback"
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
     probe.callback_returned.load(),
     "the clear completed while a provider callback was still running"
   );
@@ -333,6 +340,10 @@ void runtime_teardown_waits_for_in_flight_provider_callback() {
   start_writer(sync_points, probe);
   mln_test_destroy_runtime(runtime);
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.released));
+  TEST_ASSERT_TRUE_MESSAGE(
+    probe.writer_waited.load(),
+    "runtime teardown never waited for the running provider callback"
+  );
   TEST_ASSERT_TRUE_MESSAGE(
     probe.callback_returned.load(),
     "runtime teardown released the provider while its callback still ran"
