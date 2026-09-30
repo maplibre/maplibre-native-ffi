@@ -1,6 +1,7 @@
 // Custom geometry and custom MVT vector sources: when the host's callback state
 // is released, which tiles the fetch and cancel callbacks receive during a
-// stepped render, delivered tiles becoming features, and invalidation.
+// stepped render, delivered tiles becoming features, and which tiles an
+// invalidation refetches.
 //
 // The two kinds share their contracts, so every shared case runs once per kind.
 // The release callback is the only report that the host's state is no longer
@@ -25,6 +26,9 @@ typedef struct custom_probe {
   atomic_size_t root_fetches;
   atomic_size_t root_cancels;
   atomic_uint deepest_fetch;
+  // Fetches and cancels of each zoom-1 tile, indexed by x + 2 * y.
+  atomic_size_t quadrant_fetches[4];
+  atomic_size_t quadrant_cancels[4];
 } custom_probe;
 
 static void probe_fetch_tile(void* user_data, mln_canonical_tile_id tile_id) {
@@ -32,6 +36,9 @@ static void probe_fetch_tile(void* user_data, mln_canonical_tile_id tile_id) {
   atomic_fetch_add(&probe->fetch_count, 1);
   if (tile_id.z == 0) {
     atomic_fetch_add(&probe->root_fetches, 1);
+  }
+  if (tile_id.z == 1) {
+    atomic_fetch_add(&probe->quadrant_fetches[tile_id.x + 2 * tile_id.y], 1);
   }
   unsigned int deepest = atomic_load(&probe->deepest_fetch);
   while (
@@ -42,8 +49,12 @@ static void probe_fetch_tile(void* user_data, mln_canonical_tile_id tile_id) {
 }
 
 static void probe_cancel_tile(void* user_data, mln_canonical_tile_id tile_id) {
+  custom_probe* probe = user_data;
   if (tile_id.z == 0) {
-    atomic_fetch_add(&((custom_probe*)user_data)->root_cancels, 1);
+    atomic_fetch_add(&probe->root_cancels, 1);
+  }
+  if (tile_id.z == 1) {
+    atomic_fetch_add(&probe->quadrant_cancels[tile_id.x + 2 * tile_id.y], 1);
   }
   mln_test_pulse();
 }
@@ -197,6 +208,10 @@ static void init_probe(custom_probe* probe) {
   atomic_init(&probe->root_fetches, 0);
   atomic_init(&probe->root_cancels, 0);
   atomic_init(&probe->deepest_fetch, 0);
+  for (size_t index = 0; index < 4; index += 1) {
+    atomic_init(&probe->quadrant_fetches[index], 0);
+    atomic_init(&probe->quadrant_cancels[index], 0);
+  }
 }
 
 static mln_status submit_and_settle(
@@ -455,7 +470,9 @@ static void fetches_follow_the_rendered_tiles(void) {
 
 // Data delivered for a fetched tile becomes that tile's features, and
 // invalidating the tile cancels it and fetches it again.
-static void a_delivered_tile_becomes_features_until_invalidated(void) {
+static void a_delivered_tile_becomes_features_and_invalidation_refetches_it(
+  void
+) {
   FOR_EACH_KIND(kind) {
     mln_runtime runtime = mln_test_create_runtime();
     mln_map map = mln_test_create_map(runtime);
@@ -482,20 +499,27 @@ static void a_delivered_tile_becomes_features_until_invalidated(void) {
       kind->name
     );
 
+    const size_t fetches = atomic_load(&probe.root_fetches);
+    const size_t cancels = atomic_load(&probe.root_cancels);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_OK, submit_and_settle(kind, map, kind->invalidate_root),
       kind->name
     );
     probe_target refetched = {
       .probe = &probe,
-      .root_fetches = 2,
-      .root_cancels = 1,
+      .root_fetches = fetches + 1,
+      .root_cancels = cancels + 1,
     };
     TEST_ASSERT_TRUE_MESSAGE(
       mln_test_style_render_until(
         &fixture, probe_reached, &refetched, "the invalidated tile's fetch"
       ),
       kind->name
+    );
+    // The tile loader runs the refetch after the invalidation, so the one
+    // cancel the invalidation made has already arrived.
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(
+      cancels + 1, atomic_load(&probe.root_cancels), kind->name
     );
 
     mln_test_render_fixture_destroy(&fixture);
@@ -504,36 +528,91 @@ static void a_delivered_tile_becomes_features_until_invalidated(void) {
   }
 }
 
-// A region invalidation cancels and refetches the fetched tiles inside it.
-static void a_region_invalidation_refetches_the_tiles_inside_it(void) {
+static bool every_quadrant_fetched(void* context) {
+  const custom_probe* probe = context;
+  for (size_t index = 0; index < 4; index += 1) {
+    if (atomic_load(&probe->quadrant_fetches[index]) == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+typedef struct quadrant_target {
+  const custom_probe* probe;
+  size_t index;
+  size_t fetches;
+} quadrant_target;
+
+static bool quadrant_refetched(void* context) {
+  const quadrant_target* target = context;
+  return atomic_load(&target->probe->quadrant_fetches[target->index]) >
+         target->fetches;
+}
+
+// A region invalidation cancels and refetches the fetched tiles inside it, and
+// leaves the tiles outside it alone.
+static void a_region_invalidation_refetches_only_the_tiles_inside_it(void) {
   const custom_kind* kind = &kinds[0];
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   custom_probe probe;
   mln_test_render_fixture fixture = {0};
   start_rendering(kind, runtime, map, &probe, &fixture);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, submit_and_settle(kind, map, kind->deliver_point)
-  );
 
-  const mln_lat_lng_bounds around_the_center = {
-    .southwest = {.latitude = -1.0, .longitude = -1.0},
-    .northeast = {.latitude = 1.0, .longitude = 1.0},
+  // At zoom 1 the viewport's center is the corner all four tiles share, so
+  // every one of them is fetched.
+  mln_camera_update update = mln_camera_update_default();
+  update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  update.camera.latitude = 0.0;
+  update.camera.longitude = 0.0;
+  update.camera.zoom = 1.0;
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_TRUE(mln_test_style_render_until(
+    &fixture, every_quadrant_fetched, &probe, "every zoom-1 tile's fetch"
+  ));
+  size_t fetches[4];
+  size_t cancels[4];
+  for (size_t index = 0; index < 4; index += 1) {
+    fetches[index] = atomic_load(&probe.quadrant_fetches[index]);
+    cancels[index] = atomic_load(&probe.quadrant_cancels[index]);
+  }
+
+  // The region lies inside tile 1/1/0, the northeast quadrant.
+  const size_t inside = 1;
+  const mln_lat_lng_bounds northeast = {
+    .southwest = {.latitude = 10.0, .longitude = 10.0},
+    .northeast = {.latitude = 20.0, .longitude = 20.0},
   };
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_OK, mln_map_invalidate_custom_geometry_source_region(
-                     map, MLN_BUFFER_LITERAL("custom-geometry"),
-                     around_the_center, &completion.descriptor, NULL
+                     map, MLN_BUFFER_LITERAL("custom-geometry"), northeast,
+                     &completion.descriptor, NULL
                    )
   );
-  probe_target refetched = {
+  quadrant_target refetched = {
     .probe = &probe,
-    .root_fetches = 2,
-    .root_cancels = 1,
+    .index = inside,
+    .fetches = fetches[inside],
   };
   TEST_ASSERT_TRUE(mln_test_style_render_until(
-    &fixture, probe_reached, &refetched, "the invalidated region's fetch"
+    &fixture, quadrant_refetched, &refetched, "the invalidated tile's fetch"
   ));
+
+  // The tile loader runs the refetch after the whole invalidation, so every
+  // cancel the invalidation made has already arrived.
+  for (size_t index = 0; index < 4; index += 1) {
+    const size_t changed = index == inside ? 1 : 0;
+    TEST_ASSERT_EQUAL_size_t(
+      cancels[index] + changed, atomic_load(&probe.quadrant_cancels[index])
+    );
+    TEST_ASSERT_EQUAL_size_t(
+      fetches[index] + changed, atomic_load(&probe.quadrant_fetches[index])
+    );
+  }
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -664,8 +743,8 @@ MLN_TEST_GROUP {
   RUN_TEST(an_explicit_removal_releases_once);
   RUN_TEST(accepted_adds_release_their_callback_state);
   RUN_TEST(fetches_follow_the_rendered_tiles);
-  RUN_TEST(a_delivered_tile_becomes_features_until_invalidated);
-  RUN_TEST(a_region_invalidation_refetches_the_tiles_inside_it);
+  RUN_TEST(a_delivered_tile_becomes_features_and_invalidation_refetches_it);
+  RUN_TEST(a_region_invalidation_refetches_only_the_tiles_inside_it);
   RUN_TEST(tile_delivery_and_invalidate_accept_an_empty_tile);
   RUN_TEST(tile_operations_reject_the_other_custom_source_kind);
 }
