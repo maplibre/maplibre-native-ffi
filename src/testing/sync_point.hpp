@@ -46,6 +46,10 @@ enum class SyncPoint : std::uint8_t {
   // result or completion that work published, and is about to end. The call
   // stays in flight until the handler returns.
   RenderDriverExited,
+  // A render session's driver call has published a frame demand's result,
+  // which the host can drain, and is about to finish the demand. The call
+  // stays in flight until the handler returns. No lock is held.
+  RenderFrameResultPublished,
   // Abandoning a core-worker session found a driver call in flight and is
   // about to wait for it to end. It fires only when abandon has to wait.
   RenderAbandonWaits,
@@ -54,8 +58,7 @@ enum class SyncPoint : std::uint8_t {
   // cannot complete the image.
   StillImageFrameHeldBack,
   // An Emscripten run loop's stop() has submitted its stop task, and the loop
-  // may already be destroyed. Keep this point last: the suite sizes its tables
-  // from it.
+  // may already be destroyed.
   EmscriptenRunLoopStopSubmitted,
   // A GeoJSON data's sequenced worker holds the data and is about to slice one
   // tile for an asynchronous request. Synchronous tiling slices inline and
@@ -70,7 +73,8 @@ enum class SyncPoint : std::uint8_t {
   // one projection.
   ProjectionCallRunning,
   // A projection close retired the handle and found a call running, and is
-  // about to wait for it. It fires only when the close has to wait.
+  // about to wait for it. It fires only when the close has to wait. Keep this
+  // point last: the suite sizes its tables from it.
   ProjectionCloseWaits,
 };
 

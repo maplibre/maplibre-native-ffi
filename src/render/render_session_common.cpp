@@ -2214,8 +2214,11 @@ auto publish_frame_result(
   const std::shared_ptr<mln_render_session_object>& session,
   mln_render_frame_result result
 ) noexcept -> void {
-  const auto lock = std::scoped_lock{session->control_mutex};
-  publish_frame_result_locked(*session, result);
+  {
+    const auto lock = std::scoped_lock{session->control_mutex};
+    publish_frame_result_locked(*session, result);
+  }
+  mln::testing::hit(mln::testing::SyncPoint::RenderFrameResultPublished);
 }
 
 // The barriers whose earlier demands have all reached a terminal result.

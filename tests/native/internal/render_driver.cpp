@@ -210,10 +210,10 @@ void a_parked_demand_misses_a_deadline_that_passes_while_the_ring_is_full() {
   destroy_fixture(fixture);
 }
 
-// Requests a forced frame for a case that holds RenderDriverExited, so the
-// driver call that renders it publishes its result and then stays in flight:
-// the window in which a host that acted on the result reaches abandon before
-// the call ends, which no public fence can hold open.
+// Requests a forced frame for a case that holds the call that renders it
+// after the call publishes its result: the window in which a host that acted
+// on the result reaches abandon before the call ends, which no public fence
+// can hold open.
 void request_frame_and_hold_the_call(const Fixture& fixture, uint64_t token) {
   auto demand = mln_frame_demand_default();
   demand.flags = 0;
@@ -257,7 +257,7 @@ void release_when_abandon_waits(void* argument) {
   ));
   release.abandon_waited =
     release.points->hits(SyncPoint::RenderAbandonWaits) > 0;
-  release.points->release(SyncPoint::RenderDriverExited);
+  release.points->release(SyncPoint::RenderFrameResultPublished);
 }
 
 // Abandons from outside the caller driver's call, which the case's own thread
@@ -282,13 +282,14 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
   auto points = SyncPointScope{};
   auto fixture = Fixture{};
   create_fixture(fixture);
-  // A core worker delivers the attach completion inside the attach call, so
-  // that call can still be short of its exit. Holding the exit before it
-  // passes would park the attach call rather than the frame's.
-  if (fixture.render.driver == MLN_RENDER_DRIVER_CORE_WORKER) {
-    TEST_ASSERT_TRUE(points.wait_for_hits(SyncPoint::RenderDriverExited, 1));
-  }
-  points.hold(SyncPoint::RenderDriverExited);
+  // A core worker also runs calls of its own, such as ones that service its
+  // scheduler, so only the frame's publication tells its call apart. A caller
+  // driver runs nothing until the case services it, so its exit is the call.
+  points.hold(
+    fixture.render.driver == MLN_RENDER_DRIVER_CORE_WORKER
+      ? SyncPoint::RenderFrameResultPublished
+      : SyncPoint::RenderDriverExited
+  );
   auto release =
     DriverRelease{.points = &points, .session = fixture.render.session};
   request_frame_and_hold_the_call(fixture, 107);
