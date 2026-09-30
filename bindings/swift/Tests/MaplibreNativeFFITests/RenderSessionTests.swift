@@ -133,7 +133,6 @@ private func attachOwnedTexture(
   let fixture = try await MapFixture.make()
   let thread = RenderThread()
   let graphics = try TestGraphics()
-  try await fixture.map.setStyleJson(json: redStyle)
   try await thread.perform { try graphics.makeCurrentIfNeeded() }
   let attachment = try graphics.attachOwnedTexture(
     map: fixture.map,
@@ -149,13 +148,19 @@ private func attachOwnedTexture(
   try await attachment.completion.value
   #expect(try session.getSnapshot().driver == .callerGraphicsThread)
 
+  // A demand that waits for the style's first update wakes the thread when
+  // the update arrives.
+  try session.requestFrame(demand: FrameDemand(flags: [.ifNeeded], token: 1))
+  try await fixture.map.setStyleJson(json: redStyle)
   #expect(try await session.awaitRenderedFrame()?.disposition == .rendered)
   let readback = try await session.textureReadPremultipliedRgba8()
   #expect(Array(readback.data.prefix(4)) == [255, 0, 0, 255])
 
+  // Detaching needs the driver serviced; closing needs the thread done with
+  // the session.
   try await session.detach()
-  try session.close()
   thread.stop()
+  try session.close()
   withExtendedLifetime(graphics) {}
   await fixture.close()
 }
