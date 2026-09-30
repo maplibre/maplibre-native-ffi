@@ -119,8 +119,11 @@ case was waiting on when a wait helper recorded it, and aborts the process. The
 scale is 1 on hardware. The runner scripts and CI set it to 3 for emulators,
 simulators, the browser, and software renderers.
 
-CTest bounds each desktop entry at 120 seconds and each browser shard at 180
-seconds. The emulator runners bound each executable at 300 seconds.
+CTest bounds each desktop entry at 120 seconds, each browser shard at 180
+seconds, and a simulator's suite and plugin entries at 300 and 120 seconds. The
+browser and simulator runners stop ten seconds short of their entry's bound, so
+the runner reports the timeout rather than CTest. The emulator runners bound
+each executable at 300 seconds.
 
 ## Support helpers
 

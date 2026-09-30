@@ -17,7 +17,7 @@ EMULATOR_TESTED = {
 
 
 def runtime_tested(preset: str, tested: set[str]) -> bool:
-    """Whether CI executes this target's C API suite rather than only building it."""
+    """Whether CI executes this target's native suite rather than only building it."""
     return preset in tested or preset in EMULATOR_TESTED
 
 

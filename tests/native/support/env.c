@@ -61,6 +61,15 @@ static void reserve_map_slot(void) {
   tracked_map_capacity = capacity;
 }
 
+// Frees the record once it is empty, so a thread that exits holds nothing.
+static void release_empty_map_slots(void) {
+  if (tracked_map_count == 0) {
+    free(tracked_maps);
+    tracked_maps = NULL;
+    tracked_map_capacity = 0;
+  }
+}
+
 static void track_map(mln_map map) {
   tracked_maps[tracked_map_count] = map;
   tracked_map_count += 1;
@@ -71,6 +80,7 @@ static void untrack_map(const mln_map map) {
     if (tracked_maps[index] == map) {
       tracked_maps[index] = tracked_maps[tracked_map_count - 1];
       tracked_map_count -= 1;
+      release_empty_map_slots();
       return;
     }
   }
@@ -647,6 +657,7 @@ bool mln_test_reclaim_thread_resources(void) {
     (void)mln_test_map_close(tracked_maps[tracked_map_count]);
     reclaimed = true;
   }
+  release_empty_map_slots();
   if (tracked_runtime != MLN_HANDLE_NULL) {
     (void)mln_test_runtime_close(tracked_runtime);
     tracked_runtime = MLN_HANDLE_NULL;

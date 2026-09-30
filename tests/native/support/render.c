@@ -37,6 +37,15 @@ void mln_test_render_reserve_session(void) {
   tracked_session_capacity = capacity;
 }
 
+// Frees the record once it is empty, so a thread that exits holds nothing.
+static void release_empty_session_slots(void) {
+  if (tracked_session_count == 0) {
+    free(tracked_sessions);
+    tracked_sessions = NULL;
+    tracked_session_capacity = 0;
+  }
+}
+
 void mln_test_render_track_session(const mln_test_render_fixture* fixture) {
   tracked_sessions[tracked_session_count] = (tracked_session){
     .session = fixture->session,
@@ -50,6 +59,7 @@ static void untrack_session(mln_render_session session) {
     if (tracked_sessions[index].session == session) {
       tracked_sessions[index] = tracked_sessions[tracked_session_count - 1];
       tracked_session_count -= 1;
+      release_empty_session_slots();
       return;
     }
   }
@@ -252,6 +262,7 @@ bool mln_test_render_reclaim_thread_sessions(void) {
     mln_test_backend_destroy(entry.backend_state);
     reclaimed = true;
   }
+  release_empty_session_slots();
   return reclaimed;
 }
 

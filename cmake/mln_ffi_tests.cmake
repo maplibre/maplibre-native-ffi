@@ -482,11 +482,12 @@ function(mln_ffi_add_native_tests)
   mln_ffi_apple_is_maccatalyst(maccatalyst)
   if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$" AND NOT maccatalyst)
     # A simulator spawns one process per run, so the suite runs as one entry,
-    # with the plugin group in an invocation of its own after it.
+    # with the plugin group in an invocation of its own after it. Each runner's
+    # alarm stays below its entry's timeout, so the runner reports first.
     set(runner bash "${PROJECT_SOURCE_DIR}/scripts/run-ios-simulator-test.sh"
-        "$<TARGET_FILE:mln_native_abi_tests>" 300)
-    add_test(NAME native-abi COMMAND ${runner} -- -x /abi/plugin/)
-    add_test(NAME native-abi/plugin COMMAND ${runner} -- -f /abi/plugin/)
+        "$<TARGET_FILE:mln_native_abi_tests>")
+    add_test(NAME native-abi COMMAND ${runner} 290 -- -x /abi/plugin/)
+    add_test(NAME native-abi/plugin COMMAND ${runner} 110 -- -f /abi/plugin/)
     set_tests_properties(native-abi PROPERTIES TIMEOUT 300)
     set_tests_properties(
       native-abi/plugin

@@ -16,7 +16,7 @@
 // These are JavaScript library functions rather than a compiled shim so that a
 // Rust test binary needs no C toolchain, and they carry no __proxy annotation so
 // each one runs on the calling thread, which is where that thread's registry
-// lives. tests/native/support/test_support.c does the same through EM_JS.
+// lives. tests/native/support/render_webgl.c does the same through EM_JS.
 addToLibrary({
   mln_test_register_offscreen_canvas__deps: ["$GL", "$UTF8ToString"],
   mln_test_register_offscreen_canvas: (name, width, height) => {

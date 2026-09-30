@@ -34,7 +34,8 @@ uint32_t mln_test_timeout_scale(void);
 void mln_test_watchdog_arm(const char* file, const char* name);
 void mln_test_watchdog_disarm(void);
 // Names what the case is waiting on for the hang report. `what` must outlive
-// the wait, as a string literal does; null clears it.
+// the wait, as a string literal does; null clears it. Only the thread that runs
+// the cases records a note; a wait on any other thread leaves it unchanged.
 void mln_test_watchdog_note(const char* what);
 
 #ifdef __cplusplus

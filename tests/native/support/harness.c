@@ -1,6 +1,7 @@
 // Unity glue for the native suites: the entry point, the case runner behind
 // RUN_TEST, and the per-case reclaim that keeps one failure from cascading.
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -35,14 +36,18 @@ static const mln_test_group_entry groups[] = {
 static bool listing;
 static size_t selected_cases;
 
+// Library threads read the scale too, from waits inside provider and transform
+// callbacks, so the cache is atomic. Every reader computes the same value.
 uint32_t mln_test_timeout_scale(void) {
-  static uint32_t scale;
-  if (scale == 0) {
+  static atomic_uint scale;
+  unsigned int cached = atomic_load_explicit(&scale, memory_order_relaxed);
+  if (cached == 0) {
     const char* value = getenv("MLN_TEST_TIMEOUT_SCALE");
     const long parsed = value == NULL ? 0 : strtol(value, NULL, 10);
-    scale = parsed > 0 && parsed <= 100 ? (uint32_t)parsed : 1U;
+    cached = parsed > 0 && parsed <= 100 ? (unsigned int)parsed : 1U;
+    atomic_store_explicit(&scale, cached, memory_order_relaxed);
   }
-  return scale;
+  return cached;
 }
 
 void setUp(void) {}

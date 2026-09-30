@@ -37,6 +37,10 @@ auto watchdog() -> Watchdog& {
 }
 
 std::atomic<const char*> waiting_on{nullptr};
+// Set on the thread that runs the cases. Waits on library threads, such as a
+// transform that blocks or a gate parked in a completion, leave the note alone
+// so the report names what the case itself is waiting on.
+thread_local bool runs_cases = false;
 
 [[noreturn]] void report_hang(const char* file, const char* name) {
   const char* what = waiting_on.load();
@@ -78,6 +82,7 @@ extern "C" auto mln_test_now_milliseconds(void) -> uint64_t {
 
 extern "C" void mln_test_watchdog_arm(const char* file, const char* name) {
   auto& state = watchdog();
+  runs_cases = true;
   {
     const auto lock = std::scoped_lock{state.mutex};
     state.serial += 1;
@@ -106,5 +111,8 @@ extern "C" void mln_test_watchdog_disarm(void) {
 }
 
 extern "C" void mln_test_watchdog_note(const char* what) {
+  if (!runs_cases) {
+    return;
+  }
   waiting_on.store(what);
 }
