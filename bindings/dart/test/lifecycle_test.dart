@@ -47,7 +47,6 @@ void main() {
     await within(runtime.barrier(), 'a barrier on the refused runtime');
 
     await within(map.close(), 'map close');
-    // The future resolves only after the runtime's threads are gone.
     await within(runtime.close(), 'runtime close');
     expect(runtime.isClosed, isTrue);
   });

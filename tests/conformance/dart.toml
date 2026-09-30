@@ -4,7 +4,7 @@
 #   "ID" = { na = "reason" }
 
 [cases]
-"ERR-01" = "bindings/dart/test/internal_support_test.dart::unknown native status and copied diagnostic remain available"
+"ERR-01" = "bindings/dart/test/internal_support_test.dart::native statuses map to their exceptions and keep unknown codes"
 # The test covers the mismatch error only. That the check runs before any
 # other call rests on the generated entry points, each of which calls
 # ensureAbiVersion() first; no library with another ABI version is at hand to

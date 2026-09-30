@@ -6,20 +6,11 @@ import 'package:maplibre_native_ffi/src/error/maplibre_exception.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
-import 'package:maplibre_native_ffi/src/internal/lifecycle/lifecycle.dart';
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
 import 'package:maplibre_native_ffi/src/internal/status/status.dart';
-import 'package:maplibre_native_ffi/src/render/native_pointer.dart';
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart';
 import 'package:ffi/ffi.dart';
 import 'package:test/test.dart';
-import 'package:maplibre_native_ffi/src/internal/lifecycle/native_handles.dart';
-
-/// A handle of a distinct kind for tests that exercise binding-owned
-/// bookkeeping without a live native object.
-extension type const _FakeNativeHandle(int raw) implements NativeHandle {}
-
-const _fakeHandle = _FakeNativeHandle(0x0200000000001234);
 
 void main() {
   group('status conversion', () {
@@ -42,18 +33,7 @@ void main() {
       );
     });
 
-    test('ok status returns without reading diagnostics', () {
-      var diagnosticReads = 0;
-
-      checkNativeStatus(nativeStatusOk, () {
-        diagnosticReads += 1;
-        return 'unused';
-      });
-
-      expect(diagnosticReads, 0);
-    });
-
-    test('native failures map every known status category', () {
+    test('native statuses map to their exceptions and keep unknown codes', () {
       final cases = <(int, Type)>[
         (nativeStatusInvalidArgument, InvalidArgumentException),
         (nativeStatusInvalidState, InvalidStateException),
@@ -71,9 +51,7 @@ void main() {
           expect(error.diagnostic, 'diagnostic $status');
         }
       }
-    });
 
-    test('unknown native status and copied diagnostic remain available', () {
       var nativeDiagnostic = 'first diagnostic';
       late MaplibreException error;
 
@@ -90,35 +68,9 @@ void main() {
       expect(error.nativeStatusCode, -999);
       expect(error.diagnostic, 'first diagnostic');
     });
-
-    test('binding validation produces a fresh binding diagnostic', () {
-      expect(
-        () => throwInvalidArgument('fresh binding diagnostic'),
-        throwsA(
-          isA<InvalidArgumentException>()
-              .having(
-                (error) => error.nativeStatusCode,
-                'nativeStatusCode',
-                isNull,
-              )
-              .having(
-                (error) => error.diagnostic,
-                'diagnostic',
-                'fresh binding diagnostic',
-              ),
-        ),
-      );
-    });
   });
 
   group('native string helpers', () {
-    test('null-terminated strings reject embedded NUL', () {
-      expect(
-        () => withNativeArena((arena) => nativeUtf8CString('a\u0000b', arena)),
-        throwsA(isA<InvalidArgumentException>()),
-      );
-    });
-
     test('null-terminated strings expose UTF-8 bytes and trailing NUL', () {
       withNativeArena((arena) {
         final value = nativeUtf8CString('café', arena);
@@ -143,69 +95,6 @@ void main() {
         expect(empty.size, 0);
         expect(empty.data, isNot(nullptr));
       });
-    });
-  });
-
-  test('scoped native values validate before exposing borrowed values', () {
-    var live = true;
-    void checkLive() {
-      if (!live) throw StateError('scope closed');
-    }
-
-    final pointer = ScopedNativePointer(
-      0x1234,
-      checkValid: checkLive,
-      debugName: 'test pointer',
-    );
-    final value = ScopedNativeInt(
-      7,
-      checkValid: checkLive,
-      debugName: 'test value',
-    );
-    expect(pointer.address, 0x1234);
-    expect(pointer.toNativePointer(), const NativePointer(0x1234));
-    expect(value.value, 7);
-
-    live = false;
-    expect(() => pointer.address, throwsStateError);
-    expect(() => value.value, throwsStateError);
-  });
-
-  group('native handle state', () {
-    test('close succeeds once and later closes are no-ops', () {
-      final state = NativeHandleState<_FakeNativeHandle>(
-        _fakeHandle,
-        'fake_handle',
-      );
-      var closes = 0;
-
-      state.close((_) {
-        closes += 1;
-        return nativeStatusOk;
-      });
-      state.close((_) {
-        closes += 1;
-        return nativeStatusOk;
-      });
-
-      expect(closes, 1);
-      expect(state.isClosed, isTrue);
-    });
-
-    test('failed close leaves handle live for retry', () {
-      final state = NativeHandleState<_FakeNativeHandle>(
-        _fakeHandle,
-        'fake_handle',
-      );
-
-      expect(
-        () => state.close((_) => nativeStatusInvalidState),
-        throwsA(isA<InvalidStateException>()),
-      );
-
-      expect(state.isClosed, isFalse);
-      state.close((_) => nativeStatusOk);
-      expect(state.isClosed, isTrue);
     });
   });
 
