@@ -26,7 +26,6 @@
 "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/BackgroundThread.native.kt" = 2
 "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeEventsTest.kt" = 1
 "bindings/python/tests/render_backend_helpers/runtime.py" = 7
-"bindings/python/tests/test_package.py" = 9
 "bindings/python/tests/test_render_metal_owned.py" = 3
 "bindings/python/tests/test_render_opengl_egl.py" = 2
 "bindings/python/tests/test_render_vulkan_owned.py" = 3
@@ -57,7 +56,6 @@
 "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/map/MapHandleTest.kt" = 19
 "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeHandleTest.kt" = 5
 "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/internal/status/StatusTest.kt" = 1
-"bindings/python/tests/test_package.py" = 33
 "bindings/swift/Tests/MaplibreNativeFFITests/OfflineTests.swift" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/RuntimeTests.swift" = 3
 "bindings/swift/Tests/MaplibreNativeFFITests/StyleTests.swift" = 17
