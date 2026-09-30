@@ -57,7 +57,9 @@ when `BUILD_TESTING` is on, except for Emscripten:
 - `mln_test_graphics` is a shared library for the binding suites.
   `mise run build` installs it with its header and a pkg-config file through the
   `test-graphics` component. That component stays out of a full installation and
-  out of the package.
+  out of the package. `mise run install-native-package`, which replaces the
+  install directory with a package, carries the component's files over, so the
+  binding suites that CI runs against a package still find them.
 
 A preset's install directory then holds:
 

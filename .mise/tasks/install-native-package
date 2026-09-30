@@ -40,6 +40,25 @@ if [[ "$preset" == macos-*-egl && -f "$install_dir/lib/libEGL.dylib" ]]; then
     "$loader_stash/include"
 fi
 
+# The package also leaves out the test-graphics component, the GPU fixtures
+# that binding suites load. Its install manifest names what the build task put
+# in the tree, so those files are set aside with the manifest and restored
+# below, and a later run of this task finds them the same way.
+test_graphics_manifest="$build_dir/install_manifest_test-graphics.txt"
+test_graphics_stash=""
+if [[ -f "$test_graphics_manifest" ]]; then
+  test_graphics_stash="$(mktemp -d)"
+  while IFS= read -r installed || [[ -n "$installed" ]]; do
+    relative="${installed#*"/build/$preset/install/"}"
+    if [[ "$relative" == "$installed" || ! -f "$install_dir/$relative" ]]; then
+      continue
+    fi
+    mkdir -p "$test_graphics_stash/files/$(dirname "$relative")"
+    cp -P "$install_dir/$relative" "$test_graphics_stash/files/$relative"
+  done <"$test_graphics_manifest"
+  cp "$test_graphics_manifest" "$test_graphics_stash/manifest.txt"
+fi
+
 # Rust cross-builds use the configured Zig wrappers after this task replaces the
 # native tree with its packaged install. Preserve them across that replacement.
 zig_shim_stash=""
@@ -81,6 +100,14 @@ if [[ -n "$loader_stash" ]]; then
     "$loader_stash"/include/GLES3 "$loader_stash"/include/KHR \
     "$install_dir/include"
   rm -rf "$loader_stash"
+fi
+
+if [[ -n "$test_graphics_stash" ]]; then
+  if [[ -d "$test_graphics_stash/files" ]]; then
+    cp -RP "$test_graphics_stash/files/." "$install_dir"
+  fi
+  cp "$test_graphics_stash/manifest.txt" "$test_graphics_manifest"
+  rm -rf "$test_graphics_stash"
 fi
 
 if [[ -n "$zig_shim_stash" ]]; then
