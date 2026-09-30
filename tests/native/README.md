@@ -197,6 +197,12 @@ The map files also include `support/map.h`, which provides
 `mln_test_render_still_image`. That helper requests a still image from a static
 or tile map and keeps a frame demand in flight until the image completes.
 
+The style suites also include `support/style.h`. It renders one frame at a time
+until a condition holds, and copies rendered and source feature queries and list
+queries out of their borrowed results. It also serves URL resources through a
+resource provider that fails every request it has no route for, so a case that
+adds a URL source never reaches the network.
+
 Every wait blocks on a signal and gives up at a deadline: 10 seconds times the
 timeout scale unless the wait names another. The signal is the pulse, a
 process-wide counter that flags, gates, completions, and the fixtures' wakes all
