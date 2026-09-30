@@ -484,6 +484,93 @@ static void abandon_completes_pending_work_and_invalidates_accessors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// What abandon returned from inside the completion of a command that the
+// driver runs.
+typedef struct reentrant_abandon_probe {
+  mln_render_session session;
+  atomic_bool completed;
+  mln_status completion_status;
+  mln_status abandon_status;
+} reentrant_abandon_probe;
+
+static void abandon_from_completion(
+  void* user_data, const mln_completion_result* result
+) {
+  reentrant_abandon_probe* probe = user_data;
+  probe->completion_status = result->status;
+  mln_render_abandon_result abandoned = {
+    .size = sizeof(mln_render_abandon_result)
+  };
+  probe->abandon_status =
+    mln_render_session_abandon(probe->session, &abandoned, NULL);
+  mln_test_flag_set(&probe->completed);
+}
+
+static bool reentrant_abandon_settled(void* context) {
+  const reentrant_abandon_probe* probe = context;
+  return atomic_load(&probe->completed);
+}
+
+static const maintenance_case driver_run_commands[] = {
+  {"barrier", mln_render_session_barrier},
+  {"reduce memory use", mln_render_session_reduce_memory_use},
+};
+
+// A completion that the driver delivers runs inside the session's driver
+// call: on the core worker, or on the thread servicing a caller driver.
+// Abandon from there cannot wait for the call to end, so it is busy and the
+// session stays attached.
+static void abandon_from_a_driver_completion_is_busy(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  // A rendered frame gives the maintenance command a renderer to act on.
+  mln_test_render_request_forced(&fixture, 1);
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture, 1));
+
+  for (size_t row = 0;
+       row < sizeof(driver_run_commands) / sizeof(driver_run_commands[0]);
+       row += 1) {
+    const maintenance_case* command = &driver_run_commands[row];
+    reentrant_abandon_probe probe = {.session = fixture.session};
+    atomic_init(&probe.completed, false);
+    const mln_completion completion = {
+      .size = sizeof(mln_completion),
+      .callback = abandon_from_completion,
+      .user_data = &probe,
+      .release_user_data = maintenance_released,
+    };
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      MLN_STATUS_OK, command->submit(fixture.session, &completion, NULL),
+      command->label
+    );
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      MLN_STATUS_OK,
+      mln_test_render_step_until(
+        &fixture, reentrant_abandon_settled, &probe,
+        mln_test_deadline_default(), "a command whose completion abandons"
+      ),
+      command->label
+    );
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      MLN_STATUS_OK, probe.completion_status, command->label
+    );
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      MLN_STATUS_BUSY, probe.abandon_status, command->label
+    );
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
+      MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state,
+      command->label
+    );
+  }
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void count_nothing(void* context) { (void)context; }
 
 static void flag_release(void* context) { mln_test_flag_set(context); }
@@ -584,6 +671,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_detached_session_rejects_every_call_that_needs_its_target);
   RUN_TEST(stale_and_null_sessions_reject_maintenance_commands);
   RUN_TEST(abandon_completes_pending_work_and_invalidates_accessors);
+  RUN_TEST(abandon_from_a_driver_completion_is_busy);
   RUN_TEST(a_session_disposed_while_attaching_frees_the_map);
   RUN_TEST(parent_first_disposal_retires_a_native_render_attachment);
 }
