@@ -15,8 +15,13 @@ import 'support/fixture.dart';
 /// A runtime, by identity and weak reference, that only its callbacks name.
 typedef _Unreachable = (int, WeakReference<RuntimeHandle>);
 
-_Unreachable _unreachable(RuntimeHandle runtime) =>
-    (runtime.identity.toSigned(64).toInt(), WeakReference(runtime));
+/// Checks that native knows [runtime] while this still holds it: once the
+/// caller drops it, any allocation may collect it.
+_Unreachable _unreachable(RuntimeHandle runtime) {
+  final identity = runtime.identity.toSigned(64).toInt();
+  expect(_runtimeIsLive(identity), isTrue);
+  return (identity, WeakReference(runtime));
+}
 
 _Unreachable _unreachableRuntimeWithWake() {
   late final RuntimeHandle runtime;
@@ -88,7 +93,6 @@ void main() {
     'an abandoned runtime is disposed when the collector reclaims it',
     () async {
       final (identity, runtime) = _abandonedRuntime();
-      expect(_runtimeIsLive(identity), isTrue);
 
       // The collection runs the owner's native finalizer, which disposes the
       // runtime without any Dart code on the stack.
@@ -105,9 +109,6 @@ void main() {
       _unreachableRuntimeWithWake(),
       await _unreachableRuntimeWithProvider(),
     ];
-    for (final (identity, _) in runtimes) {
-      expect(_runtimeIsLive(identity), isTrue);
-    }
     // Each runtime and the callback that captures it form a cycle through
     // the registration, which the collector reclaims as a whole.
     await collectGarbageUntil(
