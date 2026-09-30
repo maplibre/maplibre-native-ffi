@@ -115,6 +115,9 @@ static void surface_without_its_drawable(void* call) {
 static void surface_with_unknown_ownership(void* call) {
   surface_of(call)->context.ownership = 7;
 }
+static void surface_with_unknown_platform(void* call) {
+  surface_of(call)->context.platform = 7;
+}
 #if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
 // A dedicated context joins no share group, so naming one contradicts it.
 static void dedicated_surface_with_share_context(void* call) {
@@ -219,6 +222,8 @@ static void opengl_attach_rejects_malformed_calls(void) {
      NULL},
     {"unknown ownership", surface_with_unknown_ownership,
      MLN_STATUS_INVALID_ARGUMENT, "ownership is unknown"},
+    {"unknown platform", surface_with_unknown_platform,
+     MLN_STATUS_INVALID_ARGUMENT, "platform is invalid"},
 #if defined(MLN_FFI_TEST_OPENGL_WEBGL)
     {"a surface beside a WebGL context", webgl_surface_with_surface_handle,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
