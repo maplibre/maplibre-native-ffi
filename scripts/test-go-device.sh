@@ -41,10 +41,12 @@ find "$test_dir" -maxdepth 1 -type f -name '*.test' -delete
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 # shellcheck source=scripts/go-cross-env.sh
 source "$MISE_MONOREPO_ROOT/scripts/go-cross-env.sh" "$preset"
-# The emulators have no libmln_test_graphics beside the binaries, so the suite
-# builds without a render backend tag and compiles no render tests.
-go test -c -tags mlntest -o "$test_dir/" ./...
-go vet -tags mlntest ./...
+# shellcheck source=bindings/go/test-tags.sh
+source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$preset"
+go test -c -tags "$go_test_tags" -o "$test_dir/" ./...
+go vet -tags "$go_test_tags" ./...
+# The render tests load tests/graphics, which travels beside the C API library.
+graphics_library="$native_install_dir/lib/libmln_test_graphics.so"
 
 shopt -s nullglob
 test_binaries=("$test_dir"/*.test)
@@ -58,10 +60,12 @@ if [[ "$platform" == android ]]; then
     "$abi" \
     "$native_install_dir/lib/libmaplibre-native-c.so" \
     ${emulator_args[@]+"${emulator_args[@]}"} \
+    --library "$graphics_library" \
     -test.v -- ${test_binaries[@]+"${test_binaries[@]}"}
 fi
 exec "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
   180 \
   "$native_install_dir/lib/libmaplibre-native-c.so" \
   "$OHOS_SDK_NATIVE/llvm/lib/$compiler_target/libc++_shared.so" \
+  --library "$graphics_library" \
   -test.v -- ${test_binaries[@]+"${test_binaries[@]}"}

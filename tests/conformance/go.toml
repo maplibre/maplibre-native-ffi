@@ -4,8 +4,11 @@
 #   "ID" = { na = "reason" }
 #
 # The render tests, which LIFE-03, VIEW-01, REND-01, and REND-02 name, build
-# only with the backend tag that `mise run //bindings/go:test` passes for a
-# desktop EGL, Metal, or Vulkan preset. EX-01 is `mise run
+# with the backend tag that `mise run //bindings/go:test` passes for every EGL,
+# Metal, and Vulkan preset, including the Android and OpenHarmony emulator
+# presets, whose runners push tests/graphics beside the test binaries. WGL
+# presets build no render tests, since the Go wrapper of tests/graphics has no
+# WGL context. EX-01 is `mise run
 # //examples/go-map:smoke <preset>` on an EGL preset, since go-map drives
 # OpenGL directly; its smoke run renders one frame in a hidden window.
 

@@ -108,6 +108,7 @@ OpenHarmony emulator runners, pushes the library beside its test executables, as
 the C suite's runners push the test plugin.
 
 Go is the reference: `bindings/go/internal/testsupport/graphics.go` wraps the
-interface, and the render tests attach through it on Metal, Vulkan, and EGL. The
-Go test task selects the backend with a build tag named after the preset's, so a
-build without a backend tag links no test graphics.
+interface, and the render tests attach through it on Metal, Vulkan, and EGL,
+including in the Android and OpenHarmony emulators. The Go test task selects the
+backend with a build tag named after the preset's, so a WGL build, which has no
+backend tag, links no test graphics.

@@ -3,8 +3,8 @@
 package testsupport
 
 // The test task passes the build tag of the preset's render backend, and only
-// a tagged build links tests/graphics. The emulator runners push no
-// libmln_test_graphics beside the test binaries, so they build untagged.
+// a tagged build links tests/graphics. On Android and OpenHarmony, the
+// emulator runners push libmln_test_graphics beside the test binaries.
 
 /*
 #cgo pkg-config: mln-test-graphics
