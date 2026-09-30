@@ -107,7 +107,9 @@ private final class StandardErrorCapture: @unchecked Sendable {
   private let drained = DispatchSemaphore(value: 0)
 
   init() throws {
-    fflush(stderr)
+    // Flushing every stream reaches standard error without naming Glibc's
+    // global `stderr`, which strict concurrency rejects as shared state.
+    fflush(nil)
     saved = dup(STDERR_FILENO)
     guard saved >= 0,
           dup2(pipe.fileHandleForWriting.fileDescriptor, STDERR_FILENO) >= 0
@@ -128,7 +130,7 @@ private final class StandardErrorCapture: @unchecked Sendable {
   }
 
   func finish() {
-    fflush(stderr)
+    fflush(nil)
     dup2(saved, STDERR_FILENO)
     close(saved)
     try? pipe.fileHandleForWriting.close()
