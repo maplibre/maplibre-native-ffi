@@ -14,6 +14,7 @@ import "C"
 
 import (
 	"errors"
+	"runtime"
 	"unsafe"
 )
 
@@ -50,12 +51,16 @@ type Graphics struct {
 	Context Context
 }
 
+// lastError reads the calling OS thread's error, so each call that can fail
+// locks the goroutine to its thread until it has read it.
 func lastError() error {
 	return errors.New(C.GoString(C.mln_test_graphics_last_error()))
 }
 
 // NewGraphics creates a device or context for backend.
 func NewGraphics(backend Backend) (*Graphics, error) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	handle := C.mln_test_graphics_create(C.uint32_t(backend))
 	if handle == nil {
 		return nil, lastError()
@@ -88,6 +93,8 @@ func NewGraphics(backend Backend) (*Graphics, error) {
 // MakeCurrent makes an EGL context current on the calling OS thread, which the
 // caller locks for as long as it drives sessions there.
 func (g *Graphics) MakeCurrent() error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	if !C.mln_test_graphics_make_current(g.handle) {
 		return lastError()
 	}

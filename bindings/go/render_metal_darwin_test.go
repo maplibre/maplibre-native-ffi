@@ -90,13 +90,22 @@ func newOwnedTextureSession(
 	case backends.Has(RenderBackendFlagVulkan):
 		backend = testsupport.BackendVulkan
 	}
+	// A caller driver runs on the thread its context is current on. The test
+	// goroutine keeps that thread through its cleanups, which run on it last
+	// first, so the context is released there and not left current on a thread
+	// that Go reuses.
+	callerDriven := driver == RenderDriverKindCallerGraphicsThread
+	if callerDriven {
+		stdruntime.LockOSThread()
+		t.Cleanup(stdruntime.UnlockOSThread)
+	}
 	graphics, err := testsupport.NewGraphics(backend)
 	if err != nil {
 		t.Fatalf("testsupport.NewGraphics(): %v", err)
 	}
-	// Cleanups run last first, so the graphics object outlives the session.
+	// The graphics object outlives the session, whose cleanup comes later.
 	t.Cleanup(graphics.Close)
-	if backend == testsupport.BackendEGL {
+	if callerDriven && backend == testsupport.BackendEGL {
 		if err := graphics.MakeCurrent(); err != nil {
 			t.Fatalf("Graphics.MakeCurrent(): %v", err)
 		}
@@ -383,9 +392,6 @@ func TestMetalOwnedTextureCompletionLifecycleDarwin(t *testing.T) {
 }
 
 func TestCallerDriverServicesPublishedAttachingSessionDarwin(t *testing.T) {
-	stdruntime.LockOSThread()
-	defer stdruntime.UnlockOSThread()
-
 	_, m, session, attach := newOwnedTextureSession(t, RenderDriverKindCallerGraphicsThread)
 
 	// Caller-driver initialization has not run yet, so the published session is
