@@ -9,7 +9,7 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 
 @OptIn(ExperimentalForeignApi::class)
-class MemoryUtilTest : org.maplibre.nativeffi.NativeTestBase() {
+class MemoryUtilTest {
   @Test
   fun stringViewCopiesRejectOversizedNativeLengths() {
     memScoped {

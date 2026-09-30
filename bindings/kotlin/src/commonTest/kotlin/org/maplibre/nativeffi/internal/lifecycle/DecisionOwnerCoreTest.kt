@@ -11,7 +11,7 @@ import org.maplibre.nativeffi.TestThread
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.runtime.runSuspendTest
+import org.maplibre.nativeffi.runSuspendTest
 
 @OptIn(ExperimentalAtomicApi::class)
 class DecisionOwnerCoreTest {

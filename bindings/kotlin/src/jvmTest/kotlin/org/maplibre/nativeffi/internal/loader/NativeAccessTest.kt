@@ -8,7 +8,7 @@ import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.RuntimeOptions
-import org.maplibre.nativeffi.runtime.runSuspendTest
+import org.maplibre.nativeffi.runSuspendTest
 
 class NativeAccessTest {
   @Test

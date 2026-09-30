@@ -4,7 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.coroutines.CompletableDeferred
-import org.maplibre.nativeffi.runtime.runSuspendTest
+import org.maplibre.nativeffi.runSuspendTest
 
 class OwnedCompletionTest {
   @Test

@@ -7,13 +7,6 @@
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderSessionTests.cs" = 1
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs" = 1
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTestHelpers.cs" = 3
-"bindings/kotlin/src/androidDeviceTest/kotlin/org/maplibre/nativeffi/BackgroundThread.android.kt" = 2
-"bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/BackgroundThread.kt" = 1
-"bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeHandleTest.kt" = 9
-"bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/BackgroundThread.jvm.kt" = 2
-"bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeEventsTest.kt" = 2
-"bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/BackgroundThread.native.kt" = 2
-"bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeEventsTest.kt" = 1
 "bindings/swift/Tests/MaplibreNativeFFITests/RenderTests.swift" = 1
 "bindings/swift/Tests/MaplibreNativeFFITests/RuntimeEventTestSupport.swift" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/StyleTests.swift" = 1
@@ -28,9 +21,6 @@
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleImageTests.cs" = 2
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleJsonTests.cs" = 18
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleLayerTests.cs" = 1
-"bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/map/MapHandleTest.kt" = 19
-"bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeHandleTest.kt" = 5
-"bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/internal/status/StatusTest.kt" = 1
 "bindings/swift/Tests/MaplibreNativeFFITests/OfflineTests.swift" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/RuntimeTests.swift" = 3
 "bindings/swift/Tests/MaplibreNativeFFITests/StyleTests.swift" = 17

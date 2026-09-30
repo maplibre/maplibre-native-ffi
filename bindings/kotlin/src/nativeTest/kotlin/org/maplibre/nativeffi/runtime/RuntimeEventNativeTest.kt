@@ -5,14 +5,13 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlinx.cinterop.*
-import org.maplibre.nativeffi.NativeTestBase
 import org.maplibre.nativeffi.generated.GeneratedValues
 import org.maplibre.nativeffi.generated.RuntimeEventPayload
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_payload
 
 @OptIn(ExperimentalForeignApi::class)
-class RuntimeEventNativeTest : NativeTestBase() {
+class RuntimeEventNativeTest {
   @Test
   fun unknownEventCopiesItsDiscriminantsAndOnlyThePayloadWindow() {
     val event = memScoped {

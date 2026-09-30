@@ -6,6 +6,11 @@ internal expect class TestThread(block: () -> Unit) {
   fun join()
 }
 
+/** Runs [block] on a second native thread and waits for it to finish. */
+internal fun runOnBackgroundThread(block: () -> Unit) {
+  TestThread(block).join()
+}
+
 /** A weak reference that the garbage collector clears once nothing else reaches its value. */
 internal expect class TestWeakReference(value: Any) {
   /** The value, or null once the collector has cleared it. */

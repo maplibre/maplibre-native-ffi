@@ -19,7 +19,7 @@ import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.memory.toCSize
 
 @OptIn(ExperimentalForeignApi::class)
-class NativeStatusDiagnosticTest : org.maplibre.nativeffi.NativeTestBase() {
+class NativeStatusDiagnosticTest {
   @Test
   fun deterministicNativeStatusProducersThrowMappedExceptionTypes() {
     memScoped {
@@ -33,7 +33,7 @@ class NativeStatusDiagnosticTest : org.maplibre.nativeffi.NativeTestBase() {
 
       val response = alloc<mln_resource_transform_response>()
       response.size = sizeOf<mln_resource_transform_response>().toUInt()
-      val replacement = "https://example.com/style.json"
+      val replacement = "custom://replacement-style.json"
       val invalidState =
         assertFailsWith<InvalidStateException> {
           NativeDiagnostics.check { diagnostic ->

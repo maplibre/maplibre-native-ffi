@@ -9,10 +9,9 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.NativeErrorException
-import org.maplibre.nativeffi.runtime.runSuspendTest
 
 @OptIn(ExperimentalForeignApi::class)
-class MaplibreNativeTest : org.maplibre.nativeffi.NativeTestBase() {
+class MaplibreNativeTest {
   @Test
   fun abiVersionMismatchUsesStableBindingError(): Unit = runSuspendTest {
     val error =
