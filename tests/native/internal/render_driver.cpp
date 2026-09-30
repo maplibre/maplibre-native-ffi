@@ -221,19 +221,17 @@ void request_frame_and_hold_the_call(const Fixture& fixture, uint64_t token) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, request_frame(fixture, demand));
 }
 
-// Holds once a frame result is published, releasing the batch it drained.
+struct PublishedFrame {
+  const Fixture* fixture;
+  mln_render_frame_batch batch{MLN_HANDLE_NULL};
+};
+
+// Holds once a frame result is published, keeping the batch it drained.
 auto frame_published(void* context) -> bool {
-  const auto& fixture = *static_cast<const Fixture*>(context);
-  auto batch = mln_render_frame_batch{MLN_HANDLE_NULL};
-  if (
-    mln_render_session_drain_frame_results(
-      fixture.render.session, &batch, nullptr
-    ) != MLN_STATUS_OK
-  ) {
-    return false;
-  }
-  mln_render_frame_batch_release(batch);
-  return true;
+  auto& published = *static_cast<PublishedFrame*>(context);
+  return mln_render_session_drain_frame_results(
+           published.fixture->render.session, &published.batch, nullptr
+         ) == MLN_STATUS_OK;
 }
 
 struct DriverRelease {
@@ -290,6 +288,9 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
       ? SyncPoint::RenderFrameResultPublished
       : SyncPoint::RenderDriverExited
   );
+  // The held hit has to be this case's frame, so nothing may have reached the
+  // point before the request.
+  TEST_ASSERT_EQUAL_INT(0, points.hits(SyncPoint::RenderFrameResultPublished));
   auto release =
     DriverRelease{.points = &points, .session = fixture.render.session};
   request_frame_and_hold_the_call(fixture, 107);
@@ -297,10 +298,21 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
   auto result =
     mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
   if (fixture.render.driver == MLN_RENDER_DRIVER_CORE_WORKER) {
+    // The held call published its frame before parking. Its demand is still
+    // pending, so the fixture's settled-results wait does not apply.
+    auto published = PublishedFrame{.fixture = &fixture};
     TEST_ASSERT_TRUE(mln_test_await(
-      frame_published, &fixture, mln_test_deadline_default(),
+      frame_published, &published, mln_test_deadline_default(),
       "the held call to publish its frame"
     ));
+    auto published_count = std::size_t{0};
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_frame_batch_count(published.batch, &published_count, nullptr)
+    );
+    TEST_ASSERT_EQUAL_size_t(1, published_count);
+    TEST_ASSERT_EQUAL_UINT64(107, batch_result(published.batch, 0).token);
+    mln_render_frame_batch_release(published.batch);
     auto* thread = mln_test_thread_start(release_when_abandon_waits, &release);
     release.abandon_status =
       mln_render_session_abandon(fixture.render.session, &result, nullptr);
