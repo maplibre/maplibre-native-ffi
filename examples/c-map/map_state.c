@@ -111,7 +111,30 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
   return APP_OK;
 }
 
-static app_error configure_map(map_state* state) {
+/// The style a smoke run renders, which needs no network.
+static const char smoke_style_json[] =
+  "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\","
+  "\"type\":\"background\",\"paint\":{\"background-color\":\"#d8f1ff\"}}]}";
+
+static mln_status load_style(
+  map_state* state, bool smoke, mln_diagnostic* diagnostic
+) {
+  if (smoke) {
+    return mln_map_set_style_json(
+      state->map,
+      (mln_buffer_view){
+        .data = smoke_style_json, .size = sizeof(smoke_style_json) - 1
+      },
+      map_state_discarded_completion(), diagnostic
+    );
+  }
+  return mln_map_set_style_url(
+    state->map, "https://tiles.openfreemap.org/styles/bright",
+    map_state_discarded_completion(), diagnostic
+  );
+}
+
+static app_error configure_map(map_state* state, bool smoke) {
   // The render loop re-arms from the frame result's repaint flag, so the map
   // only has to report updates that arrive between frames.
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
@@ -124,10 +147,7 @@ static app_error configure_map(map_state* state) {
     return APP_ERROR_EVENT_MASK_FAILED;
   }
 
-  status = mln_map_set_style_url(
-    state->map, "https://tiles.openfreemap.org/styles/bright",
-    map_state_discarded_completion(), &diagnostic
-  );
+  status = load_style(state, smoke, &diagnostic);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("style load failed", status, &diagnostic);
     return APP_ERROR_STYLE_LOAD_FAILED;
@@ -148,7 +168,7 @@ static app_error configure_map(map_state* state) {
 
 app_error map_state_init(
   map_state* out_state, viewport initial_viewport, mln_wake_callback event_wake,
-  void* event_wake_user_data
+  void* event_wake_user_data, bool smoke
 ) {
   *out_state = (map_state){};
   app_error error = create_runtime(out_state, event_wake, event_wake_user_data);
@@ -156,7 +176,7 @@ app_error map_state_init(
     error = create_map(out_state, initial_viewport);
   }
   if (error == APP_OK) {
-    error = configure_map(out_state);
+    error = configure_map(out_state, smoke);
   }
   if (error != APP_OK) {
     map_state_deinit(out_state);

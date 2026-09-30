@@ -60,11 +60,12 @@ Every example exposes the same task contract in its `mise.toml`:
   to `owned-texture`, so `mise run //examples/zig-map:run` works with no
   arguments, and a mode name overrides it, as in
   `mise run //examples/zig-map:run borrowed-texture`.
-- `smoke [preset]` builds the example, renders one frame without showing a
-  window, and exits `0`. CI runs it on every target that can render the preset's
-  backend, with a software renderer where the runner has no GPU. The C example
-  enters this mode when `MLN_EXAMPLE_SMOKE=1` is set, so its command-line
-  contract stays the same.
+- `smoke [preset]` builds the example, renders one frame of an inline style
+  without showing a window, and exits `0`. It fails if no frame renders within
+  60 seconds, and it needs no network. CI runs it on every target that can
+  render the preset's backend, with a software renderer where the runner has no
+  GPU. The C example enters this mode when `MLN_EXAMPLE_SMOKE=1` is set, so its
+  command-line contract stays the same.
 
 An example that has not yet implemented every backend rejects an unsupported
 preset with an error that names what it supports: `go-map` drives OpenGL

@@ -23,6 +23,7 @@ typedef enum app_error : uint8_t {
   APP_ERROR_RENDER_BACKEND_MISMATCH,
   APP_ERROR_EVENT_MASK_FAILED,
   APP_ERROR_EVENT_DRAIN_FAILED,
+  APP_ERROR_SMOKE_FRAME_TIMED_OUT,
 } app_error;
 
 const char* app_error_name(app_error error);

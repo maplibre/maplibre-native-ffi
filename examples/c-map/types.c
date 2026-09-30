@@ -36,6 +36,8 @@ const char* app_error_name(app_error error) {
       return "event mask select failed";
     case APP_ERROR_EVENT_DRAIN_FAILED:
       return "event drain failed";
+    case APP_ERROR_SMOKE_FRAME_TIMED_OUT:
+      return "no frame rendered within the smoke timeout";
   }
   return "unknown error";
 }

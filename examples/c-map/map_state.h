@@ -12,9 +12,11 @@ typedef struct map_state {
   mln_map map;
 } map_state;
 
+/// A smoke run loads an inline style instead of fetching one, so it needs no
+/// network.
 [[nodiscard]] app_error map_state_init(
   map_state* out_state, viewport initial_viewport, mln_wake_callback event_wake,
-  void* event_wake_user_data
+  void* event_wake_user_data, bool smoke
 );
 void map_state_deinit(map_state* state);
 

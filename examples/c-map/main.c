@@ -50,12 +50,16 @@ static app_error drain_events(
   return APP_OK;
 }
 
-/// Smoke mode, selected by MLN_EXAMPLE_SMOKE=1, renders one frame into a
-/// hidden window and exits, so CI can run the example without a display.
+/// Smoke mode, selected by MLN_EXAMPLE_SMOKE=1, renders one frame of an inline
+/// style into a hidden window and exits, so CI can run the example without a
+/// display or network.
 static bool smoke_mode(void) {
   const char* value = getenv("MLN_EXAMPLE_SMOKE");
   return value != nullptr && strcmp(value, "1") == 0;
 }
+
+/// How long a smoke run waits for its first rendered frame.
+static const Uint64 smoke_timeout_milliseconds = 60000;
 
 static app_error render_loop_iteration(
   SDL_Window* window, render_target* target, viewport* current_viewport,
@@ -151,6 +155,7 @@ static app_error render_loop(
   input_log_controls();
 
   const bool smoke = smoke_mode();
+  const Uint64 smoke_deadline = SDL_GetTicks() + smoke_timeout_milliseconds;
   bool running = true;
   bool render_request = true;
   bool viewport_dirty = false;
@@ -169,6 +174,8 @@ static app_error render_loop(
     if (smoke && frame_rendered) {
       puts("smoke: rendered one frame");
       running = false;
+    } else if (smoke && SDL_GetTicks() >= smoke_deadline) {
+      return APP_ERROR_SMOKE_FRAME_TIMED_OUT;
     }
   }
   return APP_OK;
@@ -281,8 +288,9 @@ int main(int argc, char** argv) {
   }
 
   map_state state;
-  error =
-    map_state_init(&state, current_viewport, schedule_event_drain, &receiver);
+  error = map_state_init(
+    &state, current_viewport, schedule_event_drain, &receiver, smoke_mode()
+  );
   if (error != APP_OK) {
     goto out_target;
   }
