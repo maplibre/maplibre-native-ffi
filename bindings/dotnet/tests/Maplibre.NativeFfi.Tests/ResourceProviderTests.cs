@@ -4,7 +4,6 @@ using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
@@ -15,35 +14,39 @@ public sealed class ResourceProviderTests
     private const string StyleUrl = "provider-test://é/style.json";
 
     private static ResourceResponse StyleResponse() =>
-        new() { Status = ResourceResponseStatus.Ok, Bytes = TestStyles.Empty };
+        new() { Status = ResourceResponseStatus.Ok, Bytes = NativeFixture.EmptyStyle };
 
+    // The admission policy forbids runtime calls inside the callback and allows answering the
+    // request, which claims the handle even though the callback then passes the request on.
     [Fact]
-    public async Task InlineCompletionClaimsHandleEvenWhenCallbackReturnsPassThrough()
+    public async Task AProviderMayAnswerButNotReenterTheRuntime()
     {
+        NativeFixture? owner = null;
         ResourceRequestHandle? retained = null;
         string? requested = null;
         Exception? reentry = null;
         Exception? waitReentry = null;
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        await runtime.SetResourceProviderAsync(
-            new ResourceProvider(
+        await using var fixture = await NativeFixture.CreateAsync(
+            provider: new ResourceProvider(
                 (request, handle) =>
                 {
                     requested = request.RequestedUrl;
                     retained = handle;
                     reentry = Record.Exception(() =>
                     {
-                        runtime.CloseAsync();
+                        _ = owner!.Runtime.BarrierAsync();
                     });
-                    waitReentry = Record.Exception(() => handle.WaitUntilRetired());
+                    waitReentry = Record.Exception(handle.WaitUntilRetired);
                     handle.Complete(StyleResponse());
                     return ResourceProviderDecision.PassThrough;
                 }
             )
         );
-        using var map = TestHandles.CreateMap(runtime, MapOptions.Default);
-        await map.SetStyleUrlAsync(StyleUrl);
-        RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapStyleLoaded);
+        owner = fixture;
+
+        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
+
         Assert.Equal(StyleUrl, requested);
         Assert.IsType<InvalidOperationException>(reentry);
         Assert.IsType<InvalidOperationException>(waitReentry);
@@ -54,27 +57,16 @@ public sealed class ResourceProviderTests
     }
 
     [Fact]
-    public async Task FailedResponseConversionRemainsRetryableAndSuccessfulCompletionKeepsOwner()
+    public async Task AProviderCanAnswerLaterThroughItsDecisionHandle()
     {
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
         var received = new TaskCompletionSource<ResourceRequestHandle>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
-        await runtime.SetResourceProviderAsync(
-            new ResourceProvider(
-                (_, handle) =>
-                {
-                    received.TrySetResult(handle);
-                    return ResourceProviderDecision.Handle;
-                }
-            )
-        );
-        using var map = TestHandles.CreateMap(runtime, MapOptions.Default);
-        await map.SetStyleUrlAsync(StyleUrl);
-        using var handle = await received.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken
-        );
+        await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
+        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+
+        // A response the binding cannot convert leaves the request open for another answer.
         Assert.Throws<ArgumentException>(() =>
             handle.Complete(
                 new ResourceResponse { Status = ResourceResponseStatus.Ok, Etag = "invalid\0etag" }
@@ -82,311 +74,15 @@ public sealed class ResourceProviderTests
         );
         Assert.False(handle.IsClosed);
         handle.Complete(StyleResponse());
-        RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapStyleLoaded);
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
+
         Assert.False(handle.IsClosed);
         handle.Close();
         handle.WaitUntilRetired();
     }
 
     [Fact]
-    public async Task CancellationCallbackCanCloseRequestWithoutBlockingNativeRetirement()
-    {
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var received = new TaskCompletionSource<ResourceRequestHandle>(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        await runtime.SetResourceProviderAsync(
-            new ResourceProvider(
-                (_, handle) =>
-                {
-                    received.TrySetResult(handle);
-                    return ResourceProviderDecision.Handle;
-                }
-            )
-        );
-        var map = TestHandles.CreateMap(runtime, MapOptions.Default);
-        await map.SetStyleUrlAsync(StyleUrl);
-        using var handle = await received.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken
-        );
-        var cancelled = new TaskCompletionSource(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        var calls = 0;
-        Assert.False(
-            handle.SetCancelCallback(() =>
-            {
-                Interlocked.Increment(ref calls);
-                handle.Close();
-                cancelled.TrySetResult();
-            })
-        );
-        await map.CloseAsync();
-        await cancelled.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken
-        );
-        Assert.Equal(1, calls);
-        Assert.True(handle.IsClosed);
-    }
-
-    [Fact]
-    public async Task CancelRegistrationIsReleasedOnceItsCallbackReturns()
-    {
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var received = await HandledRequest(runtime);
-        var map = TestHandles.CreateMap(runtime, MapOptions.Default);
-        await map.SetStyleUrlAsync(StyleUrl);
-        using var handle = await received.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken
-        );
-        var cancelled = new TaskCompletionSource(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        var (accepted, captured) = RegisterCapturing(handle, () => cancelled.TrySetResult());
-        Assert.False(accepted);
-        Assert.True(Alive(captured));
-        await map.CloseAsync();
-        await cancelled.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken
-        );
-        // Native code releases the registration after the callback returns on its
-        // own thread, before the provider releases the request.
-        await WaitUntilCollected(captured);
-        Assert.False(handle.IsClosed);
-    }
-
-    [Fact]
-    public async Task CancelRegistrationIsReleasedWithTheRequestWhenNeverCancelled()
-    {
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var received = await HandledRequest(runtime);
-        using var map = TestHandles.CreateMap(runtime, MapOptions.Default);
-        await map.SetStyleUrlAsync(StyleUrl);
-        var handle = await received.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken
-        );
-        var calls = 0;
-        var (accepted, captured) = RegisterCapturing(
-            handle,
-            () => Interlocked.Increment(ref calls)
-        );
-        Assert.False(accepted);
-        handle.Complete(StyleResponse());
-        RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapStyleLoaded);
-        Assert.True(Alive(captured));
-        handle.Close();
-        Assert.False(Alive(captured));
-        Assert.Equal(0, calls);
-    }
-
-    [Fact]
-    public async Task AlreadyCancelledRegistrationKeepsNothing()
-    {
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var received = await HandledRequest(runtime);
-        var map = TestHandles.CreateMap(runtime, MapOptions.Default);
-        await map.SetStyleUrlAsync(StyleUrl);
-        using var handle = await received.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken
-        );
-        await map.CloseAsync();
-        Assert.True(handle.Cancelled());
-        var calls = 0;
-        var (accepted, captured) = RegisterCapturing(
-            handle,
-            () => Interlocked.Increment(ref calls)
-        );
-        Assert.True(accepted);
-        // The request stores nothing, so the binding frees the callback before
-        // the request is released.
-        Assert.False(Alive(captured));
-        handle.Close();
-        Assert.Equal(0, calls);
-    }
-
-    [Fact]
-    public async Task CancelCallbackCapturingItsRequestDoesNotRootAnAbandonedRequest()
-    {
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var abandoned = new TaskCompletionSource<(WeakReference Owner, WeakReference Captured)>(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        await runtime.SetResourceProviderAsync(
-            new ResourceProvider(
-                (_, handle) =>
-                {
-                    abandoned.TrySetResult(RegisterCapturingOwner(handle));
-                    return ResourceProviderDecision.Handle;
-                }
-            )
-        );
-        using var map = TestHandles.CreateMap(runtime, MapOptions.Default);
-        await map.SetStyleUrlAsync(StyleUrl);
-        var (owner, captured) = await abandoned.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken
-        );
-        await WaitUntilCollected(owner);
-        await WaitUntilCollected(captured);
-    }
-
-    private static async Task<TaskCompletionSource<ResourceRequestHandle>> HandledRequest(
-        RuntimeHandle runtime
-    )
-    {
-        var received = new TaskCompletionSource<ResourceRequestHandle>(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        await runtime.SetResourceProviderAsync(
-            new ResourceProvider(
-                (_, handle) =>
-                {
-                    received.TrySetResult(handle);
-                    return ResourceProviderDecision.Handle;
-                }
-            )
-        );
-        return received;
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (bool Cancelled, WeakReference Captured) RegisterCapturing(
-        ResourceRequestHandle handle,
-        Action onCancel
-    )
-    {
-        var captured = new object();
-        var cancelled = handle.SetCancelCallback(() =>
-        {
-            GC.KeepAlive(captured);
-            onCancel();
-        });
-        return (cancelled, new WeakReference(captured));
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (WeakReference Owner, WeakReference Captured) RegisterCapturingOwner(
-        ResourceRequestHandle handle
-    )
-    {
-        var captured = new object();
-        Assert.False(
-            handle.SetCancelCallback(() =>
-            {
-                GC.KeepAlive(captured);
-                GC.KeepAlive(handle);
-            })
-        );
-        return (new WeakReference(handle), new WeakReference(captured));
-    }
-
-    private static bool Alive(WeakReference value)
-    {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-        return value.IsAlive;
-    }
-
-    private static async Task WaitUntilCollected(WeakReference value)
-    {
-        for (var attempt = 0; attempt < 200 && Alive(value); attempt++)
-            await Task.Delay(10, TestContext.Current.CancellationToken);
-        Assert.False(value.IsAlive);
-    }
-
-    [Fact]
-    public async Task NativeCompletionRejectionPreservesOwnerAfterCancellation()
-    {
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var received = new TaskCompletionSource<ResourceRequestHandle>(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        await runtime.SetResourceProviderAsync(
-            new ResourceProvider(
-                (_, handle) =>
-                {
-                    received.TrySetResult(handle);
-                    return ResourceProviderDecision.Handle;
-                }
-            )
-        );
-        var map = TestHandles.CreateMap(runtime, MapOptions.Default);
-        await map.SetStyleUrlAsync(StyleUrl);
-        using var handle = await received.Task.WaitAsync(
-            TimeSpan.FromSeconds(10),
-            TestContext.Current.CancellationToken
-        );
-        await map.CloseAsync();
-        Assert.True(handle.Cancelled());
-        Assert.Throws<InvalidStateException>(() => handle.Complete(StyleResponse()));
-        Assert.False(handle.IsClosed);
-    }
-
-    [Fact]
-    public async Task PassThroughAfterCancellationRegistrationDisarmsEscapedWrapper()
-    {
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        ResourceRequestHandle? escaped = null;
-        var calls = 0;
-        await runtime.SetResourceProviderAsync(
-            new ResourceProvider(
-                (_, handle) =>
-                {
-                    escaped = handle;
-                    handle.SetCancelCallback(() => Interlocked.Increment(ref calls));
-                    return ResourceProviderDecision.PassThrough;
-                }
-            )
-        );
-        using var map = TestHandles.CreateMap(runtime, MapOptions.Default);
-        await map.SetStyleUrlAsync(StyleUrl);
-        RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapLoadingFailed);
-        Assert.NotNull(escaped);
-        Assert.True(escaped.IsClosed);
-        Assert.Equal(0, calls);
-        Assert.Throws<InvalidStateException>(() => escaped.Cancelled());
-    }
-
-    [Fact]
-    public async Task ProviderErrorCopiesItsMessageBeforeTemporaryResponseIsReleased()
-    {
-        using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        await runtime.SetResourceProviderAsync(
-            new ResourceProvider(
-                (_, handle) =>
-                {
-                    handle.Complete(
-                        new ResourceResponse
-                        {
-                            Status = ResourceResponseStatus.Error,
-                            ErrorReason = ResourceErrorReason.NotFound,
-                            ErrorMessage = "style missing é",
-                        }
-                    );
-                    handle.Close();
-                    return ResourceProviderDecision.Handle;
-                }
-            )
-        );
-        using var map = TestHandles.CreateMap(runtime, MapOptions.Default);
-        await map.SetStyleUrlAsync(StyleUrl);
-        var failure = RuntimeEventTestHelpers.WaitForMapEvent(
-            runtime,
-            map,
-            RuntimeEventType.MapLoadingFailed
-        );
-        Assert.Contains("style missing é", failure.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public unsafe void RequestCopiesTransientFieldsAndContainsProviderExceptions()
+    public unsafe void AProviderExceptionIsContainedAndPassesTheRequestThrough()
     {
         ResourceRequest? copied = null;
         ResourceRequestHandle? escaped = null;
@@ -407,17 +103,21 @@ public sealed class ResourceProviderTests
         {
             size = (uint)sizeof(mln_resource_request),
             requested_url = scope.CString(StyleUrl),
-            resolved_url = scope.CString("https://example.test/é"),
+            resolved_url = scope.CString("provider-test://resolved/é"),
             has_range = 1,
             range_start = 0,
             range_end = 7,
             prior_data = (byte*)bytes.data,
             prior_data_size = bytes.size,
         };
+
         Assert.Equal(
             (uint)ResourceProviderDecision.PassThrough,
             native.callback(native.user_data, &request, SyntheticHandles.ResourceRequest(1))
         );
+
+        // The request is copied before the callback runs, so native reusing its memory afterwards
+        // leaves the copy intact.
         ((byte*)bytes.data)[0] = 99;
         Assert.NotNull(copied);
         Assert.Equal(StyleUrl, copied.RequestedUrl);
@@ -425,6 +125,82 @@ public sealed class ResourceProviderTests
         Assert.Equal([1, 2, 3], copied.PriorData);
         Assert.NotNull(escaped);
         Assert.True(escaped.IsClosed);
+    }
+
+    [Fact]
+    public async Task ACancelRegistrationIsReleasedWithItsRequest()
+    {
+        var received = new TaskCompletionSource<ResourceRequestHandle>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
+        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+        var calls = 0;
+
+        var (cancelled, captured) = RegisterCapturing(
+            handle,
+            () => Interlocked.Increment(ref calls)
+        );
+        Assert.False(cancelled);
+        handle.Complete(StyleResponse());
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapStyleLoaded);
+        Assert.True(Gc.IsAlive(captured));
+
+        handle.Close();
+        Assert.False(Gc.IsAlive(captured));
+        Assert.Equal(0, calls);
+    }
+
+    // The registration reports that the request is already cancelled, so native stores nothing
+    // and the binding frees the callback at once.
+    [Fact]
+    public async Task ARegistrationOnACancelledRequestIsNotRooted()
+    {
+        var received = new TaskCompletionSource<ResourceRequestHandle>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        await using var fixture = await NativeFixture.CreateAsync(provider: Holding(received));
+        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
+        await fixture.Map.CloseAsync();
+        Assert.True(handle.Cancelled());
+        var calls = 0;
+
+        var (cancelled, captured) = RegisterCapturing(
+            handle,
+            () => Interlocked.Increment(ref calls)
+        );
+
+        Assert.True(cancelled);
+        Assert.False(Gc.IsAlive(captured));
+        handle.Close();
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task PassingThroughDisarmsAnEscapedRequest()
+    {
+        ResourceRequestHandle? escaped = null;
+        var calls = 0;
+        await using var fixture = await NativeFixture.CreateAsync(
+            provider: new ResourceProvider(
+                (_, handle) =>
+                {
+                    escaped = handle;
+                    handle.SetCancelCallback(() => Interlocked.Increment(ref calls));
+                    return ResourceProviderDecision.PassThrough;
+                }
+            )
+        );
+
+        await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
+        await fixture.WaitForMapEventAsync(RuntimeEventType.MapLoadingFailed);
+
+        Assert.NotNull(escaped);
+        Assert.True(escaped.IsClosed);
+        Assert.Equal(0, calls);
+        Assert.Throws<InvalidStateException>(() => escaped.Cancelled());
     }
 
     [Fact]
@@ -464,5 +240,30 @@ public sealed class ResourceProviderTests
         Assert.True(explicitlyClosed.FinishDecision(false));
         Assert.True(explicitlyClosed.IsClosed);
         Assert.Equal(3, released);
+    }
+
+    /// <summary>A provider that keeps each request to answer later.</summary>
+    private static ResourceProvider Holding(TaskCompletionSource<ResourceRequestHandle> received) =>
+        new(
+            (_, handle) =>
+            {
+                received.TrySetResult(handle);
+                return ResourceProviderDecision.Handle;
+            }
+        );
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (bool Cancelled, WeakReference Captured) RegisterCapturing(
+        ResourceRequestHandle handle,
+        Action onCancel
+    )
+    {
+        var captured = new object();
+        var cancelled = handle.SetCancelCallback(() =>
+        {
+            GC.KeepAlive(captured);
+            onCancel();
+        });
+        return (cancelled, new WeakReference(captured));
     }
 }

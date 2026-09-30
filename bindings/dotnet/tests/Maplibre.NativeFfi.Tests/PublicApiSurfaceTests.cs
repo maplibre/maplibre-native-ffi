@@ -1,5 +1,7 @@
 using System.Reflection;
-using Maplibre.NativeFfi.Style;
+using Maplibre.NativeFfi.Internal.Pointer;
+using Maplibre.NativeFfi.Render;
+using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
@@ -170,22 +172,25 @@ public sealed class PublicApiSurfaceTests
         Assert.Empty(violations);
     }
 
+    // Every wrapper that owns a native handle holds its state in a NativeHandleState, so the
+    // reflection below finds all of them, including handle types added later.
     [Fact]
     public void OwnedNativeHandlesDoNotExposePublicConstructors()
     {
-        var assembly = typeof(Maplibre).Assembly;
-        var ownedHandleTypeNames = new[]
-        {
-            "Maplibre.NativeFfi.Map.MapHandle",
-            "Maplibre.NativeFfi.Map.MapProjectionHandle",
-            "Maplibre.NativeFfi.Render.AcquiredFrameHandle",
-            "Maplibre.NativeFfi.Render.RenderSessionHandle",
-            "Maplibre.NativeFfi.Runtime.ResourceRequestHandle",
-            "Maplibre.NativeFfi.Runtime.RuntimeHandle",
-        };
+        var ownedHandleTypes = typeof(Maplibre)
+            .Assembly.GetExportedTypes()
+            .Where(type =>
+                type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Any(field =>
+                        field.FieldType.IsGenericType
+                        && field.FieldType.GetGenericTypeDefinition() == typeof(NativeHandleState<>)
+                    )
+            )
+            .ToArray();
+        Assert.Contains(typeof(RuntimeHandle), ownedHandleTypes);
+        Assert.Contains(typeof(AcquiredFrameHandle), ownedHandleTypes);
 
-        var violations = ownedHandleTypeNames
-            .Select(name => assembly.GetType(name, throwOnError: true)!)
+        var violations = ownedHandleTypes
             .SelectMany(type =>
                 type.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
                     .Select(constructor => $"{type.FullName}.{constructor}")

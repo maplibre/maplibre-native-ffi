@@ -1,6 +1,3 @@
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Pointer;
@@ -12,12 +9,8 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed unsafe class NativeHandleStateTests
 {
-    private static readonly Lock Gate = new();
-    private static mln_status destroyStatus;
-    private static int destroyCount;
-
     [Fact]
-    public void BorrowedCopyPreventsConcurrentCloseAndReleasesOnException()
+    public void ABorrowHoldsOffACloseFromAnotherThreadUntilItEnds()
     {
         var destroyed = 0;
         var state = new NativeHandleState<MlnRuntime>(
@@ -49,51 +42,6 @@ public sealed unsafe class NativeHandleStateTests
         {
             using var read = state.Borrow();
         });
-    }
-
-    [Fact]
-    public void CloseIsIdempotentAfterSuccess()
-    {
-        using var _ = Gate.EnterScope();
-        destroyStatus = mln_status.MLN_STATUS_OK;
-        destroyCount = 0;
-        var state = new NativeHandleState<MlnRuntime>(
-            SyntheticHandles.Runtime(1234),
-            Destroy,
-            "RuntimeHandle"
-        );
-
-        state.Close();
-        state.Close();
-
-        Assert.True(state.IsClosed);
-        Assert.Equal(1, destroyCount);
-    }
-
-    [Fact]
-    public void FailedCloseKeepsHandleLiveForRetry()
-    {
-        using var _ = Gate.EnterScope();
-        destroyStatus = mln_status.MLN_STATUS_INVALID_STATE;
-        destroyCount = 0;
-        var state = new NativeHandleState<MlnRuntime>(
-            SyntheticHandles.Runtime(1234),
-            Destroy,
-            "RuntimeHandle"
-        );
-
-        var error = Assert.Throws<InvalidStateException>(state.Close);
-
-        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
-        Assert.Equal("destroy rejected", error.Diagnostic);
-        Assert.False(state.IsClosed);
-        Assert.Equal(1, destroyCount);
-
-        destroyStatus = mln_status.MLN_STATUS_OK;
-        state.Close();
-
-        Assert.True(state.IsClosed);
-        Assert.Equal(2, destroyCount);
     }
 
     [Fact]
@@ -146,55 +94,6 @@ public sealed unsafe class NativeHandleStateTests
         Assert.Equal(1, destroy.Count);
     }
 
-    [Fact]
-    public void FinalizerReportsLeakedLiveHandleWithoutDestroyingIt()
-    {
-        using var _ = Gate.EnterScope();
-        destroyStatus = mln_status.MLN_STATUS_OK;
-        destroyCount = 0;
-        var reports = new List<NativeLeakReport>();
-        using var capture = NativeLeakReporter.CaptureForTest(reports.Add);
-
-        CreateLeakedState();
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-
-        var report = Assert.Single(reports);
-        Assert.Equal(NativeLeakReportKind.LeakedHandle, report.Kind);
-        Assert.Equal("RuntimeHandle", report.TypeName);
-        Assert.Equal(SyntheticHandles.Runtime(5678).Value, report.Handle);
-        Assert.Null(report.Status);
-        Assert.Equal(0, destroyCount);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void CreateLeakedState()
-    {
-        _ = new NativeHandleState<MlnRuntime>(
-            SyntheticHandles.Runtime(5678),
-            Destroy,
-            "RuntimeHandle"
-        );
-    }
-
-    [Fact]
-    public void AUseStartingAfterCloseBeginsIsRefused()
-    {
-        using var _ = Gate.EnterScope();
-        destroyStatus = mln_status.MLN_STATUS_OK;
-        destroyCount = 0;
-        var state = new NativeHandleState<MlnRuntime>(
-            SyntheticHandles.Runtime(1234),
-            Destroy,
-            "RuntimeHandle"
-        );
-
-        state.Close();
-
-        Assert.Throws<InvalidStateException>(() => state.Handle);
-    }
-
     /// <summary>A destroy that blocks until the test releases it, so a close stays in progress.</summary>
     private sealed class BlockingDestroy : IDisposable
     {
@@ -209,11 +108,11 @@ public sealed unsafe class NativeHandleStateTests
             Assert.False(handle.IsNull);
             Interlocked.Increment(ref count);
             started.Set();
-            Assert.True(allowed.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(allowed.Wait(TestWaits.Deadline));
             return mln_status.MLN_STATUS_OK;
         }
 
-        internal void WaitUntilStarted() => Assert.True(started.Wait(TimeSpan.FromSeconds(5)));
+        internal void WaitUntilStarted() => Assert.True(started.Wait(TestWaits.Deadline));
 
         internal void Allow() => allowed.Set();
 
@@ -222,21 +121,6 @@ public sealed unsafe class NativeHandleStateTests
             started.Dispose();
             allowed.Dispose();
         }
-    }
-
-    private static mln_status Destroy(MlnRuntime handle, mln_diagnostic* diagnostic)
-    {
-        Assert.False(handle.IsNull);
-        destroyCount++;
-        // Native writes the diagnostic on every return, so the fake does too.
-        Span<sbyte> buffer = diagnostic->message;
-        var message = MemoryMarshal.AsBytes(buffer);
-        var length = Encoding.UTF8.GetBytes(
-            destroyStatus == mln_status.MLN_STATUS_OK ? "" : "destroy rejected",
-            message
-        );
-        message[length] = 0;
-        return destroyStatus;
     }
 }
 

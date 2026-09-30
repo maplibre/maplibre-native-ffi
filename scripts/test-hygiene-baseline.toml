@@ -4,7 +4,6 @@
 [sleep]
 "bindings/dart/test/callback_collection_test.dart" = 1
 "bindings/dart/test/maplibre_native_ffi_test.dart" = 5
-"bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs" = 1
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTestHelpers.cs" = 3
 "tests/native/support/render_webgpu.c" = 2
 
@@ -12,8 +11,6 @@
 "bindings/dart/test/foundational_values_test.dart" = 2
 "bindings/dart/test/maplibre_native_ffi_test.dart" = 33
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/BufferValueEqualityTests.cs" = 3
-"bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs" = 1
-"bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceTransformTests.cs" = 2
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleImageTests.cs" = 2
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleJsonTests.cs" = 18
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleLayerTests.cs" = 1

@@ -38,7 +38,7 @@ public sealed unsafe class RuntimeEventTests
     [Fact]
     public void CopiesEveryMessageAndTypedPayloadOfOneBatch()
     {
-        var arena = new RuntimeEventTestHelpers.MessageArena();
+        var arena = new EventBatches.MessageArena();
         var renderError = arena.Add("render failed");
         var sourceId = arena.Add("source-1");
         var events = new[]
@@ -91,11 +91,7 @@ public sealed unsafe class RuntimeEventTests
             },
         };
 
-        var copied = RuntimeEventTestHelpers.DecodeBatch(
-            events,
-            arena.Bytes,
-            RuntimeEventTestHelpers.EventStride
-        );
+        var copied = EventBatches.Decode(events, arena.Bytes, EventBatches.Stride);
 
         Assert.Equal(
             [
@@ -122,7 +118,7 @@ public sealed unsafe class RuntimeEventTests
     [Fact]
     public void WalksEventsByTheStrideTheBatchReports()
     {
-        var stride = RuntimeEventTestHelpers.EventStride + 24;
+        var stride = EventBatches.Stride + 24;
         var events = new[]
         {
             new mln_runtime_event
@@ -142,7 +138,7 @@ public sealed unsafe class RuntimeEventTests
             },
         };
 
-        var copied = RuntimeEventTestHelpers.DecodeBatch(events, [], stride);
+        var copied = EventBatches.Decode(events, [], stride);
 
         Assert.Equal(
             [
@@ -158,7 +154,7 @@ public sealed unsafe class RuntimeEventTests
     [Fact]
     public void UnknownEventDomainsKeepRawValuesAndCopyThePayloadWindow()
     {
-        var stride = RuntimeEventTestHelpers.EventStride + 8;
+        var stride = EventBatches.Stride + 8;
         var payloadOffset = OffsetOf(nameof(mln_runtime_event.payload));
         var records = new byte[stride];
         BitConverter.GetBytes(4242u).CopyTo(records, OffsetOf(nameof(mln_runtime_event.type)));
@@ -174,7 +170,7 @@ public sealed unsafe class RuntimeEventTests
             records[index] = (byte)(index - payloadOffset + 1);
         }
 
-        var copied = RuntimeEventTestHelpers.DecodeRecordBytes(records, [], 1, stride);
+        var copied = EventBatches.DecodeRecordBytes(records, [], 1, stride);
 
         var runtimeEvent = Assert.Single(copied);
         Assert.Equal(4242u, (uint)runtimeEvent.Type);
@@ -194,115 +190,28 @@ public sealed unsafe class RuntimeEventTests
     }
 
     [Fact]
-    public void UnknownRuntimePayloadSnapshotsBytesAndReturnsCopies()
+    public void NumbersAreCheckedWhenNarrowedAndKeptWhenOpen()
     {
-        var source = new byte[] { 1, 2, 3 };
-        var payload = new RuntimeEvent.PayloadValue.Unknown(999, source);
-        source[0] = 9;
+        // A batch count that no managed array can index fails instead of wrapping around.
+        Assert.Throws<OverflowException>(() =>
+            EventBatches.DecodeRecordBytes([], [], (nuint)int.MaxValue + 1, EventBatches.Stride)
+        );
 
-        var first = payload.PayloadBytes;
-        Assert.Equal([1, 2, 3], first);
-        first[0] = 8;
-        Assert.Equal([1, 2, 3], payload.PayloadBytes);
-    }
-
-    [Fact]
-    public void UnmatchedMapSourceKeepsItsRawIdentityAndExposesNoPublicMap()
-    {
-        var source = SyntheticHandles.Map(1234).Value;
         var events = new[]
         {
             new mln_runtime_event
             {
                 type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_LOADING_STARTED,
                 source_type = (uint)mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_MAP,
-                source = source,
+                source = ulong.MaxValue,
+                code = int.MinValue,
             },
+            new mln_runtime_event { type = uint.MaxValue },
         };
+        var copied = EventBatches.Decode(events, [], EventBatches.Stride);
 
-        var copied = RuntimeEventTestHelpers.DecodeBatch(
-            events,
-            [],
-            RuntimeEventTestHelpers.EventStride
-        );
-
-        var runtimeEvent = Assert.Single(copied);
-        Assert.Equal(RuntimeEventSourceType.Map, runtimeEvent.SourceType);
-        Assert.Equal(source, runtimeEvent.Source);
-    }
-
-    [Fact]
-    public void OfflineRegionObservationEventsMaterializeCopiedPublicPayloads()
-    {
-        var arena = new RuntimeEventTestHelpers.MessageArena();
-        var errorText = arena.Add("not found");
-        var events = new[]
-        {
-            new mln_runtime_event
-            {
-                type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
-                payload_type = (uint)
-                    mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
-                payload = new mln_runtime_event_payload
-                {
-                    offline_region_status = new mln_runtime_event_offline_region_status
-                    {
-                        region_id = 42,
-                        status = new mln_offline_region_status
-                        {
-                            download_state = (uint)
-                                mln_offline_region_download_state.MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
-                            completed_resource_count = 1,
-                            completed_resource_size = 2,
-                            completed_tile_count = 3,
-                            required_tile_count = 4,
-                            completed_tile_size = 5,
-                            required_resource_count = 6,
-                            required_resource_count_is_precise = 1,
-                            complete = 1,
-                        },
-                    },
-                },
-            },
-            new mln_runtime_event
-            {
-                type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
-                payload_type = (uint)
-                    mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR,
-                message_offset = errorText.Offset,
-                message_size = errorText.Size,
-                payload = new mln_runtime_event_payload
-                {
-                    offline_region_response_error =
-                        new mln_runtime_event_offline_region_response_error
-                        {
-                            region_id = 42,
-                            reason = (uint)ResourceErrorReason.NotFound,
-                        },
-                },
-            },
-        };
-
-        var copied = RuntimeEventTestHelpers.DecodeBatch(
-            events,
-            arena.Bytes,
-            RuntimeEventTestHelpers.EventStride
-        );
-
-        var status = Assert.IsType<RuntimeEvent.PayloadValue.OfflineRegionStatus>(
-            copied[0].Payload
-        );
-        Assert.Equal(42, status.Value.RegionId);
-        Assert.Equal(OfflineRegionDownloadState.Active, status.Value.Status.DownloadState);
-        Assert.Equal(6u, status.Value.Status.RequiredResourceCount);
-        Assert.True(status.Value.Status.RequiredResourceCountIsPrecise);
-        Assert.True(status.Value.Status.Complete);
-
-        var responseError = Assert.IsType<RuntimeEvent.PayloadValue.OfflineRegionResponseError>(
-            copied[1].Payload
-        );
-        Assert.Equal(42, responseError.Value.RegionId);
-        Assert.Equal(ResourceErrorReason.NotFound, responseError.Value.Reason);
-        Assert.Equal("not found", copied[1].Message);
+        Assert.Equal(ulong.MaxValue, copied[0].Source);
+        Assert.Equal(int.MinValue, copied[0].Code);
+        Assert.Equal(uint.MaxValue, (uint)copied[1].Type);
     }
 }

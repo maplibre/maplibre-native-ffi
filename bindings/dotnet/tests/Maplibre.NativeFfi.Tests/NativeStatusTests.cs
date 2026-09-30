@@ -1,12 +1,12 @@
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Loader;
 using Maplibre.NativeFfi.Internal.Status;
+using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
-public sealed unsafe class NativeStatusTests
+public sealed class NativeStatusTests
 {
     [Theory]
     [InlineData(
@@ -50,6 +50,8 @@ public sealed unsafe class NativeStatusTests
         MaplibreStatus.NotFound,
         typeof(MaplibreException)
     )]
+    // A status this binding predates keeps its raw value.
+    [InlineData(-12_345, MaplibreStatus.Unknown, typeof(MaplibreException))]
     public void NativeStatusesMapToPublicExceptionCategories(
         int rawStatus,
         MaplibreStatus expectedStatus,
@@ -68,36 +70,14 @@ public sealed unsafe class NativeStatusTests
     }
 
     [Fact]
-    public void NativeInvalidStatusMapsToExceptionWithCallDiagnostic()
+    public void ANativeFailureRaisesItsStatusWithTheCallDiagnostic()
     {
-        NativeLibraryLoader.EnsureLoaded();
-
         var error = Assert.Throws<InvalidArgumentException>(() =>
-        {
-            mln_diagnostic diagnostic;
-            NativeStatus.Check(
-                NativeMethods.mln_network_status_set(
-                    999_999,
-                    NativeDiagnostic.Prepare(&diagnostic)
-                ),
-                &diagnostic
-            );
-        });
+            Maplibre.NetworkStatusSet((NetworkStatus)999_999)
+        );
 
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
         Assert.Equal((int)mln_status.MLN_STATUS_INVALID_ARGUMENT, error.RawStatus);
         Assert.Contains("network status", error.Diagnostic, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void UnknownNativeStatusPreservesRawStatus()
-    {
-        var error = Assert.Throws<MaplibreException>(() =>
-            NativeStatus.Check(-12_345, "future status")
-        );
-
-        Assert.Equal(MaplibreStatus.Unknown, error.Status);
-        Assert.Equal(-12_345, error.RawStatus);
-        Assert.Equal("future status", error.Diagnostic);
     }
 }
