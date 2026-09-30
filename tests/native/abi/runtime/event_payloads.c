@@ -701,15 +701,60 @@ static mln_map create_static_map(mln_runtime runtime, uint64_t event_mask) {
   return mln_test_create_map_with_options(runtime, &options);
 }
 
+// Wraps a still image's completion to drain the scenario log from inside it,
+// before forwarding the result, so that the case sees what was queued when the
+// completion ran.
+typedef struct still_image_probe {
+  mln_completion inner;
+  mln_runtime runtime;
+  mln_map map;
+  uint32_t event_at_completion;
+  bool event_queued;
+} still_image_probe;
+
+static void drain_then_complete(
+  void* user_data, const mln_completion_result* result
+) {
+  still_image_probe* probe = user_data;
+  log_drain_quietly(probe->runtime, &scenario_log);
+  probe->event_queued =
+    log_contains(&scenario_log, probe->event_at_completion, probe->map);
+  probe->inner.callback(probe->inner.user_data, result);
+}
+
+static void release_still_image_probe(void* user_data) {
+  const still_image_probe* probe = user_data;
+  if (probe->inner.release_user_data != NULL) {
+    probe->inner.release_user_data(probe->inner.user_data);
+  }
+}
+
 // Requests a still image and renders until its completion arrives, then
-// reports its status.
+// reports its status. A nonzero event_at_completion is the event that must
+// already be queued when the completion runs: a host that sees the completion
+// and then drains finds it.
 static mln_status render_still_image(
   const mln_test_render_fixture* fixture, mln_runtime runtime, mln_map map,
-  char* out_diagnostic, size_t diagnostic_capacity
+  uint32_t event_at_completion, char* out_diagnostic, size_t diagnostic_capacity
 ) {
   mln_test_completion still = mln_test_completion_default(0);
+  still_image_probe probe = {
+    .inner = still.descriptor,
+    .runtime = runtime,
+    .map = map,
+    .event_at_completion = event_at_completion,
+  };
+  const mln_completion probed = {
+    .size = sizeof(mln_completion),
+    .callback = drain_then_complete,
+    .user_data = &probe,
+    .release_user_data = release_still_image_probe,
+  };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_request_still_image(map, &still.descriptor, NULL)
+    MLN_STATUS_OK,
+    mln_map_request_still_image(
+      map, event_at_completion == 0 ? &still.descriptor : &probed, NULL
+    )
   );
   const mln_test_deadline deadline = mln_test_deadline_default();
   mln_test_watchdog_note("rendering until a still image completes");
@@ -720,6 +765,12 @@ static mln_status render_still_image(
     render_one_frame(fixture, runtime, NULL);
   }
   mln_test_watchdog_note(NULL);
+  if (event_at_completion != 0) {
+    TEST_ASSERT_TRUE_MESSAGE(
+      probe.event_queued,
+      "the still image's event was not queued when its completion ran"
+    );
+  }
   const mln_status status = mln_test_completion_status(&still);
   if (out_diagnostic != NULL) {
     snprintf(
@@ -743,7 +794,10 @@ static void a_still_image_reports_that_it_finished(void) {
   log_reset(log);
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, render_still_image(&fixture, runtime, map, NULL, 0)
+    MLN_STATUS_OK, render_still_image(
+                     &fixture, runtime, map,
+                     MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED, NULL, 0
+                   )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   log_drain(runtime, log);
@@ -825,7 +879,8 @@ static void failed_loads_report_their_text(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_NATIVE_ERROR,
     render_still_image(
-      &fixture, runtime, map, still_diagnostic, sizeof(still_diagnostic)
+      &fixture, runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED,
+      still_diagnostic, sizeof(still_diagnostic)
     )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
@@ -925,7 +980,7 @@ static void a_map_created_with_an_empty_mask_queues_nothing(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, render_still_image(&fixture, runtime, map, NULL, 0)
+    MLN_STATUS_OK, render_still_image(&fixture, runtime, map, 0, NULL, 0)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
 
