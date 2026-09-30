@@ -5,7 +5,11 @@
 // the connection. Stopping wakes the accept thread with a connection of its
 // own and shuts down every open connection, so no thread stays blocked.
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+// Keeps windows.h from pulling in winsock.h, whose declarations winsock2.h
+// would then redefine.
+#define WIN32_LEAN_AND_MEAN
+#else
 #define _POSIX_C_SOURCE 200809L
 #endif
 
@@ -32,6 +36,7 @@ typedef SOCKET socket_handle;
 #define SHUTDOWN_BOTH SD_BOTH
 #else
 #include <arpa/inet.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/socket.h>
@@ -70,6 +75,9 @@ struct mln_test_http_server {
   socket_handle listener;
   uint16_t port;
   atomic_bool stopping;
+  // Set by the accept thread when accept fails for a reason other than an
+  // interrupted or aborted connection; stopping then fails the test.
+  atomic_bool accept_failed;
 
   server_mutex mutex;
   // Signalled when a held response is released or a connection thread exits.
@@ -469,11 +477,27 @@ static bool start_connection(
   return false;
 }
 
+// Whether a failed accept only lost one connection, so the next accept can
+// succeed. Any other failure, such as running out of descriptors, would repeat
+// at once.
+static bool accept_failure_is_transient(void) {
+#if defined(_WIN32)
+  const int error = WSAGetLastError();
+  return error == WSAEINTR || error == WSAECONNRESET;
+#else
+  return errno == EINTR || errno == ECONNABORTED;
+#endif
+}
+
 static void accept_connections(mln_test_http_server* server) {
   while (!atomic_load(&server->stopping)) {
     const socket_handle socket = accept(server->listener, NULL, NULL);
     if (socket == INVALID_SOCKET_HANDLE) {
-      continue;
+      if (accept_failure_is_transient()) {
+        continue;
+      }
+      atomic_store(&server->accept_failed, !atomic_load(&server->stopping));
+      return;
     }
 #if defined(SO_NOSIGPIPE)
     // Apple platforms have no MSG_NOSIGNAL, so the socket opts out instead.
@@ -528,6 +552,7 @@ mln_test_http_server* mln_test_http_server_start(
   server->routes = routes;
   server->route_count = route_count;
   atomic_init(&server->stopping, false);
+  atomic_init(&server->accept_failed, false);
   for (size_t index = 0; index < open_connection_capacity; index += 1) {
     server->connections[index] = INVALID_SOCKET_HANDLE;
   }
@@ -607,8 +632,12 @@ void mln_test_http_server_stop(mln_test_http_server* server) {
   pthread_cond_destroy(&server->changed);
   pthread_mutex_destroy(&server->mutex);
 #endif
+  const bool accept_failed = atomic_load(&server->accept_failed);
   free(server->requests);
   free(server);
+  TEST_ASSERT_FALSE_MESSAGE(
+    accept_failed, "the test server stopped accepting connections"
+  );
 }
 
 uint16_t mln_test_http_server_port(const mln_test_http_server* server) {
