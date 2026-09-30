@@ -99,6 +99,17 @@ static void pyramid_without_style(void* descriptor) {
     NULL;
 }
 
+static void pyramid_with_inverted_bounds(void* descriptor) {
+  mln_offline_region_definition* definition = descriptor;
+  definition->data.tile_pyramid.bounds.southwest.longitude = 5.0;
+}
+
+static void pyramid_with_inverted_zoom_range(void* descriptor) {
+  mln_offline_region_definition* definition = descriptor;
+  definition->data.tile_pyramid.min_zoom = 4.0;
+  definition->data.tile_pyramid.max_zoom = 2.0;
+}
+
 static void as_geometry_without_style(void* descriptor) {
   mln_offline_region_definition* definition = descriptor;
   *definition = geometry_definition();
@@ -123,6 +134,10 @@ static const mln_test_validation_case definition_cases[] = {
   {"an unknown type", with_unknown_type, MLN_STATUS_INVALID_ARGUMENT, NULL},
   {"a pyramid without a style", pyramid_without_style,
    MLN_STATUS_INVALID_ARGUMENT, NULL},
+  {"a pyramid with inverted bounds", pyramid_with_inverted_bounds,
+   MLN_STATUS_INVALID_ARGUMENT, "bounds are invalid"},
+  {"a pyramid with an inverted zoom range", pyramid_with_inverted_zoom_range,
+   MLN_STATUS_INVALID_ARGUMENT, "zoom range is invalid"},
   {"a geometry without a style", as_geometry_without_style,
    MLN_STATUS_INVALID_ARGUMENT, NULL},
   {"a geometry without bytes", as_geometry_without_bytes,
