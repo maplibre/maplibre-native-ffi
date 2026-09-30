@@ -16,7 +16,7 @@ public sealed class LeakReportTests
     // disposal fails, or the handle has none, the finalizer reports the leak on standard error
     // and destroys nothing.
     [Fact]
-    public async Task AnAbandonedHandleIsDisposedOrReportedAsALeak()
+    public void AnAbandonedHandleIsDisposedOrReportedAsALeak()
     {
         using var standardError = new StandardErrorCapture();
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
@@ -26,8 +26,9 @@ public sealed class LeakReportTests
 
         Assert.False(map.IsAlive);
         Assert.False(undisposable.IsAlive);
-        // The finalizer disposed the map, so the runtime has no live child to refuse its close.
-        await runtime.CloseAsync();
+        // The finalizer only starts the map's native disposal, and a runtime release refuses a
+        // child that is still retiring. Disposing the runtime waits for that child instead.
+        runtime.Dispose();
         Assert.Contains(
             $"Leaked RuntimeHandle native handle 0x{SyntheticHandles.Runtime(5678).Value:x}",
             standardError.Text,
