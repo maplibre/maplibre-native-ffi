@@ -1,8 +1,13 @@
-// Raw C ABI coverage for standalone projection lifecycle, ordered creation,
-// synchronous reads and setters, and any-thread handles.
+// Standalone projections: a projection copies the map's transform when it is
+// created, outlives the map, converts and fits synchronously on any thread,
+// and reads its scale at its own camera. The spherical Mercator helpers need
+// no map at all.
 
+#include <math.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "support/harness.h"
 #include "support/test_support.h"
@@ -202,51 +207,345 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static mln_lat_lng map_lat_lng_for_pixel(
+  mln_map map, mln_screen_point point, bool unwrapped
+) {
+  mln_test_completion query = mln_test_completion_default(sizeof(mln_lat_lng));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    unwrapped
+      ? mln_map_lat_lng_for_pixel_unwrapped(map, point, &query.descriptor, NULL)
+      : mln_map_lat_lng_for_pixel(map, point, &query.descriptor, NULL)
+  );
+  mln_lat_lng coordinate = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_completion_finish_value(&query, &coordinate, sizeof(coordinate))
+  );
+  return coordinate;
+}
+
+static void map_lat_lngs_for_pixels(
+  mln_map map, const mln_screen_point* points, size_t count, bool unwrapped,
+  mln_lat_lng* out_coordinates
+) {
+  mln_test_completion query =
+    mln_test_completion_default(count * sizeof(mln_lat_lng));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    unwrapped
+      ? mln_map_lat_lngs_for_pixels_unwrapped(
+          map, points, count, &query.descriptor, NULL
+        )
+      : mln_map_lat_lngs_for_pixels(map, points, count, &query.descriptor, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish_value(
+                     &query, out_coordinates, count * sizeof(mln_lat_lng)
+                   )
+  );
+}
+
+static void jump_to(mln_map map, double longitude, double zoom) {
+  mln_camera_update update = mln_camera_update_default();
+  update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  update.camera.latitude = 0.0;
+  update.camera.longitude = longitude;
+  update.camera.zoom = zoom;
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
+  );
+}
+
+// A viewport wider than one world copy, or one across the antimeridian, shows
+// longitudes that the wrapped conversions fold into -180 to 180 and that the
+// unwrapped ones keep in the visible copy. The map's ordered conversions, in
+// single and batch form, and a projection of the same camera agree.
 static void unwrapped_conversion_preserves_world_copies(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();
   options.initial_extent.width = 1024;
   options.initial_extent.height = 512;
   mln_map map = mln_test_create_map_with_options(runtime, &options);
+  jump_to(map, 179.0, 0.0);
   mln_map_projection projection = create_projection(map);
-
-  mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  camera.latitude = 0.0;
-  camera.longitude = 179.0;
-  camera.zoom = 0.0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_set_camera(projection, &camera, NULL)
-  );
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_lat_lng_for_pixel_unwrapped(
                                    projection, (mln_screen_point){0}, NULL, NULL
                                  )
   );
-
-  // The right viewport edge sits a full world east of the left edge, so the
-  // wrapped conversion folds it back across the antimeridian while the
-  // unwrapped one keeps the visible world copy.
-  const mln_screen_point right = {.x = 1024.0, .y = 256.0};
-  mln_lat_lng wrapped = {0};
+  mln_lat_lng rejected = {0};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_projection_lat_lng_for_pixel(projection, right, &wrapped, NULL)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_lat_lng_for_pixel_unwrapped(
+      projection, (mln_screen_point){.x = INFINITY}, &rejected, NULL
+    )
   );
-  TEST_ASSERT_TRUE(wrapped.longitude >= -180.0);
-  TEST_ASSERT_TRUE(wrapped.longitude <= 180.0);
 
-  mln_lat_lng unwrapped = {0};
+  // At zoom 0 the world is 512 pixels wide, so the viewport shows two copies.
+  const mln_screen_point points[] = {
+    {.x = 0.0, .y = 256.0},
+    {.x = 512.0, .y = 256.0},
+    {.x = 1024.0, .y = 256.0},
+  };
+  mln_lat_lng wrapped[3] = {0};
+  mln_lat_lng unwrapped[3] = {0};
+  map_lat_lngs_for_pixels(map, points, 3, false, wrapped);
+  map_lat_lngs_for_pixels(map, points, 3, true, unwrapped);
+  for (size_t index = 0; index < 3; index++) {
+    TEST_ASSERT_TRUE(wrapped[index].longitude >= -180.0);
+    TEST_ASSERT_TRUE(wrapped[index].longitude <= 180.0);
+  }
+  TEST_ASSERT_DOUBLE_WITHIN(1e-10, 179.0, unwrapped[1].longitude);
+  TEST_ASSERT_TRUE(unwrapped[2].longitude - unwrapped[0].longitude > 360.0);
+
+  const mln_lat_lng wrapped_right =
+    map_lat_lng_for_pixel(map, points[2], false);
+  TEST_ASSERT_TRUE(wrapped_right.longitude >= -180.0);
+  TEST_ASSERT_TRUE(wrapped_right.longitude <= 180.0);
+  const mln_lat_lng unwrapped_right =
+    map_lat_lng_for_pixel(map, points[2], true);
+  TEST_ASSERT_EQUAL_DOUBLE(unwrapped[2].longitude, unwrapped_right.longitude);
+
+  // The right edge sits a full world east of the left edge, so the projection
+  // folds it back across the antimeridian or keeps the visible copy, exactly
+  // as the map does.
+  mln_lat_lng projected = {0};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_lat_lng_for_pixel_unwrapped(
-                     projection, right, &unwrapped, NULL
+    MLN_STATUS_OK, mln_map_projection_lat_lng_for_pixel(
+                     projection, points[2], &projected, NULL
                    )
   );
-  TEST_ASSERT_TRUE(unwrapped.longitude > 180.0);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, wrapped.latitude, unwrapped.latitude);
   TEST_ASSERT_DOUBLE_WITHIN(
-    1e-9, wrapped.longitude, unwrapped.longitude - 360.0
+    1e-10, wrapped_right.longitude, projected.longitude
+  );
+  mln_lat_lng projected_unwrapped = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_lat_lng_for_pixel_unwrapped(
+                     projection, points[2], &projected_unwrapped, NULL
+                   )
+  );
+  TEST_ASSERT_TRUE(projected_unwrapped.longitude > 180.0);
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-10, unwrapped_right.longitude, projected_unwrapped.longitude
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, projected.latitude, projected_unwrapped.latitude
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, projected.longitude, projected_unwrapped.longitude - 360.0
+  );
+
+  // At zoom 2 the viewport spans less than a world but still crosses the
+  // antimeridian, so its edges unwrap onto either side of 180.
+  jump_to(map, 179.0, 2.0);
+  const mln_screen_point edges[] = {points[0], points[2]};
+  mln_lat_lng edges_wrapped[2] = {0};
+  mln_lat_lng edges_unwrapped[2] = {0};
+  map_lat_lngs_for_pixels(map, edges, 2, false, edges_wrapped);
+  map_lat_lngs_for_pixels(map, edges, 2, true, edges_unwrapped);
+  TEST_ASSERT_TRUE(edges_unwrapped[0].longitude < edges_unwrapped[1].longitude);
+  TEST_ASSERT_TRUE(edges_unwrapped[0].longitude < 180.0);
+  TEST_ASSERT_TRUE(edges_unwrapped[1].longitude > 180.0);
+  TEST_ASSERT_TRUE(
+    edges_unwrapped[1].longitude - edges_unwrapped[0].longitude < 360.0
+  );
+  TEST_ASSERT_TRUE(edges_wrapped[0].longitude > 0.0);
+  TEST_ASSERT_TRUE(edges_wrapped[1].longitude < 0.0);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_close(projection, NULL)
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A geometry fit frames the coordinates the geometry carries, the same way a
+// coordinate fit does. A geometry with nothing to frame leaves the camera
+// where it was.
+static void visible_geometry_fits_like_its_coordinates(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_map_projection projection = create_projection(map);
+  const mln_edge_insets padding = {
+    .top = 10.0, .left = 20.0, .bottom = 10.0, .right = 20.0
+  };
+
+  const mln_lat_lng corners[] = {
+    {.latitude = -10.0, .longitude = -10.0},
+    {.latitude = 10.0, .longitude = 20.0},
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_set_visible_coordinates(
+                     projection, corners, 2, padding, NULL
+                   )
+  );
+  const mln_camera_options coordinate_fit = read_camera(projection);
+
+  // Reset first, so the geometry fit has to move the camera to agree.
+  mln_camera_options reset = mln_camera_options_default();
+  reset.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  reset.zoom = 1.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_set_camera(projection, &reset, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_projection_set_visible_geometry(
+      projection,
+      MLN_BUFFER_LITERAL(
+        "{\"type\":\"MultiPoint\",\"coordinates\":[[-10,-10],[20,10]]}"
+      ),
+      padding, NULL
+    )
+  );
+  const mln_camera_options geometry_fit = read_camera(projection);
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, coordinate_fit.latitude, geometry_fit.latitude
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, coordinate_fit.longitude, geometry_fit.longitude
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, coordinate_fit.zoom, geometry_fit.zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 5.0, geometry_fit.longitude);
+
+  static const char* const unframeable[] = {
+    "",
+    "not json",
+    "{\"type\":\"Feature\",\"geometry\":null,\"properties\":{}}",
+    "{\"type\":\"GeometryCollection\",\"geometries\":[]}",
+    "{\"type\":\"MultiPoint\",\"coordinates\":[]}",
+  };
+  for (size_t index = 0; index < sizeof(unframeable) / sizeof(*unframeable);
+       index += 1) {
+    const char* geometry = unframeable[index];
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      MLN_STATUS_INVALID_ARGUMENT,
+      mln_map_projection_set_visible_geometry(
+        projection, mln_test_buffer_view(geometry, strlen(geometry)), padding,
+        NULL
+      ),
+      geometry
+    );
+  }
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_set_visible_geometry(
+      projection,
+      MLN_BUFFER_LITERAL("{\"type\":\"Point\",\"coordinates\":[0,0]}"),
+      (mln_edge_insets){.top = NAN}, NULL
+    )
+  );
+  const mln_camera_options unchanged = read_camera(projection);
+  TEST_ASSERT_EQUAL_DOUBLE(geometry_fit.zoom, unchanged.zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(geometry_fit.longitude, unchanged.longitude);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_close(projection, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_set_visible_geometry(
+      projection,
+      MLN_BUFFER_LITERAL("{\"type\":\"Point\",\"coordinates\":[0,0]}"), padding,
+      NULL
+    )
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static double projection_meters_per_pixel(
+  mln_map_projection projection, double latitude
+) {
+  double meters = 0.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_meters_per_pixel_at_latitude(
+                     projection, latitude, &meters, NULL
+                   )
+  );
+  return meters;
+}
+
+static double map_meters_per_pixel(mln_map map, double latitude) {
+  mln_test_completion query = mln_test_completion_default(sizeof(double));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_meters_per_pixel_at_latitude(map, latitude, &query.descriptor, NULL)
+  );
+  double meters = 0.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_test_completion_finish_value(&query, &meters, sizeof(meters))
+  );
+  return meters;
+}
+
+// A projection reads the scale at its own zoom: the map's scale when it was
+// created, the same scale after the map zooms, and a halved scale once the
+// projection's own camera zooms in by one.
+static void meters_per_pixel_follows_the_projection_camera(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_camera_update update = mln_camera_update_default();
+  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  update.camera.zoom = 3.0;
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
+  );
+  mln_map_projection projection = create_projection(map);
+
+  const double at_creation = map_meters_per_pixel(map, 45.0);
+  TEST_ASSERT_EQUAL_DOUBLE(
+    at_creation, projection_meters_per_pixel(projection, 45.0)
+  );
+  TEST_ASSERT_GREATER_THAN_DOUBLE(
+    at_creation, projection_meters_per_pixel(projection, 0.0)
+  );
+
+  update.camera.zoom = 4.0;
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    at_creation * 1e-9, at_creation / 2.0, map_meters_per_pixel(map, 45.0)
+  );
+  TEST_ASSERT_EQUAL_DOUBLE(
+    at_creation, projection_meters_per_pixel(projection, 45.0)
+  );
+
+  mln_camera_options camera = mln_camera_options_default();
+  camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.zoom = 4.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_set_camera(projection, &camera, NULL)
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    at_creation * 1e-9, at_creation / 2.0,
+    projection_meters_per_pixel(projection, 45.0)
+  );
+
+  double untouched = -1.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_meters_per_pixel_at_latitude(
+      projection, 90.5, &untouched, NULL
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_meters_per_pixel_at_latitude(
+      projection, NAN, &untouched, NULL
+    )
+  );
+  TEST_ASSERT_EQUAL_DOUBLE(-1.0, untouched);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_meters_per_pixel_at_latitude(projection, 0.0, NULL, NULL)
   );
 
   TEST_ASSERT_EQUAL_INT(
@@ -254,6 +553,92 @@ static void unwrapped_conversion_preserves_world_copies(void) {
   );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
+}
+
+// Spherical Mercator on MapLibre's earth radius: the origin sits at zero, the
+// antimeridian half the circumference east, and every coordinate converts
+// back to itself.
+static void projected_meters_round_trip(void) {
+  static const double half_circumference = 20037508.342789244;
+  mln_projected_meters meters = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_projected_meters_for_lat_lng((mln_lat_lng){0}, &meters, NULL)
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, meters.northing);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, meters.easting);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_projected_meters_for_lat_lng(
+      (mln_lat_lng){.latitude = 0.0, .longitude = 180.0}, &meters, NULL
+    )
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(1e-3, half_circumference, meters.easting);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, meters.northing);
+
+  const mln_lat_lng coordinates[] = {
+    {.latitude = 37.7749, .longitude = -122.4194},
+    {.latitude = -33.8688, .longitude = 151.2093},
+    {.latitude = 60.0, .longitude = 0.5},
+  };
+  for (size_t index = 0; index < sizeof(coordinates) / sizeof(*coordinates);
+       index += 1) {
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_projected_meters_for_lat_lng(coordinates[index], &meters, NULL)
+    );
+    // Northing grows with latitude and easting with longitude.
+    TEST_ASSERT_EQUAL(coordinates[index].latitude > 0.0, meters.northing > 0.0);
+    TEST_ASSERT_EQUAL(coordinates[index].longitude > 0.0, meters.easting > 0.0);
+    mln_lat_lng round_trip = {0};
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_lat_lng_for_projected_meters(meters, &round_trip, NULL)
+    );
+    TEST_ASSERT_DOUBLE_WITHIN(
+      1e-9, coordinates[index].latitude, round_trip.latitude
+    );
+    TEST_ASSERT_DOUBLE_WITHIN(
+      1e-9, coordinates[index].longitude, round_trip.longitude
+    );
+  }
+}
+
+static void projected_meters_reject_invalid_arguments(void) {
+  const mln_lat_lng center = {.latitude = 37.7749, .longitude = -122.4194};
+  mln_projected_meters meters = {.northing = -1.0, .easting = -1.0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_projected_meters_for_lat_lng(center, NULL, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_projected_meters_for_lat_lng(
+      (mln_lat_lng){.latitude = 90.5}, &meters, NULL
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_projected_meters_for_lat_lng(
+      (mln_lat_lng){.longitude = INFINITY}, &meters, NULL
+    )
+  );
+  TEST_ASSERT_EQUAL_DOUBLE(-1.0, meters.northing);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_lat_lng_for_projected_meters((mln_projected_meters){0}, NULL, NULL)
+  );
+  mln_lat_lng coordinate = {.latitude = -1.0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_lat_lng_for_projected_meters(
+      (mln_projected_meters){.northing = NAN}, &coordinate, MLN_TEST_DIAGNOSTIC
+    )
+  );
+  TEST_ASSERT_EQUAL_STRING(
+    "projected meter values must be finite", mln_test_last_error()
+  );
+  TEST_ASSERT_EQUAL_DOUBLE(-1.0, coordinate.latitude);
 }
 
 typedef struct projection_thread_probe {
@@ -330,5 +715,9 @@ MLN_TEST_GROUP {
   RUN_TEST(creation_observes_earlier_map_camera_commands);
   RUN_TEST(setters_apply_before_return_and_conversions_round_trip);
   RUN_TEST(unwrapped_conversion_preserves_world_copies);
+  RUN_TEST(visible_geometry_fits_like_its_coordinates);
+  RUN_TEST(meters_per_pixel_follows_the_projection_camera);
   RUN_TEST(projection_handles_are_callable_from_foreign_threads);
+  RUN_TEST(projected_meters_round_trip);
+  RUN_TEST(projected_meters_reject_invalid_arguments);
 }

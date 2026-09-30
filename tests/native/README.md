@@ -193,6 +193,10 @@ Test files include `support/test_support.h`, which brings in the helpers below.
 The host-target fixtures in `support/host_graphics.h` need their own include, as
 described under [GPU objects](#gpu-objects).
 
+The map files also include `support/map.h`, which provides
+`mln_test_render_still_image`. That helper requests a still image from a static
+or tile map and keeps a frame demand in flight until the image completes.
+
 Every wait blocks on a signal and gives up at a deadline: 10 seconds times the
 timeout scale unless the wait names another. The signal is the pulse, a
 process-wide counter that flags, gates, completions, and the fixtures' wakes all
@@ -210,6 +214,8 @@ Use the helper that matches what the case waits for:
 - An event: `mln_test_await_event` or `mln_test_await_event_matching`.
 - Render progress: `mln_test_render_step_until`, which services a caller-driver
   session's driver work between checks.
+- A static or tile map that has loaded and rendered everything it requested:
+  `mln_test_render_still_image`.
 - Any other condition: `mln_test_await` with a predicate.
 
 ### GPU objects
