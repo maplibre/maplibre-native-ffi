@@ -1,6 +1,6 @@
 """Emit one synthesized completion result per adapter copy kind.
 
-The C adapter tests pass each result through its completion copy and compare
+C adapter tests can pass each result through its completion copy and compare
 the copy with the source. A synthesized result sets every presence bit, picks
 the first variant of each union, and gives every array two elements, so the
 copy has to follow every pointer the kind declares.
@@ -41,21 +41,23 @@ typedef struct mln_adapter_copy_case {
   bool (*matches)(const void* copy, const void* source, size_t count);
 } mln_adapter_copy_case;
 
-static bool mln_adapter_copy_case_bytes(
+static inline bool mln_adapter_copy_case_bytes(
   const void* copy, const void* source, size_t size
 ) {
   if (size == 0) return true;
   return copy != NULL && copy != source && memcmp(copy, source, size) == 0;
 }
 
-static bool mln_adapter_copy_case_view(
+static inline bool mln_adapter_copy_case_view(
   mln_buffer_view copy, mln_buffer_view source
 ) {
   return copy.size == source.size &&
     mln_adapter_copy_case_bytes(copy.data, source.data, source.size);
 }
 
-static bool mln_adapter_copy_case_string(const char* copy, const char* source) {
+static inline bool mln_adapter_copy_case_string(
+  const char* copy, const char* source
+) {
   if (source == NULL) return copy == NULL;
   return copy != NULL && copy != source && strcmp(copy, source) == 0;
 }

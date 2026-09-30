@@ -33,3 +33,4 @@ uv.lock                                                     linguist-generated=t
 /include/maplibre_native_c/callback_capture_generated.h     linguist-generated=true
 /src/c_api/callback_capture_generated.inc                   linguist-generated=true
 /src/c_api/callback_port_generated.inc                      linguist-generated=true
+/tests/native/abi/adapter/adapter_copy_cases_generated.inc  linguist-generated=true
