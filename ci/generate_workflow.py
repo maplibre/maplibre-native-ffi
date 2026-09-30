@@ -204,16 +204,21 @@ def target_job(row: dict) -> dict:
 
 def hygiene_job() -> dict:
     commands = [
-        "mise run ci:generate-workflow --check",
-        "mise run ci:generate-devcontainer-tools --check",
-        "mise run ci:test",
-        "mise run bindings:test-generator",
-        "mise run --force //bindings/dart:ffigen",
-        "mise run --force //bindings/dotnet:generate",
-        "mise run --force //bindings/kotlin:generate",
-        "mise run bindings:check",
-        "dprint output-resolved-config > /dev/null",
-        "mise run fix",
+        run("mise run ci:generate-workflow --check"),
+        run("mise run ci:generate-devcontainer-tools --check"),
+        run("mise run ci:test"),
+        # A generator probe whose toolchain is missing fails here instead of
+        # skipping.
+        run(
+            "mise run bindings:test-generator",
+            env={"MLN_BINDGEN_REQUIRE_TOOLCHAINS": "1"},
+        ),
+        run("mise run --force //bindings/dart:ffigen"),
+        run("mise run --force //bindings/dotnet:generate"),
+        run("mise run --force //bindings/kotlin:generate"),
+        run("mise run bindings:check"),
+        run("dprint output-resolved-config > /dev/null"),
+        run("mise run fix"),
     ]
     return {
         "name": "hygiene",
@@ -222,14 +227,7 @@ def hygiene_job() -> dict:
         "environment": SCCACHE_ENVIRONMENT,
         "steps": [
             *setup(gradle=False),
-            *[
-                # A generator probe whose toolchain is missing fails here
-                # instead of skipping.
-                run(command, env={"MLN_BINDGEN_REQUIRE_TOOLCHAINS": "1"})
-                if command == "mise run bindings:test-generator"
-                else run(command)
-                for command in commands
-            ],
+            *commands,
             run(
                 "git update-index -q --refresh\n"
                 "git diff --exit-code -- . ':(exclude)mise*.lock'\n"
