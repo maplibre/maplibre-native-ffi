@@ -4,35 +4,41 @@
 #   "ID" = { na = "reason" }
 
 [cases]
-"ERR-01" = { todo = true }
-"ERR-02" = { todo = true }
-"LIFE-01" = { todo = true }
-"LIFE-02" = { todo = true }
-"LIFE-03" = { todo = true }
-"LIFE-04" = { todo = true }
-"LIFE-05" = { todo = true }
-"COMP-01" = { todo = true }
-"COMP-02" = { todo = true }
-"COMP-03" = { todo = true }
-"COMP-04" = { todo = true }
-"COMP-05" = { todo = true }
-"CB-01" = { todo = true }
-"CB-02" = { todo = true }
-"CB-03" = { todo = true }
-"CB-04" = { todo = true }
-"CB-05" = { todo = true }
-"CB-06" = { todo = true }
-"CB-07" = { todo = true }
-"CB-08" = { todo = true }
-"VAL-01" = { todo = true }
-"VAL-02" = { todo = true }
-"VAL-03" = { todo = true }
-"VAL-04" = { todo = true }
-"VAL-05" = { todo = true }
-"VIEW-01" = { todo = true }
-"REND-01" = { todo = true }
-"REND-02" = { todo = true }
-"PLAT-01" = { todo = true }
-"PLAT-02" = { todo = true }
-"PLAT-03" = { todo = true }
-"EX-01" = { todo = true }
+"ERR-01" = "bindings/rust/crates/maplibre-native-ffi-core/src/error.rs::a_failed_call_maps_its_status_and_keeps_an_unknown_code"
+"ERR-02" = "bindings/rust/crates/maplibre-native-ffi-core/src/abi.rs::rejects_unexpected_abi_version"
+"LIFE-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::closing_a_handle_twice_does_nothing"
+"LIFE-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds"
+"LIFE-03" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_read_on_another_thread_holds_off_close_until_it_ends"
+"LIFE-04" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_handle_dropped_in_a_callback_disposes_off_its_stack_and_reports_a_failure"
+"LIFE-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_map_keeps_its_runtime_alive_after_the_runtime_handle_drops"
+"COMP-01" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_panicking_converter_completes_with_an_error_before_native_release"
+"COMP-02" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_rejected_submission_frees_the_bridge_and_reports_the_status"
+"COMP-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_dropped_map_creation_future_retires_the_map"
+"COMP-04" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_command_reports_a_rejection_while_other_operations_fail"
+"COMP-05" = "bindings/rust/crates/maplibre-native-ffi/src/completion.rs::a_wait_times_out_and_a_dropped_future_leaves_native_its_bridge"
+"CB-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_registration_is_rooted_while_native_holds_it_and_a_rejected_one_is_released"
+"CB-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_registered_callback_does_not_keep_its_runtime_alive"
+"CB-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_callback_may_answer_its_request_but_not_fence_or_close_its_runtime"
+"CB-04" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_panicking_callback_is_contained_and_its_request_fails"
+"CB-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_provider_hands_its_request_to_another_thread_and_answers_later"
+"CB-06" = { na = "A transform's response borrows the callback's frame through a lifetime and holds a raw pointer, so it is neither 'static nor Send: the compiler rejects a use after the callback returns or from another thread" }
+"CB-07" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::replacing_the_log_callback_releases_the_one_it_replaced"
+"CB-08" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::registering_for_an_already_cancelled_request_reports_it_and_roots_nothing"
+"VAL-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::strings_cross_as_terminated_and_explicit_length_and_embedded_nul_is_rejected"
+"VAL-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::presence_fields_keep_a_present_zero_apart_from_an_absent_value"
+"VAL-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data"
+# Generated fields carry the C widths exactly, so the only narrowing is a
+# slice length into a native count, which this test cannot allocate.
+"VAL-04" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::open_enums_keep_unknown_values_and_64_bit_masks_cross_whole"
+"VAL-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::array_inputs_are_copied_when_they_are_submitted"
+"VIEW-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it"
+# The browser build renders on WebGL and WebGPU in tests/suite/browser/mod.rs.
+"REND-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::an_owned_texture_session_renders_a_frame_the_binding_reads_back"
+"REND-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_caller_driven_session_is_serviced_from_the_thread_that_claimed_it"
+"PLAT-01" = "bindings/rust/crates/maplibre-native-ffi-sys/src/lib.rs::loads_the_native_library"
+"PLAT-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_process_that_exits_with_live_handles_and_callbacks_exits_cleanly"
+"PLAT-03" = { na = "Rust has no garbage or cycle collector: dropping the last owner disposes a handle, as LIFE-04 checks, and a callback that holds its owner through a strong Arc keeps both alive until an explicit clear, as the crate documents" }
+# `mise run //examples/rust-map:smoke [preset]` renders one frame in each
+# render-target mode. rust-map drives OpenGL on Linux and Windows only, so a
+# macOS OpenGL preset has no build of it.
+"EX-01" = "examples/rust-map/src/main.rs::smoke_test"

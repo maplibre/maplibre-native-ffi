@@ -96,7 +96,7 @@ then, that binding keeps its own fixture.
 | Swift          | In use  | The `GraphicsSupport` SwiftPM target, which compiles `graphics.c` from this directory.                                                                     |
 | Kotlin/Native  | In use  | A cinterop definition over `mln_test_graphics.h`, linking `graphics.c` compiled by Gradle.                                                                 |
 | Kotlin/Android | In use  | A JNI shim compiled with `graphics.c` by the NDK, loaded with `System.loadLibrary`.                                                                        |
-| Rust           | Planned | A dev-only `build.rs` step emits `cargo:rustc-link-lib=mln_test_graphics` and the install's `lib` search path, and declares the functions in `extern "C"`. |
+| Rust           | In use  | `libloading` in `tests/suite/support/graphics.rs`, from the install directory that `build.rs` records, or by name beside the tests a device runner pushes. |
 | Zig            | Planned | `@cImport(@cInclude("mln_test_graphics.h"))`, with the install's `include` and `lib` added to the test step and `linkSystemLibrary("mln_test_graphics")`.  |
 | Python         | Planned | `ctypes.CDLL` on the library path, with `Structure` classes for the three info structs.                                                                    |
 | .NET           | Planned | `[LibraryImport("mln_test_graphics")]`, resolved through the same `NativeLibrary` import resolver as the C API.                                            |
