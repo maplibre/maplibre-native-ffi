@@ -2170,13 +2170,11 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
   if (auto release = std::exchange(live->still_image_release_submission, {})) {
     release();
   }
+  // The event is queued before the completion runs, so a host that sees the
+  // completion and then drains events, or orders a barrier after it, finds
+  // the event. A barrier completes as soon as the request is terminal.
   if (error) {
     const auto message = exception_message(error);
-    if (operation) {
-      operation->complete(
-        MLN_STATUS_NATIVE_ERROR, message, std::any{std::monostate{}}
-      );
-    }
     if (
       event_selected(
         live->event_state->mask, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED
@@ -2187,10 +2185,12 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
         message.c_str()
       );
     }
+    if (operation) {
+      operation->complete(
+        MLN_STATUS_NATIVE_ERROR, message, std::any{std::monostate{}}
+      );
+    }
     return;
-  }
-  if (operation) {
-    operation->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
   }
   if (
     event_selected(
@@ -2200,6 +2200,9 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
     push_runtime_map_event(
       live->runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED
     );
+  }
+  if (operation) {
+    operation->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
   }
 }
 
