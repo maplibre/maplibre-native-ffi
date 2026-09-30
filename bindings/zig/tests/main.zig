@@ -10,6 +10,9 @@ comptime {
     }
     _ = @import("generated_workflows.zig");
     _ = @import("diagnostics.zig");
+    _ = @import("lifecycle.zig");
+    _ = @import("callbacks.zig");
+    _ = @import("values.zig");
     _ = @import("runtime.zig");
     _ = @import("map_lifecycle.zig");
     _ = @import("camera.zig");

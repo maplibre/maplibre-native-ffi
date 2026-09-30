@@ -588,9 +588,56 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
     return tests;
 }
 
+/// Gives a test module the GPU fixtures of tests/graphics as the
+/// `mln_test_graphics` import. A target that runs tests loads the shared
+/// library that `mise run build` installs beside maplibre-native-c. An Apple
+/// device target builds its tests without running them, and its preset
+/// installs no shared library, so it compiles the fixture source instead.
+fn addTestGraphics(b: *std.Build, module: *std.Build.Module, options: BuildOptions) void {
+    const include_dir = b.path("tests/graphics/include");
+    module.addIncludePath(include_dir);
+    module.addImport("mln_test_graphics", translateCModule(b, .{
+        .root_source_file = b.path("tests/graphics/include/mln_test_graphics.h"),
+        .target = options.target,
+        .optimize = options.optimize,
+        .include_dirs = &.{include_dir},
+        .system_root = options.system_root,
+    }));
+    if (isAppleMobile(options.target) and !isAppleSimulator(options.target)) {
+        module.addCSourceFile(.{ .file = b.path("tests/graphics/graphics.c"), .flags = &.{"-std=c11"} });
+    } else if (options.target.result.os.tag == .windows) {
+        module.addObjectFile(installPath(b, options.native_install_dir, "lib/mln_test_graphics.lib"));
+    } else {
+        module.linkSystemLibrary("mln_test_graphics", .{ .use_pkg_config = .no });
+    }
+}
+
+/// An executable that leaves a runtime, a map, and process-global callbacks
+/// live when it returns, so the test step checks that the process still exits
+/// cleanly.
+fn addShutdownProbe(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Build.Module) *std.Build.Step.Compile {
+    const probe = b.addExecutable(.{
+        .name = "zig-shutdown-probe",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bindings/zig/tests/shutdown_probe.zig"),
+            .target = options.target,
+            .optimize = options.optimize,
+        }),
+        .use_lld = if (isAppleMobile(options.target)) false else null,
+    });
+    probe.setLibCFile(options.target_libc);
+    if (isAppleMobile(options.target)) {
+        probe.root_module.addCSourceFile(.{ .file = b.path("src/zig_test_support/ios_simulator_dyld_stub.m") });
+    }
+    linkMaplibreNativeC(b, probe.root_module, repoLinkOptions(options));
+    probe.root_module.addImport("maplibre_native_ffi", maplibre_native_ffi);
+    return probe;
+}
+
 fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Build.Module) *std.Build.Step.Compile {
     const tests = addTestCompile(b, options, b.path("bindings/zig/tests/main.zig"));
     tests.root_module.addImport("maplibre_native_ffi", maplibre_native_ffi);
+    addTestGraphics(b, tests.root_module, options);
     addRenderBackendOptions(b, tests.root_module, options.render_backend);
     addRenderBackendTranslateC(b, tests.root_module, .{
         .target = options.target,
@@ -667,6 +714,8 @@ fn addAndroidTestRunStep(
         "180",
         abi,
         installPath(b, native_install_dir, "lib/libmaplibre-native-c.so").getPath(b),
+        "--library",
+        installPath(b, native_install_dir, "lib/libmln_test_graphics.so").getPath(b),
     });
     if (emulator_api) |api| {
         run_tests.addArgs(&.{ "--api", api });
@@ -719,22 +768,24 @@ pub fn build(b: *std.Build) void {
 
     const maplibre_native_ffi = addMaplibreNativeModule(b, options);
 
+    // Each hand-written runtime module's inline tests, and those of the modules
+    // it imports, build and run on their own.
     const test_sources = [_]std.Build.LazyPath{
-        b.path("bindings/zig/src/c.zig"),
-        b.path("bindings/zig/src/status.zig"),
         b.path("bindings/zig/src/owner.zig"),
-        b.path("bindings/zig/src/callback.zig"),
         b.path("bindings/zig/src/completion.zig"),
     };
 
     const test_step = b.step("test", "Run Zig binding tests");
 
     const binding_tests = addBindingTests(b, options, maplibre_native_ffi);
-    var test_compiles: [test_sources.len + 1]*std.Build.Step.Compile = undefined;
+    const shutdown_probe = addShutdownProbe(b, options, maplibre_native_ffi);
+    var test_compiles: [test_sources.len + 2]*std.Build.Step.Compile = undefined;
     test_compiles[0] = binding_tests;
+    test_compiles[1] = shutdown_probe;
     b.default_step.dependOn(&binding_tests.step);
+    b.default_step.dependOn(&shutdown_probe.step);
 
-    for (test_sources, 1..) |source, index| {
+    for (test_sources, 2..) |source, index| {
         const tests = addTestCompile(b, options, source);
         test_compiles[index] = tests;
         b.default_step.dependOn(&tests.step);

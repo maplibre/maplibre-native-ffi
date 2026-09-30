@@ -25,7 +25,6 @@
 "bindings/swift/Tests/MaplibreNativeFFITests/RenderTests.swift" = 1
 "bindings/swift/Tests/MaplibreNativeFFITests/RuntimeEventTestSupport.swift" = 2
 "bindings/swift/Tests/MaplibreNativeFFITests/StyleTests.swift" = 1
-"bindings/zig/tests/generated_workflows.zig" = 1
 "bindings/zig/tests/resources.zig" = 8
 "bindings/zig/tests/runtime.zig" = 6
 "bindings/zig/tests/support.zig" = 5

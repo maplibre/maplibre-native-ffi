@@ -22,3 +22,20 @@ pub const Latch = struct {
         std.Io.Threaded.mutexUnlock(&self.gate);
     }
 };
+
+test "a latch releases every waiter, including one that arrives after set" {
+    var latch: Latch = .{};
+    var passed = std.atomic.Value(usize).init(0);
+    const Waiter = struct {
+        fn run(target: *Latch, count: *std.atomic.Value(usize)) void {
+            target.wait();
+            _ = count.fetchAdd(1, .acq_rel);
+        }
+    };
+    var threads: [3]std.Thread = undefined;
+    for (&threads) |*thread| thread.* = try std.Thread.spawn(.{}, Waiter.run, .{ &latch, &passed });
+    latch.set();
+    for (threads) |thread| thread.join();
+    latch.wait();
+    try std.testing.expectEqual(@as(usize, threads.len), passed.load(.acquire));
+}

@@ -264,3 +264,116 @@ pub fn value(comptime T: type) *const fn (*const c.mln_completion_result) status
         }
     }.copy;
 }
+
+/// Stands in for a native submission: it keeps the completion descriptor it
+/// receives, so a test delivers the result and retires the user data itself,
+/// in the order it chooses.
+const FakeSubmission = struct {
+    var descriptor: c.mln_completion = undefined;
+    var refuse = false;
+
+    fn start(completion: [*c]const c.mln_completion, _: [*c]c.mln_diagnostic) callconv(.c) c.mln_status {
+        if (refuse) return c.MLN_STATUS_INVALID_ARGUMENT;
+        descriptor = completion[0];
+        return c.MLN_STATUS_OK;
+    }
+
+    fn deliver(value_count: usize) void {
+        const payload: u32 = 7;
+        const result = std.mem.zeroInit(c.mln_completion_result, .{
+            .size = @sizeOf(c.mln_completion_result),
+            .status = c.MLN_STATUS_OK,
+            .value = @as(?*const anyopaque, &payload),
+            .value_count = value_count,
+        });
+        descriptor.callback.?(descriptor.user_data, &result);
+    }
+
+    fn retire() void {
+        descriptor.release_user_data.?(descriptor.user_data);
+    }
+};
+
+/// A terminal value that counts its disposals.
+const Tracked = struct {
+    var disposals: usize = 0;
+    payload: u32,
+
+    pub fn deinit(_: *Tracked) void {
+        disposals += 1;
+    }
+
+    fn copy(result: *const c.mln_completion_result) status.Error!Tracked {
+        if (result.value == null or result.value_count != 1) return error.NativeError;
+        return .{ .payload = @as(*const u32, @ptrCast(@alignCast(result.value.?))).* };
+    }
+};
+
+test "a completion delivers its value exactly once" {
+    Tracked.disposals = 0;
+    FakeSubmission.refuse = false;
+    var future = try submit(Tracked, null, Tracked.copy, FakeSubmission.start, .{});
+    try std.testing.expect(!try future.poll());
+    FakeSubmission.deliver(1);
+    FakeSubmission.retire();
+    try std.testing.expect(try future.poll());
+    try std.testing.expectEqual(@as(u32, 7), (try future.wait(null)).payload);
+    try std.testing.expectError(error.AlreadyCompleted, future.wait(null));
+    // The caller took the value, so deinit leaves it to the caller.
+    future.deinit();
+    try std.testing.expectEqual(@as(usize, 0), Tracked.disposals);
+    try std.testing.expectError(error.ClosedHandle, future.wait(null));
+}
+
+test "a value that fails to convert reports the error and leaks nothing" {
+    Tracked.disposals = 0;
+    FakeSubmission.refuse = false;
+    var future = try submit(Tracked, null, Tracked.copy, FakeSubmission.start, .{});
+    defer future.deinit();
+    FakeSubmission.deliver(2);
+    FakeSubmission.retire();
+    var diagnostic: diagnostics.Diagnostic = .{};
+    try std.testing.expectError(error.NativeError, future.wait(&diagnostic));
+    try std.testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try std.testing.expectEqualStrings("native returned a value that the binding cannot read", diagnostic.message());
+    try std.testing.expectEqual(@as(usize, 0), Tracked.disposals);
+}
+
+/// A copy context that counts how often the binding releases it.
+const CountedContext = struct {
+    var releases: usize = 0;
+    unused: u8 = 0,
+
+    pub fn deinit(_: *CountedContext) void {
+        releases += 1;
+    }
+
+    fn copy(result: *const c.mln_completion_result, _: *CountedContext) status.Error!Tracked {
+        return Tracked.copy(result);
+    }
+};
+
+test "a refused submission frees the future and its copy context" {
+    CountedContext.releases = 0;
+    FakeSubmission.refuse = true;
+    defer FakeSubmission.refuse = false;
+    var diagnostic: diagnostics.Diagnostic = .{};
+    try std.testing.expectError(error.InvalidArgument, submitWithCopyContext(Tracked, CountedContext, &diagnostic, CountedContext.copy, .{}, FakeSubmission.start, .{}));
+    try std.testing.expectEqual(@as(?i32, c.MLN_STATUS_INVALID_ARGUMENT), diagnostic.raw_status);
+    try std.testing.expectEqual(@as(usize, 1), CountedContext.releases);
+}
+
+// Zig futures have no timed wait: `poll` checks without blocking, and dropping
+// the future abandons the wait. A value that native delivers afterwards has no
+// taker, so the binding disposes it.
+test "a pending future polls without blocking and deinit abandons it" {
+    Tracked.disposals = 0;
+    FakeSubmission.refuse = false;
+    var future = try submit(Tracked, null, Tracked.copy, FakeSubmission.start, .{});
+    try std.testing.expect(!try future.poll());
+    future.deinit();
+    try std.testing.expectError(error.ClosedHandle, future.poll());
+    FakeSubmission.deliver(1);
+    FakeSubmission.retire();
+    try std.testing.expectEqual(@as(usize, 1), Tracked.disposals);
+}

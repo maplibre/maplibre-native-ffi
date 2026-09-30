@@ -1,6 +1,7 @@
 const std = @import("std");
 const status = @import("status.zig");
 const callback = @import("callback.zig");
+const sync = @import("sync.zig");
 const allocator = std.heap.smp_allocator;
 
 pub const Anchor = struct {
@@ -284,4 +285,75 @@ test "rejected close restores owner and accepted provider actions force ownershi
     try std.testing.expect((try request.beginClose()) == null);
     try std.testing.expect(request.finishDecision(false));
     try std.testing.expectEqual(@as(usize, 3), Probe.disposals);
+}
+
+/// Records the thread each disposal runs on.
+const ThreadProbe = struct {
+    var disposals: std.atomic.Value(usize) = .init(0);
+    var thread: std.atomic.Value(std.Thread.Id) = .init(0);
+    var disposed: sync.Latch = .{};
+
+    fn reset() void {
+        disposals.store(0, .release);
+        thread.store(0, .release);
+        disposed = .{};
+    }
+
+    fn dispose(_: u64) status.Error!void {
+        thread.store(std.Thread.getCurrentId(), .release);
+        _ = disposals.fetchAdd(1, .acq_rel);
+        disposed.set();
+    }
+};
+
+test "a borrow on another thread holds off disposal until it ends" {
+    ThreadProbe.reset();
+    const Owner = Handle("threaded-borrow-test", ThreadProbe.dispose);
+    var value = try Owner.adopt(91, null);
+    var borrowed: sync.Latch = .{};
+    var finish: sync.Latch = .{};
+    const Borrower = struct {
+        fn run(owner: Owner, entered: *sync.Latch, done: *sync.Latch) void {
+            const lease = owner.borrow() catch return entered.set();
+            entered.set();
+            done.wait();
+            lease.release();
+        }
+    };
+    const thread = try std.Thread.spawn(.{}, Borrower.run, .{ value, &borrowed, &finish });
+    borrowed.wait();
+    try std.testing.expectError(error.ActiveBorrow, value.beginClose());
+    value.deinit();
+    try std.testing.expectEqual(@as(usize, 0), ThreadProbe.disposals.load(.acquire));
+    finish.set();
+    thread.join();
+    // The borrow's release is the last reference, so the dispose runs on the
+    // borrowing thread as it ends.
+    try std.testing.expectEqual(@as(usize, 1), ThreadProbe.disposals.load(.acquire));
+    try std.testing.expect(ThreadProbe.thread.load(.acquire) != std.Thread.getCurrentId());
+}
+
+// A handle abandoned inside a native callback must not dispose on that
+// callback's stack, where native may hold locks the disposal needs. The binding
+// queues it for its finalizer thread instead, and disposes inline elsewhere.
+// Zig has no garbage collector, so `deinit` is always an explicit abandonment
+// rather than a leak, and there is no leak for the binding to report.
+test "an owner abandoned inside a callback scope disposes off the callback stack" {
+    ThreadProbe.reset();
+    const Owner = Handle("finalizer-owner-test", ThreadProbe.dispose);
+    var inline_value = try Owner.adopt(101, null);
+    inline_value.deinit();
+    try std.testing.expectEqual(std.Thread.getCurrentId(), ThreadProbe.thread.load(.acquire));
+
+    ThreadProbe.reset();
+    var queued_value = try Owner.adopt(102, null);
+    {
+        var scope: callback.Scope = .{};
+        scope.enter(&.{}, 0);
+        defer scope.leave();
+        queued_value.deinit();
+    }
+    ThreadProbe.disposed.wait();
+    try std.testing.expectEqual(@as(usize, 1), ThreadProbe.disposals.load(.acquire));
+    try std.testing.expect(ThreadProbe.thread.load(.acquire) != std.Thread.getCurrentId());
 }

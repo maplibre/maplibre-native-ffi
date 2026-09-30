@@ -153,6 +153,39 @@ test "unknown status preserves raw status" {
     try std.testing.expectEqual(@as(?i32, unknown_raw_status), diagnostic.raw_status);
 }
 
+test "native statuses map both ways and diagnostics truncate and reset" {
+    const table = .{
+        .{ c.MLN_STATUS_INVALID_ARGUMENT, error.InvalidArgument },
+        .{ c.MLN_STATUS_INVALID_STATE, error.InvalidState },
+        .{ c.MLN_STATUS_WRONG_THREAD, error.WrongThread },
+        .{ c.MLN_STATUS_UNSUPPORTED, error.Unsupported },
+        .{ c.MLN_STATUS_CANCELLED, error.Cancelled },
+        .{ c.MLN_STATUS_BUSY, error.Busy },
+        .{ c.MLN_STATUS_TARGET_LOST, error.TargetLost },
+        .{ c.MLN_STATUS_NOT_READY, error.NotReady },
+        .{ c.MLN_STATUS_NOT_FOUND, error.NotFound },
+        .{ c.MLN_STATUS_NATIVE_ERROR, error.NativeError },
+    };
+    inline for (table) |row| {
+        try std.testing.expectError(row[1], errorFromRawStatus(row[0]));
+        try std.testing.expectEqual(@as(c.mln_status, row[0]), rawStatus(row[1]));
+    }
+    // A host callback's error that has no native status reports a native error.
+    try std.testing.expectEqual(@as(c.mln_status, c.MLN_STATUS_NATIVE_ERROR), rawStatus(error.OutOfMemory));
+
+    var diagnostic: diagnostics.Diagnostic = .{};
+    record(&diagnostic, -1, "x" ** 8192);
+    try std.testing.expectEqual(diagnostic.native.message.len - 1, diagnostic.message().len);
+    begin(&diagnostic);
+    try std.testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try std.testing.expectEqualStrings("", diagnostic.message());
+    // A failure the binding detects records its own message only once, so the
+    // first recorded cause wins.
+    fail(&diagnostic, error.ClosedHandle);
+    fail(&diagnostic, error.InvalidString);
+    try std.testing.expectEqualStrings("the handle is closed", diagnostic.message());
+}
+
 test "ABI version validation reports mismatch diagnostics" {
     var diagnostic: diagnostics.Diagnostic = .{};
     try std.testing.expectError(error.AbiVersionMismatch, validateAbiVersionValue(1, 0, &diagnostic));
