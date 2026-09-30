@@ -58,7 +58,7 @@ if ! hdc tconn "$connect_key" >/dev/null 2>&1 ||
   mise run //:ohos-emulator:boot
 fi
 
-hdc -t "$connect_key" shell "rm -rf '$remote_dir' && mkdir -p '$remote_dir'"
+hdc -t "$connect_key" shell "rm -rf '$remote_dir' && mkdir -p '$remote_dir/tmp'"
 hdc -t "$connect_key" file send "$native_library" "$remote_dir/libmaplibre-native-c.so"
 hdc -t "$connect_key" file send "$cxx_library" "$remote_dir/libc++_shared.so"
 for library in ${extra_libraries[@]+"${extra_libraries[@]}"}; do
@@ -86,7 +86,9 @@ for test_executable in "${test_executables[@]}"; do
   echo "Running $(basename "$test_executable") in the OpenHarmony emulator."
   hdc -t "$connect_key" file send "$test_executable" "$remote_dir/test-executable"
 
-  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}${graphics_environment}LD_LIBRARY_PATH='$remote_dir' ./test-executable"
+  # A test that asks for a temporary directory gets one under the test
+  # directory, as on Android, rather than relying on the guest's /tmp.
+  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}${graphics_environment}TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
   for argument in ${test_arguments[@]+"${test_arguments[@]}"}; do
     printf -v quoted_argument '%q' "$argument"
     remote_command+=" $quoted_argument"
