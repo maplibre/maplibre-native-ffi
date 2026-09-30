@@ -36,24 +36,53 @@ STRING_LITERAL = re.compile(r'"(?:[^"\\\n]|\\.)*"')
 # return type may span lines, and nothing between MLN_API and the name holds a
 # parenthesis, brace, or semicolon.
 DECLARATION = re.compile(r"\bMLN_API\b[^;{}()]*?\b(mln_\w+)\s*\(")
+API_MARKER = re.compile(r"\bMLN_API\b")
 IDENTIFIER = re.compile(r"\bmln_\w+\b")
+ANY_IDENTIFIER = re.compile(r"\b[A-Za-z_]\w*\b")
+DEFINE = re.compile(r"#\s*define\s+([A-Za-z_]\w*)(.*)", re.DOTALL)
 
 
 def strip_comments(text: str) -> str:
     return LINE_COMMENT.sub("", BLOCK_COMMENT.sub(" ", text))
 
 
+def split_preprocessor(text: str) -> tuple[str, list[str]]:
+    """Separates the code from the preprocessor directives.
+
+    Returns the code without directives and each directive with its
+    backslash-continued lines joined.
+    """
+    code: list[str] = []
+    directives: list[str] = []
+    lines = iter(text.splitlines())
+    for line in lines:
+        if not line.lstrip().startswith("#"):
+            code.append(line)
+            continue
+        directive = line
+        while directive.endswith("\\"):
+            directive = directive[:-1] + next(lines, "")
+        directives.append(directive.lstrip())
+    return "\n".join(code), directives
+
+
 def exported_functions() -> dict[str, str]:
     """Maps each MLN_API function name to the header that declares it."""
     functions: dict[str, str] = {}
     for header in sorted(HEADERS.rglob("*.h")):
-        text = strip_comments(header.read_text(encoding="utf-8"))
         # The MLN_API definitions themselves are preprocessor lines.
-        text = "\n".join(
-            line for line in text.splitlines() if not line.lstrip().startswith("#")
-        )
-        for match in DECLARATION.finditer(text):
-            functions[match.group(1)] = header.name
+        text, _ = split_preprocessor(strip_comments(header.read_text(encoding="utf-8")))
+        names = DECLARATION.findall(text)
+        # A declaration that the pattern misses would pass the check unseen, so
+        # every MLN_API marker has to belong to a declaration it found.
+        markers = len(API_MARKER.findall(text))
+        if markers != len(names):
+            raise SystemExit(
+                f"error: {header.relative_to(ROOT).as_posix()} has {markers} "
+                f"MLN_API markers but {len(names)} parsed declarations"
+            )
+        for name in names:
+            functions[name] = header.name
     if not functions:
         raise SystemExit(f"error: found no MLN_API declarations under {HEADERS}")
     return functions
@@ -70,13 +99,38 @@ def test_dir() -> pathlib.Path:
 
 
 def called_names(directory: pathlib.Path) -> set[str]:
-    names: set[str] = set()
+    """Collects the mln_ names in the test code.
+
+    A macro body counts only when code, or another counted macro body, names the
+    macro, so a name in an unused macro counts as uncalled.
+    """
+    used: set[str] = set()
+    macros: dict[str, set[str]] = {}
     for source in sorted(directory.rglob("*")):
         if source.suffix not in TEST_SUFFIXES or not source.is_file():
             continue
-        text = strip_comments(source.read_text(encoding="utf-8"))
-        names.update(IDENTIFIER.findall(STRING_LITERAL.sub('""', text)))
-    return names
+        text = STRING_LITERAL.sub(
+            '""', strip_comments(source.read_text(encoding="utf-8"))
+        )
+        code, directives = split_preprocessor(text)
+        used.update(ANY_IDENTIFIER.findall(code))
+        for directive in directives:
+            if match := DEFINE.match(directive):
+                macros.setdefault(match.group(1), set()).update(
+                    ANY_IDENTIFIER.findall(match.group(2))
+                )
+    pending = [name for name in macros if name in used]
+    expanded: set[str] = set()
+    while pending:
+        macro = pending.pop()
+        if macro in expanded:
+            continue
+        expanded.add(macro)
+        for name in macros[macro]:
+            used.add(name)
+            if name in macros and name not in expanded:
+                pending.append(name)
+    return {name for name in used if IDENTIFIER.fullmatch(name)}
 
 
 def read_baseline() -> list[str]:
@@ -90,13 +144,22 @@ def read_baseline() -> list[str]:
     return names
 
 
-def write_baseline(names: list[str]) -> None:
-    header = [
-        line
-        for line in BASELINE.read_text(encoding="utf-8").splitlines()
-        if line.startswith("#")
-    ]
-    BASELINE.write_text("\n".join([*header, *names]) + "\n", encoding="utf-8")
+def write_baseline(keep: set[str]) -> None:
+    """Rewrites the baseline with only the kept names.
+
+    Comment lines, blank lines, and the comment after a kept name stay, and a
+    name listed twice keeps its first line.
+    """
+    lines = []
+    seen: set[str] = set()
+    for line in BASELINE.read_text(encoding="utf-8").splitlines():
+        name = line.split("#", 1)[0].strip()
+        if not name:
+            lines.append(line)
+        elif name in keep and name not in seen:
+            seen.add(name)
+            lines.append(line)
+    BASELINE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main() -> int:
@@ -129,7 +192,7 @@ def main() -> int:
     )
 
     if args.prune:
-        keep = sorted(set(uncalled) & listed)
+        keep = set(uncalled) & listed
         write_baseline(keep)
         print(f"Kept {len(keep)} names in {BASELINE.relative_to(ROOT).as_posix()}.")
         for name in unlisted:
