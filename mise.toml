@@ -240,6 +240,7 @@ sources = [
   "include/**/*",
   "patches/**/*",
   "src/**/*",
+  "tests/graphics/**/*",
   "tests/native/**/*",
   "third_party/**/*",
 ]
