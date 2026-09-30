@@ -80,4 +80,8 @@ internal actual fun awaitCollected(reference: TestWeakReference): Boolean {
   return reference.isCleared
 }
 
+internal actual fun requestCollection() {
+  GC.collect()
+}
+
 internal actual fun pendingCompletionsForTesting(): Int = CompletionBridge.pendingCountForTesting()

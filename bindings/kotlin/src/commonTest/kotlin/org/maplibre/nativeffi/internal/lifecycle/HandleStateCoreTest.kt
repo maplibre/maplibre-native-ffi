@@ -130,19 +130,41 @@ class HandleStateCoreTest {
   }
 
   @Test
-  fun leakReportReportsOnlyUnreleasedHandles() {
+  fun aLeakReportDisposesAndReportsOnlyUnreleasedHandles() {
     val reports = mutableListOf<String>()
-    val unreleased = HandleStateCore.LeakReport("RuntimeHandle", 0x1234L, reports::add)
+    val disposed = mutableListOf<Long>()
+    val unreleased =
+      HandleStateCore.LeakReport("RuntimeHandle", 0x1234L, reports::add, disposed::add)
 
     unreleased.report()
+    unreleased.report()
 
+    assertEquals(listOf(0x1234L), disposed)
     assertEquals(listOf("Leaked RuntimeHandle native handle 0x1234; close it explicitly."), reports)
 
-    val released = HandleStateCore.LeakReport("MapHandle", 0x5678L, reports::add)
+    val released = HandleStateCore.LeakReport("MapHandle", 0x5678L, reports::add, disposed::add)
     released.markReleased()
     released.report()
 
+    assertEquals(1, disposed.size)
     assertEquals(1, reports.size)
+  }
+
+  @Test
+  fun aLeakReportNamesTheDisposalFailure() {
+    val reports = mutableListOf<String>()
+    HandleStateCore.LeakReport("MapHandle", 0x5678L, reports::add) {
+        throw IllegalStateException("the map is closing")
+      }
+      .report()
+
+    assertEquals(
+      listOf(
+        "Leaked MapHandle native handle 0x5678; close it explicitly. " +
+          "Disposing it failed: the map is closing"
+      ),
+      reports,
+    )
   }
 
   @Test

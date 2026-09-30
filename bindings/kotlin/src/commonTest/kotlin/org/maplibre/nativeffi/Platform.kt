@@ -27,5 +27,11 @@ internal expect class TestWeakReference(value: Any) {
  */
 internal expect fun awaitCollected(reference: TestWeakReference): Boolean
 
+/**
+ * Asks the collector for a full collection, which queues the cleaners of unreachable handles. The
+ * cleaners run on their own worker, so a caller still waits for what they do.
+ */
+internal expect fun requestCollection()
+
 /** Counts the completions the platform's completion bridge has handed to native. */
 internal expect fun pendingCompletionsForTesting(): Int

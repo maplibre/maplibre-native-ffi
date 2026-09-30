@@ -163,14 +163,21 @@ internal class HandleStateCore(
       released.store(1)
     }
 
+    /**
+     * Disposes a handle nobody released, then reports the leak through [writeLine], with the
+     * disposal's failure when it had one. Runs once, and never for a released handle.
+     */
     fun report() {
-      if (released.compareAndSet(0, 1)) {
-        if (dispose != null) dispose(handleId)
-        else
-          writeLine(
-            "Leaked $typeName native handle 0x${handleId.toString(16)}; close it explicitly."
-          )
-      }
+      if (!released.compareAndSet(0, 1)) return
+      val failure =
+        try {
+          dispose?.invoke(handleId)
+          null
+        } catch (error: Throwable) {
+          error
+        }
+      val leak = "Leaked $typeName native handle 0x${handleId.toString(16)}; close it explicitly."
+      writeLine(if (failure == null) leak else "$leak Disposing it failed: ${failure.message}")
     }
   }
 

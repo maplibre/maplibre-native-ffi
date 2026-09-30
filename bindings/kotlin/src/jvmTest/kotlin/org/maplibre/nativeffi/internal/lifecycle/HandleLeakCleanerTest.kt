@@ -1,25 +1,12 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
-import java.util.concurrent.BlockingQueue
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** The JVM cleaner that reports and reclaims handles nobody released. */
+/** The JVM cleaner that disposes and reports handles nobody released. */
 class HandleLeakCleanerTest {
-  @Test
-  fun anUnreachableHandleReportsItsLeak() {
-    val reports = LinkedBlockingQueue<String>()
-    registerUnreachableHandle(reports)
-    assertEquals(
-      "Leaked RuntimeHandle native handle 0x1234; close it explicitly.",
-      awaitReport(reports),
-    )
-  }
-
   @Test
   fun aBlockedLeakReportDoesNotBlockNativeReclamation() {
     val reportStarted = CountDownLatch(1)
@@ -35,14 +22,6 @@ class HandleLeakCleanerTest {
     }
   }
 
-  /** Registers a handle that is unreachable once this call returns. */
-  private fun registerUnreachableHandle(reports: MutableCollection<String>) {
-    HandleLeakCleaner.register(
-      Any(),
-      HandleStateCore.LeakReport("RuntimeHandle", 0x1234L, { reports.add(it) }),
-    )
-  }
-
   /** Registers a diagnostic that blocks after its handle becomes unreachable. */
   private fun registerBlockingLeakReport(started: CountDownLatch, unblock: CountDownLatch) {
     HandleLeakCleaner.register(
@@ -52,18 +31,6 @@ class HandleLeakCleanerTest {
         unblock.await()
       },
     )
-  }
-
-  /** Requests collections until the cleaner delivers a report, blocking on the queue between. */
-  private fun awaitReport(reports: BlockingQueue<String>): String? {
-    val deadline = System.nanoTime() + WAIT_NANOS
-    while (System.nanoTime() < deadline) {
-      System.gc()
-      reports.poll(ROUND_MILLIS, TimeUnit.MILLISECONDS)?.let {
-        return it
-      }
-    }
-    return null
   }
 
   private fun awaitLatch(latch: CountDownLatch): Boolean {

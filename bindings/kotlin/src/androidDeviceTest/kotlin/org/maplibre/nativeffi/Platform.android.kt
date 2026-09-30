@@ -46,6 +46,10 @@ internal actual fun awaitCollected(reference: TestWeakReference): Boolean {
   return reference.isCleared
 }
 
+internal actual fun requestCollection() {
+  Runtime.getRuntime().gc()
+}
+
 internal actual fun pendingCompletionsForTesting(): Int = CompletionBridge.pendingCountForTesting()
 
 private const val GC_WAIT_NANOS = 30_000_000_000L
