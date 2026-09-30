@@ -22,6 +22,5 @@
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleJsonTests.cs" = 18
 "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/StyleLayerTests.cs" = 1
 "bindings/swift/Tests/MaplibreNativeFFITests/OfflineTests.swift" = 2
-"bindings/swift/Tests/MaplibreNativeFFITests/RuntimeTests.swift" = 3
 "bindings/swift/Tests/MaplibreNativeFFITests/StyleTests.swift" = 17
 "src/platform/rust/src/http_client.rs" = 8
