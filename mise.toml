@@ -365,6 +365,9 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-arm64-* ||
   "${runner[@]}" -x /abi/plugin/ -- "$suite" "$internal"
   exec "${runner[@]}" -f /abi/plugin/ -- "$suite"
 fi
+# The Rust platform crate's pure helpers, such as redirect resolution, have
+# unit tests that run on the host alongside the desktop and simulator suites.
+cargo test --locked -p mln-ffi-platform --lib
 ctest --preset "$usage_preset" --parallel
 '''
 
