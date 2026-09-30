@@ -132,15 +132,6 @@ size_t mln_test_drain_all(mln_runtime runtime);
 // The same, counting the events whose type matches.
 size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type);
 
-// Drains until one event of `type` from `source` is found, copies it and its
-// message out of the batch, and discards the rest. Pass MLN_HANDLE_NULL as
-// `source` to match any source. The message is written null-terminated and
-// truncated to message_capacity. Returns whether a match was found.
-bool mln_test_drain_find(
-  mln_runtime runtime, uint32_t type, mln_map source,
-  mln_runtime_event* out_event, char* out_message, size_t message_capacity
-);
-
 // Returns true to end an event wait. `messages` is the batch's message block.
 typedef bool (*mln_test_event_match)(
   const mln_runtime_event* event, const char* messages, void* context
@@ -160,8 +151,10 @@ size_t mln_test_drain_counting_matching(
   mln_runtime runtime, mln_test_event_match match, void* context
 );
 
-// mln_test_drain_find() as a wait: blocks until an event of `type` from
-// `source` arrives, within the default deadline.
+// Blocks until an event of `type` from `source` arrives, within the default
+// deadline, copies it and its message out of the batch, and discards the rest
+// of the queue. Pass MLN_HANDLE_NULL as `source` to match any source. The
+// message is written null-terminated and truncated to message_capacity.
 bool mln_test_await_event(
   mln_runtime runtime, uint32_t type, mln_map source,
   mln_runtime_event* out_event, char* out_message, size_t message_capacity

@@ -49,7 +49,6 @@ mln_test_http_server* mln_test_http_server_start(
 // server's threads.
 void mln_test_http_server_stop(mln_test_http_server* server);
 
-uint16_t mln_test_http_server_port(const mln_test_http_server* server);
 // Writes `http://127.0.0.1:<port><path>`. Fails the case when it does not fit.
 void mln_test_http_server_url(
   const mln_test_http_server* server, const char* path, char* out,

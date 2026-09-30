@@ -7,8 +7,6 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native_ffi");
 const support = @import("fixture.zig");
 
-const empty_collection = "{\"type\":\"FeatureCollection\",\"features\":[]}";
-
 fn fetchNothing(_: ?*anyopaque, _: maplibre.CanonicalTileId) maplibre.Error!void {}
 
 fn countRelease(context: ?*anyopaque) void {

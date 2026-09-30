@@ -34,11 +34,10 @@ const CONTENT_TYPES = {
   ".map": "application/json",
 };
 
-// Style documents served by the Rust resource fixtures.
+// The style document that the ABI suite's browser HTTP case loads from this
+// origin, keyed by path to the ID of its one layer.
 const FIXTURE_STYLE_LAYER_IDS = {
   "/__fixture/http-style.json": "http-fixture",
-  "/__fixture/rewritten-style.json": "rewritten",
-  "/__fixture/original-after-clear.json": "original-after-clear",
 };
 
 // Headless Chromium can use Metal on macOS. Forcing its Linux SwiftShader

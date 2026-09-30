@@ -66,20 +66,6 @@ final class Pulse: @unchecked Sendable {
       }
     }
   }
-
-  /// Blocks the calling thread until a signal after `seen`, or until `limit`,
-  /// for a thread the test owns, such as a render thread.
-  func block(past seen: UInt64, until limit: DispatchTime) {
-    condition.withLock {
-      while count == seen {
-        let now = DispatchTime.now()
-        guard now < limit else { return }
-        let seconds = Double(limit.uptimeNanoseconds - now.uptimeNanoseconds) /
-          1_000_000_000
-        _ = condition.wait(until: Date().addingTimeInterval(seconds))
-      }
-    }
-  }
 }
 
 /// How often a waiter re-checks its condition without a signal, which covers

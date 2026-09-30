@@ -503,47 +503,6 @@ size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type) {
   }
 }
 
-bool mln_test_drain_find(
-  mln_runtime runtime, uint32_t type, mln_map source,
-  mln_runtime_event* out_event, char* out_message, size_t message_capacity
-) {
-  bool found = false;
-  for (;;) {
-    mln_test_event_batch batch = mln_test_event_batch_default();
-    if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
-      return found;
-    }
-    if (batch.event_count == 0) {
-      return found;
-    }
-    for (size_t index = 0; index < batch.event_count; index += 1) {
-      const mln_runtime_event* event =
-        (const mln_runtime_event*)((const char*)batch.events +
-                                   (index * batch.event_size));
-      if (found || event->type != type) {
-        continue;
-      }
-      if (source != MLN_HANDLE_NULL && event->source != source) {
-        continue;
-      }
-      found = true;
-      if (out_event != NULL) {
-        *out_event = *event;
-      }
-      if (out_message != NULL && message_capacity > 0) {
-        size_t copied = event->message_size;
-        if (copied > message_capacity - 1) {
-          copied = message_capacity - 1;
-        }
-        if (copied > 0) {
-          memcpy(out_message, batch.messages + event->message_offset, copied);
-        }
-        out_message[copied] = '\0';
-      }
-    }
-  }
-}
-
 typedef struct event_search {
   mln_runtime runtime;
   mln_test_event_match match;
@@ -551,8 +510,8 @@ typedef struct event_search {
   bool drain_failed;
 } event_search;
 
-// Drains the whole queue, as mln_test_drain_find() does, so a match leaves the
-// queue empty and the events after it discarded.
+// Drains the whole queue, so a match leaves the queue empty and the events
+// after it discarded.
 static bool drain_until_match(void* context) {
   event_search* search = context;
   bool matched = false;

@@ -640,10 +640,6 @@ void mln_test_http_server_stop(mln_test_http_server* server) {
   );
 }
 
-uint16_t mln_test_http_server_port(const mln_test_http_server* server) {
-  return server->port;
-}
-
 void mln_test_http_server_url(
   const mln_test_http_server* server, const char* path, char* out,
   size_t capacity
