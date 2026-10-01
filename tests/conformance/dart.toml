@@ -48,11 +48,12 @@
 "REND-01" = "bindings/dart/test/render_test.dart::an owned texture renders a frame that reads back as pixels"
 "REND-02" = { na = "An isolate has no thread affinity: Dart can resume it on another native thread after any await, so it cannot service a caller-driven session from the thread that the session belongs to. Dart hosts, including a Flutter integration, render through core-worker sessions on Metal, Vulkan, or a dedicated EGL context" }
 "PLAT-01" = "bindings/dart/test/native_library_test.dart::loads the native library"
-# A live callback registration keeps its isolate alive, as an open receive
-# port does, so a program that leaves one open never runs out of work and ends
-# through exit(). The test runs both endings: an isolate that runs out of work
-# with a runtime and a map open, and exit() with an event wake, a resource
-# provider, and the log callback registered.
+# The test runs both endings: an isolate that runs out of work with a runtime
+# and a map open, and exit() with an event wake, a resource provider, and the
+# log callback registered. A callback registration leaves its isolate free to
+# finish, so the exit() fixture keeps its isolate alive with a port until the
+# provider runs; isolate_liveness_test.dart covers an isolate that runs out of
+# work with only registrations live.
 "PLAT-02" = "bindings/dart/test/runtime_shutdown_test.dart::shutdown with live handles and callbacks exits cleanly"
 # Each runtime is held only by a callback that captures it, a cycle through
 # its registration, and the test checks that native disposed both.

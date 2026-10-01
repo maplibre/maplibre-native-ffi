@@ -66,8 +66,8 @@ void main() {
     // The isolate runs out of work with a runtime and a map open, and its
     // shutdown finalizes them.
     await expectCleanExit('abandoned', 'ABANDONED_HANDLES');
-    // exit() ends a process whose live callback registrations would otherwise
-    // keep it running, with the runtime's threads still at work.
+    // exit() ends a process with live callback registrations and the
+    // runtime's threads still at work.
     await expectCleanExit('exit', 'LIVE_CALLBACKS');
   });
 }

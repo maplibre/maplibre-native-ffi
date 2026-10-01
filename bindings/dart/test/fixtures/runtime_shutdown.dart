@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
@@ -38,14 +39,18 @@ Future<void> abandonHandles() async {
 }
 
 /// Leaves a runtime and a map open with every kind of Dart callback
-/// registered, then ends the process. A live registration keeps its isolate
-/// alive, as an open receive port does, so a program with one left open ends
-/// through exit() rather than by running out of work.
+/// registered, then ends the process through exit() while the runtime's
+/// threads are still at work.
+///
+/// A callback registration leaves its isolate free to finish, so the fixture
+/// keeps the isolate alive itself until the resource provider runs, with a
+/// port that the provider closes.
 Future<void> exitWithLiveCallbacks() async {
   logSetCallback((_, _, _, _) {});
   final runtime = runtimeCreate(
     RuntimeOptions(eventWake: Wake(callback: () {})),
   );
+  final waiting = ReceivePort();
   final served = Completer<void>();
   await runtime.setResourceProvider(
     ResourceProvider.routedResourceProvider(
@@ -63,6 +68,7 @@ Future<void> exitWithLiveCallbacks() async {
               bytes: _json('{"version":8,"sources":{},"layers":[]}'),
             ),
           );
+          waiting.close();
           served.complete();
         },
       ),
