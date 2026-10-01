@@ -1,24 +1,30 @@
 package org.maplibre.nativeffi.examples.androidmap
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Choreographer
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import org.maplibre.nativeffi.generated.RenderResult
+import java.util.concurrent.atomic.AtomicBoolean
+import org.maplibre.nativeffi.generated.Wake
 
 /**
- * The Choreographer-paced render loop.
+ * The map view. The UI thread owns the surface, touch input, viewport, graphics context, and render
+ * session.
  *
- * The UI thread owns the surface, touch input, viewport, graphics context, and render session.
- * Runtime and map updates are submitted directly to the core-owned runtime worker.
+ * Touch input becomes map commands. A map update schedules one frame demand on the next
+ * Choreographer frame. Native wakes post the work they announce to the UI thread: runtime events to
+ * drain, driver work to service, and frame results to drain.
  */
 internal class AndroidMapView(
   context: Context,
   private val styleJson: String? = null,
   private val onRendered: () -> Unit = {},
 ) : SurfaceView(context), SurfaceHolder.Callback2, Choreographer.FrameCallback, AutoCloseable {
+  private val handler = Handler(Looper.getMainLooper())
   private val input = InputController(context) { mapState }
   private var graphics: GraphicsContext? = null
   private var renderTarget: SurfaceRenderTarget? = null
@@ -28,6 +34,9 @@ internal class AndroidMapView(
   private var appForeground = false
   private var frameCallbackPosted = false
 
+  /** Set when the platform asked for a redraw, which renders even with no newer map update. */
+  private var redrawRequested = false
+
   /** Set when a frame threw, so the view stops scheduling against a broken target. */
   private var frameFailed = false
 
@@ -35,6 +44,10 @@ internal class AndroidMapView(
   private var contextRebuildSpent = false
   private var closed = false
   private val pendingDrawingFinished = ArrayDeque<Runnable>()
+
+  private val eventWake = UiWake { if (mapState?.drainRenderUpdates() == true) scheduleFrame() }
+  private val frameWake = UiWake(::drainFrameResults)
+  private val driverWake = UiWake { renderTarget?.serviceDriverWork() }
 
   init {
     holder.addCallback(this)
@@ -45,24 +58,24 @@ internal class AndroidMapView(
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
     viewVisible = true
-    startLoopIfReady()
+    scheduleFrame()
   }
 
   override fun onDetachedFromWindow() {
     viewVisible = false
-    stopLoop()
+    stopFrames()
     detachSurface()
     super.onDetachedFromWindow()
   }
 
   fun enterForeground() {
     appForeground = true
-    startLoopIfReady()
+    scheduleFrame()
   }
 
   fun enterBackground() {
     appForeground = false
-    stopLoop()
+    stopFrames()
     finishPendingDrawing()
   }
 
@@ -79,12 +92,12 @@ internal class AndroidMapView(
   }
 
   override fun surfaceRedrawNeeded(holder: SurfaceHolder) {
-    requestRender()
+    requestRedraw()
   }
 
   override fun surfaceRedrawNeededAsync(holder: SurfaceHolder, drawingFinished: Runnable) {
     pendingDrawingFinished += drawingFinished
-    requestRender()
+    requestRedraw()
     if (!canRenderFrame()) {
       finishPendingDrawing()
     }
@@ -94,45 +107,32 @@ internal class AndroidMapView(
 
   override fun doFrame(frameTimeNanos: Long) {
     frameCallbackPosted = false
-    val state = mapState
-    if (state != null) {
-      try {
-        state.pollEvents()
-        val target = ensureRenderTarget(state)
-        if (target != null && state.renderRequest.consume()) {
-          val result = target.renderUpdate()
-          if (result?.disposition == RenderResult.RENDERED) {
-            contextRebuildSpent = false
-            finishPendingDrawing()
-            onRendered()
-            // The result carries the map's own follow-up demand, so an ongoing transition needs no
-            // runtime event round trip.
-            if (result.needsRepaint) state.renderRequest.set()
-          } else {
-            state.renderRequest.set()
-          }
-        }
-      } catch (error: RuntimeException) {
-        Log.e(TAG, "frame failed", error)
-        rebuildAfterFrameFailure()
-      }
-    }
-    startLoopIfReady()
-  }
-
-  fun requestRender() {
-    mapState?.renderRequest?.set()
-    startLoopIfReady()
+    if (!canRenderFrame()) return
+    val force = redrawRequested
+    redrawRequested = false
+    guarded { renderTarget?.requestFrame(force) }
   }
 
   override fun close() {
     if (closed) return
     closed = true
-    stopLoop()
+    stopFrames()
     // Close the render session before closing the map and runtime.
     detachSurface()
     mapState?.close()
     mapState = null
+  }
+
+  private fun drainFrameResults() {
+    val drained = renderTarget?.drainFrameResults() ?: return
+    if (drained.rendered) {
+      contextRebuildSpent = false
+      finishPendingDrawing()
+      onRendered()
+    }
+    // The result carries the map's own follow-up demand, so an ongoing transition needs no runtime
+    // event round trip.
+    if (drained.needsRepaint) scheduleFrame()
   }
 
   private fun surfaceAvailable(holder: SurfaceHolder) {
@@ -146,24 +146,27 @@ internal class AndroidMapView(
     }
     if (graphics?.setSurface(holder.surface) != true) {
       // A session outlives only the context it attached against, so replacing the context closes
-      // the session and the next frame attaches a cold one.
+      // the session and attaches a cold one.
       detachSurface()
       val nextGraphics = GraphicsContext.create(holder.surface)
       graphics = nextGraphics
       Log.i(TAG, "render-target=native-surface status=${nextGraphics.backendName}")
     }
-    if (mapState == null) {
-      mapState = MapState(nextViewport, ::startLoopIfReady, styleJson)
+    val state = mapState
+    if (state == null) {
+      mapState = MapState(nextViewport, eventWake.wake, styleJson)
     } else if (renderTarget == null) {
       // With no session attached the map is the only extent authority; a live session carries the
       // extent through followSurface below.
-      mapState?.resize(nextViewport)
+      state.resize(nextViewport)
     }
-    followSurface("surface available")
-    requestRender()
+    if (renderTarget == null) attachSurface() else followSurface("surface available")
+    requestRedraw()
   }
 
   private fun surfaceLost() {
+    // Work queued against the outgoing surface runs while that surface is still valid.
+    guarded { renderTarget?.serviceDriverWork() }
     if (graphics?.releaseSurface() == true) {
       // The context outlived the surface, so the session parks on it until a surface returns.
       followSurface("surface released")
@@ -173,30 +176,70 @@ internal class AndroidMapView(
     finishPendingDrawing()
   }
 
+  /** Starts attaching a session once a map, a context, and a non-empty viewport all exist. */
+  private fun attachSurface() {
+    val state = mapState ?: return
+    val currentGraphics = graphics ?: return
+    val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return
+    var target: SurfaceRenderTarget? = null
+    target =
+      SurfaceRenderTarget.attach(
+        state.map,
+        currentGraphics,
+        currentViewport,
+        frameWake.wake,
+        driverWake::post,
+      ) { error ->
+        handler.post { onAttached(target, error) }
+      }
+    renderTarget = target
+  }
+
+  private fun onAttached(target: SurfaceRenderTarget?, error: Throwable?) {
+    if (target == null || target !== renderTarget) return
+    if (error != null) {
+      Log.e(TAG, "attaching the render session failed", error)
+      detachSurface()
+      return
+    }
+    // The viewport may have changed while the session attached.
+    if (target.viewport != viewport) followSurface("attached")
+    scheduleFrame()
+  }
+
   /**
    * Points the live session at the surface its graphics context presents through now, and at the
-   * current viewport. A session yet to be attached takes both from [SurfaceRenderTarget.attach].
+   * current viewport. A session still attaching takes both once it attaches.
    */
   private fun followSurface(change: String) {
     val currentGraphics = graphics ?: return
     val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return
-    val target = renderTarget ?: return
+    val target = renderTarget?.takeIf { it.attached } ?: return
     val state = mapState ?: return
-    try {
-      target.resize(state.map, currentGraphics, currentViewport)
-    } catch (error: RuntimeException) {
-      // A failed handover may leave the session naming a destroyed surface, so close it here; the
-      // next surface attaches a new one.
-      Log.w(TAG, "$change: handing the surface over failed; the session is closed", error)
-      detachSurface()
-      return
+    target.follow(state.map, currentGraphics, currentViewport) { error ->
+      // A failed handover may leave the session naming a destroyed surface, so close it; the next
+      // surface attaches a new one.
+      handler.post {
+        Log.w(TAG, "$change: handing the surface over failed; the session is closed", error)
+        if (renderTarget === target) detachSurface()
+      }
     }
-    Log.i(TAG, "$change: the live session followed it and kept its renderer")
+    Log.i(TAG, "$change: the live session follows it and keeps its renderer")
+  }
+
+  /** Runs one piece of UI-thread render work, rebuilding the context once if it throws. */
+  private inline fun guarded(action: () -> Unit) {
+    try {
+      action()
+    } catch (error: RuntimeException) {
+      Log.e(TAG, "frame failed", error)
+      rebuildAfterFrameFailure()
+    }
   }
 
   /**
    * Builds the graphics context again after a failed frame, once. A second failure with no good
-   * frame in between stops scheduling rather than reposting every vsync against a broken target.
+   * frame in between stops scheduling rather than demanding frames from a broken target.
    */
   private fun rebuildAfterFrameFailure() {
     detachSurface()
@@ -214,6 +257,7 @@ internal class AndroidMapView(
         frameFailed = true
         null
       }
+    attachSurface()
   }
 
   private fun detachSurface() {
@@ -230,21 +274,14 @@ internal class AndroidMapView(
     finishPendingDrawing()
   }
 
-  /** Attaches a render session on the UI thread, which owns it until close. */
-  private fun ensureRenderTarget(state: MapState): SurfaceRenderTarget? {
-    renderTarget?.let {
-      return it
-    }
-    val currentGraphics = graphics ?: return null
-    val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return null
-    val attached = SurfaceRenderTarget.attach(state.map, currentGraphics, currentViewport)
-    renderTarget = attached
-    state.requestRepaint()
-    state.renderRequest.set()
-    return attached
+  /** Schedules a redraw that renders even when the map has nothing newer. */
+  private fun requestRedraw() {
+    redrawRequested = true
+    scheduleFrame()
   }
 
-  private fun startLoopIfReady() {
+  /** Demands one frame on the next Choreographer frame, while the view can show it. */
+  private fun scheduleFrame() {
     if (frameCallbackPosted || !canRenderFrame()) {
       return
     }
@@ -258,7 +295,7 @@ internal class AndroidMapView(
       appForeground &&
       graphics?.hasSurface == true &&
       !frameFailed &&
-      mapState != null
+      renderTarget?.attached == true
 
   private fun finishPendingDrawing() {
     while (pendingDrawingFinished.isNotEmpty()) {
@@ -266,11 +303,30 @@ internal class AndroidMapView(
     }
   }
 
-  private fun stopLoop() {
+  private fun stopFrames() {
     if (frameCallbackPosted) {
       Choreographer.getInstance().removeFrameCallback(this)
       frameCallbackPosted = false
     }
+  }
+
+  /**
+   * A native wake that runs [action] on the UI thread. It posts once however often the wake fires
+   * before the action runs, and the action drains or services everything that is ready.
+   */
+  private inner class UiWake(private val action: () -> Unit) {
+    private val posted = AtomicBoolean(false)
+
+    fun post() {
+      if (posted.compareAndSet(false, true)) {
+        handler.post {
+          posted.set(false)
+          if (!closed) guarded(action)
+        }
+      }
+    }
+
+    val wake = Wake { post() }
   }
 
   private companion object {

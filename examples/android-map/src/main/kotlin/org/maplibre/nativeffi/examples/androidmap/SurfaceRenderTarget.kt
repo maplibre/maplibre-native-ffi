@@ -1,63 +1,99 @@
 package org.maplibre.nativeffi.examples.androidmap
 
 import android.util.Log
+import java.util.concurrent.Semaphore
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
+import org.maplibre.nativeffi.error.MaplibreException
+import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.OpenglSurfaceDescriptor
 import org.maplibre.nativeffi.generated.RenderDriverKind
-import org.maplibre.nativeffi.generated.RenderFrameResult
+import org.maplibre.nativeffi.generated.RenderResult
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
-import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.generated.Wake
 
-/** A caller-driver native surface serviced on the UI graphics thread. */
-internal class SurfaceRenderTarget private constructor(private val session: RenderSessionHandle) :
+/**
+ * A caller-driver native surface that the UI thread drives. The session's wakes post its driver
+ * work and frame results to the UI thread, where the view services and drains them.
+ */
+internal class SurfaceRenderTarget
+private constructor(private val session: RenderSessionHandle, private val driverWork: Semaphore) :
   AutoCloseable {
+  /** Set once the attachment completes; a session accepts frame demand only after that. */
+  @Volatile
+  var attached = false
+    private set
+
+  /** The viewport the session last took, through attachment or [follow]. */
+  var viewport: Viewport? = null
+    private set
+
   /**
-   * Submits one Choreographer-paced demand and reports the frame the driver produced for it, or
-   * null when it produced none.
+   * Asks for a frame. A forced frame renders and presents even when the map has no newer update.
    */
-  fun renderUpdate(): RenderFrameResult? {
-    session.requestFrame(
-      GeneratedApi.frameDemandDefault()
-        .copy(
-          flags =
-            org.maplibre.nativeffi.generated.FrameDemandFlag.IF_NEEDED or
-              org.maplibre.nativeffi.generated.FrameDemandFlag.PRESENT
-        )
-    )
+  fun requestFrame(force: Boolean) {
+    val flags =
+      if (force) FrameDemandFlag.PRESENT else FrameDemandFlag.IF_NEEDED or FrameDemandFlag.PRESENT
+    session.requestFrame(GeneratedApi.frameDemandDefault().copy(flags = flags))
+  }
+
+  fun serviceDriverWork() {
     session.serviceDriverWork(0uL)
+  }
+
+  /** What one frame-result drain saw. */
+  data class Drained(val rendered: Boolean, val needsRepaint: Boolean)
+
+  /** Drains every frame result. */
+  fun drainFrameResults(): Drained {
     val batch =
       try {
         session.drainFrameResults()
-      } catch (error: org.maplibre.nativeffi.error.MaplibreException) {
-        if (error.status == org.maplibre.nativeffi.error.MaplibreStatus.NOT_READY) return null
+      } catch (error: MaplibreException) {
+        if (error.status == MaplibreStatus.NOT_READY) return Drained(false, false)
         throw error
       }
-    return batch.use { owner ->
-      val count = owner.count()
-      if (count == 0uL) null else owner.get(count - 1uL)
+    return batch.use { results ->
+      var rendered = false
+      var needsRepaint = false
+      for (index in 0uL until results.count()) {
+        val result = results.get(index)
+        if (result.disposition == RenderResult.RENDERED) {
+          rendered = true
+          needsRepaint = needsRepaint || result.needsRepaint
+        }
+      }
+      Drained(rendered, needsRepaint)
     }
   }
 
   /**
-   * Applies target changes through the native typed driver mailbox.
-   *
-   * A session resize carries the map's extent itself. An EGL surface handover replaces only the
-   * graphics resource, so that path submits the map resize alongside it.
+   * Points the session at the surface the graphics context presents through now, and at the
+   * viewport. A session resize carries the map's extent itself. An EGL surface handover replaces
+   * only the graphics resource, so that path submits the map resize alongside it. The outgoing
+   * surface stays valid until the handover runs, so nothing waits for it here; a failed handover
+   * reaches [onFailure].
    */
-  fun resize(map: MapHandle, graphics: GraphicsContext, viewport: Viewport) {
+  fun follow(
+    map: MapHandle,
+    graphics: GraphicsContext,
+    viewport: Viewport,
+    onFailure: (Throwable) -> Unit,
+  ) {
+    this.viewport = viewport
     when (graphics) {
       is EglGraphicsContext -> {
-        complete(
-          session.openglSurfaceSetTarget(
+        session
+          .openglSurfaceSetTarget(
             OpenglSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
           )
-        )
+          .invokeOnCompletion { error -> if (error != null) onFailure(error) }
         map.resize(
           LogicalExtent(
             viewport.logicalWidth.toUInt(),
@@ -66,18 +102,18 @@ internal class SurfaceRenderTarget private constructor(private val session: Rend
           )
         )
       }
-      is VulkanGraphicsContext -> complete(session.resize(viewport.extent))
+      is VulkanGraphicsContext -> session.resize(viewport.extent)
       else -> error("Unsupported graphics context: ${graphics::class.java.name}")
     }
   }
 
   /**
-   * Releases the session. Detach services driver work, which needs the graphics context current, so
-   * a platform callback that arrives after the surface is gone falls back to abandoning it.
+   * Releases the session. Detach services driver work on the UI thread until it completes; a
+   * platform callback that arrives after the surface is gone falls back to abandoning it.
    */
   override fun close() {
     try {
-      complete(session.detach())
+      awaitDriverWork(session.detach())
     } catch (error: RuntimeException) {
       Log.w(TAG, "detaching the render session failed; abandoning it instead", error)
       runCatching { session.abandon() }
@@ -85,48 +121,73 @@ internal class SurfaceRenderTarget private constructor(private val session: Rend
     session.close()
   }
 
-  private fun complete(completed: Deferred<*>) {
-    while (!completed.isCompleted) session.serviceDriverWork(0uL)
-    val result = runBlocking { completed.await() }
-    if (result is org.maplibre.nativeffi.runtime.CommandCompletion) {
-      check(result.status == org.maplibre.nativeffi.error.MaplibreStatus.OK) { result.diagnostic }
+  /**
+   * Services driver work until [completion] finishes, sleeping until the session's driver-work wake
+   * or the completion arrives. Only teardown waits like this; everything else follows the wakes.
+   */
+  private fun awaitDriverWork(completion: Deferred<*>) {
+    completion.invokeOnCompletion { driverWork.release() }
+    while (true) {
+      session.serviceDriverWork(0uL)
+      if (completion.isCompleted) break
+      driverWork.acquire()
     }
+    runBlocking { completion.await() }
   }
 
   companion object {
     private const val TAG = "MapLibreAndroidMap"
 
-    private val callerDriver =
-      RenderSessionAttachOptions(driver = RenderDriverKind.CALLER_GRAPHICS_THREAD)
-
-    fun attach(map: MapHandle, graphics: GraphicsContext, viewport: Viewport): SurfaceRenderTarget {
+    /**
+     * Starts attaching a session on the UI thread, which owns it until close. The session raises
+     * [frameWake] with frame results and [onDriverWork] with driver work. The attachment completes
+     * through that driver work, and then [onAttached] runs on a native thread with the attachment's
+     * failure, or null.
+     */
+    fun attach(
+      map: MapHandle,
+      graphics: GraphicsContext,
+      viewport: Viewport,
+      frameWake: Wake,
+      onDriverWork: () -> Unit,
+      onAttached: (Throwable?) -> Unit,
+    ): SurfaceRenderTarget {
+      val driverWork = Semaphore(0)
+      val options =
+        RenderSessionAttachOptions(
+          driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
+          frameWake = frameWake,
+          driverWorkWake =
+            Wake {
+              driverWork.release()
+              onDriverWork()
+            },
+        )
       val attachment =
         when (graphics) {
-          is EglGraphicsContext -> {
-            val descriptor =
-              OpenglSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
-            map.openglSurfaceAttach(descriptor, callerDriver)
-          }
-          is VulkanGraphicsContext -> {
-            val descriptor =
-              VulkanSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfaceHandle)
-            map.vulkanSurfaceAttach(descriptor, callerDriver)
-          }
+          is EglGraphicsContext ->
+            map.openglSurfaceAttach(
+              OpenglSurfaceDescriptor(
+                viewport.extent,
+                graphics.descriptor,
+                graphics.surfacePointer,
+              ),
+              options,
+            )
+          is VulkanGraphicsContext ->
+            map.vulkanSurfaceAttach(
+              VulkanSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfaceHandle),
+              options,
+            )
           else -> error("Unsupported graphics context: ${graphics::class.java.name}")
         }
-      return fromAttachment(attachment)
-    }
-
-    private fun fromAttachment(attachment: RenderSessionAttachment): SurfaceRenderTarget {
-      val target = SurfaceRenderTarget(attachment.session)
-      try {
-        target.complete(attachment.ready)
-        return target
-      } catch (error: Throwable) {
-        runCatching { attachment.session.abandon() }
-        runCatching { attachment.session.close() }
-        throw error
+      val target = SurfaceRenderTarget(attachment.session, driverWork)
+      target.viewport = viewport
+      attachment.ready.invokeOnCompletion { error ->
+        if (error == null) target.attached = true
+        onAttached(error)
       }
+      return target
     }
   }
 }
