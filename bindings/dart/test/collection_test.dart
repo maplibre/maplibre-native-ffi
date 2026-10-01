@@ -109,12 +109,18 @@ final class _StderrOverrides extends IOOverrides {
 }
 
 void main() {
+  // Every test here abandons owners on purpose, so each one collects the leak
+  // reports instead of writing them to the suite's output.
+  late _CapturedStderr errors;
+  setUp(() {
+    errors = _CapturedStderr();
+    IOOverrides.global = _StderrOverrides(errors);
+    addTearDown(() => IOOverrides.global = null);
+  });
+
   test(
     'an abandoned runtime is disposed and reported when collected',
     () async {
-      final errors = _CapturedStderr();
-      IOOverrides.global = _StderrOverrides(errors);
-      addTearDown(() => IOOverrides.global = null);
       final (identity, runtime) = _abandonedRuntime();
       final leak =
           'Leaked RuntimeHandle native handle 0x${identity.toRadixString(16)}; '
