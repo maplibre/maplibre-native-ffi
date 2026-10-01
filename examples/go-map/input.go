@@ -35,7 +35,8 @@ func logControls() {
   0: reset pitch and bearing`)
 }
 
-func (input *inputController) handleEvent(event *sdl.Event, state *runtimeMapState, v viewport) (bool, error) {
+// handleEvent turns input into map camera commands.
+func (input *inputController) handleEvent(event *sdl.Event, state *runtimeMapState, v viewport) error {
 	switch event.Type() {
 	case sdl.EventMouseButtonDown:
 		return input.handleMouseButtonDown(event.MouseButton(), state, v)
@@ -48,22 +49,22 @@ func (input *inputController) handleEvent(event *sdl.Event, state *runtimeMapSta
 	case sdl.EventKeyDown:
 		return handleKeyDown(event.Keyboard(), state, v)
 	default:
-		return false, nil
+		return nil
 	}
 }
 
-func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent, state *runtimeMapState, v viewport) (bool, error) {
+func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent, state *runtimeMapState, v viewport) error {
 	if event == nil {
-		return false, nil
+		return nil
 	}
 	// A second button pressed during a live drag joins it, leaving the drag
 	// baseline alone.
 	if input.dragMode != dragNone {
-		return false, nil
+		return nil
 	}
 	mode := dragModeForButton(event.Button)
 	if mode == dragNone {
-		return false, nil
+		return nil
 	}
 	cursor := logicalPoint(float64(event.X), float64(event.Y), v)
 	input.lastX = cursor.X
@@ -71,37 +72,31 @@ func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent,
 	input.dragMode = mode
 	input.dragButton = event.Button
 	if err := state.cancelTransitions(); err != nil {
-		return false, err
+		return err
 	}
-	if err := state.setGestureInProgress(true); err != nil {
-		return false, err
-	}
-	return true, nil
+	return state.setGestureInProgress(true)
 }
 
 // handleMouseButtonUp ends the drag only for the button that started it, so the
 // gesture bracket stays paired.
-func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, state *runtimeMapState, v viewport) (bool, error) {
+func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, state *runtimeMapState, v viewport) error {
 	if event == nil || (event.Button != sdl.ButtonLeft && event.Button != sdl.ButtonRight) {
-		return false, nil
+		return nil
 	}
 	if input.dragMode == dragNone || event.Button != input.dragButton {
-		return false, nil
+		return nil
 	}
 	cursor := logicalPoint(float64(event.X), float64(event.Y), v)
 	input.dragMode = dragNone
 	input.dragButton = 0
 	input.lastX = cursor.X
 	input.lastY = cursor.Y
-	if err := state.setGestureInProgress(false); err != nil {
-		return false, err
-	}
-	return true, nil
+	return state.setGestureInProgress(false)
 }
 
-func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, state *runtimeMapState, v viewport) (bool, error) {
+func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, state *runtimeMapState, v viewport) error {
 	if event == nil || input.dragMode == dragNone {
-		return false, nil
+		return nil
 	}
 	cursor := logicalPoint(float64(event.X), float64(event.Y), v)
 	dx := cursor.X - input.lastX
@@ -109,32 +104,32 @@ func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, sta
 	input.lastX = cursor.X
 	input.lastY = cursor.Y
 	if dx == 0 && dy == 0 {
-		return false, nil
+		return nil
 	}
 
 	switch input.dragMode {
 	case dragPan:
-		return true, state.moveBy(dx, dy, nil)
+		return state.moveBy(dx, dy, nil)
 	case dragRotate:
 		if err := state.adjustBearing(dx*0.5, nil); err != nil {
-			return false, err
+			return err
 		}
-		return true, state.adjustPitch(dy*0.5, nil)
+		return state.adjustPitch(dy*0.5, nil)
 	}
-	return false, nil
+	return nil
 }
 
-func handleMouseWheel(event *sdl.MouseWheelEvent, state *runtimeMapState, v viewport) (bool, error) {
+func handleMouseWheel(event *sdl.MouseWheelEvent, state *runtimeMapState, v viewport) error {
 	if event == nil || event.Y == 0 {
-		return false, nil
+		return nil
 	}
 	anchor := logicalPoint(float64(event.MouseX), float64(event.MouseY), v)
-	return true, state.scaleBy(math.Pow(2, float64(event.Y)*0.25), anchor, nil)
+	return state.scaleBy(math.Pow(2, float64(event.Y)*0.25), anchor, nil)
 }
 
-func handleKeyDown(event *sdl.KeyboardEvent, state *runtimeMapState, v viewport) (bool, error) {
+func handleKeyDown(event *sdl.KeyboardEvent, state *runtimeMapState, v viewport) error {
 	if event == nil {
-		return false, nil
+		return nil
 	}
 	const (
 		panStep     = 120.0
@@ -169,10 +164,8 @@ func handleKeyDown(event *sdl.KeyboardEvent, state *runtimeMapState, v viewport)
 		err = state.adjustPitch(-pitchStep, &durationMS)
 	case sdl.Scancode0:
 		err = state.resetOrientation(220)
-	default:
-		return false, nil
 	}
-	return err == nil, err
+	return err
 }
 
 func dragModeForButton(button byte) dragMode {

@@ -18,10 +18,13 @@ type runtimeMapState struct {
 const smokeStyle = `{"version":8,"sources":{},"layers":[` +
 	`{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}]}`
 
-func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
+// newRuntimeMapState creates the runtime and its map. The runtime raises
+// eventWake when it has events to drain.
+func newRuntimeMapState(v viewport, smoke bool, eventWake maplibre.Wake) (*runtimeMapState, error) {
 	runtimeOptions := maplibre.DefaultRuntimeOptions()
 	cachePath := ":memory:"
 	runtimeOptions.CachePath = &cachePath
+	runtimeOptions.EventWake = eventWake
 	runtimeHandle, err := maplibre.RuntimeCreate(runtimeOptions)
 	if err != nil {
 		return nil, fmt.Errorf("runtime create failed: %w", err)
@@ -29,8 +32,8 @@ func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
 	state := &runtimeMapState{runtime: runtimeHandle}
 	mapOptions := maplibre.DefaultMapOptions()
 	mapOptions.InitialExtent = maplibre.LogicalExtent{Width: v.logicalWidth, Height: v.logicalHeight, ScaleFactor: v.scaleFactor}
-	// The render loop re-arms from the frame result's repaint flag, so the map
-	// only has to report updates that arrive between frames.
+	// A map update becomes a frame demand; the frame result's repaint flag
+	// covers updates that a rendering frame asks for.
 	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable
 	mapFuture, err := runtimeHandle.MapCreate(mapOptions)
 	if err != nil {
@@ -66,11 +69,6 @@ func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("camera jump failed: %w", err)
-	}
-	_, err = mapHandle.RequestRepaint()
-	if err != nil {
-		_ = state.Close()
-		return nil, fmt.Errorf("initial repaint request failed: %w", err)
 	}
 	return state, nil
 }
@@ -171,8 +169,10 @@ func animationOptions(durationMS *float64) maplibre.AnimationOptions {
 	return maplibre.AnimationOptions{DurationMs: durationMS}
 }
 
-func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID uint64) (bool, error) {
-	batch, err := runtimeHandle.DrainEvents()
+// drainRenderUpdates drains every runtime event, and reports whether the map
+// published an update to render.
+func (state *runtimeMapState) drainRenderUpdates() (bool, error) {
+	batch, err := state.runtime.DrainEvents()
 	if err != nil {
 		return false, fmt.Errorf("runtime event drain failed: %w", err)
 	}
@@ -182,7 +182,7 @@ func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID uint64) (bool, err
 		return false, err
 	}
 	for _, event := range events.Events {
-		if event.SourceType != maplibre.RuntimeEventSourceTypeMap || event.Source != mapID {
+		if event.SourceType != maplibre.RuntimeEventSourceTypeMap || event.Source != state.mapID {
 			continue
 		}
 		if event.Type == maplibre.RuntimeEventTypeMapRenderUpdateAvailable {
@@ -190,54 +190,4 @@ func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID uint64) (bool, err
 		}
 	}
 	return false, nil
-}
-
-// renderMapState owns the render target on the SDL render loop thread.
-type renderMapState struct {
-	target renderTarget
-}
-
-func newRenderMapState(graphics *openGLContext, mapRef *maplibre.MapHandle, v viewport, mode renderTargetMode) (*renderMapState, error) {
-	target, err := newOpenGLRenderTarget(graphics, v, mode, mapRef)
-	if err != nil {
-		return nil, err
-	}
-	return &renderMapState{target: target}, nil
-}
-
-func (state *renderMapState) closeTarget() error {
-	if state.target == nil {
-		return nil
-	}
-	err := state.target.Close()
-	state.target = nil
-	return err
-}
-
-func (state *renderMapState) resize(v viewport) error {
-	if state.target == nil {
-		return errors.New("render target is not attached")
-	}
-	return state.target.Resize(v)
-}
-
-func (state *renderMapState) finishFrame() error {
-	if state.target == nil {
-		return nil
-	}
-	return state.target.FinishFrame()
-}
-
-func (state *renderMapState) pollPending() (bool, error) {
-	if state.target == nil {
-		return false, nil
-	}
-	return state.target.PollPending()
-}
-
-func (state *renderMapState) driveFrame() (frameOutcome, error) {
-	if state.target == nil {
-		return frameOutcome{}, nil
-	}
-	return state.target.DriveFrame()
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	stdruntime "runtime"
 	"strings"
@@ -122,12 +121,13 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 	}
 	_ = sdl.GL_SetSwapInterval(1)
 
-	mapState, err := newRuntimeMapState(view, smoke)
+	wakes := newLoopWakes()
+	mapState, err := newRuntimeMapState(view, smoke, wakes.events.wake())
 	if err != nil {
 		_ = graphics.Close()
 		return err
 	}
-	state, err := newRenderMapState(graphics, mapState.mapRef, view, mode)
+	target, err := newOpenGLRenderTarget(graphics, view, mode, mapState.mapRef, wakes)
 	if err != nil {
 		return errors.Join(
 			fmt.Errorf("render target attach failed: %w", err),
@@ -136,140 +136,89 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 		)
 	}
 	defer func() {
-		result = errors.Join(
-			result,
-			state.finishFrame(),
-			state.closeTarget(),
-			mapState.Close(),
-			graphics.Close(),
-		)
+		result = errors.Join(result, target.Close(), mapState.Close(), graphics.Close())
 	}()
 
 	fmt.Printf("render target: %s\n", mode)
 	fmt.Printf("render target status: %s\n", mode.statusLine())
 	logControls()
 
-	running := true
-	renderRequested := true
-	viewportDirty := false
+	// The SDL thread sleeps until input or a native wake arrives. Input
+	// becomes map commands, a map update becomes a frame demand, and each wake
+	// has the thread drain events, service driver work, or drain frame results.
 	input := inputController{}
 	smokeDeadline := time.Now().Add(smokeTimeout)
-	handleEvent := func(event *sdl.Event) error {
-		switch event.Type() {
-		case sdl.EventQuit, sdl.EventWindowCloseRequested:
-			running = false
-		case sdl.EventWindowResized, sdl.EventWindowPixelSizeChanged, sdl.EventWindowDisplayScaleChanged:
-			view = currentViewport(window)
-			view.log("resized viewport")
-			if view.empty() {
-				return nil
-			}
-			viewportDirty = true
-			renderRequested = true
-		default:
-			if view.empty() {
-				return nil
-			}
-			changed, err := input.handleEvent(event, mapState, view)
-			if err != nil {
-				return err
-			}
-			if changed {
-				renderRequested = true
-			}
-		}
-		return nil
+	// The session attached after the map took its style and camera, so it
+	// starts with one frame.
+	if err := target.RequestFrame(false); err != nil {
+		return err
 	}
-	for running {
-		didWork := false
+	for {
+		viewportChanged := false
 		var event sdl.Event
-		for sdl.PollEvent(&event) {
-			didWork = true
-			if err := handleEvent(&event); err != nil {
-				return err
-			}
-		}
-		requested, err := drainEvents(mapState.runtime, mapState.mapID)
-		if err != nil {
-			return err
-		}
-		if requested {
-			renderRequested = true
-			didWork = true
-		}
-
-		targetPending, err := state.pollPending()
-		if err != nil {
-			return err
-		}
-		if !targetPending && viewportDirty && !view.empty() {
-			viewportDirty = false
-			// The session resize carries the new logical extent to the map, so
-			// this loop starts one and never resizes the map itself. Starting
-			// it here instead of from the resize event coalesces a live resize
-			// into one outstanding submission.
-			if err := state.resize(view); err != nil {
-				return err
-			}
-			targetPending = true
-		}
-		if !targetPending && renderRequested && !view.empty() && running {
-			renderRequested = false
-			outcome, err := state.driveFrame()
-			if err != nil {
-				return err
-			}
-			if outcome.rendered {
-				didWork = true
-				if smoke {
-					// The frame is composed; presenting it below ends the run.
-					running = false
-					fmt.Println("smoke: rendered one frame")
-				}
-			}
-			if !outcome.rendered || outcome.needsRepaint {
-				renderRequested = true
-			}
-		}
-		if err := state.finishFrame(); err != nil {
-			return err
-		}
-		if smoke && running && time.Now().After(smokeDeadline) {
+		if !waitEvent(&event, smoke, smokeDeadline) {
 			return fmt.Errorf("smoke: no frame rendered within %s", smokeTimeout)
 		}
-
-		if !didWork && running {
-			if sdl.WaitEventTimeout(&event, displayRefreshTimeoutMS(window)) {
-				if err := handleEvent(&event); err != nil {
+		for ok := true; ok; ok = sdl.PollEvent(&event) {
+			switch event.Type() {
+			case sdl.EventQuit, sdl.EventWindowCloseRequested:
+				return nil
+			case sdl.EventWindowResized, sdl.EventWindowPixelSizeChanged, sdl.EventWindowDisplayScaleChanged:
+				view = currentViewport(window)
+				view.log("resized viewport")
+				viewportChanged = true
+			default:
+				if !view.empty() {
+					if err := input.handleEvent(&event, mapState, view); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		// A live resize delivers several window events at once, and this
+		// resizes once for all of them.
+		if viewportChanged && !view.empty() {
+			if err := target.Resize(view); err != nil {
+				return err
+			}
+		}
+		if wakes.events.consume() {
+			update, err := mapState.drainRenderUpdates()
+			if err != nil {
+				return err
+			}
+			if update && !view.empty() {
+				if err := target.RequestFrame(false); err != nil {
 					return err
 				}
 			}
 		}
+		if wakes.driverWork.consume() {
+			if err := target.ServiceDriverWork(); err != nil {
+				return err
+			}
+		}
+		if wakes.frames.consume() {
+			presented, err := target.DrainFrameResults()
+			if err != nil {
+				return err
+			}
+			if smoke && presented {
+				fmt.Println("smoke: rendered one frame")
+				return nil
+			}
+		}
 	}
-	return nil
 }
 
-func displayRefreshTimeoutMS(window *sdl.Window) int32 {
-	display, err := sdl.GetDisplayForWindow(window)
-	if err != nil {
-		return 16
+// waitEvent sleeps until the next SDL event. A smoke run stops waiting at its
+// deadline and reports false.
+func waitEvent(event *sdl.Event, smoke bool, deadline time.Time) bool {
+	if !smoke {
+		return sdl.WaitEvent(event) == nil
 	}
-	mode, err := display.CurrentDisplayMode()
-	if err != nil {
-		return 16
-	}
-	hz := float64(mode.RefreshRate)
-	if mode.RefreshRateNumerator > 0 && mode.RefreshRateDenominator > 0 {
-		hz = float64(mode.RefreshRateNumerator) / float64(mode.RefreshRateDenominator)
-	}
-	if hz <= 0 {
-		return 16
-	}
-	timeout := int32(math.Floor(1000 / hz))
-	if timeout < 1 {
-		return 1
-	}
-	return timeout
+	remaining := time.Until(deadline)
+	return remaining > 0 && sdl.WaitEventTimeout(event, int32(remaining.Milliseconds())+1)
 }
 
 func validateNativeRenderBackend() error {
