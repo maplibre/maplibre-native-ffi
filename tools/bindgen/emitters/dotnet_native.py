@@ -4,7 +4,8 @@ The output holds only the forms the binding uses: one `LibraryImport` per C
 function, a blittable struct per record, a C# enum per C enum, and a handle
 struct per handle typedef. Callback typedefs become unmanaged function pointer
 types at their use sites. The handwritten runtime declares `mln_diagnostic`,
-which the frontend strips from every signature it describes.
+which the frontend strips from every signature it describes. A presence mask
+takes the type of the enum whose bits it carries.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from tools.bindgen.model import CType, Function, Record
 from tools.bindgen.names import pascal
 from tools.bindgen.semantic import BoundApi
 
-from .dotnet_values import SCALARS
+from .dotnet_values import SCALARS, typed_mask
 
 HEADER = "// Generated from the C headers by tools/bindgen. Do not edit.\n"
 
@@ -128,8 +129,10 @@ class Declarations:
 
     def record(self, record: Record) -> str:
         explicit = record.kind == "union"
+        plan = self.bound.values.get(record.name)
+        masks = {field.name: typed_mask(field) for field in plan.fields} if plan else {}
         fields = "".join(
-            f"    {'[FieldOffset(0)] ' if explicit else ''}public {self.type(field.type)} {identifier(field.name)};\n"
+            f"    {'[FieldOffset(0)] ' if explicit else ''}public {masks.get(field.name) or self.type(field.type)} {identifier(field.name)};\n"
             for field in record.fields
         )
         layout = "[StructLayout(LayoutKind.Explicit)]\n" if explicit else ""

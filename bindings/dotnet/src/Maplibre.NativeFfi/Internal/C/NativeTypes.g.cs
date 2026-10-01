@@ -26,7 +26,7 @@ internal readonly record struct MlnRuntime(ulong Value) : IMlnHandle;
 internal unsafe struct mln_animation_options
 {
     public uint size;
-    public uint fields;
+    public mln_animation_option_field fields;
     public double duration_ms;
     public double velocity;
     public double min_zoom;
@@ -37,7 +37,7 @@ internal unsafe struct mln_animation_options
 internal unsafe struct mln_bound_options
 {
     public uint size;
-    public uint fields;
+    public mln_bound_option_field fields;
     public mln_lat_lng_bounds bounds;
     public double min_zoom;
     public double max_zoom;
@@ -65,7 +65,7 @@ internal unsafe struct mln_camera_delta
 internal unsafe struct mln_camera_fit_options
 {
     public uint size;
-    public uint fields;
+    public mln_camera_fit_option_field fields;
     public mln_edge_insets padding;
     public double bearing;
     public double pitch;
@@ -74,7 +74,7 @@ internal unsafe struct mln_camera_fit_options
 internal unsafe struct mln_camera_options
 {
     public uint size;
-    public uint fields;
+    public mln_camera_option_field fields;
     public double latitude;
     public double longitude;
     public double center_altitude;
@@ -135,7 +135,7 @@ internal unsafe struct mln_completion_result
 internal unsafe struct mln_custom_geometry_source_options
 {
     public uint size;
-    public uint fields;
+    public mln_custom_geometry_source_option_field fields;
     public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> fetch_tile;
     public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> cancel_tile;
     public void* user_data;
@@ -152,7 +152,7 @@ internal unsafe struct mln_custom_geometry_source_options
 internal unsafe struct mln_custom_mvt_vector_source_options
 {
     public uint size;
-    public uint fields;
+    public mln_custom_mvt_vector_source_option_field fields;
     public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> fetch_tile;
     public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> cancel_tile;
     public void* user_data;
@@ -182,7 +182,7 @@ internal unsafe struct mln_egl_context_descriptor
 internal unsafe struct mln_feature_state_selector
 {
     public uint size;
-    public uint fields;
+    public mln_feature_state_selector_field fields;
     public mln_buffer_view source_id;
     public mln_buffer_view source_layer_id;
     public mln_buffer_view feature_id;
@@ -201,7 +201,7 @@ internal unsafe struct mln_frame_demand
 internal unsafe struct mln_free_camera_options
 {
     public uint size;
-    public uint fields;
+    public mln_free_camera_option_field fields;
     public mln_vec3 position;
     public mln_quaternion orientation;
 }
@@ -209,7 +209,7 @@ internal unsafe struct mln_free_camera_options
 internal unsafe struct mln_geojson_source_options
 {
     public uint size;
-    public uint fields;
+    public mln_geojson_source_option_field fields;
     public double min_zoom;
     public double max_zoom;
     public double tolerance;
@@ -316,7 +316,7 @@ internal unsafe struct mln_map_snapshot
 internal unsafe struct mln_map_tile_options
 {
     public uint size;
-    public uint fields;
+    public mln_map_tile_option_field fields;
     public uint prefetch_zoom_delta;
     public double lod_min_radius;
     public double lod_scale;
@@ -328,7 +328,7 @@ internal unsafe struct mln_map_tile_options
 internal unsafe struct mln_map_viewport_options
 {
     public uint size;
-    public uint fields;
+    public mln_map_viewport_option_field fields;
     public uint north_orientation;
     public uint constrain_mode;
     public uint viewport_mode;
@@ -521,7 +521,7 @@ internal unsafe struct mln_projected_meters
 internal unsafe struct mln_projection_mode
 {
     public uint size;
-    public uint fields;
+    public mln_projection_mode_field fields;
     public byte axonometric;
     public double x_skew;
     public double y_skew;
@@ -538,7 +538,7 @@ internal unsafe struct mln_quaternion
 internal unsafe struct mln_queried_feature
 {
     public uint size;
-    public uint fields;
+    public mln_queried_feature_field fields;
     public mln_buffer_view feature;
     public mln_buffer_view source_id;
     public mln_buffer_view source_layer_id;
@@ -612,7 +612,7 @@ internal unsafe struct mln_render_target_extent
 internal unsafe struct mln_rendered_feature_query_options
 {
     public uint size;
-    public uint fields;
+    public mln_rendered_feature_query_option_field fields;
     public mln_buffer_view* layer_ids;
     public nuint layer_id_count;
     public mln_buffer_view* filter;
@@ -839,7 +839,7 @@ internal unsafe struct mln_screen_point
 internal unsafe struct mln_source_feature_query_options
 {
     public uint size;
-    public uint fields;
+    public mln_source_feature_query_option_field fields;
     public mln_buffer_view* source_layer_ids;
     public nuint source_layer_id_count;
     public mln_buffer_view* filter;
@@ -867,7 +867,7 @@ internal unsafe struct mln_style_image_info
 internal unsafe struct mln_style_image_options
 {
     public uint size;
-    public uint fields;
+    public mln_style_image_option_field fields;
     public mln_image_stretch* stretch_x;
     public nuint stretch_x_count;
     public mln_image_stretch* stretch_y;
@@ -933,7 +933,7 @@ internal unsafe struct mln_style_source_info
 {
     public uint size;
     public uint type;
-    public uint fields;
+    public mln_style_source_info_field fields;
     public nuint id_size;
     public byte is_volatile;
     public byte has_attribution;
@@ -979,7 +979,7 @@ internal unsafe struct mln_style_source_tile_urls_result
 internal unsafe struct mln_style_tile_source_options
 {
     public uint size;
-    public uint fields;
+    public mln_style_tile_source_option_field fields;
     public double min_zoom;
     public double max_zoom;
     public mln_buffer_view attribution;
@@ -993,7 +993,7 @@ internal unsafe struct mln_style_tile_source_options
 internal unsafe struct mln_style_transition_options
 {
     public uint size;
-    public uint fields;
+    public mln_style_transition_option_field fields;
     public double duration_ms;
     public double delay_ms;
     public byte enable_placement_transitions;

@@ -19,7 +19,7 @@ from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.semantic import BoundApi, OperationPlan
 
 from . import dotnet_native
-from .dotnet_values import Unsupported, Values
+from .dotnet_values import Unsupported, Values, typed_mask
 
 
 def operation_contract(plan: OperationPlan) -> str | None:
@@ -1094,6 +1094,19 @@ def emit(api: Api | BoundApi) -> Emission:
         )
         + "global using static Maplibre.NativeFfi.Internal.NativeCall;\n"
         "global using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;\n"
+        "global using static Maplibre.NativeFfi.Internal.Struct.NativeValues;\n"
+        # Generated values name presence bits without their enum.
+        + "".join(
+            f"global using static Maplibre.NativeFfi.Internal.C.{enum};\n"
+            for enum in sorted(
+                {
+                    typed_mask(field)
+                    for value in bound.values.values()
+                    for field in value.fields
+                }
+                - {None}
+            )
+        )
     )
     values = Values(bound)
     for owner, body in sorted(methods.items()):

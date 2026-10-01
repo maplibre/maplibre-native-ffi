@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 from support import ROOT, parse, require_tool
 
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.emitters import dart, dotnet, kotlin
+from tools.bindgen.emitters import dart, dotnet, dotnet_native, kotlin
 from tools.bindgen.emitters.dotnet_values import Values
 from tools.bindgen.schema import validate
 
@@ -303,6 +303,17 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
             (root / "ValueEquality.cs").write_text(
                 (runtime.parent.parent / "ValueEquality.cs").read_text()
             )
+            (root / "NativeValues.cs").write_text(
+                (runtime.parent.parent / "Struct/NativeValues.cs").read_text()
+            )
+            # The probe compiles the generated raw types, and declares the
+            # diagnostic and handle interface that the runtime supplies.
+            (root / "NativeMethods.cs").write_text(
+                (runtime.parent.parent / "C/NativeMethods.cs").read_text()
+            )
+            (root / "NativeTypes.g.cs").write_text(
+                dotnet_native.generate(compile_api(api))["Internal/C/NativeTypes.g.cs"]
+            )
             errors = runtime.parent.parent.parent / "Error"
             for name in (
                 "MaplibreStatus.cs",
@@ -310,21 +321,18 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
                 "InvalidArgumentException.cs",
             ):
                 (root / name).write_text((errors / name).read_text())
-            (root / "Raw.cs").write_text(
-                "namespace Maplibre.NativeFfi.Internal.C { internal unsafe struct mln_buffer_view { public void* data; public nuint size; } }"
-            )
             (root / "Program.cs").write_text(
                 """
+using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
-enum mln_camera_field : ulong { MLN_CAMERA_CENTER = 1UL << 40, MLN_CAMERA_ZOOM = 2 }
-struct mln_lat_lng { public double latitude, longitude; }
-struct mln_camera { public uint abi_size; public ulong fields; public double latitude, longitude, zoom; }
-unsafe struct mln_snapshot { public mln_camera camera; public ulong generation; public mln_lat_lng* coordinates; public nuint coordinate_count; }
-struct mln_metric { public double @event; }
-static class NativeMethods {
-  public static mln_camera mln_camera_default() => new() {
-    fields = (1UL << 40) | 2, latitude = 80, longitude = 90, zoom = 99
-  };
+using static Maplibre.NativeFfi.Internal.C.mln_camera_field;
+using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
+namespace Maplibre.NativeFfi.Internal.C {
+  static partial class NativeMethods {
+    public static mln_camera mln_camera_default() => new() {
+      fields = MLN_CAMERA_CENTER | MLN_CAMERA_ZOOM, latitude = 80, longitude = 90, zoom = 99
+    };
+  }
 }
 """
                 + declarations
@@ -336,14 +344,14 @@ static class NativeMethods {
     var absent = NativeCamera(new Camera());
     Check(absent.fields == 0 && absent.abi_size == sizeof(mln_camera));
     var zero = NativeCamera(new Camera { Center = new LatLng(0, 0), Zoom = 0 });
-    Check(zero.fields == ((1UL << 40) | 2) && zero.latitude == 0 && zero.longitude == 0 && zero.zoom == 0);
+    Check((ulong)zero.fields == ((1UL << 40) | 2) && zero.latitude == 0 && zero.longitude == 0 && zero.zoom == 0);
     var coordinates = stackalloc mln_lat_lng[2];
     coordinates[0] = new mln_lat_lng { latitude = 4, longitude = 5 };
     coordinates[1] = new mln_lat_lng { latitude = 6, longitude = 7 };
     var raw = new mln_snapshot {
       coordinates = coordinates, coordinate_count = 2,
       generation = 42,
-      camera = new mln_camera { fields = 1UL << 40, latitude = 13, longitude = -9, zoom = 55 }
+      camera = new mln_camera { fields = MLN_CAMERA_CENTER, latitude = 13, longitude = -9, zoom = 55 }
     };
     var copy = CopySnapshot(raw);
     raw.camera.latitude = 100;

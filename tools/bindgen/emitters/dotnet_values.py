@@ -7,6 +7,7 @@ import re
 from dataclasses import replace
 
 from ..compiler import compile_api
+from ..managed_contracts import KEYWORDS
 from ..model import Api, ModelError
 from ..names import pascal
 from ..semantic import BoundApi, FieldPlan, ValuePlan
@@ -41,6 +42,35 @@ class Unsupported(ValueError):
     pass
 
 
+def member(name: str) -> str:
+    """A C field or parameter name, escaped only where it is a C# keyword."""
+    return ".".join(
+        "@" + part if part in KEYWORDS["dotnet"] else part for part in name.split(".")
+    )
+
+
+def width(ctype) -> str | None:
+    return SCALARS.get(ctype.spelling) or SCALARS.get(ctype.canonical)
+
+
+def typed_mask(field: FieldPlan) -> str | None:
+    """The C enum that the raw declarations give a presence mask field.
+
+    A mask carries the bits of one enum. Declaring it as that enum lets the
+    generated values test and set bits by name, without casts.
+    """
+    value = field.value
+    if (
+        field.role != "presence_mask"
+        or value.kind != "enum"
+        or value.enum_underlying is None
+        or width(value.ctype) is None
+        or width(value.ctype) != width(value.enum_underlying)
+    ):
+        return None
+    return value.native
+
+
 def public_name(native: str) -> str:
     return pascal(native.removeprefix("mln_"))
 
@@ -51,6 +81,8 @@ class Values:
         self.api = self.bound.source
         self.plans: dict[str, ValuePlan] = {}
         self.enum_names: set[str] = set()
+        # The mask enums whose members generated values name unqualified.
+        self.mask_enums: set[str] = set()
         self.item_buffers = {
             field.value.element.native: field.value.item_buffer
             for value in self.bound.values.values()
@@ -470,6 +502,27 @@ class Values:
             current = control.value
         return self.native_type(current)
 
+    def mask_enum(self, plan: ValuePlan, name: str) -> str | None:
+        current, control = plan, None
+        for segment in name.split("."):
+            control = next(field for field in current.fields if field.name == segment)
+            current = control.value
+        assert control is not None
+        enum = typed_mask(control)
+        if enum:
+            self.mask_enums.add(enum)
+        return enum
+
+    def has_bit(self, plan: ValuePlan, mask: str, bit: str) -> str:
+        if self.mask_enum(plan, mask):
+            return f"value.{member(mask)}.HasFlag({bit})"
+        return f"(value.{member(mask)} & ({self.mask_type(plan, mask)}){self.constant(bit)}) != 0"
+
+    def bit(self, plan: ValuePlan, mask: str, bit: str) -> str:
+        if self.mask_enum(plan, mask):
+            return bit
+        return f"({self.mask_type(plan, mask)}){self.constant(bit)}"
+
     def needs_scope(self, plan: ValuePlan) -> bool:
         return (
             bool(plan.registration)
@@ -537,29 +590,31 @@ class Values:
                     union = field.value
                     tag = next(item for item in plan.fields if item.name == union.tag)
                     arms = [
-                        f"({self.native_type(tag.value)}){self.constant(variant.presence.variant)} => new {self.member_type(plan, name, fields)}.{pascal(variant.name)}({self.copy(variant.value, f'value.@{field.name}.@{variant.name}')})"
+                        f"({self.native_type(tag.value)}){self.constant(variant.presence.variant)} => new {self.member_type(plan, name, fields)}.{pascal(variant.name)}({self.copy(variant.value, f'value.{member(field.name)}.{member(variant.name)}')})"
                         for variant in union.fields
                     ]
                     if union.empty_variant:
                         arms.append(
                             f"({self.native_type(tag.value)}){self.constant(union.empty_variant[0])} => new {self.member_type(plan, name, fields)}.None()"
                         )
-                    raw_bytes = f"NativeCallScope.CopyValueBytes(value.@{field.name})"
+                    raw_bytes = (
+                        f"NativeCallScope.CopyValueBytes(value.{member(field.name)})"
+                    )
                     if plan.native in self.item_buffers:
-                        offset = f"(nuint)Marshal.OffsetOf<{plan.native}>(nameof({plan.native}.@{field.name}))"
+                        offset = f"(nuint)Marshal.OffsetOf<{plan.native}>(nameof({plan.native}.{member(field.name)}))"
                         raw_bytes = f"record == null ? {raw_bytes} : NativeCallScope.CopyArray<byte>(record + {offset}, recordSize - {offset})"
                     arms.append(
-                        f"_ => new {self.member_type(plan, name, fields)}.Unknown(({self.unknown_tag_type(tag.value)})value.@{union.tag}, {raw_bytes})"
+                        f"_ => new {self.member_type(plan, name, fields)}.Unknown(({self.unknown_tag_type(tag.value)})value.{member(union.tag)}, {raw_bytes})"
                     )
                     copied.append(
-                        f"value.@{union.tag} switch {{ " + ", ".join(arms) + " }"
+                        f"value.{member(union.tag)} switch {{ " + ", ".join(arms) + " }"
                     )
                 else:
                     copied.append(
                         self.copy(
                             field.value,
-                            f"value.@{field.name}",
-                            f"value.@{field.value.length}"
+                            f"value.{member(field.name)}",
+                            f"value.{member(field.value.length)}"
                             if field.value.length
                             else None,
                         )
@@ -573,9 +628,9 @@ class Values:
             if presence and presence.mask:
                 assert presence.mask
                 condition = (
-                    f"(value.@{presence.mask} & ({self.mask_type(plan, presence.mask)}){self.constant(presence.bit)}) != 0"
+                    self.has_bit(plan, presence.mask, presence.bit)
                     if presence.bit
-                    else f"value.@{presence.mask} != 0"
+                    else f"value.{member(presence.mask)} != 0"
                 )
                 expression = f"{condition} ? {expression} : null"
             values.append(expression)
@@ -589,7 +644,7 @@ class Values:
                     for (name, fields), value in zip(members, values, strict=True)
                 )
                 + "".join(
-                    f", {self.flag_name(plan, flag.name)} = (value.@{flag.mask} & ({self.mask_type(plan, flag.mask)}){self.constant(flag.name)}) != 0"
+                    f", {self.flag_name(plan, flag.name)} = {self.has_bit(plan, flag.mask, flag.name)}"
                     for flag in plan.mask_flags
                 )
                 + " }"
@@ -619,18 +674,18 @@ class Values:
             item_buffer = array.item_buffer
             declaration += (
                 f"    private static {public}[] Copy{public_name(plan.native)}{pascal(field.name)}({plan.native} value)\n    {{\n"
-                f"        var count = checked((int)value.@{array.length});\n"
-                f'        if (value.@{array.stride} < sizeof({native}) || (count != 0 && value.@{field.name} == null)) throw new InvalidOperationException("Invalid native array storage.");\n'
+                f"        var count = checked((int)value.{member(array.length)});\n"
+                f'        if (value.{member(array.stride)} < sizeof({native}) || (count != 0 && value.{member(field.name)} == null)) throw new InvalidOperationException("Invalid native array storage.");\n'
                 f"        var copied = new {public}[count];\n"
                 "        for (var index = 0; index < count; index++)\n        {\n"
-                f"            var record = (byte*)value.@{field.name} + checked((nuint)index * value.@{array.stride});\n"
+                f"            var record = (byte*)value.{member(field.name)} + checked((nuint)index * value.{member(array.stride)});\n"
                 f"            var item = *({native}*)record;\n"
             )
             if item_buffer:
                 declaration += (
-                    f'            if (item.@{item_buffer.offset} > value.@{item_buffer.size} || item.@{item_buffer.length} > value.@{item_buffer.size} - item.@{item_buffer.offset} || (item.@{item_buffer.length} != 0 && value.@{item_buffer.data} == null)) throw new InvalidOperationException("Invalid native item buffer.");\n'
-                    f"            var message = RuntimeStructs.CopyUtf8((byte*)value.@{item_buffer.data} + item.@{item_buffer.offset}, item.@{item_buffer.length});\n"
-                    f"            copied[index] = Copy{public_name(array.element.native)}(item, message, record, value.@{array.stride});\n"
+                    f'            if (item.{member(item_buffer.offset)} > value.{member(item_buffer.size)} || item.{member(item_buffer.length)} > value.{member(item_buffer.size)} - item.{member(item_buffer.offset)} || (item.{member(item_buffer.length)} != 0 && value.{member(item_buffer.data)} == null)) throw new InvalidOperationException("Invalid native item buffer.");\n'
+                    f"            var message = RuntimeStructs.CopyUtf8((byte*)value.{member(item_buffer.data)} + item.{member(item_buffer.offset)}, item.{member(item_buffer.length)});\n"
+                    f"            copied[index] = Copy{public_name(array.element.native)}(item, message, record, value.{member(array.stride)});\n"
                 )
             else:
                 declaration += (
@@ -663,10 +718,7 @@ class Values:
             if not reference or self.union_only(plan):
                 continue
             message = f"{public_name(plan.native)}.{name} must not be null."
-            checks.append(
-                f"        if (value.{name} is null) throw new global::Maplibre.NativeFfi.Error.InvalidArgumentException("
-                f'global::Maplibre.NativeFfi.Error.MaplibreStatus.InvalidArgument, null, "{message}", null);'
-            )
+            checks.append(f'        Required(value.{name}, "{message}");')
         return checks
 
     def declares_class(self, plan: ValuePlan) -> bool:
@@ -698,11 +750,11 @@ class Values:
                 field.presence and field.presence.mask == control.name
                 for field in plan.fields
             ):
-                lines.append(f"        native.@{control.name} = 0;")
+                lines.append(f"        native.{member(control.name)} = 0;")
         for control in plan.fields:
             if control.role == "size":
                 lines.append(
-                    f"        native.@{control.name} = ({self.native_type(control.value)})sizeof({plan.native});"
+                    f"        native.{member(control.name)} = ({self.native_type(control.value)})sizeof({plan.native});"
                 )
         if plan.registration:
             callbacks = [
@@ -715,14 +767,14 @@ class Values:
             lines.append(f"        if ({condition})")
             lines.append("        {")
             lines.append(
-                f"            native.@{plan.registration.user_data} = scope.Register(value with {{ }});"
+                f"            native.{member(plan.registration.user_data)} = scope.Register(value with {{ }});"
             )
             lines.append(
-                f"            native.@{plan.registration.release} = &NativeCallbackRoot.Release;"
+                f"            native.{member(plan.registration.release)} = &NativeCallbackRoot.Release;"
             )
             for field in callbacks:
                 lines.append(
-                    f"            native.@{field.name} = value.{pascal(field.name)} is null ? null : &Invoke{public_name(plan.native)}{pascal(field.name)};"
+                    f"            native.{member(field.name)} = value.{pascal(field.name)} is null ? null : &Invoke{public_name(plan.native)}{pascal(field.name)};"
                 )
             lines.append("        }")
         for name, fields in self.members(plan):
@@ -741,19 +793,22 @@ class Values:
             if presence and presence.mask:
                 if "." in presence.mask:
                     reset = (
-                        f" &= ~({self.mask_type(plan, presence.mask)}){self.constant(presence.bit)}"
+                        f" &= ~{self.bit(plan, presence.mask, presence.bit)}"
                         if presence.bit
                         else " = 0"
                     )
-                    lines.append(f"        native.@{presence.mask}{reset};")
+                    lines.append(f"        native.{member(presence.mask)}{reset};")
+                if put := self.put(plan, presence, fields, expression):
+                    lines.append(put)
+                    continue
                 local = f"field{name}"
                 lines.extend(
                     [
                         f"        if ({expression} is {{ }} {local})",
                         "        {",
-                        f"            native.@{presence.mask} |= ({self.mask_type(plan, presence.mask)}){self.constant(presence.bit)};"
+                        f"            native.{member(presence.mask)} |= {self.bit(plan, presence.mask, presence.bit)};"
                         if presence.bit
-                        else f"            native.@{presence.mask} = 1;",
+                        else f"            native.{member(presence.mask)} = 1;",
                     ]
                 )
                 expression = local
@@ -769,8 +824,8 @@ class Values:
                         lines.extend(
                             [
                                 f"{indent}    case {self.member_type(plan, name, fields)}.{pascal(variant.name)} selected:",
-                                f"{indent}        native.@{field.value.tag} = ({self.native_type(tag.value)}){self.constant(variant.presence.variant)};",
-                                f"{indent}        native.@{field.name}.@{variant.name} = {self.encode(variant.value, 'selected.Value')};",
+                                f"{indent}        native.{member(field.value.tag)} = ({self.native_type(tag.value)}){self.constant(variant.presence.variant)};",
+                                f"{indent}        native.{member(field.name)}.{member(variant.name)} = {self.encode(variant.value, 'selected.Value')};",
                                 f"{indent}        break;",
                             ]
                         )
@@ -796,29 +851,56 @@ class Values:
                     )
                     lines.append(f"{indent}var {local} = scope.{method}({source});")
                     lines.append(
-                        f"{indent}native.@{field.name} = ({self.raw_type(field.value)}){local}.data;"
+                        f"{indent}native.{member(field.name)} = ({self.raw_type(field.value)}){local}.data;"
                     )
                     lines.append(
-                        f"{indent}native.@{field.value.length} = checked(({self.native_type(count.value)}){local}.size);"
+                        f"{indent}native.{member(field.value.length)} = checked(({self.native_type(count.value)}){local}.size);"
                     )
                     continue
                 lines.append(
-                    f"{indent}native.@{field.name} = {self.encode(field.value, source)};"
+                    f"{indent}native.{member(field.name)} = {self.encode(field.value, source)};"
                 )
                 if field.value.kind == "array" and field.value.length:
                     count_field = next(
                         item for item in plan.fields if item.name == field.value.length
                     )
                     lines.append(
-                        f"{indent}native.@{field.value.length} = checked(({self.native_type(count_field.value)}){source}.Length);"
+                        f"{indent}native.{member(field.value.length)} = checked(({self.native_type(count_field.value)}){source}.Length);"
                     )
             if presence and presence.mask:
                 lines.append("        }")
         for flag in plan.mask_flags:
             lines.append(
-                f"        if (value.{self.flag_name(plan, flag.name)}) native.@{flag.mask} |= ({self.mask_type(plan, flag.mask)}){self.constant(flag.name)};"
+                f"        if (value.{self.flag_name(plan, flag.name)}) native.{member(flag.mask)} |= {self.bit(plan, flag.mask, flag.name)};"
             )
         return "\n".join([*lines, "        return native;", "    }", ""])
+
+    def put(self, plan: ValuePlan, presence, fields, expression: str) -> str | None:
+        """One line that stores a present member and marks its bit.
+
+        A member that spans several fields, a union, or a counted buffer keeps
+        its explicit branch.
+        """
+        if len(fields) != 1 or not presence.bit:
+            return None
+        field = fields[0]
+        value = field.value
+        if (
+            not self.mask_enum(plan, presence.mask)
+            or value.kind in {"union", "array", "callback"}
+            or (value.kind == "buffer" and value.ctype.pointee)
+        ):
+            return None
+        encoded = self.encode(value, "present")
+        arguments = [expression, f"ref native.{member(field.name)}", presence.bit]
+        if encoded != "present":
+            group = re.fullmatch(r"(\w+)\(present\)", encoded)
+            arguments.append(
+                group[1]
+                if group
+                else f"{'' if 'scope' in encoded else 'static '}present => {encoded}"
+            )
+        return f"        native.{member(presence.mask)} |= Put({', '.join(arguments)});"
 
     def callback_methods(self, plan: ValuePlan) -> str:
         if not plan.registration:
@@ -844,7 +926,7 @@ class Values:
             elif callback.reentry == "forbid":
                 restriction = "            using var restriction = NativeCallbackGuard.ForbidReentry();\n"
             args = ", ".join(
-                f"{self.raw_type(parameter.value)} @{parameter.name}"
+                f"{self.raw_type(parameter.value)} {member(parameter.name)}"
                 for parameter in callback.parameters
             )
             if callback.decision:
@@ -858,7 +940,7 @@ class Values:
                 converted = ", ".join(
                     "owned"
                     if parameter.name == decision.parameter
-                    else self.copy(parameter.value, "@" + parameter.name)
+                    else self.copy(parameter.value, member(parameter.name))
                     for parameter in callback.parameters
                     if parameter.name != callback.context
                 )
@@ -869,9 +951,9 @@ class Values:
                     "    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]\n"
                     f"    private static {raw} Invoke{public_name(plan.native)}{pascal(name)}({args})\n    {{\n"
                     f"        {owner}? owned = null;\n        try\n        {{\n"
-                    f"            owned = {owner}.BorrowDecision(@{decision.parameter});\n"
+                    f"            owned = {owner}.BorrowDecision({member(decision.parameter)});\n"
                     f"{restriction}"
-                    f"            var decision = (({public_name(plan.native)})NativeCallbackRoot.Value(@{callback.context})).{pascal(name)}?.Invoke({converted}) ?? ({self.public_type(callback.result)}){failure};\n"
+                    f"            var decision = (({public_name(plan.native)})NativeCallbackRoot.Value({member(callback.context)})).{pascal(name)}?.Invoke({converted}) ?? ({self.public_type(callback.result)}){failure};\n"
                     f"            return owned.FinishDecision(decision == ({self.public_type(callback.result)}){accept}) ? ({raw}){accept} : ({raw})decision;\n"
                     f"        }}\n        catch {{ try {{ return owned is not null && owned.FinishDecision(false) ? ({raw}){accept} : ({raw}){failure}; }} catch {{ return ({raw}){accept}; }} }}\n    }}\n"
                 )
@@ -886,18 +968,18 @@ class Values:
             converted = ", ".join(
                 "response" + pascal(parameter.name)
                 if parameter in responses
-                else self.copy(parameter.value, f"@{parameter.name}")
+                else self.copy(parameter.value, f"{member(parameter.name)}")
                 for parameter in callback.parameters
                 if parameter.name != callback.context
             )
             setup = "".join(
-                f"            var response{pascal(parameter.name)} = new {public_name(parameter.value.element.native)}(@{parameter.name});\n"
+                f"            var response{pascal(parameter.name)} = new {public_name(parameter.value.element.native)}({member(parameter.name)});\n"
                 for parameter in responses
             )
             cleanup = " ".join(
                 f"response{pascal(parameter.name)}.Expire();" for parameter in responses
             )
-            invoke = f"(({public_name(plan.native)})NativeCallbackRoot.Value(@{callback.context})).{pascal(name)}?.Invoke({converted});"
+            invoke = f"(({public_name(plan.native)})NativeCallbackRoot.Value({member(callback.context)})).{pascal(name)}?.Invoke({converted});"
             if responses:
                 invoke = f"try {{ {invoke} }} finally {{ {cleanup} }}"
             result_type = "void" if callback.result.native == "void" else "mln_status"
@@ -931,11 +1013,11 @@ class Values:
         callback = self.bound.callbacks[plan.native]
         self.supported(plan)
         parameters = ", ".join(
-            f"{self.raw_type(parameter.value)} @{parameter.name}"
+            f"{self.raw_type(parameter.value)} {member(parameter.name)}"
             for parameter in callback.parameters
         )
         arguments = ", ".join(
-            self.copy(parameter.value, "@" + parameter.name)
+            self.copy(parameter.value, member(parameter.name))
             for parameter in callback.parameters
             if parameter.name != callback.context
         )
@@ -945,9 +1027,7 @@ class Values:
             else "void"
         )
         delegate = self.public_type(plan).removesuffix("?")
-        call = (
-            f"(({delegate})NativeCallbackRoot.Value(@{callback.context}))({arguments})"
-        )
+        call = f"(({delegate})NativeCallbackRoot.Value({member(callback.context)}))({arguments})"
         failure = (
             ""
             if result == "void"
@@ -967,7 +1047,7 @@ class Values:
                 f"    private static readonly string[] {table} = [{operations}];\n"
             )
             guard = (
-                f"var owned = (NativeOwnedCallback)NativeCallbackRoot.Value(@{callback.context}); "
+                f"var owned = (NativeOwnedCallback)NativeCallbackRoot.Value({member(callback.context)}); "
                 f"using var restriction = NativeCallbackGuard.Restrict(owned.Owner, {table}); "
             )
             call = f"(({delegate})owned.Callback)({arguments})"
