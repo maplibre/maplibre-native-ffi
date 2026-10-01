@@ -27,12 +27,14 @@ struct Viewport: Equatable {
 }
 
 /// The runtime and map, driven by the native scheduler thread the runtime
-/// owns. Camera and resize calls submit commands without waiting for them.
+/// owns. Camera calls queue commands without waiting for them.
 @MainActor
 final class MapState {
   private let runtime: RuntimeHandle
   let map: MapHandle
   private var isClosed = false
+  /// The newest queued command, which awaits every command queued before it.
+  private var lastCommand: Task<Void, Never>?
   /// Reports a command that failed after native code accepted it.
   var onFailure: (@MainActor (Error) -> Void)?
 
@@ -85,6 +87,7 @@ final class MapState {
   func close() async throws {
     guard !isClosed else { return }
     isClosed = true
+    await lastCommand?.value
     // Awaiting both release completions lets native teardown finish before the
     // app tears down state that the callbacks use.
     try await map.close()
@@ -103,27 +106,19 @@ final class MapState {
     }
   }
 
-  func resize(_ viewport: Viewport) {
-    submit { _ = try await $0.resize(extent: LogicalExtent(
-      width: viewport.logicalWidth,
-      height: viewport.logicalHeight,
-      scaleFactor: viewport.scaleFactor
-    )) }
-  }
-
   func setGestureInProgress(_ inProgress: Bool) {
-    submit { _ = try await $0.updateCamera(update: CameraUpdate(
+    submit { [map] in _ = try await map.updateCamera(update: CameraUpdate(
       camera: CameraOptions(),
       gesturePhase: inProgress ? .begin : .end
     )) }
   }
 
   func cancelTransitions() {
-    submit { _ = try await $0.cancelTransitions() }
+    submit { [map] in _ = try await map.cancelTransitions() }
   }
 
   func moveBy(dx: Double, dy: Double, animation: AnimationOptions? = nil) {
-    submit { _ = try await $0.applyCameraDelta(delta: CameraDelta(
+    submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
       offset: ScreenPoint(x: dx, y: dy),
       animation: animation ?? AnimationOptions()
     )) }
@@ -134,7 +129,7 @@ final class MapState {
     anchor: ScreenPoint,
     animation: AnimationOptions? = nil
   ) {
-    submit { _ = try await $0.applyCameraDelta(delta: CameraDelta(
+    submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
       kind: .scale,
       amount: scale,
       anchor: anchor,
@@ -143,7 +138,7 @@ final class MapState {
   }
 
   func adjustBearing(delta: Double, animation: AnimationOptions? = nil) {
-    submit { _ = try await $0.applyCameraDelta(delta: CameraDelta(
+    submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
       kind: .bearing,
       amount: delta,
       animation: animation ?? AnimationOptions()
@@ -151,7 +146,7 @@ final class MapState {
   }
 
   func adjustPitch(delta: Double, animation: AnimationOptions? = nil) {
-    submit { _ = try await $0.applyCameraDelta(delta: CameraDelta(
+    submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
       kind: .pitch,
       amount: delta,
       animation: animation ?? AnimationOptions()
@@ -159,23 +154,26 @@ final class MapState {
   }
 
   func resetOrientation(animation: AnimationOptions) {
-    submit { _ = try await $0.updateCamera(update: CameraUpdate(
+    submit { [map] in _ = try await map.updateCamera(update: CameraUpdate(
       mode: .ease,
       camera: CameraOptions(bearing: 0, pitch: 0),
       animation: animation
     )) }
   }
 
-  /// Submits one command. The command reaches native code when its task
-  /// starts, before the task first suspends, and tasks that the main actor
-  /// creates for itself start in creation order, so commands keep input order.
-  private func submit(
-    _ command: @escaping @MainActor @Sendable (MapHandle) async throws -> Void
+  /// Queues one command behind every command queued before it. A generated
+  /// call leaves the main actor before it reaches native code, so tasks that
+  /// start in order can still submit out of order; awaiting the previous
+  /// command keeps a gesture's begin, deltas, and end, and successive resizes,
+  /// in input order.
+  func submit(
+    _ command: @escaping @MainActor @Sendable () async throws -> Void
   ) {
     guard !isClosed else { return }
-    let map = map
-    Task { @MainActor [weak self] in
-      do { try await command(map) }
+    let previous = lastCommand
+    lastCommand = Task { @MainActor [weak self] in
+      await previous?.value
+      do { try await command() }
       catch { self?.onFailure?(error) }
     }
   }

@@ -15,6 +15,9 @@ final class RenderLoop {
   private let graphics: MetalGraphicsContext
   private let target: MetalRenderTarget
   private var isClosed = false
+  /// Counts resizes, so a queued resize that a newer one supersedes is
+  /// skipped.
+  private var resizeCount = 0
   /// Runs after each frame that reached the layer.
   var onPresented: (@MainActor () -> Void)?
   /// Runs when the loop can no longer render.
@@ -64,6 +67,7 @@ final class RenderLoop {
       target: target
     )
     mapState.onFailure = { [weak loop] in loop?.fail($0) }
+    target.onFailure = { [weak loop] in loop?.fail($0) }
     relay.loop = loop
     // Wakes that arrived before the relay knew the loop found nothing to
     // forward to, so drain and demand once now.
@@ -73,18 +77,19 @@ final class RenderLoop {
     return loop
   }
 
-  /// Follows a new viewport. A live session carries the extent to the map.
+  /// Follows a new viewport. The resize queues behind the map's commands, and
+  /// a live session carries the extent to the map.
   func resize(_ viewport: Viewport) {
     guard !isClosed else { return }
-    do {
-      try target.resize(
-        graphics: graphics,
+    resizeCount += 1
+    let count = resizeCount
+    mapState.submit { [weak self] in
+      guard let self, count == self.resizeCount else { return }
+      try await self.target.resize(
+        graphics: self.graphics,
         viewport: viewport,
-        mapState: mapState,
-        onFailure: { [weak self] in self?.fail($0) }
+        map: self.mapState.map
       )
-    } catch {
-      fail(error)
     }
   }
 
@@ -94,7 +99,12 @@ final class RenderLoop {
     guard !isClosed else { return }
     isClosed = true
     defer { onPresented = nil }
-    try await target.close()
+    do {
+      try await target.close()
+    } catch {
+      try? await mapState.close()
+      throw error
+    }
     try await mapState.close()
   }
 

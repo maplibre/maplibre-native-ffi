@@ -63,6 +63,13 @@ final class MetalRenderTarget {
     self.driverRelay = driverRelay
   }
 
+  /// Receives a failure to service driver work. The session is abandoned by
+  /// then, so it renders nothing more.
+  var onFailure: (@MainActor (Error) -> Void)? {
+    get { driverRelay.onFailure }
+    set { driverRelay.onFailure = newValue }
+  }
+
   /// Attaches a session against the map. `frameWake` reports frame results.
   static func attach(
     map: MapHandle,
@@ -86,28 +93,21 @@ final class MetalRenderTarget {
     let session = attachment.session
     do {
       driverRelay.session = session
-      _ = try session.serviceDriverWork(maxWork: 0)
+      driverRelay.service()
       try await attachment.completion.value
       return MetalRenderTarget(session: session, driverRelay: driverRelay)
     } catch {
       _ = try? session.abandon()
       try? session.close()
-      throw error
+      // A service failure abandons the session, which fails the attachment.
+      throw driverRelay.failure ?? error
     }
   }
 
-  /// Starts the session resize, reporting an asynchronous failure through
-  /// `onFailure`. A later resize supersedes an earlier one that has not
-  /// applied yet.
-  func resize(
-    _ viewport: Viewport,
-    onFailure: @escaping @MainActor (Error) -> Void
-  ) {
-    let session = session
-    Task { @MainActor in
-      do { try await session.resize(extent: viewport.extent) }
-      catch { onFailure(error) }
-    }
+  /// Carries a new viewport to the session, which carries the extent to the
+  /// map.
+  func resize(_ viewport: Viewport) async throws {
+    try await session.resize(extent: viewport.extent)
   }
 
   /// Demands a presented frame. A forced demand renders even without a newer
@@ -168,12 +168,27 @@ private func metalError(_ message: String) -> MaplibreError {
   MaplibreError(kind: .nativeError, rawStatus: nil, diagnostic: message)
 }
 
+/// Services caller-driver work on the main actor when the driver wakes. A
+/// session that cannot be serviced is abandoned, which completes its pending
+/// work with target loss, and the failure is reported.
 @MainActor
 private final class DriverRelay {
   weak var session: RenderSessionHandle?
+  var onFailure: (@MainActor (Error) -> Void)?
+  private(set) var failure: Error?
+
   var wake: Wake {
-    Wake(callback: { [self] in Task { @MainActor in
-      _ = try? session?.serviceDriverWork(maxWork: 0)
-    } })
+    Wake(callback: { [self] in Task { @MainActor in service() } })
+  }
+
+  func service() {
+    guard failure == nil, let session else { return }
+    do {
+      _ = try session.serviceDriverWork(maxWork: 0)
+    } catch {
+      failure = error
+      _ = try? session.abandon()
+      onFailure?(error)
+    }
   }
 }

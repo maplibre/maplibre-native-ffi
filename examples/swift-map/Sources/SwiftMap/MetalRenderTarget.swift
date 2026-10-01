@@ -64,12 +64,14 @@ final class MetalRenderTarget {
   let session: RenderSessionHandle
   private let kind: Kind
   private let driverRelay: DriverRelay
-  /// The caller-owned texture the session renders into as far as completed
-  /// replacements show.
+  /// The caller-owned texture the compositor samples.
   private var borrowedTexture: MetalBorrowedTexture?
-  private var replacementCount = 0
-  private var shownReplacement = 0
+  /// A completed replacement, which the compositor samples once the frame
+  /// demanded with `token` has rendered into it.
+  private var replacement: (texture: MetalBorrowedTexture, token: UInt64)?
   private var nextToken: UInt64 = 0
+  /// The newest demand token with a rendered result.
+  private var renderedToken: UInt64 = 0
 
   private init(
     session: RenderSessionHandle,
@@ -81,6 +83,13 @@ final class MetalRenderTarget {
     self.kind = kind
     self.driverRelay = driverRelay
     self.borrowedTexture = borrowedTexture
+  }
+
+  /// Receives a failure to service driver work. The session is abandoned by
+  /// then, so it renders nothing more.
+  var onFailure: (@MainActor (Error) -> Void)? {
+    get { driverRelay.onFailure }
+    set { driverRelay.onFailure = newValue }
   }
 
   /// Attaches a session against the map. `frameWake` reports frame results.
@@ -157,9 +166,10 @@ final class MetalRenderTarget {
     }
   }
 
-  /// Demands a frame. A forced demand renders even without a newer map
-  /// update, which a retry after an undrawn frame needs.
-  func requestFrame(force: Bool = false) throws {
+  /// Demands a frame and returns its token. A forced demand renders even
+  /// without a newer map update, which a retry after an undrawn frame needs.
+  @discardableResult
+  func requestFrame(force: Bool = false) throws -> UInt64 {
     nextToken += 1
     var flags: FrameDemandFlag = force ? [] : [.ifNeeded]
     if case .nativeSurface = kind {
@@ -169,6 +179,7 @@ final class MetalRenderTarget {
       flags: flags,
       token: nextToken
     ))
+    return nextToken
   }
 
   /// Drains every queued frame result.
@@ -186,6 +197,7 @@ final class MetalRenderTarget {
       if result.disposition == .rendered {
         results.rendered = true
         results.needsRepaint = result.needsRepaint
+        renderedToken = max(renderedToken, result.token)
       } else if result.disposition == .targetNotReady {
         results.targetNotReady = true
       }
@@ -203,6 +215,10 @@ final class MetalRenderTarget {
       defer { try? frame.release(consumerCompletion: .default) }
       return try compositor.draw(frame: frame)
     case let .borrowedTexture(compositor):
+      if let replacement, renderedToken >= replacement.token {
+        borrowedTexture = replacement.texture
+        self.replacement = nil
+      }
       return try compositor.draw(texture: borrowedTexture!.texture)
     case .nativeSurface:
       // The driver already presented the frame.
@@ -210,47 +226,35 @@ final class MetalRenderTarget {
     }
   }
 
-  /// Starts the session resize or target replacement a new viewport needs,
-  /// reporting an asynchronous failure through `onFailure`. A later resize
-  /// supersedes an earlier one that has not applied yet.
+  /// Carries a new viewport to the session. A borrowed texture is replaced
+  /// instead, which changes only the graphics resource, so the extent goes to
+  /// `map` directly.
   func resize(
     graphics: MetalGraphicsContext,
     viewport: Viewport,
-    mapState: MapState,
-    onFailure: @escaping @MainActor (Error) -> Void
-  ) throws {
+    map: MapHandle
+  ) async throws {
     guard case .borrowedTexture = kind else {
-      let session = session
-      Task { @MainActor in
-        do { try await session.resize(extent: viewport.extent) }
-        catch { onFailure(error) }
-      }
+      try await session.resize(extent: viewport.extent)
       return
     }
     // The session renders into the outgoing texture until the replacement
-    // completes, and this task keeps the replacement alive until then.
-    let replacement = try MetalBorrowedTexture(
+    // completes, and this call keeps the replacement alive until then.
+    let texture = try MetalBorrowedTexture(
       graphics: graphics,
       viewport: viewport
     )
-    replacementCount += 1
-    let count = replacementCount
-    let session = session
-    Task { @MainActor [weak self] in
-      do {
-        try await session.metalBorrowedTextureSetTarget(
-          descriptor: replacement.descriptor(viewport)
-        )
-        guard let self, count > self.shownReplacement else { return }
-        self.shownReplacement = count
-        self.borrowedTexture = replacement
-      } catch {
-        onFailure(error)
-      }
-    }
-    // A handover replaces only the graphics resource, so the map still needs
-    // the new extent.
-    mapState.resize(viewport)
+    try await session.metalBorrowedTextureSetTarget(
+      descriptor: texture.descriptor(viewport)
+    )
+    // Nothing has rendered into the replacement yet, so the compositor keeps
+    // sampling the outgoing texture until this demand's frame renders.
+    replacement = try (texture, requestFrame(force: true))
+    try await map.resize(extent: LogicalExtent(
+      width: viewport.logicalWidth,
+      height: viewport.logicalHeight,
+      scaleFactor: viewport.scaleFactor
+    ))
   }
 
   func close() async throws {
@@ -297,13 +301,14 @@ final class MetalRenderTarget {
     let session = attachment.session
     do {
       relay.session = session
-      _ = try session.serviceDriverWork(maxWork: 0)
+      relay.service()
       try await attachment.completion.value
       return session
     } catch {
       _ = try? session.abandon()
       try? session.close()
-      throw error
+      // A service failure abandons the session, which fails the attachment.
+      throw relay.failure ?? error
     }
   }
 }
@@ -512,12 +517,27 @@ fragment float4 fragment_main(
 }
 """
 
+/// Services caller-driver work on the main actor when the driver wakes. A
+/// session that cannot be serviced is abandoned, which completes its pending
+/// work with target loss, and the failure is reported.
 @MainActor
 private final class DriverRelay {
   weak var session: RenderSessionHandle?
+  var onFailure: (@MainActor (Error) -> Void)?
+  private(set) var failure: Error?
+
   var wake: Wake {
-    Wake(callback: { [self] in Task { @MainActor in
-      _ = try? session?.serviceDriverWork(maxWork: 0)
-    } })
+    Wake(callback: { [self] in Task { @MainActor in service() } })
+  }
+
+  func service() {
+    guard failure == nil, let session else { return }
+    do {
+      _ = try session.serviceDriverWork(maxWork: 0)
+    } catch {
+      failure = error
+      _ = try? session.abandon()
+      onFailure?(error)
+    }
   }
 }
