@@ -6,8 +6,8 @@ private let resetAnimationDurationMS = 220.0
 private let preciseScrollDeltaDivisor = 10.0
 private let maxScrollDeltaPerEvent = 4.0
 
-/// Decodes host input into camera updates on the render loop, converting to
-/// logical map coordinates. Every handler returns whether the camera changed.
+/// Decodes host input into camera commands in logical map coordinates. The map
+/// reports the resulting render update, which drives the next frame demand.
 @MainActor
 final class InputController {
   enum DragMode {
@@ -26,8 +26,8 @@ final class InputController {
   private var dragButton = DragButton.none
   private var lastLocation = CGPoint.zero
 
-  func mouseDown(_ event: NSEvent, mapState: MapState) async throws -> Bool {
-    try await beginDrag(
+  func mouseDown(_ event: NSEvent, mapState: MapState) {
+    beginDrag(
       .left,
       mode: event.modifierFlags.contains(.control) ? .rotate : .pan,
       at: event.locationInWindow,
@@ -36,9 +36,9 @@ final class InputController {
   }
 
   func rightMouseDown(_ event: NSEvent,
-                      mapState: MapState) async throws -> Bool
+                      mapState: MapState)
   {
-    try await beginDrag(
+    beginDrag(
       .right,
       mode: .rotate,
       at: event.locationInWindow,
@@ -46,12 +46,12 @@ final class InputController {
     )
   }
 
-  func mouseUp(_ event: NSEvent, mapState: MapState) async throws -> Bool {
-    try await endDrag(.left, at: event.locationInWindow, mapState: mapState)
+  func mouseUp(_ event: NSEvent, mapState: MapState) {
+    endDrag(.left, at: event.locationInWindow, mapState: mapState)
   }
 
-  func rightMouseUp(_ event: NSEvent, mapState: MapState) async throws -> Bool {
-    try await endDrag(.right, at: event.locationInWindow, mapState: mapState)
+  func rightMouseUp(_ event: NSEvent, mapState: MapState) {
+    endDrag(.right, at: event.locationInWindow, mapState: mapState)
   }
 
   private func beginDrag(
@@ -59,16 +59,15 @@ final class InputController {
     mode: DragMode,
     at location: CGPoint,
     mapState: MapState
-  ) async throws -> Bool {
+  ) {
     // A second button pressed during a live drag joins it, leaving the drag
     // baseline alone.
-    guard dragMode == .none else { return false }
+    guard dragMode == .none else { return }
     lastLocation = location
     dragMode = mode
     dragButton = button
-    try await mapState.cancelTransitions()
-    try await mapState.setGestureInProgress(true)
-    return true
+    mapState.cancelTransitions()
+    mapState.setGestureInProgress(true)
   }
 
   /// Ends the drag only for the button that started it, so the gesture bracket
@@ -77,16 +76,15 @@ final class InputController {
     _ button: DragButton,
     at location: CGPoint,
     mapState: MapState
-  ) async throws -> Bool {
-    guard dragButton == button else { return false }
+  ) {
+    guard dragButton == button else { return }
     lastLocation = location
     dragMode = .none
     dragButton = .none
-    try await mapState.setGestureInProgress(false)
-    return true
+    mapState.setGestureInProgress(false)
   }
 
-  func mouseDragged(_ event: NSEvent, mapState: MapState) async throws -> Bool {
+  func mouseDragged(_ event: NSEvent, mapState: MapState) {
     let location = event.locationInWindow
     let dx = Double(location.x - lastLocation.x)
     let dy = Double(lastLocation.y - location.y)
@@ -94,25 +92,24 @@ final class InputController {
 
     switch dragMode {
     case .none:
-      return false
+      return
     case .pan:
-      if dx == 0 && dy == 0 { return false }
-      try await mapState.moveBy(dx: dx, dy: dy)
+      if dx == 0, dy == 0 { return }
+      mapState.moveBy(dx: dx, dy: dy)
     case .rotate:
-      if dx == 0 && dy == 0 { return false }
-      try await mapState.adjustBearing(delta: dx * 0.5)
-      try await mapState.adjustPitch(delta: dy * 0.5)
+      if dx == 0, dy == 0 { return }
+      mapState.adjustBearing(delta: dx * 0.5)
+      mapState.adjustPitch(delta: dy * 0.5)
     }
-    return true
   }
 
   func scrollWheel(
     _ event: NSEvent,
     in view: NSView,
     mapState: MapState
-  ) async throws -> Bool {
+  ) {
     let delta = scrollDelta(event)
-    if delta == 0 { return false }
+    if delta == 0 { return }
 
     let location = view.convert(event.locationInWindow, from: nil)
     let anchor = ScreenPoint(
@@ -120,15 +117,14 @@ final class InputController {
       y: Double(view.bounds.height - location.y)
     )
     let scale = pow(2.0, delta * 0.25)
-    try await mapState.scaleBy(scale, anchor: anchor)
-    return true
+    mapState.scaleBy(scale, anchor: anchor)
   }
 
   func keyDown(
     _ event: NSEvent,
     viewport: Viewport,
     mapState: MapState
-  ) async throws -> Bool {
+  ) {
     let panStep = 120.0
     let zoomStep = 1.25
     let bearingStep = 10.0
@@ -142,55 +138,54 @@ final class InputController {
 
     switch event.keyCode {
     case 123, 0:
-      try await mapState.moveBy(dx: panStep, dy: 0, animation: animation)
+      mapState.moveBy(dx: panStep, dy: 0, animation: animation)
     case 124, 2:
-      try await mapState.moveBy(dx: -panStep, dy: 0, animation: animation)
+      mapState.moveBy(dx: -panStep, dy: 0, animation: animation)
     case 126, 13:
-      try await mapState.moveBy(dx: 0, dy: panStep, animation: animation)
+      mapState.moveBy(dx: 0, dy: panStep, animation: animation)
     case 125, 1:
-      try await mapState.moveBy(dx: 0, dy: -panStep, animation: animation)
+      mapState.moveBy(dx: 0, dy: -panStep, animation: animation)
     case 24, 69:
-      try await mapState.scaleBy(
+      mapState.scaleBy(
         zoomStep,
         anchor: center,
         animation: animation
       )
     case 27, 78:
-      try await mapState.scaleBy(
+      mapState.scaleBy(
         1.0 / zoomStep,
         anchor: center,
         animation: animation
       )
     case 12:
-      try await mapState.adjustBearing(
+      mapState.adjustBearing(
         delta: -bearingStep,
         animation: animation
       )
     case 14:
-      try await mapState.adjustBearing(
+      mapState.adjustBearing(
         delta: bearingStep,
         animation: animation
       )
     case 30:
-      try await mapState.adjustPitch(
+      mapState.adjustPitch(
         delta: pitchStep,
         animation: animation
       )
     case 33:
-      try await mapState.adjustPitch(
+      mapState.adjustPitch(
         delta: -pitchStep,
         animation: animation
       )
     case 29:
-      try await mapState.resetOrientation(
+      mapState.resetOrientation(
         animation: AnimationOptions(
           durationMs: resetAnimationDurationMS
         )
       )
     default:
-      return false
+      break
     }
-    return true
   }
 
   private func scrollDelta(_ event: NSEvent) -> Double {

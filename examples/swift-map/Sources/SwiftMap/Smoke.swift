@@ -8,9 +8,9 @@ private let smokeStyleJSON = Data(##"""
 "paint":{"background-color":"#2a6f97"}}]}
 """##.utf8)
 
-/// Renders frames headless through the same render target the window uses,
-/// with a Metal layer that no window shows, until one frame reaches the layer,
-/// then shuts down. Returns the process exit status.
+/// Renders through the same render loop the window uses, with a Metal layer
+/// that no window shows, until one frame reaches the layer, then shuts down.
+/// Returns the process exit status.
 @MainActor
 func runSmoke(mode: RenderTargetMode) async -> Int32 {
   let viewport = Viewport(
@@ -24,33 +24,14 @@ func runSmoke(mode: RenderTargetMode) async -> Int32 {
   do {
     let graphics = try MetalGraphicsContext(layer: CAMetalLayer())
     graphics.resize(viewport)
-    let state = try await MapState(
+    let loop = try await RenderLoop.start(
+      mode: mode,
+      graphics: graphics,
       viewport: viewport,
       styleJSON: smokeStyleJSON
     )
-    let target: MetalRenderTarget
-    do {
-      target = try await MetalRenderTarget.attach(
-        mode: mode,
-        map: state.mapHandle,
-        graphics: graphics,
-        viewport: viewport
-      )
-    } catch {
-      try? await state.close()
-      throw error
-    }
-    let deadline = Date().addingTimeInterval(60)
-    var rendered = false
-    while !rendered, Date() < deadline {
-      rendered = try await target.renderFrame()
-      if !rendered {
-        // The window's loop runs at the display rate, and so does this one.
-        try await Task.sleep(for: .milliseconds(16))
-      }
-    }
-    try await target.close()
-    try await state.close()
+    let rendered = await firstFrame(of: loop, within: .seconds(60))
+    try await loop.close()
     guard rendered else {
       print("smoke: no \(mode.rawValue) frame rendered before the deadline")
       return 1
@@ -60,5 +41,41 @@ func runSmoke(mode: RenderTargetMode) async -> Int32 {
   } catch {
     print("smoke: \(mode.rawValue) failed: \(error)")
     return 1
+  }
+}
+
+/// Waits for the loop's first presented frame, reporting false on failure or
+/// when `timeout` passes first.
+@MainActor
+private func firstFrame(
+  of loop: RenderLoop,
+  within timeout: Duration
+) async -> Bool {
+  await withCheckedContinuation { continuation in
+    let outcome = SmokeOutcome(continuation)
+    loop.onPresented = { outcome.finish(true) }
+    loop.onFailure = {
+      print("smoke: render loop failed: \($0)")
+      outcome.finish(false)
+    }
+    Task { @MainActor in
+      try? await Task.sleep(for: timeout)
+      outcome.finish(false)
+    }
+  }
+}
+
+/// Resumes the smoke wait once, with whichever outcome arrives first.
+@MainActor
+private final class SmokeOutcome {
+  private var continuation: CheckedContinuation<Bool, Never>?
+
+  init(_ continuation: CheckedContinuation<Bool, Never>) {
+    self.continuation = continuation
+  }
+
+  func finish(_ rendered: Bool) {
+    continuation?.resume(returning: rendered)
+    continuation = nil
   }
 }
