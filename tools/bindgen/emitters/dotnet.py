@@ -7,7 +7,6 @@ result copies. Unsupported declarations carry an explicit diagnostic.
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from collections import defaultdict
@@ -19,6 +18,7 @@ from tools.bindgen.model import Api, Function
 from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.semantic import BoundApi, OperationPlan
 
+from . import dotnet_native
 from .dotnet_values import Unsupported, Values
 
 
@@ -996,21 +996,7 @@ def emit(api: Api | BoundApi) -> Emission:
         records[owner].update(used_records)
         supported.append(function.name)
     files = {}
-    files["Internal/C/Handles.g.cs"] = (
-        "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-        "namespace Maplibre.NativeFfi.Internal.C;\n\n"
-        "internal interface IMlnHandle { ulong Value { get; } }\n\n"
-        + "\n".join(
-            f"internal readonly struct {raw_handle(native)}(ulong value) : IMlnHandle\n{{\n    public ulong Value {{ get; }} = value;\n    public bool IsNull => Value == 0;\n}}\n"
-            for native in sorted(bound.handles)
-        )
-    )
-    files["Internal/C/handle-remaps.json"] = (
-        json.dumps(
-            {native: raw_handle(native) for native in sorted(bound.handles)}, indent=2
-        )
-        + "\n"
-    )
+    files.update(dotnet_native.generate(bound))
     created_handles = {
         handle.native
         for plan in bound.operations

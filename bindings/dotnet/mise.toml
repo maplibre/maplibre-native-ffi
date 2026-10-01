@@ -12,13 +12,9 @@ sources = [
 # from one `&&` line that `sh` and `cmd` each understand.
 run = "dotnet tool restore --tool-manifest .config/dotnet-tools.json --verbosity quiet && dotnet tool restore --tool-manifest bindings/dotnet/.config/dotnet-tools.json --verbosity quiet"
 
-[tasks.generate]
-run = "python scripts/generate-clangsharp.py"
-
 [tasks.api]
 description = "Generate DocFX HTML API reference for the .NET binding."
-# DocFX lives in a separate tool manifest from ClangSharp: restoring both in one
-# manifest hits a .NET SDK bug that reports DocFX's commands as ClangSharp's.
+# DocFX has its own tool manifest, so only this task restores it.
 run = '''
 rm -rf build/docfx build/docfx-api
 mkdir -p build

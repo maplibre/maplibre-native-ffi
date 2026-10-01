@@ -105,7 +105,7 @@ public sealed unsafe class NativeHandleStateTests
 
         internal mln_status Destroy(MlnRuntime handle, mln_diagnostic* diagnostic)
         {
-            Assert.False(handle.IsNull);
+            Assert.NotEqual(0UL, handle.Value);
             Interlocked.Increment(ref count);
             started.Set();
             Assert.True(allowed.Wait(TestWaits.Deadline));
