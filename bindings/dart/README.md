@@ -90,6 +90,13 @@ child maps, render sessions, frames, snapshots, request handles, and offline
 operations before their parent runtime. Scoped backend values remain valid only
 until their frame or owner is closed.
 
+Close every handle explicitly. When the collector reclaims a handle that is
+still open, a native finalizer disposes it, and the binding writes
+`Leaked <type> native handle 0x<id>; close it explicitly.` to standard error.
+That warning comes from a Dart finalizer, which runs from the event loop after
+the collection, and it is skipped for handles that the isolate's shutdown
+disposes.
+
 Projection handles are created asynchronously and are synchronous after that:
 every projection call, `close()` included, runs on the calling isolate's thread,
 may be made from any isolate, and never observes map changes made after creation

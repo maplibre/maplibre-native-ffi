@@ -1,7 +1,8 @@
-// What the garbage collector may reclaim, and what a native finalizer does
-// with an owner it reclaims.
+// What the garbage collector may reclaim, and what the binding does with an
+// owner it reclaims.
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:io';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
@@ -88,17 +89,43 @@ bool _runtimeIsLive(int runtime) => withNativeArena((arena) {
   return status == 0;
 });
 
+/// Collects what the binding writes to standard error.
+final class _CapturedStderr implements Stdout {
+  final lines = <String>[];
+
+  @override
+  void writeln([Object? object = '']) => lines.add('$object');
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+final class _StderrOverrides extends IOOverrides {
+  _StderrOverrides(this._stderr);
+  final Stdout _stderr;
+
+  @override
+  Stdout get stderr => _stderr;
+}
+
 void main() {
   test(
-    'an abandoned runtime is disposed when the collector reclaims it',
+    'an abandoned runtime is disposed and reported when collected',
     () async {
+      final errors = _CapturedStderr();
+      IOOverrides.global = _StderrOverrides(errors);
+      addTearDown(() => IOOverrides.global = null);
       final (identity, runtime) = _abandonedRuntime();
+      final leak =
+          'Leaked RuntimeHandle native handle 0x${identity.toRadixString(16)}; '
+          'close it explicitly.';
 
       // The collection runs the owner's native finalizer, which disposes the
-      // runtime without any Dart code on the stack.
+      // runtime without any Dart code on the stack. The binding's Dart
+      // finalizer reports the leak afterwards, from the event loop.
       await collectGarbageUntil(
-        () => runtime.target == null,
-        'the abandoned runtime',
+        () => runtime.target == null && errors.lines.contains(leak),
+        'the abandoned runtime and its leak report',
       );
       expect(_runtimeIsLive(identity), isFalse);
     },

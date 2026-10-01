@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:io';
 
 import '../c/maplibre_native_c.dart';
 import '../c/maplibre_native_c.g.dart' as raw;
@@ -10,6 +11,20 @@ import 'native_handles.dart';
 final NativeFinalizer _ownerFinalizer = NativeFinalizer(
   Native.addressOf<NativeFinalizerFunction>(raw.mln_adapter_owner_finalize),
 );
+
+/// Reports an owner the collector reclaimed while it was still open.
+///
+/// The native finalizer disposes the handle; this only warns, on standard
+/// error, that the program leaked it. A Dart finalizer runs after the
+/// collection, from the isolate's event loop, and not at all once the isolate
+/// shuts down, so the warning is a best-effort report.
+final Finalizer<String> _leakReporter = Finalizer((message) {
+  try {
+    stderr.writeln(message);
+  } catch (_) {
+    // A report has nowhere to go once standard error fails.
+  }
+});
 
 const _createOwnerToken = raw.mln_adapter_owner_token_create;
 
@@ -91,6 +106,12 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
     try {
       _ownerFinalizer.attach(this, token, detach: _finalizerDetachToken);
       _ownerToken = token;
+      _leakReporter.attach(
+        this,
+        'Leaked $typeName native handle 0x${handle.raw.toRadixString(16)}; '
+        'close it explicitly.',
+        detach: _finalizerDetachToken,
+      );
     } catch (_) {
       _destroyOwnerToken(token);
       rethrow;
@@ -103,6 +124,7 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
       return;
     }
     _ownerFinalizer.detach(_finalizerDetachToken);
+    _leakReporter.detach(_finalizerDetachToken);
     _destroyOwnerToken(token);
     _ownerToken = null;
   }
