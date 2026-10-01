@@ -36,9 +36,10 @@ internal open class RenderTarget(protected val session: RenderSessionHandle) : A
   }
 
   /**
-   * Drains every frame result and presents each rendered frame. A result that asks for another
-   * frame, as during a paint transition, requests it, and a frame that missed the window renders
-   * again. Reports whether a frame reached the window.
+   * Drains every frame result and presents each rendered frame, reporting whether one reached the
+   * window. A result that asks for another frame, as during a paint transition, requests it. A
+   * target that was not ready, or a frame that missed the window, consumed its map update, so a
+   * paced retry forces the next frame.
    */
   fun drainFrameResults(): Boolean {
     val batch =
@@ -54,13 +55,32 @@ internal open class RenderTarget(protected val session: RenderSessionHandle) : A
     batch.use { results ->
       for (index in 0uL until results.count()) {
         val result = results.get(index)
-        if (result.disposition != RenderResult.RENDERED) continue
-        if (present()) presented = true else missed = true
+        when (result.disposition) {
+          RenderResult.RENDERED -> if (present()) presented = true else missed = true
+          RenderResult.TARGET_NOT_READY -> missed = true
+          else -> continue
+        }
         needsRepaint = needsRepaint || result.needsRepaint
       }
     }
-    if (missed) requestFrame(force = true) else if (needsRepaint) requestFrame()
+    if (missed) {
+      retryAtNanos = System.nanoTime() + RETRY_DELAY_NANOS
+    } else if (needsRepaint) {
+      requestFrame()
+    }
     return presented
+  }
+
+  /** When a paced retry is due, as a [System.nanoTime] value, or null with none pending. */
+  var retryAtNanos: Long? = null
+    private set
+
+  /** Forces the pending paced retry once it is due. */
+  fun retryIfDue() {
+    val due = retryAtNanos ?: return
+    if (System.nanoTime() < due) return
+    retryAtNanos = null
+    requestFrame(force = true)
   }
 
   /**
@@ -117,6 +137,9 @@ internal open class RenderTarget(protected val session: RenderSessionHandle) : A
   companion object {
     /** A session-owned texture ring deep enough to keep compositing while the map renders. */
     const val OWNED_TEXTURE_RING_DEPTH = 2u
+
+    /** How long a frame that did not reach the window waits to retry, about one refresh. */
+    const val RETRY_DELAY_NANOS = 16_000_000L
 
     /** Attaches a render session for the active graphics API and mode, on the GLFW thread. */
     fun attach(

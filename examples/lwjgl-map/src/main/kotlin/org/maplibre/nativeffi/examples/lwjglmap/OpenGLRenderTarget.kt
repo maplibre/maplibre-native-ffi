@@ -146,12 +146,13 @@ internal object OpenGLRenderTarget {
     }
 
     override fun present(): Boolean {
-      // An empty ring keeps the previously composited frame on screen.
+      // An empty ring leaves the previously composited frame on screen, and nothing new reaches
+      // the window.
       val frameHandle =
         try {
           session.acquireFrame()
         } catch (error: MaplibreException) {
-          if (error.status == MaplibreStatus.NOT_READY) return true
+          if (error.status == MaplibreStatus.NOT_READY) return false
           throw error
         }
       try {

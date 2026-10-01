@@ -65,16 +65,9 @@ internal object Shell {
     smoke: Boolean,
   ) {
     val smokeDeadline = System.nanoTime() + SMOKE_TIMEOUT_NANOS
-    // The session attached after the map took its style and camera, so it starts with one frame.
-    target.requestFrame()
+    // Attaching asked the map for a frame, and its wakes may have arrived while the attachment
+    // waited, so the loop handles pending work before its first wait.
     while (!glfwWindowShouldClose(graphics.window())) {
-      if (smoke) {
-        val remaining = smokeDeadline - System.nanoTime()
-        check(remaining > 0) { "smoke: no frame reached the window" }
-        glfwWaitEventsTimeout(remaining / 1e9)
-      } else {
-        glfwWaitEvents()
-      }
       val presented =
         withAutoreleasePool(target) {
           if (viewport.consumeChanged()) {
@@ -88,11 +81,19 @@ internal object Shell {
             target.requestFrame()
           }
           if (wakes.driverWork.consume()) target.serviceDriverWork()
+          target.retryIfDue()
           wakes.frames.consume() && target.drainFrameResults()
         }
       if (smoke && presented) {
         println("smoke: rendered a frame")
         return
+      }
+      check(!smoke || System.nanoTime() < smokeDeadline) { "smoke: no frame reached the window" }
+      val wakeAt = listOfNotNull(target.retryAtNanos, smokeDeadline.takeIf { smoke }).minOrNull()
+      if (wakeAt == null) {
+        glfwWaitEvents()
+      } else {
+        glfwWaitEventsTimeout(maxOf(wakeAt - System.nanoTime(), 0L) / 1e9)
       }
     }
   }
