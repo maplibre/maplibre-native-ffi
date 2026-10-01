@@ -196,7 +196,12 @@ def sources(values, plan):
                 '"' + operation + '"' for operation in policy.operations
             )
             policy_guard = f"let _policy = GeneratedCallbackPolicy::enter(&[{operations}], {identity});"
-        rust.append(f"""unsafe extern "C" fn generated_callback_{plan.native}_{name}({native_parameters}) -> {ffi_type(callback.result)} {{
+        returns = (
+            ""
+            if callback.result.native == "void"
+            else f" -> {ffi_type(callback.result)}"
+        )
+        rust.append(f"""unsafe extern "C" fn generated_callback_{plan.native}_{name}({native_parameters}){returns} {{
     {"let _reentry = GeneratedCallbackPolicy::enter(&[], 0);" if callback.reentry == "forbid" else ""}
     {policy_guard}
     {decision_setup}
@@ -255,8 +260,10 @@ def direct_operation(plan, values):
         let weak = root.downgrade();
         let cancelled = self.state.{name}(Box::new(move || {{
             Python::try_attach(|py| {{
-                if let Some(callback) = root.get(py, 0) {{
-                    if let Err(error) = callback.bind(py).call0() {{ error.write_unraisable(py, None); }}
+                if let Some(callback) = root.get(py, 0)
+                    && let Err(error) = callback.bind(py).call0()
+                {{
+                    error.write_unraisable(py, None);
                 }}
             }});
         }})).map_err(map_error)?;

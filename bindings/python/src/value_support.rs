@@ -53,7 +53,8 @@ impl<'py> GeneratedInputStorage<'py> {
 }
 
 /// The generated caller supplies a C-contract borrowed array during its lifetime.
-unsafe fn generated_slice<'a, T>(data: *const T, count: usize) -> PyResult<&'a [T]> {
+unsafe fn generated_slice<'a, T>(data: *const T, count: impl TryInto<usize>) -> PyResult<&'a [T]> {
+    let count = generated_count(count)?;
     if count == 0 {
         return Ok(&[]);
     }
@@ -510,9 +511,10 @@ fn generated_finalize(call: impl FnOnce() + Send + 'static) {
 /// Iterates a native extensible record array while its owner remains reserved.
 unsafe fn generated_strided_values<T: Copy>(
     data: *const T,
-    count: usize,
-    stride: usize,
+    count: impl TryInto<usize>,
+    stride: impl TryInto<usize>,
 ) -> PyResult<impl Iterator<Item = T>> {
+    let (count, stride) = (generated_count(count)?, generated_count(stride)?);
     if count != 0
         && (data.is_null()
             || stride < std::mem::size_of::<T>()
@@ -531,12 +533,18 @@ unsafe fn generated_strided_values<T: Copy>(
     }))
 }
 
-unsafe fn generated_arena_string(
-    data: *const u8,
-    size: usize,
-    offset: usize,
-    length: usize,
+unsafe fn generated_arena_string<P>(
+    data: *const P,
+    size: impl TryInto<usize>,
+    offset: impl TryInto<usize>,
+    length: impl TryInto<usize>,
 ) -> PyResult<String> {
+    let (size, offset, length) = (
+        generated_count(size)?,
+        generated_count(offset)?,
+        generated_count(length)?,
+    );
+    let data = data.cast::<u8>();
     if offset > size || length > size - offset {
         return Err(native_error("native message is outside its arena"));
     }
@@ -544,4 +552,25 @@ unsafe fn generated_arena_string(
     std::str::from_utf8(&arena[offset..offset + length])
         .map(str::to_owned)
         .map_err(|_| native_error("native message is not UTF-8"))
+}
+
+/// A native count or size as a Rust length.
+fn generated_count(count: impl TryInto<usize>) -> PyResult<usize> {
+    count
+        .try_into()
+        .map_err(|_| native_error("native count exceeds the address space"))
+}
+
+/// A view of `count` units that a pointer and a separate length describe.
+fn generated_view<P>(data: *const P, count: impl TryInto<usize>) -> PyResult<sys::mln_buffer_view> {
+    Ok(sys::mln_buffer_view {
+        data: data.cast(),
+        size: generated_count(count)?,
+    })
+}
+
+/// A Python length as a native count field.
+fn generated_length<C: TryFrom<usize>>(length: usize) -> PyResult<C> {
+    C::try_from(length)
+        .map_err(|_| pyo3::exceptions::PyOverflowError::new_err("length exceeds native count"))
 }

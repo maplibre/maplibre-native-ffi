@@ -77,12 +77,14 @@ def optional(plan: ValuePlan) -> bool:
     return plan.nullable or plan.optional == "empty"
 
 
+def ok(copy: str) -> str:
+    """The copy as a `PyResult`, which a copy that ends in `?` already is."""
+    return copy[:-1] if copy.endswith("?") else f"Ok({copy})"
+
+
 def optional_copy(present: str, copy: str) -> str:
     """Copies a value that is `None` unless `present` holds."""
-    lazy = f"|| Ok({copy})"
-    if copy.endswith("?") and copy.count("?") == 1 and copy.startswith("generated_"):
-        lazy = f"|| {copy[:-1]}"
-    return f"generated_optional(py, {present}, {lazy})?"
+    return f"generated_optional(py, {present}, || {ok(copy)})?"
 
 
 class Values:
@@ -319,7 +321,7 @@ class Values:
                         if plan.length.isdigit()
                         else f"{scope}.{rust_field(plan.length)}"
                     )
-                    view = f"sys::mln_buffer_view {{ data: {expr}.cast(), size: {count} as usize }}"
+                    view = f"generated_view({expr}, {count})?"
                     return self.copy(
                         replace(plan, ctype=replace(plan.ctype, pointee=None)),
                         view,
@@ -343,7 +345,8 @@ class Values:
                 return optional_copy(present, body)
             return body
         if plan.kind == "record":
-            return f"generated_copy_{plan.native}(py, &{expr})?"
+            reference = expr[2:-1] if expr.startswith("(*") else f"&{expr}"
+            return f"generated_copy_{plan.native}(py, {reference})?"
         if plan.kind == "reference" and plan.element:
             child = (
                 "{ let referenced = unsafe { *"
@@ -364,18 +367,18 @@ class Values:
             values = (
                 f"&{expr}"
                 if plan.ctype.kind == "array"
-                else f"unsafe {{ generated_slice({expr}, {count} as usize)? }}"
+                else f"unsafe {{ generated_slice({expr}, {count})? }}"
             )
             if plan.stride:
-                values = f"unsafe {{ generated_strided_values({expr}, {count} as usize, {scope}.{rust_field(plan.stride)} as usize)? }}"
+                values = f"unsafe {{ generated_strided_values({expr}, {count}, {scope}.{rust_field(plan.stride)})? }}"
             item = self.copy(
                 plan.element, "element" if plan.stride else "*element", scope=scope
             )
             if plan.item_buffer:
                 arena = plan.item_buffer
-                content = f"generated_arena_string({scope}.{rust_field(arena.data)}.cast(), {scope}.{rust_field(arena.size)} as usize, element.{rust_field(arena.offset)} as usize, element.{rust_field(arena.length)} as usize)?"
+                content = f"generated_arena_string({scope}.{rust_field(arena.data)}, {scope}.{rust_field(arena.size)}, element.{rust_field(arena.offset)}, element.{rust_field(arena.length)})?"
                 item = f'{{ let item = {item}; item.bind(py).cast::<PyDict>()?.set_item("{arena.field}", unsafe {{ {content} }})?; item }}'
-            body = f"generated_list(py, {values}, |element| Ok({item}))?"
+            body = f"generated_list(py, {values}, |element| {ok(item)})?"
             if plan.nullable and plan.ctype.kind != "array":
                 body = optional_copy(f"!{expr}.is_null()", body)
             return body
@@ -435,17 +438,15 @@ class Values:
             )
             if plan.ctype.pointee:
                 count = (
-                    f'{scope}.{rust_field(plan.length)} = buffer.size.try_into().map_err(|_| pyo3::exceptions::PyOverflowError::new_err("buffer length exceeds native count"))?;'
+                    f"{scope}.{rust_field(plan.length)} = generated_length(buffer.size)?;"
                     if plan.length and not plan.length.isdigit()
                     else ""
                 )
                 return f"{{ let buffer = {converted}; {count} buffer.data.cast() }}"
             return converted
         if plan.kind == "record":
-            conversion = f"generated_input_{plan.native}(&{expr}, storage)?"
-            if plan.default:
-                return f"if {expr}.is_none() {{ unsafe {{ sys::{plan.default}() }} }} else {{ {conversion} }}"
-            return conversion
+            # A record with a native default converts None to that default.
+            return f"generated_input_{plan.native}(&{expr}, storage)?"
         if plan.kind == "reference" and plan.element:
             inner = self.input(plan.element, expr, scope=scope)
             body = f"{{ let value = {inner}; storage.keep_one(value) }}"
@@ -461,7 +462,7 @@ class Values:
             if plan.length and plan.length.isdigit():
                 check = f'if items.len() != {plan.length} {{ return Err(invalid_argument_error("wrong fixed array length")); }}'
             else:
-                check = f'{scope}.{rust_field(plan.length or "count")} = items.len().try_into().map_err(|_| pyo3::exceptions::PyOverflowError::new_err("array length exceeds native count"))?;'
+                check = f"{scope}.{rust_field(plan.length or 'count')} = generated_length(items.len())?;"
             body = f"{{ let mut items = Vec::new(); for item in {expr}.try_iter()? {{ let item = item?; items.push({inner}); }} {check} storage.keep_array(items) }}"
             if plan.nullable:
                 return f"if {expr}.is_none() {{ std::ptr::null() }} else {{ {body} }}"
@@ -476,6 +477,13 @@ class Values:
             else "unsafe { std::mem::zeroed() }"
         )
         lines = [f"let mut raw: sys::{name} = {init};"]
+        if plan.default:
+            lines.insert(
+                0,
+                "if value.is_none() { return Ok(unsafe { sys::"
+                + plan.default
+                + "() }); }",
+            )
         for field in plan.fields:
             if field.role == "size":
                 lines.append(

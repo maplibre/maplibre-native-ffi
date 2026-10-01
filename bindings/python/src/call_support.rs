@@ -99,6 +99,13 @@ impl<'py> GeneratedCall<'py> {
     }
 }
 
+/// The reservation that a consuming call holds on an owner's handle.
+type GeneratedOwnerReservation<'a, O> = GeneratedHandleReservation<
+    'a,
+    <O as GeneratedOwner>::Native,
+    NativeHandleState<<O as GeneratedOwner>::Native>,
+>;
+
 /// A Python owner class whose handle `NativeHandleState` tracks.
 trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     type Native: maplibre_core::handle::NativeHandle;
@@ -138,11 +145,7 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     }
 
     /// Takes the handle for a call that consumes it, or `None` once closed.
-    fn reserve(
-        &self,
-    ) -> PyResult<
-        Option<GeneratedHandleReservation<'_, Self::Native, NativeHandleState<Self::Native>>>,
-    > {
+    fn reserve(&self) -> PyResult<Option<GeneratedOwnerReservation<'_, Self>>> {
         GeneratedHandleReservation::new(self.shared())
     }
 

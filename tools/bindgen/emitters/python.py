@@ -13,7 +13,7 @@ from tools.bindgen.emitters.rust import RUST_KEYWORDS, native_call
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.semantic import BoundApi, DecisionPlan, HandlePlan, OperationPlan
 
-from .python_values import Values, public_name, scalar_type
+from .python_values import Values, ok, public_name, scalar_type
 
 SCALARS = {
     "double": ("f64", "float"),
@@ -112,9 +112,9 @@ def result_converter(
     else:
         native = SCALARS.get(result.native, ("sys::" + result.native, ""))[0]
         copied = values.copy(result, "value")
-        converter = f"|py, result| {{ let value = completion_value::<{native}>(result)?; Ok({copied}) }}"
+        converter = f"|py, result| {{ let value = completion_value::<{native}>(result)?; {ok(copied)} }}"
         if result.nullable:
-            converter = f"|py, result| {{ if result.value.is_null() {{ return Ok(py.None()); }} let value = completion_value::<{native}>(result)?; Ok({copied}) }}"
+            converter = f"|py, result| {{ if result.value.is_null() {{ return Ok(py.None()); }} let value = completion_value::<{native}>(result)?; {ok(copied)} }}"
     return "Any", public, converter, None
 
 
@@ -570,7 +570,7 @@ def operation(
                 public_result = result_owner
                 expression = f"_adopt_value({expression}, {result_owner!r}, {'self' if receiver and value.handle and value.handle.parent else 'None'})"
             else:
-                body.append(f"        Ok({values.copy(value, output)})")
+                body.append(f"        {ok(values.copy(value, output))}")
                 public_result = values.type(value)
                 expression = values.facade_copy(value, expression)
         else:
@@ -845,7 +845,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         name = "_default_" + plan.result.native.removeprefix("mln_")
         default_names.append(name)
         default_native.append(
-            f"#[pyfunction]\nfn {name}(py: Python<'_>) -> PyResult<Py<PyAny>> {{ generated_check_reentry()?; let value = unsafe {{ sys::{plan.name}() }}; Ok({values.copy(plan.result, 'value')}) }}\n"
+            f"#[pyfunction]\nfn {name}(py: Python<'_>) -> PyResult<Py<PyAny>> {{ generated_check_reentry()?; let value = unsafe {{ sys::{plan.name}() }}; {ok(values.copy(plan.result, 'value'))} }}\n"
         )
     files = {}
     rust_values, public_values = values.sources()

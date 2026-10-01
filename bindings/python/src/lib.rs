@@ -368,10 +368,11 @@ unsafe extern "C" fn complete_python_future(
                 error.write_unraisable(py, None);
             }
         });
-        if attached.is_none() && result.status == sys::MLN_STATUS_OK {
-            if let Some(discard) = bridge.discard {
-                unsafe { discard(result) };
-            }
+        if attached.is_none()
+            && result.status == sys::MLN_STATUS_OK
+            && let Some(discard) = bridge.discard
+        {
+            unsafe { discard(result) };
         }
     }));
 }
