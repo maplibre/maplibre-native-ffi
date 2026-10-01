@@ -1,6 +1,6 @@
-// The library's own MapLibre run loop, for Android and the browser. Every thread
-// that owns one runs it continuously and blocks on a condition variable that
-// timers and submitted work wake. The loop calls nothing outside the C++
+// The library's own MapLibre run loop, for Android and the browser. Every
+// thread that owns one runs it continuously and blocks on a condition variable
+// that timers and submitted work wake. The loop calls nothing outside the C++
 // standard library:
 //
 // - A browser pthread blocks here, so no loop depends on returning to the

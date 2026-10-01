@@ -14,11 +14,7 @@ class AsyncTaskState : public platform::RunLoopWake::Runnable,
                        public std::enable_shared_from_this<AsyncTaskState> {
  public:
   explicit AsyncTaskState(std::function<void()> fn)
-      : wake(
-          static_cast<platform::RunLoopWake*>(
-            RunLoop::getLoopHandle()
-          )
-        ),
+      : wake(static_cast<platform::RunLoopWake*>(RunLoop::getLoopHandle())),
         task(std::move(fn)) {}
 
   void cancel() {

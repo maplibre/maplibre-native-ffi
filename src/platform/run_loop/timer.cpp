@@ -16,11 +16,7 @@ class TimerState : public platform::RunLoopWake::Runnable,
                    public std::enable_shared_from_this<TimerState> {
  public:
   TimerState()
-      : wake(
-          static_cast<platform::RunLoopWake*>(
-            RunLoop::getLoopHandle()
-          )
-        ) {}
+      : wake(static_cast<platform::RunLoopWake*>(RunLoop::getLoopHandle())) {}
 
   void start(Duration timeout, Duration repeat_, std::function<void()>&& cb_) {
     stop();
