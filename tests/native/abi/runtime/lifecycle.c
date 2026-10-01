@@ -90,60 +90,9 @@ static void runtime_creation_validates_its_options(void) {
   TEST_ASSERT_EQUAL_UINT64(1, runtime);
 }
 
-// Every runtime entry point that takes a handle, called with one.
-typedef mln_status (*runtime_call)(mln_runtime runtime);
-
-static mln_status call_release(mln_runtime runtime) {
-  const mln_completion discard = mln_test_discard_completion();
-  return mln_runtime_release(runtime, &discard, NULL);
-}
-
-static mln_status call_barrier(mln_runtime runtime) {
-  const mln_completion discard = mln_test_discard_completion();
-  return mln_runtime_barrier(runtime, &discard, NULL);
-}
-
-static mln_status call_dispose(mln_runtime runtime) {
-  return mln_runtime_dispose(runtime, NULL);
-}
-
-static mln_status call_drain(mln_runtime runtime) {
-  mln_event_batch batch = MLN_HANDLE_NULL;
-  const mln_status status = mln_runtime_drain_events(runtime, &batch, NULL);
-  mln_event_batch_release(batch);
-  return status;
-}
-
-static mln_status call_get_event_mask(mln_runtime runtime) {
-  uint64_t mask = 0;
-  return mln_runtime_get_event_mask(runtime, &mask, NULL);
-}
-
-static mln_status call_set_event_mask(mln_runtime runtime) {
-  return mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_ALL, NULL);
-}
-
-static mln_status call_create_map(mln_runtime runtime) {
-  const mln_map_options options = mln_map_options_default();
-  const mln_completion discard = mln_test_discard_completion();
-  return mln_map_create(runtime, &options, &discard, NULL);
-}
-
-static const struct {
-  const char* label;
-  runtime_call call;
-} runtime_calls[] = {
-  {"release", call_release},
-  {"barrier", call_barrier},
-  {"dispose", call_dispose},
-  {"drain", call_drain},
-  {"get event mask", call_get_event_mask},
-  {"set event mask", call_set_event_mask},
-  {"create map", call_create_map},
-};
-
 // The null handle, a released runtime, and a live handle of another kind each
-// name no runtime, and every entry point rejects them the same way.
+// name no runtime, and every entry point that takes a runtime rejects them the
+// same way.
 static void runtime_calls_reject_a_value_that_names_no_runtime(void) {
   mln_runtime live = mln_test_create_runtime();
   mln_map map = mln_test_create_map(live);
@@ -151,15 +100,23 @@ static void runtime_calls_reject_a_value_that_names_no_runtime(void) {
   mln_test_destroy_runtime(released);
 
   const mln_runtime handles[] = {MLN_HANDLE_NULL, released, map};
-  const size_t call_count = sizeof(runtime_calls) / sizeof(*runtime_calls);
-  for (size_t handle = 0; handle < sizeof(handles) / sizeof(*handles);
-       handle += 1) {
-    for (size_t call = 0; call < call_count; call += 1) {
-      TEST_ASSERT_EQUAL_INT_MESSAGE(
-        MLN_STATUS_INVALID_ARGUMENT, runtime_calls[call].call(handles[handle]),
-        runtime_calls[call].label
-      );
-    }
+  const mln_completion discard = mln_test_discard_completion();
+  const mln_map_options map_options = mln_map_options_default();
+  for (size_t index = 0; index < sizeof(handles) / sizeof(*handles);
+       index += 1) {
+    const mln_runtime handle = handles[index];
+    mln_event_batch batch = MLN_HANDLE_NULL;
+    uint64_t mask = 0;
+    MLN_TEST_INVALID(mln_runtime_release(handle, &discard, NULL));
+    MLN_TEST_INVALID(mln_runtime_barrier(handle, &discard, NULL));
+    MLN_TEST_INVALID(mln_runtime_dispose(handle, NULL));
+    MLN_TEST_INVALID(mln_runtime_drain_events(handle, &batch, NULL));
+    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
+    MLN_TEST_INVALID(mln_runtime_get_event_mask(handle, &mask, NULL));
+    MLN_TEST_INVALID(
+      mln_runtime_set_event_mask(handle, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
+    );
+    MLN_TEST_INVALID(mln_map_create(handle, &map_options, &discard, NULL));
   }
 
   // The map named as a runtime is unaffected.

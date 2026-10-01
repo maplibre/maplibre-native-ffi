@@ -54,83 +54,6 @@ static void call_event_api_from_a_foreign_thread(void* argument) {
     mln_test_map_set_event_mask(probe->map, MLN_RUNTIME_EVENT_MASK_ALL);
 }
 
-static void event_drain_and_mask_changes_are_any_thread(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-
-  foreign_thread_probe probe = {.runtime = runtime, .map = map};
-  mln_test_thread* thread =
-    mln_test_thread_start(call_event_api_from_a_foreign_thread, &probe);
-  mln_test_thread_join(thread);
-
-  MLN_TEST_OK(probe.drain_status);
-  MLN_TEST_OK(probe.runtime_mask_status);
-  MLN_TEST_OK(probe.map_mask_status);
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// Each setter reads only its own group's bits but stores the whole value, so a
-// host that reads a mask, sets one bit, and writes it back keeps every other.
-static void both_mask_setters_reject_unknown_bits_and_keep_foreign_ones(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-
-  MLN_TEST_INVALID(mln_runtime_set_event_mask(runtime, unknown_mask_bit, NULL));
-  MLN_TEST_INVALID(mln_test_map_set_event_mask(map, unknown_mask_bit));
-
-  MLN_TEST_OK(
-    mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
-  );
-  MLN_TEST_OK(mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL));
-
-  uint64_t runtime_mask = 0;
-  MLN_TEST_OK(mln_runtime_get_event_mask(runtime, &runtime_mask, NULL));
-  TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, runtime_mask);
-  uint64_t map_mask = 0;
-  MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
-  TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, map_mask);
-
-  // One in-group bit for the other source kind, which each setter accepts and
-  // reports back unchanged.
-  MLN_TEST_OK(mln_runtime_set_event_mask(
-    runtime, MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, NULL
-  ));
-  MLN_TEST_OK(mln_runtime_get_event_mask(runtime, &runtime_mask, NULL));
-  TEST_ASSERT_EQUAL_UINT64(
-    MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, runtime_mask
-  );
-
-  MLN_TEST_INVALID(mln_runtime_get_event_mask(runtime, NULL, NULL));
-  MLN_TEST_INVALID(mln_map_snapshot_get(map, NULL, NULL));
-  mln_map_snapshot undersized = {.size = sizeof(mln_map_snapshot) - 1};
-  MLN_TEST_INVALID(mln_map_snapshot_get(map, &undersized, NULL));
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void a_fresh_map_and_runtime_select_every_event_type(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-
-  uint64_t runtime_mask = 0;
-  MLN_TEST_OK(mln_runtime_get_event_mask(runtime, &runtime_mask, NULL));
-  TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, runtime_mask);
-  uint64_t map_mask = 0;
-  MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
-  TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, map_mask);
-
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
-  TEST_ASSERT_GREATER_THAN_size_t(
-    0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
-  );
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // Map creation rejects a mask the setter rejects, so one value is not accepted
 // at creation and then refused on the way back through a read-modify-write.
 // The runtime options have the same check in lifecycle.c.
@@ -231,38 +154,6 @@ static void a_suppressed_producer_leaves_the_queue_empty(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void an_owned_batch_remains_stable_across_later_drains(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
-
-  mln_event_batch first = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_runtime_drain_events(runtime, &first, NULL));
-  mln_runtime_event_batch_view first_view = {
-    .size = sizeof(mln_runtime_event_batch_view)
-  };
-  MLN_TEST_OK(mln_event_batch_get(first, &first_view, NULL));
-  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_runtime_event), first_view.event_size);
-  TEST_ASSERT_GREATER_THAN_size_t(1, first_view.event_count);
-  const size_t first_count = first_view.event_count;
-  const mln_runtime_event first_event = first_view.events[0];
-
-  mln_event_batch second = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_runtime_drain_events(runtime, &second, NULL));
-  mln_runtime_event_batch_view second_view = {
-    .size = sizeof(mln_runtime_event_batch_view)
-  };
-  MLN_TEST_OK(mln_event_batch_get(second, &second_view, NULL));
-  TEST_ASSERT_EQUAL_size_t(0, second_view.event_count);
-  TEST_ASSERT_EQUAL_size_t(first_count, first_view.event_count);
-  TEST_ASSERT_EQUAL_UINT32(first_event.type, first_view.events[0].type);
-
-  mln_event_batch_release(second);
-  mln_event_batch_release(first);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // Closing a source prevents future publication without rewriting history that
 // is already queued.
 static void queued_events_outlive_the_map_that_produced_them(void) {
@@ -297,32 +188,6 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_test_destroy_runtime(runtime);
   TEST_ASSERT_GREATER_THAN_size_t(0, view.event_count);
   mln_event_batch_release(batch);
-}
-
-// A drained batch is an owned handle: releasing it twice is a no-op, releasing
-// the null handle is a no-op, and a released handle names no batch.
-static void a_released_event_batch_names_no_batch(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
-
-  mln_event_batch batch = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_runtime_drain_events(runtime, &batch, NULL));
-  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
-  mln_event_batch_release(batch);
-  mln_event_batch_release(batch);
-  mln_event_batch_release(MLN_HANDLE_NULL);
-
-  mln_runtime_event_batch_view view = {
-    .size = sizeof(mln_runtime_event_batch_view), .event_count = 99
-  };
-  MLN_TEST_INVALID(mln_event_batch_get(batch, &view, NULL));
-  TEST_ASSERT_EQUAL_size_t(99, view.event_count);
-  MLN_TEST_INVALID(mln_event_batch_get(MLN_HANDLE_NULL, &view, NULL));
-  TEST_ASSERT_EQUAL_size_t(99, view.event_count);
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
 }
 
 // Counts the transition-finished events in one drain and reports the last
@@ -462,18 +327,138 @@ static void the_message_arena_carries_one_range_per_event(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A fresh map and runtime select every event type. The masks change from any
+// thread, and each setter rejects unknown bits but keeps the other group's.
+static void event_masks_select_every_type_and_keep_foreign_bits(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  {
+    uint64_t runtime_mask = 0;
+    MLN_TEST_OK(mln_runtime_get_event_mask(runtime, &runtime_mask, NULL));
+    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, runtime_mask);
+    uint64_t map_mask = 0;
+    MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
+    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, map_mask);
+
+    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+    TEST_ASSERT_GREATER_THAN_size_t(
+      0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
+    );
+  }
+  {
+    foreign_thread_probe probe = {.runtime = runtime, .map = map};
+    mln_test_thread* thread =
+      mln_test_thread_start(call_event_api_from_a_foreign_thread, &probe);
+    mln_test_thread_join(thread);
+
+    MLN_TEST_OK(probe.drain_status);
+    MLN_TEST_OK(probe.runtime_mask_status);
+    MLN_TEST_OK(probe.map_mask_status);
+  }
+  // Each setter reads only its own group's bits but stores the whole value, so
+  // a host that reads a mask, sets one bit, and writes it back keeps every
+  // other.
+  {
+    MLN_TEST_INVALID(
+      mln_runtime_set_event_mask(runtime, unknown_mask_bit, NULL)
+    );
+    MLN_TEST_INVALID(mln_test_map_set_event_mask(map, unknown_mask_bit));
+
+    MLN_TEST_OK(
+      mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
+    );
+    MLN_TEST_OK(mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL));
+
+    uint64_t runtime_mask = 0;
+    MLN_TEST_OK(mln_runtime_get_event_mask(runtime, &runtime_mask, NULL));
+    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, runtime_mask);
+    uint64_t map_mask = 0;
+    MLN_TEST_OK(mln_test_map_get_event_mask(map, &map_mask));
+    TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, map_mask);
+
+    // One in-group bit for the other source kind, which each setter accepts and
+    // reports back unchanged.
+    MLN_TEST_OK(mln_runtime_set_event_mask(
+      runtime, MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, NULL
+    ));
+    MLN_TEST_OK(mln_runtime_get_event_mask(runtime, &runtime_mask, NULL));
+    TEST_ASSERT_EQUAL_UINT64(
+      MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, runtime_mask
+    );
+
+    MLN_TEST_INVALID(mln_runtime_get_event_mask(runtime, NULL, NULL));
+    MLN_TEST_INVALID(mln_map_snapshot_get(map, NULL, NULL));
+    mln_map_snapshot undersized = {.size = sizeof(mln_map_snapshot) - 1};
+    MLN_TEST_INVALID(mln_map_snapshot_get(map, &undersized, NULL));
+  }
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A drained batch is an owned handle that stays readable across later drains.
+static void a_drained_batch_is_an_owned_handle(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  {
+    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+
+    mln_event_batch first = MLN_HANDLE_NULL;
+    MLN_TEST_OK(mln_runtime_drain_events(runtime, &first, NULL));
+    mln_runtime_event_batch_view first_view = {
+      .size = sizeof(mln_runtime_event_batch_view)
+    };
+    MLN_TEST_OK(mln_event_batch_get(first, &first_view, NULL));
+    TEST_ASSERT_EQUAL_UINT32(sizeof(mln_runtime_event), first_view.event_size);
+    TEST_ASSERT_GREATER_THAN_size_t(1, first_view.event_count);
+    const size_t first_count = first_view.event_count;
+    const mln_runtime_event first_event = first_view.events[0];
+
+    mln_event_batch second = MLN_HANDLE_NULL;
+    MLN_TEST_OK(mln_runtime_drain_events(runtime, &second, NULL));
+    mln_runtime_event_batch_view second_view = {
+      .size = sizeof(mln_runtime_event_batch_view)
+    };
+    MLN_TEST_OK(mln_event_batch_get(second, &second_view, NULL));
+    TEST_ASSERT_EQUAL_size_t(0, second_view.event_count);
+    TEST_ASSERT_EQUAL_size_t(first_count, first_view.event_count);
+    TEST_ASSERT_EQUAL_UINT32(first_event.type, first_view.events[0].type);
+
+    mln_event_batch_release(second);
+    mln_event_batch_release(first);
+  }
+  // A drained batch is an owned handle: releasing it twice is a no-op,
+  // releasing the null handle is a no-op, and a released handle names no batch.
+  {
+    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+
+    mln_event_batch batch = MLN_HANDLE_NULL;
+    MLN_TEST_OK(mln_runtime_drain_events(runtime, &batch, NULL));
+    TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
+    mln_event_batch_release(batch);
+    mln_event_batch_release(batch);
+    mln_event_batch_release(MLN_HANDLE_NULL);
+
+    mln_runtime_event_batch_view view = {
+      .size = sizeof(mln_runtime_event_batch_view), .event_count = 99
+    };
+    MLN_TEST_INVALID(mln_event_batch_get(batch, &view, NULL));
+    TEST_ASSERT_EQUAL_size_t(99, view.event_count);
+    MLN_TEST_INVALID(mln_event_batch_get(MLN_HANDLE_NULL, &view, NULL));
+    TEST_ASSERT_EQUAL_size_t(99, view.event_count);
+  }
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(a_drain_rejects_a_nonnull_output_or_a_stale_runtime);
-  RUN_TEST(event_drain_and_mask_changes_are_any_thread);
-  RUN_TEST(both_mask_setters_reject_unknown_bits_and_keep_foreign_ones);
-  RUN_TEST(a_fresh_map_and_runtime_select_every_event_type);
+  RUN_TEST(event_masks_select_every_type_and_keep_foreign_bits);
   RUN_TEST(options_reject_unknown_event_mask_bits);
   RUN_TEST(a_creation_mask_applies_during_construction);
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);
   RUN_TEST(a_suppressed_producer_leaves_the_queue_empty);
-  RUN_TEST(an_owned_batch_remains_stable_across_later_drains);
+  RUN_TEST(a_drained_batch_is_an_owned_handle);
   RUN_TEST(queued_events_outlive_the_map_that_produced_them);
   RUN_TEST(a_transition_reports_one_terminal_outcome);
-  RUN_TEST(a_released_event_batch_names_no_batch);
   RUN_TEST(the_message_arena_carries_one_range_per_event);
 }

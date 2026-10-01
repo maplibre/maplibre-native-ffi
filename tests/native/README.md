@@ -132,9 +132,7 @@ A test file is one group. Write each case as a `static void` function, and run
 the cases from the file's one group block:
 
 ```c
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void a_stale_handle_is_rejected(void) { /* ... */ }
 
@@ -213,14 +211,23 @@ emulator runners bound each executable at 300 seconds.
 
 ## Support helpers
 
-Test files include `support/test_support.h`, which brings in the helpers below.
+Test files include `support/test_support.h`, which brings in Unity, the harness,
+the C library headers that most cases use, and the helpers below.
 
 | Header     | Provides                                                             |
 | ---------- | -------------------------------------------------------------------- |
 | `wait.h`   | Deadlines, the pulse, flags, gates, and the completion probe         |
 | `env.h`    | Runtime and map fixtures, event draining and waits, fixture files    |
 | `render.h` | The render fixture, driver service, and `mln_test_render_step_until` |
+| `status.h` | Status checks that name the call they check                          |
 | `tables.h` | A runner for validation tables                                       |
+
+Check a status with `MLN_TEST_OK`, `MLN_TEST_INVALID`, or `MLN_TEST_STATUS`,
+which report the call that returned the wrong status. `MLN_TEST_AWAIT_OK` and
+`MLN_TEST_AWAIT_COMMAND` submit a command and wait for its terminal status, and
+`MLN_TEST_RENDER_AWAIT` does the same for a render session operation, servicing
+the fixture until it completes. Each declares the `completion` that its
+expression passes.
 
 The resource and platform suites also include two headers of their own:
 
@@ -250,10 +257,10 @@ described under [GPU objects](#gpu-objects).
 
 The render files also include `support/frames.h`. It requests forced frames,
 waits until every pending demand has a result and one drain holds as many as the
-case expects, and renders and acquires one frame. A case that needs a negative
-check on the driver, such as a barrier that must still be pending, fences the
-driver first with a maintenance command, which runs after every work item the
-driver already holds.
+case expects, renders and acquires one frame, releases a frame, and reads the
+latest frame back. A case that needs a negative check on the driver, such as a
+barrier that must still be pending, fences the driver first with a maintenance
+command, which runs after every work item the driver already holds.
 
 The map files also include `support/map.h`, which provides
 `mln_test_render_still_image`. That helper requests a still image from a static

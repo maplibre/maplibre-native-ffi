@@ -585,10 +585,54 @@ static void projection_handles_are_callable_from_foreign_threads(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A standalone projection validates what its setters take: a finite camera,
+// coordinates in range, nonnegative padding, and at least one coordinate to
+// fit. A rejected call leaves the projection's camera as it was.
+static void projection_setters_reject_invalid_values(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_map_projection projection = create_projection(map);
+  const mln_camera_options before = read_camera(projection);
+
+  mln_camera_options camera = mln_camera_options_default();
+  camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.zoom = NAN;
+  MLN_TEST_INVALID(
+    mln_map_projection_set_camera(projection, &camera, MLN_TEST_DIAGNOSTIC)
+  );
+  const mln_lat_lng past_the_pole[2] = {{91.0, 0.0}, {0.0, 10.0}};
+  const mln_edge_insets no_padding = {0};
+  MLN_TEST_INVALID(mln_map_projection_set_visible_coordinates(
+    projection, past_the_pole, 2, no_padding, MLN_TEST_DIAGNOSTIC
+  ));
+  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "latitude"));
+  const mln_lat_lng corners[2] = {{-10.0, -10.0}, {10.0, 10.0}};
+  const mln_edge_insets negative_padding = {.top = -1.0};
+  MLN_TEST_INVALID(mln_map_projection_set_visible_coordinates(
+    projection, corners, 2, negative_padding, MLN_TEST_DIAGNOSTIC
+  ));
+  MLN_TEST_INVALID(mln_map_projection_set_visible_coordinates(
+    projection, corners, 0, no_padding, MLN_TEST_DIAGNOSTIC
+  ));
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    strstr(mln_test_last_error(), "coordinate_count must be greater than 0"),
+    mln_test_last_error()
+  );
+
+  const mln_camera_options after = read_camera(projection);
+  TEST_ASSERT_EQUAL_DOUBLE(before.latitude, after.latitude);
+  TEST_ASSERT_EQUAL_DOUBLE(before.longitude, after.longitude);
+  TEST_ASSERT_EQUAL_DOUBLE(before.zoom, after.zoom);
+  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(projection_outlives_its_source_map_and_runtime);
   RUN_TEST(creation_observes_earlier_map_camera_commands);
   RUN_TEST(setters_apply_before_return_and_conversions_round_trip);
+  RUN_TEST(projection_setters_reject_invalid_values);
   RUN_TEST(unwrapped_conversion_preserves_world_copies);
   RUN_TEST(visible_geometry_fits_like_its_coordinates);
   RUN_TEST(meters_per_pixel_follows_the_projection_camera);
