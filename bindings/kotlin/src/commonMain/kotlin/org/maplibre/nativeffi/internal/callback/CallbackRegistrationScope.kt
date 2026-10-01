@@ -47,8 +47,6 @@ internal object NativeRoots {
 
   /** Drops the root and returns its value, or null for a token already released. */
   fun release(token: Long): Any? = locked { roots.remove(token) }
-
-  fun countForTesting(): Int = locked { roots.size }
 }
 
 /**

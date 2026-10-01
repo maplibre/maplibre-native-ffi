@@ -93,10 +93,6 @@ internal object CompletionBridge {
   fun command(call: (Long) -> Unit): Deferred<CommandCompletion> =
     submitInternal(::commandCompletion, false, true, call)
 
-  /** Submits an ordered command and throws instead of deferring a synchronous rejection. */
-  fun commandChecked(call: (Long) -> Unit): Deferred<CommandCompletion> =
-    submitInternal(::commandCompletion, true, true, call)
-
   private fun <T> submitInternal(
     convert: (Long) -> T,
     rejectSynchronously: Boolean,
