@@ -12,6 +12,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 include!("value_support.rs");
+include!("call_support.rs");
 include!("generated_operations.rs");
 
 mod py_errors {

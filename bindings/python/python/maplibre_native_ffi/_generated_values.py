@@ -33,6 +33,10 @@ def _copy_variant(raw, variants, empty=None):
     return variants[raw["kind"]]._from_native(raw["value"])
 
 
+def _maybe(convert, raw):
+    return None if raw is None else convert(raw)
+
+
 @dataclass(frozen=True, slots=True)
 class RuntimeEventRenderFrameVariant:
     value: RuntimeEventRenderFrame
@@ -760,15 +764,11 @@ class AnimationOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            duration_ms=None if raw["duration_ms"] is None else (raw["duration_ms"]),
-            velocity=None if raw["velocity"] is None else (raw["velocity"]),
-            min_zoom=None if raw["min_zoom"] is None else (raw["min_zoom"]),
-            easing=None
-            if raw["easing"] is None
-            else (UnitBezier._from_native(raw["easing"])),
-            transition_id=None
-            if raw["transition_id"] is None
-            else (raw["transition_id"]),
+            duration_ms=raw["duration_ms"],
+            velocity=raw["velocity"],
+            min_zoom=raw["min_zoom"],
+            easing=_maybe(UnitBezier._from_native, raw["easing"]),
+            transition_id=raw["transition_id"],
         )
 
     @classmethod
@@ -790,13 +790,11 @@ class BoundOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            bounds=None
-            if raw["bounds"] is None
-            else (LatLngBounds._from_native(raw["bounds"])),
-            min_zoom=None if raw["min_zoom"] is None else (raw["min_zoom"]),
-            max_zoom=None if raw["max_zoom"] is None else (raw["max_zoom"]),
-            min_pitch=None if raw["min_pitch"] is None else (raw["min_pitch"]),
-            max_pitch=None if raw["max_pitch"] is None else (raw["max_pitch"]),
+            bounds=_maybe(LatLngBounds._from_native, raw["bounds"]),
+            min_zoom=raw["min_zoom"],
+            max_zoom=raw["max_zoom"],
+            min_pitch=raw["min_pitch"],
+            max_pitch=raw["max_pitch"],
             unbounded=raw["unbounded"],
         )
 
@@ -821,9 +819,7 @@ class CameraDelta:
             kind=CameraDeltaKind(raw["kind"]),
             offset=ScreenPoint._from_native(raw["offset"]),
             amount=raw["amount"],
-            anchor=None
-            if raw["anchor"] is None
-            else (ScreenPoint._from_native(raw["anchor"])),
+            anchor=_maybe(ScreenPoint._from_native, raw["anchor"]),
             animation=AnimationOptions._from_native(raw["animation"]),
         )
 
@@ -843,11 +839,9 @@ class CameraFitOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            padding=None
-            if raw["padding"] is None
-            else (EdgeInsets._from_native(raw["padding"])),
-            bearing=None if raw["bearing"] is None else (raw["bearing"]),
-            pitch=None if raw["pitch"] is None else (raw["pitch"]),
+            padding=_maybe(EdgeInsets._from_native, raw["padding"]),
+            bearing=raw["bearing"],
+            pitch=raw["pitch"],
         )
 
     @classmethod
@@ -872,25 +866,15 @@ class CameraOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            center=None
-            if raw["center"] is None
-            else (LatLng._from_native(raw["center"])),
-            center_altitude=None
-            if raw["center_altitude"] is None
-            else (raw["center_altitude"]),
-            padding=None
-            if raw["padding"] is None
-            else (EdgeInsets._from_native(raw["padding"])),
-            anchor=None
-            if raw["anchor"] is None
-            else (ScreenPoint._from_native(raw["anchor"])),
-            zoom=None if raw["zoom"] is None else (raw["zoom"]),
-            bearing=None if raw["bearing"] is None else (raw["bearing"]),
-            pitch=None if raw["pitch"] is None else (raw["pitch"]),
-            roll=None if raw["roll"] is None else (raw["roll"]),
-            field_of_view=None
-            if raw["field_of_view"] is None
-            else (raw["field_of_view"]),
+            center=_maybe(LatLng._from_native, raw["center"]),
+            center_altitude=raw["center_altitude"],
+            padding=_maybe(EdgeInsets._from_native, raw["padding"]),
+            anchor=_maybe(ScreenPoint._from_native, raw["anchor"]),
+            zoom=raw["zoom"],
+            bearing=raw["bearing"],
+            pitch=raw["pitch"],
+            roll=raw["roll"],
+            field_of_view=raw["field_of_view"],
         )
 
     @classmethod
@@ -964,13 +948,13 @@ class CustomGeometrySourceOptions:
         return cls(
             fetch_tile=raw["fetch_tile"],
             cancel_tile=raw["cancel_tile"],
-            min_zoom=None if raw["min_zoom"] is None else (raw["min_zoom"]),
-            max_zoom=None if raw["max_zoom"] is None else (raw["max_zoom"]),
-            tolerance=None if raw["tolerance"] is None else (raw["tolerance"]),
-            tile_size=None if raw["tile_size"] is None else (raw["tile_size"]),
-            buffer=None if raw["buffer"] is None else (raw["buffer"]),
-            clip=None if raw["clip"] is None else (raw["clip"]),
-            wrap=None if raw["wrap"] is None else (raw["wrap"]),
+            min_zoom=raw["min_zoom"],
+            max_zoom=raw["max_zoom"],
+            tolerance=raw["tolerance"],
+            tile_size=raw["tile_size"],
+            buffer=raw["buffer"],
+            clip=raw["clip"],
+            wrap=raw["wrap"],
         )
 
     def _invoke_fetch_tile(self, tile_id):
@@ -1002,8 +986,8 @@ class CustomMvtVectorSourceOptions:
         return cls(
             fetch_tile=raw["fetch_tile"],
             cancel_tile=raw["cancel_tile"],
-            min_zoom=None if raw["min_zoom"] is None else (raw["min_zoom"]),
-            max_zoom=None if raw["max_zoom"] is None else (raw["max_zoom"]),
+            min_zoom=raw["min_zoom"],
+            max_zoom=raw["max_zoom"],
         )
 
     def _invoke_fetch_tile(self, tile_id):
@@ -1067,11 +1051,9 @@ class FeatureStateSelector:
     def _from_native(cls, raw):
         return cls(
             source_id=raw["source_id"],
-            source_layer_id=None
-            if raw["source_layer_id"] is None
-            else (raw["source_layer_id"]),
-            feature_id=None if raw["feature_id"] is None else (raw["feature_id"]),
-            state_key=None if raw["state_key"] is None else (raw["state_key"]),
+            source_layer_id=raw["source_layer_id"],
+            feature_id=raw["feature_id"],
+            state_key=raw["state_key"],
         )
 
 
@@ -1106,12 +1088,8 @@ class FreeCameraOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            position=None
-            if raw["position"] is None
-            else (Vec3._from_native(raw["position"])),
-            orientation=None
-            if raw["orientation"] is None
-            else (Quaternion._from_native(raw["orientation"])),
+            position=_maybe(Vec3._from_native, raw["position"]),
+            orientation=_maybe(Quaternion._from_native, raw["orientation"]),
         )
 
     @classmethod
@@ -1139,28 +1117,18 @@ class GeojsonSourceOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            min_zoom=None if raw["min_zoom"] is None else (raw["min_zoom"]),
-            max_zoom=None if raw["max_zoom"] is None else (raw["max_zoom"]),
-            tolerance=None if raw["tolerance"] is None else (raw["tolerance"]),
-            cluster_max_zoom=None
-            if raw["cluster_max_zoom"] is None
-            else (raw["cluster_max_zoom"]),
-            cluster_properties=None
-            if raw["cluster_properties"] is None
-            else (raw["cluster_properties"]),
-            tile_size=None if raw["tile_size"] is None else (raw["tile_size"]),
-            buffer=None if raw["buffer"] is None else (raw["buffer"]),
-            cluster_radius=None
-            if raw["cluster_radius"] is None
-            else (raw["cluster_radius"]),
-            cluster_min_points=None
-            if raw["cluster_min_points"] is None
-            else (raw["cluster_min_points"]),
-            line_metrics=None if raw["line_metrics"] is None else (raw["line_metrics"]),
-            cluster=None if raw["cluster"] is None else (raw["cluster"]),
-            synchronous_tiling=None
-            if raw["synchronous_tiling"] is None
-            else (raw["synchronous_tiling"]),
+            min_zoom=raw["min_zoom"],
+            max_zoom=raw["max_zoom"],
+            tolerance=raw["tolerance"],
+            cluster_max_zoom=raw["cluster_max_zoom"],
+            cluster_properties=raw["cluster_properties"],
+            tile_size=raw["tile_size"],
+            buffer=raw["buffer"],
+            cluster_radius=raw["cluster_radius"],
+            cluster_min_points=raw["cluster_min_points"],
+            line_metrics=raw["line_metrics"],
+            cluster=raw["cluster"],
+            synchronous_tiling=raw["synchronous_tiling"],
         )
 
     @classmethod
@@ -1357,22 +1325,12 @@ class MapTileOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            prefetch_zoom_delta=None
-            if raw["prefetch_zoom_delta"] is None
-            else (raw["prefetch_zoom_delta"]),
-            lod_min_radius=None
-            if raw["lod_min_radius"] is None
-            else (raw["lod_min_radius"]),
-            lod_scale=None if raw["lod_scale"] is None else (raw["lod_scale"]),
-            lod_pitch_threshold=None
-            if raw["lod_pitch_threshold"] is None
-            else (raw["lod_pitch_threshold"]),
-            lod_zoom_shift=None
-            if raw["lod_zoom_shift"] is None
-            else (raw["lod_zoom_shift"]),
-            lod_mode=None
-            if raw["lod_mode"] is None
-            else (TileLodMode(raw["lod_mode"])),
+            prefetch_zoom_delta=raw["prefetch_zoom_delta"],
+            lod_min_radius=raw["lod_min_radius"],
+            lod_scale=raw["lod_scale"],
+            lod_pitch_threshold=raw["lod_pitch_threshold"],
+            lod_zoom_shift=raw["lod_zoom_shift"],
+            lod_mode=_maybe(TileLodMode, raw["lod_mode"]),
         )
 
     @classmethod
@@ -1392,18 +1350,10 @@ class MapViewportOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            north_orientation=None
-            if raw["north_orientation"] is None
-            else (NorthOrientation(raw["north_orientation"])),
-            constrain_mode=None
-            if raw["constrain_mode"] is None
-            else (ConstrainMode(raw["constrain_mode"])),
-            viewport_mode=None
-            if raw["viewport_mode"] is None
-            else (ViewportMode(raw["viewport_mode"])),
-            frustum_offset=None
-            if raw["frustum_offset"] is None
-            else (EdgeInsets._from_native(raw["frustum_offset"])),
+            north_orientation=_maybe(NorthOrientation, raw["north_orientation"]),
+            constrain_mode=_maybe(ConstrainMode, raw["constrain_mode"]),
+            viewport_mode=_maybe(ViewportMode, raw["viewport_mode"]),
+            frustum_offset=_maybe(EdgeInsets._from_native, raw["frustum_offset"]),
         )
 
     @classmethod
@@ -1782,9 +1732,7 @@ class ProjectionMode:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            axonometric=None if raw["axonometric"] is None else (raw["axonometric"]),
-            x_skew=None if raw["x_skew"] is None else (raw["x_skew"]),
-            y_skew=None if raw["y_skew"] is None else (raw["y_skew"]),
+            axonometric=raw["axonometric"], x_skew=raw["x_skew"], y_skew=raw["y_skew"]
         )
 
     @classmethod
@@ -1817,11 +1765,9 @@ class QueriedFeature:
     def _from_native(cls, raw):
         return cls(
             feature=raw["feature"],
-            source_id=None if raw["source_id"] is None else (raw["source_id"]),
-            source_layer_id=None
-            if raw["source_layer_id"] is None
-            else (raw["source_layer_id"]),
-            state=None if raw["state"] is None else (raw["state"]),
+            source_id=raw["source_id"],
+            source_layer_id=raw["source_layer_id"],
+            state=raw["state"],
         )
 
 
@@ -1958,7 +1904,7 @@ class RenderedFeatureQueryOptions:
             layer_ids=None
             if raw["layer_ids"] is None
             else (tuple(item for item in raw["layer_ids"])),
-            filter=None if raw["filter"] is None else (raw["filter"]),
+            filter=raw["filter"],
         )
 
     @classmethod
@@ -2049,25 +1995,17 @@ class ResourceRequest:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            requested_url=None
-            if raw["requested_url"] is None
-            else (raw["requested_url"]),
-            resolved_url=None if raw["resolved_url"] is None else (raw["resolved_url"]),
+            requested_url=raw["requested_url"],
+            resolved_url=raw["resolved_url"],
             kind=ResourceKind(raw["kind"]),
             loading_method=ResourceLoadingMethod(raw["loading_method"]),
             priority=ResourcePriority(raw["priority"]),
             usage=ResourceUsage(raw["usage"]),
             storage_policy=ResourceStoragePolicy(raw["storage_policy"]),
-            range=None
-            if raw["range"] is None
-            else (ResourceRequestRange._from_native(raw["range"])),
-            prior_modified_unix_ms=None
-            if raw["prior_modified_unix_ms"] is None
-            else (raw["prior_modified_unix_ms"]),
-            prior_expires_unix_ms=None
-            if raw["prior_expires_unix_ms"] is None
-            else (raw["prior_expires_unix_ms"]),
-            prior_etag=None if raw["prior_etag"] is None else (raw["prior_etag"]),
+            range=_maybe(ResourceRequestRange._from_native, raw["range"]),
+            prior_modified_unix_ms=raw["prior_modified_unix_ms"],
+            prior_expires_unix_ms=raw["prior_expires_unix_ms"],
+            prior_etag=raw["prior_etag"],
             prior_data=raw["prior_data"],
         )
 
@@ -2100,20 +2038,12 @@ class ResourceResponse:
             status=ResourceResponseStatus(raw["status"]),
             error_reason=ResourceErrorReason(raw["error_reason"]),
             bytes=raw["bytes"],
-            error_message=None
-            if raw["error_message"] is None
-            else (raw["error_message"]),
+            error_message=raw["error_message"],
             must_revalidate=raw["must_revalidate"],
-            modified_unix_ms=None
-            if raw["modified_unix_ms"] is None
-            else (raw["modified_unix_ms"]),
-            expires_unix_ms=None
-            if raw["expires_unix_ms"] is None
-            else (raw["expires_unix_ms"]),
-            etag=None if raw["etag"] is None else (raw["etag"]),
-            retry_after_unix_ms=None
-            if raw["retry_after_unix_ms"] is None
-            else (raw["retry_after_unix_ms"]),
+            modified_unix_ms=raw["modified_unix_ms"],
+            expires_unix_ms=raw["expires_unix_ms"],
+            etag=raw["etag"],
+            retry_after_unix_ms=raw["retry_after_unix_ms"],
         )
 
 
@@ -2286,8 +2216,8 @@ class RuntimeOptions:
     def _from_native(cls, raw):
         return cls(
             flags=raw["flags"],
-            asset_path=None if raw["asset_path"] is None else (raw["asset_path"]),
-            cache_path=None if raw["cache_path"] is None else (raw["cache_path"]),
+            asset_path=raw["asset_path"],
+            cache_path=raw["cache_path"],
             event_mask=RuntimeEventMask(raw["event_mask"]),
             event_wake=Wake._from_native(raw["event_wake"]),
         )
@@ -2344,7 +2274,7 @@ class SourceFeatureQueryOptions:
             source_layer_ids=None
             if raw["source_layer_ids"] is None
             else (tuple(item for item in raw["source_layer_ids"])),
-            filter=None if raw["filter"] is None else (raw["filter"]),
+            filter=raw["filter"],
         )
 
     @classmethod
@@ -2377,15 +2307,9 @@ class StyleImageInfo:
             byte_length=raw["byte_length"],
             stretch_x_count=raw["stretch_x_count"],
             stretch_y_count=raw["stretch_y_count"],
-            content=None
-            if raw["content"] is None
-            else (ImageContent._from_native(raw["content"])),
-            text_fit_width=None
-            if raw["text_fit_width"] is None
-            else (StyleImageTextFit(raw["text_fit_width"])),
-            text_fit_height=None
-            if raw["text_fit_height"] is None
-            else (StyleImageTextFit(raw["text_fit_height"])),
+            content=_maybe(ImageContent._from_native, raw["content"]),
+            text_fit_width=_maybe(StyleImageTextFit, raw["text_fit_width"]),
+            text_fit_height=_maybe(StyleImageTextFit, raw["text_fit_height"]),
             pixel_ratio=raw["pixel_ratio"],
             sdf=raw["sdf"],
         )
@@ -2416,17 +2340,11 @@ class StyleImageOptions:
             stretch_y=None
             if raw["stretch_y"] is None
             else (tuple(ImageStretch._from_native(item) for item in raw["stretch_y"])),
-            content=None
-            if raw["content"] is None
-            else (ImageContent._from_native(raw["content"])),
-            text_fit_width=None
-            if raw["text_fit_width"] is None
-            else (StyleImageTextFit(raw["text_fit_width"])),
-            text_fit_height=None
-            if raw["text_fit_height"] is None
-            else (StyleImageTextFit(raw["text_fit_height"])),
-            pixel_ratio=None if raw["pixel_ratio"] is None else (raw["pixel_ratio"]),
-            sdf=None if raw["sdf"] is None else (raw["sdf"]),
+            content=_maybe(ImageContent._from_native, raw["content"]),
+            text_fit_width=_maybe(StyleImageTextFit, raw["text_fit_width"]),
+            text_fit_height=_maybe(StyleImageTextFit, raw["text_fit_height"]),
+            pixel_ratio=raw["pixel_ratio"],
+            sdf=raw["sdf"],
         )
 
     @classmethod
@@ -2486,8 +2404,8 @@ class StyleLayerEntry:
         return cls(
             id=raw["id"],
             type=raw["type"],
-            source_id=None if raw["source_id"] is None else (raw["source_id"]),
-            source_layer=None if raw["source_layer"] is None else (raw["source_layer"]),
+            source_id=raw["source_id"],
+            source_layer=raw["source_layer"],
         )
 
 
@@ -2518,8 +2436,8 @@ class StyleLayerResult:
     def _from_native(cls, raw):
         return cls(
             info=StyleLayerInfo._from_native(raw["info"]),
-            source_id=None if raw["source_id"] is None else (raw["source_id"]),
-            source_layer=None if raw["source_layer"] is None else (raw["source_layer"]),
+            source_id=raw["source_id"],
+            source_layer=raw["source_layer"],
         )
 
 
@@ -2542,23 +2460,13 @@ class StyleSourceInfo:
             type=StyleSourceType(raw["type"]),
             id_size=raw["id_size"],
             is_volatile=raw["is_volatile"],
-            attribution_size=None
-            if raw["attribution_size"] is None
-            else (raw["attribution_size"]),
-            url_size=None if raw["url_size"] is None else (raw["url_size"]),
-            tilejson=None
-            if raw["tilejson"] is None
-            else (StyleSourceTileInfo._from_native(raw["tilejson"])),
-            bounds=None
-            if raw["bounds"] is None
-            else (LatLngBounds._from_native(raw["bounds"])),
-            tile_size=None if raw["tile_size"] is None else (raw["tile_size"]),
-            vector_encoding=None
-            if raw["vector_encoding"] is None
-            else (StyleVectorTileEncoding(raw["vector_encoding"])),
-            raster_encoding=None
-            if raw["raster_encoding"] is None
-            else (StyleRasterDemEncoding(raw["raster_encoding"])),
+            attribution_size=raw["attribution_size"],
+            url_size=raw["url_size"],
+            tilejson=_maybe(StyleSourceTileInfo._from_native, raw["tilejson"]),
+            bounds=_maybe(LatLngBounds._from_native, raw["bounds"]),
+            tile_size=raw["tile_size"],
+            vector_encoding=_maybe(StyleVectorTileEncoding, raw["vector_encoding"]),
+            raster_encoding=_maybe(StyleRasterDemEncoding, raw["raster_encoding"]),
         )
 
 
@@ -2573,8 +2481,8 @@ class StyleSourceResult:
     def _from_native(cls, raw):
         return cls(
             info=StyleSourceInfo._from_native(raw["info"]),
-            attribution=None if raw["attribution"] is None else (raw["attribution"]),
-            url=None if raw["url"] is None else (raw["url"]),
+            attribution=raw["attribution"],
+            url=raw["url"],
             tile_urls=None
             if raw["tile_urls"] is None
             else (tuple(item for item in raw["tile_urls"])),
@@ -2621,20 +2529,14 @@ class StyleTileSourceOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            min_zoom=None if raw["min_zoom"] is None else (raw["min_zoom"]),
-            max_zoom=None if raw["max_zoom"] is None else (raw["max_zoom"]),
-            attribution=None if raw["attribution"] is None else (raw["attribution"]),
-            scheme=None if raw["scheme"] is None else (StyleTileScheme(raw["scheme"])),
-            bounds=None
-            if raw["bounds"] is None
-            else (LatLngBounds._from_native(raw["bounds"])),
-            tile_size=None if raw["tile_size"] is None else (raw["tile_size"]),
-            vector_encoding=None
-            if raw["vector_encoding"] is None
-            else (StyleVectorTileEncoding(raw["vector_encoding"])),
-            raster_encoding=None
-            if raw["raster_encoding"] is None
-            else (StyleRasterDemEncoding(raw["raster_encoding"])),
+            min_zoom=raw["min_zoom"],
+            max_zoom=raw["max_zoom"],
+            attribution=raw["attribution"],
+            scheme=_maybe(StyleTileScheme, raw["scheme"]),
+            bounds=_maybe(LatLngBounds._from_native, raw["bounds"]),
+            tile_size=raw["tile_size"],
+            vector_encoding=_maybe(StyleVectorTileEncoding, raw["vector_encoding"]),
+            raster_encoding=_maybe(StyleRasterDemEncoding, raw["raster_encoding"]),
         )
 
     @classmethod
@@ -2653,11 +2555,9 @@ class StyleTransitionOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            duration_ms=None if raw["duration_ms"] is None else (raw["duration_ms"]),
-            delay_ms=None if raw["delay_ms"] is None else (raw["delay_ms"]),
-            enable_placement_transitions=None
-            if raw["enable_placement_transitions"] is None
-            else (raw["enable_placement_transitions"]),
+            duration_ms=raw["duration_ms"],
+            delay_ms=raw["delay_ms"],
+            enable_placement_transitions=raw["enable_placement_transitions"],
         )
 
     @classmethod

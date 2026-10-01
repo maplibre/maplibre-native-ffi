@@ -200,19 +200,12 @@ def sources(values, plan):
     {"let _reentry = GeneratedCallbackPolicy::enter(&[], 0);" if callback.reentry == "forbid" else ""}
     {policy_guard}
     {decision_setup}
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {{
-        Python::try_attach(|py| -> PyResult<{ffi_type(callback.result)}> {{
-            {scope}
-            let Some(callback) = (unsafe {{ generated_get_callback(py, {callback.context}, {index}) }}) else {{ return Ok({failure}); }};
-            let {"_result" if callback.result.native == "void" else "result"} = callback.bind(py).call1(({copied}))?;
-            {result}
-        }}).unwrap_or(Ok({failure}))
-    }}));
-    match result {{
-        Ok(Ok(result)) => result,
-        Ok(Err(error)) => {{ Python::try_attach(|py| error.write_unraisable(py, None)); {failure} }},
-        Err(_) => {failure},
-    }}
+    generated_invoke(|| {failure}, |py| {{
+        {scope}
+        let Some(callback) = (unsafe {{ generated_get_callback(py, {callback.context}, {index}) }}) else {{ return Ok({failure}); }};
+        let {"_result" if callback.result.native == "void" else "result"} = callback.bind(py).call1(({copied}))?;
+        {result}
+    }})
 }}
 """)
     record_rust, record_python = values.record_sources(

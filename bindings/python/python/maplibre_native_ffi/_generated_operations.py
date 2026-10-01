@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, NamedTuple, TypeVar
 from . import _native
 from ._completion import CommandCompletion
 from ._future import map_future
+from ._generated_values import _maybe
 from ._operation import GeneratedOperations, _adopt_future, _adopt_value, _with_view
 
 R = TypeVar("R")
@@ -458,26 +459,17 @@ class _MapHandleOperations(GeneratedOperations):
 
     def copy_layer_source_id(self, layer_id: str) -> Future[str | None]:
         """Call mln_map_copy_layer_source_id."""
-        return map_future(
-            self._native.copy_layer_source_id(layer_id),
-            lambda value: None if value is None else (value),
-        )
+        return self._native.copy_layer_source_id(layer_id)
 
     def copy_layer_source_layer(self, layer_id: str) -> Future[str | None]:
         """Call mln_map_copy_layer_source_layer."""
-        return map_future(
-            self._native.copy_layer_source_layer(layer_id),
-            lambda value: None if value is None else (value),
-        )
+        return self._native.copy_layer_source_layer(layer_id)
 
     def copy_style_image_premultiplied_rgba8(
         self, image_id: str
     ) -> Future[bytes | None]:
         """Call mln_map_copy_style_image_premultiplied_rgba8."""
-        return map_future(
-            self._native.copy_style_image_premultiplied_rgba8(image_id),
-            lambda value: None if value is None else (value),
-        )
+        return self._native.copy_style_image_premultiplied_rgba8(image_id)
 
     def copy_style_image_stretches(
         self, image_id: str
@@ -485,26 +477,16 @@ class _MapHandleOperations(GeneratedOperations):
         """Call mln_map_copy_style_image_stretches."""
         return map_future(
             self._native.copy_style_image_stretches(image_id),
-            lambda value: (
-                None
-                if value is None
-                else (StyleImageStretchesResult._from_native(value))
-            ),
+            lambda value: _maybe(StyleImageStretchesResult._from_native, value),
         )
 
     def copy_style_source_attribution(self, source_id: str) -> Future[str | None]:
         """Call mln_map_copy_style_source_attribution."""
-        return map_future(
-            self._native.copy_style_source_attribution(source_id),
-            lambda value: None if value is None else (value),
-        )
+        return self._native.copy_style_source_attribution(source_id)
 
     def copy_style_source_url(self, source_id: str) -> Future[str | None]:
         """Call mln_map_copy_style_source_url."""
-        return map_future(
-            self._native.copy_style_source_url(source_id),
-            lambda value: None if value is None else (value),
-        )
+        return self._native.copy_style_source_url(source_id)
 
     def dump_debug_logs(self) -> Future[CommandCompletion]:
         """Call mln_map_dump_debug_logs."""
@@ -533,59 +515,41 @@ class _MapHandleOperations(GeneratedOperations):
 
     def get_layer_filter(self, layer_id: str) -> Future[bytes | None]:
         """Call mln_map_get_layer_filter."""
-        return map_future(
-            self._native.get_layer_filter(layer_id),
-            lambda value: None if value is None else (value),
-        )
+        return self._native.get_layer_filter(layer_id)
 
     def get_layer_property(
         self, layer_id: str, property_name: str
     ) -> Future[bytes | None]:
         """Call mln_map_get_layer_property."""
-        return map_future(
-            self._native.get_layer_property(layer_id, property_name),
-            lambda value: None if value is None else (value),
-        )
+        return self._native.get_layer_property(layer_id, property_name)
 
     def get_style_image_info(self, image_id: str) -> Future[StyleImageResult | None]:
         """Call mln_map_get_style_image_info."""
         return map_future(
             self._native.get_style_image_info(image_id),
-            lambda value: (
-                None if value is None else (StyleImageResult._from_native(value))
-            ),
+            lambda value: _maybe(StyleImageResult._from_native, value),
         )
 
     def get_style_layer_info(self, layer_id: str) -> Future[StyleLayerResult | None]:
         """Call mln_map_get_style_layer_info."""
         return map_future(
             self._native.get_style_layer_info(layer_id),
-            lambda value: (
-                None if value is None else (StyleLayerResult._from_native(value))
-            ),
+            lambda value: _maybe(StyleLayerResult._from_native, value),
         )
 
     def get_style_layer_json(self, layer_id: str) -> Future[bytes | None]:
         """Call mln_map_get_style_layer_json."""
-        return map_future(
-            self._native.get_style_layer_json(layer_id),
-            lambda value: None if value is None else (value),
-        )
+        return self._native.get_style_layer_json(layer_id)
 
     def get_style_light_property(self, property_name: str) -> Future[bytes | None]:
         """Call mln_map_get_style_light_property."""
-        return map_future(
-            self._native.get_style_light_property(property_name),
-            lambda value: None if value is None else (value),
-        )
+        return self._native.get_style_light_property(property_name)
 
     def get_style_source_info(self, source_id: str) -> Future[StyleSourceResult | None]:
         """Call mln_map_get_style_source_info."""
         return map_future(
             self._native.get_style_source_info(source_id),
-            lambda value: (
-                None if value is None else (StyleSourceResult._from_native(value))
-            ),
+            lambda value: _maybe(StyleSourceResult._from_native, value),
         )
 
     def get_style_source_tile_urls(
@@ -594,11 +558,7 @@ class _MapHandleOperations(GeneratedOperations):
         """Call mln_map_get_style_source_tile_urls."""
         return map_future(
             self._native.get_style_source_tile_urls(source_id),
-            lambda value: (
-                None
-                if value is None
-                else (StyleSourceTileUrlsResult._from_native(value))
-            ),
+            lambda value: _maybe(StyleSourceTileUrlsResult._from_native, value),
         )
 
     def get_style_transition_options(self) -> Future[StyleTransitionOptions]:
@@ -1443,9 +1403,7 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """Call mln_runtime_offline_region_get."""
         return map_future(
             self._native.offline_region_get(region_id),
-            lambda value: (
-                None if value is None else (OfflineRegionInfo._from_native(value))
-            ),
+            lambda value: _maybe(OfflineRegionInfo._from_native, value),
         )
 
     def offline_region_get_status(self, region_id: int) -> Future[OfflineRegionStatus]:

@@ -28,6 +28,8 @@ SCALARS = {
 }
 # Public owner class names by native handle type.
 OWNERS: dict[str, str] = {}
+# Runtime adapter exports, which no owner disposes through.
+RUNTIME_EXPORTS: set[str] = set()
 # Callback decision protocols by the native handle type they issue. Their
 # owners hold the core decision state instead of a NativeHandleState.
 DECISIONS: dict[str, DecisionPlan] = {}
@@ -51,6 +53,9 @@ OWNER_MEMBERS = {"state", "closed", "close", "id"}
 LOCAL_NAMES = {
     "self",
     "py",
+    "call",
+    "read",
+    "reservation",
     "state",
     "completion",
     "handle",
@@ -88,11 +93,8 @@ def result_converter(
             raise unsupported(
                 plan.function, "owned result needs a supported handle constructor"
             )
-        converter = f"""|py, result| {{
-            let raw = completion_value::<sys::{result.native}>(result)?;
-            let state = unsafe {{ NativeHandleState::from_handle(raw, "{result.native}") }}.map_err(map_error)?.with_disposal(generated_dispose_{result.native});
-            Py::new(py, {owner} {{ state: generated_owner_state(state) }}).map(|value| value.into_any())
-        }}"""
+        # SAFETY: the completion transfers its one handle to the converter.
+        converter = f"|py, result| unsafe {{ {owner}::adopt(py, completion_value::<sys::{result.native}>(result)?, Vec::new()) }}"
         return "Any", owner, converter, None
     values.supported(result)
     public = values.type(result)
@@ -125,11 +127,9 @@ def borrows_memory(value):
 
 
 def owned_native(value, expression, callbacks=False):
-    roots = ".with_callback_roots(callback_roots.clone())" if callbacks else ""
-    state = f'unsafe {{ NativeHandleState::from_handle({expression}, "{value.native}") }}.map_err(map_error)?.with_disposal(generated_dispose_{value.native}){roots}'
-    owner = OWNERS[value.native]
-    extra = ""
-    return f"{owner} {{ state: generated_owner_state({state}){extra} }}"
+    """Adopts an output handle that an accepted call transferred."""
+    roots = "callback_roots.clone()" if callbacks else "Vec::new()"
+    return f"unsafe {{ {OWNERS[value.native]}::adopt(py, {expression}, {roots}) }}"
 
 
 def operation(
@@ -192,7 +192,7 @@ def operation(
         if scoped
         else "maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle())"
         if decision
-        else "self.state().live_handle().map(maplibre_core::handle::NativeHandle::to_raw).unwrap_or(0)"
+        else "self.admission()"
         if receiver
         else "0"
     )
@@ -200,7 +200,9 @@ def operation(
         [],
         [],
         {},
-        [f'        generated_check_operation("{plan.name}", {receiver_identity})?;'],
+        [
+            f'        let mut call = GeneratedCall::new(py, "{plan.name}", {receiver_identity})?;'
+        ],
     )
     python_arguments, native_signature = [], []
     counts = {
@@ -309,7 +311,7 @@ def operation(
         ):
             py_parameters[i] = declaration.removesuffix(" = None")
             native_signature[i] = native_signature[i].removesuffix("=None")
-    setup.insert(0, "        let storage = &mut GeneratedInputStorage::default();")
+    setup.insert(1, "        let storage = &mut call.storage;")
     abandon = bool(
         receiver
         and receiver.value.handle
@@ -329,7 +331,7 @@ def operation(
     elif plan.consumes or abandon:
         closed = "completed_python_future(py)" if plan.completion else "Ok(py.None())"
         setup += [
-            f"        let Some({'mut ' if plan.consumes else ''}reservation) = GeneratedHandleReservation::new(&self.state)? else {{ return {closed}; }};",
+            f"        let Some({'mut ' if plan.consumes else ''}reservation) = self.reserve()? else {{ return {closed}; }};",
             "        let mut handle = reservation.handle();"
             if receiver_pointer
             else "        let handle = reservation.handle();",
@@ -340,12 +342,12 @@ def operation(
         and any(borrows_memory(output.value) for output in plan.outputs)
     ):
         setup += [
-            "        let read = GeneratedReadReservation::new(&self.state)?;",
+            "        let read = self.read()?;",
             "        let handle = read.handle;",
         ]
     elif receiver:
         setup += [
-            '        let handle = self.state().live_handle().ok_or_else(|| invalid_state_error("handle is closed"))?;',
+            "        let handle = self.live()?;",
         ]
     if receiver:
         arguments[receiver.name] = (
@@ -388,34 +390,56 @@ def operation(
         arguments[plan.completion.parameter] = "completion"
         if plan.execution == "command":
             native_result = public_result = "Future[CommandCompletion]"
-            helper, converter = "submit_python_command_future", None
+            helper, converter = "command", None
         else:
             native_result, public_result, converter, _ = result_converter(plan, values)
             native_result, public_result = (
                 f"Future[{native_result}]",
                 f"Future[{public_result}]",
             )
-            helper = "submit_python_future"
+            helper = "complete"
         discard = None
         if (
             plan.result
             and plan.result.kind == "handle"
             and plan.result.ownership == "owned"
         ):
-            helper = "submit_python_owned_future"
+            helper = "complete_owned"
             discard = f"|result| {{ if !result.value.is_null() && result.value_count == 1 {{ unsafe {{ generated_dispose_{plan.result.native}(result.value.cast::<sys::{plan.result.native}>().read()); }} }} }}"
         call = native_call(function, [arguments[p.name] for p in function.parameters])
-        body = setup + [
-            f"        {helper}(py, |completion, diagnostic| unsafe {{ generated_native_call(py, || {call}) }}"
-            + (f", {converter}" if converter else "")
-            + (f", {discard}" if discard else "")
-            + ")"
+        # The converters run outside the native call's unsafe contract.
+        body = [
+            *setup,
+            *(
+                [
+                    "        let convert = "
+                    + converter.replace(
+                        "|py, result|",
+                        "|py: Python<'_>, result: &sys::mln_completion_result|",
+                        1,
+                    )
+                    + ";"
+                ]
+                if converter
+                else []
+            ),
+            *(
+                [
+                    f"        let discard: unsafe fn(&sys::mln_completion_result) = {discard};"
+                ]
+                if discard
+                else []
+            ),
+            f"        unsafe {{ call.{helper}(|completion, diagnostic| {call}"
+            + (", convert" if converter else "")
+            + (", discard" if discard else "")
+            + ") }",
         ]
         expression = f"self._native.{name}({', '.join(python_arguments)})"
         if plan.consumes:
             body[-1] += "?;"
             body[-1] = body[-1].replace(
-                f"        {helper}(", f"        let future = {helper}(", 1
+                "        unsafe {", "        let future = unsafe {", 1
             )
             body.extend(["        reservation.commit();", "        Ok(future)"])
         if outputs:
@@ -429,7 +453,7 @@ def operation(
                 )
             body[-1] += "?;"
             body[-1] = body[-1].replace(
-                f"        {helper}(", f"        let future = {helper}(", 1
+                "        unsafe {", "        let future = unsafe {", 1
             )
             for output, value in outputs:
                 body.append(
@@ -437,7 +461,7 @@ def operation(
                 )
             for output, value in outputs:
                 body.append(
-                    f"        let {output}_python = Py::new(py, {owned_native(value, output + '_owner.take()', bool(plan.registrations))})?;"
+                    f"        let {output}_python = {owned_native(value, output + '_owner.take()', bool(plan.registrations))}?;"
                 )
             body.append("        let result = PyDict::new(py);")
             for output, _ in outputs:
@@ -488,7 +512,7 @@ def operation(
         if decision and plan.name == decision.handle.release:
             body = [line for line in setup if "let storage =" not in line] + [
                 # Native release retires the cancel registration and its root.
-                "        unsafe { generated_native_call(py, || self.state.close()) };",
+                "        unsafe { call.run(|| self.state.close()) };",
                 "        Ok(py.None())",
             ]
             rust = (
@@ -505,18 +529,18 @@ def operation(
             )
         status = ctype(function.return_type) == "mln_status"
         body = setup + [
-            f"        let result = maplibre_core::check(|diagnostic| unsafe {{ generated_native_call(py, || {call}) }});"
+            f"        let result = unsafe {{ call.status(|diagnostic| {call}) }};"
             if status
-            else f"        let result = unsafe {{ generated_native_call(py, || {call}) }};"
+            else f"        let result = unsafe {{ call.run(|| {call}) }};"
         ]
         if decision and plan.name == decision.complete:
             body[-1] = (
-                f"        let result = unsafe {{ generated_native_call(py, || self.state.complete_with(|handle| maplibre_core::check(|diagnostic| {call}))) }};"
+                f"        let result = unsafe {{ call.run(|| self.state.complete_with(|handle| maplibre_core::check(|diagnostic| {call}))) }}.map_err(map_error);"
             )
         if status:
             if plan.consumes == "always":
                 body.append("        reservation.commit();")
-            body.append("        result.map_err(map_error)?;")
+            body.append("        result?;")
             if abandon:
                 state = "self.state()"
                 body.append(f"        {state}.views_valid = false;")
@@ -541,7 +565,7 @@ def operation(
             if value.kind == "handle" and value.ownership == "owned":
                 result_owner = OWNERS[value.native]
                 body.append(
-                    f"        Py::new(py, {owned_native(value, output, bool(plan.registrations))}).map(|value| value.into_any())"
+                    f"        {owned_native(value, output, bool(plan.registrations))}"
                 )
                 public_result = result_owner
                 expression = f"_adopt_value({expression}, {result_owner!r}, {'self' if receiver and value.handle and value.handle.parent else 'None'})"
@@ -586,7 +610,7 @@ def operation(
             index = next(i for i, line in enumerate(body) if f"{helper}(" in line)
             body[index] = (
                 body[index].replace(
-                    f"        {helper}(", f"        let future = {helper}(", 1
+                    "        unsafe {", "        let future = unsafe {", 1
                 )
                 + "?;"
             )
@@ -596,17 +620,8 @@ def operation(
                 next(i for i, line in enumerate(body) if "let future = " in line) + 1
             )
         else:
-            accepted = (
-                next(
-                    i
-                    for i, line in enumerate(body)
-                    if "result.map_err(map_error)?" in line
-                )
-                + 1
-            )
-        body.insert(
-            accepted, "        let callback_roots = storage.accept_callbacks();"
-        )
+            accepted = next(i for i, line in enumerate(body) if "result?;" in line) + 1
+        body.insert(accepted, "        let callback_roots = call.accept_callbacks();")
         if not outputs:
             if not receiver:
                 raise unsupported(
@@ -617,8 +632,9 @@ def operation(
                 accepted + 1,
                 f"        {owner_state}.retain_callback_roots(callback_roots);",
             )
-    if not any("storage" in line for line in body[1:]):
+    if not any("storage" in line for line in body[2:]):
         body = [line for line in body if "let storage =" not in line]
+    body = compact(body)
     rust_arguments = ", ".join(["&self", "py: Python<'_>", *rust_parameters])
     rust = f"""    #[pyo3(signature = ({", ".join(native_signature)}))]
     fn {name}({rust_arguments}) -> PyResult<Py<PyAny>> {{
@@ -668,42 +684,44 @@ def operation(
     return owner, rust, facade, stub, product
 
 
+def compact(body: list[str]) -> list[str]:
+    """Checks a status where the call makes it, and returns a final copy as is."""
+    result = []
+    for line in body:
+        if (
+            line == "        result?;"
+            and result
+            and result[-1].startswith("        let result = ")
+        ):
+            result[-1] = (
+                "        "
+                + result[-1].strip().removeprefix("let result = ")[:-1]
+                + "?;"
+            )
+            continue
+        result.append(line)
+    last = result[-1].strip()
+    if last.startswith("Ok(") and last.endswith("?)") and last.count("?") == 1:
+        result[-1] = "        " + last[3:-2]
+    return result
+
+
 def state_owner(owner: str, handle: HandlePlan) -> str:
-    """Emit the PyO3 class for a handle whose ownership NativeHandleState tracks."""
+    """Declare the PyO3 class for a handle whose ownership NativeHandleState tracks."""
     native = handle.native
     read_scope = (
-        f"GeneratedReadScope::with_native::<sys::{native}, _>(py, Arc::clone(&self.state), sys::{handle.view_begin}, sys::{handle.view_end})"
+        f"|py, owner| GeneratedReadScope::with_native::<sys::{native}, _>(py, Arc::clone(&owner.state), sys::{handle.view_begin}, sys::{handle.view_end})"
         if handle.view_begin
-        else f"GeneratedReadScope::new::<sys::{native}, _>(Arc::clone(&self.state))"
+        else f"|_, owner| GeneratedReadScope::new::<sys::{native}, _>(Arc::clone(&owner.state))"
     )
-    return f"""
-#[pyclass(name = "_{owner}")]
-struct {owner} {{ state: Arc<Mutex<NativeHandleState<sys::{native}>>> }}
-impl {owner} {{
-    fn state(&self) -> MutexGuard<'_, NativeHandleState<sys::{native}>> {{
-        self.state.lock().unwrap_or_else(|p| p.into_inner())
-    }}
-}}
-#[pymethods]
-impl {owner} {{
-    #[getter]
-    fn closed(&self) -> bool {{ self.state().is_closed() }}
-    #[getter]
-    fn id(&self) -> u64 {{ self.state().issued_id() }}
-    fn __traverse__(&self, visit: pyo3::gc::PyVisit<'_>) -> Result<(), pyo3::gc::PyTraverseError> {{
-        self.state().traverse_callbacks(&visit)
-    }}
-    fn __clear__(&self) {{
-        let callbacks = self.state().take_callbacks();
-        drop(callbacks);
-    }}
-    fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {{
-        let _ = py;
-        generated_check_reentry()?;
-        {read_scope}
-    }}
-}}
-"""
+    dispose = (
+        f"Some(generated_dispose_{native})"
+        if handle.dispose and handle.dispose not in RUNTIME_EXPORTS
+        else "None"
+    )
+    return (
+        f'generated_owner!({owner}, "_{owner}", {native}, {dispose}, {read_scope});\n'
+    )
 
 
 def decision_owner(owner: str) -> str:
@@ -766,6 +784,8 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
             for name in bound.public_handles
         }
     )
+    RUNTIME_EXPORTS.clear()
+    RUNTIME_EXPORTS.update(bound.source.runtime_exports)
     DECISIONS.clear()
     DECISIONS.update(
         {
@@ -833,8 +853,11 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     for handle in bound.handles.values():
         if not handle.dispose or handle.dispose in bound.source.runtime_exports:
             continue
-        if f"generated_dispose_{handle.native}" not in rust_values + "".join(
-            "".join(methods) for methods in rust.values()
+        state_owned = handle.native in OWNERS and handle.native not in DECISIONS
+        if (
+            not state_owned
+            and f"generated_dispose_{handle.native}"
+            not in rust_values + "".join("".join(methods) for methods in rust.values())
         ):
             continue
         disposer = bound.source.functions_by_name[handle.dispose]
@@ -912,7 +935,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         if not values.records.get(record, values.enums.get(record)).response
     )
     files["python/maplibre_native_ffi/_generated_operations.py"] = (
-        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom concurrent.futures import Future\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple, TypeVar\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_future, _adopt_value, _with_view\nR = TypeVar("R")\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join([*OWNERS.values(), *scope_owners.values()]) or "__name__"}\n\n'
+        f'"""{notice}"""\n\nfrom __future__ import annotations\n\nfrom concurrent.futures import Future\nfrom dataclasses import dataclass\nfrom typing import TYPE_CHECKING, Any, Callable, NamedTuple, TypeVar\nfrom . import _native\nfrom ._completion import CommandCompletion\nfrom ._future import map_future\nfrom ._operation import GeneratedOperations, _adopt_future, _adopt_value, _with_view\nfrom ._generated_values import _maybe\nR = TypeVar("R")\n{imports}\nif TYPE_CHECKING:\n    from ._generated_owners import {", ".join([*OWNERS.values(), *scope_owners.values()]) or "__name__"}\n\n'
         + "\n".join(sorted(records))
         + "\n".join(
             f"class _{owner}Operations(GeneratedOperations):\n    _native: _native._{owner}\n\n{chr(10).join(methods)}"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import keyword
 import os
+import re
 from dataclasses import replace
 from typing import NoReturn
 
@@ -74,6 +75,14 @@ def rust_field(name: str) -> str:
 
 def optional(plan: ValuePlan) -> bool:
     return plan.nullable or plan.optional == "empty"
+
+
+def optional_copy(present: str, copy: str) -> str:
+    """Copies a value that is `None` unless `present` holds."""
+    lazy = f"|| Ok({copy})"
+    if copy.endswith("?") and copy.count("?") == 1 and copy.startswith("generated_"):
+        lazy = f"|| {copy[:-1]}"
+    return f"generated_optional(py, {present}, {lazy})?"
 
 
 class Values:
@@ -269,6 +278,7 @@ class Values:
             yield flag.name.removeprefix(prefix).lower(), None, flag, None
 
     def copy(self, plan: ValuePlan, expr: str, *, scope: str = "value") -> str:
+        """An expression that copies the C value `expr` into a Python object."""
         expr = f"({expr})" if expr.startswith(("*", "unsafe ")) else expr
         if plan.kind == "native_pointer":
             pointer = (
@@ -278,9 +288,7 @@ class Values:
                 or (plan.ctype.pointee and plan.ctype.pointee.result)
                 else f"{expr} as usize"
             )
-            return (
-                f"pyo3::BoundObject::unbind(({pointer}).into_pyobject(py)?).into_any()"
-            )
+            return f"generated_value(py, {pointer})?"
         if plan.kind == "union":
             arms = []
             for field in plan.fields:
@@ -290,15 +298,15 @@ class Values:
                     scope=scope,
                 )
                 arms.append(
-                    f'sys::{field.presence.variant} => {{ let variant = PyDict::new(py); variant.set_item("kind", "{field.name}")?; variant.set_item("value", {value})?; variant.into_any().unbind() }}'
+                    f'sys::{field.presence.variant} => generated_variant(py, "{field.name}", {value})?'
                 )
             return (
                 f"match {scope}.{rust_field(plan.tag)} {{ "
                 + ", ".join(arms)
-                + ', tag => { let variant = PyDict::new(py); variant.set_item("kind", py.None())?; variant.set_item("tag", tag)?; variant.into_any().unbind() } }'
+                + ", tag => generated_unknown_variant(py, tag)? }"
             )
         if plan.kind in {"scalar", "enum"}:
-            return f"pyo3::BoundObject::unbind(({expr}).into_pyobject(py)?).into_any()"
+            return f"generated_value(py, {expr})?"
         if plan.kind == "buffer":
             if plan.ctype.pointee:
                 if plan.length != "nul":
@@ -317,24 +325,22 @@ class Values:
                         view,
                         scope=scope,
                     )
-                text = f'unsafe {{ std::ffi::CStr::from_ptr({expr}) }}.to_str().map_err(|_| native_error("native string is not UTF-8"))?.into_pyobject(py)?.into_any().unbind()'
-                if optional(plan):
-                    return f"if {expr}.is_null() {{ py.None() }} else {{ {text} }}"
-                return f'{{ if {expr}.is_null() {{ return Err(native_error("null native string")); }} {text} }}'
+                return f"unsafe {{ generated_c_string(py, {expr}, {str(optional(plan)).lower()}) }}?"
             argument = (
                 expr[1:-1] if expr.startswith("(*") and expr.endswith(")") else expr
             )
-            if plan.encoding == "utf8":
-                body = f"copied_string_view({argument})?.into_pyobject(py)?.into_any().unbind()"
-            else:
-                body = f"PyBytes::new(py, unsafe {{ generated_slice({expr}.data.cast::<u8>(), {expr}.size)? }}).into_any().unbind()"
+            body = (
+                f"generated_text(py, {argument})?"
+                if plan.encoding == "utf8"
+                else f"unsafe {{ generated_bytes(py, {argument}) }}?"
+            )
             if optional(plan):
-                absent = (
-                    f"{expr}.size == 0"
+                present = (
+                    f"{expr}.size != 0"
                     if plan.optional == "empty"
-                    else f"{expr}.data.is_null()"
+                    else f"!{expr}.data.is_null()"
                 )
-                return f"if {absent} {{ py.None() }} else {{ {body} }}"
+                return optional_copy(present, body)
             return body
         if plan.kind == "record":
             return f"generated_copy_{plan.native}(py, &{expr})?"
@@ -347,7 +353,7 @@ class Values:
                 + " }"
             )
             if plan.nullable:
-                return f"if {expr}.is_null() {{ py.None() }} else {{ {child} }}"
+                return optional_copy(f"!{expr}.is_null()", child)
             return f'{{ if {expr}.is_null() {{ return Err(native_error("null record pointer")); }} {child} }}'
         if plan.kind == "array" and plan.element:
             count = (
@@ -365,21 +371,25 @@ class Values:
             item = self.copy(
                 plan.element, "element" if plan.stride else "*element", scope=scope
             )
-            enrichment = ""
             if plan.item_buffer:
                 arena = plan.item_buffer
                 content = f"generated_arena_string({scope}.{rust_field(arena.data)}.cast(), {scope}.{rust_field(arena.size)} as usize, element.{rust_field(arena.offset)} as usize, element.{rust_field(arena.length)} as usize)?"
-                enrichment = f'item.bind(py).cast::<PyDict>()?.set_item("{arena.field}", unsafe {{ {content} }})?;'
-            body = f"{{ let items = PyList::empty(py); for element in {values} {{ let item = {item}; {enrichment} items.append(item)?; }} items.into_any().unbind() }}"
+                item = f'{{ let item = {item}; item.bind(py).cast::<PyDict>()?.set_item("{arena.field}", unsafe {{ {content} }})?; item }}'
+            body = f"generated_list(py, {values}, |element| Ok({item}))?"
             if plan.nullable and plan.ctype.kind != "array":
-                body = f"if {expr}.is_null() {{ py.None() }} else {{ {body} }}"
+                body = optional_copy(f"!{expr}.is_null()", body)
             return body
         self.fail(plan, "missing output copy")
 
     def facade_copy(self, plan: ValuePlan, expr: str) -> str:
         bare = replace(plan, nullable=False, optional=None)
         if optional(plan):
-            return f"None if {expr} is None else ({self.facade_copy(bare, expr)})"
+            copied = self.facade_copy(bare, expr)
+            if copied == expr:
+                return expr
+            if bare.kind in {"record", "enum"} and not bare.response:
+                return f"_maybe({copied.removesuffix(f'({expr})')}, {expr})"
+            return f"None if {expr} is None else ({copied})"
         if plan.kind == "union":
             variants = ", ".join(
                 f"{field.name!r}: {self.variant_name(plan, field)}"
@@ -519,7 +529,19 @@ class Values:
                     if field.presence.bit
                     else f"raw.{rust_field(field.presence.mask)} = true;"
                 )
-                lines.append("if !field.is_none() { " + " ".join(statements) + " }")
+                lines[-1] = (
+                    f'if let Some(field) = generated_present(value, "{member}")? {{ '
+                    + " ".join(statements)
+                    + " }"
+                )
+            elif (
+                len(statements) == 1
+                and len(re.findall(r"\bfield\b", statements[0])) == 1
+            ):
+                # A field read once reads its attribute in place.
+                lines[-1] = re.sub(
+                    r"\bfield\b", f'value.getattr("{member}")?', statements[0]
+                )
             else:
                 lines.extend(statements)
         return lines
@@ -545,7 +567,7 @@ class Values:
     def sources(self) -> tuple[str, str]:
         rust, python = [], []
         python.append(
-            '@dataclass(frozen=True, slots=True)\nclass UnknownVariant:\n    tag: int\n\n    @property\n    def _tag(self):\n        return self.tag\n\ndef _copy_variant(raw, variants, empty=None):\n    if raw["kind"] is None:\n        return None if raw["tag"] == empty else UnknownVariant(raw["tag"])\n    return variants[raw["kind"]]._from_native(raw["value"])\n'
+            '@dataclass(frozen=True, slots=True)\nclass UnknownVariant:\n    tag: int\n\n    @property\n    def _tag(self):\n        return self.tag\n\ndef _copy_variant(raw, variants, empty=None):\n    if raw["kind"] is None:\n        return None if raw["tag"] == empty else UnknownVariant(raw["tag"])\n    return variants[raw["kind"]]._from_native(raw["value"])\n\ndef _maybe(convert, raw):\n    return None if raw is None else convert(raw)\n'
         )
         for parent in self.records.values():
             for union in (
@@ -637,12 +659,12 @@ class Values:
             else:
                 copy = self.copy(field.value, "value." + rust_field(field.name))
             if field.presence and field.presence.mask:
-                absent = (
-                    f"value.{rust_field(field.presence.mask)} & sys::{field.presence.bit} == 0"
+                present = (
+                    f"value.{rust_field(field.presence.mask)} & sys::{field.presence.bit} != 0"
                     if field.presence.bit
-                    else f"!value.{rust_field(field.presence.mask)}"
+                    else f"value.{rust_field(field.presence.mask)}"
                 )
-                copy = f"if {absent} {{ py.None() }} else {{ {copy} }}"
+                copy = optional_copy(present, copy)
             copies.append(f'dict.set_item("{member}", {copy})?;')
             public_copies.append(
                 f"{member}={self.facade_copy(value, f'raw[{member!r}]')}"
