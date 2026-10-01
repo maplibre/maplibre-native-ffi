@@ -275,6 +275,8 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
         empty_optional = function.metadata.get("optional") == "empty"
         start = "Start"
         conversion = ""
+        # A result that one initializer copies from its single native value.
+        copying = None
         if execution == "command":
             if shape != "none" or result_type != "void":
                 raise unsupported(
@@ -298,6 +300,7 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
                     else ""
                 )
                 conversion = f"try {result}(adopting: NativeCompletion.value(result, as: {plan.result.native}.self){parent})"
+                copying = f"{{ try {result}(adopting: $0{parent}) }}"
             elif function.metadata.get("ownership") != "borrowed":
                 raise unsupported(
                     function,
@@ -323,6 +326,12 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
                 value_types.add(plan.result)
                 result = value_types.public(plan.result)
                 conversion = f"{'try ' if dynamic(plan.result) else ''}{result}(raw: try NativeCompletion.value(result, as: {result_type}.self))"
+                # A copied record's initializer also takes the record's bytes.
+                copying = (
+                    f"{{ try {result}(raw: $0) }}"
+                    if dynamic(plan.result)
+                    else f"{result}.init(raw:)"
+                )
             elif (
                 shape == "array"
                 and plan.result is not None
@@ -354,7 +363,11 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
             elif nullable:
                 result += "?"
                 conversion = f"if {'result.pointee.value == nil' if shape == 'array' else 'result.pointee.value_count == 0'} {{ return nil }}; return {conversion}"
-            conversion = f", convert: {{ result in {conversion} }}"
+            conversion = (
+                f", copying: {copying}"
+                if copying and not (empty_optional or nullable)
+                else f", convert: {{ result in {conversion} }}"
+            )
         attribute = "@discardableResult\n" if execution == "command" else ""
         returns = "" if result == "Void" else f" -> {result}"
         return (

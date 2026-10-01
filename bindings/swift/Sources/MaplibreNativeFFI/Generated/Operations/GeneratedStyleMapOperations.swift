@@ -655,12 +655,7 @@ public extension MapHandle {
   func getStyleTransitionOptions() async throws -> StyleTransitionOptions {
     try await nativeStart(
       "mln_map_get_style_transition_options",
-      convert: { result in
-        try StyleTransitionOptions(raw: NativeCompletion.value(
-          result,
-          as: mln_style_transition_options.self
-        ))
-      }
+      copying: StyleTransitionOptions.init(raw:)
     ) { raw, _, completion, diagnostic in mln_map_get_style_transition_options(
       raw,
       completion,

@@ -8,10 +8,7 @@ public extension RuntimeHandle {
   func mapCreate(options bindingArg0: MapOptions) async throws -> MapHandle {
     try await nativeStart(
       "mln_map_create",
-      convert: { result in try MapHandle(
-        adopting: NativeCompletion.value(result, as: mln_map.self),
-        parent: self
-      ) }
+      copying: { try MapHandle(adopting: $0, parent: self) }
     ) { raw, arena, completion, diagnostic in mln_map_create(
       raw,
       arena.store(bindingArg0.nativeValue()),
@@ -27,10 +24,7 @@ public extension RuntimeHandle {
   ) async throws -> OfflineRegionInfo {
     try await nativeStart(
       "mln_runtime_offline_region_create",
-      convert: { result in try OfflineRegionInfo(raw: NativeCompletion.value(
-        result,
-        as: mln_offline_region_info.self
-      )) }
+      copying: { try OfflineRegionInfo(raw: $0) }
     ) { raw, arena, completion, diagnostic in
       try mln_runtime_offline_region_create(
         raw,
@@ -85,10 +79,7 @@ public extension RuntimeHandle {
   {
     try await nativeStart(
       "mln_runtime_offline_region_get_status",
-      convert: { result in try OfflineRegionStatus(raw: NativeCompletion.value(
-        result,
-        as: mln_offline_region_status.self
-      )) }
+      copying: OfflineRegionStatus.init(raw:)
     ) { raw, _, completion, diagnostic in mln_runtime_offline_region_get_status(
       raw,
       bindingArg0,
@@ -148,10 +139,7 @@ public extension RuntimeHandle {
   ) async throws -> OfflineRegionInfo {
     try await nativeStart(
       "mln_runtime_offline_region_update_metadata",
-      convert: { result in try OfflineRegionInfo(raw: NativeCompletion.value(
-        result,
-        as: mln_offline_region_info.self
-      )) }
+      copying: { try OfflineRegionInfo(raw: $0) }
     ) { raw, arena, completion, diagnostic in
       try mln_runtime_offline_region_update_metadata(
         raw,

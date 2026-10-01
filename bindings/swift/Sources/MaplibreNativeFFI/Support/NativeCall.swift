@@ -107,6 +107,19 @@ extension NativeReceiver {
     }
   }
 
+  /// Starts work and awaits its completion's one native value, which `copy`
+  /// converts.
+  func nativeStart<Raw, T: Sendable>(
+    _ operation: String,
+    _ access: NativeAccess = .live,
+    copying copy: @escaping (Raw) throws -> T,
+    _ call: NativeStartCall
+  ) async throws -> T {
+    try await nativeStart(operation, access, convert: { result in
+      try copy(NativeCompletion.value(result))
+    }, call)
+  }
+
   /// Starts work and awaits its completion.
   func nativeUnit(
     _ operation: String,
@@ -293,6 +306,18 @@ func nativeStart<T: Sendable>(
       }, convert: convert)
     }
   }
+}
+
+/// Starts global work and awaits its completion's one native value, which
+/// `copy` converts.
+func nativeStart<Raw, T: Sendable>(
+  _ operation: String,
+  copying copy: @escaping (Raw) throws -> T,
+  _ call: NativeStartCall
+) async throws -> T {
+  try await nativeStart(operation, convert: { result in
+    try copy(NativeCompletion.value(result))
+  }, call)
 }
 
 /// Starts global work and awaits its completion.

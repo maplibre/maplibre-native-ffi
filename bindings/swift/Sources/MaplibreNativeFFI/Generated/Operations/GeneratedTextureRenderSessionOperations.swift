@@ -36,12 +36,7 @@ public extension RenderSessionHandle {
   func textureReadPremultipliedRgba8() async throws -> TextureReadbackResult {
     try await nativeStart(
       "mln_texture_read_premultiplied_rgba8",
-      convert: { result in
-        try TextureReadbackResult(raw: NativeCompletion.value(
-          result,
-          as: mln_texture_readback_result.self
-        ))
-      }
+      copying: { try TextureReadbackResult(raw: $0) }
     ) { raw, _, completion, diagnostic in mln_texture_read_premultiplied_rgba8(
       raw,
       completion,

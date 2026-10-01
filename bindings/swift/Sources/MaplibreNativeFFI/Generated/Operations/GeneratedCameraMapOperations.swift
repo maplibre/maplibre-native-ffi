@@ -26,10 +26,7 @@ public extension MapHandle {
   ) async throws -> CameraOptions {
     try await nativeStart(
       "mln_map_camera_for_geometry",
-      convert: { result in try CameraOptions(raw: NativeCompletion.value(
-        result,
-        as: mln_camera_options.self
-      )) }
+      copying: CameraOptions.init(raw:)
     ) { raw, arena, completion, diagnostic in mln_map_camera_for_geometry(
       raw,
       arena.view(bindingArg0),
@@ -46,10 +43,7 @@ public extension MapHandle {
   ) async throws -> CameraOptions {
     try await nativeStart(
       "mln_map_camera_for_lat_lng_bounds",
-      convert: { result in try CameraOptions(raw: NativeCompletion.value(
-        result,
-        as: mln_camera_options.self
-      )) }
+      copying: CameraOptions.init(raw:)
     ) { raw, arena, completion, diagnostic in mln_map_camera_for_lat_lng_bounds(
       raw,
       bindingArg0.nativeValue(),
@@ -66,10 +60,7 @@ public extension MapHandle {
   ) async throws -> CameraOptions {
     try await nativeStart(
       "mln_map_camera_for_lat_lngs",
-      convert: { result in try CameraOptions(raw: NativeCompletion.value(
-        result,
-        as: mln_camera_options.self
-      )) }
+      copying: CameraOptions.init(raw:)
     ) { raw, arena, completion, diagnostic in try mln_map_camera_for_lat_lngs(
       raw,
       arena.array(bindingArg0.map { $0.nativeValue() }),
@@ -84,10 +75,7 @@ public extension MapHandle {
   func cameraQuery() async throws -> CameraQueryResult {
     try await nativeStart(
       "mln_map_camera_query",
-      convert: { result in try CameraQueryResult(raw: NativeCompletion.value(
-        result,
-        as: mln_camera_query_result.self
-      )) }
+      copying: CameraQueryResult.init(raw:)
     ) { raw, _, completion, diagnostic in mln_map_camera_query(
       raw,
       completion,
@@ -141,10 +129,7 @@ public extension MapHandle {
   {
     try await nativeStart(
       "mln_map_lat_lng_bounds_for_camera",
-      convert: { result in try LatLngBounds(raw: NativeCompletion.value(
-        result,
-        as: mln_lat_lng_bounds.self
-      )) }
+      copying: LatLngBounds.init(raw:)
     ) { raw, arena, completion, diagnostic in mln_map_lat_lng_bounds_for_camera(
       raw,
       arena.store(bindingArg0.nativeValue()),
@@ -161,10 +146,7 @@ public extension MapHandle {
   {
     try await nativeStart(
       "mln_map_lat_lng_bounds_for_camera_unwrapped",
-      convert: { result in try LatLngBounds(raw: NativeCompletion.value(
-        result,
-        as: mln_lat_lng_bounds.self
-      )) }
+      copying: LatLngBounds.init(raw:)
     ) { raw, arena, completion, diagnostic in
       mln_map_lat_lng_bounds_for_camera_unwrapped(
         raw,
@@ -179,10 +161,7 @@ public extension MapHandle {
   func latLngForPixel(point bindingArg0: ScreenPoint) async throws -> LatLng {
     try await nativeStart(
       "mln_map_lat_lng_for_pixel",
-      convert: { result in try LatLng(raw: NativeCompletion.value(
-        result,
-        as: mln_lat_lng.self
-      )) }
+      copying: LatLng.init(raw:)
     ) { raw, _, completion, diagnostic in mln_map_lat_lng_for_pixel(
       raw,
       bindingArg0.nativeValue(),
@@ -197,10 +176,7 @@ public extension MapHandle {
   {
     try await nativeStart(
       "mln_map_lat_lng_for_pixel_unwrapped",
-      convert: { result in try LatLng(raw: NativeCompletion.value(
-        result,
-        as: mln_lat_lng.self
-      )) }
+      copying: LatLng.init(raw:)
     ) { raw, _, completion, diagnostic in mln_map_lat_lng_for_pixel_unwrapped(
       raw,
       bindingArg0.nativeValue(),
@@ -270,10 +246,7 @@ public extension MapHandle {
   {
     try await nativeStart(
       "mln_map_pixel_for_lat_lng",
-      convert: { result in try ScreenPoint(raw: NativeCompletion.value(
-        result,
-        as: mln_screen_point.self
-      )) }
+      copying: ScreenPoint.init(raw:)
     ) { raw, _, completion, diagnostic in mln_map_pixel_for_lat_lng(
       raw,
       bindingArg0.nativeValue(),

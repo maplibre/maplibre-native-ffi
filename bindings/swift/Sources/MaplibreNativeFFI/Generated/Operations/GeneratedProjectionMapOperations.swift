@@ -8,12 +8,7 @@ public extension MapHandle {
   func projectionCreate() async throws -> MapProjectionHandle {
     try await nativeStart(
       "mln_map_projection_create",
-      convert: { result in
-        try MapProjectionHandle(adopting: NativeCompletion.value(
-          result,
-          as: mln_map_projection.self
-        ))
-      }
+      copying: { try MapProjectionHandle(adopting: $0) }
     ) { raw, _, completion, diagnostic in mln_map_projection_create(
       raw,
       completion,
