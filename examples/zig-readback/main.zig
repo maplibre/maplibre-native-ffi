@@ -113,9 +113,13 @@ pub fn main(init_args: std.process.Init) !void {
 
     var options = try maplibre.mapOptionsDefault();
     options.map_mode = .static;
-    // Each map update demands a frame, until one renders the fully loaded
-    // still image.
-    options.event_mask = .{ .map_render_update_available = true };
+    // Each map update demands a frame, until the still-image events report
+    // that one rendered the fully loaded image.
+    options.event_mask = .{
+        .map_render_update_available = true,
+        .map_still_image_finished = true,
+        .map_still_image_failed = true,
+    };
     var map_future = try maplibre.mapCreate(allocator, runtime, options, &diagnostic);
     defer map_future.deinit();
     var map = try map_future.wait(&diagnostic);
@@ -200,8 +204,8 @@ fn renderWithDriver(
     std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image.value.info.width, image.value.info.height });
 }
 
-/// Demands a frame for each map update until a rendered frame completes the
-/// still image. The thread sleeps between wakes.
+/// Demands a frame for each map update until a still-image event reports that
+/// the request finished. The thread sleeps between wakes.
 fn renderStillImage(
     allocator: std.mem.Allocator,
     runtime: *maplibre.Runtime,
@@ -213,11 +217,14 @@ fn renderStillImage(
     const deadline = std.Io.Clock.Timestamp.now(signal.io, .awake).addDuration(native_work_timeout);
     var next_token: u64 = 1;
     try maplibre.renderSessionRequestFrame(allocator, session, .{ .token = next_token }, null);
-    var rendered = false;
     while (true) {
         signal.reset();
         if (uses_caller_driver) _ = try maplibre.renderSessionServiceDriverWork(session, 0, null);
-        var demand = try drainRenderUpdates(allocator, runtime, map);
+        const updates = try drainMapEvents(allocator, runtime, map);
+        // The core queues the event before it runs the completion, so this
+        // wait is short.
+        if (updates.still_image_done) return still_image.wait(null);
+        var demand = updates.render_update;
         var results = maplibre.renderSessionDrainFrameResults(session, null) catch |err| switch (err) {
             error.NotReady => null,
             else => return err,
@@ -227,10 +234,7 @@ fn renderStillImage(
             for (0..try maplibre.renderFrameBatchCount(batch.*, null)) |index| {
                 const result = try maplibre.renderFrameBatchGet(batch.*, index, null);
                 switch (result.disposition) {
-                    .rendered => {
-                        rendered = true;
-                        demand = demand or result.needs_repaint;
-                    },
+                    .rendered => demand = demand or result.needs_repaint,
                     // These wait for the map's next update, which demands
                     // another frame.
                     .no_update, .size_pending, .target_not_ready, .superseded => {},
@@ -238,7 +242,6 @@ fn renderStillImage(
                 }
             }
         }
-        if (rendered and try still_image.poll()) return still_image.wait(null);
         if (demand) {
             next_token += 1;
             try maplibre.renderSessionRequestFrame(allocator, session, .{ .token = next_token }, null);
@@ -247,17 +250,30 @@ fn renderStillImage(
     }
 }
 
-/// Drains every queued runtime event and reports whether the map published a
-/// render update.
-fn drainRenderUpdates(allocator: std.mem.Allocator, runtime: *maplibre.Runtime, map: *maplibre.Map) !bool {
+/// What one drain of the runtime event queue found for the map.
+const MapEvents = struct {
+    /// The map published a render update.
+    render_update: bool = false,
+    /// The still-image request finished or failed.
+    still_image_done: bool = false,
+};
+
+/// Drains every queued runtime event.
+fn drainMapEvents(allocator: std.mem.Allocator, runtime: *maplibre.Runtime, map: *maplibre.Map) !MapEvents {
     var batch = try maplibre.runtimeDrainEvents(runtime.*, null);
     defer batch.deinit();
     var queued = try maplibre.eventBatchGet(allocator, batch, null);
     defer queued.deinit();
+    var found: MapEvents = .{};
     for (queued.value.events) |event| {
-        if (event.source_type == .map and event.source == map.raw and event.type == .map_render_update_available) return true;
+        if (event.source_type != .map or event.source != map.raw) continue;
+        switch (event.type) {
+            .map_render_update_available => found.render_update = true,
+            .map_still_image_finished, .map_still_image_failed => found.still_image_done = true,
+            else => {},
+        }
     }
-    return false;
+    return found;
 }
 
 fn logAndValidateRenderBackend() !void {
