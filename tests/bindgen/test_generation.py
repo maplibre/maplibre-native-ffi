@@ -4,7 +4,18 @@ import unittest
 
 from support import parse, protocol_groups
 
-from tools.bindgen.emitters import dart, dotnet, go, kotlin, python, rust, swift, zig
+from tools.bindgen.compiler import compile_api
+from tools.bindgen.emitters import (
+    dart,
+    dart_native,
+    dotnet,
+    go,
+    kotlin,
+    python,
+    rust,
+    swift,
+    zig,
+)
 from tools.bindgen.model import ModelError
 from tools.bindgen.schema import validate
 
@@ -80,6 +91,11 @@ BIND("execution=immediate") mln_status mln_roundtrip(mln_values input, mln_value
                 self.assertEqual(
                     self.rendered(emitter, before), self.rendered(emitter, after)
                 )
+        # Dart's declarations come from the bound model rather than the API.
+        self.assertEqual(
+            dart_native.generate(compile_api(before)),
+            dart_native.generate(compile_api(after)),
+        )
 
     def test_added_and_renamed_function_generate_without_function_tables(self):
         for emitter in EMITTERS:

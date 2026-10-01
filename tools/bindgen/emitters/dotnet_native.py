@@ -80,12 +80,16 @@ class Declarations:
         if name in self.enums:
             self.used_enums.add(name)
             return name
+        # A fixed-width name such as int64_t keeps its width whatever it
+        # expands to on the host.
+        scalar = None if name in C_LONG else SCALARS.get(name)
         typedef = self.typedefs.get(name)
-        if typedef is not None and ctype.kind == "typedef":
+        if scalar is None and typedef is not None and ctype.kind == "typedef":
             return self.type(typedef.type, pointee, field)
-        if name in C_LONG:
-            return C_LONG[name]
-        scalar = SCALARS.get(name) or SCALARS.get(ctype.canonical)
+        if scalar is None:
+            if width := C_LONG.get(name) or C_LONG.get(ctype.canonical):
+                return width
+            scalar = SCALARS.get(ctype.canonical)
         if scalar == "bool":
             # A by-value C bool crosses as its byte; a pointer to one is a
             # pointer to C#'s one-byte bool.

@@ -89,13 +89,15 @@ class Declarations:
             return name
         if name in self.enums:
             return self.native(self.enums[name].underlying_type)
+        # A fixed-width name such as int64_t keeps its width whatever it
+        # expands to on the host.
+        if name in NATIVE:
+            return NATIVE[name]
         typedef = self.typedefs.get(name)
         if typedef is not None:
             if self.callback(typedef.type):
                 return name
             return self.native(typedef.type, field)
-        if name in NATIVE:
-            return NATIVE[name]
         if ctype.canonical in NATIVE:
             return NATIVE[ctype.canonical]
         if "(*)" in ctype.canonical or ctype.canonical.endswith("*"):
