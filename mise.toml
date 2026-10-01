@@ -146,7 +146,9 @@ MLN_FFI_ANDROID_NDK_VERSION = "{{vars.android_ndk_version}}"
 
 # sccache keeps compiled objects in its own disk cache, which every checkout on
 # the machine shares; .mise/bin/with-sccache-basedirs lines the cache keys up
-# across Git worktrees. The R2 backend belongs to CI, which configures it in
+# across Git worktrees and turns preprocessor cache mode off, because that
+# mode's hits restore depfiles that name another worktree's headers. The R2
+# backend belongs to CI, which configures it in
 # .github/actions/setup-ci-deps: those keys carry the toolchain paths of the
 # runner that produced them, so a contributor machine reads its own disk cache
 # instead. CI wraps rustc there as well, where it turns incremental compilation

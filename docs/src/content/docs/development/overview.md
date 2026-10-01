@@ -144,10 +144,20 @@ runs the guest in software, where a boot takes an hour or more.
 ## Compiler Cache
 
 Native builds use [`sccache`](https://github.com/mozilla/sccache) through mise.
-`mise.toml` pins the tool and sets the public read-only R2 backend plus CMake
-compiler-launcher env, so `mise run build` and other mise tasks pick up the
-shared cache automatically. CI overrides those settings with write credentials
-when available.
+`mise.toml` pins the tool and sets it as the CMake compiler launcher, so
+`mise run build` and other mise tasks use it automatically.
+
+On a contributor machine, sccache keeps a local disk cache that every checkout
+of the repository shares. `mise run build` lists each Git worktree in
+`SCCACHE_BASEDIRS`, so a new worktree reuses the objects that its siblings
+already compiled. The same build turns sccache's preprocessor cache mode off.
+Hits in that mode restore a depfile that names the headers of the worktree that
+first compiled the source, and Ninja then misses later header edits in the
+current worktree.
+
+CI uses an R2 backend instead, which `.github/actions/setup-ci-deps` configures.
+Push runs write to it, and pull request runs read it through the public
+endpoint.
 
 ## Common Commands
 

@@ -10,9 +10,19 @@ set -euo pipefail
 # worktree reuses what its siblings already compiled instead of building the
 # vendored MapLibre Native core again.
 #
-# The server reads SCCACHE_BASEDIRS once, when it starts, so a new worktree means
-# restarting it with the wider list. Stopping the server drains the compilations
-# already in flight, which keeps a restart safe during a concurrent build.
+# Shared entries also need preprocessor cache mode (SCCACHE_DIRECT) off. That
+# mode answers a repeat compilation from a lookup keyed on the source path and
+# command line, and its hit restores the depfile stored with the shared object
+# entry. That depfile names the headers of whichever checkout first compiled
+# the source, so Ninja tracks another worktree's files and misses later header
+# edits here. With the mode off, each compilation preprocesses locally, and
+# sccache keeps the depfile that local run wrote. The object key stays the
+# preprocessed content, so worktrees still share every object.
+#
+# The server reads both settings once, when it starts, so a new worktree or a
+# server started elsewhere means a restart. Stopping the server drains the
+# compilations already in flight, which keeps a restart safe during a concurrent
+# build.
 
 if [[ $# -eq 0 ]]; then
   echo "usage: ${0##*/} <command> [args...]" >&2
@@ -38,20 +48,23 @@ basedirs="$(git worktree list --porcelain |
 if [[ -z "$basedirs" ]]; then
   exec "$@"
 fi
-export SCCACHE_BASEDIRS="$basedirs"
+export SCCACHE_BASEDIRS="$basedirs" SCCACHE_DIRECT=false
 
 # Reading the stats starts a server when none runs, so the common case already
-# picks up the list above and needs no restart.
+# picks up the settings above and needs no restart.
 normalize() {
   tr ':,' '\n\n' |
     sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s|/*$||' |
     sed '/^$/d' | sort -u
 }
 
-running="$(sccache --show-stats 2>/dev/null |
+stats="$(sccache --show-stats 2>/dev/null || true)"
+running="$(printf '%s\n' "$stats" |
   sed -n 's/^Base directories[[:space:]]*//p')"
+direct="$(printf '%s\n' "$stats" |
+  sed -n 's|^Use direct/preprocessor mode?[[:space:]]*||p')"
 
-if ! diff -q \
+if [[ "$direct" == "yes" ]] || ! diff -q \
   <(printf '%s\n' "$running" | normalize) \
   <(printf '%s\n' "$basedirs" | normalize) >/dev/null 2>&1; then
   sccache --stop-server >/dev/null 2>&1 || true
