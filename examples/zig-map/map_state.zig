@@ -151,10 +151,7 @@ pub const MapState = struct {
     /// Drains every queued runtime event and reports whether the map published
     /// a render update.
     pub fn drainEvents(self: *MapState) !bool {
-        var batch = maplibre.runtimeDrainEvents(self.runtime, null) catch |err| switch (err) {
-            error.NotReady => return false,
-            else => return err,
-        };
+        var batch = try maplibre.runtimeDrainEvents(self.runtime, null);
         defer batch.deinit();
         var queued = try maplibre.eventBatchGet(self.allocator, batch, null);
         defer queued.deinit();

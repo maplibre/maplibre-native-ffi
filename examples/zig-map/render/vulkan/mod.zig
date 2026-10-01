@@ -62,11 +62,11 @@ pub const VulkanRenderTarget = union(enum) {
         }
     }
 
-    /// Services caller-driver work, then releases what completed target
-    /// replacements retired.
+    /// Services caller-driver work, then shows any replacement a rendered
+    /// frame has drawn into.
     pub fn service(self: *VulkanRenderTarget) !void {
         try self.session().service();
-        if (self.* == .borrowed_texture) try self.borrowed_texture.retireReplaced();
+        if (self.* == .borrowed_texture) try self.borrowed_texture.showReplacements();
     }
 
     /// Shows the newest rendered frame, reporting false when no frame reached
@@ -75,7 +75,10 @@ pub const VulkanRenderTarget = union(enum) {
         _ = viewport;
         return switch (self.*) {
             .owned_texture => |*backend| backend.present(),
-            .borrowed_texture => |*backend| backend.compositor.presentImageView(backend.image.view),
+            .borrowed_texture => |*backend| blk: {
+                try backend.showReplacements();
+                break :blk backend.compositor.presentImageView(backend.image.view);
+            },
             // The driver already presented the frame.
             .native_surface => true,
         };
@@ -392,8 +395,7 @@ const BorrowedImage = struct {
 const VulkanBorrowedTextureBackend = struct {
     compositor: VulkanTextureCompositor,
     session: render_target.Session = .{},
-    /// The image the session renders into as far as completed replacements
-    /// show.
+    /// The image the compositor samples.
     image: BorrowedImage,
     replacements: render_target.Replacements(BorrowedImage) = .{},
 
@@ -450,8 +452,10 @@ const VulkanBorrowedTextureBackend = struct {
         try self.session.resizeMap(viewport);
     }
 
-    fn retireReplaced(self: *VulkanBorrowedTextureBackend) !void {
-        while (try self.replacements.takeCompleted()) |replacement| {
+    /// Switches the compositor to each replacement a rendered frame has
+    /// drawn into, destroying the image it retires.
+    fn showReplacements(self: *VulkanBorrowedTextureBackend) !void {
+        while (try self.replacements.takeShown(&self.session)) |replacement| {
             // The compositor waits for its own sampling, but the session's
             // last render into the outgoing image may still be in flight.
             self.compositor.waitIdle();

@@ -263,11 +263,11 @@ const PlatformOpenGLRenderTarget = union(enum) {
         }
     }
 
-    /// Services caller-driver work, then releases what completed target
-    /// replacements retired.
+    /// Services caller-driver work, then shows any replacement a rendered
+    /// frame has drawn into.
     pub fn service(self: *PlatformOpenGLRenderTarget) !void {
         try self.session().service();
-        if (self.* == .borrowed_texture) try self.borrowed_texture.retireReplaced();
+        if (self.* == .borrowed_texture) try self.borrowed_texture.showReplacements();
     }
 
     /// Shows the newest rendered frame, reporting false when no frame reached
@@ -276,7 +276,10 @@ const PlatformOpenGLRenderTarget = union(enum) {
         _ = viewport;
         return switch (self.*) {
             .owned_texture => |*backend| backend.present(),
-            .borrowed_texture => |*backend| backend.compositor.drawTexture(backend.texture.texture),
+            .borrowed_texture => |*backend| blk: {
+                try backend.showReplacements();
+                break :blk backend.compositor.drawTexture(backend.texture.texture);
+            },
             // The driver already presented the frame.
             .native_surface => true,
         };
@@ -573,8 +576,7 @@ const BorrowedTexture = struct {
 const OpenGLBorrowedTextureBackend = struct {
     compositor: OpenGLTextureCompositor,
     session: render_target.Session = .{},
-    /// The texture the session renders into as far as completed replacements
-    /// show.
+    /// The texture the compositor samples.
     texture: BorrowedTexture,
     replacements: render_target.Replacements(BorrowedTexture) = .{},
 
@@ -639,8 +641,10 @@ const OpenGLBorrowedTextureBackend = struct {
         try self.session.resizeMap(viewport);
     }
 
-    fn retireReplaced(self: *OpenGLBorrowedTextureBackend) !void {
-        while (try self.replacements.takeCompleted()) |replacement| {
+    /// Switches the compositor to each replacement a rendered frame has
+    /// drawn into, destroying the texture it retires.
+    fn showReplacements(self: *OpenGLBorrowedTextureBackend) !void {
+        while (try self.replacements.takeShown(&self.session)) |replacement| {
             self.texture.deinit(&self.compositor.context, self.compositor.procs);
             self.texture = replacement;
         }

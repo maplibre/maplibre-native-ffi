@@ -72,11 +72,11 @@ pub const MetalRenderTarget = union(enum) {
         }
     }
 
-    /// Services caller-driver work, then releases what completed target
-    /// replacements retired.
+    /// Services caller-driver work, then shows any replacement a rendered
+    /// frame has drawn into.
     pub fn service(self: *MetalRenderTarget) !void {
         try self.session().service();
-        if (self.* == .borrowed_texture) try self.borrowed_texture.retireReplaced();
+        if (self.* == .borrowed_texture) try self.borrowed_texture.showReplacements();
     }
 
     /// Shows the newest rendered frame, reporting false when no frame reached
@@ -85,7 +85,10 @@ pub const MetalRenderTarget = union(enum) {
         _ = viewport;
         return switch (self.*) {
             .owned_texture => |*backend| backend.present(),
-            .borrowed_texture => |*backend| backend.compositor.drawMetalTexture(backend.texture.value.?, .{ .kind = .cpu_complete }),
+            .borrowed_texture => |*backend| blk: {
+                try backend.showReplacements();
+                break :blk backend.compositor.drawMetalTexture(backend.texture.value.?, .{ .kind = .cpu_complete });
+            },
             // The driver already presented the frame.
             .native_surface => true,
         };
@@ -265,8 +268,7 @@ const MetalOwnedTextureBackend = struct {
 const MetalBorrowedTextureBackend = struct {
     compositor: MetalTextureCompositor,
     session: render_target.Session = .{},
-    /// The texture the session renders into as far as completed replacements
-    /// show.
+    /// The texture the compositor samples.
     texture: objc.Object,
     replacements: render_target.Replacements(objc.Object) = .{},
 
@@ -324,8 +326,10 @@ const MetalBorrowedTextureBackend = struct {
         try self.session.resizeMap(viewport);
     }
 
-    fn retireReplaced(self: *MetalBorrowedTextureBackend) !void {
-        while (try self.replacements.takeCompleted()) |replacement| {
+    /// Switches the compositor to each replacement a rendered frame has
+    /// drawn into, releasing the texture it retires.
+    fn showReplacements(self: *MetalBorrowedTextureBackend) !void {
+        while (try self.replacements.takeShown(&self.session)) |replacement| {
             self.texture.release();
             self.texture = replacement;
         }

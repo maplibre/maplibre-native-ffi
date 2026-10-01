@@ -22,11 +22,29 @@ pub const Code = enum(i32) {
 };
 
 var event_type: u32 = 0;
+/// Lives for the whole process, because a wake can arrive from a native thread
+/// at any time.
+var driver_wait: ?*c.SDL_Semaphore = null;
 
 /// Registers the SDL event type app events use. Call once after SDL_Init.
 pub fn init() !void {
     event_type = c.SDL_RegisterEvents(1);
     if (event_type == 0) return types.AppError.EventDrainFailed;
+    driver_wait = c.SDL_CreateSemaphore(0) orelse {
+        std.debug.print("SDL_CreateSemaphore failed: {s}\n", .{std.mem.span(c.SDL_GetError())});
+        return types.AppError.EventDrainFailed;
+    };
+}
+
+/// Startup and shutdown block on a session's lifecycle completion outside the
+/// SDL loop. Every driver wake also signals this wait, so it services driver
+/// work only when there is some.
+pub fn clearDriverWait() void {
+    while (c.SDL_TryWaitSemaphore(driver_wait)) {}
+}
+
+pub fn waitDriver() void {
+    c.SDL_WaitSemaphore(driver_wait);
 }
 
 /// Returns the code of an app event, or null for any other SDL event.
@@ -68,7 +86,9 @@ fn push(code: Code) void {
 }
 
 fn wakeRenderLoop(context: ?*anyopaque) maplibre.Error!void {
-    push(codeFor(context));
+    const code = codeFor(context);
+    push(code);
+    if (code == .driver_work) c.SDL_SignalSemaphore(driver_wait);
 }
 
 fn pushTimed(context: ?*anyopaque, _: c.SDL_TimerID, _: u32) callconv(.c) u32 {

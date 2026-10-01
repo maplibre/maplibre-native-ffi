@@ -39,6 +39,8 @@ pub const Session = struct {
     /// Whether demands ask the driver to present, as a surface target does.
     presents: bool = false,
     next_token: u64 = 0,
+    /// The newest demand token with a rendered result.
+    rendered_token: u64 = 0,
 
     /// Services driver work until the attachment resolves, abandoning the
     /// session when it does not.
@@ -110,6 +112,7 @@ pub const Session = struct {
                 .rendered => {
                     results.rendered = true;
                     results.needs_repaint = result.needs_repaint;
+                    self.rendered_token = @max(self.rendered_token, result.token);
                 },
                 .target_not_ready => results.target_not_ready = true,
                 else => {},
@@ -163,16 +166,19 @@ pub const Session = struct {
 };
 
 /// Services driver work until a lifecycle submission completes. Startup and
-/// shutdown block here. The driver's wake goes to the SDL loop rather than to
-/// this wait, so the loop yields between service calls instead.
+/// shutdown block here, between driver wakes. A caller driver completes the
+/// submission inside a service call.
 fn serviceUntil(handle: maplibre.RenderSession, future: *maplibre.Future(void)) !void {
     var diagnostic: maplibre.Diagnostic = .{};
-    while (!try future.poll()) {
+    while (true) {
+        // A wake that arrives after the clear ends the next wait at once.
+        events.clearDriverWait();
         _ = maplibre.renderSessionServiceDriverWork(handle, 0, &diagnostic) catch |err| {
             diagnostics.logError("render driver service failed", err, &diagnostic);
             return err;
         };
-        std.Thread.yield() catch {};
+        if (try future.poll()) break;
+        events.waitDriver();
     }
     future.wait(&diagnostic) catch |err| {
         diagnostics.logError("render session lifecycle failed", err, &diagnostic);
@@ -197,6 +203,9 @@ pub fn Replacements(comptime Texture: type) type {
         const Entry = struct {
             completion: maplibre.Future(void),
             texture: Texture,
+            /// The demand whose rendered frame shows the replacement, once
+            /// its set_target has completed.
+            shown_token: u64 = 0,
         };
 
         entries: std.ArrayList(Entry) = .empty,
@@ -211,19 +220,26 @@ pub fn Replacements(comptime Texture: type) type {
             try self.entries.append(std.heap.smp_allocator, .{ .completion = completion, .texture = texture });
         }
 
-        /// Takes the oldest replacement whose set_target completed, or null
-        /// when none has. A failed replacement reports its error and stays
-        /// queued: the session may still render into it or the texture before
-        /// it, so neither is released before the session detaches.
-        pub fn takeCompleted(self: *Self) !?Texture {
+        /// Takes the oldest replacement that a rendered frame has drawn
+        /// into, or null when none has. A completed replacement holds no
+        /// frame yet, so the first call that finds it demands one. A failed
+        /// replacement reports its error and stays queued: the session may
+        /// still render into it or the texture before it, so neither is
+        /// released before the session detaches.
+        pub fn takeShown(self: *Self, session: *Session) !?Texture {
             if (self.entries.items.len == 0) return null;
             const oldest = &self.entries.items[0];
             if (!try oldest.completion.poll()) return null;
-            var diagnostic: maplibre.Diagnostic = .{};
-            oldest.completion.wait(&diagnostic) catch |err| {
-                diagnostics.logError("texture replacement failed", err, &diagnostic);
-                return types.AppError.ResizeFailed;
-            };
+            if (oldest.shown_token == 0) {
+                var diagnostic: maplibre.Diagnostic = .{};
+                oldest.completion.wait(&diagnostic) catch |err| {
+                    diagnostics.logError("texture replacement failed", err, &diagnostic);
+                    return types.AppError.ResizeFailed;
+                };
+                try session.requestFrame(true);
+                oldest.shown_token = session.next_token;
+            }
+            if (session.rendered_token < oldest.shown_token) return null;
             return self.takeOldest();
         }
 
