@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
-import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.callback.CallbackAdmission
 
 /**
@@ -43,9 +42,6 @@ internal class DecisionOwnerState(
     CallbackAdmission.check(handle, name)
     close()
   }
-
-  override fun retireHandle(call: (Long) -> Deferred<Unit>): Deferred<Unit> =
-    throw UnsupportedOperationException("a decision owner cannot retire asynchronously")
 
   /** Runs a native completion call, keeping the owner retryable when native rejects it. */
   fun complete(call: () -> Unit) {

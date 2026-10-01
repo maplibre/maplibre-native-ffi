@@ -67,8 +67,8 @@ internal class HandleStateCore(
     })
   }
 
-  override fun retireHandle(call: (Long) -> Deferred<Unit>): Deferred<Unit> =
-    retire({ call(handleId) })
+  /** Runs the owner's asynchronous release once; later calls share its result. */
+  fun retireHandle(call: (Long) -> Deferred<Unit>): Deferred<Unit> = retire({ call(handleId) })
 
   /**
    * Acquires the exclusive close lease before an asynchronous native close starts.

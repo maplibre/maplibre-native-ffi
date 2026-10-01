@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope
 import org.maplibre.nativeffi.internal.callback.CallbackScope
 import org.maplibre.nativeffi.internal.lifecycle.DecisionOwnerState
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.OwnerState
 import org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive
 import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
@@ -235,7 +236,7 @@ internal fun nativeClose(owner: Any, state: OwnerState, name: String, body: Nati
 /** Runs [state]'s asynchronous release, the C operation [name]. */
 internal fun nativeRetire(
   owner: Any,
-  state: OwnerState,
+  state: HandleStateCore,
   name: String,
   body: NativeCall.() -> Unit,
 ): Deferred<Unit> =

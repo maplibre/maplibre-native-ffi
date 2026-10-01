@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
-import kotlinx.coroutines.Deferred
-
 /**
  * The live-state contract a generated owner gives its operations.
  *
@@ -21,7 +19,4 @@ internal interface OwnerState {
 
   /** Runs the owner's synchronous release, the operation [name], once. */
   fun closeHandle(name: String, call: (Long) -> Unit)
-
-  /** Runs the owner's asynchronous release once; later calls share its result. */
-  fun retireHandle(call: (Long) -> Deferred<Unit>): Deferred<Unit>
 }
