@@ -64,6 +64,11 @@ final class _PendingCompletion<T> implements _PendingCompletionBase {
 final _pendingCompletions = <int, _PendingCompletionBase>{};
 var _nextCompletionToken = 1;
 
+/// The port every pending completion of this isolate arrives on.
+///
+/// It keeps the isolate alive while any completion is pending, so an awaited
+/// future resolves before the isolate finishes, and closes once none is.
+/// Callback registrations use ports that leave the isolate free to finish.
 RawReceivePort? _completionListener;
 
 RawReceivePort _createCompletionListener() => RawReceivePort((dynamic message) {

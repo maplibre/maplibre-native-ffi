@@ -128,7 +128,9 @@ final class _NativeCallbackPort {
     void Function(List<dynamic>)? discard,
   ]) {
     _callbacks = callbacks;
-    _port = RawReceivePort();
+    // A registration lives as long as its owner, so its port leaves the
+    // isolate free to finish. Only pending completions keep it alive.
+    _port = RawReceivePort()..keepIsolateAlive = false;
     _port.handler = _callbackPortHandler(WeakReference(this), _port, discard);
     try {
       context = create(_port.sendPort.nativePort);

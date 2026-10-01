@@ -86,7 +86,9 @@ final class NativeCallbackReleases {
   }) {
     var accepted = false;
     try {
-      final port = _port ??= RawReceivePort();
+      // Releases follow registrations that outlive any awaited work, so
+      // their port leaves the isolate free to finish, as theirs do.
+      final port = _port ??= (RawReceivePort()..keepIsolateAlive = false);
       port.handler = _releasePortHandler(WeakReference(this), port);
       withNativeArena((temporary) {
         final registration = temporary<Uint64>();
