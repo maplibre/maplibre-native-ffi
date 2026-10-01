@@ -25,9 +25,12 @@ Use a runtime barrier when later work must wait for every preceding submission
 to reach a terminal disposition. The runtime's direct event wake callback tells
 the host when its event queue is ready to drain.
 
-Before the process exits, release every runtime and wait for each release
-completion. Native threads keep running until that completion, and process exit
-can crash a thread that is still running.
+A process may exit while runtimes, maps, and render sessions are live. Native
+threads keep running until the operating system ends the process, and nothing
+that they use is destroyed at exit. Once exit begins, the library starts no host
+callback. A binding whose language runtime shuts down before the process exits
+stops native callbacks into it first: the Python binding releases every runtime
+before the interpreter finalizes.
 
 ## Map
 

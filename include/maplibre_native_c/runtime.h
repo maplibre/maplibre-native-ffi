@@ -1338,14 +1338,25 @@ MLN_API mln_status mln_runtime_barrier(
  * The completion runs after every earlier accepted submission, including
  * released maps' teardown, has finished and the runtime's threads and
  * resources are gone. The invoking thread touches no library state after the
- * callback returns, so a host that waits for it may exit the process without
- * racing native teardown. A host that outlives its runtimes may pass a
- * discarding completion.
+ * callback returns. A host that outlives its runtimes may pass a discarding
+ * completion.
  *
- * A process MUST NOT exit while any runtime is live or its release completion
- * has not yet run. Until then, native threads may still be starting or
- * running, and the static destruction that process exit performs can crash
- * them.
+ * A process may exit at any point, including while runtimes, maps, and render
+ * sessions are live and their work is in flight. Native threads keep running
+ * until the operating system ends the process: nothing at exit stops them or
+ * waits for them, and nothing that they use is destroyed. Once exit begins,
+ * native code starts no host callback, release callbacks included. A callback
+ * that is already running when exit begins may still be running. Exit begins
+ * when the C runtime runs the exit handler that the library registers when it
+ * first creates a runtime or installs the log callback. Exit handlers and
+ * static destructors that the host registered before that run after it.
+ *
+ * A host that tears down state its callbacks use before that exit handler runs
+ * MUST stop native callbacks into that state first. That covers a language
+ * runtime that shuts down before the process exits, such as an interpreter
+ * that finalizes before the C runtime's exit handlers run, and an exit handler
+ * or static destructor that the host registered after the library's. Releasing
+ * each runtime and waiting for its release completion stops its callbacks.
  *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.

@@ -46,7 +46,7 @@
 
 # Platform
 "PLAT-01" = "The binding finds and loads the native library as it ships (package, loader, build hook)"
-"PLAT-02" = "Process or runtime shutdown with live handles and callbacks exits cleanly"
+"PLAT-02" = "Process exit, or language runtime shutdown, with live handles and callbacks that nothing retired first exits cleanly"
 "PLAT-03" = "The garbage collector or cycle collector reclaims abandoned handles and callback cycles"
 
 # Examples
