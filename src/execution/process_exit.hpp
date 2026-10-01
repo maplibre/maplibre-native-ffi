@@ -15,13 +15,19 @@ namespace mln::core {
 // - Nothing at exit waits for a native thread.
 // - Once exit begins, native code starts no host callback. Every call into a
 //   host function pointer checks process_exiting() first and skips the call.
-//   A callback that is already running when exit begins may still be running.
+//   A callback whose check passed just before exit began may still start.
 
 // Registers the exit handler that marks the start of process exit, once per
 // process. Called before the library first hands host callbacks to native
 // threads: when it creates a runtime or installs the log callback. The C
 // runtime runs exit handlers in reverse order of registration, so this one
 // runs before every exit handler and static destructor registered earlier.
+//
+// On Windows, the library links the C runtime statically, so the handler
+// joins the library's own exit list, which runs when the library unloads at
+// process exit. The operating system has ended every other thread by then, so
+// no native thread is left to start a callback, and the host's exit handlers
+// and static destructors have already run while native threads still could.
 auto watch_process_exit() noexcept -> void;
 
 // Whether the process has begun to exit.

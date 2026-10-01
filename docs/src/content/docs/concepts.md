@@ -27,10 +27,16 @@ the host when its event queue is ready to drain.
 
 A process may exit while runtimes, maps, and render sessions are live. Native
 threads keep running until the operating system ends the process, and nothing
-that they use is destroyed at exit. Once exit begins, the library starts no host
-callback. A binding whose language runtime shuts down before the process exits
-stops native callbacks into it first: the Python binding releases every runtime
-before the interpreter finalizes.
+that they use is destroyed at exit. Once exit begins, the library dispatches no
+further host callback, and a completion that is still pending never runs. A
+binding whose language runtime shuts down before exit begins stops native
+callbacks into it first: the Python binding releases every runtime before the
+interpreter finalizes.
+
+On Windows, exit begins only when the operating system ends the process's other
+threads, after the host's exit handlers and static destructors have run. A host
+exit handler or static destructor there that tears down state its callbacks use
+releases each runtime and waits for its release completion first.
 
 ## Map
 

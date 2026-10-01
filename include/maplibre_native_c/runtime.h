@@ -1345,19 +1345,29 @@ MLN_API mln_status mln_runtime_barrier(
  * sessions are live and their work is in flight. Native threads keep running
  * until the operating system ends the process: nothing at exit stops them or
  * waits for them, and the library destroys nothing that they use. Once exit
- * begins, native code starts no host callback, release callbacks included. A
- * callback that is already running when exit begins may still be running.
- * Exit begins when the C runtime runs the exit handler that the library
- * registers when it first creates a runtime or installs the log callback. Exit
- * handlers and static destructors that the host registered before that run
- * after it.
+ * begins, native code dispatches no further callback that the host registered
+ * through this API, release callbacks included. A callback that native code
+ * dispatched before exit began may still start or be running after it. A
+ * completion or release callback that is still pending when exit begins never
+ * runs, so code that runs after exit begins MUST NOT wait for one. Plugin code
+ * is native code, not a host callback in this sense; see plugin.h.
  *
- * A host that tears down state its callbacks use before that exit handler runs
- * MUST stop native callbacks into that state first. That covers a language
- * runtime that shuts down before the process exits, such as an interpreter
- * that finalizes before the C runtime's exit handlers run, and an exit handler
- * or static destructor that the host registered after the library's. Releasing
- * each runtime and waiting for its release completion stops its callbacks.
+ * When exit begins depends on the platform. On Windows, it begins when the
+ * operating system ends the process's other threads, after every exit handler
+ * and static destructor that the host registered has run. Elsewhere, it begins
+ * when the C runtime runs the exit handler that the library registers when it
+ * first creates a runtime or installs the log callback; exit handlers and
+ * static destructors that the host registered before that run after it. A
+ * process that ends without running exit handlers, such as through _exit(),
+ * ends native threads with it.
+ *
+ * A host that tears down state its callbacks use before exit begins MUST stop
+ * native callbacks into that state first. That covers a language runtime that
+ * shuts down before the C runtime's exit handlers run, such as an interpreter
+ * that finalizes first; on Windows, every exit handler and static destructor
+ * that the host registered; and elsewhere, those that the host registered
+ * after the library's exit handler. Releasing each runtime and waiting for its
+ * release completion stops its callbacks.
  *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.
