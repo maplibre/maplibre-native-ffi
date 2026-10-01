@@ -1033,7 +1033,6 @@ dependencies = [
 name = "maplibre-native-ffi-core"
 version = "0.0.0"
 dependencies = [
- "bitflags 2.13.0",
  "maplibre-native-ffi-sys",
 ]
 

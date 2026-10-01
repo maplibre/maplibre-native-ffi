@@ -2109,9 +2109,7 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         Python::try_attach(|py| -> PyResult<sys::mln_resource_provider_decision> {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
-                return Ok(decision_state.finish_provider_decision(
-                    maplibre_core::ResourceProviderDecision::PassThrough,
-                ));
+                return Ok(decision_state.finish_provider_decision(false));
             };
             let result = callback.bind(py).call1((
                 {
@@ -2132,27 +2130,18 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
                 )?,
             ))?;
             let decision = result.extract::<u32>()?;
-            Ok(decision_state.finish_provider_decision(
-                if decision == sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE {
-                    maplibre_core::ResourceProviderDecision::Handle
-                } else {
-                    maplibre_core::ResourceProviderDecision::PassThrough
-                },
-            ))
+            Ok(decision_state
+                .finish_provider_decision(decision == sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE))
         })
-        .unwrap_or(Ok(decision_state.finish_provider_decision(
-            maplibre_core::ResourceProviderDecision::PassThrough,
-        )))
+        .unwrap_or(Ok(decision_state.finish_provider_decision(false)))
     }));
     match result {
         Ok(Ok(result)) => result,
         Ok(Err(error)) => {
             Python::try_attach(|py| error.write_unraisable(py, None));
-            decision_state
-                .finish_provider_decision(maplibre_core::ResourceProviderDecision::PassThrough)
+            decision_state.finish_provider_decision(false)
         }
-        Err(_) => decision_state
-            .finish_provider_decision(maplibre_core::ResourceProviderDecision::PassThrough),
+        Err(_) => decision_state.finish_provider_decision(false),
     }
 }
 

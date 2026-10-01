@@ -179,8 +179,8 @@ def sources(values, plan):
             decision = callback.decision
             functions = f"maplibre_core::resource::ResourceRequestHandleFns::new(sys::{decision.complete}, sys::{decision.handle.release})"
             decision_setup = f"let decision_state = match unsafe {{ maplibre_core::resource::ResourceRequestHandleState::new({decision.parameter}, {functions}) }} {{ Ok(state) => state, Err(_) => return sys::{decision.pass_through} }};"
-            failure = "decision_state.finish_provider_decision(maplibre_core::ResourceProviderDecision::PassThrough)"
-            result = f"let decision = result.extract::<u32>()?; Ok(decision_state.finish_provider_decision(if decision == sys::{decision.accept} {{ maplibre_core::ResourceProviderDecision::Handle }} else {{ maplibre_core::ResourceProviderDecision::PassThrough }}))"
+            failure = "decision_state.finish_provider_decision(false)"
+            result = f"let decision = result.extract::<u32>()?; Ok(decision_state.finish_provider_decision(decision == sys::{decision.accept}))"
         policy_guard = ""
         if callback.reentry_policy:
             policy = callback.reentry_policy

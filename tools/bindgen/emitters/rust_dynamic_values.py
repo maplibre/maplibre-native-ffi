@@ -1,6 +1,16 @@
-"""Rust owned records and temporary C storage for pointer-bearing values."""
+"""Rust records and the conversions of their fields to and from C.
+
+Each record implements the runtime's `ToNative` and `FromNative` traits. A
+field converts through the traits when its Rust type selects the C form, and
+through a `convert` helper when the C form also depends on another field, such
+as an array's count or a presence mask.
+"""
+
+from dataclasses import replace
 
 from .rust import Unsupported, identifier, native_identifier, pascal
+
+TRAIT_COPY = "unsafe {{ from_native({}) }}?"
 
 
 def dynamic(value):
@@ -28,106 +38,114 @@ def public(values, value):
     )
 
 
-def encode(values, value, source):
-    source = f"({source})"
-    optional = value.nullable or value.optional == "empty"
-    if value.kind in {"buffer", "array", "reference"} and optional:
-        from dataclasses import replace
+def optional(value):
+    return value.nullable or value.optional == "empty"
 
-        raw = encode(values, replace(value, nullable=False, optional=None), "item")
-        null = (
-            "maplibre_native_ffi_sys::mln_buffer_view { data: std::ptr::null(), size: 0 }"
-            if value.buffer_form == "view"
-            else "std::ptr::null()"
-        )
-        return f"match {source}.as_ref() {{ Some(item) => {raw}, None => {null} }}"
+
+def encode(values, value, source):
+    """Converts the place `source` for one native call, with `arena` in scope."""
+    if value.kind in {"buffer", "array", "reference"} and optional(value):
+        if value.kind == "buffer" and (
+            value.buffer_form == "view" or value.length == "nul"
+        ):
+            return f"to_native(&{source}, arena)?"
+        if value.kind == "buffer":
+            return f"{source}.as_ref().map_or(std::ptr::null(), |item| item.as_ptr().cast())"
+        if value.kind == "array" and value.ctype.kind != "array":
+            return f"convert::optional_array({source}.as_deref(), arena)?"
+        if value.kind == "reference":
+            return f"convert::optional_reference({source}.as_ref(), arena)?"
+        raise Unsupported(f"{value.native}: optional fixed arrays need a presence rule")
     if value.kind == "buffer":
-        if value.length == "nul":
-            return f"arena.c_string({source})?"
-        data = f"{source}.as_bytes()" if value.encoding == "utf8" else source
-        return (
-            f"maplibre_native_ffi_sys::mln_buffer_view {{ data: {data}.as_ptr().cast(), size: {data}.len() }}"
-            if value.buffer_form == "view"
-            else f"{data}.as_ptr().cast()"
-        )
+        if value.buffer_form == "view" or value.length == "nul":
+            return f"to_native(&{source}, arena)?"
+        return f"{source}.as_ptr().cast()"
     if value.kind == "reference":
-        converted = encode(values, value.element, source)
-        return f"{{ let item = {converted}; arena.store(item) }}"
+        return f"convert::reference(&{source}, arena)?"
     if value.kind == "array":
-        if value.element.kind == "scalar" and value.ctype.kind != "array":
-            return f"{source}.as_ptr()"
-        converted = encode(values, value.element, "item")
-        array = f"{source}.iter().map(|item| -> crate::Result<_> {{ Ok({converted}) }}).collect::<crate::Result<Vec<_>>>()?"
         if value.ctype.kind == "array":
-            return f'{array}.try_into().map_err(|_| crate::Error::invalid_argument("incorrect fixed array length"))?'
-        return f"{{ let items = {array}; arena.array(items) }}"
+            return f"convert::fixed(&{source}, arena)?"
+        if value.element.kind == "scalar":
+            return f"{source}.as_ptr()"
+        return f"convert::array(&{source}, arena)?"
     if value.kind in {"scalar", "native_pointer"}:
-        return f"*({source})"
-    return f"{source}.to_native(arena)?" if dynamic(value) else f"{source}.to_native()"
+        return source
+    return f"to_native(&{source}, arena)?"
+
+
+def count(value, context):
+    return (
+        value.length
+        if value.length.isdigit()
+        else f"{context}.{native_identifier(value.length)}"
+    )
 
 
 def decode(values, value, source, context="raw"):
-    optional = value.nullable or value.optional == "empty"
-    if value.kind in {"buffer", "array", "reference"} and optional:
-        from dataclasses import replace
-
+    """Copies the C place `source`, whose sibling fields `context` holds."""
+    if value.kind in {"buffer", "array", "reference"} and optional(value):
+        if value.kind == "buffer" and value.buffer_form == "view":
+            if value.nullable:
+                return TRAIT_COPY.format(source)
+            return f"unsafe {{ convert::nonempty({source}) }}?"
+        if value.kind == "buffer" and value.length == "nul":
+            return TRAIT_COPY.format(source)
+        if value.kind == "reference":
+            return f"unsafe {{ convert::copy_optional_reference({source}) }}?"
+        if (
+            value.kind == "array"
+            and value.ctype.kind != "array"
+            and not value.stride
+            and not value.item_buffer
+        ):
+            return f"unsafe {{ convert::copy_optional_array({source}, {count(value, context)}) }}?"
         copied = decode(
             values, replace(value, nullable=False, optional=None), source, context
         )
-        absent = (
-            (f"{source}.data.is_null()" if value.nullable else f"{source}.size == 0")
-            if value.buffer_form == "view"
-            else f"{source}.is_null()"
-        )
-        return f"if {absent} {{ None }} else {{ Some({copied}) }}"
+        return f"if {source}.is_null() {{ None }} else {{ Some({copied}) }}"
     if value.kind == "buffer":
         if value.buffer_form != "view" and value.length != "nul":
-            count = (
-                value.length
-                if value.length.isdigit()
-                else f"{context}.{native_identifier(value.length)} as usize"
-            )
-            source = f"maplibre_native_ffi_sys::mln_buffer_view {{ data: {source}.cast(), size: {count} }}"
-        copier = (
-            "copy_c_string"
-            if value.length == "nul"
-            else "copy_string_view"
-            if value.encoding == "utf8"
-            else "copy_string_view_bytes"
-        )
-        return f"unsafe {{ crate::string::{copier}({source}) }}?"
+            return f"unsafe {{ convert::counted({source}, {count(value, context)}) }}?"
+        return TRAIT_COPY.format(source)
     if value.kind == "reference":
-        return f'{{ let item = unsafe {{ {source}.as_ref() }}.ok_or_else(|| crate::Error::invalid_argument("null record value"))?; {decode(values, value.element, "*item", context)} }}'
+        return f"unsafe {{ convert::copy_reference({source}) }}?"
     if value.kind == "array":
         if value.ctype.kind == "array":
-            items = f"{source}.iter()"
-        else:
-            count = (
-                value.length
-                if value.length.isdigit()
-                else f"{context}.{native_identifier(value.length)} as usize"
-            )
-            items = f"unsafe {{ crate::input::slice({source}, {count}) }}?.iter()"
-        if value.stride:
-            items = f"unsafe {{ crate::input::strided_values({source}, {count}, {context}.{native_identifier(value.stride)} as usize) }}?.iter()"
-        copied = decode(values, value.element, "*item", context)
+            return f"unsafe {{ convert::copy_fixed({source}) }}?"
         if value.item_buffer:
             buffer = value.item_buffer
-            content = f"unsafe {{ crate::input::arena_string({context}.{buffer.data}.cast(), {context}.{buffer.size} as usize, item.{buffer.offset} as usize, item.{buffer.length} as usize) }}?"
-            copied = f"{{ let mut value = {copied}; value.{identifier(buffer.field)} = {content}; value }}"
-        return f"{items}.map(|item| -> crate::Result<_> {{ Ok({copied}) }}).collect::<crate::Result<Vec<_>>>()?"
+            items = (
+                f"unsafe {{ convert::strided_items({source}, {count(value, context)}, {context}.{native_identifier(value.stride)}) }}?"
+                if value.stride
+                else f"unsafe {{ convert::items({source}, {count(value, context)}) }}?"
+            )
+            element = values.public(value.element)
+            content = f"unsafe {{ convert::arena_string({context}.{buffer.data}, {context}.{buffer.size}, item.{buffer.offset}, item.{buffer.length}) }}?"
+            return (
+                f"{items}.into_iter().map(|item| -> Result<{element}> {{ "
+                f"let mut value: {element} = unsafe {{ from_native(item) }}?; "
+                f"value.{identifier(buffer.field)} = {content}; Ok(value) }}).collect::<Result<Vec<_>>>()?"
+            )
+        if value.stride:
+            return f"unsafe {{ convert::copy_strided({source}, {count(value, context)}, {context}.{native_identifier(value.stride)}) }}?"
+        return f"unsafe {{ convert::copy_array({source}, {count(value, context)}) }}?"
     if value.kind == "union":
-        cases = ", ".join(
-            f"maplibre_native_ffi_sys::{field.presence.variant} => {values.public(value)}::{pascal(field.name)}({decode(values, field.value, 'unsafe { ' + source + '.' + native_identifier(field.name) + ' }', context)})"
-            for field in value.fields
-        )
+        name = values.public(value)
+        cases = []
+        for field in value.fields:
+            place = f"{source}.{native_identifier(field.name)}"
+            copied = decode(values, field.value, place, context)
+            if copied == place:
+                copied = f"unsafe {{ {place} }}"
+            cases.append(
+                f"sys::{field.presence.variant} => {name}::{pascal(field.name)}({copied})"
+            )
         if value.empty_variant:
-            cases += f", maplibre_native_ffi_sys::{value.empty_variant[0]} => {values.public(value)}::Empty"
-        return f"match {context}.{native_identifier(value.tag)} {{ {cases}, tag => {values.public(value)}::Unknown(tag as u32) }}"
+            cases.append(f"sys::{value.empty_variant[0]} => {name}::Empty")
+        return f"match {context}.{native_identifier(value.tag)} {{ {', '.join(cases)}, tag => {name}::Unknown(tag as u32) }}"
     if value.kind in {"scalar", "native_pointer"}:
         return source
-    copied = f"{values.public(value)}::from_native({source})"
-    return f"unsafe {{ {copied} }}?" if dynamic(value) else copied
+    return TRAIT_COPY.format(source)
 
 
 def comparable(value):
@@ -140,78 +158,102 @@ def comparable(value):
     )
 
 
+def presence(mask, bit):
+    """The mask place and the bit that marks one optional field."""
+    return mask, (f"sys::{bit}" if bit else "true")
+
+
 def declaration(values, value):
-    public_name = pascal(value.native)
-    fields, captures, writes = [], [], []
-    group_declarations = []
+    """The struct, its conversions, and its constructors for one record."""
+    name = pascal(value.native)
+    raw = f"sys::{value.native}"
+    copyable = not dynamic(value)
+    fields, writes, copies, args, names = [], [], [], [], []
+    extra = []
+    for field in value.fields:
+        if field.role == "presence_mask":
+            reset = "false" if field.value.ctype.canonical in {"_Bool", "bool"} else "0"
+            writes.append(f"raw.{native_identifier(field.name)} = {reset};")
+        elif field.role == "size":
+            writes.insert(
+                0,
+                f"raw.{native_identifier(field.name)} = std::mem::size_of::<{raw}>() as _;",
+            )
+    for flag in value.mask_flags:
+        from os.path import commonprefix
+
+        mask_plan = next(f.value for f in value.fields if f.name == flag.mask)
+        prefix = (
+            commonprefix([key for key, _ in mask_plan.enum_values]).rsplit("_", 1)[0]
+            + "_"
+        )
+        local = identifier(flag.name.removeprefix(prefix).lower())
+        mask = native_identifier(flag.mask)
+        fields.append(f"    pub {local}: bool,")
+        writes.append(
+            f"convert::set_flag(&mut raw.{mask}, sys::{flag.name}, self.{local});"
+        )
+        copies.append(f"{local}: raw.{mask} & sys::{flag.name} != 0,")
+    members = {field.name: field for field in value.fields}
     grouped = set()
     for group in value.presence_groups:
-        if len(group.fields) < 2 or group.type:
+        if len(group.fields) < 2:
             continue
-        local = identifier(group.mask.removeprefix("has_"))
-        group_name = public_name + pascal(local)
-        members = [
-            next(field for field in value.fields if field.name == name)
-            for name in group.fields
-        ]
-        group_declarations.append(
-            f"#[derive(Debug, Clone, PartialEq, Default)] pub struct {group_name} {{ "
-            + ", ".join(
-                f"pub {identifier(field.name)}: {values.public(field.value)}"
-                for field in members
+        grouped.update(group.fields)
+        mask, bit = presence(f"raw.{native_identifier(group.mask)}", group.bit)
+        if group.type:
+            # Header mask names supply the semantic group label; the group type
+            # supplies the member names and their conversion rules.
+            child = values.bound.values[group.type]
+            prefix = value.native.removeprefix("mln_").removesuffix("s").upper() + "_"
+            local = identifier(
+                group.bit.removeprefix("MLN_").removeprefix(prefix).lower()
             )
-            + " }"
-        )
+            group_name = values.public(child)
+        else:
+            local = identifier(group.mask.removeprefix("has_"))
+            group_name = name + pascal(local)
+            extra.append(
+                f"#[derive(Debug, Clone, PartialEq, Default)] pub struct {group_name} {{ "
+                + ", ".join(
+                    f"pub {identifier(member)}: {values.public(members[member].value)}"
+                    for member in group.fields
+                )
+                + " }"
+            )
         fields.append(f"    pub {local}: Option<{group_name}>,")
-        mask = native_identifier(group.mask)
-        present = (
-            f"raw.{mask} & maplibre_native_ffi_sys::{group.bit} != 0"
-            if group.bit
-            else f"raw.{mask}"
-        )
-        mark = (
-            f"raw.{mask} |= maplibre_native_ffi_sys::{group.bit}"
-            if group.bit
-            else f"raw.{mask} = true"
-        )
-        copied = ", ".join(
-            f"{identifier(field.name)}: {decode(values, field.value, 'raw.' + native_identifier(field.name))}"
-            for field in members
-        )
         assigned = " ".join(
-            f"raw.{native_identifier(field.name)} = {encode(values, field.value, '&item.' + identifier(field.name))};"
-            for field in members
-        )
-        captures.append(
-            f"            {local}: if {present} {{ Some({group_name} {{ {copied} }}) }} else {{ None }},"
+            f"raw.{native_identifier(member)} = {encode(values, members[member].value, 'item.' + identifier(member))};"
+            for member in group.fields
         )
         writes.append(
-            f"        if let Some(item) = &self.{local} {{ {mark}; {assigned} }}"
+            f"if let Some(item) = &self.{local} {{ {mask_mark(mask, bit)}; {assigned} }}"
         )
-        grouped.update(group.fields)
+        copied = ", ".join(
+            f"{identifier(member)}: {decode(values, members[member].value, 'raw.' + native_identifier(member))}"
+            for member in group.fields
+        )
+        copies.append(
+            f"{local}: if {mask_test(mask, bit)} {{ Some({group_name} {{ {copied} }}) }} else {{ None }},"
+        )
     item_buffer = values.item_buffers.get(value.native)
     if item_buffer:
         fields.append(f"    pub {identifier(item_buffer.field)}: String,")
-        captures.append(f"            {identifier(item_buffer.field)}: String::new(),")
+        copies.append(f"{identifier(item_buffer.field)}: String::new(),")
     for field in value.fields:
         if field.name in grouped:
             continue
         if item_buffer and field.name in {item_buffer.offset, item_buffer.length}:
             continue
-        raw = f"raw.{native_identifier(field.name)}"
-        local = identifier(field.name)
-        if field.role == "size":
-            writes.append(
-                f"        {raw} = std::mem::size_of::<maplibre_native_ffi_sys::{value.native}>() as _;"
-            )
-            continue
-        if field.role == "presence_mask":
-            writes.insert(
-                0,
-                f"        {raw} = {'false' if field.value.ctype.canonical in {'bool', '_Bool'} else '0'};",
-            )
-            continue
-        if field.role in {"reserved", "tag", "stride", "arena"}:
+        place, local = f"raw.{native_identifier(field.name)}", identifier(field.name)
+        if field.role in {
+            "size",
+            "presence_mask",
+            "reserved",
+            "tag",
+            "stride",
+            "arena",
+        }:
             continue
         if field.role == "count":
             arrays = [f for f in value.fields if f.value.length == field.name]
@@ -220,99 +262,131 @@ def declaration(values, value):
             array = arrays[0]
             if array.role == "arena":
                 continue
-            expression = f"self.{identifier(array.name)}"
+            source = f"self.{identifier(array.name)}"
             length = (
-                f"{expression}.as_ref().map_or(0, |items| items.len())"
-                if array.value.nullable
-                or array.value.optional == "empty"
-                or array.presence
-                else f"{expression}.len()"
+                f"{source}.as_ref().map_or(0, |items| items.len())"
+                if optional(array.value) or array.presence
+                else f"{source}.len()"
             )
-            writes.append(
-                f'        {raw} = {length}.try_into().map_err(|_| crate::Error::invalid_argument("array exceeds native count range"))?;'
-            )
+            writes.append(f"{place} = convert::count({length})?;")
             continue
         if field.value.kind == "union":
             union = field.value
-            typ = values.public(union)
-            fields.append(f"    pub {local}: {typ},")
-            captures.append(f"            {local}: {decode(values, union, raw)},")
+            union_name = values.public(union)
+            fields.append(f"    pub {local}: {union_name},")
+            copies.append(f"{local}: {decode(values, union, place)},")
+            tag = native_identifier(union.tag)
             cases = " ".join(
-                f"{typ}::{pascal(member.name)}(item) => {{ raw.{native_identifier(union.tag)} = maplibre_native_ffi_sys::{member.presence.variant}; {raw}.{native_identifier(member.name)} = {encode(values, member.value, 'item')}; }},"
+                f"{union_name}::{pascal(member.name)}(item) => {{ raw.{tag} = sys::{member.presence.variant}; {place}.{native_identifier(member.name)} = {encode(values, member.value, '(*item)')}; }}"
                 for member in union.fields
             )
             if union.empty_variant:
-                cases += f" {typ}::Empty => {{ raw.{native_identifier(union.tag)} = maplibre_native_ffi_sys::{union.empty_variant[0]}; }},"
+                cases += f" {union_name}::Empty => raw.{tag} = sys::{union.empty_variant[0]},"
             writes.append(
-                f'        match &self.{local} {{ {cases} {typ}::Unknown(_) => return Err(crate::Error::invalid_argument("unknown union variant cannot be submitted")), }}'
+                f'match &self.{local} {{ {cases} {union_name}::Unknown(_) => return Err(Error::invalid_argument("unknown union variant cannot be submitted")), }}'
             )
             continue
-        optional = field.presence and field.presence.mask
         typ = values.public(field.value)
-        fields.append(f"    pub {local}: {'Option<' + typ + '>' if optional else typ},")
-        copied = decode(values, field.value, raw)
-        if optional:
-            mask, bit = native_identifier(field.presence.mask), field.presence.bit
-            present = (
-                f"raw.{mask} & maplibre_native_ffi_sys::{bit} != 0"
-                if bit
-                else f"raw.{mask}"
+        masked = field.presence and field.presence.mask
+        fields.append(f"    pub {local}: {'Option<' + typ + '>' if masked else typ},")
+        written = encode(values, field.value, "(*item)")
+        copied = decode(values, field.value, place)
+        if masked:
+            mask, bit = presence(
+                f"raw.{native_identifier(field.presence.mask)}", field.presence.bit
             )
-            mark = (
-                f"raw.{mask} |= maplibre_native_ffi_sys::{bit}"
-                if bit
-                else f"raw.{mask} = true"
-            )
-            writes.append(
-                f"        if let Some(item) = &self.{local} {{ {mark}; {raw} = {encode(values, field.value, 'item')}; }}"
-            )
-            captures.append(
-                f"            {local}: if {present} {{ Some({copied}) }} else {{ None }},"
-            )
+            if written == "to_native(&(*item), arena)?" or written == "(*item)":
+                writes.append(
+                    f"convert::set_present(&mut {mask}, {bit}, &mut {place}, &self.{local}, arena)?;"
+                )
+            else:
+                writes.append(
+                    f"if let Some(item) = &self.{local} {{ {mask_mark(mask, bit)}; {place} = {written}; }}"
+                )
+            if copied == TRAIT_COPY.format(place) or copied == place:
+                copies.append(
+                    f"{local}: unsafe {{ convert::present({mask}, {bit}, {place}) }}?,"
+                )
+            else:
+                copies.append(
+                    f"{local}: if {mask_test(mask, bit)} {{ Some({copied}) }} else {{ None }},"
+                )
         else:
-            writes.append(
-                f"        {raw} = {encode(values, field.value, '&self.' + local)};"
-            )
-            captures.append(f"            {local}: {copied},")
+            writes.append(f"{place} = {encode(values, field.value, 'self.' + local)};")
+            copies.append(f"{local}: {copied},")
+            args.append(f"{local}: {typ}")
+            names.append(local)
     constructors = []
     public_fields = [field for field in value.fields if field.role == "value"]
     if len(public_fields) == 1 and public_fields[0].value.kind == "union":
         field = public_fields[0]
+        union_name = values.public(field.value)
         for member in field.value.fields:
-            name = (
+            method = (
                 member.name + "_"
                 if member.name in {"box", "type"}
                 else identifier(member.name)
             )
             constructors.append(
-                f"    pub fn {name}(value: {values.public(member.value)}) -> Self {{ Self {{ {identifier(field.name)}: {values.public(field.value)}::{pascal(member.name)}(value) }} }}"
+                f"pub fn {method}(value: {values.public(member.value)}) -> Self {{ Self {{ {identifier(field.name)}: {union_name}::{pascal(member.name)}(value) }} }}"
             )
+    elif copyable and not value.presence_groups:
+        constructors.append(
+            f"pub const fn new({', '.join(args)}) -> Self {{ Self {{ {', '.join(names)} }} }}"
+        )
     initial = (
-        f"unsafe {{ maplibre_native_ffi_sys::{value.default}() }}"
+        f"unsafe {{ sys::{value.default}() }}"
         if value.default
         else "unsafe { std::mem::zeroed() }"
     )
-    return f"""{chr(10).join(group_declarations)}
-#[derive(Debug, Clone{", PartialEq" if comparable(value) else ""}{", Default" if not value.default else ""})]
-pub struct {public_name} {{
-{chr(10).join(fields)}
-}}
-{f'impl Default for {public_name} {{ fn default() -> Self {{ unsafe {{ Self::from_native(maplibre_native_ffi_sys::{value.default}()).expect("native default must be valid") }} }} }}' if value.default else ""}
-impl {public_name} {{
-{chr(10).join(constructors)}
-    pub fn to_native(&self, arena: &mut crate::input::InputArena) -> crate::Result<maplibre_native_ffi_sys::{value.native}> {{
-        let mut raw: maplibre_native_ffi_sys::{value.native} = {initial};
-{chr(10).join(writes)}
-        Ok(raw)
-    }}
-    /// Copies all borrowed storage before the native callback returns.
-    ///
-    /// # Safety
-    /// Pointer fields must remain readable for the lengths declared by this record.
-    pub unsafe fn from_native(raw: maplibre_native_ffi_sys::{value.native}) -> crate::Result<Self> {{
-        Ok(Self {{
-{chr(10).join(captures)}
-        }})
-    }}
-}}
-"""
+    derives = ["Debug", "Clone"]
+    if copyable:
+        derives += ["Copy", "PartialEq"]
+    elif comparable(value):
+        derives.append("PartialEq")
+    if not value.default:
+        derives.append("Default")
+    default = (
+        f"impl Default for {name} {{ fn default() -> Self {{ convert::native_default(unsafe {{ sys::{value.default}() }}) }} }}\n"
+        if value.default
+        else ""
+    )
+    arena = "arena" if any("arena" in line for line in writes) else "_arena"
+    impl = f"impl {name} {{ {' '.join(constructors)} }}\n" if constructors else ""
+    directions = values.directions.get(value.native, {"in", "out"})
+    to_native = (
+        f"impl ToNative<{raw}> for {name} {{\n"
+        + f"    fn to_native(&self, {arena}: &mut InputArena) -> Result<{raw}> {{\n"
+        + f"        let mut raw: {raw} = {initial};\n"
+        + "".join(f"        {line}\n" for line in writes)
+        + "        Ok(raw)\n    }\n}\n"
+        if "in" in directions
+        else ""
+    )
+    from_native = (
+        f"impl FromNative<{raw}> for {name} {{\n"
+        + f"    unsafe fn from_native(raw: {raw}) -> Result<Self> {{\n"
+        + "        Ok(Self {\n"
+        + "".join(f"            {line}\n" for line in copies)
+        + "        })\n    }\n}\n"
+        if "out" in directions
+        else ""
+    )
+    return (
+        "\n".join(extra)
+        + f"\n#[derive({', '.join(derives)})]\npub struct {name} {{\n"
+        + "\n".join(fields)
+        + "\n}\n"
+        + default
+        + impl
+        + to_native
+        + from_native
+    )
+
+
+def mask_mark(mask, bit):
+    return f"{mask} = true" if bit == "true" else f"{mask} |= {bit}"
+
+
+def mask_test(mask, bit):
+    return mask if bit == "true" else f"{mask} & {bit} != 0"

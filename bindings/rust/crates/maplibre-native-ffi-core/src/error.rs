@@ -101,6 +101,27 @@ pub fn check(call: impl FnOnce(*mut sys::mln_diagnostic) -> sys::mln_status) -> 
     }))
 }
 
+/// The status that reports `error` to native code.
+pub fn status_for_error(error: &Error) -> sys::mln_status {
+    if let Some(status) = error.raw_status() {
+        return status;
+    }
+    match error.kind() {
+        ErrorKind::InvalidArgument => sys::MLN_STATUS_INVALID_ARGUMENT,
+        ErrorKind::InvalidState => sys::MLN_STATUS_INVALID_STATE,
+        ErrorKind::WrongThread => sys::MLN_STATUS_WRONG_THREAD,
+        ErrorKind::Unsupported => sys::MLN_STATUS_UNSUPPORTED,
+        ErrorKind::Cancelled => sys::MLN_STATUS_CANCELLED,
+        ErrorKind::Busy => sys::MLN_STATUS_BUSY,
+        ErrorKind::TargetLost => sys::MLN_STATUS_TARGET_LOST,
+        ErrorKind::NotReady => sys::MLN_STATUS_NOT_READY,
+        ErrorKind::NotFound => sys::MLN_STATUS_NOT_FOUND,
+        ErrorKind::NativeError | ErrorKind::AbiVersionMismatch | ErrorKind::UnknownStatus => {
+            sys::MLN_STATUS_NATIVE_ERROR
+        }
+    }
+}
+
 pub fn kind_for_status(status: i32) -> ErrorKind {
     match status {
         sys::MLN_STATUS_INVALID_ARGUMENT => ErrorKind::InvalidArgument,

@@ -1,6 +1,166 @@
+use std::any::Any;
+use std::sync::Arc;
+
 use maplibre_native_ffi_core::{self as maplibre_core, handle::NativeHandle};
 
+use crate::call::Call;
+use crate::completion::{self, NativeFuture};
 use crate::{Error, Result};
+
+/// The state that a child handle keeps alive: its parent's owner.
+pub(crate) type Parent = Option<Arc<dyn Any + Send + Sync>>;
+
+/// The shared state behind one public handle type: the native handle, its
+/// parent, and the disposal that `Drop` runs.
+pub(crate) struct OwnerState<H: NativeHandle> {
+    handle: ConcurrentNativeHandle<H>,
+    id: u64,
+    owner: &'static str,
+    dispose: fn(H) -> Result<()>,
+    _parent: Parent,
+}
+
+impl<H: NativeHandle> OwnerState<H> {
+    /// Takes ownership of `raw` for the public type named `owner`.
+    ///
+    /// # Safety
+    ///
+    /// `raw` must come from an accepted ownership transfer of handle type `H`,
+    /// and `dispose` must be its disposal.
+    pub(crate) unsafe fn adopt(
+        raw: H,
+        native: &'static str,
+        owner: &'static str,
+        dispose: fn(H) -> Result<()>,
+        parent: Parent,
+    ) -> Result<Arc<Self>> {
+        // SAFETY: the caller transfers ownership of a live handle.
+        let handle = unsafe { ConcurrentNativeHandle::from_handle(raw, native) }?;
+        Ok(Arc::new(Self {
+            handle,
+            id: raw.to_raw(),
+            owner,
+            dispose,
+            _parent: parent,
+        }))
+    }
+
+    pub(crate) fn id(&self) -> u64 {
+        self.id
+    }
+
+    /// This owner, for a child handle to keep alive.
+    pub(crate) fn parent(self: &Arc<Self>) -> Parent
+    where
+        H: Send + Sync,
+    {
+        Some(Arc::clone(self) as Arc<dyn Any + Send + Sync>)
+    }
+
+    pub(crate) fn is_closed(&self) -> bool {
+        self.handle.is_closed()
+    }
+
+    /// The live handle, outside every callback's reentry contract.
+    pub(crate) fn native(&self) -> Result<H> {
+        maplibre_core::callback::check("", 0)?;
+        self.handle
+            .live_handle()
+            .ok_or_else(|| closed_handle_error(self.owner))
+    }
+
+    /// Admits one call of `operation` on the live handle.
+    pub(crate) fn call(&self, operation: &'static str) -> Result<Call<'_, H>> {
+        let native = self.native()?;
+        maplibre_core::callback::check(operation, native.to_raw())?;
+        Ok(Call::new(native, None))
+    }
+
+    /// Admits a call whose results borrow the handle's storage, and holds off
+    /// close until the call ends.
+    pub(crate) fn read(&self, operation: &'static str) -> Result<Call<'_, H>> {
+        let read = self.handle.read_handle()?;
+        let native = read.native;
+        maplibre_core::callback::check(operation, native.to_raw())?;
+        Ok(Call::new(native, Some(read)))
+    }
+
+    /// Consumes the handle through `close`, or does nothing for a handle that
+    /// is already closed.
+    pub(crate) fn close<R: Default>(&self, close: impl FnOnce(H) -> Result<R>) -> Result<R> {
+        Ok(self.handle.close_with(close)?.unwrap_or_default())
+    }
+
+    /// Consumes the handle through a completion, or completes at once for a
+    /// handle that is already closed.
+    pub(crate) fn release<T: Default + Send + 'static>(
+        &self,
+        close: impl FnOnce(H) -> Result<NativeFuture<T>>,
+    ) -> Result<NativeFuture<T>> {
+        Ok(self
+            .handle
+            .close_with(close)?
+            .unwrap_or_else(|| completion::ready(T::default())))
+    }
+}
+
+impl<H: NativeHandle> Drop for OwnerState<H> {
+    fn drop(&mut self) {
+        self.handle.finalize_with(self.dispose);
+    }
+}
+
+/// Declares a public handle type that owns one native handle of type
+/// `$native`, which `$dispose` disposes when the last reference drops.
+macro_rules! native_owner {
+    ($(#[$meta:meta])* pub struct $name:ident($native:ident) dispose $dispose:expr;) => {
+        $(#[$meta])*
+        pub struct $name {
+            pub(crate) inner: std::sync::Arc<$crate::handle::OwnerState<maplibre_native_ffi_sys::$native>>,
+        }
+        impl std::fmt::Debug for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_struct(stringify!($name))
+                    .field("closed", &self.is_closed())
+                    .finish()
+            }
+        }
+        impl $name {
+            pub(crate) fn adopt(
+                raw: maplibre_native_ffi_sys::$native,
+                parent: $crate::handle::Parent,
+            ) -> $crate::Result<Self> {
+                let dispose: fn(maplibre_native_ffi_sys::$native) -> $crate::Result<()> = $dispose;
+                // SAFETY: generated operations adopt only the handles that an
+                // accepted native call transferred, with their disposal.
+                let inner = unsafe {
+                    $crate::handle::OwnerState::adopt(
+                        raw,
+                        stringify!($native),
+                        stringify!($name),
+                        dispose,
+                        parent,
+                    )
+                }?;
+                Ok(Self { inner })
+            }
+
+            /// Returns the native handle value, which event sources report for
+            /// this handle.
+            pub fn id(&self) -> u64 {
+                self.inner.id()
+            }
+
+            /// Reports whether an explicit release, close, or disposal consumed
+            /// this handle.
+            pub fn is_closed(&self) -> bool {
+                self.inner.is_closed()
+            }
+        }
+    };
+}
+
+pub(crate) use native_owner;
 
 #[derive(Debug)]
 enum ConcurrentHandleState<T> {

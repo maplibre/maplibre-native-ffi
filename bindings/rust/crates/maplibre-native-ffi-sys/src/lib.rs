@@ -15,6 +15,37 @@ mod generated;
 
 pub use generated::*;
 
+/// A C handle type: a transparent newtype over the 64-bit id the C API issues.
+pub trait NativeHandle: Copy + 'static {
+    fn to_raw(self) -> u64;
+    fn from_raw(raw: u64) -> Self;
+}
+
+/// The receiver of a call that has none, which admits no handle.
+impl NativeHandle for () {
+    fn to_raw(self) -> u64 {
+        0
+    }
+
+    fn from_raw(_: u64) -> Self {}
+}
+
+/// Implements [`NativeHandle`] for the generated handle newtypes.
+macro_rules! native_handles {
+    ($($handle:ident),* $(,)?) => {$(
+        impl $crate::NativeHandle for $handle {
+            fn to_raw(self) -> u64 {
+                self.0
+            }
+
+            fn from_raw(raw: u64) -> Self {
+                Self(raw)
+            }
+        }
+    )*};
+}
+use native_handles;
+
 /// The length of a diagnostic message buffer, including its null byte.
 pub const MLN_DIAGNOSTIC_MESSAGE_CAPACITY: u32 = 4096;
 

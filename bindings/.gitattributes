@@ -225,7 +225,6 @@
 /python/python/maplibre_native_ffi/_native.pyi linguist-generated=true
 /python/python/maplibre_native_ffi/api.py linguist-generated=true
 /python/src/generated_operations.rs linguist-generated=true
-/rust/crates/maplibre-native-ffi-core/src/generated.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi-sys/src/generated.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/acquired_frame.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/buffer.rs linguist-generated=true
@@ -238,6 +237,7 @@
 /rust/crates/maplibre-native-ffi/src/generated/render_frame_batch.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/render_session.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/runtime.rs linguist-generated=true
+/rust/crates/maplibre-native-ffi/src/generated/values.rs linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedAttachments.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedOwners.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/GeneratedViews.swift linguist-generated=true

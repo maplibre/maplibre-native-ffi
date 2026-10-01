@@ -1614,6 +1614,18 @@ pub type mln_runtime_callback_release =
 pub type mln_vulkan_non_dispatchable_handle = u64;
 pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 pub type mln_wake_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
+native_handles!(
+    mln_acquired_frame,
+    mln_buffer,
+    mln_event_batch,
+    mln_geojson_source_data,
+    mln_map,
+    mln_map_projection,
+    mln_render_frame_batch,
+    mln_render_session,
+    mln_resource_request_handle,
+    mln_runtime
+);
 
 unsafe extern "C" {
     pub fn mln_acquired_frame_dispose(

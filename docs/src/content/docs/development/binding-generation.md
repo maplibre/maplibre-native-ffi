@@ -140,16 +140,16 @@ headers fail before any output is written.
 An executed probe builds generated code with the binding's handwritten runtime
 and runs it. The Go, Swift, Zig, and Dart probes generate bindings for the
 `values` and `keywords` groups and call
-`tests/bindgen/fixtures/protocols_stub.c`. The Rust probe compiles its own
-declarations against an ABI stub, and the .NET probe runs the value conversions
-of the `presence_mask` group. The Python tests execute the generated modules
-over fakes of the native extension. The Kotlin binding reads and writes records
-at offsets that its emitter computes, so its tests compile those offsets as
-static assertions for both the ILP32 and the LP64 data model. They also compile
-the generated JNI glue against the headers. A probe finds its toolchain through
-the binding's mise configuration and skips when that toolchain is missing. The
-CI hygiene job sets `MLN_BINDGEN_REQUIRE_TOOLCHAINS=1`, which turns each skip
-into a failure.
+`tests/bindgen/fixtures/protocols_stub.c`. The Rust probe builds the `keywords`
+group with the binding's handwritten runtime and calls the same stub. The .NET
+probe runs the value conversions of the `presence_mask` group. The Python tests
+execute the generated modules over fakes of the native extension. The Kotlin
+binding reads and writes records at offsets that its emitter computes, so its
+tests compile those offsets as static assertions for both the ILP32 and the LP64
+data model. They also compile the generated JNI glue against the headers. A
+probe finds its toolchain through the binding's mise configuration and skips
+when that toolchain is missing. The CI hygiene job sets
+`MLN_BINDGEN_REQUIRE_TOOLCHAINS=1`, which turns each skip into a failure.
 
 The generator also writes the FFI declarations of the Rust `-sys` crate, which
 Rust and Python share. A layout probe compiles those declarations beside a C

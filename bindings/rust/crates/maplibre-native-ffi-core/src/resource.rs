@@ -1,31 +1,18 @@
-pub use crate::generated::ResourceProviderDecision;
-#[cfg(test)]
-use crate::generated::ResourceResponse;
+pub use crate::error::status_for_error;
 use crate::{Error, ErrorKind, Result};
 use maplibre_native_ffi_sys as sys;
 use std::sync::{Arc, Mutex};
 
-pub fn status_for_error(error: &Error) -> sys::mln_status {
-    if let Some(status) = error.raw_status() {
-        return status;
-    }
-    match error.kind() {
-        ErrorKind::InvalidArgument => sys::MLN_STATUS_INVALID_ARGUMENT,
-        ErrorKind::InvalidState => sys::MLN_STATUS_INVALID_STATE,
-        ErrorKind::WrongThread => sys::MLN_STATUS_WRONG_THREAD,
-        ErrorKind::Unsupported => sys::MLN_STATUS_UNSUPPORTED,
-        ErrorKind::Cancelled => sys::MLN_STATUS_CANCELLED,
-        ErrorKind::Busy => sys::MLN_STATUS_BUSY,
-        ErrorKind::TargetLost => sys::MLN_STATUS_TARGET_LOST,
-        ErrorKind::NotReady => sys::MLN_STATUS_NOT_READY,
-        ErrorKind::NotFound => sys::MLN_STATUS_NOT_FOUND,
-        ErrorKind::NativeError | ErrorKind::AbiVersionMismatch | ErrorKind::UnknownStatus => {
-            sys::MLN_STATUS_NATIVE_ERROR
-        }
-    }
-}
-
 pub const UNKNOWN_PROVIDER_DECISION: u32 = u32::MAX;
+
+/// The request operations that a provider or cancel callback may call on the
+/// request it was given.
+pub const REQUEST_OPERATIONS: &[&str] = &[
+    "mln_resource_request_complete",
+    "mln_resource_request_cancelled",
+    "mln_resource_request_set_cancel_callback",
+    "mln_resource_request_release",
+];
 
 pub type CompleteRequestFn = unsafe extern "C" fn(
     sys::mln_resource_request_handle,
@@ -42,8 +29,6 @@ pub struct ResourceRequestHandleFns {
 }
 
 impl ResourceRequestHandleFns {
-    pub const NATIVE: Self = crate::generated::RESOURCE_REQUEST_HANDLE_FUNCTIONS;
-
     /// Creates a function table for a native resource request handle.
     ///
     /// # Safety
@@ -118,10 +103,11 @@ impl ResourceRequestHandleState {
         sys::mln_resource_request_handle(inner.handle)
     }
 
+    /// Completes the request with an empty response.
     #[cfg(test)]
-    pub fn complete(&self, response: &ResourceResponse) -> Result<()> {
-        let mut arena = crate::input::InputArena::default();
-        let native = response.to_native(&mut arena)?;
+    fn complete(&self) -> Result<()> {
+        // SAFETY: the response is plain data, and all zeroes is a valid value.
+        let native: sys::mln_resource_response = unsafe { std::mem::zeroed() };
         self.complete_with(|handle| {
             // SAFETY: complete_with reserves this handle and native owns the input storage.
             crate::check(|diagnostic| unsafe { (self.fns.complete)(handle, &native, diagnostic) })
@@ -201,6 +187,56 @@ impl ResourceRequestHandleState {
         Ok(Self::native_handle(&inner))
     }
 
+    /// Registers a callback that runs at most once when MapLibre cancels the
+    /// request, returning whether the request was already cancelled.
+    ///
+    /// An accepted registration transfers the callback to the C API, which
+    /// releases it once it can no longer run. A rejected registration or an
+    /// already cancelled request drops the callback unrun before returning.
+    pub fn set_cancel_callback(
+        &self,
+        callback: Box<dyn FnOnce() + Send + 'static>,
+    ) -> Result<bool> {
+        type Registration = (u64, Option<Box<dyn FnOnce() + Send + 'static>>);
+        unsafe extern "C" fn invoke(user_data: *mut std::ffi::c_void) {
+            // SAFETY: native passes the registration it owns and invokes it at
+            // most once, before its release.
+            let (owner, callback) = unsafe { &mut *user_data.cast::<Registration>() };
+            let _policy = crate::callback::PolicyScope::enter(REQUEST_OPERATIONS, *owner);
+            if let Some(callback) = callback.take() {
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(callback));
+            }
+        }
+        unsafe extern "C" fn release(user_data: *mut std::ffi::c_void) {
+            let _policy = crate::callback::PolicyScope::enter(&[], 0);
+            // SAFETY: native or the rejected registration below releases each
+            // registration once.
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
+                drop(Box::from_raw(user_data.cast::<Registration>()))
+            }));
+        }
+        let handle = self.native_for_call()?;
+        let registration: Box<Registration> = Box::new((handle.0, Some(callback)));
+        let user_data = Box::into_raw(registration).cast();
+        let mut cancelled = false;
+        let registered = crate::check(|diagnostic| unsafe {
+            sys::mln_resource_request_set_cancel_callback(
+                handle,
+                Some(invoke),
+                user_data,
+                Some(release),
+                &mut cancelled,
+                diagnostic,
+            )
+        });
+        if registered.is_err() || cancelled {
+            // SAFETY: native took no ownership of a rejected or already
+            // cancelled registration.
+            unsafe { release(user_data) };
+        }
+        registered.map(|()| cancelled)
+    }
+
     pub fn close(&self) {
         let Ok(mut inner) = self.inner.lock() else {
             return;
@@ -218,7 +254,10 @@ impl ResourceRequestHandleState {
         self.release_now(release, handle);
     }
 
-    pub fn finish_provider_decision(&self, decision: ResourceProviderDecision) -> u32 {
+    /// Records the provider's decision: `handled` keeps the request for the
+    /// provider to complete, and otherwise the C API serves it. Returns the
+    /// decision to report to the C API.
+    pub fn finish_provider_decision(&self, handled: bool) -> u32 {
         let Ok(mut inner) = self.inner.lock() else {
             return UNKNOWN_PROVIDER_DECISION;
         };
@@ -229,11 +268,7 @@ impl ResourceRequestHandleState {
                 sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
             };
         }
-        if inner.closed
-            || inner.completed
-            || inner.completing
-            || matches!(decision, ResourceProviderDecision::Handle)
-        {
+        if inner.closed || inner.completed || inner.completing || handled {
             inner.decision_finalized = true;
             inner.provider_owned = true;
             let handle = Self::native_handle(&inner);
@@ -257,7 +292,7 @@ impl ResourceRequestHandleState {
             .map(|inner| inner.closed || inner.completed || inner.completing)
             .unwrap_or(false);
         if completed {
-            return self.finish_provider_decision(ResourceProviderDecision::Handle);
+            return self.finish_provider_decision(true);
         }
         if let Ok(mut inner) = self.inner.lock() {
             // The C API releases the request it gets no decision for.
@@ -427,9 +462,7 @@ mod tests {
         fn handled() -> Self {
             let fixture = Self::new();
             assert_eq!(
-                fixture
-                    .state
-                    .finish_provider_decision(ResourceProviderDecision::Handle),
+                fixture.state.finish_provider_decision(true),
                 sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
             );
             fixture
@@ -441,14 +474,6 @@ mod tests {
 
         fn releases(&self) -> usize {
             self.fake.releases.load(Ordering::SeqCst)
-        }
-    }
-
-    fn ok_response(bytes: impl Into<Vec<u8>>) -> ResourceResponse {
-        ResourceResponse {
-            status: crate::ResourceResponseStatus::Ok,
-            bytes: bytes.into(),
-            ..Default::default()
         }
     }
 
@@ -480,7 +505,7 @@ mod tests {
     fn provider_decision_finalization_is_idempotent_for_owned_handles() {
         let Fixture { fake, state } = Fixture::handled();
         assert_eq!(
-            state.finish_provider_decision(ResourceProviderDecision::PassThrough),
+            state.finish_provider_decision(false),
             sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
         );
         drop(state);
@@ -498,7 +523,7 @@ mod tests {
             let decision = if exception {
                 state.finish_provider_exception()
             } else {
-                state.finish_provider_decision(ResourceProviderDecision::PassThrough)
+                state.finish_provider_decision(false)
             };
             assert_eq!(decision, sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE);
             assert_eq!(fake.releases.load(Ordering::SeqCst), 1);
@@ -513,7 +538,7 @@ mod tests {
         let Fixture { fake, state } = Fixture::new();
 
         assert_eq!(
-            state.finish_provider_decision(ResourceProviderDecision::PassThrough),
+            state.finish_provider_decision(false),
             sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
         );
         assert_eq!(
@@ -529,8 +554,8 @@ mod tests {
     fn request_handle_rejects_double_successful_completion() {
         let fixture = Fixture::new();
 
-        fixture.state.complete(&ok_response([1, 2, 3])).unwrap();
-        let error = fixture.state.complete(&ok_response([4, 5, 6])).unwrap_err();
+        fixture.state.complete().unwrap();
+        let error = fixture.state.complete().unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::InvalidState);
         assert_eq!(fixture.completes(), 1);
@@ -542,16 +567,12 @@ mod tests {
         let status = &fixture.fake.complete_status;
         status.store(sys::MLN_STATUS_INVALID_ARGUMENT, Ordering::SeqCst);
         assert_eq!(
-            fixture
-                .state
-                .complete(&ok_response([1]))
-                .unwrap_err()
-                .kind(),
+            fixture.state.complete().unwrap_err().kind(),
             ErrorKind::InvalidArgument
         );
         assert_eq!(fixture.releases(), 0);
         status.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
-        fixture.state.complete(&ok_response([2])).unwrap();
+        fixture.state.complete().unwrap();
         assert!(fixture.state.native_for_call().is_ok());
         assert_eq!(fixture.completes(), 2);
         assert_eq!(fixture.releases(), 0);

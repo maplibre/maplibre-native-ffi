@@ -1,122 +1,162 @@
-"""Compile header-driven Rust value types and methods against an isolated ABI stub."""
+"""Compile header-driven Rust bindings with the binding's own runtime and run them."""
 
+import shutil
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from support import ROOT, parse, real_api, require_tool, run
+from support import (
+    FIXTURES,
+    PROTOCOLS_STUB,
+    ROOT,
+    parse,
+    real_api,
+    require_tool,
+    run,
+)
 
 from tools.bindgen.emitters import rust, rust_sys
 from tools.bindgen.emitters.rust import native_identifier
 from tools.bindgen.schema import validate
 
-SYS = ROOT / "bindings/rust/crates/maplibre-native-ffi-sys/src"
+CRATES = ROOT / "bindings/rust/crates"
+SYS = CRATES / "maplibre-native-ffi-sys/src"
+PROBE = FIXTURES / "probes/rust"
 
-
-class RustEmitterTests(unittest.TestCase):
-    def test_new_record_keywords_and_runtime_local_collisions_compile(self):
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            api = parse(
-                """
+# Declarations the probe adds to the protocol fixture: a record and a command
+# whose names collide with Rust keywords and the generated operations' locals.
+COLLISIONS = """
 typedef struct mln_new_point { double type; double self; double str; } mln_new_point;
 BIND("execution=query;result=mln_new_point;shape=value;ownership=borrowed")
 mln_status mln_map_match(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_move(mln_map map, mln_new_point native, mln_new_point arena, mln_new_point binding_arg_1, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-""",
-                defines=("MLN_PROTOCOL_MAP_RELEASE",),
-            )
-            validate(api)
-            self.assertEqual(
-                set(rust.coverage(api)["generated"]),
-                {"mln_map_match", "mln_map_move", "mln_map_release"},
-            )
+mln_status mln_map_move(mln_map map, mln_new_point call, mln_new_point value, mln_new_point future, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+"""
+
+# The functions that COLLISIONS declares, which the probe links but calls only
+# to release its map.
+COLLISIONS_STUB = """
+#include <stdint.h>
+typedef struct { double type, self, str; } point;
+void mln_map_release(uint64_t map) { (void)map; }
+int mln_map_match(uint64_t map, const void* completion, void* diagnostic) {
+  (void)map; (void)completion; (void)diagnostic;
+  return -4;
+}
+int mln_map_move(uint64_t map, point call, point value, point future,
+                 const void* completion, void* diagnostic) {
+  (void)map; (void)call; (void)value; (void)future; (void)completion;
+  (void)diagnostic;
+  return -4;
+}
+"""
+
+
+class RustEmitterTests(unittest.TestCase):
+    def test_generated_bindings_run_with_the_handwritten_runtime(self):
+        defines = (
+            "MLN_PROTOCOL_MAP_RELEASE",
+            "MLN_PROTOCOL_COMPLETION_RUNTIME",
+            "MLN_PROTOCOL_ABI_VERSION",
+        )
+        api = parse(COLLISIONS, groups=("keywords",), defines=defines)
+        validate(api)
+        self.assertEqual(
+            set(rust.coverage(api)["generated"]),
+            {
+                "mln_c_version",
+                "mln_keyword_combine",
+                "mln_map_match",
+                "mln_map_move",
+                "mln_map_release",
+            },
+        )
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
             files = rust.generate(api)
-            (root / "values.rs").write_text(
-                files["crates/maplibre-native-ffi-core/src/generated.rs"]
-            )
-            owners = root / "generated"
-            owners.mkdir()
-            prefix = "crates/maplibre-native-ffi/src/generated/"
-            self.assertEqual(
-                {
-                    path.removeprefix(prefix)
-                    for path in files
-                    if path.startswith(prefix)
-                },
-                {"map.rs", "mod.rs"},
-            )
             for path, source in files.items():
-                if path.startswith(prefix):
-                    (owners / path.removeprefix(prefix)).write_text(source)
-            (root / "lib.rs").write_text("""
-#![allow(dead_code, non_camel_case_types, unused_imports)]
-extern crate self as maplibre_native_ffi_sys;
-extern crate self as maplibre_native_ffi_core;
-#[derive(Clone, Copy)]
-pub struct mln_new_point { pub type_: f64, pub self_: f64, pub str_: f64 }
-#[derive(Clone, Copy, Debug)]
-pub struct mln_map(pub u64);
-pub unsafe fn mln_map_release(_: mln_map) {}
-pub unsafe fn mln_map_match(_: mln_map, _: *const (), _: *mut ()) -> i32 { 0 }
-pub unsafe fn mln_map_move(_: mln_map, _: mln_new_point, _: mln_new_point, _: mln_new_point, _: *const (), _: *mut ()) -> i32 { 0 }
-pub mod values {
-    pub trait NativeValue: Sized {
-        type Raw;
-        fn to_native(self) -> Self::Raw;
-        fn from_native(value: Self::Raw) -> Self;
-    }
-}
-pub mod generated { include!("values.rs"); }
-pub use generated::*;
-type Result<T> = std::result::Result<T, ()>;
-struct NativeFuture<T>(std::marker::PhantomData<T>);
-struct CommandCompletion;
-mod completion {
-    pub fn copy_value<T>(_: ()) -> super::Result<T> { unimplemented!() }
-    pub fn ready<T>(_: T) -> super::NativeFuture<T> { unimplemented!() }
-    pub fn submit<T>(_: impl Fn(*const (), *mut ()) -> i32, _: impl Fn(()) -> super::Result<T>) -> super::Result<super::NativeFuture<T>> { unimplemented!() }
-    pub fn submit_command(_: impl Fn(*const (), *mut ()) -> i32) -> super::Result<super::NativeFuture<super::CommandCompletion>> { unimplemented!() }
-}
-mod callback { pub fn check(_: &str, _: u64) -> super::Result<()> { Ok(()) } }
-mod handle {
-    #[derive(Debug)]
-    pub struct ConcurrentNativeHandle<T: Copy>(std::cell::Cell<Option<T>>);
-    impl<T: Copy> ConcurrentNativeHandle<T> {
-        pub unsafe fn from_handle(raw: T, _: &str) -> super::Result<Self> { Ok(Self(std::cell::Cell::new(Some(raw)))) }
-        pub fn live_handle(&self) -> Option<T> { self.0.get() }
-        pub fn is_closed(&self) -> bool { self.0.get().is_none() }
-        pub fn close_with<R>(&self, close: impl FnOnce(T) -> super::Result<R>) -> super::Result<Option<R>> {
-            let Some(raw) = self.0.get() else { return Ok(None) };
-            let result = close(raw)?;
-            self.0.set(None);
-            Ok(Some(result))
-        }
-        pub fn finalize_with(&mut self, dispose: impl FnOnce(T) -> super::Result<()>) {
-            if let Some(raw) = self.0.take() { let _ = dispose(raw); }
-        }
-    }
-    pub fn closed_handle_error(_: &str) {}
-}
-#[path = "generated/mod.rs"]
-mod owners;
-fn main() {
-    let point = NewPoint::new(1.0, 2.0, 3.0);
-    let raw = values::NativeValue::to_native(point);
-    assert_eq!((raw.type_, raw.self_, raw.str_), (1.0, 2.0, 3.0));
-    assert_eq!(NewPoint::from_native(raw), point);
-    let map = owners::MapHandle::from_native(mln_map(7)).unwrap();
-    assert_eq!(map.id(), 7);
-    map.release().unwrap();
-    assert!(map.is_closed());
-}
-""")
+                (root / path).parent.mkdir(parents=True, exist_ok=True)
+                (root / path).write_text(source)
+            sys_crate = root / "crates/maplibre-native-ffi-sys/src"
+            core_crate = root / "crates/maplibre-native-ffi-core/src"
+            safe_crate = root / "crates/maplibre-native-ffi/src"
+            shutil.copy(SYS / "lib.rs", sys_crate / "lib.rs")
+            shutil.copytree(CRATES / "maplibre-native-ffi-core/src", core_crate)
+            (core_crate / "resource.rs").unlink()
+            shutil.copy(PROBE / "core.rs", core_crate / "lib.rs")
+            for source in (CRATES / "maplibre-native-ffi/src").glob("*.rs"):
+                shutil.copy(source, safe_crate / source.name)
+            shutil.copy(PROBE / "probe.rs", safe_crate / "probe.rs")
+            with (safe_crate / "lib.rs").open("a") as lib:
+                lib.write("\nmod probe;\n\nfn main() {\n    probe::run();\n}\n")
+
+            clang = require_tool(self, "clang")
+            objects = []
+            for name, source in (
+                ("protocols_stub", PROTOCOLS_STUB),
+                ("collisions_stub", None),
+            ):
+                if source is None:
+                    source = root / f"{name}.c"
+                    source.write_text(COLLISIONS_STUB)
+                objects.append(root / f"{name}.o")
+                clang.run(
+                    self,
+                    "-c",
+                    *(f"-D{define}" for define in defines),
+                    f"-I{FIXTURES}",
+                    str(source),
+                    "-o",
+                    str(objects[-1]),
+                    cwd=root,
+                )
+            rustc = require_tool(self, "rustc")
+            for name, crate, extern in (
+                ("maplibre_native_ffi_sys", sys_crate, ()),
+                (
+                    "maplibre_native_ffi_core",
+                    core_crate,
+                    ("maplibre_native_ffi_sys",),
+                ),
+            ):
+                rustc.run(
+                    self,
+                    "--edition=2024",
+                    "--crate-type=lib",
+                    f"--crate-name={name}",
+                    f"-Ldependency={root}",
+                    *(
+                        argument
+                        for dependency in extern
+                        for argument in (
+                            "--extern",
+                            f"{dependency}={root / f'lib{dependency}.rlib'}",
+                        )
+                    ),
+                    str(crate / "lib.rs"),
+                    "--out-dir",
+                    str(root),
+                    cwd=root,
+                )
             binary = root / "probe"
-            require_tool(self, "rustc").run(
+            rustc.run(
                 self,
                 "--edition=2024",
-                str(root / "lib.rs"),
+                "--crate-name=maplibre_native_ffi",
+                f"-Ldependency={root}",
+                *(
+                    argument
+                    for dependency in (
+                        "maplibre_native_ffi_sys",
+                        "maplibre_native_ffi_core",
+                    )
+                    for argument in (
+                        "--extern",
+                        f"{dependency}={root / f'lib{dependency}.rlib'}",
+                    )
+                ),
+                *(f"-Clink-arg={item}" for item in objects),
+                str(safe_crate / "lib.rs"),
                 "-o",
                 str(binary),
                 cwd=root,

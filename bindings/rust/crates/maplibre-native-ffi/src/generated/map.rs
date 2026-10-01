@@ -1,3308 +1,2170 @@
 // Generated from C headers by tools/bindgen. Do not edit.
 use super::*;
 
-#[derive(Debug)]
-pub(crate) struct MapHandleState {
-    pub(crate) handle: crate::handle::ConcurrentNativeHandle<sys::mln_map>,
-    id: u64,
-    _parent: std::sync::Arc<crate::RuntimeHandleState>,
-}
-impl MapHandleState {
-    pub(crate) fn native(&self) -> Result<sys::mln_map> {
-        maplibre_core::callback::check("", 0)?;
-        self.handle
-            .live_handle()
-            .ok_or_else(|| crate::handle::closed_handle_error("MapHandle"))
-    }
-}
-impl Drop for MapHandleState {
-    fn drop(&mut self) {
-        self.handle
-            .finalize_with(|raw| unsafe { maplibre_core::generated::map_dispose(raw) });
-    }
-}
-/// Owns one `mln_map` native handle.
-pub struct MapHandle {
-    pub(crate) inner: std::sync::Arc<MapHandleState>,
-}
-impl std::fmt::Debug for MapHandle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MapHandle")
-            .field("closed", &self.is_closed())
-            .finish()
-    }
-}
-impl MapHandle {
-    pub(crate) fn from_native(
-        raw: sys::mln_map,
-        parent: std::sync::Arc<crate::RuntimeHandleState>,
-    ) -> Result<Self> {
-        // SAFETY: raw came from an accepted ownership transfer of this handle type.
-        let handle = unsafe { crate::handle::ConcurrentNativeHandle::from_handle(raw, "mln_map") }?;
-        Ok(Self {
-            inner: std::sync::Arc::new(MapHandleState {
-                handle,
-                id: raw.0,
-                _parent: parent,
-            }),
-        })
-    }
-
-    /// Returns the native handle value, which event sources report for this handle.
-    pub fn id(&self) -> u64 {
-        self.inner.id
-    }
-
-    /// Reports whether an explicit release, close, or disposal consumed this handle.
-    pub fn is_closed(&self) -> bool {
-        self.inner.handle.is_closed()
-    }
+native_owner! {
+    /// Owns one `mln_map` native handle.
+    pub struct MapHandle(mln_map) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_map_dispose(raw, out_diagnostic) });
 }
 
 impl MapHandle {
-    /// Calls `mln_map_add_color_relief_layer` using its header execution and ownership contract.
+    /// Calls `mln_map_add_color_relief_layer`.
     pub fn add_color_relief_layer(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &str,
-        binding_arg_3: Option<&str>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_color_relief_layer", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_bytes().as_ptr().cast(),
-            size: (binding_arg_2).as_bytes().len(),
-        };
-        let binding_arg_3 = match (binding_arg_3).as_ref() {
-            Some(item) => maplibre_native_ffi_sys::mln_buffer_view {
-                data: (item).as_bytes().as_ptr().cast(),
-                size: (item).as_bytes().len(),
-            },
-            None => maplibre_native_ffi_sys::mln_buffer_view {
-                data: std::ptr::null(),
-                size: 0,
-            },
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_id: &str,
+        source_id: &str,
+        before_layer_id: Option<&str>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_color_relief_layer")?;
+        let layer_id = call.input(&layer_id)?;
+        let source_id = call.input(&source_id)?;
+        let before_layer_id = call.input(&before_layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_color_relief_layer(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                binding_arg_3,
+                map,
+                layer_id,
+                source_id,
+                before_layer_id,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_custom_geometry_source` using its header execution and ownership contract.
+    /// Calls `mln_map_add_custom_geometry_source`.
     pub fn add_custom_geometry_source(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: maplibre_core::generated::CustomGeometrySourceOptions,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_custom_geometry_source", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let submitted = crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        options: CustomGeometrySourceOptions,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_custom_geometry_source")?;
+        let source_id = call.input(&source_id)?;
+        let options = call.reference(&options)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_custom_geometry_source(
-                native,
-                binding_arg_1,
-                &binding_arg_2,
+                map,
+                source_id,
+                options,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
-        });
-        if submitted.is_ok() {
-            arena.accept_registrations();
-        }
-        submitted
+        })
     }
 
-    /// Calls `mln_map_add_custom_mvt_vector_source` using its header execution and ownership contract.
+    /// Calls `mln_map_add_custom_mvt_vector_source`.
     pub fn add_custom_mvt_vector_source(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: maplibre_core::generated::CustomMvtVectorSourceOptions,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_custom_mvt_vector_source", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let submitted = crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        options: CustomMvtVectorSourceOptions,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_custom_mvt_vector_source")?;
+        let source_id = call.input(&source_id)?;
+        let options = call.reference(&options)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_custom_mvt_vector_source(
-                native,
-                binding_arg_1,
-                &binding_arg_2,
+                map,
+                source_id,
+                options,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
-        });
-        if submitted.is_ok() {
-            arena.accept_registrations();
-        }
-        submitted
+        })
     }
 
-    /// Calls `mln_map_add_geojson_source_data` using its header execution and ownership contract.
+    /// Calls `mln_map_add_geojson_source_data`.
     pub fn add_geojson_source_data(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &crate::GeojsonSourceDataHandle,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_geojson_source_data", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2_native = binding_arg_2.inner.native()?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_add_geojson_source_data(
-                native,
-                binding_arg_1,
-                binding_arg_2_native,
-                completion,
-                diagnostic,
-            )
+        source_id: &str,
+        data: &GeojsonSourceDataHandle,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_geojson_source_data")?;
+        let data = data.inner.native()?;
+        let source_id = call.input(&source_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_add_geojson_source_data(map, source_id, data, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_add_geojson_source_url` using its header execution and ownership contract.
+    /// Calls `mln_map_add_geojson_source_url`.
     pub fn add_geojson_source_url(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &str,
-        binding_arg_3: Option<&maplibre_core::generated::GeojsonSourceOptions>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_geojson_source_url", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_bytes().as_ptr().cast(),
-            size: (binding_arg_2).as_bytes().len(),
-        };
-        let binding_arg_3 = binding_arg_3
-            .map(|value| value.to_native(&mut arena))
-            .transpose()?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        url: &str,
+        options: Option<&GeojsonSourceOptions>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_geojson_source_url")?;
+        let source_id = call.input(&source_id)?;
+        let url = call.input(&url)?;
+        let options = call.optional_reference(options.as_ref())?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_geojson_source_url(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                binding_arg_3
-                    .as_ref()
-                    .map_or(std::ptr::null(), |value| value),
+                map,
+                source_id,
+                url,
+                options,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_hillshade_layer` using its header execution and ownership contract.
+    /// Calls `mln_map_add_hillshade_layer`.
     pub fn add_hillshade_layer(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &str,
-        binding_arg_3: Option<&str>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_hillshade_layer", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_bytes().as_ptr().cast(),
-            size: (binding_arg_2).as_bytes().len(),
-        };
-        let binding_arg_3 = match (binding_arg_3).as_ref() {
-            Some(item) => maplibre_native_ffi_sys::mln_buffer_view {
-                data: (item).as_bytes().as_ptr().cast(),
-                size: (item).as_bytes().len(),
-            },
-            None => maplibre_native_ffi_sys::mln_buffer_view {
-                data: std::ptr::null(),
-                size: 0,
-            },
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_id: &str,
+        source_id: &str,
+        before_layer_id: Option<&str>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_hillshade_layer")?;
+        let layer_id = call.input(&layer_id)?;
+        let source_id = call.input(&source_id)?;
+        let before_layer_id = call.input(&before_layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_hillshade_layer(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                binding_arg_3,
+                map,
+                layer_id,
+                source_id,
+                before_layer_id,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_image_source_image` using its header execution and ownership contract.
+    /// Calls `mln_map_add_image_source_image`.
     pub fn add_image_source_image(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &[maplibre_core::generated::LatLng],
-        binding_arg_4: &maplibre_core::generated::PremultipliedRgba8Image,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_image_source_image", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2: Vec<_> = binding_arg_2
-            .iter()
-            .map(|value| -> Result<_> { Ok((value).to_native()) })
-            .collect::<Result<_>>()?;
-        let binding_arg_3 = binding_arg_2
-            .len()
-            .try_into()
-            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        let binding_arg_4 = binding_arg_4.to_native(&mut arena)?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        coordinates: &[LatLng],
+        image: &PremultipliedRgba8Image,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_image_source_image")?;
+        let coordinate_count = convert::count(coordinates.len())?;
+        let source_id = call.input(&source_id)?;
+        let coordinates = call.array(coordinates)?;
+        let image = call.reference(&image)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_image_source_image(
-                native,
-                binding_arg_1,
-                binding_arg_2.as_ptr(),
-                binding_arg_3,
-                &binding_arg_4,
+                map,
+                source_id,
+                coordinates,
+                coordinate_count,
+                image,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_image_source_url` using its header execution and ownership contract.
+    /// Calls `mln_map_add_image_source_url`.
     pub fn add_image_source_url(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &[maplibre_core::generated::LatLng],
-        binding_arg_4: &str,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_image_source_url", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2: Vec<_> = binding_arg_2
-            .iter()
-            .map(|value| -> Result<_> { Ok((value).to_native()) })
-            .collect::<Result<_>>()?;
-        let binding_arg_3 = binding_arg_2
-            .len()
-            .try_into()
-            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        let binding_arg_4 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_4).as_bytes().as_ptr().cast(),
-            size: (binding_arg_4).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        coordinates: &[LatLng],
+        url: &str,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_image_source_url")?;
+        let coordinate_count = convert::count(coordinates.len())?;
+        let source_id = call.input(&source_id)?;
+        let coordinates = call.array(coordinates)?;
+        let url = call.input(&url)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_image_source_url(
-                native,
-                binding_arg_1,
-                binding_arg_2.as_ptr(),
-                binding_arg_3,
-                binding_arg_4,
+                map,
+                source_id,
+                coordinates,
+                coordinate_count,
+                url,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_location_indicator_layer` using its header execution and ownership contract.
+    /// Calls `mln_map_add_location_indicator_layer`.
     pub fn add_location_indicator_layer(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: Option<&str>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_location_indicator_layer", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = match (binding_arg_2).as_ref() {
-            Some(item) => maplibre_native_ffi_sys::mln_buffer_view {
-                data: (item).as_bytes().as_ptr().cast(),
-                size: (item).as_bytes().len(),
-            },
-            None => maplibre_native_ffi_sys::mln_buffer_view {
-                data: std::ptr::null(),
-                size: 0,
-            },
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_id: &str,
+        before_layer_id: Option<&str>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_location_indicator_layer")?;
+        let layer_id = call.input(&layer_id)?;
+        let before_layer_id = call.input(&before_layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_location_indicator_layer(
-                native,
-                binding_arg_1,
-                binding_arg_2,
+                map,
+                layer_id,
+                before_layer_id,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_raster_dem_source_tiles` using its header execution and ownership contract.
+    /// Calls `mln_map_add_raster_dem_source_tiles`.
     pub fn add_raster_dem_source_tiles(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &[&str],
-        binding_arg_4: Option<&maplibre_core::generated::StyleTileSourceOptions>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_raster_dem_source_tiles", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2: Vec<_> = binding_arg_2
-            .iter()
-            .map(|value| -> Result<_> {
-                Ok(maplibre_native_ffi_sys::mln_buffer_view {
-                    data: (value).as_bytes().as_ptr().cast(),
-                    size: (value).as_bytes().len(),
-                })
-            })
-            .collect::<Result<_>>()?;
-        let binding_arg_3 = binding_arg_2
-            .len()
-            .try_into()
-            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        let binding_arg_4 = binding_arg_4
-            .map(|value| value.to_native(&mut arena))
-            .transpose()?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        tiles: &[&str],
+        options: Option<&StyleTileSourceOptions>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_raster_dem_source_tiles")?;
+        let tile_count = convert::count(tiles.len())?;
+        let source_id = call.input(&source_id)?;
+        let tiles = call.array(tiles)?;
+        let options = call.optional_reference(options.as_ref())?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_raster_dem_source_tiles(
-                native,
-                binding_arg_1,
-                binding_arg_2.as_ptr(),
-                binding_arg_3,
-                binding_arg_4
-                    .as_ref()
-                    .map_or(std::ptr::null(), |value| value),
+                map,
+                source_id,
+                tiles,
+                tile_count,
+                options,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_raster_dem_source_url` using its header execution and ownership contract.
+    /// Calls `mln_map_add_raster_dem_source_url`.
     pub fn add_raster_dem_source_url(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &str,
-        binding_arg_3: Option<&maplibre_core::generated::StyleTileSourceOptions>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_raster_dem_source_url", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_bytes().as_ptr().cast(),
-            size: (binding_arg_2).as_bytes().len(),
-        };
-        let binding_arg_3 = binding_arg_3
-            .map(|value| value.to_native(&mut arena))
-            .transpose()?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        url: &str,
+        options: Option<&StyleTileSourceOptions>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_raster_dem_source_url")?;
+        let source_id = call.input(&source_id)?;
+        let url = call.input(&url)?;
+        let options = call.optional_reference(options.as_ref())?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_raster_dem_source_url(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                binding_arg_3
-                    .as_ref()
-                    .map_or(std::ptr::null(), |value| value),
+                map,
+                source_id,
+                url,
+                options,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_raster_source_tiles` using its header execution and ownership contract.
+    /// Calls `mln_map_add_raster_source_tiles`.
     pub fn add_raster_source_tiles(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &[&str],
-        binding_arg_4: Option<&maplibre_core::generated::StyleTileSourceOptions>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_raster_source_tiles", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2: Vec<_> = binding_arg_2
-            .iter()
-            .map(|value| -> Result<_> {
-                Ok(maplibre_native_ffi_sys::mln_buffer_view {
-                    data: (value).as_bytes().as_ptr().cast(),
-                    size: (value).as_bytes().len(),
-                })
-            })
-            .collect::<Result<_>>()?;
-        let binding_arg_3 = binding_arg_2
-            .len()
-            .try_into()
-            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        let binding_arg_4 = binding_arg_4
-            .map(|value| value.to_native(&mut arena))
-            .transpose()?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        tiles: &[&str],
+        options: Option<&StyleTileSourceOptions>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_raster_source_tiles")?;
+        let tile_count = convert::count(tiles.len())?;
+        let source_id = call.input(&source_id)?;
+        let tiles = call.array(tiles)?;
+        let options = call.optional_reference(options.as_ref())?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_raster_source_tiles(
-                native,
-                binding_arg_1,
-                binding_arg_2.as_ptr(),
-                binding_arg_3,
-                binding_arg_4
-                    .as_ref()
-                    .map_or(std::ptr::null(), |value| value),
+                map,
+                source_id,
+                tiles,
+                tile_count,
+                options,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_raster_source_url` using its header execution and ownership contract.
+    /// Calls `mln_map_add_raster_source_url`.
     pub fn add_raster_source_url(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &str,
-        binding_arg_3: Option<&maplibre_core::generated::StyleTileSourceOptions>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_raster_source_url", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_bytes().as_ptr().cast(),
-            size: (binding_arg_2).as_bytes().len(),
-        };
-        let binding_arg_3 = binding_arg_3
-            .map(|value| value.to_native(&mut arena))
-            .transpose()?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        url: &str,
+        options: Option<&StyleTileSourceOptions>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_raster_source_url")?;
+        let source_id = call.input(&source_id)?;
+        let url = call.input(&url)?;
+        let options = call.optional_reference(options.as_ref())?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_raster_source_url(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                binding_arg_3
-                    .as_ref()
-                    .map_or(std::ptr::null(), |value| value),
+                map,
+                source_id,
+                url,
+                options,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_style_layer_json` using its header execution and ownership contract.
+    /// Calls `mln_map_add_style_layer_json`.
     pub fn add_style_layer_json(
         &self,
-        binding_arg_1: &[u8],
-        binding_arg_2: Option<&str>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_style_layer_json", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_ptr().cast(),
-            size: (binding_arg_1).len(),
-        };
-        let binding_arg_2 = match (binding_arg_2).as_ref() {
-            Some(item) => maplibre_native_ffi_sys::mln_buffer_view {
-                data: (item).as_bytes().as_ptr().cast(),
-                size: (item).as_bytes().len(),
-            },
-            None => maplibre_native_ffi_sys::mln_buffer_view {
-                data: std::ptr::null(),
-                size: 0,
-            },
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_json: &[u8],
+        before_layer_id: Option<&str>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_style_layer_json")?;
+        let layer_json = call.input(&layer_json)?;
+        let before_layer_id = call.input(&before_layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_style_layer_json(
-                native,
-                binding_arg_1,
-                binding_arg_2,
+                map,
+                layer_json,
+                before_layer_id,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_style_source_json` using its header execution and ownership contract.
+    /// Calls `mln_map_add_style_source_json`.
     pub fn add_style_source_json(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &[u8],
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_style_source_json", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_ptr().cast(),
-            size: (binding_arg_2).len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        source_json: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_style_source_json")?;
+        let source_id = call.input(&source_id)?;
+        let source_json = call.input(&source_json)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_style_source_json(
-                native,
-                binding_arg_1,
-                binding_arg_2,
+                map,
+                source_id,
+                source_json,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_vector_source_tiles` using its header execution and ownership contract.
+    /// Calls `mln_map_add_vector_source_tiles`.
     pub fn add_vector_source_tiles(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &[&str],
-        binding_arg_4: Option<&maplibre_core::generated::StyleTileSourceOptions>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_vector_source_tiles", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2: Vec<_> = binding_arg_2
-            .iter()
-            .map(|value| -> Result<_> {
-                Ok(maplibre_native_ffi_sys::mln_buffer_view {
-                    data: (value).as_bytes().as_ptr().cast(),
-                    size: (value).as_bytes().len(),
-                })
-            })
-            .collect::<Result<_>>()?;
-        let binding_arg_3 = binding_arg_2
-            .len()
-            .try_into()
-            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        let binding_arg_4 = binding_arg_4
-            .map(|value| value.to_native(&mut arena))
-            .transpose()?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        tiles: &[&str],
+        options: Option<&StyleTileSourceOptions>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_vector_source_tiles")?;
+        let tile_count = convert::count(tiles.len())?;
+        let source_id = call.input(&source_id)?;
+        let tiles = call.array(tiles)?;
+        let options = call.optional_reference(options.as_ref())?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_vector_source_tiles(
-                native,
-                binding_arg_1,
-                binding_arg_2.as_ptr(),
-                binding_arg_3,
-                binding_arg_4
-                    .as_ref()
-                    .map_or(std::ptr::null(), |value| value),
+                map,
+                source_id,
+                tiles,
+                tile_count,
+                options,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_add_vector_source_url` using its header execution and ownership contract.
+    /// Calls `mln_map_add_vector_source_url`.
     pub fn add_vector_source_url(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &str,
-        binding_arg_3: Option<&maplibre_core::generated::StyleTileSourceOptions>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_add_vector_source_url", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_bytes().as_ptr().cast(),
-            size: (binding_arg_2).as_bytes().len(),
-        };
-        let binding_arg_3 = binding_arg_3
-            .map(|value| value.to_native(&mut arena))
-            .transpose()?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        url: &str,
+        options: Option<&StyleTileSourceOptions>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_add_vector_source_url")?;
+        let source_id = call.input(&source_id)?;
+        let url = call.input(&url)?;
+        let options = call.optional_reference(options.as_ref())?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_add_vector_source_url(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                binding_arg_3
-                    .as_ref()
-                    .map_or(std::ptr::null(), |value| value),
+                map,
+                source_id,
+                url,
+                options,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_apply_camera_delta` using its header execution and ownership contract.
+    /// Calls `mln_map_apply_camera_delta`.
     pub fn apply_camera_delta(
         &self,
-        binding_arg_1: &maplibre_core::generated::CameraDelta,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_apply_camera_delta", native.0)?;
-        let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_apply_camera_delta(native, &binding_arg_1, completion, diagnostic)
+        delta: &CameraDelta,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_apply_camera_delta")?;
+        let delta = call.reference(&delta)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_apply_camera_delta(map, delta, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_camera_for_geometry` using its header execution and ownership contract.
+    /// Calls `mln_map_camera_for_geometry`.
     pub fn camera_for_geometry(
         &self,
-        binding_arg_1: &[u8],
-        binding_arg_2: Option<&maplibre_core::generated::CameraFitOptions>,
-    ) -> Result<NativeFuture<maplibre_core::generated::CameraOptions>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_camera_for_geometry", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_ptr().cast(),
-            size: (binding_arg_1).len(),
-        };
-        let binding_arg_2 = binding_arg_2.map(|value| value.to_native());
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        geometry: &[u8],
+        fit_options: Option<&CameraFitOptions>,
+    ) -> Result<NativeFuture<CameraOptions>> {
+        let mut call = self.inner.call("mln_map_camera_for_geometry")?;
+        let geometry = call.input(&geometry)?;
+        let fit_options = call.optional_reference(fit_options.as_ref())?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_camera_for_geometry(
-                    native,
-                    binding_arg_1,
-                    binding_arg_2
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    map,
+                    geometry,
+                    fit_options,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_camera_options>(result)?;
-                Ok(maplibre_core::generated::CameraOptions::from_native(value))
-            },
+            completion::value::<sys::mln_camera_options, _>,
         )
     }
 
-    /// Calls `mln_map_camera_for_lat_lng_bounds` using its header execution and ownership contract.
+    /// Calls `mln_map_camera_for_lat_lng_bounds`.
     pub fn camera_for_lat_lng_bounds(
         &self,
-        binding_arg_1: maplibre_core::generated::LatLngBounds,
-        binding_arg_2: Option<&maplibre_core::generated::CameraFitOptions>,
-    ) -> Result<NativeFuture<maplibre_core::generated::CameraOptions>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_camera_for_lat_lng_bounds", native.0)?;
-        let binding_arg_2 = binding_arg_2.map(|value| value.to_native());
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        bounds: LatLngBounds,
+        fit_options: Option<&CameraFitOptions>,
+    ) -> Result<NativeFuture<CameraOptions>> {
+        let mut call = self.inner.call("mln_map_camera_for_lat_lng_bounds")?;
+        let bounds = call.input(&bounds)?;
+        let fit_options = call.optional_reference(fit_options.as_ref())?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_camera_for_lat_lng_bounds(
-                    native,
-                    binding_arg_1.to_native(),
-                    binding_arg_2
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    map,
+                    bounds,
+                    fit_options,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_camera_options>(result)?;
-                Ok(maplibre_core::generated::CameraOptions::from_native(value))
-            },
+            completion::value::<sys::mln_camera_options, _>,
         )
     }
 
-    /// Calls `mln_map_camera_for_lat_lngs` using its header execution and ownership contract.
+    /// Calls `mln_map_camera_for_lat_lngs`.
     pub fn camera_for_lat_lngs(
         &self,
-        binding_arg_1: &[maplibre_core::generated::LatLng],
-        binding_arg_3: Option<&maplibre_core::generated::CameraFitOptions>,
-    ) -> Result<NativeFuture<maplibre_core::generated::CameraOptions>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_camera_for_lat_lngs", native.0)?;
-        let binding_arg_1: Vec<_> = binding_arg_1
-            .iter()
-            .map(|value| -> Result<_> { Ok((value).to_native()) })
-            .collect::<Result<_>>()?;
-        let binding_arg_2 = binding_arg_1
-            .len()
-            .try_into()
-            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        let binding_arg_3 = binding_arg_3.map(|value| value.to_native());
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        coordinates: &[LatLng],
+        fit_options: Option<&CameraFitOptions>,
+    ) -> Result<NativeFuture<CameraOptions>> {
+        let mut call = self.inner.call("mln_map_camera_for_lat_lngs")?;
+        let coordinate_count = convert::count(coordinates.len())?;
+        let coordinates = call.array(coordinates)?;
+        let fit_options = call.optional_reference(fit_options.as_ref())?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_camera_for_lat_lngs(
-                    native,
-                    binding_arg_1.as_ptr(),
-                    binding_arg_2,
-                    binding_arg_3
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    map,
+                    coordinates,
+                    coordinate_count,
+                    fit_options,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_camera_options>(result)?;
-                Ok(maplibre_core::generated::CameraOptions::from_native(value))
-            },
+            completion::value::<sys::mln_camera_options, _>,
         )
     }
 
-    /// Calls `mln_map_camera_query` using its header execution and ownership contract.
-    pub fn camera_query(
-        &self,
-    ) -> Result<NativeFuture<maplibre_core::generated::CameraQueryResult>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_camera_query", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_camera_query(native, completion, diagnostic)
+    /// Calls `mln_map_camera_query`.
+    pub fn camera_query(&self) -> Result<NativeFuture<CameraQueryResult>> {
+        let call = self.inner.call("mln_map_camera_query")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_camera_query(map, completion, out_diagnostic)
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_camera_query_result>(result)?;
-                Ok(maplibre_core::generated::CameraQueryResult::from_native(
-                    value,
-                ))
-            },
+            completion::value::<sys::mln_camera_query_result, _>,
         )
     }
 
-    /// Calls `mln_map_camera_snapshot_get` using its header execution and ownership contract.
-    pub fn camera_snapshot_get(&self) -> Result<(maplibre_core::generated::CameraOptions, u64)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_camera_snapshot_get", native.0)?;
-        let mut binding_arg_1: sys::mln_camera_options =
-            maplibre_core::generated::CameraOptions::default().to_native();
-        let mut binding_arg_2: u64 = Default::default();
-        maplibre_core::check(|diagnostic| unsafe {
+    /// Calls `mln_map_camera_snapshot_get`.
+    pub fn camera_snapshot_get(&self) -> Result<(CameraOptions, u64)> {
+        let mut call = self.inner.call("mln_map_camera_snapshot_get")?;
+        let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
+        out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
+        let mut out_generation: u64 = Default::default();
+        call.status(|map, out_diagnostic| unsafe {
             sys::mln_map_camera_snapshot_get(
-                native,
-                &mut binding_arg_1,
-                &mut binding_arg_2,
-                diagnostic,
+                map,
+                &mut out_camera,
+                &mut out_generation,
+                out_diagnostic,
             )
         })?;
-        Ok((
-            maplibre_core::generated::CameraOptions::from_native(binding_arg_1),
-            binding_arg_2,
-        ))
+        Ok((unsafe { from_native(out_camera) }?, out_generation))
     }
 
-    /// Calls `mln_map_cancel_transitions` using its header execution and ownership contract.
-    pub fn cancel_transitions(&self) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_cancel_transitions", native.0)?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_cancel_transitions(native, completion, diagnostic)
+    /// Calls `mln_map_cancel_transitions`.
+    pub fn cancel_transitions(&self) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self.inner.call("mln_map_cancel_transitions")?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_cancel_transitions(map, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_copy_layer_source_id` using its header execution and ownership contract.
-    pub fn copy_layer_source_id(
-        &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<Option<String>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_copy_layer_source_id", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_copy_layer_source_id(native, binding_arg_1, completion, diagnostic)
+    /// Calls `mln_map_copy_layer_source_id`.
+    pub fn copy_layer_source_id(&self, layer_id: &str) -> Result<NativeFuture<Option<String>>> {
+        let mut call = self.inner.call("mln_map_copy_layer_source_id")?;
+        let layer_id = call.input(&layer_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_copy_layer_source_id(map, layer_id, completion, out_diagnostic)
             },
             |result| {
-                let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
-                Ok(if value.size == 0 {
-                    None
-                } else {
-                    Some(unsafe { maplibre_core::string::copy_string_view(value) }?)
-                })
+                let value = completion::copy_value::<sys::mln_buffer_view>(result)?;
+                Ok(unsafe { convert::nonempty(value) }?)
             },
         )
     }
 
-    /// Calls `mln_map_copy_layer_source_layer` using its header execution and ownership contract.
-    pub fn copy_layer_source_layer(
-        &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<Option<String>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_copy_layer_source_layer", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_copy_layer_source_layer(native, binding_arg_1, completion, diagnostic)
+    /// Calls `mln_map_copy_layer_source_layer`.
+    pub fn copy_layer_source_layer(&self, layer_id: &str) -> Result<NativeFuture<Option<String>>> {
+        let mut call = self.inner.call("mln_map_copy_layer_source_layer")?;
+        let layer_id = call.input(&layer_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_copy_layer_source_layer(map, layer_id, completion, out_diagnostic)
             },
             |result| {
-                let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
-                Ok(if value.size == 0 {
-                    None
-                } else {
-                    Some(unsafe { maplibre_core::string::copy_string_view(value) }?)
-                })
+                let value = completion::copy_value::<sys::mln_buffer_view>(result)?;
+                Ok(unsafe { convert::nonempty(value) }?)
             },
         )
     }
 
-    /// Calls `mln_map_copy_style_image_premultiplied_rgba8` using its header execution and ownership contract.
+    /// Calls `mln_map_copy_style_image_premultiplied_rgba8`.
     pub fn copy_style_image_premultiplied_rgba8(
         &self,
-        binding_arg_1: &str,
+        image_id: &str,
     ) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_copy_style_image_premultiplied_rgba8", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        let mut call = self
+            .inner
+            .call("mln_map_copy_style_image_premultiplied_rgba8")?;
+        let image_id = call.input(&image_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_copy_style_image_premultiplied_rgba8(
-                    native,
-                    binding_arg_1,
+                    map,
+                    image_id,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_buffer_view>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe { maplibre_core::string::copy_string_view_bytes(value) }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_copy_style_image_stretches` using its header execution and ownership contract.
+    /// Calls `mln_map_copy_style_image_stretches`.
     pub fn copy_style_image_stretches(
         &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<Option<maplibre_core::generated::StyleImageStretchesResult>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_copy_style_image_stretches", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_copy_style_image_stretches(
-                    native,
-                    binding_arg_1,
-                    completion,
-                    diagnostic,
-                )
+        image_id: &str,
+    ) -> Result<NativeFuture<Option<StyleImageStretchesResult>>> {
+        let mut call = self.inner.call("mln_map_copy_style_image_stretches")?;
+        let image_id = call.input(&image_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_copy_style_image_stretches(map, image_id, completion, out_diagnostic)
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_style_image_stretches_result>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe {
-                            maplibre_core::generated::StyleImageStretchesResult::from_native(value)
-                        }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_style_image_stretches_result, _>,
         )
     }
 
-    /// Calls `mln_map_copy_style_source_attribution` using its header execution and ownership contract.
+    /// Calls `mln_map_copy_style_source_attribution`.
     pub fn copy_style_source_attribution(
         &self,
-        binding_arg_1: &str,
+        source_id: &str,
     ) -> Result<NativeFuture<Option<String>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_copy_style_source_attribution", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        let mut call = self.inner.call("mln_map_copy_style_source_attribution")?;
+        let source_id = call.input(&source_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_copy_style_source_attribution(
-                    native,
-                    binding_arg_1,
+                    map,
+                    source_id,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_buffer_view>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe { maplibre_core::string::copy_string_view(value) }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_copy_style_source_url` using its header execution and ownership contract.
-    pub fn copy_style_source_url(
-        &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<Option<String>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_copy_style_source_url", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_copy_style_source_url(native, binding_arg_1, completion, diagnostic)
+    /// Calls `mln_map_copy_style_source_url`.
+    pub fn copy_style_source_url(&self, source_id: &str) -> Result<NativeFuture<Option<String>>> {
+        let mut call = self.inner.call("mln_map_copy_style_source_url")?;
+        let source_id = call.input(&source_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_copy_style_source_url(map, source_id, completion, out_diagnostic)
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_buffer_view>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe { maplibre_core::string::copy_string_view(value) }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_dispose` using its header execution and ownership contract.
+    /// Calls `mln_map_dispose`.
     pub fn dispose(&self) -> Result<()> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let result = self.inner.handle.close_with(|native| {
-            maplibre_core::check(|diagnostic| unsafe { sys::mln_map_dispose(native, diagnostic) })?;
-            Ok(())
-        })?;
-        Ok(result.unwrap_or_else(|| Default::default()))
-    }
-
-    /// Calls `mln_map_dump_debug_logs` using its header execution and ownership contract.
-    pub fn dump_debug_logs(&self) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_dump_debug_logs", native.0)?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_dump_debug_logs(native, completion, diagnostic)
+        self.inner.close(|map| {
+            let mut call = Call::new(map, None);
+            call.status(|map, out_diagnostic| unsafe { sys::mln_map_dispose(map, out_diagnostic) })
         })
     }
 
-    /// Calls `mln_map_get_feature_state` using its header execution and ownership contract.
+    /// Calls `mln_map_dump_debug_logs`.
+    pub fn dump_debug_logs(&self) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self.inner.call("mln_map_dump_debug_logs")?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_dump_debug_logs(map, completion, out_diagnostic)
+        })
+    }
+
+    /// Calls `mln_map_get_feature_state`.
     pub fn get_feature_state(
         &self,
-        binding_arg_1: &maplibre_core::generated::FeatureStateSelector,
+        selector: &FeatureStateSelector,
     ) -> Result<NativeFuture<Vec<u8>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_feature_state", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_get_feature_state(native, &binding_arg_1, completion, diagnostic)
+        let mut call = self.inner.call("mln_map_get_feature_state")?;
+        let selector = call.reference(&selector)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_feature_state(map, selector, completion, out_diagnostic)
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
-                Ok(unsafe { maplibre_core::string::copy_string_view_bytes(value) }?)
-            },
+            completion::value::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_get_global_state` using its header execution and ownership contract.
+    /// Calls `mln_map_get_global_state`.
     pub fn get_global_state(&self) -> Result<NativeFuture<Vec<u8>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_global_state", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_get_global_state(native, completion, diagnostic)
+        let call = self.inner.call("mln_map_get_global_state")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_global_state(map, completion, out_diagnostic)
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
-                Ok(unsafe { maplibre_core::string::copy_string_view_bytes(value) }?)
-            },
+            completion::value::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_get_image_source_coordinates` using its header execution and ownership contract.
+    /// Calls `mln_map_get_image_source_coordinates`.
     pub fn get_image_source_coordinates(
         &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<Option<Vec<maplibre_core::generated::LatLng>>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_image_source_coordinates", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        source_id: &str,
+    ) -> Result<NativeFuture<Option<Vec<LatLng>>>> {
+        let mut call = self.inner.call("mln_map_get_image_source_coordinates")?;
+        let source_id = call.input(&source_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_get_image_source_coordinates(
-                    native,
-                    binding_arg_1,
+                    map,
+                    source_id,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            |result| {
-                if result.value.is_null() {
-                    return Ok(None);
-                }
-                (|result| {
-                    crate::completion::copy_slice::<sys::mln_lat_lng>(result)?
-                        .into_iter()
-                        .map(|value| -> Result<_> {
-                            Ok(maplibre_core::generated::LatLng::from_native(value))
-                        })
-                        .collect::<Result<Vec<_>>>()
-                })(result)
-                .map(Some)
-            },
+            completion::optional_list::<sys::mln_lat_lng, _>,
         )
     }
 
-    /// Calls `mln_map_get_layer_filter` using its header execution and ownership contract.
-    pub fn get_layer_filter(&self, binding_arg_1: &str) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_layer_filter", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_get_layer_filter(native, binding_arg_1, completion, diagnostic)
+    /// Calls `mln_map_get_layer_filter`.
+    pub fn get_layer_filter(&self, layer_id: &str) -> Result<NativeFuture<Option<Vec<u8>>>> {
+        let mut call = self.inner.call("mln_map_get_layer_filter")?;
+        let layer_id = call.input(&layer_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_layer_filter(map, layer_id, completion, out_diagnostic)
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_buffer_view>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe { maplibre_core::string::copy_string_view_bytes(value) }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_get_layer_property` using its header execution and ownership contract.
+    /// Calls `mln_map_get_layer_property`.
     pub fn get_layer_property(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &str,
+        layer_id: &str,
+        property_name: &str,
     ) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_layer_property", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_bytes().as_ptr().cast(),
-            size: (binding_arg_2).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        let mut call = self.inner.call("mln_map_get_layer_property")?;
+        let layer_id = call.input(&layer_id)?;
+        let property_name = call.input(&property_name)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_get_layer_property(
-                    native,
-                    binding_arg_1,
-                    binding_arg_2,
+                    map,
+                    layer_id,
+                    property_name,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_buffer_view>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe { maplibre_core::string::copy_string_view_bytes(value) }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_get_style_image_info` using its header execution and ownership contract.
+    /// Calls `mln_map_get_style_image_info`.
     pub fn get_style_image_info(
         &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<Option<maplibre_core::generated::StyleImageResult>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_style_image_info", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_get_style_image_info(native, binding_arg_1, completion, diagnostic)
+        image_id: &str,
+    ) -> Result<NativeFuture<Option<StyleImageResult>>> {
+        let mut call = self.inner.call("mln_map_get_style_image_info")?;
+        let image_id = call.input(&image_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_image_info(map, image_id, completion, out_diagnostic)
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_style_image_result>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe {
-                            maplibre_core::generated::StyleImageResult::from_native(value)
-                        }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_style_image_result, _>,
         )
     }
 
-    /// Calls `mln_map_get_style_layer_info` using its header execution and ownership contract.
+    /// Calls `mln_map_get_style_layer_info`.
     pub fn get_style_layer_info(
         &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<Option<maplibre_core::generated::StyleLayerResult>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_style_layer_info", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_get_style_layer_info(native, binding_arg_1, completion, diagnostic)
+        layer_id: &str,
+    ) -> Result<NativeFuture<Option<StyleLayerResult>>> {
+        let mut call = self.inner.call("mln_map_get_style_layer_info")?;
+        let layer_id = call.input(&layer_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_layer_info(map, layer_id, completion, out_diagnostic)
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_style_layer_result>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe {
-                            maplibre_core::generated::StyleLayerResult::from_native(value)
-                        }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_style_layer_result, _>,
         )
     }
 
-    /// Calls `mln_map_get_style_layer_json` using its header execution and ownership contract.
-    pub fn get_style_layer_json(
-        &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_style_layer_json", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_get_style_layer_json(native, binding_arg_1, completion, diagnostic)
+    /// Calls `mln_map_get_style_layer_json`.
+    pub fn get_style_layer_json(&self, layer_id: &str) -> Result<NativeFuture<Option<Vec<u8>>>> {
+        let mut call = self.inner.call("mln_map_get_style_layer_json")?;
+        let layer_id = call.input(&layer_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_layer_json(map, layer_id, completion, out_diagnostic)
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_buffer_view>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe { maplibre_core::string::copy_string_view_bytes(value) }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_get_style_light_property` using its header execution and ownership contract.
+    /// Calls `mln_map_get_style_light_property`.
     pub fn get_style_light_property(
         &self,
-        binding_arg_1: &str,
+        property_name: &str,
     ) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_style_light_property", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_get_style_light_property(native, binding_arg_1, completion, diagnostic)
+        let mut call = self.inner.call("mln_map_get_style_light_property")?;
+        let property_name = call.input(&property_name)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_light_property(
+                    map,
+                    property_name,
+                    completion,
+                    out_diagnostic,
+                )
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_buffer_view>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe { maplibre_core::string::copy_string_view_bytes(value) }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_get_style_source_info` using its header execution and ownership contract.
+    /// Calls `mln_map_get_style_source_info`.
     pub fn get_style_source_info(
         &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<Option<maplibre_core::generated::StyleSourceResult>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_style_source_info", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_get_style_source_info(native, binding_arg_1, completion, diagnostic)
+        source_id: &str,
+    ) -> Result<NativeFuture<Option<StyleSourceResult>>> {
+        let mut call = self.inner.call("mln_map_get_style_source_info")?;
+        let source_id = call.input(&source_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_source_info(map, source_id, completion, out_diagnostic)
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_style_source_result>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe {
-                            maplibre_core::generated::StyleSourceResult::from_native(value)
-                        }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_style_source_result, _>,
         )
     }
 
-    /// Calls `mln_map_get_style_source_tile_urls` using its header execution and ownership contract.
+    /// Calls `mln_map_get_style_source_tile_urls`.
     pub fn get_style_source_tile_urls(
         &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<Option<maplibre_core::generated::StyleSourceTileUrlsResult>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_style_source_tile_urls", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_get_style_source_tile_urls(
-                    native,
-                    binding_arg_1,
-                    completion,
-                    diagnostic,
-                )
+        source_id: &str,
+    ) -> Result<NativeFuture<Option<StyleSourceTileUrlsResult>>> {
+        let mut call = self.inner.call("mln_map_get_style_source_tile_urls")?;
+        let source_id = call.input(&source_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_source_tile_urls(map, source_id, completion, out_diagnostic)
             },
-            |result| {
-                crate::completion::optional_value::<sys::mln_style_source_tile_urls_result>(result)?
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe {
-                            maplibre_core::generated::StyleSourceTileUrlsResult::from_native(value)
-                        }?)
-                    })
-                    .transpose()
-            },
+            completion::optional::<sys::mln_style_source_tile_urls_result, _>,
         )
     }
 
-    /// Calls `mln_map_get_style_transition_options` using its header execution and ownership contract.
-    pub fn get_style_transition_options(
-        &self,
-    ) -> Result<NativeFuture<maplibre_core::generated::StyleTransitionOptions>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_get_style_transition_options", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_get_style_transition_options(native, completion, diagnostic)
+    /// Calls `mln_map_get_style_transition_options`.
+    pub fn get_style_transition_options(&self) -> Result<NativeFuture<StyleTransitionOptions>> {
+        let call = self.inner.call("mln_map_get_style_transition_options")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_transition_options(map, completion, out_diagnostic)
             },
-            |result| {
-                let value =
-                    crate::completion::copy_value::<sys::mln_style_transition_options>(result)?;
-                Ok(maplibre_core::generated::StyleTransitionOptions::from_native(value))
-            },
+            completion::value::<sys::mln_style_transition_options, _>,
         )
     }
 
-    /// Calls `mln_map_invalidate_custom_geometry_source_region` using its header execution and ownership contract.
+    /// Calls `mln_map_invalidate_custom_geometry_source_region`.
     pub fn invalidate_custom_geometry_source_region(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: maplibre_core::generated::LatLngBounds,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check(
-            "mln_map_invalidate_custom_geometry_source_region",
-            native.0,
-        )?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        bounds: LatLngBounds,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self
+            .inner
+            .call("mln_map_invalidate_custom_geometry_source_region")?;
+        let source_id = call.input(&source_id)?;
+        let bounds = call.input(&bounds)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_invalidate_custom_geometry_source_region(
-                native,
-                binding_arg_1,
-                binding_arg_2.to_native(),
+                map,
+                source_id,
+                bounds,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_invalidate_custom_geometry_source_tile` using its header execution and ownership contract.
+    /// Calls `mln_map_invalidate_custom_geometry_source_tile`.
     pub fn invalidate_custom_geometry_source_tile(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: maplibre_core::generated::CanonicalTileId,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_invalidate_custom_geometry_source_tile", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        tile_id: CanonicalTileId,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self
+            .inner
+            .call("mln_map_invalidate_custom_geometry_source_tile")?;
+        let source_id = call.input(&source_id)?;
+        let tile_id = call.input(&tile_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_invalidate_custom_geometry_source_tile(
-                native,
-                binding_arg_1,
-                binding_arg_2.to_native(),
+                map,
+                source_id,
+                tile_id,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_invalidate_custom_mvt_vector_source_tile` using its header execution and ownership contract.
+    /// Calls `mln_map_invalidate_custom_mvt_vector_source_tile`.
     pub fn invalidate_custom_mvt_vector_source_tile(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: maplibre_core::generated::CanonicalTileId,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check(
-            "mln_map_invalidate_custom_mvt_vector_source_tile",
-            native.0,
-        )?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        tile_id: CanonicalTileId,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self
+            .inner
+            .call("mln_map_invalidate_custom_mvt_vector_source_tile")?;
+        let source_id = call.input(&source_id)?;
+        let tile_id = call.input(&tile_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_invalidate_custom_mvt_vector_source_tile(
-                native,
-                binding_arg_1,
-                binding_arg_2.to_native(),
+                map,
+                source_id,
+                tile_id,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_lat_lng_bounds_for_camera` using its header execution and ownership contract.
+    /// Calls `mln_map_lat_lng_bounds_for_camera`.
     pub fn lat_lng_bounds_for_camera(
         &self,
-        binding_arg_1: &maplibre_core::generated::CameraOptions,
-    ) -> Result<NativeFuture<maplibre_core::generated::LatLngBounds>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_lat_lng_bounds_for_camera", native.0)?;
-        let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_lat_lng_bounds_for_camera(
-                    native,
-                    &binding_arg_1,
-                    completion,
-                    diagnostic,
-                )
+        camera: &CameraOptions,
+    ) -> Result<NativeFuture<LatLngBounds>> {
+        let mut call = self.inner.call("mln_map_lat_lng_bounds_for_camera")?;
+        let camera = call.reference(&camera)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_lat_lng_bounds_for_camera(map, camera, completion, out_diagnostic)
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_lat_lng_bounds>(result)?;
-                Ok(maplibre_core::generated::LatLngBounds::from_native(value))
-            },
+            completion::value::<sys::mln_lat_lng_bounds, _>,
         )
     }
 
-    /// Calls `mln_map_lat_lng_bounds_for_camera_unwrapped` using its header execution and ownership contract.
+    /// Calls `mln_map_lat_lng_bounds_for_camera_unwrapped`.
     pub fn lat_lng_bounds_for_camera_unwrapped(
         &self,
-        binding_arg_1: &maplibre_core::generated::CameraOptions,
-    ) -> Result<NativeFuture<maplibre_core::generated::LatLngBounds>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_lat_lng_bounds_for_camera_unwrapped", native.0)?;
-        let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        camera: &CameraOptions,
+    ) -> Result<NativeFuture<LatLngBounds>> {
+        let mut call = self
+            .inner
+            .call("mln_map_lat_lng_bounds_for_camera_unwrapped")?;
+        let camera = call.reference(&camera)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_lat_lng_bounds_for_camera_unwrapped(
-                    native,
-                    &binding_arg_1,
+                    map,
+                    camera,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_lat_lng_bounds>(result)?;
-                Ok(maplibre_core::generated::LatLngBounds::from_native(value))
-            },
+            completion::value::<sys::mln_lat_lng_bounds, _>,
         )
     }
 
-    /// Calls `mln_map_lat_lng_for_pixel` using its header execution and ownership contract.
-    pub fn lat_lng_for_pixel(
-        &self,
-        binding_arg_1: maplibre_core::generated::ScreenPoint,
-    ) -> Result<NativeFuture<maplibre_core::generated::LatLng>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_lat_lng_for_pixel", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_lat_lng_for_pixel(
-                    native,
-                    binding_arg_1.to_native(),
-                    completion,
-                    diagnostic,
-                )
+    /// Calls `mln_map_lat_lng_for_pixel`.
+    pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<NativeFuture<LatLng>> {
+        let mut call = self.inner.call("mln_map_lat_lng_for_pixel")?;
+        let point = call.input(&point)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_lat_lng_for_pixel(map, point, completion, out_diagnostic)
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_lat_lng>(result)?;
-                Ok(maplibre_core::generated::LatLng::from_native(value))
-            },
+            completion::value::<sys::mln_lat_lng, _>,
         )
     }
 
-    /// Calls `mln_map_lat_lng_for_pixel_unwrapped` using its header execution and ownership contract.
-    pub fn lat_lng_for_pixel_unwrapped(
-        &self,
-        binding_arg_1: maplibre_core::generated::ScreenPoint,
-    ) -> Result<NativeFuture<maplibre_core::generated::LatLng>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_lat_lng_for_pixel_unwrapped", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_lat_lng_for_pixel_unwrapped(
-                    native,
-                    binding_arg_1.to_native(),
-                    completion,
-                    diagnostic,
-                )
+    /// Calls `mln_map_lat_lng_for_pixel_unwrapped`.
+    pub fn lat_lng_for_pixel_unwrapped(&self, point: ScreenPoint) -> Result<NativeFuture<LatLng>> {
+        let mut call = self.inner.call("mln_map_lat_lng_for_pixel_unwrapped")?;
+        let point = call.input(&point)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_lat_lng_for_pixel_unwrapped(map, point, completion, out_diagnostic)
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_lat_lng>(result)?;
-                Ok(maplibre_core::generated::LatLng::from_native(value))
-            },
+            completion::value::<sys::mln_lat_lng, _>,
         )
     }
 
-    /// Calls `mln_map_lat_lngs_for_pixels` using its header execution and ownership contract.
-    pub fn lat_lngs_for_pixels(
-        &self,
-        binding_arg_1: &[maplibre_core::generated::ScreenPoint],
-    ) -> Result<NativeFuture<Vec<maplibre_core::generated::LatLng>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_lat_lngs_for_pixels", native.0)?;
-        let binding_arg_1: Vec<_> = binding_arg_1
-            .iter()
-            .map(|value| -> Result<_> { Ok((value).to_native()) })
-            .collect::<Result<_>>()?;
-        let binding_arg_2 = binding_arg_1
-            .len()
-            .try_into()
-            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
+    /// Calls `mln_map_lat_lngs_for_pixels`.
+    pub fn lat_lngs_for_pixels(&self, points: &[ScreenPoint]) -> Result<NativeFuture<Vec<LatLng>>> {
+        let mut call = self.inner.call("mln_map_lat_lngs_for_pixels")?;
+        let point_count = convert::count(points.len())?;
+        let points = call.array(points)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_lat_lngs_for_pixels(
-                    native,
-                    binding_arg_1.as_ptr(),
-                    binding_arg_2,
+                    map,
+                    points,
+                    point_count,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            |result| {
-                crate::completion::copy_slice::<sys::mln_lat_lng>(result)?
-                    .into_iter()
-                    .map(|value| -> Result<_> {
-                        Ok(maplibre_core::generated::LatLng::from_native(value))
-                    })
-                    .collect::<Result<Vec<_>>>()
-            },
+            completion::list::<sys::mln_lat_lng, _>,
         )
     }
 
-    /// Calls `mln_map_lat_lngs_for_pixels_unwrapped` using its header execution and ownership contract.
+    /// Calls `mln_map_lat_lngs_for_pixels_unwrapped`.
     pub fn lat_lngs_for_pixels_unwrapped(
         &self,
-        binding_arg_1: &[maplibre_core::generated::ScreenPoint],
-    ) -> Result<NativeFuture<Vec<maplibre_core::generated::LatLng>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_lat_lngs_for_pixels_unwrapped", native.0)?;
-        let binding_arg_1: Vec<_> = binding_arg_1
-            .iter()
-            .map(|value| -> Result<_> { Ok((value).to_native()) })
-            .collect::<Result<_>>()?;
-        let binding_arg_2 = binding_arg_1
-            .len()
-            .try_into()
-            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        points: &[ScreenPoint],
+    ) -> Result<NativeFuture<Vec<LatLng>>> {
+        let mut call = self.inner.call("mln_map_lat_lngs_for_pixels_unwrapped")?;
+        let point_count = convert::count(points.len())?;
+        let points = call.array(points)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_lat_lngs_for_pixels_unwrapped(
-                    native,
-                    binding_arg_1.as_ptr(),
-                    binding_arg_2,
+                    map,
+                    points,
+                    point_count,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            |result| {
-                crate::completion::copy_slice::<sys::mln_lat_lng>(result)?
-                    .into_iter()
-                    .map(|value| -> Result<_> {
-                        Ok(maplibre_core::generated::LatLng::from_native(value))
-                    })
-                    .collect::<Result<Vec<_>>>()
-            },
+            completion::list::<sys::mln_lat_lng, _>,
         )
     }
 
-    /// Calls `mln_map_list_style_layer_ids` using its header execution and ownership contract.
+    /// Calls `mln_map_list_style_layer_ids`.
     pub fn list_style_layer_ids(&self) -> Result<NativeFuture<Vec<String>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_list_style_layer_ids", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_list_style_layer_ids(native, completion, diagnostic)
+        let call = self.inner.call("mln_map_list_style_layer_ids")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_list_style_layer_ids(map, completion, out_diagnostic)
             },
-            |result| {
-                crate::completion::copy_slice::<sys::mln_buffer_view>(result)?
-                    .into_iter()
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe { maplibre_core::string::copy_string_view(value) }?)
-                    })
-                    .collect::<Result<Vec<_>>>()
-            },
+            completion::list::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_list_style_layers` using its header execution and ownership contract.
-    pub fn list_style_layers(
-        &self,
-    ) -> Result<NativeFuture<Vec<maplibre_core::generated::StyleLayerEntry>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_list_style_layers", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_list_style_layers(native, completion, diagnostic)
+    /// Calls `mln_map_list_style_layers`.
+    pub fn list_style_layers(&self) -> Result<NativeFuture<Vec<StyleLayerEntry>>> {
+        let call = self.inner.call("mln_map_list_style_layers")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_list_style_layers(map, completion, out_diagnostic)
             },
-            |result| {
-                crate::completion::copy_slice::<sys::mln_style_layer_entry>(result)?
-                    .into_iter()
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe {
-                            maplibre_core::generated::StyleLayerEntry::from_native(value)
-                        }?)
-                    })
-                    .collect::<Result<Vec<_>>>()
-            },
+            completion::list::<sys::mln_style_layer_entry, _>,
         )
     }
 
-    /// Calls `mln_map_list_style_source_ids` using its header execution and ownership contract.
+    /// Calls `mln_map_list_style_source_ids`.
     pub fn list_style_source_ids(&self) -> Result<NativeFuture<Vec<String>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_list_style_source_ids", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_list_style_source_ids(native, completion, diagnostic)
+        let call = self.inner.call("mln_map_list_style_source_ids")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_list_style_source_ids(map, completion, out_diagnostic)
             },
-            |result| {
-                crate::completion::copy_slice::<sys::mln_buffer_view>(result)?
-                    .into_iter()
-                    .map(|value| -> Result<_> {
-                        Ok(unsafe { maplibre_core::string::copy_string_view(value) }?)
-                    })
-                    .collect::<Result<Vec<_>>>()
-            },
+            completion::list::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_loaded_style_json` using its header execution and ownership contract.
+    /// Calls `mln_map_loaded_style_json`.
     pub fn loaded_style_json(&self) -> Result<NativeFuture<Vec<u8>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_loaded_style_json", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_loaded_style_json(native, completion, diagnostic)
+        let call = self.inner.call("mln_map_loaded_style_json")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_loaded_style_json(map, completion, out_diagnostic)
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
-                Ok(unsafe { maplibre_core::string::copy_string_view_bytes(value) }?)
-            },
+            completion::value::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_meters_per_pixel_at_latitude` using its header execution and ownership contract.
-    pub fn meters_per_pixel_at_latitude(&self, binding_arg_1: f64) -> Result<NativeFuture<f64>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_meters_per_pixel_at_latitude", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_meters_per_pixel_at_latitude(
-                    native,
-                    binding_arg_1,
-                    completion,
-                    diagnostic,
-                )
+    /// Calls `mln_map_meters_per_pixel_at_latitude`.
+    pub fn meters_per_pixel_at_latitude(&self, latitude: f64) -> Result<NativeFuture<f64>> {
+        let call = self.inner.call("mln_map_meters_per_pixel_at_latitude")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_meters_per_pixel_at_latitude(map, latitude, completion, out_diagnostic)
             },
             |result| {
-                let value = crate::completion::copy_value::<f64>(result)?;
+                let value = completion::copy_value::<f64>(result)?;
                 Ok(value)
             },
         )
     }
 
-    /// Calls `mln_map_move_style_layer` using its header execution and ownership contract.
+    /// Calls `mln_map_move_style_layer`.
     pub fn move_style_layer(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: Option<&str>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_move_style_layer", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = match (binding_arg_2).as_ref() {
-            Some(item) => maplibre_native_ffi_sys::mln_buffer_view {
-                data: (item).as_bytes().as_ptr().cast(),
-                size: (item).as_bytes().len(),
-            },
-            None => maplibre_native_ffi_sys::mln_buffer_view {
-                data: std::ptr::null(),
-                size: 0,
-            },
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_id: &str,
+        before_layer_id: Option<&str>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_move_style_layer")?;
+        let layer_id = call.input(&layer_id)?;
+        let before_layer_id = call.input(&before_layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_move_style_layer(
-                native,
-                binding_arg_1,
-                binding_arg_2,
+                map,
+                layer_id,
+                before_layer_id,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_pixel_for_lat_lng` using its header execution and ownership contract.
-    pub fn pixel_for_lat_lng(
-        &self,
-        binding_arg_1: maplibre_core::generated::LatLng,
-    ) -> Result<NativeFuture<maplibre_core::generated::ScreenPoint>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_pixel_for_lat_lng", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_pixel_for_lat_lng(
-                    native,
-                    binding_arg_1.to_native(),
-                    completion,
-                    diagnostic,
-                )
+    /// Calls `mln_map_pixel_for_lat_lng`.
+    pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<NativeFuture<ScreenPoint>> {
+        let mut call = self.inner.call("mln_map_pixel_for_lat_lng")?;
+        let coordinate = call.input(&coordinate)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_pixel_for_lat_lng(map, coordinate, completion, out_diagnostic)
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_screen_point>(result)?;
-                Ok(maplibre_core::generated::ScreenPoint::from_native(value))
-            },
+            completion::value::<sys::mln_screen_point, _>,
         )
     }
 
-    /// Calls `mln_map_pixels_for_lat_lngs` using its header execution and ownership contract.
+    /// Calls `mln_map_pixels_for_lat_lngs`.
     pub fn pixels_for_lat_lngs(
         &self,
-        binding_arg_1: &[maplibre_core::generated::LatLng],
-    ) -> Result<NativeFuture<Vec<maplibre_core::generated::ScreenPoint>>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_pixels_for_lat_lngs", native.0)?;
-        let binding_arg_1: Vec<_> = binding_arg_1
-            .iter()
-            .map(|value| -> Result<_> { Ok((value).to_native()) })
-            .collect::<Result<_>>()?;
-        let binding_arg_2 = binding_arg_1
-            .len()
-            .try_into()
-            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        coordinates: &[LatLng],
+    ) -> Result<NativeFuture<Vec<ScreenPoint>>> {
+        let mut call = self.inner.call("mln_map_pixels_for_lat_lngs")?;
+        let coordinate_count = convert::count(coordinates.len())?;
+        let coordinates = call.array(coordinates)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_pixels_for_lat_lngs(
-                    native,
-                    binding_arg_1.as_ptr(),
-                    binding_arg_2,
+                    map,
+                    coordinates,
+                    coordinate_count,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            |result| {
-                crate::completion::copy_slice::<sys::mln_screen_point>(result)?
-                    .into_iter()
-                    .map(|value| -> Result<_> {
-                        Ok(maplibre_core::generated::ScreenPoint::from_native(value))
-                    })
-                    .collect::<Result<Vec<_>>>()
-            },
+            completion::list::<sys::mln_screen_point, _>,
         )
     }
 
-    /// Calls `mln_map_projection_create` using its header execution and ownership contract.
-    pub fn projection_create(&self) -> Result<NativeFuture<crate::MapProjectionHandle>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_projection_create", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_projection_create(native, completion, diagnostic)
+    /// Calls `mln_map_projection_create`.
+    pub fn projection_create(&self) -> Result<NativeFuture<MapProjectionHandle>> {
+        let call = self.inner.call("mln_map_projection_create")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_projection_create(map, completion, out_diagnostic)
             },
             move |result| {
-                let value = crate::completion::copy_value::<sys::mln_map_projection>(result)?;
-                crate::MapProjectionHandle::from_native(value)
+                MapProjectionHandle::adopt(
+                    completion::copy_value::<sys::mln_map_projection>(result)?,
+                    None,
+                )
             },
         )
     }
 
-    /// Calls `mln_map_release` using its header execution and ownership contract.
+    /// Calls `mln_map_release`.
     pub fn release(&self) -> Result<NativeFuture<()>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let result = self.inner.handle.close_with(|native| {
-            crate::completion::submit(
-                |completion, diagnostic| unsafe {
-                    sys::mln_map_release(native, completion, diagnostic)
+        self.inner.release(|map| {
+            let call = Call::new(map, None);
+            call.complete(
+                |map, completion, out_diagnostic| unsafe {
+                    sys::mln_map_release(map, completion, out_diagnostic)
                 },
-                crate::completion::unit,
+                completion::unit,
             )
-        })?;
-        Ok(result.unwrap_or_else(|| crate::completion::ready(())))
+        })
     }
 
-    /// Calls `mln_map_remove_feature_state` using its header execution and ownership contract.
+    /// Calls `mln_map_remove_feature_state`.
     pub fn remove_feature_state(
         &self,
-        binding_arg_1: &maplibre_core::generated::FeatureStateSelector,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_remove_feature_state", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_remove_feature_state(native, &binding_arg_1, completion, diagnostic)
+        selector: &FeatureStateSelector,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_remove_feature_state")?;
+        let selector = call.reference(&selector)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_remove_feature_state(map, selector, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_remove_style_image` using its header execution and ownership contract.
-    pub fn remove_style_image(
-        &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_remove_style_image", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_remove_style_image(native, binding_arg_1, completion, diagnostic)
+    /// Calls `mln_map_remove_style_image`.
+    pub fn remove_style_image(&self, image_id: &str) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_remove_style_image")?;
+        let image_id = call.input(&image_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_remove_style_image(map, image_id, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_remove_style_layer` using its header execution and ownership contract.
-    pub fn remove_style_layer(
-        &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_remove_style_layer", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_remove_style_layer(native, binding_arg_1, completion, diagnostic)
+    /// Calls `mln_map_remove_style_layer`.
+    pub fn remove_style_layer(&self, layer_id: &str) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_remove_style_layer")?;
+        let layer_id = call.input(&layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_remove_style_layer(map, layer_id, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_remove_style_source` using its header execution and ownership contract.
-    pub fn remove_style_source(
-        &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_remove_style_source", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_remove_style_source(native, binding_arg_1, completion, diagnostic)
+    /// Calls `mln_map_remove_style_source`.
+    pub fn remove_style_source(&self, source_id: &str) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_remove_style_source")?;
+        let source_id = call.input(&source_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_remove_style_source(map, source_id, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_request_repaint` using its header execution and ownership contract.
-    pub fn request_repaint(&self) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_request_repaint", native.0)?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_request_repaint(native, completion, diagnostic)
+    /// Calls `mln_map_request_repaint`.
+    pub fn request_repaint(&self) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self.inner.call("mln_map_request_repaint")?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_request_repaint(map, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_request_still_image` using its header execution and ownership contract.
+    /// Calls `mln_map_request_still_image`.
     pub fn request_still_image(&self) -> Result<NativeFuture<()>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_request_still_image", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_request_still_image(native, completion, diagnostic)
+        let call = self.inner.call("mln_map_request_still_image")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_request_still_image(map, completion, out_diagnostic)
             },
-            crate::completion::unit,
+            completion::unit,
         )
     }
 
-    /// Calls `mln_map_resize` using its header execution and ownership contract.
-    pub fn resize(
-        &self,
-        binding_arg_1: maplibre_core::generated::LogicalExtent,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_resize", native.0)?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_resize(native, binding_arg_1.to_native(), completion, diagnostic)
+    /// Calls `mln_map_resize`.
+    pub fn resize(&self, extent: LogicalExtent) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_resize")?;
+        let extent = call.input(&extent)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_resize(map, extent, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_bounds` using its header execution and ownership contract.
-    pub fn set_bounds(
-        &self,
-        binding_arg_1: &maplibre_core::generated::BoundOptions,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_bounds", native.0)?;
-        let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_bounds(native, &binding_arg_1, completion, diagnostic)
+    /// Calls `mln_map_set_bounds`.
+    pub fn set_bounds(&self, options: &BoundOptions) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_bounds")?;
+        let options = call.reference(&options)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_bounds(map, options, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_custom_geometry_source_tile_data` using its header execution and ownership contract.
+    /// Calls `mln_map_set_custom_geometry_source_tile_data`.
     pub fn set_custom_geometry_source_tile_data(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: maplibre_core::generated::CanonicalTileId,
-        binding_arg_3: &[u8],
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_custom_geometry_source_tile_data", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_3 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_3).as_ptr().cast(),
-            size: (binding_arg_3).len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        tile_id: CanonicalTileId,
+        data: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self
+            .inner
+            .call("mln_map_set_custom_geometry_source_tile_data")?;
+        let source_id = call.input(&source_id)?;
+        let tile_id = call.input(&tile_id)?;
+        let data = call.input(&data)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_custom_geometry_source_tile_data(
-                native,
-                binding_arg_1,
-                binding_arg_2.to_native(),
-                binding_arg_3,
+                map,
+                source_id,
+                tile_id,
+                data,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_custom_mvt_vector_source_tile_data` using its header execution and ownership contract.
+    /// Calls `mln_map_set_custom_mvt_vector_source_tile_data`.
     pub fn set_custom_mvt_vector_source_tile_data(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: maplibre_core::generated::CanonicalTileId,
-        binding_arg_3: &[u8],
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_custom_mvt_vector_source_tile_data", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_3 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_3).as_ptr().cast(),
-            size: (binding_arg_3).len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        tile_id: CanonicalTileId,
+        data: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self
+            .inner
+            .call("mln_map_set_custom_mvt_vector_source_tile_data")?;
+        let source_id = call.input(&source_id)?;
+        let tile_id = call.input(&tile_id)?;
+        let data = call.input(&data)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_custom_mvt_vector_source_tile_data(
-                native,
-                binding_arg_1,
-                binding_arg_2.to_native(),
-                binding_arg_3,
+                map,
+                source_id,
+                tile_id,
+                data,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_custom_mvt_vector_source_tile_error` using its header execution and ownership contract.
+    /// Calls `mln_map_set_custom_mvt_vector_source_tile_error`.
     pub fn set_custom_mvt_vector_source_tile_error(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: maplibre_core::generated::CanonicalTileId,
-        binding_arg_3: &str,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check(
-            "mln_map_set_custom_mvt_vector_source_tile_error",
-            native.0,
-        )?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_3 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_3).as_bytes().as_ptr().cast(),
-            size: (binding_arg_3).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        tile_id: CanonicalTileId,
+        message: &str,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self
+            .inner
+            .call("mln_map_set_custom_mvt_vector_source_tile_error")?;
+        let source_id = call.input(&source_id)?;
+        let tile_id = call.input(&tile_id)?;
+        let message = call.input(&message)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_custom_mvt_vector_source_tile_error(
-                native,
-                binding_arg_1,
-                binding_arg_2.to_native(),
-                binding_arg_3,
+                map,
+                source_id,
+                tile_id,
+                message,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_debug_options` using its header execution and ownership contract.
+    /// Calls `mln_map_set_debug_options`.
     pub fn set_debug_options(
         &self,
-        binding_arg_1: maplibre_core::generated::MapDebugOption,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_debug_options", native.0)?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_debug_options(
-                native,
-                binding_arg_1.to_native(),
-                completion,
-                diagnostic,
-            )
+        options: MapDebugOption,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self.inner.call("mln_map_set_debug_options")?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_debug_options(map, options.to_native(), completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_event_mask` using its header execution and ownership contract.
+    /// Calls `mln_map_set_event_mask`.
     pub fn set_event_mask(
         &self,
-        binding_arg_1: maplibre_core::generated::RuntimeEventMask,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_event_mask", native.0)?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_event_mask(native, binding_arg_1.to_native(), completion, diagnostic)
+        mask: RuntimeEventMask,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self.inner.call("mln_map_set_event_mask")?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_event_mask(map, mask.to_native(), completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_feature_state` using its header execution and ownership contract.
+    /// Calls `mln_map_set_feature_state`.
     pub fn set_feature_state(
         &self,
-        binding_arg_1: &maplibre_core::generated::FeatureStateSelector,
-        binding_arg_2: &[u8],
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_feature_state", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_ptr().cast(),
-            size: (binding_arg_2).len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_feature_state(
-                native,
-                &binding_arg_1,
-                binding_arg_2,
-                completion,
-                diagnostic,
-            )
+        selector: &FeatureStateSelector,
+        state: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_feature_state")?;
+        let selector = call.reference(&selector)?;
+        let state = call.input(&state)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_feature_state(map, selector, state, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_free_camera_options` using its header execution and ownership contract.
+    /// Calls `mln_map_set_free_camera_options`.
     pub fn set_free_camera_options(
         &self,
-        binding_arg_1: &maplibre_core::generated::FreeCameraOptions,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_free_camera_options", native.0)?;
-        let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_free_camera_options(native, &binding_arg_1, completion, diagnostic)
+        options: &FreeCameraOptions,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_free_camera_options")?;
+        let options = call.reference(&options)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_free_camera_options(map, options, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_geojson_source_data` using its header execution and ownership contract.
+    /// Calls `mln_map_set_geojson_source_data`.
     pub fn set_geojson_source_data(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &crate::GeojsonSourceDataHandle,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_geojson_source_data", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2_native = binding_arg_2.inner.native()?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_geojson_source_data(
-                native,
-                binding_arg_1,
-                binding_arg_2_native,
-                completion,
-                diagnostic,
-            )
+        source_id: &str,
+        data: &GeojsonSourceDataHandle,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_geojson_source_data")?;
+        let data = data.inner.native()?;
+        let source_id = call.input(&source_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_geojson_source_data(map, source_id, data, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_geojson_source_synchronous_tiling` using its header execution and ownership contract.
+    /// Calls `mln_map_set_geojson_source_synchronous_tiling`.
     pub fn set_geojson_source_synchronous_tiling(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: bool,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_geojson_source_synchronous_tiling", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        enabled: bool,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self
+            .inner
+            .call("mln_map_set_geojson_source_synchronous_tiling")?;
+        let source_id = call.input(&source_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_geojson_source_synchronous_tiling(
-                native,
-                binding_arg_1,
-                binding_arg_2,
+                map,
+                source_id,
+                enabled,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_geojson_source_url` using its header execution and ownership contract.
+    /// Calls `mln_map_set_geojson_source_url`.
     pub fn set_geojson_source_url(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &str,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_geojson_source_url", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_bytes().as_ptr().cast(),
-            size: (binding_arg_2).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_geojson_source_url(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                completion,
-                diagnostic,
-            )
+        source_id: &str,
+        url: &str,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_geojson_source_url")?;
+        let source_id = call.input(&source_id)?;
+        let url = call.input(&url)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_geojson_source_url(map, source_id, url, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_global_state_property` using its header execution and ownership contract.
+    /// Calls `mln_map_set_global_state_property`.
     pub fn set_global_state_property(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &[u8],
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_global_state_property", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_ptr().cast(),
-            size: (binding_arg_2).len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        property_name: &str,
+        value_: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_global_state_property")?;
+        let property_name = call.input(&property_name)?;
+        let value_ = call.input(&value_)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_global_state_property(
-                native,
-                binding_arg_1,
-                binding_arg_2,
+                map,
+                property_name,
+                value_,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_image_source_coordinates` using its header execution and ownership contract.
+    /// Calls `mln_map_set_image_source_coordinates`.
     pub fn set_image_source_coordinates(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &[maplibre_core::generated::LatLng],
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_image_source_coordinates", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2: Vec<_> = binding_arg_2
-            .iter()
-            .map(|value| -> Result<_> { Ok((value).to_native()) })
-            .collect::<Result<_>>()?;
-        let binding_arg_3 = binding_arg_2
-            .len()
-            .try_into()
-            .map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        coordinates: &[LatLng],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_image_source_coordinates")?;
+        let coordinate_count = convert::count(coordinates.len())?;
+        let source_id = call.input(&source_id)?;
+        let coordinates = call.array(coordinates)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_image_source_coordinates(
-                native,
-                binding_arg_1,
-                binding_arg_2.as_ptr(),
-                binding_arg_3,
+                map,
+                source_id,
+                coordinates,
+                coordinate_count,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_image_source_image` using its header execution and ownership contract.
+    /// Calls `mln_map_set_image_source_image`.
     pub fn set_image_source_image(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &maplibre_core::generated::PremultipliedRgba8Image,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_image_source_image", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_image_source_image(
-                native,
-                binding_arg_1,
-                &binding_arg_2,
-                completion,
-                diagnostic,
-            )
+        source_id: &str,
+        image: &PremultipliedRgba8Image,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_image_source_image")?;
+        let source_id = call.input(&source_id)?;
+        let image = call.reference(&image)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_image_source_image(map, source_id, image, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_image_source_url` using its header execution and ownership contract.
+    /// Calls `mln_map_set_image_source_url`.
     pub fn set_image_source_url(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &str,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_image_source_url", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_bytes().as_ptr().cast(),
-            size: (binding_arg_2).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_image_source_url(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                completion,
-                diagnostic,
-            )
+        source_id: &str,
+        url: &str,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_image_source_url")?;
+        let source_id = call.input(&source_id)?;
+        let url = call.input(&url)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_image_source_url(map, source_id, url, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_layer_filter` using its header execution and ownership contract.
+    /// Calls `mln_map_set_layer_filter`.
     pub fn set_layer_filter(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: Option<&[u8]>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_layer_filter", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = binding_arg_2
-            .map(|value| -> Result<_> {
-                Ok(maplibre_native_ffi_sys::mln_buffer_view {
-                    data: (value).as_ptr().cast(),
-                    size: (value).len(),
-                })
-            })
-            .transpose()?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_layer_filter(
-                native,
-                binding_arg_1,
-                binding_arg_2
-                    .as_ref()
-                    .map_or(std::ptr::null(), |value| value),
-                completion,
-                diagnostic,
-            )
+        layer_id: &str,
+        filter: Option<&[u8]>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_layer_filter")?;
+        let layer_id = call.input(&layer_id)?;
+        let filter = call.optional_reference(filter)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_layer_filter(map, layer_id, filter, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_layer_max_zoom` using its header execution and ownership contract.
+    /// Calls `mln_map_set_layer_max_zoom`.
     pub fn set_layer_max_zoom(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: f64,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_layer_max_zoom", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_layer_max_zoom(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                completion,
-                diagnostic,
-            )
+        layer_id: &str,
+        max_zoom: f64,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_layer_max_zoom")?;
+        let layer_id = call.input(&layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_layer_max_zoom(map, layer_id, max_zoom, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_layer_min_zoom` using its header execution and ownership contract.
+    /// Calls `mln_map_set_layer_min_zoom`.
     pub fn set_layer_min_zoom(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: f64,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_layer_min_zoom", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_layer_min_zoom(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                completion,
-                diagnostic,
-            )
+        layer_id: &str,
+        min_zoom: f64,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_layer_min_zoom")?;
+        let layer_id = call.input(&layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_layer_min_zoom(map, layer_id, min_zoom, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_layer_property` using its header execution and ownership contract.
+    /// Calls `mln_map_set_layer_property`.
     pub fn set_layer_property(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &str,
-        binding_arg_3: &[u8],
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_layer_property", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_bytes().as_ptr().cast(),
-            size: (binding_arg_2).as_bytes().len(),
-        };
-        let binding_arg_3 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_3).as_ptr().cast(),
-            size: (binding_arg_3).len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_id: &str,
+        property_name: &str,
+        value_: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_layer_property")?;
+        let layer_id = call.input(&layer_id)?;
+        let property_name = call.input(&property_name)?;
+        let value_ = call.input(&value_)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_layer_property(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                binding_arg_3,
+                map,
+                layer_id,
+                property_name,
+                value_,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_layer_source_id` using its header execution and ownership contract.
+    /// Calls `mln_map_set_layer_source_id`.
     pub fn set_layer_source_id(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &str,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_layer_source_id", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_bytes().as_ptr().cast(),
-            size: (binding_arg_2).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_layer_source_id(
-                native,
-                binding_arg_1,
-                binding_arg_2,
-                completion,
-                diagnostic,
-            )
+        layer_id: &str,
+        source_id: &str,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_layer_source_id")?;
+        let layer_id = call.input(&layer_id)?;
+        let source_id = call.input(&source_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_layer_source_id(map, layer_id, source_id, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_layer_source_layer` using its header execution and ownership contract.
+    /// Calls `mln_map_set_layer_source_layer`.
     pub fn set_layer_source_layer(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: Option<&str>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_layer_source_layer", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = match (binding_arg_2).as_ref() {
-            Some(item) => maplibre_native_ffi_sys::mln_buffer_view {
-                data: (item).as_bytes().as_ptr().cast(),
-                size: (item).as_bytes().len(),
-            },
-            None => maplibre_native_ffi_sys::mln_buffer_view {
-                data: std::ptr::null(),
-                size: 0,
-            },
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_id: &str,
+        source_layer: Option<&str>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_layer_source_layer")?;
+        let layer_id = call.input(&layer_id)?;
+        let source_layer = call.input(&source_layer)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_layer_source_layer(
-                native,
-                binding_arg_1,
-                binding_arg_2,
+                map,
+                layer_id,
+                source_layer,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_layer_visibility` using its header execution and ownership contract.
+    /// Calls `mln_map_set_layer_visibility`.
     pub fn set_layer_visibility(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: maplibre_core::generated::StyleLayerVisibility,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_layer_visibility", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_id: &str,
+        visibility: StyleLayerVisibility,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_layer_visibility")?;
+        let layer_id = call.input(&layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_layer_visibility(
-                native,
-                binding_arg_1,
-                binding_arg_2.to_native(),
+                map,
+                layer_id,
+                visibility.to_native(),
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_location_indicator_accuracy_radius` using its header execution and ownership contract.
+    /// Calls `mln_map_set_location_indicator_accuracy_radius`.
     pub fn set_location_indicator_accuracy_radius(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: f64,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_location_indicator_accuracy_radius", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_id: &str,
+        radius: f64,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self
+            .inner
+            .call("mln_map_set_location_indicator_accuracy_radius")?;
+        let layer_id = call.input(&layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_location_indicator_accuracy_radius(
-                native,
-                binding_arg_1,
-                binding_arg_2,
+                map,
+                layer_id,
+                radius,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_location_indicator_bearing` using its header execution and ownership contract.
+    /// Calls `mln_map_set_location_indicator_bearing`.
     pub fn set_location_indicator_bearing(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: f64,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_location_indicator_bearing", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_id: &str,
+        bearing: f64,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_location_indicator_bearing")?;
+        let layer_id = call.input(&layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_location_indicator_bearing(
-                native,
-                binding_arg_1,
-                binding_arg_2,
+                map,
+                layer_id,
+                bearing,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_location_indicator_image_name` using its header execution and ownership contract.
+    /// Calls `mln_map_set_location_indicator_image_name`.
     pub fn set_location_indicator_image_name(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: maplibre_core::generated::LocationIndicatorImageKind,
-        binding_arg_3: &str,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_location_indicator_image_name", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_3 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_3).as_bytes().as_ptr().cast(),
-            size: (binding_arg_3).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_id: &str,
+        image_kind: LocationIndicatorImageKind,
+        image_id: &str,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self
+            .inner
+            .call("mln_map_set_location_indicator_image_name")?;
+        let layer_id = call.input(&layer_id)?;
+        let image_id = call.input(&image_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_location_indicator_image_name(
-                native,
-                binding_arg_1,
-                binding_arg_2.to_native(),
-                binding_arg_3,
+                map,
+                layer_id,
+                image_kind.to_native(),
+                image_id,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_location_indicator_location` using its header execution and ownership contract.
+    /// Calls `mln_map_set_location_indicator_location`.
     pub fn set_location_indicator_location(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: maplibre_core::generated::LatLng,
-        binding_arg_3: f64,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_location_indicator_location", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        layer_id: &str,
+        coordinate: LatLng,
+        altitude: f64,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_location_indicator_location")?;
+        let layer_id = call.input(&layer_id)?;
+        let coordinate = call.input(&coordinate)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_location_indicator_location(
-                native,
-                binding_arg_1,
-                binding_arg_2.to_native(),
-                binding_arg_3,
+                map,
+                layer_id,
+                coordinate,
+                altitude,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_projection_mode` using its header execution and ownership contract.
+    /// Calls `mln_map_set_projection_mode`.
     pub fn set_projection_mode(
         &self,
-        binding_arg_1: &maplibre_core::generated::ProjectionMode,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_projection_mode", native.0)?;
-        let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_projection_mode(native, &binding_arg_1, completion, diagnostic)
+        mode: &ProjectionMode,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_projection_mode")?;
+        let mode = call.reference(&mode)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_projection_mode(map, mode, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_rendering_stats_view_enabled` using its header execution and ownership contract.
+    /// Calls `mln_map_set_rendering_stats_view_enabled`.
     pub fn set_rendering_stats_view_enabled(
         &self,
-        binding_arg_1: bool,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_rendering_stats_view_enabled", native.0)?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_rendering_stats_view_enabled(
-                native,
-                binding_arg_1,
-                completion,
-                diagnostic,
-            )
+        enabled: bool,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self
+            .inner
+            .call("mln_map_set_rendering_stats_view_enabled")?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_rendering_stats_view_enabled(map, enabled, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_style_image` using its header execution and ownership contract.
+    /// Calls `mln_map_set_style_image`.
     pub fn set_style_image(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &maplibre_core::generated::PremultipliedRgba8Image,
-        binding_arg_3: Option<&maplibre_core::generated::StyleImageOptions>,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_style_image", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let binding_arg_3 = binding_arg_3
-            .map(|value| value.to_native(&mut arena))
-            .transpose()?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_style_image(
-                native,
-                binding_arg_1,
-                &binding_arg_2,
-                binding_arg_3
-                    .as_ref()
-                    .map_or(std::ptr::null(), |value| value),
-                completion,
-                diagnostic,
-            )
+        image_id: &str,
+        image: &PremultipliedRgba8Image,
+        options: Option<&StyleImageOptions>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_image")?;
+        let image_id = call.input(&image_id)?;
+        let image = call.reference(&image)?;
+        let options = call.optional_reference(options.as_ref())?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_image(map, image_id, image, options, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_style_json` using its header execution and ownership contract.
-    pub fn set_style_json(
-        &self,
-        binding_arg_1: &[u8],
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_style_json", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_ptr().cast(),
-            size: (binding_arg_1).len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_style_json(native, binding_arg_1, completion, diagnostic)
+    /// Calls `mln_map_set_style_json`.
+    pub fn set_style_json(&self, json: &[u8]) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_json")?;
+        let json = call.input(&json)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_json(map, json, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_style_light_json` using its header execution and ownership contract.
+    /// Calls `mln_map_set_style_light_json`.
     pub fn set_style_light_json(
         &self,
-        binding_arg_1: &[u8],
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_style_light_json", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_ptr().cast(),
-            size: (binding_arg_1).len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_style_light_json(native, binding_arg_1, completion, diagnostic)
+        light_json: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_light_json")?;
+        let light_json = call.input(&light_json)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_light_json(map, light_json, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_style_light_property` using its header execution and ownership contract.
+    /// Calls `mln_map_set_style_light_property`.
     pub fn set_style_light_property(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: &[u8],
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_style_light_property", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        let binding_arg_2 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_2).as_ptr().cast(),
-            size: (binding_arg_2).len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        property_name: &str,
+        value_: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_light_property")?;
+        let property_name = call.input(&property_name)?;
+        let value_ = call.input(&value_)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_light_property(
-                native,
-                binding_arg_1,
-                binding_arg_2,
+                map,
+                property_name,
+                value_,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_style_source_volatile` using its header execution and ownership contract.
+    /// Calls `mln_map_set_style_source_volatile`.
     pub fn set_style_source_volatile(
         &self,
-        binding_arg_1: &str,
-        binding_arg_2: bool,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_style_source_volatile", native.0)?;
-        let binding_arg_1 = maplibre_native_ffi_sys::mln_buffer_view {
-            data: (binding_arg_1).as_bytes().as_ptr().cast(),
-            size: (binding_arg_1).as_bytes().len(),
-        };
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
+        source_id: &str,
+        is_volatile: bool,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_source_volatile")?;
+        let source_id = call.input(&source_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_set_style_source_volatile(
-                native,
-                binding_arg_1,
-                binding_arg_2,
+                map,
+                source_id,
+                is_volatile,
                 completion,
-                diagnostic,
+                out_diagnostic,
             )
         })
     }
 
-    /// Calls `mln_map_set_style_transition_options` using its header execution and ownership contract.
+    /// Calls `mln_map_set_style_transition_options`.
     pub fn set_style_transition_options(
         &self,
-        binding_arg_1: &maplibre_core::generated::StyleTransitionOptions,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_style_transition_options", native.0)?;
-        let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_style_transition_options(
-                native,
-                &binding_arg_1,
-                completion,
-                diagnostic,
-            )
+        options: &StyleTransitionOptions,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_transition_options")?;
+        let options = call.reference(&options)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_transition_options(map, options, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_style_url` using its header execution and ownership contract.
-    pub fn set_style_url(
-        &self,
-        binding_arg_1: &str,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_style_url", native.0)?;
-        let binding_arg_1 = maplibre_core::string::c_string(binding_arg_1)?;
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_style_url(native, binding_arg_1.as_ptr(), completion, diagnostic)
+    /// Calls `mln_map_set_style_url`.
+    pub fn set_style_url(&self, url: &str) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_url")?;
+        let url = call.input(url)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_url(map, url, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_tile_options` using its header execution and ownership contract.
+    /// Calls `mln_map_set_tile_options`.
     pub fn set_tile_options(
         &self,
-        binding_arg_1: &maplibre_core::generated::MapTileOptions,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_tile_options", native.0)?;
-        let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_tile_options(native, &binding_arg_1, completion, diagnostic)
+        options: &MapTileOptions,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_tile_options")?;
+        let options = call.reference(&options)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_tile_options(map, options, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_set_viewport_options` using its header execution and ownership contract.
+    /// Calls `mln_map_set_viewport_options`.
     pub fn set_viewport_options(
         &self,
-        binding_arg_1: &maplibre_core::generated::MapViewportOptions,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_set_viewport_options", native.0)?;
-        let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_set_viewport_options(native, &binding_arg_1, completion, diagnostic)
+        options: &MapViewportOptions,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_viewport_options")?;
+        let options = call.reference(&options)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_viewport_options(map, options, completion, out_diagnostic)
         })
     }
 
-    /// Calls `mln_map_snapshot_get` using its header execution and ownership contract.
-    pub fn snapshot_get(&self) -> Result<maplibre_core::generated::MapSnapshot> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_snapshot_get", native.0)?;
-        let mut binding_arg_1: sys::mln_map_snapshot =
-            maplibre_core::generated::MapSnapshot::default().to_native();
-        maplibre_core::check(|diagnostic| unsafe {
-            sys::mln_map_snapshot_get(native, &mut binding_arg_1, diagnostic)
+    /// Calls `mln_map_snapshot_get`.
+    pub fn snapshot_get(&self) -> Result<MapSnapshot> {
+        let mut call = self.inner.call("mln_map_snapshot_get")?;
+        let mut out_snapshot: sys::mln_map_snapshot = unsafe { std::mem::zeroed() };
+        out_snapshot.size = std::mem::size_of::<sys::mln_map_snapshot>() as _;
+        call.status(|map, out_diagnostic| unsafe {
+            sys::mln_map_snapshot_get(map, &mut out_snapshot, out_diagnostic)
         })?;
-        Ok(maplibre_core::generated::MapSnapshot::from_native(
-            binding_arg_1,
-        ))
+        Ok(unsafe { from_native(out_snapshot) }?)
     }
 
-    /// Calls `mln_map_style_url` using its header execution and ownership contract.
+    /// Calls `mln_map_style_url`.
     pub fn style_url(&self) -> Result<NativeFuture<String>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_style_url", native.0)?;
-        crate::completion::submit(
-            |completion, diagnostic| unsafe {
-                sys::mln_map_style_url(native, completion, diagnostic)
+        let call = self.inner.call("mln_map_style_url")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_style_url(map, completion, out_diagnostic)
             },
-            |result| {
-                let value = crate::completion::copy_value::<sys::mln_buffer_view>(result)?;
-                Ok(unsafe { maplibre_core::string::copy_string_view(value) }?)
-            },
+            completion::value::<sys::mln_buffer_view, _>,
         )
     }
 
-    /// Calls `mln_map_update_camera` using its header execution and ownership contract.
-    pub fn update_camera(
-        &self,
-        binding_arg_1: &maplibre_core::generated::CameraUpdate,
-    ) -> Result<NativeFuture<crate::CommandCompletion>> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_map_update_camera", native.0)?;
-        let binding_arg_1 = binding_arg_1.to_native();
-        crate::completion::submit_command(|completion, diagnostic| unsafe {
-            sys::mln_map_update_camera(native, &binding_arg_1, completion, diagnostic)
+    /// Calls `mln_map_update_camera`.
+    pub fn update_camera(&self, update: &CameraUpdate) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_update_camera")?;
+        let update = call.reference(&update)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_update_camera(map, update, completion, out_diagnostic)
         })
     }
 
+    /// Calls `mln_metal_borrowed_texture_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_metal_borrowed_texture_attach` using its header execution and ownership contract.
     pub unsafe fn metal_borrowed_texture_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::MetalBorrowedTextureDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_metal_borrowed_texture_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native();
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &MetalBorrowedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_metal_borrowed_texture_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_metal_borrowed_texture_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 
+    /// Calls `mln_metal_owned_texture_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_metal_owned_texture_attach` using its header execution and ownership contract.
     pub unsafe fn metal_owned_texture_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::MetalOwnedTextureDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_metal_owned_texture_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native();
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &MetalOwnedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_metal_owned_texture_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_metal_owned_texture_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 
+    /// Calls `mln_metal_surface_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_metal_surface_attach` using its header execution and ownership contract.
     pub unsafe fn metal_surface_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::MetalSurfaceDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_metal_surface_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native();
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &MetalSurfaceDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_metal_surface_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_metal_surface_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 
+    /// Calls `mln_opengl_borrowed_texture_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_opengl_borrowed_texture_attach` using its header execution and ownership contract.
     pub unsafe fn opengl_borrowed_texture_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::OpenglBorrowedTextureDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_opengl_borrowed_texture_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &OpenglBorrowedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_opengl_borrowed_texture_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_opengl_borrowed_texture_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 
+    /// Calls `mln_opengl_owned_texture_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_opengl_owned_texture_attach` using its header execution and ownership contract.
     pub unsafe fn opengl_owned_texture_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::OpenglOwnedTextureDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_opengl_owned_texture_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &OpenglOwnedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_opengl_owned_texture_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_opengl_owned_texture_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 
+    /// Calls `mln_opengl_surface_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_opengl_surface_attach` using its header execution and ownership contract.
     pub unsafe fn opengl_surface_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::OpenglSurfaceDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_opengl_surface_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native(&mut arena)?;
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &OpenglSurfaceDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_opengl_surface_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_opengl_surface_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 
+    /// Calls `mln_vulkan_borrowed_texture_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_vulkan_borrowed_texture_attach` using its header execution and ownership contract.
     pub unsafe fn vulkan_borrowed_texture_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::VulkanBorrowedTextureDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_vulkan_borrowed_texture_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native();
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &VulkanBorrowedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_vulkan_borrowed_texture_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_vulkan_borrowed_texture_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 
+    /// Calls `mln_vulkan_owned_texture_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_vulkan_owned_texture_attach` using its header execution and ownership contract.
     pub unsafe fn vulkan_owned_texture_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::VulkanOwnedTextureDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_vulkan_owned_texture_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native();
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &VulkanOwnedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_vulkan_owned_texture_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_vulkan_owned_texture_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 
+    /// Calls `mln_vulkan_surface_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_vulkan_surface_attach` using its header execution and ownership contract.
     pub unsafe fn vulkan_surface_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::VulkanSurfaceDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_vulkan_surface_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native();
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &VulkanSurfaceDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_vulkan_surface_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_vulkan_surface_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 
+    /// Calls `mln_webgpu_borrowed_texture_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_webgpu_borrowed_texture_attach` using its header execution and ownership contract.
     pub unsafe fn webgpu_borrowed_texture_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::WebgpuBorrowedTextureDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_webgpu_borrowed_texture_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native();
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &WebgpuBorrowedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_webgpu_borrowed_texture_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_webgpu_borrowed_texture_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 
+    /// Calls `mln_webgpu_owned_texture_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_webgpu_owned_texture_attach` using its header execution and ownership contract.
     pub unsafe fn webgpu_owned_texture_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::WebgpuOwnedTextureDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_webgpu_owned_texture_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native();
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &WebgpuOwnedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_webgpu_owned_texture_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_webgpu_owned_texture_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 
+    /// Calls `mln_webgpu_surface_attach`.
+    ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    /// Calls `mln_webgpu_surface_attach` using its header execution and ownership contract.
     pub unsafe fn webgpu_surface_attach(
         &self,
-        binding_arg_1: &maplibre_core::generated::WebgpuSurfaceDescriptor,
-        binding_arg_2: &maplibre_core::generated::RenderSessionAttachOptions,
-    ) -> Result<(crate::RenderSessionHandle, NativeFuture<()>)> {
-        // SAFETY: input storage lives through submission; callback values are copied before return.
-        let native = self.inner.native()?;
-        maplibre_core::callback::check("mln_webgpu_surface_attach", native.0)?;
-        let mut arena = maplibre_core::input::InputArena::default();
-        let binding_parent = std::sync::Arc::clone(&self.inner);
-        let binding_arg_1 = binding_arg_1.to_native();
-        let binding_arg_2 = binding_arg_2.to_native(&mut arena)?;
-        let mut binding_arg_3 = sys::mln_render_session(0);
-        let submitted = crate::completion::submit(
-            |completion, diagnostic| unsafe {
+        descriptor: &WebgpuSurfaceDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_webgpu_surface_attach")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
                 sys::mln_webgpu_surface_attach(
-                    native,
-                    &binding_arg_1,
-                    &binding_arg_2,
-                    &mut binding_arg_3,
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
                     completion,
-                    diagnostic,
+                    out_diagnostic,
                 )
             },
-            crate::completion::unit,
+            completion::unit,
         )?;
-        arena.accept_registrations();
-        Ok((
-            crate::RenderSessionHandle::from_native(binding_arg_3, binding_parent)?,
-            submitted,
-        ))
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 }

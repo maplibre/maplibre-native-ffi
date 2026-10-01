@@ -1,6 +1,6 @@
-"""Retained callback descriptors and quiescent native release adapters."""
+"""Retained callback descriptors, scoped responses, and decision handles."""
 
-from .rust import Unsupported, checked_call, identifier, native_identifier
+from .rust import Unsupported, identifier, native_call, native_identifier
 from .rust_dynamic_values import decode, encode
 
 
@@ -20,7 +20,7 @@ def native_type(values, ctype):
             return values.scalar(value)
     from .rust import SCALARS
 
-    return SCALARS.get(native, "maplibre_native_ffi_sys::" + native)
+    return SCALARS.get(native, "sys::" + native)
 
 
 def callbacks(values, value):
@@ -62,9 +62,9 @@ def add(values, value):
     for field, callback in callbacks(values, value):
         for parameter in callback.parameters:
             if parameter.name != callback.context:
-                values.add(parameter.value)
+                values.add(parameter.value, "out")
         if callback.result.ctype.kind != "void":
-            values.add(callback.result)
+            values.add(callback.result, "in")
     for field in value.fields:
         if (
             field.name
@@ -75,106 +75,139 @@ def add(values, value):
             }
             and field.role == "value"
         ):
-            values.add(field.value)
+            values.add(field.value, "in")
+
+
+def reentry(callback, locals_by_name):
+    """The reentry contract that host code runs under during `callback`."""
+    if callback.reentry == "allow":
+        return "None"
+    policy = callback.reentry_policy
+    if not policy:
+        return "Some((&[], 0))"
+    owner_parameter = next(
+        p for p in callback.parameters if p.name == policy.owner_parameter
+    )
+    owner = locals_by_name[owner_parameter.name] + (
+        ".0" if owner_parameter.value.kind == "handle" else " as usize as u64"
+    )
+    operations = ", ".join(f'"{operation}"' for operation in policy.operations)
+    return f"Some((&[{operations}], {owner}))"
+
+
+def callback_output(values, callback):
+    """The host callback's Rust result and the C value that it returns."""
+    if callback.result.ctype.kind == "void":
+        return "()", "()", "value"
+    if callback.result.native == "mln_status":
+        return "Result<()>", "sys::mln_status", "value"
+    result = callback.result
+    public = values.public(result)
+    raw = native_type(values, result.ctype)
+    if result.kind == "scalar":
+        return public, raw, "value"
+    if result.kind == "enum":
+        return public, raw, "value.to_native()"
+    raise Unsupported(f"{callback.native}: callback result requires a native copy")
+
+
+def trampoline(values, callback, name, host, state="Self"):
+    """One `unsafe extern "C"` function that runs a registration's callback.
+
+    `host` is the host callback, read from `state`, the registration state of
+    type `state`.
+    """
+    locals_by_name = {
+        parameter.name: identifier(parameter.name) + "_"
+        if identifier(parameter.name) in {"state", "callback", "value"}
+        else identifier(parameter.name)
+        for parameter in callback.parameters
+    }
+    arguments = [p for p in callback.parameters if p.name != callback.context]
+    raw_arguments = ", ".join(
+        f"{locals_by_name[p.name]}: {native_type(values, p.value.ctype)}"
+        for p in callback.parameters
+    )
+    copies = ", ".join(
+        callback_parameter_capture(values, p, locals_by_name[p.name]) for p in arguments
+    )
+    public, raw, converted = callback_output(values, callback)
+    returns = "" if raw == "()" else f" -> {raw}"
+    context = locals_by_name[callback.context]
+    host = f"{host}({copies})"
+    if raw == "sys::mln_status":
+        failure = (
+            f"sys::{callback.failure}"
+            if callback.failure not in {None, "contain"}
+            else "Default::default()"
+        )
+        run = f"callback::invoke_status({reentry(callback, locals_by_name)}, {failure}, || {host})"
+    else:
+        fallback = (
+            "()"
+            if raw == "()"
+            else f"sys::{callback.failure}"
+            if callback.failure not in {None, "contain"}
+            and not callback.failure.isdigit()
+            else callback.failure
+            if callback.failure and callback.failure.isdigit()
+            else "Default::default()"
+        )
+        body = (
+            f"{{ {host}; Ok(()) }}"
+            if raw == "()"
+            else f"{{ let value = {host}; Ok({converted}) }}"
+        )
+        run = f"callback::invoke({reentry(callback, locals_by_name)}, {fallback}, || {body})"
+    return (
+        f'unsafe extern "C" fn {name}({raw_arguments}){returns} {{\n'
+        f"    // SAFETY: native passes the registration that this trampoline's\n"
+        f"    // descriptor transferred.\n"
+        f"    let state = unsafe {{ callback::state::<{state}>({context}) }};\n"
+        f"    {run}\n"
+        "}"
+    ), public
 
 
 def declaration(values, value):
     name = values.name(value)
-    fields, writes, captures, trampolines = [], [], [], []
-    for field, callback in callbacks(values, value):
+    raw = f"sys::{value.native}"
+    fields, writes, copies, trampolines, constructors = [], [], [], [], []
+    for index, (field, callback) in enumerate(callbacks(values, value)):
         public = identifier(field.name)
-        locals_by_name = {
-            parameter.name: f"binding_arg_{index}"
-            for index, parameter in enumerate(callback.parameters)
-        }
-        args = [
-            parameter
-            for parameter in callback.parameters
-            if parameter.name != callback.context
-        ]
-        returns = callback.result.ctype.kind != "void"
-        status_result = callback.result.native == "mln_status"
-        output = (
-            "crate::Result<()>"
-            if status_result
-            else values.public(callback.result)
-            if returns
-            else "()"
+        arguments = [p for p in callback.parameters if p.name != callback.context]
+        signature = ", ".join(callback_parameter_type(values, p) for p in arguments)
+        code, output = trampoline(
+            values,
+            callback,
+            f"{public}_trampoline",
+            f"callback::require(&state.{public})?",
         )
-        fields.append(
-            f"    pub {public}: Option<std::sync::Arc<dyn Fn({', '.join(callback_parameter_type(values, p) for p in args)}) -> {output} + Send + Sync + 'static>>,"
-        )
-        writes.append(
-            f"        raw.{native_identifier(field.name)} = self.{public}.as_ref().map(|_| Self::{public}_trampoline as _);"
-        )
-        captures.append(f"            {public}: None,")
-        raw_args = ", ".join(
-            f"{locals_by_name[p.name]}: {native_type(values, p.value.ctype)}"
-            for p in callback.parameters
-        )
-        raw_output = native_type(values, callback.result.ctype) if returns else "()"
-        convert = ", ".join(
-            callback_parameter_capture(values, p, locals_by_name[p.name]) for p in args
-        )
-        result = (
-            f"callback({convert})?; Ok(maplibre_native_ffi_sys::MLN_STATUS_OK)"
-            if status_result
-            else f"let result = callback({convert}); Ok(result.to_native())"
-            if returns
-            else f"callback({convert}); Ok(())"
-        )
-        fallback = (
-            f"maplibre_native_ffi_sys::{callback.failure}"
-            if returns and callback.failure not in {None, "contain"}
-            else "Default::default()"
-        )
-        policy = callback.reentry_policy
-        owner = "0"
-        if policy:
-            owner_param = next(
-                p for p in callback.parameters if p.name == policy.owner_parameter
-            )
-            owner = locals_by_name[owner_param.name] + (
-                ".0" if owner_param.value.kind == "handle" else " as usize as u64"
-            )
-        operations = (
-            ", ".join('"' + operation + '"' for operation in policy.operations)
-            if policy
-            else ""
-        )
-        scope = (
-            f"let _policy = crate::callback::PolicyScope::enter(&[{operations}], {owner});"
-            if callback.reentry != "allow"
-            else ""
-        )
-        decision_setup = ""
-        decision_scope = ""
-        finish = f"match result {{ Ok(Ok(value)) => value, {'Ok(Err(error)) => crate::resource::status_for_error(&error),' if status_result else ''} _ => {fallback} }}"
         if callback.decision:
-            decision = callback.decision
-            decision_scope, scope = scope, ""
-            parameter = locals_by_name[decision.parameter]
-            decision_setup = f"let request_state = match unsafe {{ crate::resource::ResourceRequestHandleState::new({parameter}, crate::generated::{decision.handle.native.removeprefix('mln_').upper()}_FUNCTIONS) }} {{ Ok(state) => state, Err(_) => return {fallback} }};"
-            finish = f"match result {{ Ok(Ok(value)) if value == maplibre_native_ffi_sys::{decision.accept} => request_state.finish_provider_decision(crate::resource::ResourceProviderDecision::Handle), Ok(Ok(value)) if value == maplibre_native_ffi_sys::{decision.pass_through} => request_state.finish_provider_decision(crate::resource::ResourceProviderDecision::PassThrough), _ => request_state.finish_provider_exception() }}"
-        trampolines.append(f"""    unsafe extern "C" fn {public}_trampoline({raw_args}) -> {raw_output} {{
-        {decision_scope}
-        {decision_setup}
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> crate::Result<{raw_output}> {{
-            {scope}
-            let state = unsafe {{ &*{locals_by_name[callback.context]}.cast::<Self>() }};
-            let callback = state.{public}.as_ref().ok_or_else(|| crate::Error::invalid_argument("missing callback"))?;
-            {result}
-        }}));
-        {finish}
-    }}""")
+            code = decision_trampoline(values, callback, f"{public}_trampoline", public)
+        trampolines.append(code)
+        function = f"Fn({signature}) -> {output} + Send + Sync + 'static"
+        fields.append(f"    pub {public}: Option<std::sync::Arc<dyn {function}>>,")
+        writes.append(
+            f"raw.{native_identifier(field.name)} = self.{public}.as_ref().map(|_| Self::{public}_trampoline as _);"
+        )
+        copies.append(f"{public}: None,")
+        constructors.append(
+            f"pub fn with_{field.name}<F>(mut self, callback: F) -> Self where F: {function} {{ self.{public} = Some(std::sync::Arc::new(callback)); self }}"
+        )
+        if index == 0:
+            constructors.append(
+                f"pub fn new<F>(callback: F) -> Self where F: {function} {{ Self::default().with_{field.name}(callback) }}"
+            )
     hidden = {
         *value.registration.callbacks,
         value.registration.user_data,
         value.registration.release,
     }
     for field in value.fields:
+        place = f"raw.{native_identifier(field.name)}"
         if field.role == "presence_mask":
-            writes.insert(0, f"        raw.{native_identifier(field.name)} = 0;")
+            writes.insert(0, f"{place} = 0;")
         if field.name in hidden or field.role in {
             "reserved",
             "presence_mask",
@@ -182,109 +215,109 @@ def declaration(values, value):
             "tag",
         }:
             continue
-        raw = f"raw.{native_identifier(field.name)}"
         if field.role == "size":
-            writes.insert(
-                0,
-                f"        {raw} = std::mem::size_of::<maplibre_native_ffi_sys::{value.native}>() as _;",
-            )
+            writes.insert(0, f"{place} = std::mem::size_of::<{raw}>() as _;")
             continue
         public = identifier(field.name)
-        optional = field.presence and field.presence.mask
+        masked = field.presence and field.presence.mask
         typ = values.public(field.value)
-        fields.append(
-            f"    pub {public}: {'Option<' + typ + '>' if optional else typ},"
-        )
-        copied = decode(values, field.value, raw)
-        if optional:
-            mask, bit = field.presence.mask, field.presence.bit
-            present = (
-                f"raw.{mask} & maplibre_native_ffi_sys::{bit} != 0"
-                if bit
-                else f"raw.{mask}"
-            )
-            mark = (
-                f"raw.{mask} |= maplibre_native_ffi_sys::{bit}"
-                if bit
-                else f"raw.{mask} = true"
-            )
+        fields.append(f"    pub {public}: {'Option<' + typ + '>' if masked else typ},")
+        copied = decode(values, field.value, place)
+        if masked:
+            mask = f"raw.{native_identifier(field.presence.mask)}"
+            bit = f"sys::{field.presence.bit}" if field.presence.bit else "true"
             writes.append(
-                f"        if let Some(item) = &self.{public} {{ {mark}; {raw} = {encode(values, field.value, 'item')}; }}"
+                f"convert::set_present(&mut {mask}, {bit}, &mut {place}, &self.{public}, arena)?;"
             )
-            captures.append(
-                f"            {public}: if {present} {{ Some({copied}) }} else {{ None }},"
+            copies.append(
+                f"{public}: unsafe {{ convert::present({mask}, {bit}, {place}) }}?,"
             )
         else:
-            writes.append(
-                f"        {raw} = {encode(values, field.value, '&self.' + public)};"
-            )
-            captures.append(f"            {public}: {copied},")
-    constructors = []
-    for index, (field, callback) in enumerate(callbacks(values, value)):
-        arguments = [p for p in callback.parameters if p.name != callback.context]
-        signature = ", ".join(callback_parameter_type(values, p) for p in arguments)
-        result = (
-            "crate::Result<()>"
-            if callback.result.native == "mln_status"
-            else values.public(callback.result)
-            if callback.result.ctype.kind != "void"
-            else "()"
-        )
-        constructors.append(
-            f"    pub fn with_{field.name}<F>(mut self, callback: F) -> Self where F: Fn({signature}) -> {result} + Send + Sync + 'static {{ self.{identifier(field.name)} = Some(std::sync::Arc::new(callback)); self }}"
-        )
-        if index == 0:
-            constructors.append(
-                f"    pub fn new<F>(callback: F) -> Self where F: Fn({signature}) -> {result} + Send + Sync + 'static {{ Self::default().with_{field.name}(callback) }}"
-            )
+            writes.append(f"{place} = {encode(values, field.value, 'self.' + public)};")
+            copies.append(f"{public}: {copied},")
     initial = (
-        f"unsafe {{ maplibre_native_ffi_sys::{value.default}() }}"
+        f"unsafe {{ sys::{value.default}() }}"
         if value.default
         else "unsafe { std::mem::zeroed() }"
     )
-    callbacks_empty = " && ".join(
+    empty = " && ".join(
         f"raw.{native_identifier(field.name)}.is_none()"
         for field, _ in callbacks(values, value)
     )
-    default_impl = (
-        f'impl Default for {name} {{ fn default() -> Self {{ unsafe {{ Self::from_native(maplibre_native_ffi_sys::{value.default}()).expect("native default has no callbacks") }} }} }}'
+    default = (
+        f"impl Default for {name} {{ fn default() -> Self {{ convert::native_default(unsafe {{ sys::{value.default}() }}) }} }}\n"
         if value.default
         else ""
     )
-    return f'''#[derive(Clone{", Default" if not value.default else ""})]
-pub struct {name} {{
-{chr(10).join(fields)}
-}}
-{default_impl}
-impl std::fmt::Debug for {name} {{ fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{ f.debug_struct("{name}").finish_non_exhaustive() }} }}
-impl {name} {{
-{chr(10).join(constructors)}
-    pub fn to_native(&self, arena: &mut crate::input::InputArena) -> crate::Result<maplibre_native_ffi_sys::{value.native}> {{
-        let mut raw: maplibre_native_ffi_sys::{value.native} = {initial};
-{chr(10).join(writes)}
-        if !({callbacks_empty}) {{
-            raw.{native_identifier(value.registration.user_data)} = unsafe {{ arena.registration(self.clone(), Self::release_callback) }};
-            raw.{native_identifier(value.registration.release)} = Some(Self::release_callback);
-        }}
-        Ok(raw)
+    user_data = native_identifier(value.registration.user_data)
+    release = native_identifier(value.registration.release)
+    return (
+        f"#[derive(Clone{', Default' if not value.default else ''})]\n"
+        f"pub struct {name} {{\n"
+        + "\n".join(fields)
+        + "\n}\n"
+        + default
+        + f'impl std::fmt::Debug for {name} {{ fn fmt(&self, f: &mut std::fmt::Formatter<\'_>) -> std::fmt::Result {{ f.debug_struct("{name}").finish_non_exhaustive() }} }}\n'
+        + f"impl {name} {{\n"
+        + "".join(f"    {line}\n" for line in constructors)
+        + "\n".join(trampolines)
+        + "\n}\n"
+        + f"impl ToNative<{raw}> for {name} {{\n"
+        + f"    fn to_native(&self, arena: &mut InputArena) -> Result<{raw}> {{\n"
+        + f"        let mut raw: {raw} = {initial};\n"
+        + "".join(f"        {line}\n" for line in writes)
+        + f"        if !({empty}) {{\n"
+        + "            // SAFETY: the release reclaims exactly this state.\n"
+        + f"            raw.{user_data} = unsafe {{ arena.registration(self.clone(), callback::release::<Self>) }};\n"
+        + f"            raw.{release} = Some(callback::release::<Self>);\n"
+        + "        }\n        Ok(raw)\n    }\n}\n"
+        + f"impl FromNative<{raw}> for {name} {{\n"
+        + "    /// Copies a descriptor whose callbacks are unset, such as a native default.\n"
+        + f"    unsafe fn from_native(raw: {raw}) -> Result<Self> {{\n"
+        + f'        if !({empty}) {{ return Err(Error::invalid_argument("foreign callbacks cannot be adopted")); }}\n'
+        + "        Ok(Self {\n"
+        + "".join(f"            {line}\n" for line in copies)
+        + "        })\n    }\n}\n"
+    )
+
+
+def decision_trampoline(values, callback, name, public):
+    """A provider trampoline, which turns the host's decision into ownership of
+    the request handle it was given."""
+    decision = callback.decision
+    locals_by_name = {
+        parameter.name: identifier(parameter.name) for parameter in callback.parameters
+    }
+    arguments = [p for p in callback.parameters if p.name != callback.context]
+    raw_arguments = ", ".join(
+        f"{locals_by_name[p.name]}: {native_type(values, p.value.ctype)}"
+        for p in callback.parameters
+    )
+    copies = ", ".join(
+        callback_parameter_capture(values, p, locals_by_name[p.name]) for p in arguments
+    )
+    raw = native_type(values, callback.result.ctype)
+    fallback = (
+        f"sys::{callback.failure}"
+        if callback.failure not in {None, "contain"}
+        else "Default::default()"
+    )
+    functions = f"{decision.handle.native.removeprefix('mln_').upper()}_FUNCTIONS"
+    return f"""unsafe extern "C" fn {name}({raw_arguments}) -> {raw} {{
+    let _policy = callback::enter({reentry(callback, locals_by_name)});
+    // SAFETY: native lends the provider this live request handle.
+    let Ok(request_state) = (unsafe {{ maplibre_core::resource::ResourceRequestHandleState::new({locals_by_name[decision.parameter]}, {functions}) }}) else {{
+        return {fallback};
+    }};
+    // SAFETY: native passes the registration that this trampoline's
+    // descriptor transferred.
+    let state = unsafe {{ callback::state::<Self>({locals_by_name[callback.context]}) }};
+    match callback::invoke(None, None, || Ok(Some(callback::require(&state.{public})?({copies}).to_native()))) {{
+        Some(sys::{decision.accept}) => request_state.finish_provider_decision(true),
+        Some(sys::{decision.pass_through}) => request_state.finish_provider_decision(false),
+        _ => request_state.finish_provider_exception(),
     }}
-    /// Captures an empty callback descriptor returned by its native constructor.
-    ///
-    /// # Safety
-    /// Borrowed fields must remain valid for this conversion.
-    pub unsafe fn from_native(raw: maplibre_native_ffi_sys::{value.native}) -> crate::Result<Self> {{
-        if !({callbacks_empty}) {{ return Err(crate::Error::invalid_argument("foreign callbacks cannot be adopted")); }}
-        Ok(Self {{
-{chr(10).join(captures)}
-        }})
-    }}
-    unsafe extern "C" fn release_callback(user_data: *mut std::ffi::c_void) {{
-        let _policy = crate::callback::PolicyScope::enter(&[], 0);
-        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {{ drop(Box::from_raw(user_data.cast::<Self>())) }}));
-    }}
-{chr(10).join(trampolines)}
-}}
-'''
+}}"""
 
 
 def response(value):
@@ -306,16 +339,18 @@ def callback_parameter_capture(values, parameter, local=None):
     local = local or identifier(parameter.name)
     scoped = response(parameter.value)
     if scoped:
-        return f'&mut {values.name(scoped)} {{ raw: std::ptr::NonNull::new({local}).ok_or_else(|| crate::Error::invalid_argument("null callback response"))?, lifetime: std::marker::PhantomData }}'
+        return f"&mut {values.name(scoped)}::new({local})?"
     if parameter.value.kind == "handle":
         return f"{values.name(parameter.value)} {{ state: std::sync::Arc::clone(&request_state), not_sync: std::marker::PhantomData }}"
     return decode(values, parameter.value, local)
 
 
 def response_declaration(values, value):
+    name = values.name(value)
+    raw = f"sys::{value.native}"
     methods = []
-    for name in value.response.methods:
-        plan = values.bound.operations_by_name[name]
+    for method_name in value.response.methods:
+        plan = values.bound.operations_by_name[method_name]
         receiver = plan.scoped_receiver
         args, signature, setup = [], ["&mut self"], []
         counts = {
@@ -332,7 +367,7 @@ def response_declaration(values, value):
             elif parameter.name in counts:
                 # The checked closure returns a status, so fallible conversions precede it.
                 setup.append(
-                    f'let {local} = {identifier(counts[parameter.name])}.len().try_into().map_err(|_| crate::Error::invalid_argument("input exceeds native count range"))?;'
+                    f"let {local} = convert::count({identifier(counts[parameter.name])}.len())?;"
                 )
                 args.append(local)
             elif parameter.value.kind == "buffer":
@@ -341,19 +376,26 @@ def response_declaration(values, value):
                 args.append(encode(values, parameter.value, local))
             else:
                 raise Unsupported(
-                    f"response parameter {name}.{parameter.name} requires conversion"
+                    f"response parameter {method_name}.{parameter.name} requires conversion"
                 )
-        method = identifier(name.removeprefix(value.native + "_"))
+        method = identifier(method_name.removeprefix(value.native + "_"))
+        if not plan.function.diagnostic:
+            raise Unsupported(f"{plan.function.name}: status return has no diagnostic")
+        call = native_call(plan.function, args, diagnostic="out_diagnostic")
         methods.append(
-            f'    pub fn {method}({", ".join(signature)}) -> crate::Result<()> {{ crate::callback::check("{name}", self.raw.as_ptr() as usize as u64)?; {" ".join(setup)} {checked_call(plan.function, args, "maplibre_native_ffi_sys::", "crate")} }}'
+            f'    pub fn {method}({", ".join(signature)}) -> Result<()> {{ maplibre_core::callback::check("{method_name}", self.raw.as_ptr() as usize as u64)?; {" ".join(setup)} maplibre_core::check(|out_diagnostic| unsafe {{ {call} }}) }}'
         )
     return f"""/// A native response borrowed only for one host callback.
 #[derive(Debug)]
-pub struct {values.name(value)}<'a> {{
-    raw: std::ptr::NonNull<maplibre_native_ffi_sys::{value.native}>,
-    lifetime: std::marker::PhantomData<&'a mut maplibre_native_ffi_sys::{value.native}>,
+pub struct {name}<'a> {{
+    raw: std::ptr::NonNull<{raw}>,
+    lifetime: std::marker::PhantomData<&'a mut {raw}>,
 }}
-impl {values.name(value)}<'_> {{
+impl {name}<'_> {{
+    fn new(raw: *mut {raw}) -> Result<Self> {{
+        let raw = std::ptr::NonNull::new(raw).ok_or_else(|| Error::invalid_argument("null callback response"))?;
+        Ok(Self {{ raw, lifetime: std::marker::PhantomData }})
+    }}
 {chr(10).join(methods)}
 }}
 """
@@ -369,59 +411,66 @@ def decision_declaration(values, value):
     functions = values.bound.source.functions_by_name
 
     def checked(operation, *arguments):
-        return checked_call(
-            functions[operation], arguments, "maplibre_native_ffi_sys::", "crate"
-        )
+        function = functions[operation]
+        if not function.diagnostic:
+            raise Unsupported(f"{operation}: status return has no diagnostic")
+        call = native_call(function, arguments, diagnostic="out_diagnostic")
+        return f"maplibre_core::check(|out_diagnostic| unsafe {{ {call} }})"
 
-    response = next(
+    response_value = next(
         parameter.value.element
         for parameter in complete.inputs
         if parameter.name != complete.receiver
     )
     name = values.name(value)
     prefix = value.native.removesuffix("_handle") + "_"
-    method = lambda operation: identifier(operation.removeprefix(prefix))
-    registration = cancel_registration(values, decision, method)
+
+    def method(operation):
+        return identifier(operation.removeprefix(prefix))
+
+    cancel_registration(values, decision)
     return f'''#[derive(Debug)]
 pub struct {name} {{
-    state: std::sync::Arc<crate::resource::ResourceRequestHandleState>,
+    state: std::sync::Arc<maplibre_core::resource::ResourceRequestHandleState>,
     not_sync: std::marker::PhantomData<std::cell::Cell<()>>,
 }}
 impl {name} {{
-    pub fn {method(decision.complete)}(&self, response: &{values.public(response)}) -> crate::Result<()> {{
+    pub fn {method(decision.complete)}(&self, response: &{values.public(response_value)}) -> Result<()> {{
         let native = self.state.native_for_call()?;
-        crate::callback::check("{decision.complete}", native.0)?;
-        let mut arena = crate::input::InputArena::default();
+        maplibre_core::callback::check("{decision.complete}", native.0)?;
+        let mut arena = InputArena::default();
         let response = response.to_native(&mut arena)?;
         self.state.complete_with(|handle| {checked(decision.complete, "handle", "&response")})
     }}
-    pub fn {method(decision.cancelled)}(&self) -> crate::Result<bool> {{
+    pub fn {method(decision.cancelled)}(&self) -> Result<bool> {{
         let native = self.state.native_for_call()?;
-        crate::callback::check("{decision.cancelled}", native.0)?;
+        maplibre_core::callback::check("{decision.cancelled}", native.0)?;
         let mut cancelled = false;
         {checked(decision.cancelled, "native", "&mut cancelled")}?;
         Ok(cancelled)
     }}
-    pub fn {method(decision.cancel_registration)}(&self, callback: impl FnOnce() + Send + 'static) -> crate::Result<bool> {{
+    pub fn {method(decision.cancel_registration)}(&self, callback: impl FnOnce() + Send + 'static) -> Result<bool> {{
         let native = self.state.native_for_call()?;
-        crate::callback::check("{decision.cancel_registration}", native.0)?;
-        self.state.{method(decision.cancel_registration)}(Box::new(callback))
+        maplibre_core::callback::check("{decision.cancel_registration}", native.0)?;
+        self.state.set_cancel_callback(Box::new(callback))
     }}
-    pub fn {method(decision.wait_retired)}(&self) -> crate::Result<()> {{
+    pub fn {method(decision.wait_retired)}(&self) -> Result<()> {{
         let native = self.state.issued_handle();
-        crate::callback::check("{decision.wait_retired}", native.0)?;
+        maplibre_core::callback::check("{decision.wait_retired}", native.0)?;
         {checked(decision.wait_retired, "native")}
     }}
-    pub fn close(&self) -> crate::Result<()> {{
-        crate::callback::check("{decision.handle.release}", self.state.issued_handle().0)?;
-        self.state.close(); Ok(())
+    pub fn close(&self) -> Result<()> {{
+        maplibre_core::callback::check("{decision.handle.release}", self.state.issued_handle().0)?;
+        self.state.close();
+        Ok(())
     }}
 }}
-{registration}'''
+'''
 
 
-def cancel_registration(values, decision, method):
-    """Emit the one-shot cancel registration whose root native releases."""
+def cancel_registration(values, decision):
+    """Check that the cancel registration is the one-shot request notification
+    whose root native releases, which the core runtime registers."""
     plan = values.bound.operations_by_name[decision.cancel_registration]
     if len(plan.direct_registrations) != 1:
         raise Unsupported(f"{plan.name}: cancel registration needs one callback")
@@ -442,53 +491,3 @@ def cancel_registration(values, decision, method):
         raise Unsupported(
             f"{plan.name}: cancel callback must be a request notification"
         )
-    allowed = ", ".join(
-        f'"{operation}"' for operation in callback.reentry_policy.operations
-    )
-    arguments = {
-        plan.receiver: "handle",
-        registration.callback: "Some(invoke)",
-        registration.user_data: "user_data",
-        registration.release_callback: "Some(release)",
-        registration.accepted_unless: "&mut cancelled",
-    }
-    call = checked_call(
-        plan.function,
-        [arguments[p.name] for p in plan.function.parameters],
-        "maplibre_native_ffi_sys::",
-        "crate",
-    )
-    return f"""impl crate::resource::ResourceRequestHandleState {{
-    /// Registers a callback that runs at most once when MapLibre cancels the
-    /// request, returning whether the request was already cancelled.
-    ///
-    /// An accepted registration transfers the callback to the C API, which
-    /// releases it once it can no longer run. A rejected registration or an
-    /// already cancelled request drops the callback unrun before returning.
-    pub fn {method(decision.cancel_registration)}(&self, callback: Box<dyn FnOnce() + Send + 'static>) -> crate::Result<bool> {{
-        type Registration = (u64, Option<Box<dyn FnOnce() + Send + 'static>>);
-        unsafe extern "C" fn invoke(user_data: *mut std::ffi::c_void) {{
-            // SAFETY: native passes the registration it owns and invokes it at
-            // most once, before its release.
-            let (owner, callback) = unsafe {{ &mut *user_data.cast::<Registration>() }};
-            let _policy = crate::callback::PolicyScope::enter(&[{allowed}], *owner);
-            if let Some(callback) = callback.take() {{
-                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(callback));
-            }}
-        }}
-        unsafe extern "C" fn release(user_data: *mut std::ffi::c_void) {{
-            let _policy = crate::callback::PolicyScope::enter(&[], 0);
-            // SAFETY: native or the rejecting arena releases each registration once.
-            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {{ drop(Box::from_raw(user_data.cast::<Registration>())) }}));
-        }}
-        let handle = self.native_for_call()?;
-        let mut arena = crate::input::InputArena::default();
-        // SAFETY: release reclaims exactly this box without unwinding.
-        let user_data = unsafe {{ arena.registration::<Registration>((handle.0, Some(callback)), release) }};
-        let mut cancelled = false;
-        {call}?;
-        if !cancelled {{ arena.accept_registrations(); }}
-        Ok(cancelled)
-    }}
-}}
-"""

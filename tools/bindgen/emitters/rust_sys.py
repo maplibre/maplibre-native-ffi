@@ -235,6 +235,13 @@ class Declarations:
                 items.append(
                     f"pub type {typedef.name} = {self.typedef_target(typedef)};"
                 )
+        handles = [
+            typedef.name
+            for typedef in self.api.typedefs
+            if typedef.name in self.used and self.handle(typedef.name)
+        ]
+        if handles:
+            items.append(f"native_handles!({', '.join(handles)});")
         return (
             "// Generated from C headers by tools/bindgen. Do not edit.\n"
             "use super::*;\n\n"

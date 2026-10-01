@@ -1,41 +1,6 @@
 use std::sync::Mutex;
 
-use maplibre_native_ffi_sys as sys;
-
-/// A C handle type: a transparent newtype over the 64-bit id the C API issues.
-pub trait NativeHandle: Copy + 'static {
-    fn to_raw(self) -> u64;
-    fn from_raw(raw: u64) -> Self;
-}
-
-macro_rules! native_handle {
-    ($($handle:ty),* $(,)?) => {
-        $(
-            impl NativeHandle for $handle {
-                fn to_raw(self) -> u64 {
-                    self.0
-                }
-
-                fn from_raw(raw: u64) -> Self {
-                    Self(raw)
-                }
-            }
-        )*
-    };
-}
-
-native_handle!(
-    sys::mln_buffer,
-    sys::mln_runtime,
-    sys::mln_map,
-    sys::mln_map_projection,
-    sys::mln_render_session,
-    sys::mln_event_batch,
-    sys::mln_render_frame_batch,
-    sys::mln_acquired_frame,
-    sys::mln_resource_request_handle,
-    sys::mln_geojson_source_data,
-);
+pub use maplibre_native_ffi_sys::NativeHandle;
 
 /// A native handle a destructor attempted to destroy and could not. The handle
 /// stays live.
@@ -73,33 +38,5 @@ pub fn report_leak(leak: NativeHandleLeak) {
         // The reporter is arbitrary caller code running from `Drop`; unwinding
         // through a destructor during another unwind aborts the process.
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| reporter(leak)));
-    }
-}
-
-/// Keeps native borrowed graphics resources live through a synchronous host scope.
-pub struct NativeViewScope {
-    token: *mut std::ffi::c_void,
-    end: unsafe extern "C" fn(*mut std::ffi::c_void),
-}
-impl NativeViewScope {
-    /// # Safety
-    /// The functions must be the matching scope operations for this handle type.
-    pub unsafe fn begin<T>(
-        handle: T,
-        begin: unsafe extern "C" fn(
-            T,
-            *mut *mut std::ffi::c_void,
-            *mut maplibre_native_ffi_sys::mln_diagnostic,
-        ) -> maplibre_native_ffi_sys::mln_status,
-        end: unsafe extern "C" fn(*mut std::ffi::c_void),
-    ) -> crate::Result<Self> {
-        let mut token = std::ptr::null_mut();
-        crate::check(|diagnostic| unsafe { begin(handle, &mut token, diagnostic) })?;
-        Ok(Self { token, end })
-    }
-}
-impl Drop for NativeViewScope {
-    fn drop(&mut self) {
-        unsafe { (self.end)(self.token) };
     }
 }

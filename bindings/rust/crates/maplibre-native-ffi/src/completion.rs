@@ -9,6 +9,7 @@ use std::time::Duration;
 use maplibre_native_ffi_core as core;
 use maplibre_native_ffi_sys as sys;
 
+use crate::convert::{FromNative, from_native};
 use crate::handle::lock;
 use crate::{Error, Result};
 
@@ -278,11 +279,67 @@ pub(crate) fn copy_slice<T: Copy>(result: &sys::mln_completion_result) -> Result
     )
 }
 
+#[allow(
+    dead_code,
+    reason = "a generator shape that the current headers do not use"
+)]
 pub(crate) fn optional_value<T: Copy>(result: &sys::mln_completion_result) -> Result<Option<T>> {
     if result.value_count == 0 {
         return Ok(None);
     }
     copy_value(result).map(Some)
+}
+
+#[allow(
+    dead_code,
+    reason = "a generator shape that the current headers do not use"
+)]
+pub(crate) fn optional_slice<T: Copy>(
+    result: &sys::mln_completion_result,
+) -> Result<Option<Vec<T>>> {
+    if result.value.is_null() {
+        return Ok(None);
+    }
+    copy_slice(result).map(Some)
+}
+
+/// Copies a completion's one value.
+pub(crate) fn value<N: Copy, T: FromNative<N>>(result: &sys::mln_completion_result) -> Result<T> {
+    let value = copy_value::<N>(result)?;
+    // SAFETY: the value and the storage it points to are borrowed for the
+    // completion callback, which runs this converter.
+    unsafe { from_native(value) }
+}
+
+/// Copies a completion's value, or `None` when it carries no value.
+pub(crate) fn optional<N: Copy, T: FromNative<N>>(
+    result: &sys::mln_completion_result,
+) -> Result<Option<T>> {
+    if result.value_count == 0 {
+        return Ok(None);
+    }
+    value::<N, T>(result).map(Some)
+}
+
+/// Copies every value of a completion.
+pub(crate) fn list<N: Copy, T: FromNative<N>>(
+    result: &sys::mln_completion_result,
+) -> Result<Vec<T>> {
+    copy_slice::<N>(result)?
+        .into_iter()
+        // SAFETY: as for `value`.
+        .map(|value| unsafe { from_native(value) })
+        .collect()
+}
+
+/// Copies every value of a completion, or `None` for a null array.
+pub(crate) fn optional_list<N: Copy, T: FromNative<N>>(
+    result: &sys::mln_completion_result,
+) -> Result<Option<Vec<T>>> {
+    if result.value.is_null() {
+        return Ok(None);
+    }
+    list::<N, T>(result).map(Some)
 }
 
 #[cfg(test)]

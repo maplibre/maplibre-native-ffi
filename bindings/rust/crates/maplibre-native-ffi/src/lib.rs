@@ -12,14 +12,17 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod call;
+mod callback;
 mod completion;
-#[allow(clippy::all, dead_code, unused_imports, unused_parens)]
+mod convert;
+#[allow(clippy::all, dead_code, unused_imports)]
 mod generated;
 mod handle;
 
 pub use completion::{CommandCompletion, NativeFuture};
+pub use convert::{FromNative, InputArena, ToNative};
 pub use generated::*;
-pub use maplibre_core::generated::*;
 pub use maplibre_core::handle::{NativeHandleLeak, set_leak_reporter};
 pub use maplibre_core::{Error, ErrorKind, Result};
 use maplibre_native_ffi_core as maplibre_core;
