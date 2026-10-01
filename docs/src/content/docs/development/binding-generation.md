@@ -35,6 +35,17 @@ ownership relationships. Its source is the translation specification:
 | Language syntax and runtime calls                   | `tools/bindgen/emitters/`         |
 | Header mutation and rejection tests                 | `tests/bindgen/`                  |
 
+The generator also writes the raw C declarations of the .NET and Dart bindings:
+`LibraryImport` methods and blittable structs for .NET, and `@Native` externs
+and `Struct` classes for Dart. Each set holds only the forms that its binding
+calls. The handwritten runtime declares `mln_diagnostic`, because the frontend
+removes it from every signature.
+
+A generated operation names its C function and maps its parameters, then passes
+the call to a handwritten helper. The helpers own admission, status checks,
+completion wiring, and callback registration, so a change to one of those
+mechanisms is a runtime change that every operation shares.
+
 Use the execution category that describes the native operation. Commands report
 mutation disposition and generation; queries return ordered values. Published
 snapshots copy current state synchronously. Lifecycle operations transfer or
