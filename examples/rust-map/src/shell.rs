@@ -2,6 +2,7 @@
 //! does the work they schedule on this thread.
 
 use std::error::Error;
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use maplibre_native_ffi::Wake;
@@ -33,16 +34,61 @@ pub enum AppEvent {
 /// Builds wakes that post an [`AppEvent`] to the event loop from any native
 /// thread.
 #[derive(Clone)]
-pub struct Wakes(EventLoopProxy<AppEvent>);
+pub struct Wakes {
+    proxy: EventLoopProxy<AppEvent>,
+    driver_wait: DriverWait,
+}
 
 impl Wakes {
     pub fn wake(&self, event: AppEvent) -> Wake {
-        let proxy = self.0.clone();
-        // The send fails only once the loop has exited, when nothing is left
-        // to wake.
+        let proxy = self.proxy.clone();
+        let driver_wait = self.driver_wait.clone();
         Wake::new(move || {
+            // The send fails only once the loop has exited, when nothing is
+            // left to wake.
             let _ = proxy.send_event(event);
+            if matches!(event, AppEvent::DriverWork) {
+                driver_wait.signal();
+            }
         })
+    }
+
+    pub fn driver_wait(&self) -> DriverWait {
+        self.driver_wait.clone()
+    }
+}
+
+/// Startup and shutdown block on a session's lifecycle completion outside the
+/// event loop. Every driver wake also signals this wait, so it services driver
+/// work only when there is some.
+#[derive(Clone, Default)]
+pub struct DriverWait(Arc<(Mutex<bool>, Condvar)>);
+
+impl DriverWait {
+    fn signal(&self) {
+        let (signaled, condvar) = &*self.0;
+        *signaled
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = true;
+        condvar.notify_all();
+    }
+
+    pub fn clear(&self) {
+        *self
+            .0
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = false;
+    }
+
+    pub fn wait(&self) {
+        let (signaled, condvar) = &*self.0;
+        let guard = signaled
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _signaled = condvar
+            .wait_while(guard, |signaled| !*signaled)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
     }
 }
 
@@ -54,7 +100,10 @@ pub fn run(
     let mut shell = Shell {
         mode,
         backends,
-        wakes: Wakes(event_loop.create_proxy()),
+        wakes: Wakes {
+            proxy: event_loop.create_proxy(),
+            driver_wait: DriverWait::default(),
+        },
         app: None,
         error: None,
         smoke_deadline: crate::smoke_test().then(|| Instant::now() + SMOKE_DEADLINE),

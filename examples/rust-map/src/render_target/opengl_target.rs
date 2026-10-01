@@ -23,8 +23,7 @@ pub enum RenderTarget {
     BorrowedTexture {
         session: Session,
         compositor: Box<OpenGLTextureCompositor>,
-        /// The texture the session renders into as far as completed
-        /// replacements show.
+        /// The texture the compositor samples.
         texture: Box<OpenGLBorrowedTexture>,
         replacements: Replacements<OpenGLBorrowedTexture>,
     },
@@ -55,6 +54,7 @@ impl RenderTarget {
                 let session = Session::new(
                     unsafe { map.opengl_owned_texture_attach(&descriptor, &options) }?,
                     false,
+                    wakes,
                 )?;
                 Ok(Self::OwnedTexture {
                     session,
@@ -69,6 +69,7 @@ impl RenderTarget {
                 let session = Session::new(
                     unsafe { map.opengl_borrowed_texture_attach(&descriptor, &options) }?,
                     false,
+                    wakes,
                 )?;
                 Ok(Self::BorrowedTexture {
                     session,
@@ -90,6 +91,7 @@ impl RenderTarget {
                     session: Session::new(
                         unsafe { map.opengl_surface_attach(&descriptor, &options) }?,
                         true,
+                        wakes,
                     )?,
                 })
             }
@@ -152,17 +154,24 @@ impl RenderTarget {
         }
     }
 
-    /// Services caller-driver work, then releases what completed target
-    /// replacements retired.
+    /// Services caller-driver work, then shows any replacement a rendered
+    /// frame has drawn into.
     pub fn service(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
         self.session_mut().service()?;
+        self.show_replacements(graphics)
+    }
+
+    /// Switches the compositor to each replacement a rendered frame has drawn
+    /// into, closing the texture it retires.
+    fn show_replacements(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
         if let Self::BorrowedTexture {
+            session,
             texture,
             replacements,
             ..
         } = self
         {
-            while let Some(replacement) = replacements.take_completed()? {
+            while let Some(replacement) = replacements.take_shown(session)? {
                 std::mem::replace(&mut **texture, replacement).close(Some(graphics.opengl()));
             }
         }
@@ -172,6 +181,7 @@ impl RenderTarget {
     /// Shows the newest rendered frame, reporting false when no frame reached
     /// the window.
     pub fn present(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<bool> {
+        self.show_replacements(graphics)?;
         match self {
             Self::OwnedTexture {
                 session,

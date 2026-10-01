@@ -20,8 +20,7 @@ pub enum RenderTarget {
     BorrowedTexture {
         session: Session,
         compositor: Box<MetalTextureCompositor>,
-        /// The texture the session renders into as far as completed
-        /// replacements show.
+        /// The texture the compositor samples.
         texture: Box<MetalBorrowedTexture>,
         replacements: Replacements<MetalBorrowedTexture>,
     },
@@ -49,6 +48,7 @@ impl RenderTarget {
                 let session = Session::new(
                     unsafe { map.metal_owned_texture_attach(&descriptor, &options) }?,
                     false,
+                    wakes,
                 )?;
                 Ok(Self::OwnedTexture {
                     session,
@@ -65,6 +65,7 @@ impl RenderTarget {
                         )
                     }?,
                     false,
+                    wakes,
                 )?;
                 Ok(Self::BorrowedTexture {
                     session,
@@ -83,6 +84,7 @@ impl RenderTarget {
                     session: Session::new(
                         unsafe { map.metal_surface_attach(&descriptor, &options) }?,
                         true,
+                        wakes,
                     )?,
                 })
             }
@@ -131,17 +133,24 @@ impl RenderTarget {
         }
     }
 
-    /// Services caller-driver work, then releases what completed target
-    /// replacements retired.
+    /// Services caller-driver work, then shows any replacement a rendered
+    /// frame has drawn into.
     pub fn service(&mut self, _graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
         self.session_mut().service()?;
+        self.show_replacements()
+    }
+
+    /// Switches the compositor to each replacement a rendered frame has drawn
+    /// into, releasing the texture it retires.
+    fn show_replacements(&mut self) -> maplibre_native_ffi::Result<()> {
         if let Self::BorrowedTexture {
+            session,
             texture,
             replacements,
             ..
         } = self
         {
-            while let Some(replacement) = replacements.take_completed()? {
+            while let Some(replacement) = replacements.take_shown(session)? {
                 **texture = replacement;
             }
         }
@@ -151,6 +160,7 @@ impl RenderTarget {
     /// Shows the newest rendered frame, reporting false when no frame reached
     /// the window.
     pub fn present(&mut self, _graphics: &GraphicsContext) -> maplibre_native_ffi::Result<bool> {
+        self.show_replacements()?;
         match self {
             Self::OwnedTexture {
                 session,

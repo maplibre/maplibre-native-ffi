@@ -24,8 +24,7 @@ pub enum RenderTarget {
     BorrowedTexture {
         session: Session,
         compositor: Box<VulkanTextureCompositor>,
-        /// The image the session renders into as far as completed replacements
-        /// show.
+        /// The image the compositor samples.
         image: Box<BorrowedImage>,
         replacements: Replacements<BorrowedImage>,
     },
@@ -56,6 +55,7 @@ impl RenderTarget {
                 let session = Session::new(
                     unsafe { map.vulkan_owned_texture_attach(&descriptor, &options) }?,
                     false,
+                    wakes,
                 )?;
                 Ok(Self::OwnedTexture {
                     session,
@@ -70,6 +70,7 @@ impl RenderTarget {
                 let session = Session::new(
                     unsafe { map.vulkan_borrowed_texture_attach(&descriptor, &options) }?,
                     false,
+                    wakes,
                 )?;
                 Ok(Self::BorrowedTexture {
                     session,
@@ -88,6 +89,7 @@ impl RenderTarget {
                     session: Session::new(
                         unsafe { map.vulkan_surface_attach(&descriptor, &options) }?,
                         true,
+                        wakes,
                     )?,
                 })
             }
@@ -151,17 +153,24 @@ impl RenderTarget {
         }
     }
 
-    /// Services caller-driver work, then releases what completed target
-    /// replacements retired.
+    /// Services caller-driver work, then shows any replacement a rendered
+    /// frame has drawn into.
     pub fn service(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
         self.session_mut().service()?;
+        self.show_replacements(graphics)
+    }
+
+    /// Switches the compositor to each replacement a rendered frame has drawn
+    /// into, destroying the image it retires.
+    fn show_replacements(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
         if let Self::BorrowedTexture {
+            session,
             image,
             replacements,
             ..
         } = self
         {
-            while let Some(replacement) = replacements.take_completed()? {
+            while let Some(replacement) = replacements.take_shown(session)? {
                 // The compositor waits for its own sampling, but the session's
                 // last render into the outgoing image may still be in flight.
                 graphics.vulkan().wait_idle().map_err(|error| {
@@ -176,7 +185,8 @@ impl RenderTarget {
     /// Shows the newest rendered frame, reporting false when no frame reached
     /// the window. The compositor's sampling finishes before this returns, so
     /// the session may render into the sampled image again.
-    pub fn present(&mut self, _graphics: &GraphicsContext) -> maplibre_native_ffi::Result<bool> {
+    pub fn present(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<bool> {
+        self.show_replacements(graphics)?;
         let presented = match self {
             Self::OwnedTexture {
                 session,
