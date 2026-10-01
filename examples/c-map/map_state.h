@@ -1,4 +1,4 @@
-// The runtime and map driven by the core-owned scheduler.
+// The runtime and map, driven by the native scheduler thread the runtime owns.
 
 #ifndef C_MAP_MAP_STATE_H
 #define C_MAP_MAP_STATE_H
@@ -12,16 +12,13 @@ typedef struct map_state {
   mln_map map;
 } map_state;
 
-/// A smoke run loads an inline style instead of fetching one, so it needs no
-/// network.
+/// Creates the runtime, whose event wake posts APP_EVENT_RUNTIME_EVENTS, and
+/// the map. A smoke run loads an inline style instead of fetching one, so it
+/// needs no network.
 [[nodiscard]] app_error map_state_init(
-  map_state* out_state, viewport initial_viewport, mln_wake_callback event_wake,
-  void* event_wake_user_data, bool smoke
+  map_state* out_state, viewport initial_viewport, bool smoke
 );
 void map_state_deinit(map_state* state);
-
-/// Completion for accepted commands whose terminal metadata is not consumed.
-const mln_completion* map_state_discarded_completion(void);
 
 [[nodiscard]] app_error map_state_update_camera(
   map_state* state, const mln_camera_options* camera, uint32_t mode,
@@ -32,7 +29,8 @@ const mln_completion* map_state_discarded_completion(void);
 /// it rather than fighting it.
 [[nodiscard]] app_error map_state_cancel_transitions(map_state* state);
 
-/// Drains the owned event queue on the render-loop receiver.
+/// Drains every queued runtime event and reports whether the map published a
+/// render update.
 [[nodiscard]] app_error map_state_drain_events(
   map_state* state, bool* out_render_update
 );

@@ -1,13 +1,18 @@
 // App shell: command-line parsing, the SDL window, and the render loop.
+//
+// The render loop only reacts to SDL events. Input submits camera commands,
+// and native wakes post app events: a runtime event drain demands a frame for
+// each map update, a driver wake services the session, and a frame-result
+// drain shows what the driver rendered.
 
 #include <SDL3/SDL.h>
 #include <maplibre_native_c.h>
-#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "diagnostics.h"
+#include "events.h"
 #include "input.h"
 #include "map_state.h"
 #include "render/render.h"
@@ -15,40 +20,25 @@
 #include "util.h"
 #include "viewport.h"
 
-typedef struct wake_receiver {
-  atomic_bool scheduled;
-  /// Set when a wake could not reach the SDL queue, so the next render-loop
-  /// iteration drains instead of waiting for an event that never arrives.
-  atomic_bool push_failed;
-  Uint32 event_type;
-} wake_receiver;
+/// How long a smoke run waits for its first rendered frame.
+static const Uint32 smoke_timeout_milliseconds = 60000;
 
-/// Native callbacks only schedule receiver work. The SDL event loop performs
-/// every C API drain later on the render-loop thread.
-static void schedule_event_drain(void* user_data) {
-  wake_receiver* receiver = user_data;
-  if (
-    atomic_exchange_explicit(&receiver->scheduled, true, memory_order_acq_rel)
-  ) {
-    return;
-  }
-  SDL_Event event = {.type = receiver->event_type};
-  if (!SDL_PushEvent(&event)) {
-    atomic_store_explicit(&receiver->push_failed, true, memory_order_release);
-  }
-}
+/// How long a frame that did not reach the window waits before it retries,
+/// about one display refresh.
+static const Uint32 frame_retry_milliseconds = 16;
 
-static app_error drain_events(
-  map_state* state, wake_receiver* receiver, bool* render_request
-) {
-  atomic_store_explicit(&receiver->scheduled, false, memory_order_release);
-  bool render_update = false;
-  MAP_TRY(map_state_drain_events(state, &render_update));
-  if (render_update) {
-    *render_request = true;
-  }
-  return APP_OK;
-}
+/// How long the render loop waits before SDL checks for a quit signal.
+static const Sint32 signal_check_milliseconds = 250;
+
+typedef struct app {
+  SDL_Window* window;
+  render_target* target;
+  map_state map;
+  viewport viewport;
+  input_controller input;
+  bool smoke;
+  bool running;
+} app;
 
 /// Smoke mode, selected by MLN_EXAMPLE_SMOKE=1, renders one frame of an inline
 /// style into a hidden window and exits, so CI can run the example without a
@@ -58,125 +48,106 @@ static bool smoke_mode(void) {
   return value != nullptr && strcmp(value, "1") == 0;
 }
 
-/// How long a smoke run waits for its first rendered frame.
-static const Uint64 smoke_timeout_milliseconds = 60000;
-
-static app_error render_loop_iteration(
-  SDL_Window* window, render_target* target, viewport* current_viewport,
-  bool* viewport_dirty, map_state* state, bool* render_request,
-  wake_receiver* receiver, input_controller* controller, bool* running,
-  bool* frame_rendered
-) {
-  // The runtime raises its wake only when the queue goes from empty to
-  // non-empty, so a dropped push has to be recovered here.
-  if (
-    atomic_exchange_explicit(
-      &receiver->push_failed, false, memory_order_acq_rel
-    )
-  ) {
-    MAP_TRY(drain_events(state, receiver, render_request));
+static app_error show_frame_results(app* app) {
+  render_session* session = render_target_session(app->target);
+  frame_results results;
+  MAP_TRY(render_session_drain_results(session, &results));
+  bool presented = false;
+  if (results.rendered) {
+    MAP_TRY(render_target_present(app->target, app->viewport, &presented));
   }
-
-  SDL_Event event;
-  while (SDL_PollEvent(&event)) {
-    if (event.type == receiver->event_type) {
-      MAP_TRY(drain_events(state, receiver, render_request));
-      continue;
-    }
-
-    switch (event.type) {
-      case SDL_EVENT_QUIT:
-      case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-        *running = false;
-        break;
-      case SDL_EVENT_WINDOW_RESIZED:
-      case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-      case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-        *current_viewport = viewport_get(window);
-        viewport_log("resized viewport", *current_viewport);
-        *viewport_dirty = true;
-        *render_request = true;
-        break;
-      default: {
-        const input_result result = input_controller_handle_event(
-          controller, &event, state, *current_viewport
-        );
-        if (result.error != APP_OK) {
-          return result.error;
-        }
-        if (result.camera_changed) {
-          *render_request = true;
-        }
-        break;
-      }
-    }
+  if (presented && app->smoke) {
+    puts("smoke: rendered one frame");
+    app->running = false;
+    return APP_OK;
   }
-
-  bool target_pending = false;
-  MAP_TRY(render_target_poll_pending(target, &target_pending));
-  if (!target_pending && *viewport_dirty) {
-    *viewport_dirty = false;
-    // The session resize carries the new logical extent to the map, so this
-    // loop starts one and never resizes the map itself. Starting it here
-    // instead of from the resize event coalesces a live resize into one
-    // outstanding submission.
-    MAP_TRY(render_target_resize(target, *current_viewport));
-    target_pending = true;
+  if (results.target_not_ready || (results.rendered && !presented)) {
+    // The map update was consumed without reaching the window, so the retry
+    // forces a frame rather than waiting for another update.
+    app_event_push_after(APP_EVENT_RETRY_FRAME, frame_retry_milliseconds);
+    return APP_OK;
   }
-  // Consume before rendering, so a request published during the render call is
-  // not discarded.
-  if (!target_pending && *render_request) {
-    *render_request = false;
-    render_frame_outcome outcome = {};
-    MAP_TRY(render_target_render_update(target, *current_viewport, &outcome));
-    if (!outcome.rendered || outcome.needs_repaint) {
-      *render_request = true;
-    }
-    *frame_rendered = outcome.rendered;
+  if (results.needs_repaint) {
+    return render_session_request_frame(session, false);
   }
-  MAP_TRY(render_target_finish_frame(target));
-
-  // Stand-in for a display-refresh subscription.
-  sleep_milliseconds(8);
   return APP_OK;
 }
 
-static app_error render_loop(
-  SDL_Window* window, render_target_mode mode, render_target* target,
-  viewport* current_viewport, map_state* state, wake_receiver* receiver
-) {
-  app_error error = render_target_attach(target, state->map, *current_viewport);
-  if (error != APP_OK) {
-    return error;
+static app_error handle_app_event(app* app, app_event_code code) {
+  render_session* session = render_target_session(app->target);
+  switch (code) {
+    case APP_EVENT_RUNTIME_EVENTS: {
+      bool render_update = false;
+      MAP_TRY(map_state_drain_events(&app->map, &render_update));
+      return render_update ? render_session_request_frame(session, false)
+                           : APP_OK;
+    }
+    case APP_EVENT_DRIVER_WORK:
+      return render_target_service(app->target);
+    case APP_EVENT_FRAME_RESULTS:
+      return show_frame_results(app);
+    case APP_EVENT_RETRY_FRAME:
+      return render_session_request_frame(session, true);
+    case APP_EVENT_SMOKE_TIMEOUT:
+      return APP_ERROR_SMOKE_FRAME_TIMED_OUT;
   }
+  return APP_OK;
+}
+
+static app_error handle_event(app* app, const SDL_Event* event) {
+  app_event_code code;
+  if (app_event_code_of(event, &code)) {
+    return handle_app_event(app, code);
+  }
+  switch (event->type) {
+    case SDL_EVENT_QUIT:
+    case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+      app->running = false;
+      return APP_OK;
+    case SDL_EVENT_WINDOW_RESIZED:
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+    case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: {
+      // One window change raises several of these events.
+      const viewport resized = viewport_get(app->window);
+      if (viewport_equal(resized, app->viewport)) return APP_OK;
+      app->viewport = resized;
+      viewport_log("resized viewport", resized);
+      // The session resize carries the new logical extent to the map, and a
+      // later resize supersedes an earlier one that has not applied yet.
+      return render_target_resize(app->target, resized);
+    }
+    default:
+      return input_controller_handle_event(
+        &app->input, event, &app->map, app->viewport
+      );
+  }
+}
+
+static app_error render_loop(app* app, render_target_mode mode) {
+  MAP_TRY(render_target_attach(app->target, app->map.map, app->viewport));
 
   printf("render target: %s\n", render_target_mode_label(mode));
   printf("render target status: %s\n", render_target_mode_status_line(mode));
   input_log_controls();
 
-  const bool smoke = smoke_mode();
-  const Uint64 smoke_deadline = SDL_GetTicks() + smoke_timeout_milliseconds;
-  bool running = true;
-  bool render_request = true;
-  bool viewport_dirty = false;
-  input_controller controller = {};
-  while (running) {
-    bool frame_rendered = false;
+  if (app->smoke) {
+    app_event_push_after(APP_EVENT_SMOKE_TIMEOUT, smoke_timeout_milliseconds);
+  }
+  // Updates the map published before attachment have no event left to demand
+  // their frame.
+  MAP_TRY(
+    render_session_request_frame(render_target_session(app->target), false)
+  );
+  app->running = true;
+  while (app->running) {
+    SDL_Event event;
+    // SDL turns SIGINT and SIGTERM into a quit event only when it next pumps
+    // events, so the wait wakes now and then to let it.
+    if (!SDL_WaitEventTimeout(&event, signal_check_milliseconds)) continue;
     void* frame_scope = render_target_frame_scope_open();
-    error = render_loop_iteration(
-      window, target, current_viewport, &viewport_dirty, state, &render_request,
-      receiver, &controller, &running, &frame_rendered
-    );
+    const app_error error = handle_event(app, &event);
     render_target_frame_scope_close(frame_scope);
-    if (error != APP_OK) {
-      return error;
-    }
-    if (smoke && frame_rendered) {
-      puts("smoke: rendered one frame");
-      running = false;
-    } else if (smoke && SDL_GetTicks() >= smoke_deadline) {
-      return APP_ERROR_SMOKE_FRAME_TIMED_OUT;
-    }
+    MAP_TRY(error);
   }
   return APP_OK;
 }
@@ -221,6 +192,47 @@ static void print_usage(FILE* stream) {
   );
 }
 
+/// Runs the example once SDL is up: the window, the map, and the render loop,
+/// then tears them down in reverse order.
+static app_error run(render_target_mode mode) {
+  MAP_TRY(app_events_init());
+  MAP_TRY(render_target_configure_video());
+
+  app app = {.smoke = smoke_mode()};
+  const SDL_WindowFlags window_flags =
+    render_target_window_flags() | SDL_WINDOW_RESIZABLE |
+    SDL_WINDOW_HIGH_PIXEL_DENSITY | (app.smoke ? SDL_WINDOW_HIDDEN : 0);
+  app.window = SDL_CreateWindow(
+    "MapLibre SDL3 Map", viewport_window_width, viewport_window_height,
+    window_flags
+  );
+  if (app.window == nullptr) {
+    fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
+    return APP_ERROR_BACKEND_SETUP_FAILED;
+  }
+  if (!app.smoke) {
+    SDL_RaiseWindow(app.window);
+  }
+
+  app.viewport = viewport_get(app.window);
+  viewport_log("initial viewport", app.viewport);
+  app_error error =
+    render_target_init(&app.target, app.window, app.viewport, mode);
+  if (error == APP_OK) {
+    error = map_state_init(&app.map, app.viewport, app.smoke);
+    if (error == APP_OK) {
+      error = render_loop(&app, mode);
+      // The session detaches before its map and runtime close.
+      render_target_deinit(app.target);
+      map_state_deinit(&app.map);
+    } else {
+      render_target_deinit(app.target);
+    }
+  }
+  SDL_DestroyWindow(app.window);
+  return error;
+}
+
 int main(int argc, char** argv) {
   if (argc == 2 && strcmp(argv[1], "--help") == 0) {
     print_usage(stdout);
@@ -235,89 +247,21 @@ int main(int argc, char** argv) {
   }
 
   app_error error = validate_native_render_backend();
+  if (error == APP_OK) {
+    mln_log_set_callback(diagnostics_log_record, nullptr, nullptr, NULL);
+    render_target_apply_sdl_hints();
+    if (SDL_Init(SDL_INIT_VIDEO)) {
+      error = run(mode);
+      SDL_Quit();
+    } else {
+      fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+      error = APP_ERROR_BACKEND_SETUP_FAILED;
+    }
+    mln_log_clear_callback(NULL);
+  }
   if (error != APP_OK) {
     fprintf(stderr, "c-map failed: %s\n", app_error_name(error));
     return EXIT_FAILURE;
   }
-
-  mln_log_set_callback(diagnostics_log_record, nullptr, nullptr, NULL);
-  int exit_code = EXIT_FAILURE;
-  render_target_apply_sdl_hints();
-  if (!SDL_Init(SDL_INIT_VIDEO)) {
-    fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
-    goto out_log_callback;
-  }
-  error = render_target_configure_video();
-  if (error != APP_OK) {
-    fprintf(stderr, "c-map failed: %s\n", app_error_name(error));
-    goto out_sdl;
-  }
-
-  const SDL_WindowFlags window_flags =
-    render_target_window_flags() | SDL_WINDOW_RESIZABLE |
-    SDL_WINDOW_HIGH_PIXEL_DENSITY | (smoke_mode() ? SDL_WINDOW_HIDDEN : 0);
-  SDL_Window* window = SDL_CreateWindow(
-    "MapLibre SDL3 Map", viewport_window_width, viewport_window_height,
-    window_flags
-  );
-  if (window == nullptr) {
-    fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
-    goto out_sdl;
-  }
-  if (!smoke_mode()) {
-    SDL_RaiseWindow(window);
-  }
-
-  viewport current_viewport = viewport_get(window);
-  viewport_log("initial viewport", current_viewport);
-  render_target* target = nullptr;
-  error = render_target_init(&target, window, current_viewport, mode);
-  if (error != APP_OK) {
-    fprintf(stderr, "c-map failed: %s\n", app_error_name(error));
-    goto out_window;
-  }
-
-  wake_receiver receiver = {
-    .event_type = SDL_RegisterEvents(1),
-  };
-  atomic_init(&receiver.scheduled, false);
-  atomic_init(&receiver.push_failed, false);
-  if (receiver.event_type == 0) {
-    error = APP_ERROR_EVENT_DRAIN_FAILED;
-    goto out_target;
-  }
-
-  map_state state;
-  error = map_state_init(
-    &state, current_viewport, schedule_event_drain, &receiver, smoke_mode()
-  );
-  if (error != APP_OK) {
-    goto out_target;
-  }
-
-  error =
-    render_loop(window, mode, target, &current_viewport, &state, &receiver);
-
-  // The graphics-thread-affine session closes before its map and runtime.
-  render_target_deinit(target);
-  target = nullptr;
-  map_state_deinit(&state);
-
-  if (error == APP_OK) {
-    exit_code = EXIT_SUCCESS;
-  } else {
-    fprintf(stderr, "c-map failed: %s\n", app_error_name(error));
-  }
-  goto out_window;
-
-out_target:
-  fprintf(stderr, "c-map failed: %s\n", app_error_name(error));
-  render_target_deinit(target);
-out_window:
-  SDL_DestroyWindow(window);
-out_sdl:
-  SDL_Quit();
-out_log_callback:
-  mln_log_clear_callback(NULL);
-  return exit_code;
+  return EXIT_SUCCESS;
 }

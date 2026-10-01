@@ -1,73 +1,13 @@
-#if !defined(_WIN32)
-#define _POSIX_C_SOURCE 200809L
-#endif
-
-#include <stdatomic.h>
-
 #include "map_state.h"
 
 #include "diagnostics.h"
+#include "events.h"
+#include "util.h"
 
-#if defined(_WIN32)
-#include <windows.h>
-#else
-#include <sched.h>
-#endif
-
-/// Hands the processor to the runtime threads that complete the operations
-/// this file waits on. The Apple SDK ships no C11 <threads.h>, so the wait
-/// yields through the platform primitive rather than thrd_yield.
-static void yield_to_runtime(void) {
-#if defined(_WIN32)
-  Sleep(0);
-#else
-  sched_yield();
-#endif
-}
-
-typedef struct map_create_completion {
-  atomic_bool completed;
-  mln_status status;
-  mln_map map;
-} map_create_completion;
-
-static void discard_completion(
-  void* user_data, const mln_completion_result* result
-) {
-  (void)user_data;
-  (void)result;
-}
-
-static const mln_completion discarded_completion = {
-  .size = sizeof(mln_completion),
-  .callback = discard_completion,
-};
-
-const mln_completion* map_state_discarded_completion(void) {
-  return &discarded_completion;
-}
-
-static void complete_map_create(
-  void* user_data, const mln_completion_result* result
-) {
-  map_create_completion* state = user_data;
-  state->status = result->status;
-  if (result->status == MLN_STATUS_OK && result->value_count == 1) {
-    state->map = *(const mln_map*)result->value;
-  }
-  atomic_store_explicit(&state->completed, true, memory_order_release);
-}
-
-static app_error create_runtime(
-  map_state* state, mln_wake_callback callback, void* user_data
-) {
+static app_error create_runtime(map_state* state) {
   mln_runtime_options options = mln_runtime_options_default();
   options.cache_path = ":memory:";
-  options.event_wake = (mln_wake){
-    .size = sizeof(mln_wake),
-    .callback = callback,
-    .user_data = user_data,
-  };
+  options.event_wake = app_event_wake(APP_EVENT_RUNTIME_EVENTS);
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
     mln_runtime_create(&options, &state->runtime, &diagnostic);
@@ -86,28 +26,29 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
     .scale_factor = initial_viewport.scale_factor,
   };
   options.map_mode = MLN_MAP_MODE_CONTINUOUS;
+  // The render loop re-arms from the frame result's repaint flag, so the map
+  // only has to report updates that arrive between frames.
+  options.event_mask = MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE;
 
-  map_create_completion result = {.completed = false};
-  const mln_completion completion = {
-    .size = sizeof(mln_completion),
-    .callback = complete_map_create,
-    .user_data = &result,
-  };
+  awaited_completion created;
+  mln_completion completion;
+  MAP_TRY(awaited_completion_init(&created, &completion));
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  mln_status status =
+  const mln_status status =
     mln_map_create(state->runtime, &options, &completion, &diagnostic);
+  if (status == MLN_STATUS_OK) {
+    awaited_completion_wait(&created, -1);
+  }
+  awaited_completion_deinit(&created);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("map create start failed", status, &diagnostic);
     return APP_ERROR_MAP_CREATE_FAILED;
   }
-  while (!atomic_load_explicit(&result.completed, memory_order_acquire)) {
-    yield_to_runtime();
-  }
-  if (result.status != MLN_STATUS_OK || result.map == MLN_HANDLE_NULL) {
-    diagnostics_log_status("map create failed", result.status, NULL);
+  if (created.status != MLN_STATUS_OK || created.map == MLN_HANDLE_NULL) {
+    diagnostics_log_status("map create failed", created.status, NULL);
     return APP_ERROR_MAP_CREATE_FAILED;
   }
-  state->map = result.map;
+  state->map = created.map;
   return APP_OK;
 }
 
@@ -119,35 +60,25 @@ static const char smoke_style_json[] =
 static mln_status load_style(
   map_state* state, bool smoke, mln_diagnostic* diagnostic
 ) {
+  const mln_completion completion = diagnostics_completion("style load failed");
   if (smoke) {
     return mln_map_set_style_json(
       state->map,
       (mln_buffer_view){
         .data = smoke_style_json, .size = sizeof(smoke_style_json) - 1
       },
-      map_state_discarded_completion(), diagnostic
+      &completion, diagnostic
     );
   }
   return mln_map_set_style_url(
-    state->map, "https://tiles.openfreemap.org/styles/bright",
-    map_state_discarded_completion(), diagnostic
+    state->map, "https://tiles.openfreemap.org/styles/bright", &completion,
+    diagnostic
   );
 }
 
 static app_error configure_map(map_state* state, bool smoke) {
-  // The render loop re-arms from the frame result's repaint flag, so the map
-  // only has to report updates that arrive between frames.
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  mln_status status = mln_map_set_event_mask(
-    state->map, MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE,
-    map_state_discarded_completion(), &diagnostic
-  );
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("event mask select failed", status, &diagnostic);
-    return APP_ERROR_EVENT_MASK_FAILED;
-  }
-
-  status = load_style(state, smoke, &diagnostic);
+  const mln_status status = load_style(state, smoke, &diagnostic);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("style load failed", status, &diagnostic);
     return APP_ERROR_STYLE_LOAD_FAILED;
@@ -167,11 +98,10 @@ static app_error configure_map(map_state* state, bool smoke) {
 }
 
 app_error map_state_init(
-  map_state* out_state, viewport initial_viewport, mln_wake_callback event_wake,
-  void* event_wake_user_data, bool smoke
+  map_state* out_state, viewport initial_viewport, bool smoke
 ) {
   *out_state = (map_state){};
-  app_error error = create_runtime(out_state, event_wake, event_wake_user_data);
+  app_error error = create_runtime(out_state);
   if (error == APP_OK) {
     error = create_map(out_state, initial_viewport);
   }
@@ -184,50 +114,40 @@ app_error map_state_init(
   return error;
 }
 
-typedef struct runtime_teardown_completion {
-  atomic_bool completed;
-} runtime_teardown_completion;
+/// mln_map_release and mln_runtime_release.
+typedef mln_status (*release_function)(
+  uint64_t handle, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+);
 
-static void complete_runtime_teardown(
-  void* user_data, const mln_completion_result* result
+/// Releases a handle and waits for native retirement, so the map's render
+/// resources are gone before its runtime closes, and the runtime's threads
+/// stop before the app tears down state its callbacks use.
+static void release_and_wait(
+  const char* message, release_function release, uint64_t handle
 ) {
-  (void)result;
-  runtime_teardown_completion* teardown = user_data;
-  atomic_store_explicit(&teardown->completed, true, memory_order_release);
+  awaited_completion released;
+  mln_completion completion;
+  if (awaited_completion_init(&released, &completion) != APP_OK) return;
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status = release(handle, &completion, &diagnostic);
+  if (status == MLN_STATUS_OK) {
+    awaited_completion_wait(&released, -1);
+  } else {
+    diagnostics_log_status(message, status, &diagnostic);
+  }
+  awaited_completion_deinit(&released);
 }
 
 void map_state_deinit(map_state* state) {
-  runtime_teardown_completion teardown = {.completed = false};
-  const mln_completion completion = {
-    .size = sizeof(mln_completion),
-    .callback = complete_runtime_teardown,
-    .user_data = &teardown,
-  };
   if (state->map != MLN_HANDLE_NULL) {
-    mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-    const mln_status status =
-      mln_map_release(state->map, &completion, &diagnostic);
-    if (status != MLN_STATUS_OK)
-      diagnostics_log_status("map release failed", status, &diagnostic);
-    else
-      while (!atomic_load_explicit(&teardown.completed, memory_order_acquire))
-        yield_to_runtime();
+    release_and_wait("map release failed", mln_map_release, state->map);
     state->map = MLN_HANDLE_NULL;
   }
   if (state->runtime != MLN_HANDLE_NULL) {
-    atomic_store_explicit(&teardown.completed, false, memory_order_release);
-    mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-    const mln_status status =
-      mln_runtime_release(state->runtime, &completion, &diagnostic);
-    if (status != MLN_STATUS_OK) {
-      diagnostics_log_status("runtime release failed", status, &diagnostic);
-    } else {
-      // The completion writes to this stack frame, so it must run before the
-      // function returns.
-      while (!atomic_load_explicit(&teardown.completed, memory_order_acquire)) {
-        yield_to_runtime();
-      }
-    }
+    release_and_wait(
+      "runtime release failed", mln_runtime_release, state->runtime
+    );
     state->runtime = MLN_HANDLE_NULL;
   }
 }
@@ -243,10 +163,11 @@ app_error map_state_update_camera(
     update.animation = *animation;
   }
   update.gesture_phase = gesture_phase;
+  const mln_completion completion =
+    diagnostics_completion("camera command failed");
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  const mln_status status = mln_map_update_camera(
-    state->map, &update, map_state_discarded_completion(), &diagnostic
-  );
+  const mln_status status =
+    mln_map_update_camera(state->map, &update, &completion, &diagnostic);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("camera command failed", status, &diagnostic);
     return APP_ERROR_CAMERA_COMMAND_FAILED;
@@ -255,10 +176,11 @@ app_error map_state_update_camera(
 }
 
 app_error map_state_cancel_transitions(map_state* state) {
+  const mln_completion completion =
+    diagnostics_completion("camera transition cancel failed");
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  const mln_status status = mln_map_cancel_transitions(
-    state->map, map_state_discarded_completion(), &diagnostic
-  );
+  const mln_status status =
+    mln_map_cancel_transitions(state->map, &completion, &diagnostic);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status(
       "camera transition cancel failed", status, &diagnostic
@@ -274,6 +196,9 @@ app_error map_state_drain_events(map_state* state, bool* out_render_update) {
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_status status =
     mln_runtime_drain_events(state->runtime, &batch, &diagnostic);
+  if (status == MLN_STATUS_NOT_READY) {
+    return APP_OK;
+  }
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("event drain failed", status, &diagnostic);
     return APP_ERROR_EVENT_DRAIN_FAILED;
@@ -291,12 +216,10 @@ app_error map_state_drain_events(map_state* state, bool* out_render_update) {
     const char* bytes = (const char*)view.events + index * view.event_size;
     const mln_runtime_event* event = (const mln_runtime_event*)bytes;
     if (
-      event->source_type != MLN_RUNTIME_EVENT_SOURCE_MAP ||
-      event->source != state->map
+      event->source_type == MLN_RUNTIME_EVENT_SOURCE_MAP &&
+      event->source == state->map &&
+      event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
     ) {
-      continue;
-    }
-    if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) {
       *out_render_update = true;
     }
   }

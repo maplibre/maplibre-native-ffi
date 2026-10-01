@@ -25,9 +25,9 @@ void render_target_apply_sdl_hints(void);
 /// The SDL window flag the active backend's surface needs.
 SDL_WindowFlags render_target_window_flags(void);
 
-/// Opens the scope one render-loop iteration runs inside. Metal returns an
-/// autorelease pool that collects the iteration's presentation objects; the
-/// other backends return null.
+/// Opens the scope one render-loop event runs inside. Metal returns an
+/// autorelease pool that collects the event's presentation objects; the other
+/// backends return null.
 void* render_target_frame_scope_open(void);
 
 /// Closes a scope returned by render_target_frame_scope_open().
@@ -50,29 +50,23 @@ void render_target_frame_scope_close(void* scope);
 /// no session attached.
 void render_target_deinit(render_target* target);
 
+render_session* render_target_session(render_target* target);
+
 /// Starts the session resize or target replacement a new viewport needs and
-/// returns without waiting. The render loop drives it through
-/// render_target_poll_pending().
+/// returns without waiting for it.
 [[nodiscard]] app_error render_target_resize(
   render_target* target, viewport current_viewport
 );
 
-/// Services caller-driver work, releases anything a completed target
-/// replacement retired, and reports whether an ordered submission is still
-/// outstanding. The render loop holds frame demand back while one is.
-[[nodiscard]] app_error render_target_poll_pending(
-  render_target* target, bool* out_pending
-);
+/// Services caller-driver work, then releases what completed target
+/// replacements retired.
+[[nodiscard]] app_error render_target_service(render_target* target);
 
-/// Runs once per render loop iteration, before the render request is consumed:
-/// fences, pacing, and deferred presentation cleanup.
-[[nodiscard]] app_error render_target_finish_frame(render_target* target);
-
-/// Consumes one render request: renders, composites when the mode needs it,
-/// and presents. Reports the demand's outcome.
-[[nodiscard]] app_error render_target_render_update(
-  render_target* target, viewport current_viewport,
-  render_frame_outcome* out_outcome
+/// Shows the newest rendered frame: the texture modes sample it into the
+/// window, and a surface target already presented it. Reports false when no
+/// frame reached the window.
+[[nodiscard]] app_error render_target_present(
+  render_target* target, viewport current_viewport, bool* out_presented
 );
 
 #endif  // C_MAP_RENDER_RENDER_H

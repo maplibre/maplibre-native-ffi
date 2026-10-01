@@ -14,11 +14,6 @@ typedef enum drag_mode : uint8_t {
   DRAG_MODE_ROTATE,
 } drag_mode;
 
-typedef struct input_result {
-  bool camera_changed;
-  app_error error;
-} input_result;
-
 typedef struct input_controller {
   drag_mode drag_mode;
   uint8_t drag_button;
@@ -26,7 +21,9 @@ typedef struct input_controller {
   double last_y;
 } input_controller;
 
-input_result input_controller_handle_event(
+/// Submits the camera commands one input event makes. The map reports the
+/// resulting render update, which drives the next frame demand.
+[[nodiscard]] app_error input_controller_handle_event(
   input_controller* controller, const SDL_Event* event, map_state* state,
   viewport current_viewport
 );

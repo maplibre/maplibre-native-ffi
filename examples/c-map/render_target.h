@@ -1,5 +1,5 @@
-// The backend-agnostic slice of the render target: the attached session and
-// the extent a viewport maps to.
+// The backend-agnostic slice of the render target: the attached session, its
+// frame demands and results, and the extent a viewport maps to.
 
 #ifndef C_MAP_RENDER_TARGET_H
 #define C_MAP_RENDER_TARGET_H
@@ -7,73 +7,61 @@
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
 
+#include "events.h"
 #include "types.h"
 
-typedef enum render_session_kind : uint8_t {
-  RENDER_SESSION_NONE,
-  RENDER_SESSION_TEXTURE,
-  RENDER_SESSION_SURFACE,
-} render_session_kind;
-
-typedef struct render_completion {
-  atomic_bool completed;
-  mln_status status;
-  mln_completion descriptor;
-} render_completion;
-
 typedef struct render_session {
-  render_session_kind kind;
   mln_render_session handle;
   /// The map this session renders. Target replacement changes only the
   /// graphics resource, so those paths carry the extent to the map directly.
   mln_map map;
+  /// Whether demands ask the driver to present, as a surface target does.
+  bool presents;
   uint64_t next_frame_token;
-  /// Storage for the one ordered submission that can be outstanding: attach,
-  /// resize, target replacement, or detach. The core copies the descriptor and
-  /// runs it from the driver, so the storage outlives the submitting frame.
-  render_completion pending;
-  /// The submission's synchronous diagnostic, reported with a non-OK status.
-  mln_diagnostic diagnostic;
-  bool pending_active;
-  app_error pending_error;
-  const char* pending_message;
 } render_session;
 
-/// One frame demand's outcome: whether the session rendered the demand, and
-/// whether the map asked for another frame while it rendered this one.
-typedef struct render_frame_outcome {
+/// What one drain of the frame-result queue found.
+typedef struct frame_results {
+  /// A demand rendered a frame.
   bool rendered;
+  /// The map asked for another frame while it rendered one.
   bool needs_repaint;
-} render_frame_outcome;
+  /// The target could not produce a frame, so the loop retries later.
+  bool target_not_ready;
+} frame_results;
 
-/// Arms the session's one completion slot, which at most one ordered
-/// submission uses at a time. Pass the returned descriptor and the session's
-/// diagnostic to the C API, then report the status it returned to
-/// render_session_submitted().
-mln_completion* render_session_begin_submission(
-  render_session* session, app_error error, const char* message
+/// Caller-driver attach options whose wakes post APP_EVENT_FRAME_RESULTS and
+/// APP_EVENT_DRIVER_WORK.
+mln_render_session_attach_options render_session_attach_options(void);
+
+/// Finishes an attach call: services driver work until the attachment
+/// completes, and abandons the session when it fails. Pass the completion the
+/// call took and the status and diagnostic it returned.
+[[nodiscard]] app_error render_session_finish_attach(
+  render_session* session, mln_render_session handle, mln_map map,
+  bool presents, awaited_completion* attached, mln_status status,
+  const mln_diagnostic* diagnostic
 );
 
-/// Records an ordered submission's synchronous status. A non-OK status logs the
-/// failure and leaves the slot free.
-[[nodiscard]] app_error render_session_submitted(
-  render_session* session, mln_status status
-);
-
-/// Services caller-driver work and reports whether the outstanding submission
-/// is still pending. A submission that failed reports its error.
-[[nodiscard]] app_error render_session_poll(
-  render_session* session, bool* out_pending
-);
-
-/// Services caller-driver work until the outstanding submission completes.
-/// Startup and shutdown block here; the render loop polls instead.
-[[nodiscard]] app_error render_session_await(render_session* session);
-
+/// Detaches through the driver, abandoning instead when that fails, then
+/// destroys the session. Safe to call with no session attached.
 void render_session_close(render_session* session);
 
+/// Services every queued caller-driver item on the graphics thread.
+[[nodiscard]] app_error render_session_service(render_session* session);
+
+/// Demands a frame. A forced demand renders even without a newer map update,
+/// which a retry after an undrawn frame needs.
+[[nodiscard]] app_error render_session_request_frame(
+  render_session* session, bool force
+);
+
+/// Drains every queued frame result.
+[[nodiscard]] app_error render_session_drain_results(
+  render_session* session, frame_results* out_results
+);
+
 /// Starts the session resize that carries the new logical extent to the map.
-/// The render loop drives it to completion through render_session_poll().
 [[nodiscard]] app_error render_session_resize(
   render_session* session, viewport current_viewport
 );
@@ -85,11 +73,15 @@ void render_session_close(render_session* session);
   render_session* session, viewport current_viewport
 );
 
-/// Submits one frame demand, services caller-driver work, and drains the
-/// result the demand's token identifies.
-[[nodiscard]] app_error render_session_render_update(
-  render_session* session, render_frame_outcome* out_outcome
+/// Acquires the newest rendered frame, releasing any older one unsampled.
+/// Leaves *out_frame null when the ring holds none.
+[[nodiscard]] app_error render_session_acquire_newest(
+  render_session* session, mln_acquired_frame* out_frame
 );
+
+/// Releases a sampled frame. The compositor waits for its GPU work before
+/// returning, so CPU-complete consumer synchronization is accurate.
+void render_session_release_frame(mln_acquired_frame* frame);
 
 /// Reads the producer synchronization an acquired frame carries, reporting a
 /// backend-draw failure for anything this example cannot wait on.
@@ -97,7 +89,39 @@ void render_session_close(render_session* session);
   mln_acquired_frame frame, const char* message
 );
 
-mln_render_session_attach_options render_session_attach_options(void);
+/// The caller-owned textures a borrowed-texture target hands over on resize,
+/// oldest first. The session renders into a texture until its replacement
+/// completes, so each outgoing texture stays alive until then.
+typedef struct texture_replacement texture_replacement;
+typedef struct texture_replacements {
+  texture_replacement* oldest;
+  texture_replacement* newest;
+} texture_replacements;
+
+/// Allocates the entry for texture and writes the completion to submit with
+/// its set_target call. Returns null when allocation fails.
+texture_replacement* texture_replacement_begin(
+  void* texture, mln_completion* out_completion
+);
+
+/// Queues an entry whose set_target call returned status, or frees it when the
+/// call failed.
+void texture_replacements_queue(
+  texture_replacements* replacements, texture_replacement* replacement,
+  mln_status status
+);
+
+/// Takes the oldest replacement whose set_target completed, writing its
+/// texture, or null when none has. A failed replacement reports its error.
+[[nodiscard]] app_error texture_replacements_take_completed(
+  texture_replacements* replacements, void** out_texture
+);
+
+/// Takes the oldest replacement whatever its state, for teardown after the
+/// session detached, writing null once none remains.
+void texture_replacements_take_any(
+  texture_replacements* replacements, void** out_texture
+);
 
 mln_render_target_extent render_target_extent(viewport current_viewport);
 

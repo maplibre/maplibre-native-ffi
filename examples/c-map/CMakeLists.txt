@@ -26,6 +26,7 @@ pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
 add_executable(
   c-map
   diagnostics.c
+  events.c
   input.c
   main.c
   map_state.c

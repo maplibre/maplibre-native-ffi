@@ -4,6 +4,7 @@
 #include "input.h"
 
 #include "diagnostics.h"
+#include "util.h"
 
 static constexpr double keyboard_animation_ms = 160.0;
 static constexpr double reset_animation_ms = 220.0;
@@ -29,10 +30,6 @@ static mln_animation_options animation(double duration_ms) {
   return options;
 }
 
-static input_result submitted(app_error error) {
-  return (input_result){.camera_changed = error == APP_OK, .error = error};
-}
-
 static app_error submit_camera(
   map_state* state, const mln_camera_options* camera, uint32_t mode,
   double duration_ms, uint32_t gesture_phase
@@ -44,11 +41,14 @@ static app_error submit_camera(
   );
 }
 
-static app_error camera_status(
-  mln_status status, const mln_diagnostic* diagnostic
-) {
+static app_error apply_delta(map_state* state, const mln_camera_delta* delta) {
+  const mln_completion completion =
+    diagnostics_completion("camera command failed");
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status =
+    mln_map_apply_camera_delta(state->map, delta, &completion, &diagnostic);
   if (status == MLN_STATUS_OK) return APP_OK;
-  diagnostics_log_status("camera command failed", status, diagnostic);
+  diagnostics_log_status("camera command failed", status, &diagnostic);
   return APP_ERROR_CAMERA_COMMAND_FAILED;
 }
 
@@ -59,11 +59,7 @@ static app_error pan(
   delta.offset = (mln_screen_point){.x = dx, .y = dy};
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
-  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  const mln_status status = mln_map_apply_camera_delta(
-    state->map, &delta, map_state_discarded_completion(), &diagnostic
-  );
-  return camera_status(status, &diagnostic);
+  return apply_delta(state, &delta);
 }
 
 static app_error zoom(
@@ -77,11 +73,7 @@ static app_error zoom(
   delta.anchor = anchor;
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
-  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  const mln_status status = mln_map_apply_camera_delta(
-    state->map, &delta, map_state_discarded_completion(), &diagnostic
-  );
-  return camera_status(status, &diagnostic);
+  return apply_delta(state, &delta);
 }
 
 static app_error adjust_orientation(
@@ -91,23 +83,17 @@ static app_error adjust_orientation(
   mln_camera_delta delta = mln_camera_delta_default();
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
-  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  mln_status status = MLN_STATUS_OK;
   if (bearing_delta != 0.0) {
     delta.kind = MLN_CAMERA_DELTA_BEARING;
     delta.amount = bearing_delta;
-    status = mln_map_apply_camera_delta(
-      state->map, &delta, map_state_discarded_completion(), &diagnostic
-    );
+    MAP_TRY(apply_delta(state, &delta));
   }
-  if (status == MLN_STATUS_OK && pitch_delta != 0.0) {
+  if (pitch_delta != 0.0) {
     delta.kind = MLN_CAMERA_DELTA_PITCH;
     delta.amount = pitch_delta;
-    status = mln_map_apply_camera_delta(
-      state->map, &delta, map_state_discarded_completion(), &diagnostic
-    );
+    MAP_TRY(apply_delta(state, &delta));
   }
-  return camera_status(status, &diagnostic);
+  return APP_OK;
 }
 
 static drag_mode drag_mode_for_button(uint8_t button) {
@@ -117,76 +103,70 @@ static drag_mode drag_mode_for_button(uint8_t button) {
                                                   : DRAG_MODE_PAN;
 }
 
-static input_result handle_mouse_button_down(
+static app_error handle_mouse_button_down(
   input_controller* controller, const SDL_MouseButtonEvent* button,
   map_state* state, viewport value
 ) {
-  if (controller->drag_mode != DRAG_MODE_NONE) return (input_result){};
+  if (controller->drag_mode != DRAG_MODE_NONE) return APP_OK;
   const drag_mode mode = drag_mode_for_button(button->button);
-  if (mode == DRAG_MODE_NONE) return (input_result){};
+  if (mode == DRAG_MODE_NONE) return APP_OK;
   const mln_screen_point cursor = logical_point(button->x, button->y, value);
   controller->last_x = cursor.x;
   controller->last_y = cursor.y;
   controller->drag_mode = mode;
   controller->drag_button = button->button;
-  app_error error = map_state_cancel_transitions(state);
-  if (error == APP_OK) {
-    mln_camera_options camera = mln_camera_options_default();
-    error = map_state_update_camera(
-      state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_BEGIN
-    );
-  }
-  return submitted(error);
+  MAP_TRY(map_state_cancel_transitions(state));
+  mln_camera_options camera = mln_camera_options_default();
+  return map_state_update_camera(
+    state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_BEGIN
+  );
 }
 
-static input_result handle_mouse_button_up(
+static app_error handle_mouse_button_up(
   input_controller* controller, const SDL_MouseButtonEvent* button,
   map_state* state
 ) {
   if (button->button != SDL_BUTTON_LEFT && button->button != SDL_BUTTON_RIGHT)
-    return (input_result){};
-  if (button->button != controller->drag_button) return (input_result){};
+    return APP_OK;
+  if (button->button != controller->drag_button) return APP_OK;
   controller->drag_mode = DRAG_MODE_NONE;
   controller->drag_button = 0;
   mln_camera_options camera = mln_camera_options_default();
-  const app_error error = map_state_update_camera(
+  return map_state_update_camera(
     state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_END
   );
-  return (input_result){.error = error};
 }
 
-static input_result handle_mouse_motion(
+static app_error handle_mouse_motion(
   input_controller* controller, const SDL_MouseMotionEvent* motion,
   map_state* state, viewport value
 ) {
-  if (controller->drag_mode == DRAG_MODE_NONE) return (input_result){};
+  if (controller->drag_mode == DRAG_MODE_NONE) return APP_OK;
   const mln_screen_point cursor = logical_point(motion->x, motion->y, value);
   const double dx = cursor.x - controller->last_x;
   const double dy = cursor.y - controller->last_y;
   controller->last_x = cursor.x;
   controller->last_y = cursor.y;
-  if (dx == 0.0 && dy == 0.0) return (input_result){};
-  return submitted(
-    controller->drag_mode == DRAG_MODE_PAN
-      ? pan(state, dx, dy, MLN_CAMERA_UPDATE_MODE_JUMP, 0.0)
-      : adjust_orientation(
-          state, dx * 0.5, dy / 2.0, MLN_CAMERA_UPDATE_MODE_JUMP, 0.0
-        )
-  );
+  if (dx == 0.0 && dy == 0.0) return APP_OK;
+  return controller->drag_mode == DRAG_MODE_PAN
+           ? pan(state, dx, dy, MLN_CAMERA_UPDATE_MODE_JUMP, 0.0)
+           : adjust_orientation(
+               state, dx * 0.5, dy * 0.5, MLN_CAMERA_UPDATE_MODE_JUMP, 0.0
+             );
 }
 
-static input_result handle_mouse_wheel(
+static app_error handle_mouse_wheel(
   const SDL_MouseWheelEvent* wheel, map_state* state, viewport value
 ) {
-  if (wheel->y == 0.0) return (input_result){};
-  return submitted(zoom(
+  if (wheel->y == 0.0) return APP_OK;
+  return zoom(
     state, pow(2.0, wheel->y * 0.25),
     logical_point(wheel->mouse_x, wheel->mouse_y, value),
     MLN_CAMERA_UPDATE_MODE_JUMP, 0.0
-  ));
+  );
 }
 
-static input_result handle_key_down(
+static app_error handle_key_down(
   const SDL_KeyboardEvent* key, map_state* state, viewport value
 ) {
   constexpr double pan_step = 120.0;
@@ -275,12 +255,12 @@ static input_result handle_key_down(
       break;
     }
     default:
-      return (input_result){};
+      return APP_OK;
   }
-  return submitted(error);
+  return error;
 }
 
-input_result input_controller_handle_event(
+app_error input_controller_handle_event(
   input_controller* controller, const SDL_Event* event, map_state* state,
   viewport value
 ) {
@@ -296,7 +276,7 @@ input_result input_controller_handle_event(
     case SDL_EVENT_KEY_DOWN:
       return handle_key_down(&event->key, state, value);
     default:
-      return (input_result){};
+      return APP_OK;
   }
 }
 

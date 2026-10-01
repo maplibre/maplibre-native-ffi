@@ -35,5 +35,7 @@ export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH
 if [[ "$(uname -s)" == Linux && -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
   export SDL_VIDEO_DRIVER=offscreen
 fi
-MLN_EXAMPLE_SMOKE=1 "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map/c-map" owned-texture
+for mode in owned-texture borrowed-texture native-surface; do
+  MLN_EXAMPLE_SMOKE=1 "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map/c-map" "$mode" || exit 1
+done
 '''

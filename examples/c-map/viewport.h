@@ -13,5 +13,6 @@ static constexpr int viewport_window_height = 640;
 
 viewport viewport_get(SDL_Window* window);
 void viewport_log(const char* label, viewport value);
+bool viewport_equal(viewport left, viewport right);
 
 #endif  // C_MAP_VIEWPORT_H
