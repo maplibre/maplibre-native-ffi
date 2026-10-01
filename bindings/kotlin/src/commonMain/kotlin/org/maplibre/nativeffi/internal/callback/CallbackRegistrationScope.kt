@@ -26,27 +26,13 @@ internal class CallbackRoot(value: Any, val owner: Long? = null) {
  * Strong roots for values native holds by token, such as a callback's `user_data` or a pending
  * completion. Tokens are never reused, so a stray or repeated release finds nothing.
  */
-@OptIn(ExperimentalAtomicApi::class)
-internal object NativeRoots {
-  private val locked = AtomicInt(0)
-  private var next = 1L
-  private val roots = HashMap<Long, Any>()
+internal expect object NativeRoots {
+  fun retain(value: Any): Long
 
-  private inline fun <T> locked(block: () -> T): T {
-    while (!locked.compareAndSet(0, 1)) yieldThread()
-    try {
-      return block()
-    } finally {
-      locked.store(0)
-    }
-  }
-
-  fun retain(value: Any): Long = locked { next++.also { roots[it] = value } }
-
-  fun get(token: Long): Any? = locked { roots[token] }
+  fun get(token: Long): Any?
 
   /** Drops the root and returns its value, or null for a token already released. */
-  fun release(token: Long): Any? = locked { roots.remove(token) }
+  fun release(token: Long): Any?
 }
 
 /**

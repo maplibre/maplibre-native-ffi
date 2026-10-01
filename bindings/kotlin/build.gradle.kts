@@ -4,6 +4,7 @@ import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
@@ -60,6 +61,17 @@ kotlin {
   linuxArm64()
   linuxX64()
   macosArm64()
+
+  // jvmAndroidMain holds the code the JVM and Android share through java.lang.ref and
+  // java.util.concurrent.
+  applyDefaultHierarchyTemplate {
+    common {
+      group("jvmAndroid") {
+        withJvm()
+        withCompilations { it.target.platformType == KotlinPlatformType.androidJvm }
+      }
+    }
+  }
 
   jvmToolchain(libs.versions.java.toolchain.get().toInt())
 
