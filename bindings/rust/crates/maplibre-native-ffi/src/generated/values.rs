@@ -38,70 +38,43 @@ impl ToNative<sys::mln_animation_options> for AnimationOptions {
         let mut raw: sys::mln_animation_options = unsafe { sys::mln_animation_options_default() };
         raw.size = std::mem::size_of::<sys::mln_animation_options>() as _;
         raw.fields = 0;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_ANIMATION_OPTION_DURATION,
-            &mut raw.duration_ms,
-            &self.duration_ms,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_ANIMATION_OPTION_VELOCITY,
-            &mut raw.velocity,
-            &self.velocity,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_ANIMATION_OPTION_MIN_ZOOM,
-            &mut raw.min_zoom,
-            &self.min_zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_ANIMATION_OPTION_EASING,
-            &mut raw.easing,
-            &self.easing,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_ANIMATION_OPTION_TRANSITION_ID,
-            &mut raw.transition_id,
-            &self.transition_id,
-            arena,
-        )?;
+        if let Some(item) = &self.duration_ms {
+            raw.fields |= sys::MLN_ANIMATION_OPTION_DURATION;
+            raw.duration_ms = *item;
+        }
+        if let Some(item) = &self.velocity {
+            raw.fields |= sys::MLN_ANIMATION_OPTION_VELOCITY;
+            raw.velocity = *item;
+        }
+        if let Some(item) = &self.min_zoom {
+            raw.fields |= sys::MLN_ANIMATION_OPTION_MIN_ZOOM;
+            raw.min_zoom = *item;
+        }
+        if let Some(item) = &self.easing {
+            raw.fields |= sys::MLN_ANIMATION_OPTION_EASING;
+            raw.easing = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.transition_id {
+            raw.fields |= sys::MLN_ANIMATION_OPTION_TRANSITION_ID;
+            raw.transition_id = *item;
+        }
         Ok(raw)
     }
 }
 impl FromNative<sys::mln_animation_options> for AnimationOptions {
     unsafe fn from_native(raw: sys::mln_animation_options) -> Result<Self> {
         Ok(Self {
-            duration_ms: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_ANIMATION_OPTION_DURATION,
-                    raw.duration_ms,
-                )
-            }?,
-            velocity: unsafe {
-                convert::present(raw.fields, sys::MLN_ANIMATION_OPTION_VELOCITY, raw.velocity)
-            }?,
-            min_zoom: unsafe {
-                convert::present(raw.fields, sys::MLN_ANIMATION_OPTION_MIN_ZOOM, raw.min_zoom)
-            }?,
+            duration_ms: (raw.fields & sys::MLN_ANIMATION_OPTION_DURATION != 0)
+                .then_some(raw.duration_ms),
+            velocity: (raw.fields & sys::MLN_ANIMATION_OPTION_VELOCITY != 0)
+                .then_some(raw.velocity),
+            min_zoom: (raw.fields & sys::MLN_ANIMATION_OPTION_MIN_ZOOM != 0)
+                .then_some(raw.min_zoom),
             easing: unsafe {
                 convert::present(raw.fields, sys::MLN_ANIMATION_OPTION_EASING, raw.easing)
             }?,
-            transition_id: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_ANIMATION_OPTION_TRANSITION_ID,
-                    raw.transition_id,
-                )
-            }?,
+            transition_id: (raw.fields & sys::MLN_ANIMATION_OPTION_TRANSITION_ID != 0)
+                .then_some(raw.transition_id),
         })
     }
 }
@@ -141,41 +114,26 @@ impl ToNative<sys::mln_bound_options> for BoundOptions {
             sys::MLN_BOUND_OPTION_UNBOUNDED,
             self.unbounded,
         );
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_BOUND_OPTION_BOUNDS,
-            &mut raw.bounds,
-            &self.bounds,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_BOUND_OPTION_MIN_ZOOM,
-            &mut raw.min_zoom,
-            &self.min_zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_BOUND_OPTION_MAX_ZOOM,
-            &mut raw.max_zoom,
-            &self.max_zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_BOUND_OPTION_MIN_PITCH,
-            &mut raw.min_pitch,
-            &self.min_pitch,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_BOUND_OPTION_MAX_PITCH,
-            &mut raw.max_pitch,
-            &self.max_pitch,
-            arena,
-        )?;
+        if let Some(item) = &self.bounds {
+            raw.fields |= sys::MLN_BOUND_OPTION_BOUNDS;
+            raw.bounds = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.min_zoom {
+            raw.fields |= sys::MLN_BOUND_OPTION_MIN_ZOOM;
+            raw.min_zoom = *item;
+        }
+        if let Some(item) = &self.max_zoom {
+            raw.fields |= sys::MLN_BOUND_OPTION_MAX_ZOOM;
+            raw.max_zoom = *item;
+        }
+        if let Some(item) = &self.min_pitch {
+            raw.fields |= sys::MLN_BOUND_OPTION_MIN_PITCH;
+            raw.min_pitch = *item;
+        }
+        if let Some(item) = &self.max_pitch {
+            raw.fields |= sys::MLN_BOUND_OPTION_MAX_PITCH;
+            raw.max_pitch = *item;
+        }
         Ok(raw)
     }
 }
@@ -186,18 +144,10 @@ impl FromNative<sys::mln_bound_options> for BoundOptions {
             bounds: unsafe {
                 convert::present(raw.fields, sys::MLN_BOUND_OPTION_BOUNDS, raw.bounds)
             }?,
-            min_zoom: unsafe {
-                convert::present(raw.fields, sys::MLN_BOUND_OPTION_MIN_ZOOM, raw.min_zoom)
-            }?,
-            max_zoom: unsafe {
-                convert::present(raw.fields, sys::MLN_BOUND_OPTION_MAX_ZOOM, raw.max_zoom)
-            }?,
-            min_pitch: unsafe {
-                convert::present(raw.fields, sys::MLN_BOUND_OPTION_MIN_PITCH, raw.min_pitch)
-            }?,
-            max_pitch: unsafe {
-                convert::present(raw.fields, sys::MLN_BOUND_OPTION_MAX_PITCH, raw.max_pitch)
-            }?,
+            min_zoom: (raw.fields & sys::MLN_BOUND_OPTION_MIN_ZOOM != 0).then_some(raw.min_zoom),
+            max_zoom: (raw.fields & sys::MLN_BOUND_OPTION_MAX_ZOOM != 0).then_some(raw.max_zoom),
+            min_pitch: (raw.fields & sys::MLN_BOUND_OPTION_MIN_PITCH != 0).then_some(raw.min_pitch),
+            max_pitch: (raw.fields & sys::MLN_BOUND_OPTION_MAX_PITCH != 0).then_some(raw.max_pitch),
         })
     }
 }
@@ -230,13 +180,10 @@ impl ToNative<sys::mln_camera_delta> for CameraDelta {
         raw.kind = to_native(&self.kind, arena)?;
         raw.offset = to_native(&self.offset, arena)?;
         raw.amount = self.amount;
-        convert::set_present(
-            &mut raw.has_anchor,
-            true,
-            &mut raw.anchor,
-            &self.anchor,
-            arena,
-        )?;
+        if let Some(item) = &self.anchor {
+            raw.has_anchor = true;
+            raw.anchor = to_native(&*item, arena)?;
+        }
         raw.animation = to_native(&self.animation, arena)?;
         Ok(raw)
     }
@@ -286,27 +233,18 @@ impl ToNative<sys::mln_camera_fit_options> for CameraFitOptions {
         let mut raw: sys::mln_camera_fit_options = unsafe { sys::mln_camera_fit_options_default() };
         raw.size = std::mem::size_of::<sys::mln_camera_fit_options>() as _;
         raw.fields = 0;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CAMERA_FIT_OPTION_PADDING,
-            &mut raw.padding,
-            &self.padding,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CAMERA_FIT_OPTION_BEARING,
-            &mut raw.bearing,
-            &self.bearing,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CAMERA_FIT_OPTION_PITCH,
-            &mut raw.pitch,
-            &self.pitch,
-            arena,
-        )?;
+        if let Some(item) = &self.padding {
+            raw.fields |= sys::MLN_CAMERA_FIT_OPTION_PADDING;
+            raw.padding = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.bearing {
+            raw.fields |= sys::MLN_CAMERA_FIT_OPTION_BEARING;
+            raw.bearing = *item;
+        }
+        if let Some(item) = &self.pitch {
+            raw.fields |= sys::MLN_CAMERA_FIT_OPTION_PITCH;
+            raw.pitch = *item;
+        }
         Ok(raw)
     }
 }
@@ -316,12 +254,8 @@ impl FromNative<sys::mln_camera_fit_options> for CameraFitOptions {
             padding: unsafe {
                 convert::present(raw.fields, sys::MLN_CAMERA_FIT_OPTION_PADDING, raw.padding)
             }?,
-            bearing: unsafe {
-                convert::present(raw.fields, sys::MLN_CAMERA_FIT_OPTION_BEARING, raw.bearing)
-            }?,
-            pitch: unsafe {
-                convert::present(raw.fields, sys::MLN_CAMERA_FIT_OPTION_PITCH, raw.pitch)
-            }?,
+            bearing: (raw.fields & sys::MLN_CAMERA_FIT_OPTION_BEARING != 0).then_some(raw.bearing),
+            pitch: (raw.fields & sys::MLN_CAMERA_FIT_OPTION_PITCH != 0).then_some(raw.pitch),
         })
     }
 }
@@ -367,62 +301,38 @@ impl ToNative<sys::mln_camera_options> for CameraOptions {
             raw.latitude = item.latitude;
             raw.longitude = item.longitude;
         }
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE,
-            &mut raw.center_altitude,
-            &self.center_altitude,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CAMERA_OPTION_PADDING,
-            &mut raw.padding,
-            &self.padding,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CAMERA_OPTION_ANCHOR,
-            &mut raw.anchor,
-            &self.anchor,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CAMERA_OPTION_ZOOM,
-            &mut raw.zoom,
-            &self.zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CAMERA_OPTION_BEARING,
-            &mut raw.bearing,
-            &self.bearing,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CAMERA_OPTION_PITCH,
-            &mut raw.pitch,
-            &self.pitch,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CAMERA_OPTION_ROLL,
-            &mut raw.roll,
-            &self.roll,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CAMERA_OPTION_FOV,
-            &mut raw.field_of_view,
-            &self.field_of_view,
-            arena,
-        )?;
+        if let Some(item) = &self.center_altitude {
+            raw.fields |= sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE;
+            raw.center_altitude = *item;
+        }
+        if let Some(item) = &self.padding {
+            raw.fields |= sys::MLN_CAMERA_OPTION_PADDING;
+            raw.padding = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.anchor {
+            raw.fields |= sys::MLN_CAMERA_OPTION_ANCHOR;
+            raw.anchor = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.zoom {
+            raw.fields |= sys::MLN_CAMERA_OPTION_ZOOM;
+            raw.zoom = *item;
+        }
+        if let Some(item) = &self.bearing {
+            raw.fields |= sys::MLN_CAMERA_OPTION_BEARING;
+            raw.bearing = *item;
+        }
+        if let Some(item) = &self.pitch {
+            raw.fields |= sys::MLN_CAMERA_OPTION_PITCH;
+            raw.pitch = *item;
+        }
+        if let Some(item) = &self.roll {
+            raw.fields |= sys::MLN_CAMERA_OPTION_ROLL;
+            raw.roll = *item;
+        }
+        if let Some(item) = &self.field_of_view {
+            raw.fields |= sys::MLN_CAMERA_OPTION_FOV;
+            raw.field_of_view = *item;
+        }
         Ok(raw)
     }
 }
@@ -437,30 +347,20 @@ impl FromNative<sys::mln_camera_options> for CameraOptions {
             } else {
                 None
             },
-            center_altitude: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE,
-                    raw.center_altitude,
-                )
-            }?,
+            center_altitude: (raw.fields & sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0)
+                .then_some(raw.center_altitude),
             padding: unsafe {
                 convert::present(raw.fields, sys::MLN_CAMERA_OPTION_PADDING, raw.padding)
             }?,
             anchor: unsafe {
                 convert::present(raw.fields, sys::MLN_CAMERA_OPTION_ANCHOR, raw.anchor)
             }?,
-            zoom: unsafe { convert::present(raw.fields, sys::MLN_CAMERA_OPTION_ZOOM, raw.zoom) }?,
-            bearing: unsafe {
-                convert::present(raw.fields, sys::MLN_CAMERA_OPTION_BEARING, raw.bearing)
-            }?,
-            pitch: unsafe {
-                convert::present(raw.fields, sys::MLN_CAMERA_OPTION_PITCH, raw.pitch)
-            }?,
-            roll: unsafe { convert::present(raw.fields, sys::MLN_CAMERA_OPTION_ROLL, raw.roll) }?,
-            field_of_view: unsafe {
-                convert::present(raw.fields, sys::MLN_CAMERA_OPTION_FOV, raw.field_of_view)
-            }?,
+            zoom: (raw.fields & sys::MLN_CAMERA_OPTION_ZOOM != 0).then_some(raw.zoom),
+            bearing: (raw.fields & sys::MLN_CAMERA_OPTION_BEARING != 0).then_some(raw.bearing),
+            pitch: (raw.fields & sys::MLN_CAMERA_OPTION_PITCH != 0).then_some(raw.pitch),
+            roll: (raw.fields & sys::MLN_CAMERA_OPTION_ROLL != 0).then_some(raw.roll),
+            field_of_view: (raw.fields & sys::MLN_CAMERA_OPTION_FOV != 0)
+                .then_some(raw.field_of_view),
         })
     }
 }
@@ -684,55 +584,34 @@ impl ToNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceO
             .cancel_tile
             .as_ref()
             .map(|_| Self::cancel_tile_trampoline as _);
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM,
-            &mut raw.min_zoom,
-            &self.min_zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM,
-            &mut raw.max_zoom,
-            &self.max_zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE,
-            &mut raw.tolerance,
-            &self.tolerance,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE,
-            &mut raw.tile_size,
-            &self.tile_size,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER,
-            &mut raw.buffer,
-            &self.buffer,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP,
-            &mut raw.clip,
-            &self.clip,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP,
-            &mut raw.wrap,
-            &self.wrap,
-            arena,
-        )?;
+        if let Some(item) = &self.min_zoom {
+            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
+            raw.min_zoom = *item;
+        }
+        if let Some(item) = &self.max_zoom {
+            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
+            raw.max_zoom = *item;
+        }
+        if let Some(item) = &self.tolerance {
+            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
+            raw.tolerance = *item;
+        }
+        if let Some(item) = &self.tile_size {
+            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
+            raw.tile_size = *item;
+        }
+        if let Some(item) = &self.buffer {
+            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
+            raw.buffer = *item;
+        }
+        if let Some(item) = &self.clip {
+            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
+            raw.clip = *item;
+        }
+        if let Some(item) = &self.wrap {
+            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
+            raw.wrap = *item;
+        }
         if !(raw.fetch_tile.is_none() && raw.cancel_tile.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -752,55 +631,20 @@ impl FromNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourc
         Ok(Self {
             fetch_tile: None,
             cancel_tile: None,
-            min_zoom: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM,
-                    raw.min_zoom,
-                )
-            }?,
-            max_zoom: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM,
-                    raw.max_zoom,
-                )
-            }?,
-            tolerance: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE,
-                    raw.tolerance,
-                )
-            }?,
-            tile_size: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE,
-                    raw.tile_size,
-                )
-            }?,
-            buffer: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER,
-                    raw.buffer,
-                )
-            }?,
-            clip: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP,
-                    raw.clip,
-                )
-            }?,
-            wrap: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP,
-                    raw.wrap,
-                )
-            }?,
+            min_zoom: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM != 0)
+                .then_some(raw.min_zoom),
+            max_zoom: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM != 0)
+                .then_some(raw.max_zoom),
+            tolerance: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE != 0)
+                .then_some(raw.tolerance),
+            tile_size: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE != 0)
+                .then_some(raw.tile_size),
+            buffer: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER != 0)
+                .then_some(raw.buffer),
+            clip: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP != 0)
+                .then_some(raw.clip),
+            wrap: (raw.fields & sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP != 0)
+                .then_some(raw.wrap),
         })
     }
 }
@@ -893,20 +737,14 @@ impl ToNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSour
             .cancel_tile
             .as_ref()
             .map(|_| Self::cancel_tile_trampoline as _);
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM,
-            &mut raw.min_zoom,
-            &self.min_zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM,
-            &mut raw.max_zoom,
-            &self.max_zoom,
-            arena,
-        )?;
+        if let Some(item) = &self.min_zoom {
+            raw.fields |= sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
+            raw.min_zoom = *item;
+        }
+        if let Some(item) = &self.max_zoom {
+            raw.fields |= sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+            raw.max_zoom = *item;
+        }
         if !(raw.fetch_tile.is_none() && raw.cancel_tile.is_none()) {
             // SAFETY: the release reclaims exactly this state.
             raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
@@ -926,20 +764,10 @@ impl FromNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSo
         Ok(Self {
             fetch_tile: None,
             cancel_tile: None,
-            min_zoom: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM,
-                    raw.min_zoom,
-                )
-            }?,
-            max_zoom: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM,
-                    raw.max_zoom,
-                )
-            }?,
+            min_zoom: (raw.fields & sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM != 0)
+                .then_some(raw.min_zoom),
+            max_zoom: (raw.fields & sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM != 0)
+                .then_some(raw.max_zoom),
         })
     }
 }
@@ -1044,27 +872,18 @@ impl ToNative<sys::mln_feature_state_selector> for FeatureStateSelector {
         raw.size = std::mem::size_of::<sys::mln_feature_state_selector>() as _;
         raw.fields = 0;
         raw.source_id = to_native(&self.source_id, arena)?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID,
-            &mut raw.source_layer_id,
-            &self.source_layer_id,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
-            &mut raw.feature_id,
-            &self.feature_id,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY,
-            &mut raw.state_key,
-            &self.state_key,
-            arena,
-        )?;
+        if let Some(item) = &self.source_layer_id {
+            raw.fields |= sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
+            raw.source_layer_id = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.feature_id {
+            raw.fields |= sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
+            raw.feature_id = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.state_key {
+            raw.fields |= sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
+            raw.state_key = to_native(&*item, arena)?;
+        }
         Ok(raw)
     }
 }
@@ -1156,20 +975,14 @@ impl ToNative<sys::mln_free_camera_options> for FreeCameraOptions {
             unsafe { sys::mln_free_camera_options_default() };
         raw.size = std::mem::size_of::<sys::mln_free_camera_options>() as _;
         raw.fields = 0;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_FREE_CAMERA_OPTION_POSITION,
-            &mut raw.position,
-            &self.position,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_FREE_CAMERA_OPTION_ORIENTATION,
-            &mut raw.orientation,
-            &self.orientation,
-            arena,
-        )?;
+        if let Some(item) = &self.position {
+            raw.fields |= sys::MLN_FREE_CAMERA_OPTION_POSITION;
+            raw.position = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.orientation {
+            raw.fields |= sys::MLN_FREE_CAMERA_OPTION_ORIENTATION;
+            raw.orientation = to_native(&*item, arena)?;
+        }
         Ok(raw)
     }
 }
@@ -1237,124 +1050,68 @@ impl ToNative<sys::mln_geojson_source_options> for GeojsonSourceOptions {
             unsafe { sys::mln_geojson_source_options_default() };
         raw.size = std::mem::size_of::<sys::mln_geojson_source_options>() as _;
         raw.fields = 0;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM,
-            &mut raw.min_zoom,
-            &self.min_zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM,
-            &mut raw.max_zoom,
-            &self.max_zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_TOLERANCE,
-            &mut raw.tolerance,
-            &self.tolerance,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM,
-            &mut raw.cluster_max_zoom,
-            &self.cluster_max_zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES,
-            &mut raw.cluster_properties,
-            &self.cluster_properties,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE,
-            &mut raw.tile_size,
-            &self.tile_size,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER,
-            &mut raw.buffer,
-            &self.buffer,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS,
-            &mut raw.cluster_radius,
-            &self.cluster_radius,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS,
-            &mut raw.cluster_min_points,
-            &self.cluster_min_points,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS,
-            &mut raw.line_metrics,
-            &self.line_metrics,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER,
-            &mut raw.cluster,
-            &self.cluster,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING,
-            &mut raw.synchronous_tiling,
-            &self.synchronous_tiling,
-            arena,
-        )?;
+        if let Some(item) = &self.min_zoom {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
+            raw.min_zoom = *item;
+        }
+        if let Some(item) = &self.max_zoom {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+            raw.max_zoom = *item;
+        }
+        if let Some(item) = &self.tolerance {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
+            raw.tolerance = *item;
+        }
+        if let Some(item) = &self.cluster_max_zoom {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+            raw.cluster_max_zoom = *item;
+        }
+        if let Some(item) = &self.cluster_properties {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+            raw.cluster_properties = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.tile_size {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
+            raw.tile_size = *item;
+        }
+        if let Some(item) = &self.buffer {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER;
+            raw.buffer = *item;
+        }
+        if let Some(item) = &self.cluster_radius {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+            raw.cluster_radius = *item;
+        }
+        if let Some(item) = &self.cluster_min_points {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+            raw.cluster_min_points = *item;
+        }
+        if let Some(item) = &self.line_metrics {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
+            raw.line_metrics = *item;
+        }
+        if let Some(item) = &self.cluster {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+            raw.cluster = *item;
+        }
+        if let Some(item) = &self.synchronous_tiling {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+            raw.synchronous_tiling = *item;
+        }
         Ok(raw)
     }
 }
 impl FromNative<sys::mln_geojson_source_options> for GeojsonSourceOptions {
     unsafe fn from_native(raw: sys::mln_geojson_source_options) -> Result<Self> {
         Ok(Self {
-            min_zoom: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM,
-                    raw.min_zoom,
-                )
-            }?,
-            max_zoom: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM,
-                    raw.max_zoom,
-                )
-            }?,
-            tolerance: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_TOLERANCE,
-                    raw.tolerance,
-                )
-            }?,
-            cluster_max_zoom: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM,
-                    raw.cluster_max_zoom,
-                )
-            }?,
+            min_zoom: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM != 0)
+                .then_some(raw.min_zoom),
+            max_zoom: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM != 0)
+                .then_some(raw.max_zoom),
+            tolerance: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_TOLERANCE != 0)
+                .then_some(raw.tolerance),
+            cluster_max_zoom: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0)
+                .then_some(raw.cluster_max_zoom),
             cluster_properties: unsafe {
                 convert::present(
                     raw.fields,
@@ -1362,55 +1119,21 @@ impl FromNative<sys::mln_geojson_source_options> for GeojsonSourceOptions {
                     raw.cluster_properties,
                 )
             }?,
-            tile_size: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE,
-                    raw.tile_size,
-                )
-            }?,
-            buffer: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER,
-                    raw.buffer,
-                )
-            }?,
-            cluster_radius: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS,
-                    raw.cluster_radius,
-                )
-            }?,
-            cluster_min_points: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS,
-                    raw.cluster_min_points,
-                )
-            }?,
-            line_metrics: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS,
-                    raw.line_metrics,
-                )
-            }?,
-            cluster: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER,
-                    raw.cluster,
-                )
-            }?,
-            synchronous_tiling: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING,
-                    raw.synchronous_tiling,
-                )
-            }?,
+            tile_size: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE != 0)
+                .then_some(raw.tile_size),
+            buffer: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0).then_some(raw.buffer),
+            cluster_radius: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0)
+                .then_some(raw.cluster_radius),
+            cluster_min_points: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+                != 0)
+                .then_some(raw.cluster_min_points),
+            line_metrics: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS != 0)
+                .then_some(raw.line_metrics),
+            cluster: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER != 0)
+                .then_some(raw.cluster),
+            synchronous_tiling: (raw.fields & sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING
+                != 0)
+                .then_some(raw.synchronous_tiling),
         })
     }
 }
@@ -1983,89 +1706,46 @@ impl ToNative<sys::mln_map_tile_options> for MapTileOptions {
         let mut raw: sys::mln_map_tile_options = unsafe { sys::mln_map_tile_options_default() };
         raw.size = std::mem::size_of::<sys::mln_map_tile_options>() as _;
         raw.fields = 0;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA,
-            &mut raw.prefetch_zoom_delta,
-            &self.prefetch_zoom_delta,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS,
-            &mut raw.lod_min_radius,
-            &self.lod_min_radius,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_MAP_TILE_OPTION_LOD_SCALE,
-            &mut raw.lod_scale,
-            &self.lod_scale,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD,
-            &mut raw.lod_pitch_threshold,
-            &self.lod_pitch_threshold,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT,
-            &mut raw.lod_zoom_shift,
-            &self.lod_zoom_shift,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_MAP_TILE_OPTION_LOD_MODE,
-            &mut raw.lod_mode,
-            &self.lod_mode,
-            arena,
-        )?;
+        if let Some(item) = &self.prefetch_zoom_delta {
+            raw.fields |= sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
+            raw.prefetch_zoom_delta = *item;
+        }
+        if let Some(item) = &self.lod_min_radius {
+            raw.fields |= sys::MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
+            raw.lod_min_radius = *item;
+        }
+        if let Some(item) = &self.lod_scale {
+            raw.fields |= sys::MLN_MAP_TILE_OPTION_LOD_SCALE;
+            raw.lod_scale = *item;
+        }
+        if let Some(item) = &self.lod_pitch_threshold {
+            raw.fields |= sys::MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
+            raw.lod_pitch_threshold = *item;
+        }
+        if let Some(item) = &self.lod_zoom_shift {
+            raw.fields |= sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
+            raw.lod_zoom_shift = *item;
+        }
+        if let Some(item) = &self.lod_mode {
+            raw.fields |= sys::MLN_MAP_TILE_OPTION_LOD_MODE;
+            raw.lod_mode = to_native(&*item, arena)?;
+        }
         Ok(raw)
     }
 }
 impl FromNative<sys::mln_map_tile_options> for MapTileOptions {
     unsafe fn from_native(raw: sys::mln_map_tile_options) -> Result<Self> {
         Ok(Self {
-            prefetch_zoom_delta: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA,
-                    raw.prefetch_zoom_delta,
-                )
-            }?,
-            lod_min_radius: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS,
-                    raw.lod_min_radius,
-                )
-            }?,
-            lod_scale: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_MAP_TILE_OPTION_LOD_SCALE,
-                    raw.lod_scale,
-                )
-            }?,
-            lod_pitch_threshold: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD,
-                    raw.lod_pitch_threshold,
-                )
-            }?,
-            lod_zoom_shift: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT,
-                    raw.lod_zoom_shift,
-                )
-            }?,
+            prefetch_zoom_delta: (raw.fields & sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA != 0)
+                .then_some(raw.prefetch_zoom_delta),
+            lod_min_radius: (raw.fields & sys::MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS != 0)
+                .then_some(raw.lod_min_radius),
+            lod_scale: (raw.fields & sys::MLN_MAP_TILE_OPTION_LOD_SCALE != 0)
+                .then_some(raw.lod_scale),
+            lod_pitch_threshold: (raw.fields & sys::MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD != 0)
+                .then_some(raw.lod_pitch_threshold),
+            lod_zoom_shift: (raw.fields & sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT != 0)
+                .then_some(raw.lod_zoom_shift),
             lod_mode: unsafe {
                 convert::present(raw.fields, sys::MLN_MAP_TILE_OPTION_LOD_MODE, raw.lod_mode)
             }?,
@@ -2100,34 +1780,22 @@ impl ToNative<sys::mln_map_viewport_options> for MapViewportOptions {
             unsafe { sys::mln_map_viewport_options_default() };
         raw.size = std::mem::size_of::<sys::mln_map_viewport_options>() as _;
         raw.fields = 0;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION,
-            &mut raw.north_orientation,
-            &self.north_orientation,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE,
-            &mut raw.constrain_mode,
-            &self.constrain_mode,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE,
-            &mut raw.viewport_mode,
-            &self.viewport_mode,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET,
-            &mut raw.frustum_offset,
-            &self.frustum_offset,
-            arena,
-        )?;
+        if let Some(item) = &self.north_orientation {
+            raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
+            raw.north_orientation = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.constrain_mode {
+            raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
+            raw.constrain_mode = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.viewport_mode {
+            raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
+            raw.viewport_mode = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.frustum_offset {
+            raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+            raw.frustum_offset = to_native(&*item, arena)?;
+        }
         Ok(raw)
     }
 }
@@ -2957,50 +2625,32 @@ impl Default for ProjectionMode {
     }
 }
 impl ToNative<sys::mln_projection_mode> for ProjectionMode {
-    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_projection_mode> {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_projection_mode> {
         let mut raw: sys::mln_projection_mode = unsafe { sys::mln_projection_mode_default() };
         raw.size = std::mem::size_of::<sys::mln_projection_mode>() as _;
         raw.fields = 0;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_PROJECTION_MODE_AXONOMETRIC,
-            &mut raw.axonometric,
-            &self.axonometric,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_PROJECTION_MODE_X_SKEW,
-            &mut raw.x_skew,
-            &self.x_skew,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_PROJECTION_MODE_Y_SKEW,
-            &mut raw.y_skew,
-            &self.y_skew,
-            arena,
-        )?;
+        if let Some(item) = &self.axonometric {
+            raw.fields |= sys::MLN_PROJECTION_MODE_AXONOMETRIC;
+            raw.axonometric = *item;
+        }
+        if let Some(item) = &self.x_skew {
+            raw.fields |= sys::MLN_PROJECTION_MODE_X_SKEW;
+            raw.x_skew = *item;
+        }
+        if let Some(item) = &self.y_skew {
+            raw.fields |= sys::MLN_PROJECTION_MODE_Y_SKEW;
+            raw.y_skew = *item;
+        }
         Ok(raw)
     }
 }
 impl FromNative<sys::mln_projection_mode> for ProjectionMode {
     unsafe fn from_native(raw: sys::mln_projection_mode) -> Result<Self> {
         Ok(Self {
-            axonometric: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_PROJECTION_MODE_AXONOMETRIC,
-                    raw.axonometric,
-                )
-            }?,
-            x_skew: unsafe {
-                convert::present(raw.fields, sys::MLN_PROJECTION_MODE_X_SKEW, raw.x_skew)
-            }?,
-            y_skew: unsafe {
-                convert::present(raw.fields, sys::MLN_PROJECTION_MODE_Y_SKEW, raw.y_skew)
-            }?,
+            axonometric: (raw.fields & sys::MLN_PROJECTION_MODE_AXONOMETRIC != 0)
+                .then_some(raw.axonometric),
+            x_skew: (raw.fields & sys::MLN_PROJECTION_MODE_X_SKEW != 0).then_some(raw.x_skew),
+            y_skew: (raw.fields & sys::MLN_PROJECTION_MODE_Y_SKEW != 0).then_some(raw.y_skew),
         })
     }
 }
@@ -3409,7 +3059,7 @@ impl ToNative<sys::mln_rendered_feature_query_options> for RenderedFeatureQueryO
         raw.fields = 0;
         if let Some(item) = &self.layer_ids {
             raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
-            raw.layer_ids = convert::array(&(*item), arena)?;
+            raw.layer_ids = convert::array(&*item, arena)?;
         }
         raw.layer_id_count =
             convert::count(self.layer_ids.as_ref().map_or(0, |items| items.len()))?;
@@ -3752,12 +3402,8 @@ impl FromNative<sys::mln_resource_request> for ResourceRequest {
             priority: unsafe { from_native(raw.priority) }?,
             usage: unsafe { from_native(raw.usage) }?,
             storage_policy: unsafe { from_native(raw.storage_policy) }?,
-            prior_modified_unix_ms: unsafe {
-                convert::present(raw.has_prior_modified, true, raw.prior_modified_unix_ms)
-            }?,
-            prior_expires_unix_ms: unsafe {
-                convert::present(raw.has_prior_expires, true, raw.prior_expires_unix_ms)
-            }?,
+            prior_modified_unix_ms: (raw.has_prior_modified).then_some(raw.prior_modified_unix_ms),
+            prior_expires_unix_ms: (raw.has_prior_expires).then_some(raw.prior_expires_unix_ms),
             prior_etag: unsafe { from_native(raw.prior_etag) }?,
             prior_data: unsafe { convert::counted(raw.prior_data, raw.prior_data_size) }?,
         })
@@ -3837,28 +3483,19 @@ impl ToNative<sys::mln_resource_response> for ResourceResponse {
         raw.byte_count = convert::count(self.bytes.len())?;
         raw.error_message = to_native(&self.error_message, arena)?;
         raw.must_revalidate = self.must_revalidate;
-        convert::set_present(
-            &mut raw.has_modified,
-            true,
-            &mut raw.modified_unix_ms,
-            &self.modified_unix_ms,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.has_expires,
-            true,
-            &mut raw.expires_unix_ms,
-            &self.expires_unix_ms,
-            arena,
-        )?;
+        if let Some(item) = &self.modified_unix_ms {
+            raw.has_modified = true;
+            raw.modified_unix_ms = *item;
+        }
+        if let Some(item) = &self.expires_unix_ms {
+            raw.has_expires = true;
+            raw.expires_unix_ms = *item;
+        }
         raw.etag = to_native(&self.etag, arena)?;
-        convert::set_present(
-            &mut raw.has_retry_after,
-            true,
-            &mut raw.retry_after_unix_ms,
-            &self.retry_after_unix_ms,
-            arena,
-        )?;
+        if let Some(item) = &self.retry_after_unix_ms {
+            raw.has_retry_after = true;
+            raw.retry_after_unix_ms = *item;
+        }
         Ok(raw)
     }
 }
@@ -4472,7 +4109,7 @@ impl ToNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOptio
         raw.fields = 0;
         if let Some(item) = &self.source_layer_ids {
             raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
-            raw.source_layer_ids = convert::array(&(*item), arena)?;
+            raw.source_layer_ids = convert::array(&*item, arena)?;
         }
         raw.source_layer_id_count = convert::count(
             self.source_layer_ids
@@ -4592,51 +4229,36 @@ impl ToNative<sys::mln_style_image_options> for StyleImageOptions {
         raw.fields = 0;
         if let Some(item) = &self.stretch_x {
             raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_STRETCH_X;
-            raw.stretch_x = convert::array(&(*item), arena)?;
+            raw.stretch_x = convert::array(&*item, arena)?;
         }
         raw.stretch_x_count =
             convert::count(self.stretch_x.as_ref().map_or(0, |items| items.len()))?;
         if let Some(item) = &self.stretch_y {
             raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
-            raw.stretch_y = convert::array(&(*item), arena)?;
+            raw.stretch_y = convert::array(&*item, arena)?;
         }
         raw.stretch_y_count =
             convert::count(self.stretch_y.as_ref().map_or(0, |items| items.len()))?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_IMAGE_OPTION_CONTENT,
-            &mut raw.content,
-            &self.content,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH,
-            &mut raw.text_fit_width,
-            &self.text_fit_width,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT,
-            &mut raw.text_fit_height,
-            &self.text_fit_height,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO,
-            &mut raw.pixel_ratio,
-            &self.pixel_ratio,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_IMAGE_OPTION_SDF,
-            &mut raw.sdf,
-            &self.sdf,
-            arena,
-        )?;
+        if let Some(item) = &self.content {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_CONTENT;
+            raw.content = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.text_fit_width {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
+            raw.text_fit_width = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.text_fit_height {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+            raw.text_fit_height = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.pixel_ratio {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+            raw.pixel_ratio = *item;
+        }
+        if let Some(item) = &self.sdf {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
+            raw.sdf = *item;
+        }
         Ok(raw)
     }
 }
@@ -4670,14 +4292,9 @@ impl FromNative<sys::mln_style_image_options> for StyleImageOptions {
                     raw.text_fit_height,
                 )
             }?,
-            pixel_ratio: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO,
-                    raw.pixel_ratio,
-                )
-            }?,
-            sdf: unsafe { convert::present(raw.fields, sys::MLN_STYLE_IMAGE_OPTION_SDF, raw.sdf) }?,
+            pixel_ratio: (raw.fields & sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO != 0)
+                .then_some(raw.pixel_ratio),
+            sdf: (raw.fields & sys::MLN_STYLE_IMAGE_OPTION_SDF != 0).then_some(raw.sdf),
         })
     }
 }
@@ -4817,22 +4434,13 @@ impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
             r#type: unsafe { from_native(raw.type_) }?,
             id_size: raw.id_size,
             is_volatile: raw.is_volatile,
-            attribution_size: unsafe {
-                convert::present(raw.has_attribution, true, raw.attribution_size)
-            }?,
-            url_size: unsafe {
-                convert::present(raw.fields, sys::MLN_STYLE_SOURCE_INFO_URL, raw.url_size)
-            }?,
+            attribution_size: (raw.has_attribution).then_some(raw.attribution_size),
+            url_size: (raw.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0).then_some(raw.url_size),
             bounds: unsafe {
                 convert::present(raw.fields, sys::MLN_STYLE_SOURCE_INFO_BOUNDS, raw.bounds)
             }?,
-            tile_size: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_SOURCE_INFO_TILE_SIZE,
-                    raw.tile_size,
-                )
-            }?,
+            tile_size: (raw.fields & sys::MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0)
+                .then_some(raw.tile_size),
             vector_encoding: unsafe {
                 convert::present(
                     raw.fields,
@@ -4990,82 +4598,48 @@ impl ToNative<sys::mln_style_tile_source_options> for StyleTileSourceOptions {
             unsafe { sys::mln_style_tile_source_options_default() };
         raw.size = std::mem::size_of::<sys::mln_style_tile_source_options>() as _;
         raw.fields = 0;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM,
-            &mut raw.min_zoom,
-            &self.min_zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM,
-            &mut raw.max_zoom,
-            &self.max_zoom,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION,
-            &mut raw.attribution,
-            &self.attribution,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_TILE_SOURCE_OPTION_SCHEME,
-            &mut raw.scheme,
-            &self.scheme,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS,
-            &mut raw.bounds,
-            &self.bounds,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE,
-            &mut raw.tile_size,
-            &self.tile_size,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING,
-            &mut raw.vector_encoding,
-            &self.vector_encoding,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING,
-            &mut raw.raster_encoding,
-            &self.raster_encoding,
-            arena,
-        )?;
+        if let Some(item) = &self.min_zoom {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
+            raw.min_zoom = *item;
+        }
+        if let Some(item) = &self.max_zoom {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
+            raw.max_zoom = *item;
+        }
+        if let Some(item) = &self.attribution {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
+            raw.attribution = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.scheme {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
+            raw.scheme = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.bounds {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
+            raw.bounds = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.tile_size {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
+            raw.tile_size = *item;
+        }
+        if let Some(item) = &self.vector_encoding {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
+            raw.vector_encoding = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.raster_encoding {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
+            raw.raster_encoding = to_native(&*item, arena)?;
+        }
         Ok(raw)
     }
 }
 impl FromNative<sys::mln_style_tile_source_options> for StyleTileSourceOptions {
     unsafe fn from_native(raw: sys::mln_style_tile_source_options) -> Result<Self> {
         Ok(Self {
-            min_zoom: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM,
-                    raw.min_zoom,
-                )
-            }?,
-            max_zoom: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM,
-                    raw.max_zoom,
-                )
-            }?,
+            min_zoom: (raw.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM != 0)
+                .then_some(raw.min_zoom),
+            max_zoom: (raw.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM != 0)
+                .then_some(raw.max_zoom),
             attribution: unsafe {
                 convert::present(
                     raw.fields,
@@ -5087,13 +4661,8 @@ impl FromNative<sys::mln_style_tile_source_options> for StyleTileSourceOptions {
                     raw.bounds,
                 )
             }?,
-            tile_size: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE,
-                    raw.tile_size,
-                )
-            }?,
+            tile_size: (raw.fields & sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE != 0)
+                .then_some(raw.tile_size),
             vector_encoding: unsafe {
                 convert::present(
                     raw.fields,
@@ -5132,59 +4701,37 @@ impl Default for StyleTransitionOptions {
     }
 }
 impl ToNative<sys::mln_style_transition_options> for StyleTransitionOptions {
-    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_style_transition_options> {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_style_transition_options> {
         let mut raw: sys::mln_style_transition_options =
             unsafe { sys::mln_style_transition_options_default() };
         raw.size = std::mem::size_of::<sys::mln_style_transition_options>() as _;
         raw.fields = 0;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_TRANSITION_OPTION_DURATION,
-            &mut raw.duration_ms,
-            &self.duration_ms,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_TRANSITION_OPTION_DELAY,
-            &mut raw.delay_ms,
-            &self.delay_ms,
-            arena,
-        )?;
-        convert::set_present(
-            &mut raw.fields,
-            sys::MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS,
-            &mut raw.enable_placement_transitions,
-            &self.enable_placement_transitions,
-            arena,
-        )?;
+        if let Some(item) = &self.duration_ms {
+            raw.fields |= sys::MLN_STYLE_TRANSITION_OPTION_DURATION;
+            raw.duration_ms = *item;
+        }
+        if let Some(item) = &self.delay_ms {
+            raw.fields |= sys::MLN_STYLE_TRANSITION_OPTION_DELAY;
+            raw.delay_ms = *item;
+        }
+        if let Some(item) = &self.enable_placement_transitions {
+            raw.fields |= sys::MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
+            raw.enable_placement_transitions = *item;
+        }
         Ok(raw)
     }
 }
 impl FromNative<sys::mln_style_transition_options> for StyleTransitionOptions {
     unsafe fn from_native(raw: sys::mln_style_transition_options) -> Result<Self> {
         Ok(Self {
-            duration_ms: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_TRANSITION_OPTION_DURATION,
-                    raw.duration_ms,
-                )
-            }?,
-            delay_ms: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_TRANSITION_OPTION_DELAY,
-                    raw.delay_ms,
-                )
-            }?,
-            enable_placement_transitions: unsafe {
-                convert::present(
-                    raw.fields,
-                    sys::MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS,
-                    raw.enable_placement_transitions,
-                )
-            }?,
+            duration_ms: (raw.fields & sys::MLN_STYLE_TRANSITION_OPTION_DURATION != 0)
+                .then_some(raw.duration_ms),
+            delay_ms: (raw.fields & sys::MLN_STYLE_TRANSITION_OPTION_DELAY != 0)
+                .then_some(raw.delay_ms),
+            enable_placement_transitions: (raw.fields
+                & sys::MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+                != 0)
+                .then_some(raw.enable_placement_transitions),
         })
     }
 }

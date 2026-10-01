@@ -289,28 +289,11 @@ def declaration(values, value):
         typ = values.public(field.value)
         masked = field.presence and field.presence.mask
         fields.append(f"    pub {local}: {'Option<' + typ + '>' if masked else typ},")
-        written = encode(values, field.value, "(*item)")
         copied = decode(values, field.value, place)
         if masked:
-            mask, bit = presence(
-                f"raw.{native_identifier(field.presence.mask)}", field.presence.bit
-            )
-            if written == "to_native(&(*item), arena)?" or written == "(*item)":
-                writes.append(
-                    f"convert::set_present(&mut {mask}, {bit}, &mut {place}, &self.{local}, arena)?;"
-                )
-            else:
-                writes.append(
-                    f"if let Some(item) = &self.{local} {{ {mask_mark(mask, bit)}; {place} = {written}; }}"
-                )
-            if copied == TRAIT_COPY.format(place) or copied == place:
-                copies.append(
-                    f"{local}: unsafe {{ convert::present({mask}, {bit}, {place}) }}?,"
-                )
-            else:
-                copies.append(
-                    f"{local}: if {mask_test(mask, bit)} {{ Some({copied}) }} else {{ None }},"
-                )
+            write, copy = masked_field(values, field, place, local)
+            writes.append(write)
+            copies.append(copy)
         else:
             writes.append(f"{place} = {encode(values, field.value, 'self.' + local)};")
             copies.append(f"{local}: {copied},")
@@ -382,6 +365,25 @@ def declaration(values, value):
         + to_native
         + from_native
     )
+
+
+def masked_field(values, field, place, local):
+    """The write and the copy of an optional field that a mask marks present."""
+    mask, bit = presence(
+        f"raw.{native_identifier(field.presence.mask)}", field.presence.bit
+    )
+    written = encode(values, field.value, "(*item)").replace("(*item)", "*item")
+    write = f"if let Some(item) = &self.{local} {{ {mask_mark(mask, bit)}; {place} = {written}; }}"
+    copied = decode(values, field.value, place)
+    if copied == place:
+        copy = f"{local}: ({mask_test(mask, bit)}).then_some({place}),"
+    elif copied == TRAIT_COPY.format(place):
+        copy = f"{local}: unsafe {{ convert::present({mask}, {bit}, {place}) }}?,"
+    else:
+        copy = (
+            f"{local}: if {mask_test(mask, bit)} {{ Some({copied}) }} else {{ None }},"
+        )
+    return write, copy
 
 
 def mask_mark(mask, bit):

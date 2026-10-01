@@ -224,14 +224,11 @@ def declaration(values, value):
         fields.append(f"    pub {public}: {'Option<' + typ + '>' if masked else typ},")
         copied = decode(values, field.value, place)
         if masked:
-            mask = f"raw.{native_identifier(field.presence.mask)}"
-            bit = f"sys::{field.presence.bit}" if field.presence.bit else "true"
-            writes.append(
-                f"convert::set_present(&mut {mask}, {bit}, &mut {place}, &self.{public}, arena)?;"
-            )
-            copies.append(
-                f"{public}: unsafe {{ convert::present({mask}, {bit}, {place}) }}?,"
-            )
+            from .rust_dynamic_values import masked_field
+
+            write, copy = masked_field(values, field, place, public)
+            writes.append(write)
+            copies.append(copy)
         else:
             writes.append(f"{place} = {encode(values, field.value, 'self.' + public)};")
             copies.append(f"{public}: {copied},")

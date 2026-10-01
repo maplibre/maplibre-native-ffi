@@ -285,21 +285,6 @@ pub(crate) unsafe fn present<M: Presence, N, T: FromNative<N>>(
     unsafe { T::from_native(native) }.map(Some)
 }
 
-/// Writes a present optional field and marks it in `mask`.
-pub(crate) fn set_present<M: Presence, N, T: ToNative<N>>(
-    mask: &mut M,
-    bit: M,
-    field: &mut N,
-    value: &Option<T>,
-    arena: &mut InputArena,
-) -> Result<()> {
-    if let Some(value) = value {
-        *field = value.to_native(arena)?;
-        mask.mark(bit);
-    }
-    Ok(())
-}
-
 /// Sets `bit` in `mask` for a true flag.
 pub(crate) fn set_flag<M: Presence>(mask: &mut M, bit: M, value: bool) {
     if value {
