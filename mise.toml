@@ -74,7 +74,6 @@ emsdk_version = "4.0.10"
 go_version = "1.26.3"
 doc2go_version = "0.12.2"
 gofumpt_version = "0.10.0"
-google_java_format_version = "1.35.0"
 flutter_version = "3.44.8"
 hk_version = "1.45.0"
 java_version = "zulu-25.34.17.0"
@@ -439,7 +438,7 @@ description = "Stop the OpenHarmony emulator started by mise."
 run = '"$MISE_MONOREPO_ROOT/scripts/stop-ohos-emulator.sh"'
 
 [tasks.check]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
+tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
 env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools
@@ -448,7 +447,7 @@ hk check --all
 '''
 
 [tasks.fix]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
+tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
 env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools

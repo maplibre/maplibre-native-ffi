@@ -297,22 +297,6 @@ def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
         check=True,
         stdout=subprocess.DEVNULL,
     )
-    java_files = [str(staging / path) for path in outputs if path.endswith(".java")]
-    if java_files:
-        subprocess.run(
-            [
-                "mise",
-                "exec",
-                "--no-deps",
-                "--",
-                "bash",
-                str(ROOT / ".mise/bin/dprint-java"),
-                "--replace",
-                *java_files,
-            ],
-            cwd=ROOT / "bindings/kotlin",
-            check=True,
-        )
     kotlin_files = [str(staging / path) for path in outputs if path.endswith(".kt")]
     subprocess.run(
         [

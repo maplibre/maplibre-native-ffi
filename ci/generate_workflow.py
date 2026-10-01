@@ -215,7 +215,6 @@ def hygiene_job() -> dict:
         ),
         run("mise run --force //bindings/dart:ffigen"),
         run("mise run --force //bindings/dotnet:generate"),
-        run("mise run --force //bindings/kotlin:generate"),
         run("mise run bindings:check"),
         run("dprint output-resolved-config > /dev/null"),
         run("mise run fix"),

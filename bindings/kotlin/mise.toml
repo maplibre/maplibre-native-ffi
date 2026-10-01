@@ -1,7 +1,6 @@
 [tools]
 "core:java" = "{{vars.java_version}}"
 "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}"
-"aqua:google/google-java-format" = "{{vars.google_java_format_version}}"
 
 [tasks.api]
 description = "Generate Dokka HTML API reference for the Kotlin binding."

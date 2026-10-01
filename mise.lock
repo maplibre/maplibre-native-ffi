@@ -638,35 +638,6 @@ checksum = "sha256:f39bf9a1f520d27f86f2bdf4d6dbb2574c05e84f656171ed65c4e534b86b9
 url = "https://github.com/Kotlin/ktfmt/releases/download/v0.62/ktfmt-0.62-with-dependencies.jar"
 url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/375830158"
 
-[[tools."aqua:google/google-java-format"]]
-version = "1.35.0"
-backend = "aqua:google/google-java-format"
-
-[tools."aqua:google/google-java-format"."platforms.linux-arm64"]
-checksum = "sha256:a69b2e85deb681f3eae4c946b948908e162e76ef27d752fa31830866dd7aa764"
-url = "https://github.com/google/google-java-format/releases/download/v1.35.0/google-java-format_linux-arm64"
-url_api = "https://api.github.com/repos/google/google-java-format/releases/assets/365933462"
-
-[tools."aqua:google/google-java-format"."platforms.linux-x64"]
-checksum = "sha256:e0f95ad6d26b8fbd5b1e3fd3014f8306c4eb3b29d2a6b15fab62d0a364629437"
-url = "https://github.com/google/google-java-format/releases/download/v1.35.0/google-java-format_linux-x86-64"
-url_api = "https://api.github.com/repos/google/google-java-format/releases/assets/365933717"
-
-[tools."aqua:google/google-java-format"."platforms.macos-arm64"]
-checksum = "sha256:563f066c324687885b5f4039325f8952fbb9aaf3d67c68e0b2eafccc8069d3b8"
-url = "https://github.com/google/google-java-format/releases/download/v1.35.0/google-java-format_darwin-arm64"
-url_api = "https://api.github.com/repos/google/google-java-format/releases/assets/365933286"
-
-[tools."aqua:google/google-java-format"."platforms.windows-arm64"]
-checksum = "sha256:2451e70f7805ce51dc026c0ca6b76b689b20c99c5e5769412ae5235f59f3a427"
-url = "https://github.com/google/google-java-format/releases/download/v1.35.0/google-java-format_windows-x86-64.exe"
-url_api = "https://api.github.com/repos/google/google-java-format/releases/assets/365934498"
-
-[tools."aqua:google/google-java-format"."platforms.windows-x64"]
-checksum = "sha256:2451e70f7805ce51dc026c0ca6b76b689b20c99c5e5769412ae5235f59f3a427"
-url = "https://github.com/google/google-java-format/releases/download/v1.35.0/google-java-format_windows-x86-64.exe"
-url_api = "https://api.github.com/repos/google/google-java-format/releases/assets/365934498"
-
 [[tools."aqua:jdx/hk"]]
 version = "1.45.0"
 backend = "aqua:jdx/hk"
