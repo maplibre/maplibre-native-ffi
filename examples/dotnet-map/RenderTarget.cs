@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Render;
@@ -16,6 +17,9 @@ internal abstract class RenderTarget : IDisposable
     /// frame.
     /// </summary>
     protected const uint OwnedTextureRingDepth = 2;
+
+    /// <summary>How long a frame that did not reach the window waits to retry, about one refresh.</summary>
+    private const long RetryDelayMilliseconds = 16;
 
     private readonly GlfwWindow window;
     private bool released;
@@ -98,8 +102,8 @@ internal abstract class RenderTarget : IDisposable
 
     /// <summary>
     /// Drains every frame result and presents each rendered frame. A result that asks for another
-    /// frame, as during a paint transition, requests it, and a frame that missed the window renders
-    /// again.
+    /// frame, as during a paint transition, requests it. A target that was not ready, or a frame
+    /// that missed the window, consumed its map update, so a paced retry forces the next frame.
     /// </summary>
     /// <returns>Whether a frame reached the window.</returns>
     public bool DrainFrameResults()
@@ -123,27 +127,49 @@ internal abstract class RenderTarget : IDisposable
             for (ulong index = 0; index < count; index++)
             {
                 var result = results.Get(index);
-                if (result.Disposition != RenderResult.Rendered)
+                switch (result.Disposition)
                 {
-                    continue;
-                }
-                if (Present())
-                {
-                    presented = true;
-                }
-                else
-                {
-                    missed = true;
+                    case RenderResult.Rendered when Present():
+                        presented = true;
+                        break;
+                    case RenderResult.Rendered:
+                    case RenderResult.TargetNotReady:
+                        missed = true;
+                        break;
+                    default:
+                        continue;
                 }
                 needsRepaint |= result.NeedsRepaint;
             }
         }
 
-        if (missed || needsRepaint)
+        if (missed)
         {
-            RequestFrame(force: missed);
+            RetryAt =
+                Stopwatch.GetTimestamp() + Stopwatch.Frequency * RetryDelayMilliseconds / 1000;
+        }
+        else if (needsRepaint)
+        {
+            RequestFrame();
         }
         return presented;
+    }
+
+    /// <summary>
+    /// When a paced retry is due, as a <see cref="Stopwatch.GetTimestamp" /> value, or null with
+    /// none pending.
+    /// </summary>
+    public long? RetryAt { get; private set; }
+
+    /// <summary>Forces the pending paced retry once it is due.</summary>
+    public void RetryIfDue()
+    {
+        if (RetryAt is not { } due || Stopwatch.GetTimestamp() < due)
+        {
+            return;
+        }
+        RetryAt = null;
+        RequestFrame(force: true);
     }
 
     /// <summary>
@@ -307,7 +333,8 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
 
     protected override bool Present()
     {
-        // An empty ring keeps the previously composited frame on screen.
+        // An empty ring leaves the previously composited frame on screen, and nothing new reaches
+        // the window.
         AcquiredFrameHandle frame;
         try
         {
@@ -315,7 +342,7 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
         }
         catch (MaplibreException error) when (error.Status == MaplibreStatus.NotReady)
         {
-            return true;
+            return false;
         }
         using (frame)
         {

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Maplibre.NativeFfi.Base;
 using Maplibre.NativeFfi.Render;
 
@@ -50,49 +51,56 @@ internal static class Shell
         using var input = new InputController(graphics.Window, state);
 
         var viewport = graphics.ReadViewport();
-        var elapsed = System.Diagnostics.Stopwatch.StartNew();
-        // The session attached after the map took its style and camera, so it starts with one frame.
-        target.RequestFrame();
+        var smokeDeadline =
+            Stopwatch.GetTimestamp() + (long)(Stopwatch.Frequency * SmokeDeadline.TotalSeconds);
+        // Attaching asked the map for a frame, and its wakes may have arrived while the attachment
+        // waited, so the loop handles pending work before its first wait.
         while (!graphics.ShouldClose)
         {
-            if (smoke)
+            using (graphics is MetalContext ? MacObjectiveC.AutoreleasePool() : null)
             {
-                var remaining = SmokeDeadline - elapsed.Elapsed;
-                if (remaining <= TimeSpan.Zero)
+                var currentViewport = graphics.ReadViewport();
+                if (currentViewport != viewport)
                 {
-                    Console.Error.WriteLine($"smoke: no frame rendered within {SmokeDeadline}");
-                    return false;
+                    viewport = currentViewport;
+                    if (!viewport.IsEmpty)
+                    {
+                        graphics.Resize(viewport);
+                        target.Resize(viewport);
+                    }
                 }
-                graphics.Window.WaitEventsTimeout(remaining.TotalSeconds);
+                if (wakes.Events.Consume() && state.DrainRenderUpdates() && graphics.CanRenderFrame)
+                {
+                    target.RequestFrame();
+                }
+                if (wakes.DriverWork.Consume())
+                {
+                    target.ServiceDriverWork();
+                }
+                target.RetryIfDue();
+                if (wakes.Frames.Consume() && target.DrainFrameResults() && smoke)
+                {
+                    Console.WriteLine($"smoke: rendered a frame with {mode.CliName}");
+                    return true;
+                }
+            }
+
+            if (smoke && Stopwatch.GetTimestamp() >= smokeDeadline)
+            {
+                Console.Error.WriteLine($"smoke: no frame rendered within {SmokeDeadline}");
+                return false;
+            }
+            long? wakeAt = smoke
+                ? Math.Min(smokeDeadline, target.RetryAt ?? long.MaxValue)
+                : target.RetryAt;
+            if (wakeAt is { } due)
+            {
+                var remaining = Math.Max(due - Stopwatch.GetTimestamp(), 0);
+                graphics.Window.WaitEventsTimeout((double)remaining / Stopwatch.Frequency);
             }
             else
             {
                 graphics.Window.WaitEvents();
-            }
-
-            using var pool = graphics is MetalContext ? MacObjectiveC.AutoreleasePool() : null;
-            var currentViewport = graphics.ReadViewport();
-            if (currentViewport != viewport)
-            {
-                viewport = currentViewport;
-                if (!viewport.IsEmpty)
-                {
-                    graphics.Resize(viewport);
-                    target.Resize(viewport);
-                }
-            }
-            if (wakes.Events.Consume() && state.DrainRenderUpdates() && graphics.CanRenderFrame)
-            {
-                target.RequestFrame();
-            }
-            if (wakes.DriverWork.Consume())
-            {
-                target.ServiceDriverWork();
-            }
-            if (wakes.Frames.Consume() && target.DrainFrameResults() && smoke)
-            {
-                Console.WriteLine($"smoke: rendered a frame with {mode.CliName}");
-                return true;
             }
         }
         return true;
