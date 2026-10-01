@@ -6,6 +6,7 @@
  */
 #define MLN_PROTOCOL_VALUES
 #define MLN_PROTOCOL_KEYWORDS
+#include <stdlib.h>
 #include <string.h>
 
 #include "protocols.h"
@@ -18,8 +19,12 @@ static mln_status fail(mln_diagnostic* diagnostic, const char* message) {
   return MLN_STATUS_INVALID_ARGUMENT;
 }
 
-// Reports the C ABI version that every binding's handwritten runtime expects.
-uint32_t mln_c_version(void) { return 0; }
+// Reports the C ABI version that every binding's handwritten runtime expects,
+// or MLN_PROBE_C_VERSION when it is set, for a probe that checks a mismatch.
+uint32_t mln_c_version(void) {
+  const char* version = getenv("MLN_PROBE_C_VERSION");
+  return version == NULL ? 0 : (uint32_t)strtoul(version, NULL, 10);
+}
 
 // Returns its input, so a probe sees what its binding encoded, as decoded.
 mln_status mln_probe_roundtrip(

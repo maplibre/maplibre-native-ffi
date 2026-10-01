@@ -11,6 +11,19 @@ func check(
   }
 }
 
+// A library that reports another C ABI version fails the program's first call
+// before it reaches C. The call takes only scalars, so no value's default reads
+// a native struct first.
+if ProcessInfo.processInfo.environment["MLN_PROBE_C_VERSION"] != nil {
+  do {
+    _ = try Maplibre.keywordCombine(defer: 1, self: 1, raw: 1, bindingArg0: 1)
+    check(false, "a mismatched C ABI version was not reported")
+  } catch let error as MaplibreError {
+    check(error.kind == .abiVersionMismatch, "ABI mismatch: \(error)")
+  }
+  exit(0)
+}
+
 let point = ProbePoint(type: 9.5, gain: 3.25)
 let input = ProbeOptions(
   title: "",

@@ -5,9 +5,10 @@
 
 [cases]
 "ERR-01" = "bindings/swift/Tests/MaplibreNativeFFITests/ErrorTests.swift::aFailedCallMapsItsStatusAndCarriesItsDiagnostic"
-# The test injects another version into the check. That the check runs before
-# any other call rests on the generated entry points without a receiver, each
-# of which calls NativeAbi.ensureCompatible() first.
+# The test injects another version into the check. Each generated entry point
+# without a receiver calls NativeAbi.ensureCompatible() first, which the
+# generator's Swift probe checks against a stub that reports another version.
+# A value's generated default reads native defaults without the check.
 "ERR-02" = "bindings/swift/Tests/MaplibreNativeFFITests/ErrorTests.swift::aLibraryWithAnotherCAbiVersionIsRejected"
 "LIFE-01" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::closingAHandleTwiceDoesNothingTheSecondTime"
 "LIFE-02" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aRefusedCloseLeavesTheRuntimeUsableAndALaterCloseSucceeds"

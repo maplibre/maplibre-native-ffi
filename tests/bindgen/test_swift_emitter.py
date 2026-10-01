@@ -75,6 +75,7 @@ class SwiftEmitterTests(unittest.TestCase):
                 timeout=300,
             )
             run(self, [str(root / "probe")], root)
+            run(self, [str(root / "probe")], root, env={"MLN_PROBE_C_VERSION": "1"})
 
 
 if __name__ == "__main__":
