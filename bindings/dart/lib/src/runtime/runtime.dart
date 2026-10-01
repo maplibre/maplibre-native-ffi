@@ -21,6 +21,7 @@ import '../internal/value/uint64.dart';
 import '../render/native_pointer.dart';
 
 part 'generated_operations.dart';
+part 'native_calls.dart';
 part 'runtime_offline.dart';
 
 /// Native release roots for the adapter rule contexts.

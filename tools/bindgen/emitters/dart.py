@@ -57,16 +57,6 @@ def adopt_owner(owned, expression, receiver, function, values):
     return public, result
 
 
-def registration_body(plan, body):
-    """Wrap body in a registration transaction that it accepts after admission."""
-    roots = (
-        "_callbackPorts"
-        if plan.receiver and not plan.owned_outputs
-        else "_NativeCallbackPorts()"
-    )
-    return f"      final registrations = _NativeRegistrations({roots});\n      try {{\n{body}\n      }} finally {{ registrations.close(); }}"
-
-
 def lower_port_registration(plan, registration, callback, values):
     """Lower a receiver's direct registration that a native port delivers.
 
@@ -284,6 +274,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         and p.value.buffer_form != "view"
         and p.value.length not in {None, "1", "nul"}
     }
+    attach_output = None
     signature, optional, setup, args, returns = (
         [],
         [],
@@ -302,9 +293,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
     if receiver_reference:
         if not plan.consumes:
             raise Unsupported("mutable handle receiver requires consumption")
-        setup.append(
-            "      final receiverPointer = arena<Uint64>()..value = handle.raw;"
-        )
+        setup.append("final receiverPointer = arena<Uint64>()..value = handle.raw;")
         args = ["receiverPointer"]
     for parameter in function.parameters[1 if receiver else 0 :]:
         if plan.completion and parameter.name == plan.completion.parameter:
@@ -335,21 +324,26 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
                 (o for o in plan.owned_outputs if o.parameter == parameter.name), None
             )
             if owned:
-                setup.append(f"      final {local} = arena<Uint64>();")
+                if plan.completion:
+                    attach_output = local
+                    args.append(local)
+                    returns.append(
+                        adopt_owner(owned, "handle", receiver, function, values)
+                    )
+                    continue
+                setup.append(f"final {local} = arena<Uint64>();")
                 args.append(local)
                 returns.append(
                     adopt_owner(owned, local + ".value", receiver, function, values)
                 )
                 continue
             values.check(output)
-            setup.append(f"      final {local} = arena<{values.ffi(output)}>();")
+            setup.append(f"final {local} = arena<{values.ffi(output)}>();")
             if output.kind == "record":
                 if output.default:
-                    setup.append(f"      {local}.ref = raw.{output.default}();")
+                    setup.append(f"{local}.ref = raw.{output.default}();")
                 elif any(f.role == "size" for f in output.fields):
-                    setup.append(
-                        f"      {local}.ref.size = sizeOf<{values.ffi(output)}>();"
-                    )
+                    setup.append(f"{local}.ref.size = sizeOf<{values.ffi(output)}>();")
             args.append(local + ".cast()" if output.kind == "native_pointer" else local)
             expression = f"{local}." + (
                 "ref"
@@ -404,7 +398,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
                 if value.encoding == "utf8"
                 else f"nativeBufferView({local}, arena)"
             )
-            setup.append(f"      final bytes{local} = {view};")
+            setup.append(f"final bytes{local} = {view};")
             args.append(f"bytes{local}.data.cast()")
         elif value.kind == "reference":
             args.append(values.native(value, local))
@@ -415,8 +409,8 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
                 )
             child = value.element
             setup += [
-                f"      final native{local} = arena<{values.ffi(child)}>({local}.isEmpty ? 1 : {local}.length);",
-                f"      for (var index = 0; index < {local}.length; index++) {{ native{local}[index] = {values.native(child, local + '[index]')}; }}",
+                f"final native{local} = arena<{values.ffi(child)}>({local}.isEmpty ? 1 : {local}.length);",
+                f"for (var index = 0; index < {local}.length; index++) {{ native{local}[index] = {values.native(child, local + '[index]')}; }}",
             ]
             args.append(f"native{local}")
         else:
@@ -424,17 +418,34 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
     if optional:
         signature.append("{" + ", ".join(optional) + "}")
     call = native_call(function, args)
+    roots = (
+        "_callbackPorts"
+        if plan.receiver and not plan.owned_outputs
+        else "_NativeCallbackPorts()"
+    )
+    transaction = []
+    if plan.registrations:
+        if not status_return:
+            raise Unsupported("registration requires an admission status")
+        if plan.completion and plan.completion.result_owner:
+            raise Unsupported("an adopted result cannot retain its registrations")
+        # A transaction accepts its registrations once native code admits the call.
+        transaction = [f"final registrations = _NativeRegistrations({roots});"]
+        call = f"registrations.run(() => {call})"
+        if not (plan.completion and returns):
+            setup += transaction
+            transaction = []
     if plan.consumes and not plan.completion:
         if not receiver or returns:
             raise Unsupported("consumption requires an owned receiver without outputs")
-        body = "\n".join(setup) + (
-            f"\n      return {call};"
+        body = setup + (
+            [f"return {call};"]
             if status_return
-            else f"\n      {call};\n      return nativeStatusOk;"
+            else [f"{call};", "return nativeStatusOk;"]
         )
         return (
             owner,
-            f"  void {name}({', '.join(signature)}) => _state.close((handle) => withNativeArena((arena) {{\n{body}\n  }}));\n",
+            f"  void {name}({', '.join(signature)}) => _state.close({closure('handle', body)});\n",
         )
     if not plan.completion:
         if not status_return and plan.result:
@@ -457,24 +468,17 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             if returns
             else None
         )
-        body = (
-            "\n".join(setup)
-            + (
-                f"\n      _check({call});"
-                if status_return
-                else f"\n      final nativeResult = {call};"
-                if plan.result
-                else f"\n      {call};"
-            )
-            + ("\n      registrations.accept();" if plan.registrations else "")
-            + (f"\n      return {result};" if result else "")
-        )
-        if plan.registrations:
-            body = registration_body(plan, body)
-        return (
-            owner,
-            f"  {public} {name}({', '.join(signature)}) => withNativeArena((arena) {{\n{body}\n  }});\n",
-        )
+        body = setup + [
+            f"_check({call});"
+            if status_return
+            else f"final nativeResult = {call};"
+            if plan.result
+            else f"{call};"
+        ]
+        if result:
+            body.append(f"return {result};")
+        return owner, f"  {public} {name}({', '.join(signature)}) {method_body(body)}\n"
+    start = f"(arena, completion) {block(setup + [f'return {call};'])}"
     if returns:
         if (
             len(returns) != 1
@@ -486,93 +490,47 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             )
         public, adoption = returns[0]
         attachment = attachment_name(plan.completion.immediate_owners[0])
-        accept = "registrations.accept();" if plan.registrations else ""
-        body = (
-            "\n".join(setup)
-            + f"\n      final status = {call};\n      if (status == nativeStatusOk) {{ {accept} try {{ created = {adoption}; }} catch (error, stack) {{ adoptionError = error; adoptionStack = stack; }} }}\n      return status;"
-        )
-        if plan.registrations:
-            body = registration_body(plan, body)
-        return (
-            owner,
-            f"  {attachment} {name}({', '.join(signature)}) {{\n    {public}? created;\n    Object? adoptionError; StackTrace? adoptionStack;\n    final completed = startNativeCompletion<void>(copyKind: raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT, elementSize: 0, start: (completion) => withNativeArena((arena) {{\n{body}\n    }}), decode: (_) {{}});\n    if (adoptionError != null) {{ completed.ignore(); Error.throwWithStackTrace(adoptionError!, adoptionStack!); }}\n    final owner = created!;\n    return {attachment}(owner, completed.whenComplete(() {{ owner.isClosed; }}));\n  }}\n",
-        )
-
-    if plan.registrations:
-        setup = [
-            registration_body(
-                plan,
-                "\n".join(setup)
-                + f"\n      final status = {call};\n      if (status == nativeStatusOk) {{ registrations.accept(); }}\n      return status;",
+        output = attach_output
+        start = f"(arena, completion, {output}) {block(setup + [f'return {call};'])}"
+        operation = f"_attach({start}, (handle) => {adoption}, {attachment}.new)"
+        if transaction:
+            body = [*transaction, f"return {operation};"]
+            return (
+                owner,
+                f"  {attachment} {name}({', '.join(signature)}) {{\n"
+                + "".join(f"    {line}\n" for line in body)
+                + "  }\n",
             )
-        ]
-        call = None
-    start = (
-        "(completion) => withNativeArena((arena) {\n"
-        + "\n".join(setup)
-        + (f"\n      return {call};" if call else "")
-        + "\n    })"
-    )
+        return owner, f"  {attachment} {name}({', '.join(signature)}) => {operation};\n"
     if execution == "command":
         if plan.result:
             raise Unsupported("command requires a resultless receipt")
-        return (
-            owner,
-            f"  Future<CommandCompletion> {name}({', '.join(signature)}) => _startCommand({start});\n",
-        )
-    result = plan.result
-    if result is None:
-        public, kind, size, decode = (
-            "void",
-            "MLN_ADAPTER_COMPLETION_COPY_FLAT",
-            "0",
-            "null",
-        )
+        operation = f"_command({start})"
+    elif plan.result is None:
+        public, operation = "void", f"_run({start})"
     elif plan.completion.result_owner:
         public, decode = adopt_owner(
-            plan.completion.result_owner,
-            "result.value.cast<Uint64>().value",
-            receiver,
-            function,
-            values,
+            plan.completion.result_owner, "handle", receiver, function, values
         )
-        kind, size = copy_kind(result.native), "sizeOf<Uint64>()"
+        operation = f"_queryOwned(raw.mln_adapter_completion_copy_kind.{copy_kind(plan.result.native)}, {start}, (handle) => {decode})"
     else:
+        result = plan.result
         values.check(result)
         public = values.public(result)
         element = result.element if result.kind == "array" else result
+        if result.kind == "array" and result.optional:
+            raise Unsupported("empty optional array needs cardinality interpretation")
         bare = replace(element, nullable=False)
-        kind = (
-            copy_kind(element.native)
-            if element.kind in {"record", "handle"} or element.buffer_form == "view"
-            else "MLN_ADAPTER_COMPLETION_COPY_FLAT"
+        if result.kind != "array" and bare.kind == "buffer":
+            bare = replace(bare, nullable=result.nullable)
+        helper = (
+            ("_queryOptionalList" if result.nullable else "_queryList")
+            if result.kind == "array"
+            else "_queryOptional"
+            if result.nullable
+            else "_query"
         )
-        size = f"sizeOf<{values.ffi(element)}>()"
-        pointer = f"result.value.cast<{values.ffi(element)}>()"
-        if result.kind == "array":
-            decode = values.copy(
-                replace(result, nullable=False), pointer, "result.value_count"
-            )
-            if result.optional:
-                raise Unsupported(
-                    "empty optional array needs cardinality interpretation"
-                )
-            if result.nullable:
-                decode = f"result.value == nullptr ? null : {decode}"
-        else:
-            expression = pointer + (
-                ".ref"
-                if element.kind == "record" or element.buffer_form == "view"
-                else ".value"
-            )
-            decode = values.copy(
-                replace(bare, nullable=result.nullable)
-                if bare.kind == "buffer"
-                else bare,
-                expression,
-            )
-            if result.nullable:
-                decode = f"result.value_count == 0 ? null : {decode}"
+        operation = f"{helper}({completion_value(values, element, bare)}, {start})"
     if plan.consumes:
         if public != "void" or not receiver:
             raise Unsupported(
@@ -580,12 +538,64 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             )
         return (
             owner,
-            f"  Future<void> {name}({', '.join(signature)}) => _state.closeAsync((handle) => startNativeCompletion(copyKind: raw.mln_adapter_completion_copy_kind.{kind}, elementSize: {size}, start: {start}, decode: (result) {{}}));\n",
+            f"  Future<void> {name}({', '.join(signature)}) => _state.closeAsync((handle) => {operation});\n",
         )
-    return (
-        owner,
-        f"  Future<{public}> {name}({', '.join(signature)}) => startNativeCompletion(\n    copyKind: raw.mln_adapter_completion_copy_kind.{kind},\n    elementSize: {size},\n    start: {start},\n    decode: {'(result) {}' if public == 'void' else '(result) => ' + decode},\n    claimBeforeDecode: {str(bool(plan.completion.result_owner)).lower()},\n  );\n",
+    if execution == "command":
+        return (
+            owner,
+            f"  Future<CommandCompletion> {name}({', '.join(signature)}) => {operation};\n",
+        )
+    return owner, f"  Future<{public}> {name}({', '.join(signature)}) => {operation};\n"
+
+
+def block(body: list[str]) -> str:
+    """A closure body: an expression for one return, a block otherwise."""
+    if len(body) == 1 and body[0].startswith("return "):
+        return "=> " + body[0].removeprefix("return ").removesuffix(";")
+    return "{\n" + "\n".join(f"      {line}" for line in body) + "\n    }"
+
+
+def closure(parameter: str, body: list[str]) -> str:
+    """A closure over one parameter, with a scratch arena when it allocates."""
+    if any(re.search(r"\barena\b", line) for line in body):
+        return f"({parameter}) => withNativeArena((arena) {block(body)})"
+    return f"({parameter}) {block(body)}"
+
+
+def method_body(body: list[str]) -> str:
+    """A method body, which takes a scratch arena only when it allocates."""
+    uses_arena = any(re.search(r"\barena\b", line) for line in body)
+    if not uses_arena:
+        if len(body) == 1:
+            line = body[0].removeprefix("return ")
+            return f"=> {line}"
+        return "{\n" + "\n".join(f"    {line}" for line in body) + "\n  }"
+    return f"=> withNativeArena((arena) {block(body)});"
+
+
+def completion_value(values: Values, element, read) -> str:
+    """The descriptor of how a completion copies and reads one value type."""
+    ffi = values.ffi(element)
+    kind = (
+        copy_kind(element.native)
+        if element.kind in {"record", "handle"} or element.buffer_form == "view"
+        else "MLN_ADAPTER_COMPLETION_COPY_FLAT"
     )
+    suffix = (
+        ".ref"
+        if element.kind == "record" or element.buffer_form == "view"
+        else ".value"
+    )
+    code = (
+        f"_CompletionValue(raw.mln_adapter_completion_copy_kind.{kind}, sizeOf<{ffi}>(), "
+        f"(element) => {values.copy(read, f'element.cast<{ffi}>(){suffix}')})"
+    )
+    stem = "_result" + re.sub(r"\W", "", values.public(read).replace("?", "OrNull"))
+    name, index = stem, 2
+    while values.results.get(name, code) != code:
+        name, index = f"{stem}{index}", index + 1
+    values.results[name] = code
+    return name
 
 
 def attachment_name(owned):
@@ -609,6 +619,7 @@ def lower(api: Api | BoundApi):
             owner, body = lower_function(plan, local_values)
             local_values.render()
             values.used.update(local_values.used)
+            values.results.update(local_values.results)
             methods[owner].append(body)
             generated.append(plan.name)
         except Unsupported as error:
@@ -639,76 +650,19 @@ def render_scoped_views(bound, generated, values):
             result = (
                 f"ScopedNativePointer(_value.{name}.address, checkValid: _scope.checkActive, debugName: '{public}.{name}')"
                 if native_pointer
-                else f"_value.{name}"
+                else f"_scope.active(_value).{name}"
             )
             getters.append(
-                f"  {'ScopedNativePointer' if native_pointer else typ} get {name} {{ _scope.checkActive(); return {result}; }}"
+                f"  {'ScopedNativePointer' if native_pointer else typ} get {name} => {result};"
             )
         chunks.append(
-            f"final class Scoped{public} {{\n  Scoped{public}._({owner_names(plan.view.owner.native)[0]} owner, this._value) : _scope = _GeneratedNativeViewScope(() => owner._handle, raw.{plan.view.owner.view_begin}, raw.{plan.view.owner.view_end});\n  final {public} _value;\n  final _GeneratedNativeViewScope _scope;\n  T withView<T>(T Function(Scoped{public}) use) => _scope.use(() => use(this));\n"
+            f"final class Scoped{public} {{\n  Scoped{public}._({owner_names(plan.view.owner.native)[0]} owner, this._value) : _scope = _NativeViewScope(() => owner._handle, raw.{plan.view.owner.view_begin}, raw.{plan.view.owner.view_end});\n  final {public} _value;\n  final _NativeViewScope _scope;\n  T withView<T>(T Function(Scoped{public}) use) => _scope.use(() => use(this));\n"
             + "\n".join(getters)
             + "\n}\n"
         )
-    if chunks:
-        if diagnostic != {True}:
-            raise Unsupported("borrowed view scopes require a diagnostic begin")
-        chunks.append("""final class _GeneratedNativeViewScope {
-  _GeneratedNativeViewScope(this.handle, this.begin, this.end);
-  final NativeHandle Function() handle;
-  final int Function(int, Pointer<Pointer<Void>>, Pointer<raw.mln_diagnostic>) begin;
-  final void Function(Pointer<Void>) end;
-  int _active = 0;
-  void checkActive() { if (_active == 0) { throwInvalidState('borrowed native value requires an active withView callback'); } }
-  T use<T>(T Function() callback) => withNativeArena((arena) {
-    final token = arena<Pointer<Void>>();
-    _check(begin(handle().raw, token, nativeDiagnostic));
-    _active++;
-    try {
-      final result = callback();
-      if (result is Future) { throwInvalidArgument('withView callback must complete synchronously'); }
-      return result;
-    } finally { _active--; end(token.value); }
-  });
-}
-""")
+    if chunks and diagnostic != {True}:
+        raise Unsupported("borrowed view scopes require a diagnostic begin")
     return "\n".join(chunks)
-
-
-def registration_runtime(values):
-    descriptors = [v for v in values.used.values() if v.registration]
-    if not descriptors:
-        return ""
-    methods = []
-    for value in descriptors:
-        public = public_name(value.native)
-        roots = (
-            "ports"
-            if values.port_callbacks(value)
-            else "_callbackReleases, ports"
-            if values.registration_ports(value)
-            else "_callbackReleases"
-        )
-        methods.append(
-            f"  Pointer<raw.{value.native}> prepare{public}({public} value) {{ final registration = _prepare{public}(value, {roots}); _pending.add(registration); return registration.pointer; }}"
-        )
-    return (
-        """final class _NativeRegistrations {
-  _NativeRegistrations(this.ports);
-  final _NativeCallbackPorts ports;
-  final _pending = <_NativeRegistration>[];
-  bool _accepted = false;
-  void accept() { _accepted = true; }
-  void close() {
-    for (final registration in _pending.reversed) {
-      if (!_accepted) { registration.reject(); }
-      registration.releaseMemory?.call();
-    }
-    _pending.clear();
-  }
-"""
-        + "\n".join(methods)
-        + "\n}\n"
-    )
 
 
 def render_owner(native, handle, bodies, bound):
@@ -778,11 +732,14 @@ def generate(api: Api | BoundApi) -> str:
         match = re.search(r"(_(?:write|read|prepare|deliver)\w+)\(", part)
         if match:
             conversion_map[match[1]] = part
+    descriptors = "".join(
+        f"final {name} = {code};\n" for name, code in sorted(values.results.items())
+    )
     needed = set(
         re.findall(
             r"_(?:write|read|prepare|deliver)\w+",
             "".join(body for bodies in methods.values() for body in bodies)
-            + registration_runtime(values),
+            + descriptors,
         )
     )
     needed.update("_read" + public_name(value.native) for value in values.projections)
@@ -799,28 +756,10 @@ def generate(api: Api | BoundApi) -> str:
     conversions = "".join(
         part for name, part in conversion_map.items() if name in needed
     )
-    if "_generatedArenaUtf8" in conversions:
-        conversions += """String _generatedArenaUtf8(Pointer<Uint8> data, int size, int offset, int length) {
-  if (offset < 0 || length < 0 || offset > size || length > size - offset) { throwInvalidState('native message slice exceeds its arena'); }
-  return length == 0 ? '' : utf8.decode((data + offset).asTypedList(length));
-}
-"""
     chunks = [
         "// Generated from the C headers by tools/bindgen. Do not edit.\npart of 'runtime.dart';\n",
-        "final class _NativeRegistration<T extends Struct> {\n  const _NativeRegistration(this.pointer, this.reject, [this.releaseMemory]);\n  final Pointer<T> pointer;\n  final void Function() reject;\n  final void Function()? releaseMemory;\n}\n"
-        if "_prepare" in conversions
-        else "",
-        registration_runtime(values),
         conversions,
-        "",
-        "int _generatedInteger(int value, int minimum, int maximum) {\n  if (value < minimum || value > maximum) { throwInvalidArgument('integer is outside its native range'); }\n  return value;\n}\n"
-        if "_generatedInteger(" in conversions
-        or any(
-            "_generatedInteger(" in body
-            for bodies in methods.values()
-            for body in bodies
-        )
-        else "",
+        descriptors,
     ]
     chunks.extend(abi_checked(body) for body in methods.get("Globals", []))
     for native, handle in sorted(bound.public_handles.items()):

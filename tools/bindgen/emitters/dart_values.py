@@ -103,6 +103,8 @@ class Values:
             if value.kind == "enum"
         }
 
+        # The completion descriptors that queries name, by descriptor name.
+        self.results: dict[str, str] = {}
         self.projections = tuple(
             value for value in bound.values.values() if value.projection
         )
@@ -330,9 +332,20 @@ class Values:
             )
         )
 
+    def prepared(self, value, expression):
+        """A registration descriptor added to the call's transaction."""
+        roots = (
+            "registrations.ports"
+            if self.port_callbacks(value)
+            else "_callbackReleases, registrations.ports"
+            if self.registration_ports(value)
+            else "_callbackReleases"
+        )
+        return f"registrations.add(_prepare{public_name(value.native)}({expression}, {roots}))"
+
     def native(self, value, expression):
         if value.registration:
-            return f"registrations.prepare{public_name(value.native)}({expression}).ref"
+            return f"{self.prepared(value, expression)}.ref"
         if value.kind == "handle":
             return f"{expression}._handle.raw"
         if value.kind == "native_pointer":
@@ -352,7 +365,7 @@ class Values:
                     + ")"
                 )
                 if child.registration:
-                    code = f"registrations.prepare{public_name(child.native)}({local})"
+                    code = self.prepared(child, local)
                 return (
                     f"{expression} == null ? nullptr : {code}"
                     if value.nullable
@@ -386,7 +399,7 @@ class Values:
             if public == "BigInt":
                 bits = f"uint64ToNative({expression}, '{value.native}')"
                 return (
-                    f"sizeOf<UnsignedLong>() == 4 ? _generatedInteger({bits}, 0, 4294967295) : {bits}"
+                    f"sizeOf<UnsignedLong>() == 4 ? _nativeInteger({bits}, 0, 4294967295) : {bits}"
                     if ffi == "UnsignedLong"
                     else bits
                 )
@@ -402,11 +415,11 @@ class Values:
             }
             if ffi in widths:
                 lo, hi = widths[ffi]
-                return f"_generatedInteger({expression}, {lo}, {hi})"
+                return f"_nativeInteger({expression}, {lo}, {hi})"
             if ffi in {"Size", "UintPtr"}:
-                return f"_generatedInteger({expression}, 0, sizeOf<{ffi}>() == 4 ? 4294967295 : 0x7fffffffffffffff)"
+                return f"_nativeInteger({expression}, 0, sizeOf<{ffi}>() == 4 ? 4294967295 : 0x7fffffffffffffff)"
             if ffi in {"Long", "IntPtr"}:
-                return f"sizeOf<{ffi}>() == 4 ? _generatedInteger({expression}, -2147483648, 2147483647) : {expression}"
+                return f"sizeOf<{ffi}>() == 4 ? _nativeInteger({expression}, -2147483648, 2147483647) : {expression}"
             return expression
         if value.kind == "enum":
             return f"{expression}.rawValue"
@@ -482,7 +495,7 @@ class Values:
                 extra = ""
                 if value.item_buffer:
                     item_buffer = value.item_buffer
-                    extra = f", {item_buffer.field}: _generatedArenaUtf8({parent}.{item_buffer.data}.cast(), {parent}.{item_buffer.size}, {item_expression}.{item_buffer.offset}, {item_expression}.{item_buffer.length})"
+                    extra = f", {item_buffer.field}: _arenaUtf8({parent}.{item_buffer.data}.cast(), {parent}.{item_buffer.size}, {item_expression}.{item_buffer.offset}, {item_expression}.{item_buffer.length})"
                 item = f"_read{public_name(value.element.native)}({item_expression}, rawRecord: () => {pointer}.cast<Uint8>().asTypedList({parent}.{value.stride}){extra})"
             else:
                 item = self.copy(value.element, item_expression)

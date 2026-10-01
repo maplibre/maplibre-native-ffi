@@ -1,81 +1,6 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 part of 'runtime.dart';
 
-final class _NativeRegistration<T extends Struct> {
-  const _NativeRegistration(this.pointer, this.reject, [this.releaseMemory]);
-  final Pointer<T> pointer;
-  final void Function() reject;
-  final void Function()? releaseMemory;
-}
-
-final class _NativeRegistrations {
-  _NativeRegistrations(this.ports);
-  final _NativeCallbackPorts ports;
-  final _pending = <_NativeRegistration>[];
-  bool _accepted = false;
-  void accept() {
-    _accepted = true;
-  }
-
-  void close() {
-    for (final registration in _pending.reversed) {
-      if (!_accepted) {
-        registration.reject();
-      }
-      registration.releaseMemory?.call();
-    }
-    _pending.clear();
-  }
-
-  Pointer<raw.mln_custom_geometry_source_options>
-  prepareCustomGeometrySourceOptions(CustomGeometrySourceOptions value) {
-    final registration = _prepareCustomGeometrySourceOptions(value, ports);
-    _pending.add(registration);
-    return registration.pointer;
-  }
-
-  Pointer<raw.mln_custom_mvt_vector_source_options>
-  prepareCustomMvtVectorSourceOptions(CustomMvtVectorSourceOptions value) {
-    final registration = _prepareCustomMvtVectorSourceOptions(value, ports);
-    _pending.add(registration);
-    return registration.pointer;
-  }
-
-  Pointer<raw.mln_wake> prepareWake(Wake value) {
-    final registration = _prepareWake(value, ports);
-    _pending.add(registration);
-    return registration.pointer;
-  }
-
-  Pointer<raw.mln_http_header_transform> prepareHttpHeaderTransform(
-    HttpHeaderTransform value,
-  ) {
-    final registration = _prepareHttpHeaderTransform(value, _callbackReleases);
-    _pending.add(registration);
-    return registration.pointer;
-  }
-
-  Pointer<raw.mln_resource_provider> prepareResourceProvider(
-    ResourceProvider value,
-  ) {
-    final registration = _prepareResourceProvider(
-      value,
-      _callbackReleases,
-      ports,
-    );
-    _pending.add(registration);
-    return registration.pointer;
-  }
-
-  Pointer<raw.mln_resource_transform> prepareResourceTransform(
-    ResourceTransform value,
-  ) {
-    final registration = _prepareResourceTransform(value, _callbackReleases);
-    _pending.add(registration);
-    return registration.pointer;
-  }
-}
-
 MetalOwnedTextureFrame _readMetalOwnedTextureFrame(
   raw.mln_metal_owned_texture_frame source,
 ) => MetalOwnedTextureFrame(
@@ -548,9 +473,9 @@ Pointer<raw.mln_canonical_tile_id> _writeCanonicalTileId(
   Arena arena,
 ) {
   final result = arena<raw.mln_canonical_tile_id>();
-  result.ref.z = _generatedInteger(value.z, 0, 4294967295);
-  result.ref.x = _generatedInteger(value.x, 0, 4294967295);
-  result.ref.y = _generatedInteger(value.y, 0, 4294967295);
+  result.ref.z = _nativeInteger(value.z, 0, 4294967295);
+  result.ref.x = _nativeInteger(value.x, 0, 4294967295);
+  result.ref.y = _nativeInteger(value.y, 0, 4294967295);
   return result;
 }
 
@@ -633,13 +558,13 @@ _prepareCustomGeometrySourceOptions(
       result.ref.fields |= raw
           .mln_custom_geometry_source_option_field
           .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
-      result.ref.tile_size = _generatedInteger(value.tileSize!, 0, 4294967295);
+      result.ref.tile_size = _nativeInteger(value.tileSize!, 0, 4294967295);
     }
     if (value.buffer != null) {
       result.ref.fields |= raw
           .mln_custom_geometry_source_option_field
           .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
-      result.ref.buffer = _generatedInteger(value.buffer!, 0, 4294967295);
+      result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
     }
     if (value.clip != null) {
       result.ref.fields |= raw
@@ -944,7 +869,7 @@ RuntimeEventBatchView _readRuntimeEventBatchView(
                   .cast<raw.mln_runtime_event>()
                   .cast<Uint8>()
                   .asTypedList(source.event_size),
-          message: _generatedArenaUtf8(
+          message: _arenaUtf8(
             source.messages.cast(),
             source.messages_size,
             (source.events.cast<Uint8>() + index * source.event_size)
@@ -1085,18 +1010,18 @@ Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
   if (value.tileSize != null) {
     result.ref.fields |=
         raw.mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
-    result.ref.tile_size = _generatedInteger(value.tileSize!, 0, 4294967295);
+    result.ref.tile_size = _nativeInteger(value.tileSize!, 0, 4294967295);
   }
   if (value.buffer != null) {
     result.ref.fields |=
         raw.mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_BUFFER;
-    result.ref.buffer = _generatedInteger(value.buffer!, 0, 4294967295);
+    result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
   }
   if (value.clusterRadius != null) {
     result.ref.fields |= raw
         .mln_geojson_source_option_field
         .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
-    result.ref.cluster_radius = _generatedInteger(
+    result.ref.cluster_radius = _nativeInteger(
       value.clusterRadius!,
       0,
       4294967295,
@@ -1106,7 +1031,7 @@ Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
     result.ref.fields |= raw
         .mln_geojson_source_option_field
         .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
-    result.ref.cluster_min_points = _generatedInteger(
+    result.ref.cluster_min_points = _nativeInteger(
       value.clusterMinPoints!,
       0,
       4294967295,
@@ -1271,9 +1196,9 @@ Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
 ) {
   final result = arena<raw.mln_premultiplied_rgba8_image>();
   result.ref = raw.mln_premultiplied_rgba8_image_default();
-  result.ref.width = _generatedInteger(value.width, 0, 4294967295);
-  result.ref.height = _generatedInteger(value.height, 0, 4294967295);
-  result.ref.stride = _generatedInteger(value.stride, 0, 4294967295);
+  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
+  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
+  result.ref.stride = _nativeInteger(value.stride, 0, 4294967295);
   final bytespixels = nativeBufferView(value.pixels, arena);
   result.ref.pixels = bytespixels.data.cast();
   result.ref.byte_length = bytespixels.size;
@@ -1331,7 +1256,7 @@ Pointer<raw.mln_style_tile_source_options> _writeStyleTileSourceOptions(
     result.ref.fields |= raw
         .mln_style_tile_source_option_field
         .MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
-    result.ref.tile_size = _generatedInteger(value.tileSize!, 0, 4294967295);
+    result.ref.tile_size = _nativeInteger(value.tileSize!, 0, 4294967295);
   }
   if (value.vectorEncoding != null) {
     result.ref.fields |= raw
@@ -1458,8 +1383,8 @@ Pointer<raw.mln_logical_extent> _writeLogicalExtent(
   Arena arena,
 ) {
   final result = arena<raw.mln_logical_extent>();
-  result.ref.width = _generatedInteger(value.width, 0, 4294967295);
-  result.ref.height = _generatedInteger(value.height, 0, 4294967295);
+  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
+  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
   result.ref.scale_factor = value.scaleFactor;
   return result;
 }
@@ -1944,7 +1869,7 @@ Pointer<raw.mln_map_tile_options> _writeMapTileOptions(
   if (value.prefetchZoomDelta != null) {
     result.ref.fields |=
         raw.mln_map_tile_option_field.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
-    result.ref.prefetch_zoom_delta = _generatedInteger(
+    result.ref.prefetch_zoom_delta = _nativeInteger(
       value.prefetchZoomDelta!,
       0,
       4294967295,
@@ -2125,8 +2050,8 @@ Pointer<raw.mln_render_target_extent> _writeRenderTargetExtent(
 ) {
   final result = arena<raw.mln_render_target_extent>();
   result.ref.size = sizeOf<raw.mln_render_target_extent>();
-  result.ref.width = _generatedInteger(value.width, 0, 4294967295);
-  result.ref.height = _generatedInteger(value.height, 0, 4294967295);
+  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
+  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
   result.ref.scale_factor = value.scaleFactor;
   return result;
 }
@@ -2147,12 +2072,12 @@ _writeMetalBorrowedTextureDescriptor(
   final result = arena<raw.mln_metal_borrowed_texture_descriptor>();
   result.ref = raw.mln_metal_borrowed_texture_descriptor_default();
   result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
-  result.ref.physical_width = _generatedInteger(
+  result.ref.physical_width = _nativeInteger(
     value.physicalWidth,
     0,
     4294967295,
   );
-  result.ref.physical_height = _generatedInteger(
+  result.ref.physical_height = _nativeInteger(
     value.physicalHeight,
     0,
     4294967295,
@@ -2229,14 +2154,16 @@ Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
   final result = arena<raw.mln_render_session_attach_options>();
   result.ref = raw.mln_render_session_attach_options_default();
   result.ref.driver = value.driver.rawValue;
-  result.ref.requested_texture_ring_depth = _generatedInteger(
+  result.ref.requested_texture_ring_depth = _nativeInteger(
     value.requestedTextureRingDepth,
     0,
     4294967295,
   );
-  result.ref.frame_wake = registrations.prepareWake(value.frameWake).ref;
+  result.ref.frame_wake = registrations
+      .add(_prepareWake(value.frameWake, registrations.ports))
+      .ref;
   result.ref.driver_work_wake = registrations
-      .prepareWake(value.driverWorkWake)
+      .add(_prepareWake(value.driverWorkWake, registrations.ports))
       .ref;
   return result;
 }
@@ -2364,11 +2291,7 @@ Pointer<raw.mln_webgl_context_descriptor> _writeWebglContextDescriptor(
   final result = arena<raw.mln_webgl_context_descriptor>();
   result.ref.size = sizeOf<raw.mln_webgl_context_descriptor>();
   result.ref.kind = value.kind.rawValue;
-  result.ref.context = _generatedInteger(
-    value.context,
-    -2147483648,
-    2147483647,
-  );
+  result.ref.context = _nativeInteger(value.context, -2147483648, 2147483647);
   result.ref.canvas_selector = nativeStringView(
     value.canvasSelector,
     arena,
@@ -2446,19 +2369,19 @@ _writeOpenglBorrowedTextureDescriptor(
   final result = arena<raw.mln_opengl_borrowed_texture_descriptor>();
   result.ref = raw.mln_opengl_borrowed_texture_descriptor_default();
   result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
-  result.ref.physical_width = _generatedInteger(
+  result.ref.physical_width = _nativeInteger(
     value.physicalWidth,
     0,
     4294967295,
   );
-  result.ref.physical_height = _generatedInteger(
+  result.ref.physical_height = _nativeInteger(
     value.physicalHeight,
     0,
     4294967295,
   );
   result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
-  result.ref.texture = _generatedInteger(value.texture, 0, 4294967295);
-  result.ref.target = _generatedInteger(value.target, 0, 4294967295);
+  result.ref.texture = _nativeInteger(value.texture, 0, 4294967295);
+  result.ref.target = _nativeInteger(value.target, 0, 4294967295);
   return result;
 }
 
@@ -2788,7 +2711,7 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
 ) {
   final result = arena<raw.mln_runtime_options>();
   result.ref = raw.mln_runtime_options_default();
-  result.ref.flags = _generatedInteger(value.flags, 0, 4294967295);
+  result.ref.flags = _nativeInteger(value.flags, 0, 4294967295);
   result.ref.asset_path = value.assetPath == null
       ? nullptr
       : nativeUtf8CString(value.assetPath!, arena).pointer.cast<Char>();
@@ -2796,7 +2719,9 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
       ? nullptr
       : nativeUtf8CString(value.cachePath!, arena).pointer.cast<Char>();
   result.ref.event_mask = value.eventMask.rawValue;
-  result.ref.event_wake = registrations.prepareWake(value.eventWake).ref;
+  result.ref.event_wake = registrations
+      .add(_prepareWake(value.eventWake, registrations.ports))
+      .ref;
   return result;
 }
 
@@ -2937,7 +2862,7 @@ _writeAdapterHttpHeaderTransformRule(
   Arena arena,
 ) {
   final result = arena<raw.mln_adapter_http_header_transform_rule>();
-  result.ref.kind = _generatedInteger(value.kind, 0, 4294967295);
+  result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
   result.ref.flags = value.flags.rawValue;
   result.ref.url = value.url == null
       ? nullptr
@@ -3027,7 +2952,7 @@ _writeAdapterResourceProviderRule(
   Arena arena,
 ) {
   final result = arena<raw.mln_adapter_resource_provider_rule>();
-  result.ref.kind = _generatedInteger(value.kind, 0, 4294967295);
+  result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
   result.ref.flags = value.flags.rawValue;
   result.ref.requested_url = value.requestedUrl == null
       ? nullptr
@@ -3060,7 +2985,7 @@ Pointer<raw.mln_adapter_resource_route> _writeAdapterResourceRoute(
   Arena arena,
 ) {
   final result = arena<raw.mln_adapter_resource_route>();
-  result.ref.kind = _generatedInteger(value.kind, 0, 4294967295);
+  result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
   result.ref.flags = value.flags.rawValue;
   result.ref.url = value.url == null
       ? nullptr
@@ -3241,7 +3166,7 @@ Pointer<raw.mln_adapter_resource_rewrite_rule> _writeAdapterResourceRewriteRule(
   Arena arena,
 ) {
   final result = arena<raw.mln_adapter_resource_rewrite_rule>();
-  result.ref.kind = _generatedInteger(value.kind, 0, 4294967295);
+  result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
   result.ref.flags = value.flags.rawValue;
   result.ref.url = value.url == null
       ? nullptr
@@ -3346,7 +3271,7 @@ Pointer<raw.mln_vulkan_context_descriptor> _writeVulkanContextDescriptor(
   result.ref.graphics_queue = Pointer<Void>.fromAddress(
     value.graphicsQueue.address,
   ).cast();
-  result.ref.graphics_queue_family_index = _generatedInteger(
+  result.ref.graphics_queue_family_index = _nativeInteger(
     value.graphicsQueueFamilyIndex,
     0,
     4294967295,
@@ -3380,12 +3305,12 @@ _writeVulkanBorrowedTextureDescriptor(
   final result = arena<raw.mln_vulkan_borrowed_texture_descriptor>();
   result.ref = raw.mln_vulkan_borrowed_texture_descriptor_default();
   result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
-  result.ref.physical_width = _generatedInteger(
+  result.ref.physical_width = _nativeInteger(
     value.physicalWidth,
     0,
     4294967295,
   );
-  result.ref.physical_height = _generatedInteger(
+  result.ref.physical_height = _nativeInteger(
     value.physicalHeight,
     0,
     4294967295,
@@ -3399,13 +3324,13 @@ _writeVulkanBorrowedTextureDescriptor(
     value.imageView,
     'mln_vulkan_non_dispatchable_handle',
   );
-  result.ref.format = _generatedInteger(value.format, 0, 4294967295);
-  result.ref.initial_layout = _generatedInteger(
+  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
+  result.ref.initial_layout = _nativeInteger(
     value.initialLayout,
     0,
     4294967295,
   );
-  result.ref.final_layout = _generatedInteger(value.finalLayout, 0, 4294967295);
+  result.ref.final_layout = _nativeInteger(value.finalLayout, 0, 4294967295);
   return result;
 }
 
@@ -3495,12 +3420,12 @@ _writeWebgpuBorrowedTextureDescriptor(
   final result = arena<raw.mln_webgpu_borrowed_texture_descriptor>();
   result.ref = raw.mln_webgpu_borrowed_texture_descriptor_default();
   result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
-  result.ref.physical_width = _generatedInteger(
+  result.ref.physical_width = _nativeInteger(
     value.physicalWidth,
     0,
     4294967295,
   );
-  result.ref.physical_height = _generatedInteger(
+  result.ref.physical_height = _nativeInteger(
     value.physicalHeight,
     0,
     4294967295,
@@ -3510,7 +3435,7 @@ _writeWebgpuBorrowedTextureDescriptor(
   result.ref.texture_view = Pointer<Void>.fromAddress(
     value.textureView.address,
   ).cast();
-  result.ref.format = _generatedInteger(value.format, 0, 4294967295);
+  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
   return result;
 }
 
@@ -3554,7 +3479,7 @@ Pointer<raw.mln_webgpu_surface_descriptor> _writeWebgpuSurfaceDescriptor(
   result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
   result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
   result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
-  result.ref.format = _generatedInteger(value.format, 0, 4294967295);
+  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
   return result;
 }
 
@@ -3566,33 +3491,169 @@ WebgpuSurfaceDescriptor _readWebgpuSurfaceDescriptor(
   surface: NativePointer(source.surface.address),
   format: source.format,
 );
-String _generatedArenaUtf8(
-  Pointer<Uint8> data,
-  int size,
-  int offset,
-  int length,
-) {
-  if (offset < 0 || length < 0 || offset > size || length > size - offset) {
-    throwInvalidState('native message slice exceeds its arena');
-  }
-  return length == 0 ? '' : utf8.decode((data + offset).asTypedList(length));
-}
 
-int _generatedInteger(int value, int minimum, int maximum) {
-  if (value < minimum || value > maximum) {
-    throwInvalidArgument('integer is outside its native range');
-  }
-  return value;
-}
+final _resultCameraOptions = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS,
+  sizeOf<raw.mln_camera_options>(),
+  (element) => _readCameraOptions(element.cast<raw.mln_camera_options>().ref),
+);
+final _resultCameraQueryResult = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT,
+  sizeOf<raw.mln_camera_query_result>(),
+  (element) =>
+      _readCameraQueryResult(element.cast<raw.mln_camera_query_result>().ref),
+);
+final _resultLatLng = _CompletionValue(
+  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_LAT_LNG,
+  sizeOf<raw.mln_lat_lng>(),
+  (element) => _readLatLng(element.cast<raw.mln_lat_lng>().ref),
+);
+final _resultLatLngBounds = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS,
+  sizeOf<raw.mln_lat_lng_bounds>(),
+  (element) => _readLatLngBounds(element.cast<raw.mln_lat_lng_bounds>().ref),
+);
+final _resultOfflineRegionInfo = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO,
+  sizeOf<raw.mln_offline_region_info>(),
+  (element) =>
+      _readOfflineRegionInfo(element.cast<raw.mln_offline_region_info>().ref),
+);
+final _resultOfflineRegionStatus = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS,
+  sizeOf<raw.mln_offline_region_status>(),
+  (element) => _readOfflineRegionStatus(
+    element.cast<raw.mln_offline_region_status>().ref,
+  ),
+);
+final _resultQueriedFeature = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE,
+  sizeOf<raw.mln_queried_feature>(),
+  (element) => _readQueriedFeature(element.cast<raw.mln_queried_feature>().ref),
+);
+final _resultScreenPoint = _CompletionValue(
+  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT,
+  sizeOf<raw.mln_screen_point>(),
+  (element) => _readScreenPoint(element.cast<raw.mln_screen_point>().ref),
+);
+final _resultString = _CompletionValue(
+  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
+  sizeOf<raw.mln_buffer_view>(),
+  (element) =>
+      utf8.decode(_copyBufferView(element.cast<raw.mln_buffer_view>().ref)),
+);
+final _resultStringOrNull = _CompletionValue(
+  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
+  sizeOf<raw.mln_buffer_view>(),
+  (element) => element.cast<raw.mln_buffer_view>().ref.data == nullptr
+      ? null
+      : utf8.decode(_copyBufferView(element.cast<raw.mln_buffer_view>().ref)),
+);
+final _resultStyleImageResult = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT,
+  sizeOf<raw.mln_style_image_result>(),
+  (element) =>
+      _readStyleImageResult(element.cast<raw.mln_style_image_result>().ref),
+);
+final _resultStyleImageStretchesResult = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT,
+  sizeOf<raw.mln_style_image_stretches_result>(),
+  (element) => _readStyleImageStretchesResult(
+    element.cast<raw.mln_style_image_stretches_result>().ref,
+  ),
+);
+final _resultStyleLayerEntry = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY,
+  sizeOf<raw.mln_style_layer_entry>(),
+  (element) =>
+      _readStyleLayerEntry(element.cast<raw.mln_style_layer_entry>().ref),
+);
+final _resultStyleLayerResult = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT,
+  sizeOf<raw.mln_style_layer_result>(),
+  (element) =>
+      _readStyleLayerResult(element.cast<raw.mln_style_layer_result>().ref),
+);
+final _resultStyleSourceResult = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT,
+  sizeOf<raw.mln_style_source_result>(),
+  (element) =>
+      _readStyleSourceResult(element.cast<raw.mln_style_source_result>().ref),
+);
+final _resultStyleSourceTileUrlsResult = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT,
+  sizeOf<raw.mln_style_source_tile_urls_result>(),
+  (element) => _readStyleSourceTileUrlsResult(
+    element.cast<raw.mln_style_source_tile_urls_result>().ref,
+  ),
+);
+final _resultStyleTransitionOptions = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS,
+  sizeOf<raw.mln_style_transition_options>(),
+  (element) => _readStyleTransitionOptions(
+    element.cast<raw.mln_style_transition_options>().ref,
+  ),
+);
+final _resultTextureReadbackResult = _CompletionValue(
+  raw
+      .mln_adapter_completion_copy_kind
+      .MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT,
+  sizeOf<raw.mln_texture_readback_result>(),
+  (element) => _readTextureReadbackResult(
+    element.cast<raw.mln_texture_readback_result>().ref,
+  ),
+);
+final _resultUint8List = _CompletionValue(
+  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
+  sizeOf<raw.mln_buffer_view>(),
+  (element) => _copyBufferView(element.cast<raw.mln_buffer_view>().ref),
+);
+final _resultUint8ListOrNull = _CompletionValue(
+  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
+  sizeOf<raw.mln_buffer_view>(),
+  (element) => element.cast<raw.mln_buffer_view>().ref.data == nullptr
+      ? null
+      : _copyBufferView(element.cast<raw.mln_buffer_view>().ref),
+);
+final _resultdouble = _CompletionValue(
+  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+  sizeOf<Double>(),
+  (element) => element.cast<Double>().value,
+);
 
 void androidInit(
   NativePointer jniEnv,
   NativePointer jniClass,
   NativePointer context,
-) => withNativeArena((arena) {
+) {
   ensureAbiVersion();
-
-  _check(
+  return _check(
     raw.mln_android_init(
       Pointer<Void>.fromAddress(jniEnv.address).cast(),
       Pointer<Void>.fromAddress(jniClass.address).cast(),
@@ -3600,86 +3661,73 @@ void androidInit(
       nativeDiagnostic,
     ),
   );
-});
+}
 
-AnimationOptions animationOptionsDefault() => withNativeArena((arena) {
+AnimationOptions animationOptionsDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_animation_options_default();
   return _readAnimationOptions(nativeResult);
-});
+}
 
-BoundOptions boundOptionsDefault() => withNativeArena((arena) {
+BoundOptions boundOptionsDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_bound_options_default();
   return _readBoundOptions(nativeResult);
-});
+}
 
-int cVersion() => withNativeArena((arena) {
+int cVersion() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_c_version();
   return nativeResult;
-});
+}
 
-CameraDelta cameraDeltaDefault() => withNativeArena((arena) {
+CameraDelta cameraDeltaDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_camera_delta_default();
   return _readCameraDelta(nativeResult);
-});
+}
 
-CameraFitOptions cameraFitOptionsDefault() => withNativeArena((arena) {
+CameraFitOptions cameraFitOptionsDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_camera_fit_options_default();
   return _readCameraFitOptions(nativeResult);
-});
+}
 
-CameraOptions cameraOptionsDefault() => withNativeArena((arena) {
+CameraOptions cameraOptionsDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_camera_options_default();
   return _readCameraOptions(nativeResult);
-});
+}
 
-CameraUpdate cameraUpdateDefault() => withNativeArena((arena) {
+CameraUpdate cameraUpdateDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_camera_update_default();
   return _readCameraUpdate(nativeResult);
-});
+}
 
-CustomGeometrySourceOptions customGeometrySourceOptionsDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_custom_geometry_source_options_default();
-      return _readCustomGeometrySourceOptions(nativeResult);
-    });
-
-CustomMvtVectorSourceOptions customMvtVectorSourceOptionsDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_custom_mvt_vector_source_options_default();
-      return _readCustomMvtVectorSourceOptions(nativeResult);
-    });
-
-FrameDemand frameDemandDefault() => withNativeArena((arena) {
+CustomGeometrySourceOptions customGeometrySourceOptionsDefault() {
   ensureAbiVersion();
+  final nativeResult = raw.mln_custom_geometry_source_options_default();
+  return _readCustomGeometrySourceOptions(nativeResult);
+}
 
+CustomMvtVectorSourceOptions customMvtVectorSourceOptionsDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_custom_mvt_vector_source_options_default();
+  return _readCustomMvtVectorSourceOptions(nativeResult);
+}
+
+FrameDemand frameDemandDefault() {
+  ensureAbiVersion();
   final nativeResult = raw.mln_frame_demand_default();
   return _readFrameDemand(nativeResult);
-});
+}
 
-FreeCameraOptions freeCameraOptionsDefault() => withNativeArena((arena) {
+FreeCameraOptions freeCameraOptionsDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_free_camera_options_default();
   return _readFreeCameraOptions(nativeResult);
-});
+}
 
 GeojsonSourceDataHandle geojsonSourceDataCreate(
   Uint8List data, {
@@ -3704,19 +3752,17 @@ GeojsonSourceDataHandle geojsonSourceDataCreate(
   );
 });
 
-GeojsonSourceOptions geojsonSourceOptionsDefault() => withNativeArena((arena) {
+GeojsonSourceOptions geojsonSourceOptionsDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_geojson_source_options_default();
   return _readGeojsonSourceOptions(nativeResult);
-});
+}
 
-GpuSync gpuSyncDefault() => withNativeArena((arena) {
+GpuSync gpuSyncDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_gpu_sync_default();
   return _readGpuSync(nativeResult);
-});
+}
 
 LatLng latLngForProjectedMeters(ProjectedMeters meters) =>
     withNativeArena((arena) {
@@ -3732,17 +3778,17 @@ LatLng latLngForProjectedMeters(ProjectedMeters meters) =>
       return _readLatLng(outCoordinate.ref);
     });
 
-void logClearCallback() => withNativeArena((arena) {
+void logClearCallback() {
   ensureAbiVersion();
+  return _check(raw.mln_log_clear_callback(nativeDiagnostic));
+}
 
-  _check(raw.mln_log_clear_callback(nativeDiagnostic));
-});
-
-void logSetAsyncSeverityMask(LogSeverityMask mask) => withNativeArena((arena) {
+void logSetAsyncSeverityMask(LogSeverityMask mask) {
   ensureAbiVersion();
-
-  _check(raw.mln_log_set_async_severity_mask(mask.rawValue, nativeDiagnostic));
-});
+  return _check(
+    raw.mln_log_set_async_severity_mask(mask.rawValue, nativeDiagnostic),
+  );
+}
 
 void logSetCallback(LogCallback callback) {
   ensureAbiVersion();
@@ -3778,50 +3824,41 @@ void logSetCallback(LogCallback callback) {
   }
 }
 
-MapOptions mapOptionsDefault() => withNativeArena((arena) {
+MapOptions mapOptionsDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_map_options_default();
   return _readMapOptions(nativeResult);
-});
+}
 
-MapTileOptions mapTileOptionsDefault() => withNativeArena((arena) {
+MapTileOptions mapTileOptionsDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_map_tile_options_default();
   return _readMapTileOptions(nativeResult);
-});
+}
 
-MapViewportOptions mapViewportOptionsDefault() => withNativeArena((arena) {
+MapViewportOptions mapViewportOptionsDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_map_viewport_options_default();
   return _readMapViewportOptions(nativeResult);
-});
+}
 
-MetalBorrowedTextureDescriptor metalBorrowedTextureDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
+MetalBorrowedTextureDescriptor metalBorrowedTextureDescriptorDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_metal_borrowed_texture_descriptor_default();
+  return _readMetalBorrowedTextureDescriptor(nativeResult);
+}
 
-      final nativeResult = raw.mln_metal_borrowed_texture_descriptor_default();
-      return _readMetalBorrowedTextureDescriptor(nativeResult);
-    });
+MetalOwnedTextureDescriptor metalOwnedTextureDescriptorDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_metal_owned_texture_descriptor_default();
+  return _readMetalOwnedTextureDescriptor(nativeResult);
+}
 
-MetalOwnedTextureDescriptor metalOwnedTextureDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_metal_owned_texture_descriptor_default();
-      return _readMetalOwnedTextureDescriptor(nativeResult);
-    });
-
-MetalSurfaceDescriptor metalSurfaceDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_metal_surface_descriptor_default();
-      return _readMetalSurfaceDescriptor(nativeResult);
-    });
+MetalSurfaceDescriptor metalSurfaceDescriptorDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_metal_surface_descriptor_default();
+  return _readMetalSurfaceDescriptor(nativeResult);
+}
 
 NetworkStatus networkStatusGet() => withNativeArena((arena) {
   ensureAbiVersion();
@@ -3830,58 +3867,46 @@ NetworkStatus networkStatusGet() => withNativeArena((arena) {
   return NetworkStatus.fromRawValue(outStatus.value);
 });
 
-void networkStatusSet(NetworkStatus status) => withNativeArena((arena) {
+void networkStatusSet(NetworkStatus status) {
   ensureAbiVersion();
+  return _check(raw.mln_network_status_set(status.rawValue, nativeDiagnostic));
+}
 
-  _check(raw.mln_network_status_set(status.rawValue, nativeDiagnostic));
-});
-
-OpenglBorrowedTextureDescriptor openglBorrowedTextureDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_opengl_borrowed_texture_descriptor_default();
-      return _readOpenglBorrowedTextureDescriptor(nativeResult);
-    });
-
-OpenglOwnedTextureDescriptor openglOwnedTextureDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_opengl_owned_texture_descriptor_default();
-      return _readOpenglOwnedTextureDescriptor(nativeResult);
-    });
-
-OpenglContextProviderFlag openglSupportedContextProviderMask() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_opengl_supported_context_provider_mask();
-      return OpenglContextProviderFlag.fromRawValue(nativeResult);
-    });
-
-OpenglSurfaceDescriptor openglSurfaceDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_opengl_surface_descriptor_default();
-      return _readOpenglSurfaceDescriptor(nativeResult);
-    });
-
-NativePointer pluginGetRegisterFunctionV1() => withNativeArena((arena) {
+OpenglBorrowedTextureDescriptor openglBorrowedTextureDescriptorDefault() {
   ensureAbiVersion();
+  final nativeResult = raw.mln_opengl_borrowed_texture_descriptor_default();
+  return _readOpenglBorrowedTextureDescriptor(nativeResult);
+}
 
+OpenglOwnedTextureDescriptor openglOwnedTextureDescriptorDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_opengl_owned_texture_descriptor_default();
+  return _readOpenglOwnedTextureDescriptor(nativeResult);
+}
+
+OpenglContextProviderFlag openglSupportedContextProviderMask() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_opengl_supported_context_provider_mask();
+  return OpenglContextProviderFlag.fromRawValue(nativeResult);
+}
+
+OpenglSurfaceDescriptor openglSurfaceDescriptorDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_opengl_surface_descriptor_default();
+  return _readOpenglSurfaceDescriptor(nativeResult);
+}
+
+NativePointer pluginGetRegisterFunctionV1() {
+  ensureAbiVersion();
   final nativeResult = raw.mln_plugin_get_register_function_v1();
   return NativePointer(nativeResult.address);
-});
+}
 
-PremultipliedRgba8Image premultipliedRgba8ImageDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_premultiplied_rgba8_image_default();
-      return _readPremultipliedRgba8Image(nativeResult);
-    });
+PremultipliedRgba8Image premultipliedRgba8ImageDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_premultiplied_rgba8_image_default();
+  return _readPremultipliedRgba8Image(nativeResult);
+}
 
 ProjectedMeters projectedMetersForLatLng(LatLng coordinate) =>
     withNativeArena((arena) {
@@ -3897,20 +3922,17 @@ ProjectedMeters projectedMetersForLatLng(LatLng coordinate) =>
       return _readProjectedMeters(outMeters.ref);
     });
 
-ProjectionMode projectionModeDefault() => withNativeArena((arena) {
+ProjectionMode projectionModeDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_projection_mode_default();
   return _readProjectionMode(nativeResult);
-});
+}
 
-RenderSessionAttachOptions renderSessionAttachOptionsDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_render_session_attach_options_default();
-      return _readRenderSessionAttachOptions(nativeResult);
-    });
+RenderSessionAttachOptions renderSessionAttachOptionsDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_render_session_attach_options_default();
+  return _readRenderSessionAttachOptions(nativeResult);
+}
 
 (int, int) renderTargetExtentPhysicalSize(RenderTargetExtent extent) =>
     withNativeArena((arena) {
@@ -3928,18 +3950,15 @@ RenderSessionAttachOptions renderSessionAttachOptionsDefault() =>
       return (outWidth.value, outHeight.value);
     });
 
-RenderedFeatureQueryOptions renderedFeatureQueryOptionsDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_rendered_feature_query_options_default();
-      return _readRenderedFeatureQueryOptions(nativeResult);
-    });
+RenderedFeatureQueryOptions renderedFeatureQueryOptionsDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_rendered_feature_query_options_default();
+  return _readRenderedFeatureQueryOptions(nativeResult);
+}
 
 RenderedQueryGeometry renderedQueryGeometryBox(ScreenBox box) =>
     withNativeArena((arena) {
       ensureAbiVersion();
-
       final nativeResult = raw.mln_rendered_query_geometry_box(
         _writeScreenBox(box, arena).ref,
       );
@@ -3966,7 +3985,6 @@ RenderedQueryGeometry renderedQueryGeometryLineString(
 RenderedQueryGeometry renderedQueryGeometryPoint(ScreenPoint point) =>
     withNativeArena((arena) {
       ensureAbiVersion();
-
       final nativeResult = raw.mln_rendered_query_geometry_point(
         _writeScreenPoint(point, arena).ref,
       );
@@ -3975,137 +3993,111 @@ RenderedQueryGeometry renderedQueryGeometryPoint(ScreenPoint point) =>
 
 RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
   ensureAbiVersion();
+  final outRuntime = arena<Uint64>();
   final registrations = _NativeRegistrations(_NativeCallbackPorts());
-  try {
-    final outRuntime = arena<Uint64>();
-    _check(
-      raw.mln_runtime_create(
+  _check(
+    registrations.run(
+      () => raw.mln_runtime_create(
         _writeRuntimeOptions(options, arena, registrations),
         outRuntime,
         nativeDiagnostic,
       ),
-    );
-    registrations.accept();
-    return _adoptOwned(
-      outRuntime.value,
-      () =>
-          (RuntimeHandle._(NativeRuntime(outRuntime.value))
-            .._state.retain(registrations)),
-      (handle) {
-        _check(raw.mln_runtime_dispose(handle, nativeDiagnostic));
-      },
-    );
-  } finally {
-    registrations.close();
-  }
+    ),
+  );
+  return _adoptOwned(
+    outRuntime.value,
+    () =>
+        (RuntimeHandle._(NativeRuntime(outRuntime.value))
+          .._state.retain(registrations)),
+    (handle) {
+      _check(raw.mln_runtime_dispose(handle, nativeDiagnostic));
+    },
+  );
 });
 
-RuntimeOptions runtimeOptionsDefault() => withNativeArena((arena) {
+RuntimeOptions runtimeOptionsDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_runtime_options_default();
   return _readRuntimeOptions(nativeResult);
-});
+}
 
-SourceFeatureQueryOptions sourceFeatureQueryOptionsDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_source_feature_query_options_default();
-      return _readSourceFeatureQueryOptions(nativeResult);
-    });
-
-StyleImageInfo styleImageInfoDefault() => withNativeArena((arena) {
+SourceFeatureQueryOptions sourceFeatureQueryOptionsDefault() {
   ensureAbiVersion();
+  final nativeResult = raw.mln_source_feature_query_options_default();
+  return _readSourceFeatureQueryOptions(nativeResult);
+}
 
+StyleImageInfo styleImageInfoDefault() {
+  ensureAbiVersion();
   final nativeResult = raw.mln_style_image_info_default();
   return _readStyleImageInfo(nativeResult);
-});
+}
 
-StyleImageOptions styleImageOptionsDefault() => withNativeArena((arena) {
+StyleImageOptions styleImageOptionsDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_style_image_options_default();
   return _readStyleImageOptions(nativeResult);
-});
+}
 
-StyleTileSourceOptions styleTileSourceOptionsDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_style_tile_source_options_default();
-      return _readStyleTileSourceOptions(nativeResult);
-    });
-
-StyleTransitionOptions styleTransitionOptionsDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_style_transition_options_default();
-      return _readStyleTransitionOptions(nativeResult);
-    });
-
-RenderBackendFlag supportedRenderBackendMask() => withNativeArena((arena) {
+StyleTileSourceOptions styleTileSourceOptionsDefault() {
   ensureAbiVersion();
+  final nativeResult = raw.mln_style_tile_source_options_default();
+  return _readStyleTileSourceOptions(nativeResult);
+}
 
+StyleTransitionOptions styleTransitionOptionsDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_style_transition_options_default();
+  return _readStyleTransitionOptions(nativeResult);
+}
+
+RenderBackendFlag supportedRenderBackendMask() {
+  ensureAbiVersion();
   final nativeResult = raw.mln_supported_render_backend_mask();
   return RenderBackendFlag.fromRawValue(nativeResult);
-});
+}
 
-TextureImageInfo textureImageInfoDefault() => withNativeArena((arena) {
+TextureImageInfo textureImageInfoDefault() {
   ensureAbiVersion();
-
   final nativeResult = raw.mln_texture_image_info_default();
   return _readTextureImageInfo(nativeResult);
-});
+}
 
-VulkanBorrowedTextureDescriptor vulkanBorrowedTextureDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
+VulkanBorrowedTextureDescriptor vulkanBorrowedTextureDescriptorDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_vulkan_borrowed_texture_descriptor_default();
+  return _readVulkanBorrowedTextureDescriptor(nativeResult);
+}
 
-      final nativeResult = raw.mln_vulkan_borrowed_texture_descriptor_default();
-      return _readVulkanBorrowedTextureDescriptor(nativeResult);
-    });
+VulkanOwnedTextureDescriptor vulkanOwnedTextureDescriptorDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_vulkan_owned_texture_descriptor_default();
+  return _readVulkanOwnedTextureDescriptor(nativeResult);
+}
 
-VulkanOwnedTextureDescriptor vulkanOwnedTextureDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
+VulkanSurfaceDescriptor vulkanSurfaceDescriptorDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_vulkan_surface_descriptor_default();
+  return _readVulkanSurfaceDescriptor(nativeResult);
+}
 
-      final nativeResult = raw.mln_vulkan_owned_texture_descriptor_default();
-      return _readVulkanOwnedTextureDescriptor(nativeResult);
-    });
+WebgpuBorrowedTextureDescriptor webgpuBorrowedTextureDescriptorDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_webgpu_borrowed_texture_descriptor_default();
+  return _readWebgpuBorrowedTextureDescriptor(nativeResult);
+}
 
-VulkanSurfaceDescriptor vulkanSurfaceDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
+WebgpuOwnedTextureDescriptor webgpuOwnedTextureDescriptorDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_webgpu_owned_texture_descriptor_default();
+  return _readWebgpuOwnedTextureDescriptor(nativeResult);
+}
 
-      final nativeResult = raw.mln_vulkan_surface_descriptor_default();
-      return _readVulkanSurfaceDescriptor(nativeResult);
-    });
-
-WebgpuBorrowedTextureDescriptor webgpuBorrowedTextureDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_webgpu_borrowed_texture_descriptor_default();
-      return _readWebgpuBorrowedTextureDescriptor(nativeResult);
-    });
-
-WebgpuOwnedTextureDescriptor webgpuOwnedTextureDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_webgpu_owned_texture_descriptor_default();
-      return _readWebgpuOwnedTextureDescriptor(nativeResult);
-    });
-
-WebgpuSurfaceDescriptor webgpuSurfaceDescriptorDefault() =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-
-      final nativeResult = raw.mln_webgpu_surface_descriptor_default();
-      return _readWebgpuSurfaceDescriptor(nativeResult);
-    });
+WebgpuSurfaceDescriptor webgpuSurfaceDescriptorDefault() {
+  ensureAbiVersion();
+  final nativeResult = raw.mln_webgpu_surface_descriptor_default();
+  return _readWebgpuSurfaceDescriptor(nativeResult);
+}
 
 /// Issued `mln_acquired_frame` handle id.
 extension type const NativeAcquiredFrame(int raw) implements NativeHandle {}
@@ -4127,9 +4119,7 @@ final class AcquiredFrameHandle implements Finalizable {
   BigInt get identity => uint64FromNative(_state.handleId);
 
   void dispose() => _state.close(
-    (handle) => withNativeArena((arena) {
-      return raw.mln_acquired_frame_dispose(handle.raw, nativeDiagnostic);
-    }),
+    (handle) => raw.mln_acquired_frame_dispose(handle.raw, nativeDiagnostic),
   );
   ScopedMetalOwnedTextureFrame getMetalTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_metal_owned_texture_frame>();
@@ -4243,12 +4233,10 @@ final class BufferHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
-  void close() => _state.close(
-    (handle) => withNativeArena((arena) {
-      raw.mln_buffer_destroy(handle.raw);
-      return nativeStatusOk;
-    }),
-  );
+  void close() => _state.close((handle) {
+    raw.mln_buffer_destroy(handle.raw);
+    return nativeStatusOk;
+  });
   Uint8List getValue() => withNativeArena((arena) {
     final outView = arena<raw.mln_buffer_view>();
     _check(raw.mln_buffer_get(_handle.raw, outView, nativeDiagnostic));
@@ -4278,12 +4266,10 @@ final class EventBatchHandle implements Finalizable {
     _check(raw.mln_event_batch_get(_handle.raw, outView, nativeDiagnostic));
     return _readRuntimeEventBatchView(outView.ref);
   });
-  void close() => _state.close(
-    (handle) => withNativeArena((arena) {
-      raw.mln_event_batch_release(handle.raw);
-      return nativeStatusOk;
-    }),
-  );
+  void close() => _state.close((handle) {
+    raw.mln_event_batch_release(handle.raw);
+    return nativeStatusOk;
+  });
 }
 
 /// Issued `mln_geojson_source_data` handle id.
@@ -4302,12 +4288,10 @@ final class GeojsonSourceDataHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
-  void close() => _state.close(
-    (handle) => withNativeArena((arena) {
-      raw.mln_geojson_source_data_destroy(handle.raw);
-      return nativeStatusOk;
-    }),
-  );
+  void close() => _state.close((handle) {
+    raw.mln_geojson_source_data_destroy(handle.raw);
+    return nativeStatusOk;
+  });
 }
 
 /// Issued `mln_map` handle id.
@@ -4335,430 +4319,330 @@ final class MapHandle implements Finalizable {
     String layerId,
     String sourceId, {
     String? beforeLayerId,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_add_color_relief_layer(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        nativeStringView(sourceId, arena).value,
-        nativeStringView((beforeLayerId ?? ''), arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  }) => _command(
+    (arena, completion) => raw.mln_map_add_color_relief_layer(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      nativeStringView(sourceId, arena).value,
+      nativeStringView((beforeLayerId ?? ''), arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> addCustomGeometrySource(
     String sourceId,
     CustomGeometrySourceOptions options,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      final registrations = _NativeRegistrations(_callbackPorts);
-      try {
-        final status = raw.mln_map_add_custom_geometry_source(
-          _handle.raw,
-          nativeStringView(sourceId, arena).value,
-          registrations.prepareCustomGeometrySourceOptions(options),
-          completion,
-          nativeDiagnostic,
-        );
-        if (status == nativeStatusOk) {
-          registrations.accept();
-        }
-        return status;
-      } finally {
-        registrations.close();
-      }
-    }),
-  );
+  ) => _command((arena, completion) {
+    final registrations = _NativeRegistrations(_callbackPorts);
+    return registrations.run(
+      () => raw.mln_map_add_custom_geometry_source(
+        _handle.raw,
+        nativeStringView(sourceId, arena).value,
+        registrations.add(
+          _prepareCustomGeometrySourceOptions(options, registrations.ports),
+        ),
+        completion,
+        nativeDiagnostic,
+      ),
+    );
+  });
   Future<CommandCompletion> addCustomMvtVectorSource(
     String sourceId,
     CustomMvtVectorSourceOptions options,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      final registrations = _NativeRegistrations(_callbackPorts);
-      try {
-        final status = raw.mln_map_add_custom_mvt_vector_source(
-          _handle.raw,
-          nativeStringView(sourceId, arena).value,
-          registrations.prepareCustomMvtVectorSourceOptions(options),
-          completion,
-          nativeDiagnostic,
-        );
-        if (status == nativeStatusOk) {
-          registrations.accept();
-        }
-        return status;
-      } finally {
-        registrations.close();
-      }
-    }),
-  );
+  ) => _command((arena, completion) {
+    final registrations = _NativeRegistrations(_callbackPorts);
+    return registrations.run(
+      () => raw.mln_map_add_custom_mvt_vector_source(
+        _handle.raw,
+        nativeStringView(sourceId, arena).value,
+        registrations.add(
+          _prepareCustomMvtVectorSourceOptions(options, registrations.ports),
+        ),
+        completion,
+        nativeDiagnostic,
+      ),
+    );
+  });
   Future<CommandCompletion> addGeojsonSourceData(
     String sourceId,
     GeojsonSourceDataHandle data,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_add_geojson_source_data(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        data._handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_add_geojson_source_data(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      data._handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> addGeojsonSourceUrl(
     String sourceId,
     String url, {
     GeojsonSourceOptions? options,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_add_geojson_source_url(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativeStringView(url, arena).value,
-        options == null ? nullptr : _writeGeojsonSourceOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  }) => _command(
+    (arena, completion) => raw.mln_map_add_geojson_source_url(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativeStringView(url, arena).value,
+      options == null ? nullptr : _writeGeojsonSourceOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> addHillshadeLayer(
     String layerId,
     String sourceId, {
     String? beforeLayerId,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_add_hillshade_layer(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        nativeStringView(sourceId, arena).value,
-        nativeStringView((beforeLayerId ?? ''), arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  }) => _command(
+    (arena, completion) => raw.mln_map_add_hillshade_layer(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      nativeStringView(sourceId, arena).value,
+      nativeStringView((beforeLayerId ?? ''), arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> addImageSourceImage(
     String sourceId,
     List<LatLng> coordinates,
     PremultipliedRgba8Image image,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      final nativecoordinates = arena<raw.mln_lat_lng>(
-        coordinates.isEmpty ? 1 : coordinates.length,
-      );
-      for (var index = 0; index < coordinates.length; index++) {
-        nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
-      }
-      return raw.mln_map_add_image_source_image(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativecoordinates,
-        coordinates.length,
-        _writePremultipliedRgba8Image(image, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-  );
+  ) => _command((arena, completion) {
+    final nativecoordinates = arena<raw.mln_lat_lng>(
+      coordinates.isEmpty ? 1 : coordinates.length,
+    );
+    for (var index = 0; index < coordinates.length; index++) {
+      nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
+    }
+    return raw.mln_map_add_image_source_image(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativecoordinates,
+      coordinates.length,
+      _writePremultipliedRgba8Image(image, arena),
+      completion,
+      nativeDiagnostic,
+    );
+  });
   Future<CommandCompletion> addImageSourceUrl(
     String sourceId,
     List<LatLng> coordinates,
     String url,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      final nativecoordinates = arena<raw.mln_lat_lng>(
-        coordinates.isEmpty ? 1 : coordinates.length,
-      );
-      for (var index = 0; index < coordinates.length; index++) {
-        nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
-      }
-      return raw.mln_map_add_image_source_url(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativecoordinates,
-        coordinates.length,
-        nativeStringView(url, arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-  );
+  ) => _command((arena, completion) {
+    final nativecoordinates = arena<raw.mln_lat_lng>(
+      coordinates.isEmpty ? 1 : coordinates.length,
+    );
+    for (var index = 0; index < coordinates.length; index++) {
+      nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
+    }
+    return raw.mln_map_add_image_source_url(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativecoordinates,
+      coordinates.length,
+      nativeStringView(url, arena).value,
+      completion,
+      nativeDiagnostic,
+    );
+  });
   Future<CommandCompletion> addLocationIndicatorLayer(
     String layerId, {
     String? beforeLayerId,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_add_location_indicator_layer(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        nativeStringView((beforeLayerId ?? ''), arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  }) => _command(
+    (arena, completion) => raw.mln_map_add_location_indicator_layer(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      nativeStringView((beforeLayerId ?? ''), arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> addRasterDemSourceTiles(
     String sourceId,
     List<String> tiles, {
     StyleTileSourceOptions? options,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      final nativetiles = arena<raw.mln_buffer_view>(
-        tiles.isEmpty ? 1 : tiles.length,
-      );
-      for (var index = 0; index < tiles.length; index++) {
-        nativetiles[index] = nativeStringView(tiles[index], arena).value;
-      }
-      return raw.mln_map_add_raster_dem_source_tiles(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativetiles,
-        tiles.length,
-        options == null
-            ? nullptr
-            : _writeStyleTileSourceOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-  );
+  }) => _command((arena, completion) {
+    final nativetiles = arena<raw.mln_buffer_view>(
+      tiles.isEmpty ? 1 : tiles.length,
+    );
+    for (var index = 0; index < tiles.length; index++) {
+      nativetiles[index] = nativeStringView(tiles[index], arena).value;
+    }
+    return raw.mln_map_add_raster_dem_source_tiles(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativetiles,
+      tiles.length,
+      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    );
+  });
   Future<CommandCompletion> addRasterDemSourceUrl(
     String sourceId,
     String url, {
     StyleTileSourceOptions? options,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_add_raster_dem_source_url(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativeStringView(url, arena).value,
-        options == null
-            ? nullptr
-            : _writeStyleTileSourceOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  }) => _command(
+    (arena, completion) => raw.mln_map_add_raster_dem_source_url(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativeStringView(url, arena).value,
+      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> addRasterSourceTiles(
     String sourceId,
     List<String> tiles, {
     StyleTileSourceOptions? options,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      final nativetiles = arena<raw.mln_buffer_view>(
-        tiles.isEmpty ? 1 : tiles.length,
-      );
-      for (var index = 0; index < tiles.length; index++) {
-        nativetiles[index] = nativeStringView(tiles[index], arena).value;
-      }
-      return raw.mln_map_add_raster_source_tiles(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativetiles,
-        tiles.length,
-        options == null
-            ? nullptr
-            : _writeStyleTileSourceOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-  );
+  }) => _command((arena, completion) {
+    final nativetiles = arena<raw.mln_buffer_view>(
+      tiles.isEmpty ? 1 : tiles.length,
+    );
+    for (var index = 0; index < tiles.length; index++) {
+      nativetiles[index] = nativeStringView(tiles[index], arena).value;
+    }
+    return raw.mln_map_add_raster_source_tiles(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativetiles,
+      tiles.length,
+      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    );
+  });
   Future<CommandCompletion> addRasterSourceUrl(
     String sourceId,
     String url, {
     StyleTileSourceOptions? options,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_add_raster_source_url(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativeStringView(url, arena).value,
-        options == null
-            ? nullptr
-            : _writeStyleTileSourceOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  }) => _command(
+    (arena, completion) => raw.mln_map_add_raster_source_url(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativeStringView(url, arena).value,
+      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> addStyleLayerJson(
     Uint8List layerJson, {
     String? beforeLayerId,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_add_style_layer_json(
-        _handle.raw,
-        nativeBufferView(layerJson, arena),
-        nativeStringView((beforeLayerId ?? ''), arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  }) => _command(
+    (arena, completion) => raw.mln_map_add_style_layer_json(
+      _handle.raw,
+      nativeBufferView(layerJson, arena),
+      nativeStringView((beforeLayerId ?? ''), arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> addStyleSourceJson(
     String sourceId,
     Uint8List sourceJson,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_add_style_source_json(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativeBufferView(sourceJson, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_add_style_source_json(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativeBufferView(sourceJson, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> addVectorSourceTiles(
     String sourceId,
     List<String> tiles, {
     StyleTileSourceOptions? options,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      final nativetiles = arena<raw.mln_buffer_view>(
-        tiles.isEmpty ? 1 : tiles.length,
-      );
-      for (var index = 0; index < tiles.length; index++) {
-        nativetiles[index] = nativeStringView(tiles[index], arena).value;
-      }
-      return raw.mln_map_add_vector_source_tiles(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativetiles,
-        tiles.length,
-        options == null
-            ? nullptr
-            : _writeStyleTileSourceOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-  );
+  }) => _command((arena, completion) {
+    final nativetiles = arena<raw.mln_buffer_view>(
+      tiles.isEmpty ? 1 : tiles.length,
+    );
+    for (var index = 0; index < tiles.length; index++) {
+      nativetiles[index] = nativeStringView(tiles[index], arena).value;
+    }
+    return raw.mln_map_add_vector_source_tiles(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativetiles,
+      tiles.length,
+      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    );
+  });
   Future<CommandCompletion> addVectorSourceUrl(
     String sourceId,
     String url, {
     StyleTileSourceOptions? options,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_add_vector_source_url(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativeStringView(url, arena).value,
-        options == null
-            ? nullptr
-            : _writeStyleTileSourceOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  }) => _command(
+    (arena, completion) => raw.mln_map_add_vector_source_url(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativeStringView(url, arena).value,
+      options == null ? nullptr : _writeStyleTileSourceOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> applyCameraDelta(CameraDelta delta) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_apply_camera_delta(
-            _handle.raw,
-            _writeCameraDelta(delta, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-      );
+  Future<CommandCompletion> applyCameraDelta(CameraDelta delta) => _command(
+    (arena, completion) => raw.mln_map_apply_camera_delta(
+      _handle.raw,
+      _writeCameraDelta(delta, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<CameraOptions> cameraForGeometry(
     Uint8List geometry, {
     CameraFitOptions? fitOptions,
-  }) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS,
-    elementSize: sizeOf<raw.mln_camera_options>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_camera_for_geometry(
-        _handle.raw,
-        nativeBufferView(geometry, arena),
-        fitOptions == null
-            ? nullptr
-            : _writeCameraFitOptions(fitOptions, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) =>
-        _readCameraOptions(result.value.cast<raw.mln_camera_options>().ref),
-    claimBeforeDecode: false,
+  }) => _query(
+    _resultCameraOptions,
+    (arena, completion) => raw.mln_map_camera_for_geometry(
+      _handle.raw,
+      nativeBufferView(geometry, arena),
+      fitOptions == null ? nullptr : _writeCameraFitOptions(fitOptions, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CameraOptions> cameraForLatLngBounds(
     LatLngBounds bounds, {
     CameraFitOptions? fitOptions,
-  }) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS,
-    elementSize: sizeOf<raw.mln_camera_options>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_camera_for_lat_lng_bounds(
-        _handle.raw,
-        _writeLatLngBounds(bounds, arena).ref,
-        fitOptions == null
-            ? nullptr
-            : _writeCameraFitOptions(fitOptions, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) =>
-        _readCameraOptions(result.value.cast<raw.mln_camera_options>().ref),
-    claimBeforeDecode: false,
+  }) => _query(
+    _resultCameraOptions,
+    (arena, completion) => raw.mln_map_camera_for_lat_lng_bounds(
+      _handle.raw,
+      _writeLatLngBounds(bounds, arena).ref,
+      fitOptions == null ? nullptr : _writeCameraFitOptions(fitOptions, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CameraOptions> cameraForLatLngs(
     List<LatLng> coordinates, {
     CameraFitOptions? fitOptions,
-  }) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS,
-    elementSize: sizeOf<raw.mln_camera_options>(),
-    start: (completion) => withNativeArena((arena) {
-      final nativecoordinates = arena<raw.mln_lat_lng>(
-        coordinates.isEmpty ? 1 : coordinates.length,
-      );
-      for (var index = 0; index < coordinates.length; index++) {
-        nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
-      }
-      return raw.mln_map_camera_for_lat_lngs(
-        _handle.raw,
-        nativecoordinates,
-        coordinates.length,
-        fitOptions == null
-            ? nullptr
-            : _writeCameraFitOptions(fitOptions, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) =>
-        _readCameraOptions(result.value.cast<raw.mln_camera_options>().ref),
-    claimBeforeDecode: false,
-  );
-  Future<CameraQueryResult> cameraQuery() => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT,
-    elementSize: sizeOf<raw.mln_camera_query_result>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_camera_query(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => _readCameraQueryResult(
-      result.value.cast<raw.mln_camera_query_result>().ref,
-    ),
-    claimBeforeDecode: false,
+  }) => _query(_resultCameraOptions, (arena, completion) {
+    final nativecoordinates = arena<raw.mln_lat_lng>(
+      coordinates.isEmpty ? 1 : coordinates.length,
+    );
+    for (var index = 0; index < coordinates.length; index++) {
+      nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
+    }
+    return raw.mln_map_camera_for_lat_lngs(
+      _handle.raw,
+      nativecoordinates,
+      coordinates.length,
+      fitOptions == null ? nullptr : _writeCameraFitOptions(fitOptions, arena),
+      completion,
+      nativeDiagnostic,
+    );
+  });
+  Future<CameraQueryResult> cameraQuery() => _query(
+    _resultCameraQueryResult,
+    (arena, completion) =>
+        raw.mln_map_camera_query(_handle.raw, completion, nativeDiagnostic),
   );
   (CameraOptions, BigInt) cameraSnapshotGet() => withNativeArena((arena) {
     final outCamera = arena<raw.mln_camera_options>();
@@ -4777,1336 +4661,863 @@ final class MapHandle implements Finalizable {
       uint64FromNative(outGeneration.value),
     );
   });
-  Future<CommandCompletion> cancelTransitions() => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_cancel_transitions(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> cancelTransitions() => _command(
+    (arena, completion) => raw.mln_map_cancel_transitions(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<String?> copyLayerSourceId(String layerId) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-    elementSize: sizeOf<raw.mln_buffer_view>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_copy_layer_source_id(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => result.value.cast<raw.mln_buffer_view>().ref.size == 0
-        ? null
-        : utf8.decode(
-            _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-          ),
-    claimBeforeDecode: false,
+  Future<String?> copyLayerSourceId(String layerId) => _query(
+    _resultStringOrNull,
+    (arena, completion) => raw.mln_map_copy_layer_source_id(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<String?> copyLayerSourceLayer(String layerId) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-    elementSize: sizeOf<raw.mln_buffer_view>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_copy_layer_source_layer(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => result.value.cast<raw.mln_buffer_view>().ref.size == 0
-        ? null
-        : utf8.decode(
-            _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-          ),
-    claimBeforeDecode: false,
+  Future<String?> copyLayerSourceLayer(String layerId) => _query(
+    _resultStringOrNull,
+    (arena, completion) => raw.mln_map_copy_layer_source_layer(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<Uint8List?> copyStyleImagePremultipliedRgba8(String imageId) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-        elementSize: sizeOf<raw.mln_buffer_view>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_copy_style_image_premultiplied_rgba8(
-            _handle.raw,
-            nativeStringView(imageId, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value_count == 0
-            ? null
-            : result.value.cast<raw.mln_buffer_view>().ref.data == nullptr
-            ? null
-            : _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-        claimBeforeDecode: false,
+      _queryOptional(
+        _resultUint8ListOrNull,
+        (arena, completion) => raw.mln_map_copy_style_image_premultiplied_rgba8(
+          _handle.raw,
+          nativeStringView(imageId, arena).value,
+          completion,
+          nativeDiagnostic,
+        ),
       );
   Future<StyleImageStretchesResult?> copyStyleImageStretches(String imageId) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT,
-        elementSize: sizeOf<raw.mln_style_image_stretches_result>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_copy_style_image_stretches(
-            _handle.raw,
-            nativeStringView(imageId, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value_count == 0
-            ? null
-            : _readStyleImageStretchesResult(
-                result.value.cast<raw.mln_style_image_stretches_result>().ref,
-              ),
-        claimBeforeDecode: false,
+      _queryOptional(
+        _resultStyleImageStretchesResult,
+        (arena, completion) => raw.mln_map_copy_style_image_stretches(
+          _handle.raw,
+          nativeStringView(imageId, arena).value,
+          completion,
+          nativeDiagnostic,
+        ),
       );
-  Future<String?> copyStyleSourceAttribution(String sourceId) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-        elementSize: sizeOf<raw.mln_buffer_view>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_copy_style_source_attribution(
-            _handle.raw,
-            nativeStringView(sourceId, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value_count == 0
-            ? null
-            : result.value.cast<raw.mln_buffer_view>().ref.data == nullptr
-            ? null
-            : utf8.decode(
-                _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-              ),
-        claimBeforeDecode: false,
-      );
-  Future<String?> copyStyleSourceUrl(String sourceId) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-    elementSize: sizeOf<raw.mln_buffer_view>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_copy_style_source_url(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => result.value_count == 0
-        ? null
-        : result.value.cast<raw.mln_buffer_view>().ref.data == nullptr
-        ? null
-        : utf8.decode(
-            _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-          ),
-    claimBeforeDecode: false,
+  Future<String?> copyStyleSourceAttribution(String sourceId) => _queryOptional(
+    _resultStringOrNull,
+    (arena, completion) => raw.mln_map_copy_style_source_attribution(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+  Future<String?> copyStyleSourceUrl(String sourceId) => _queryOptional(
+    _resultStringOrNull,
+    (arena, completion) => raw.mln_map_copy_style_source_url(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   void dispose() => _state.close(
-    (handle) => withNativeArena((arena) {
-      return raw.mln_map_dispose(handle.raw, nativeDiagnostic);
-    }),
+    (handle) => raw.mln_map_dispose(handle.raw, nativeDiagnostic),
   );
-  Future<CommandCompletion> dumpDebugLogs() => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_dump_debug_logs(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> dumpDebugLogs() => _command(
+    (arena, completion) =>
+        raw.mln_map_dump_debug_logs(_handle.raw, completion, nativeDiagnostic),
   );
-  Future<Uint8List> getFeatureState(FeatureStateSelector selector) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-        elementSize: sizeOf<raw.mln_buffer_view>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_get_feature_state(
-            _handle.raw,
-            _writeFeatureStateSelector(selector, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) =>
-            _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-        claimBeforeDecode: false,
-      );
-  Future<Uint8List> getGlobalState() => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-    elementSize: sizeOf<raw.mln_buffer_view>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_get_global_state(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) =>
-        _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-    claimBeforeDecode: false,
+  Future<Uint8List> getFeatureState(FeatureStateSelector selector) => _query(
+    _resultUint8List,
+    (arena, completion) => raw.mln_map_get_feature_state(
+      _handle.raw,
+      _writeFeatureStateSelector(selector, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+  Future<Uint8List> getGlobalState() => _query(
+    _resultUint8List,
+    (arena, completion) =>
+        raw.mln_map_get_global_state(_handle.raw, completion, nativeDiagnostic),
   );
   Future<List<LatLng>?> getImageSourceCoordinates(String sourceId) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_LAT_LNG,
-        elementSize: sizeOf<raw.mln_lat_lng>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_get_image_source_coordinates(
-            _handle.raw,
-            nativeStringView(sourceId, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value == nullptr
-            ? null
-            : List<LatLng>.unmodifiable(
-                List.generate(
-                  result.value_count,
-                  (index) =>
-                      _readLatLng(result.value.cast<raw.mln_lat_lng>()[index]),
-                ),
-              ),
-        claimBeforeDecode: false,
+      _queryOptionalList(
+        _resultLatLng,
+        (arena, completion) => raw.mln_map_get_image_source_coordinates(
+          _handle.raw,
+          nativeStringView(sourceId, arena).value,
+          completion,
+          nativeDiagnostic,
+        ),
       );
-  Future<Uint8List?> getLayerFilter(String layerId) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-    elementSize: sizeOf<raw.mln_buffer_view>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_get_layer_filter(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => result.value_count == 0
-        ? null
-        : result.value.cast<raw.mln_buffer_view>().ref.data == nullptr
-        ? null
-        : _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-    claimBeforeDecode: false,
+  Future<Uint8List?> getLayerFilter(String layerId) => _queryOptional(
+    _resultUint8ListOrNull,
+    (arena, completion) => raw.mln_map_get_layer_filter(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<Uint8List?> getLayerProperty(String layerId, String propertyName) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-        elementSize: sizeOf<raw.mln_buffer_view>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_get_layer_property(
-            _handle.raw,
-            nativeStringView(layerId, arena).value,
-            nativeStringView(propertyName, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value_count == 0
-            ? null
-            : result.value.cast<raw.mln_buffer_view>().ref.data == nullptr
-            ? null
-            : _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-        claimBeforeDecode: false,
+      _queryOptional(
+        _resultUint8ListOrNull,
+        (arena, completion) => raw.mln_map_get_layer_property(
+          _handle.raw,
+          nativeStringView(layerId, arena).value,
+          nativeStringView(propertyName, arena).value,
+          completion,
+          nativeDiagnostic,
+        ),
       );
-  Future<StyleImageResult?> getStyleImageInfo(String imageId) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT,
-        elementSize: sizeOf<raw.mln_style_image_result>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_get_style_image_info(
-            _handle.raw,
-            nativeStringView(imageId, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value_count == 0
-            ? null
-            : _readStyleImageResult(
-                result.value.cast<raw.mln_style_image_result>().ref,
-              ),
-        claimBeforeDecode: false,
-      );
-  Future<StyleLayerResult?> getStyleLayerInfo(String layerId) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT,
-        elementSize: sizeOf<raw.mln_style_layer_result>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_get_style_layer_info(
-            _handle.raw,
-            nativeStringView(layerId, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value_count == 0
-            ? null
-            : _readStyleLayerResult(
-                result.value.cast<raw.mln_style_layer_result>().ref,
-              ),
-        claimBeforeDecode: false,
-      );
-  Future<Uint8List?> getStyleLayerJson(String layerId) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-    elementSize: sizeOf<raw.mln_buffer_view>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_get_style_layer_json(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => result.value_count == 0
-        ? null
-        : result.value.cast<raw.mln_buffer_view>().ref.data == nullptr
-        ? null
-        : _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-    claimBeforeDecode: false,
+  Future<StyleImageResult?> getStyleImageInfo(String imageId) => _queryOptional(
+    _resultStyleImageResult,
+    (arena, completion) => raw.mln_map_get_style_image_info(
+      _handle.raw,
+      nativeStringView(imageId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+  Future<StyleLayerResult?> getStyleLayerInfo(String layerId) => _queryOptional(
+    _resultStyleLayerResult,
+    (arena, completion) => raw.mln_map_get_style_layer_info(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+  Future<Uint8List?> getStyleLayerJson(String layerId) => _queryOptional(
+    _resultUint8ListOrNull,
+    (arena, completion) => raw.mln_map_get_style_layer_json(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<Uint8List?> getStyleLightProperty(String propertyName) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-        elementSize: sizeOf<raw.mln_buffer_view>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_get_style_light_property(
-            _handle.raw,
-            nativeStringView(propertyName, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value_count == 0
-            ? null
-            : result.value.cast<raw.mln_buffer_view>().ref.data == nullptr
-            ? null
-            : _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-        claimBeforeDecode: false,
+      _queryOptional(
+        _resultUint8ListOrNull,
+        (arena, completion) => raw.mln_map_get_style_light_property(
+          _handle.raw,
+          nativeStringView(propertyName, arena).value,
+          completion,
+          nativeDiagnostic,
+        ),
       );
   Future<StyleSourceResult?> getStyleSourceInfo(String sourceId) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT,
-        elementSize: sizeOf<raw.mln_style_source_result>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_get_style_source_info(
-            _handle.raw,
-            nativeStringView(sourceId, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value_count == 0
-            ? null
-            : _readStyleSourceResult(
-                result.value.cast<raw.mln_style_source_result>().ref,
-              ),
-        claimBeforeDecode: false,
+      _queryOptional(
+        _resultStyleSourceResult,
+        (arena, completion) => raw.mln_map_get_style_source_info(
+          _handle.raw,
+          nativeStringView(sourceId, arena).value,
+          completion,
+          nativeDiagnostic,
+        ),
       );
   Future<StyleSourceTileUrlsResult?> getStyleSourceTileUrls(String sourceId) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT,
-        elementSize: sizeOf<raw.mln_style_source_tile_urls_result>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_get_style_source_tile_urls(
-            _handle.raw,
-            nativeStringView(sourceId, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value_count == 0
-            ? null
-            : _readStyleSourceTileUrlsResult(
-                result.value.cast<raw.mln_style_source_tile_urls_result>().ref,
-              ),
-        claimBeforeDecode: false,
-      );
-  Future<StyleTransitionOptions> getStyleTransitionOptions() =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS,
-        elementSize: sizeOf<raw.mln_style_transition_options>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_get_style_transition_options(
-            _handle.raw,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => _readStyleTransitionOptions(
-          result.value.cast<raw.mln_style_transition_options>().ref,
+      _queryOptional(
+        _resultStyleSourceTileUrlsResult,
+        (arena, completion) => raw.mln_map_get_style_source_tile_urls(
+          _handle.raw,
+          nativeStringView(sourceId, arena).value,
+          completion,
+          nativeDiagnostic,
         ),
-        claimBeforeDecode: false,
       );
+  Future<StyleTransitionOptions> getStyleTransitionOptions() => _query(
+    _resultStyleTransitionOptions,
+    (arena, completion) => raw.mln_map_get_style_transition_options(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<CommandCompletion> invalidateCustomGeometrySourceRegion(
     String sourceId,
     LatLngBounds bounds,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_invalidate_custom_geometry_source_region(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        _writeLatLngBounds(bounds, arena).ref,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_invalidate_custom_geometry_source_region(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _writeLatLngBounds(bounds, arena).ref,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> invalidateCustomGeometrySourceTile(
     String sourceId,
     CanonicalTileId tileId,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_invalidate_custom_geometry_source_tile(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        _writeCanonicalTileId(tileId, arena).ref,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_invalidate_custom_geometry_source_tile(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _writeCanonicalTileId(tileId, arena).ref,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> invalidateCustomMvtVectorSourceTile(
     String sourceId,
     CanonicalTileId tileId,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_invalidate_custom_mvt_vector_source_tile(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        _writeCanonicalTileId(tileId, arena).ref,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_invalidate_custom_mvt_vector_source_tile(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _writeCanonicalTileId(tileId, arena).ref,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<LatLngBounds> latLngBoundsForCamera(CameraOptions camera) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS,
-        elementSize: sizeOf<raw.mln_lat_lng_bounds>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_lat_lng_bounds_for_camera(
-            _handle.raw,
-            _writeCameraOptions(camera, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) =>
-            _readLatLngBounds(result.value.cast<raw.mln_lat_lng_bounds>().ref),
-        claimBeforeDecode: false,
-      );
+  Future<LatLngBounds> latLngBoundsForCamera(CameraOptions camera) => _query(
+    _resultLatLngBounds,
+    (arena, completion) => raw.mln_map_lat_lng_bounds_for_camera(
+      _handle.raw,
+      _writeCameraOptions(camera, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<LatLngBounds> latLngBoundsForCameraUnwrapped(CameraOptions camera) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS,
-        elementSize: sizeOf<raw.mln_lat_lng_bounds>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_lat_lng_bounds_for_camera_unwrapped(
-            _handle.raw,
-            _writeCameraOptions(camera, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) =>
-            _readLatLngBounds(result.value.cast<raw.mln_lat_lng_bounds>().ref),
-        claimBeforeDecode: false,
+      _query(
+        _resultLatLngBounds,
+        (arena, completion) => raw.mln_map_lat_lng_bounds_for_camera_unwrapped(
+          _handle.raw,
+          _writeCameraOptions(camera, arena),
+          completion,
+          nativeDiagnostic,
+        ),
       );
-  Future<LatLng> latLngForPixel(ScreenPoint point) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_LAT_LNG,
-    elementSize: sizeOf<raw.mln_lat_lng>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_lat_lng_for_pixel(
-        _handle.raw,
-        _writeScreenPoint(point, arena).ref,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => _readLatLng(result.value.cast<raw.mln_lat_lng>().ref),
-    claimBeforeDecode: false,
+  Future<LatLng> latLngForPixel(ScreenPoint point) => _query(
+    _resultLatLng,
+    (arena, completion) => raw.mln_map_lat_lng_for_pixel(
+      _handle.raw,
+      _writeScreenPoint(point, arena).ref,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<LatLng> latLngForPixelUnwrapped(ScreenPoint point) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_LAT_LNG,
-        elementSize: sizeOf<raw.mln_lat_lng>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_lat_lng_for_pixel_unwrapped(
-            _handle.raw,
-            _writeScreenPoint(point, arena).ref,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) =>
-            _readLatLng(result.value.cast<raw.mln_lat_lng>().ref),
-        claimBeforeDecode: false,
-      );
+  Future<LatLng> latLngForPixelUnwrapped(ScreenPoint point) => _query(
+    _resultLatLng,
+    (arena, completion) => raw.mln_map_lat_lng_for_pixel_unwrapped(
+      _handle.raw,
+      _writeScreenPoint(point, arena).ref,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<List<LatLng>> latLngsForPixels(List<ScreenPoint> points) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_LAT_LNG,
-        elementSize: sizeOf<raw.mln_lat_lng>(),
-        start: (completion) => withNativeArena((arena) {
-          final nativepoints = arena<raw.mln_screen_point>(
-            points.isEmpty ? 1 : points.length,
-          );
-          for (var index = 0; index < points.length; index++) {
-            nativepoints[index] = _writeScreenPoint(points[index], arena).ref;
-          }
-          return raw.mln_map_lat_lngs_for_pixels(
-            _handle.raw,
-            nativepoints,
-            points.length,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => List<LatLng>.unmodifiable(
-          List.generate(
-            result.value_count,
-            (index) => _readLatLng(result.value.cast<raw.mln_lat_lng>()[index]),
-          ),
-        ),
-        claimBeforeDecode: false,
-      );
+      _queryList(_resultLatLng, (arena, completion) {
+        final nativepoints = arena<raw.mln_screen_point>(
+          points.isEmpty ? 1 : points.length,
+        );
+        for (var index = 0; index < points.length; index++) {
+          nativepoints[index] = _writeScreenPoint(points[index], arena).ref;
+        }
+        return raw.mln_map_lat_lngs_for_pixels(
+          _handle.raw,
+          nativepoints,
+          points.length,
+          completion,
+          nativeDiagnostic,
+        );
+      });
   Future<List<LatLng>> latLngsForPixelsUnwrapped(List<ScreenPoint> points) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_LAT_LNG,
-        elementSize: sizeOf<raw.mln_lat_lng>(),
-        start: (completion) => withNativeArena((arena) {
-          final nativepoints = arena<raw.mln_screen_point>(
-            points.isEmpty ? 1 : points.length,
-          );
-          for (var index = 0; index < points.length; index++) {
-            nativepoints[index] = _writeScreenPoint(points[index], arena).ref;
-          }
-          return raw.mln_map_lat_lngs_for_pixels_unwrapped(
-            _handle.raw,
-            nativepoints,
-            points.length,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => List<LatLng>.unmodifiable(
-          List.generate(
-            result.value_count,
-            (index) => _readLatLng(result.value.cast<raw.mln_lat_lng>()[index]),
-          ),
-        ),
-        claimBeforeDecode: false,
-      );
-  Future<List<String>> listStyleLayerIds() => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-    elementSize: sizeOf<raw.mln_buffer_view>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_list_style_layer_ids(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => List<String>.unmodifiable(
-      List.generate(
-        result.value_count,
-        (index) => utf8.decode(
-          _copyBufferView(result.value.cast<raw.mln_buffer_view>()[index]),
-        ),
-      ),
+      _queryList(_resultLatLng, (arena, completion) {
+        final nativepoints = arena<raw.mln_screen_point>(
+          points.isEmpty ? 1 : points.length,
+        );
+        for (var index = 0; index < points.length; index++) {
+          nativepoints[index] = _writeScreenPoint(points[index], arena).ref;
+        }
+        return raw.mln_map_lat_lngs_for_pixels_unwrapped(
+          _handle.raw,
+          nativepoints,
+          points.length,
+          completion,
+          nativeDiagnostic,
+        );
+      });
+  Future<List<String>> listStyleLayerIds() => _queryList(
+    _resultString,
+    (arena, completion) => raw.mln_map_list_style_layer_ids(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
     ),
-    claimBeforeDecode: false,
   );
-  Future<List<StyleLayerEntry>> listStyleLayers() => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY,
-    elementSize: sizeOf<raw.mln_style_layer_entry>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_list_style_layers(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => List<StyleLayerEntry>.unmodifiable(
-      List.generate(
-        result.value_count,
-        (index) => _readStyleLayerEntry(
-          result.value.cast<raw.mln_style_layer_entry>()[index],
-        ),
-      ),
+  Future<List<StyleLayerEntry>> listStyleLayers() => _queryList(
+    _resultStyleLayerEntry,
+    (arena, completion) => raw.mln_map_list_style_layers(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
     ),
-    claimBeforeDecode: false,
   );
-  Future<List<String>> listStyleSourceIds() => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-    elementSize: sizeOf<raw.mln_buffer_view>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_list_style_source_ids(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => List<String>.unmodifiable(
-      List.generate(
-        result.value_count,
-        (index) => utf8.decode(
-          _copyBufferView(result.value.cast<raw.mln_buffer_view>()[index]),
-        ),
-      ),
+  Future<List<String>> listStyleSourceIds() => _queryList(
+    _resultString,
+    (arena, completion) => raw.mln_map_list_style_source_ids(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
     ),
-    claimBeforeDecode: false,
   );
-  Future<Uint8List> loadedStyleJson() => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-    elementSize: sizeOf<raw.mln_buffer_view>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_loaded_style_json(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) =>
-        _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-    claimBeforeDecode: false,
+  Future<Uint8List> loadedStyleJson() => _query(
+    _resultUint8List,
+    (arena, completion) => raw.mln_map_loaded_style_json(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<double> metersPerPixelAtLatitude(double latitude) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
-        elementSize: sizeOf<Double>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_meters_per_pixel_at_latitude(
-            _handle.raw,
-            latitude,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value.cast<Double>().value,
-        claimBeforeDecode: false,
-      );
+  Future<double> metersPerPixelAtLatitude(double latitude) => _query(
+    _resultdouble,
+    (arena, completion) => raw.mln_map_meters_per_pixel_at_latitude(
+      _handle.raw,
+      latitude,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<CommandCompletion> moveStyleLayer(
     String layerId, {
     String? beforeLayerId,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_move_style_layer(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        nativeStringView((beforeLayerId ?? ''), arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-  );
-  Future<ScreenPoint> pixelForLatLng(LatLng coordinate) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT,
-        elementSize: sizeOf<raw.mln_screen_point>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_map_pixel_for_lat_lng(
-            _handle.raw,
-            _writeLatLng(coordinate, arena).ref,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) =>
-            _readScreenPoint(result.value.cast<raw.mln_screen_point>().ref),
-        claimBeforeDecode: false,
-      );
-  Future<List<ScreenPoint>> pixelsForLatLngs(
-    List<LatLng> coordinates,
-  ) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT,
-    elementSize: sizeOf<raw.mln_screen_point>(),
-    start: (completion) => withNativeArena((arena) {
-      final nativecoordinates = arena<raw.mln_lat_lng>(
-        coordinates.isEmpty ? 1 : coordinates.length,
-      );
-      for (var index = 0; index < coordinates.length; index++) {
-        nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
-      }
-      return raw.mln_map_pixels_for_lat_lngs(
-        _handle.raw,
-        nativecoordinates,
-        coordinates.length,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => List<ScreenPoint>.unmodifiable(
-      List.generate(
-        result.value_count,
-        (index) =>
-            _readScreenPoint(result.value.cast<raw.mln_screen_point>()[index]),
-      ),
+  }) => _command(
+    (arena, completion) => raw.mln_map_move_style_layer(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      nativeStringView((beforeLayerId ?? ''), arena).value,
+      completion,
+      nativeDiagnostic,
     ),
-    claimBeforeDecode: false,
   );
-  Future<MapProjectionHandle> projectionCreate() => startNativeCompletion(
-    copyKind: raw
+  Future<ScreenPoint> pixelForLatLng(LatLng coordinate) => _query(
+    _resultScreenPoint,
+    (arena, completion) => raw.mln_map_pixel_for_lat_lng(
+      _handle.raw,
+      _writeLatLng(coordinate, arena).ref,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+  Future<List<ScreenPoint>> pixelsForLatLngs(List<LatLng> coordinates) =>
+      _queryList(_resultScreenPoint, (arena, completion) {
+        final nativecoordinates = arena<raw.mln_lat_lng>(
+          coordinates.isEmpty ? 1 : coordinates.length,
+        );
+        for (var index = 0; index < coordinates.length; index++) {
+          nativecoordinates[index] = _writeLatLng(
+            coordinates[index],
+            arena,
+          ).ref;
+        }
+        return raw.mln_map_pixels_for_lat_lngs(
+          _handle.raw,
+          nativecoordinates,
+          coordinates.length,
+          completion,
+          nativeDiagnostic,
+        );
+      });
+  Future<MapProjectionHandle> projectionCreate() => _queryOwned(
+    raw
         .mln_adapter_completion_copy_kind
         .MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION,
-    elementSize: sizeOf<Uint64>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_projection_create(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => _adoptOwned(
-      result.value.cast<Uint64>().value,
-      () => MapProjectionHandle._(
-        NativeMapProjection(result.value.cast<Uint64>().value),
-      ),
+    (arena, completion) => raw.mln_map_projection_create(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+    (handle) => _adoptOwned(
+      handle,
+      () => MapProjectionHandle._(NativeMapProjection(handle)),
       (handle) {
         _check(raw.mln_map_projection_close(handle, nativeDiagnostic));
       },
     ),
-    claimBeforeDecode: true,
   );
   Future<void> close() => _state.closeAsync(
-    (handle) => startNativeCompletion(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        return raw.mln_map_release(handle.raw, completion, nativeDiagnostic);
-      }),
-      decode: (result) {},
+    (handle) => _run(
+      (arena, completion) =>
+          raw.mln_map_release(handle.raw, completion, nativeDiagnostic),
     ),
   );
   Future<CommandCompletion> removeFeatureState(FeatureStateSelector selector) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_remove_feature_state(
-            _handle.raw,
-            _writeFeatureStateSelector(selector, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
+      _command(
+        (arena, completion) => raw.mln_map_remove_feature_state(
+          _handle.raw,
+          _writeFeatureStateSelector(selector, arena),
+          completion,
+          nativeDiagnostic,
+        ),
       );
-  Future<CommandCompletion> removeStyleImage(String imageId) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_remove_style_image(
-        _handle.raw,
-        nativeStringView(imageId, arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> removeStyleImage(String imageId) => _command(
+    (arena, completion) => raw.mln_map_remove_style_image(
+      _handle.raw,
+      nativeStringView(imageId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> removeStyleLayer(String layerId) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_remove_style_layer(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> removeStyleLayer(String layerId) => _command(
+    (arena, completion) => raw.mln_map_remove_style_layer(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> removeStyleSource(String sourceId) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_remove_style_source(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> removeStyleSource(String sourceId) => _command(
+    (arena, completion) => raw.mln_map_remove_style_source(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> requestRepaint() => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_request_repaint(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> requestRepaint() => _command(
+    (arena, completion) =>
+        raw.mln_map_request_repaint(_handle.raw, completion, nativeDiagnostic),
   );
-  Future<void> requestStillImage() => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_request_still_image(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<void> requestStillImage() => _run(
+    (arena, completion) => raw.mln_map_request_still_image(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> resize(LogicalExtent extent) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_resize(
-        _handle.raw,
-        _writeLogicalExtent(extent, arena).ref,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> resize(LogicalExtent extent) => _command(
+    (arena, completion) => raw.mln_map_resize(
+      _handle.raw,
+      _writeLogicalExtent(extent, arena).ref,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> setBounds(BoundOptions options) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_bounds(
-        _handle.raw,
-        _writeBoundOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> setBounds(BoundOptions options) => _command(
+    (arena, completion) => raw.mln_map_set_bounds(
+      _handle.raw,
+      _writeBoundOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setCustomGeometrySourceTileData(
     String sourceId,
     CanonicalTileId tileId,
     Uint8List data,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_custom_geometry_source_tile_data(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        _writeCanonicalTileId(tileId, arena).ref,
-        nativeBufferView(data, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_custom_geometry_source_tile_data(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _writeCanonicalTileId(tileId, arena).ref,
+      nativeBufferView(data, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setCustomMvtVectorSourceTileData(
     String sourceId,
     CanonicalTileId tileId,
     Uint8List data,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_custom_mvt_vector_source_tile_data(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        _writeCanonicalTileId(tileId, arena).ref,
-        nativeBufferView(data, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_custom_mvt_vector_source_tile_data(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _writeCanonicalTileId(tileId, arena).ref,
+      nativeBufferView(data, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setCustomMvtVectorSourceTileError(
     String sourceId,
     CanonicalTileId tileId,
     String message,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_custom_mvt_vector_source_tile_error(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        _writeCanonicalTileId(tileId, arena).ref,
-        nativeStringView(message, arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_custom_mvt_vector_source_tile_error(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _writeCanonicalTileId(tileId, arena).ref,
+      nativeStringView(message, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> setDebugOptions(MapDebugOption options) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_debug_options(
-            _handle.raw,
-            options.rawValue,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-      );
-  Future<CommandCompletion> setEventMask(RuntimeEventMask mask) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_event_mask(
-            _handle.raw,
-            mask.rawValue,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-      );
+  Future<CommandCompletion> setDebugOptions(MapDebugOption options) => _command(
+    (arena, completion) => raw.mln_map_set_debug_options(
+      _handle.raw,
+      options.rawValue,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+  Future<CommandCompletion> setEventMask(RuntimeEventMask mask) => _command(
+    (arena, completion) => raw.mln_map_set_event_mask(
+      _handle.raw,
+      mask.rawValue,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<CommandCompletion> setFeatureState(
     FeatureStateSelector selector,
     Uint8List state,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_feature_state(
-        _handle.raw,
-        _writeFeatureStateSelector(selector, arena),
-        nativeBufferView(state, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_feature_state(
+      _handle.raw,
+      _writeFeatureStateSelector(selector, arena),
+      nativeBufferView(state, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setFreeCameraOptions(FreeCameraOptions options) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_free_camera_options(
-            _handle.raw,
-            _writeFreeCameraOptions(options, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
+      _command(
+        (arena, completion) => raw.mln_map_set_free_camera_options(
+          _handle.raw,
+          _writeFreeCameraOptions(options, arena),
+          completion,
+          nativeDiagnostic,
+        ),
       );
   Future<CommandCompletion> setGeojsonSourceData(
     String sourceId,
     GeojsonSourceDataHandle data,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_geojson_source_data(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        data._handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_geojson_source_data(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      data._handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setGeojsonSourceSynchronousTiling(
     String sourceId,
     bool enabled,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_geojson_source_synchronous_tiling(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        enabled,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_geojson_source_synchronous_tiling(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      enabled,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setGeojsonSourceUrl(String sourceId, String url) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_geojson_source_url(
-            _handle.raw,
-            nativeStringView(sourceId, arena).value,
-            nativeStringView(url, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
+      _command(
+        (arena, completion) => raw.mln_map_set_geojson_source_url(
+          _handle.raw,
+          nativeStringView(sourceId, arena).value,
+          nativeStringView(url, arena).value,
+          completion,
+          nativeDiagnostic,
+        ),
       );
   Future<CommandCompletion> setGlobalStateProperty(
     String propertyName,
     Uint8List value,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_global_state_property(
-        _handle.raw,
-        nativeStringView(propertyName, arena).value,
-        nativeBufferView(value, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_global_state_property(
+      _handle.raw,
+      nativeStringView(propertyName, arena).value,
+      nativeBufferView(value, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setImageSourceCoordinates(
     String sourceId,
     List<LatLng> coordinates,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      final nativecoordinates = arena<raw.mln_lat_lng>(
-        coordinates.isEmpty ? 1 : coordinates.length,
-      );
-      for (var index = 0; index < coordinates.length; index++) {
-        nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
-      }
-      return raw.mln_map_set_image_source_coordinates(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativecoordinates,
-        coordinates.length,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-  );
+  ) => _command((arena, completion) {
+    final nativecoordinates = arena<raw.mln_lat_lng>(
+      coordinates.isEmpty ? 1 : coordinates.length,
+    );
+    for (var index = 0; index < coordinates.length; index++) {
+      nativecoordinates[index] = _writeLatLng(coordinates[index], arena).ref;
+    }
+    return raw.mln_map_set_image_source_coordinates(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativecoordinates,
+      coordinates.length,
+      completion,
+      nativeDiagnostic,
+    );
+  });
   Future<CommandCompletion> setImageSourceImage(
     String sourceId,
     PremultipliedRgba8Image image,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_image_source_image(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        _writePremultipliedRgba8Image(image, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_image_source_image(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      _writePremultipliedRgba8Image(image, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setImageSourceUrl(String sourceId, String url) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_image_source_url(
-            _handle.raw,
-            nativeStringView(sourceId, arena).value,
-            nativeStringView(url, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
+      _command(
+        (arena, completion) => raw.mln_map_set_image_source_url(
+          _handle.raw,
+          nativeStringView(sourceId, arena).value,
+          nativeStringView(url, arena).value,
+          completion,
+          nativeDiagnostic,
+        ),
       );
   Future<CommandCompletion> setLayerFilter(
     String layerId, {
     Uint8List? filter,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_layer_filter(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        filter == null
-            ? nullptr
-            : (() {
-                final storage = arena<raw.mln_buffer_view>();
-                storage.ref = nativeBufferView(filter, arena);
-                return storage;
-              })(),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  }) => _command(
+    (arena, completion) => raw.mln_map_set_layer_filter(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      filter == null
+          ? nullptr
+          : (() {
+              final storage = arena<raw.mln_buffer_view>();
+              storage.ref = nativeBufferView(filter, arena);
+              return storage;
+            })(),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setLayerMaxZoom(String layerId, double maxZoom) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_layer_max_zoom(
-            _handle.raw,
-            nativeStringView(layerId, arena).value,
-            maxZoom,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
+      _command(
+        (arena, completion) => raw.mln_map_set_layer_max_zoom(
+          _handle.raw,
+          nativeStringView(layerId, arena).value,
+          maxZoom,
+          completion,
+          nativeDiagnostic,
+        ),
       );
   Future<CommandCompletion> setLayerMinZoom(String layerId, double minZoom) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_layer_min_zoom(
-            _handle.raw,
-            nativeStringView(layerId, arena).value,
-            minZoom,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
+      _command(
+        (arena, completion) => raw.mln_map_set_layer_min_zoom(
+          _handle.raw,
+          nativeStringView(layerId, arena).value,
+          minZoom,
+          completion,
+          nativeDiagnostic,
+        ),
       );
   Future<CommandCompletion> setLayerProperty(
     String layerId,
     String propertyName,
     Uint8List value,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_layer_property(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        nativeStringView(propertyName, arena).value,
-        nativeBufferView(value, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_layer_property(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      nativeStringView(propertyName, arena).value,
+      nativeBufferView(value, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setLayerSourceId(String layerId, String sourceId) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_layer_source_id(
-            _handle.raw,
-            nativeStringView(layerId, arena).value,
-            nativeStringView(sourceId, arena).value,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
+      _command(
+        (arena, completion) => raw.mln_map_set_layer_source_id(
+          _handle.raw,
+          nativeStringView(layerId, arena).value,
+          nativeStringView(sourceId, arena).value,
+          completion,
+          nativeDiagnostic,
+        ),
       );
   Future<CommandCompletion> setLayerSourceLayer(
     String layerId, {
     String? sourceLayer,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_layer_source_layer(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        nativeStringView((sourceLayer ?? ''), arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  }) => _command(
+    (arena, completion) => raw.mln_map_set_layer_source_layer(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      nativeStringView((sourceLayer ?? ''), arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setLayerVisibility(
     String layerId,
     StyleLayerVisibility visibility,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_layer_visibility(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        visibility.rawValue,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_layer_visibility(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      visibility.rawValue,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setLocationIndicatorAccuracyRadius(
     String layerId,
     double radius,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_location_indicator_accuracy_radius(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        radius,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_location_indicator_accuracy_radius(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      radius,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setLocationIndicatorBearing(
     String layerId,
     double bearing,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_location_indicator_bearing(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        bearing,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_location_indicator_bearing(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      bearing,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setLocationIndicatorImageName(
     String layerId,
     LocationIndicatorImageKind imageKind,
     String imageId,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_location_indicator_image_name(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        imageKind.rawValue,
-        nativeStringView(imageId, arena).value,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_location_indicator_image_name(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      imageKind.rawValue,
+      nativeStringView(imageId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setLocationIndicatorLocation(
     String layerId,
     LatLng coordinate,
     double altitude,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_location_indicator_location(
-        _handle.raw,
-        nativeStringView(layerId, arena).value,
-        _writeLatLng(coordinate, arena).ref,
-        altitude,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_location_indicator_location(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      _writeLatLng(coordinate, arena).ref,
+      altitude,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> setProjectionMode(ProjectionMode mode) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_projection_mode(
-            _handle.raw,
-            _writeProjectionMode(mode, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-      );
+  Future<CommandCompletion> setProjectionMode(ProjectionMode mode) => _command(
+    (arena, completion) => raw.mln_map_set_projection_mode(
+      _handle.raw,
+      _writeProjectionMode(mode, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<CommandCompletion> setRenderingStatsViewEnabled(bool enabled) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_rendering_stats_view_enabled(
-            _handle.raw,
-            enabled,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
+      _command(
+        (arena, completion) => raw.mln_map_set_rendering_stats_view_enabled(
+          _handle.raw,
+          enabled,
+          completion,
+          nativeDiagnostic,
+        ),
       );
   Future<CommandCompletion> setStyleImage(
     String imageId,
     PremultipliedRgba8Image image, {
     StyleImageOptions? options,
-  }) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_style_image(
-        _handle.raw,
-        nativeStringView(imageId, arena).value,
-        _writePremultipliedRgba8Image(image, arena),
-        options == null ? nullptr : _writeStyleImageOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  }) => _command(
+    (arena, completion) => raw.mln_map_set_style_image(
+      _handle.raw,
+      nativeStringView(imageId, arena).value,
+      _writePremultipliedRgba8Image(image, arena),
+      options == null ? nullptr : _writeStyleImageOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> setStyleJson(Uint8List json) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_style_json(
-        _handle.raw,
-        nativeBufferView(json, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> setStyleJson(Uint8List json) => _command(
+    (arena, completion) => raw.mln_map_set_style_json(
+      _handle.raw,
+      nativeBufferView(json, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> setStyleLightJson(Uint8List lightJson) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_style_light_json(
-            _handle.raw,
-            nativeBufferView(lightJson, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-      );
+  Future<CommandCompletion> setStyleLightJson(Uint8List lightJson) => _command(
+    (arena, completion) => raw.mln_map_set_style_light_json(
+      _handle.raw,
+      nativeBufferView(lightJson, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<CommandCompletion> setStyleLightProperty(
     String propertyName,
     Uint8List value,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_style_light_property(
-        _handle.raw,
-        nativeStringView(propertyName, arena).value,
-        nativeBufferView(value, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_style_light_property(
+      _handle.raw,
+      nativeStringView(propertyName, arena).value,
+      nativeBufferView(value, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setStyleSourceVolatile(
     String sourceId,
     bool isVolatile,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_style_source_volatile(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        isVolatile,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_style_source_volatile(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      isVolatile,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<CommandCompletion> setStyleTransitionOptions(
     StyleTransitionOptions options,
-  ) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_style_transition_options(
-        _handle.raw,
-        _writeStyleTransitionOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_style_transition_options(
+      _handle.raw,
+      _writeStyleTransitionOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> setStyleUrl(String url) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_set_style_url(
-        _handle.raw,
-        nativeUtf8CString(url, arena).pointer.cast<Char>(),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> setStyleUrl(String url) => _command(
+    (arena, completion) => raw.mln_map_set_style_url(
+      _handle.raw,
+      nativeUtf8CString(url, arena).pointer.cast<Char>(),
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<CommandCompletion> setTileOptions(MapTileOptions options) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_tile_options(
-            _handle.raw,
-            _writeMapTileOptions(options, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-      );
+  Future<CommandCompletion> setTileOptions(MapTileOptions options) => _command(
+    (arena, completion) => raw.mln_map_set_tile_options(
+      _handle.raw,
+      _writeMapTileOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<CommandCompletion> setViewportOptions(MapViewportOptions options) =>
-      _startCommand(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_map_set_viewport_options(
-            _handle.raw,
-            _writeMapViewportOptions(options, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
+      _command(
+        (arena, completion) => raw.mln_map_set_viewport_options(
+          _handle.raw,
+          _writeMapViewportOptions(options, arena),
+          completion,
+          nativeDiagnostic,
+        ),
       );
   MapSnapshot snapshotGet() => withNativeArena((arena) {
     final outSnapshot = arena<raw.mln_map_snapshot>();
@@ -6116,89 +5527,45 @@ final class MapHandle implements Finalizable {
     );
     return _readMapSnapshot(outSnapshot.ref);
   });
-  Future<String> styleUrl() => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-    elementSize: sizeOf<raw.mln_buffer_view>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_style_url(_handle.raw, completion, nativeDiagnostic);
-    }),
-    decode: (result) => utf8.decode(
-      _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-    ),
-    claimBeforeDecode: false,
+  Future<String> styleUrl() => _query(
+    _resultString,
+    (arena, completion) =>
+        raw.mln_map_style_url(_handle.raw, completion, nativeDiagnostic),
   );
-  Future<CommandCompletion> updateCamera(CameraUpdate update) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_map_update_camera(
-        _handle.raw,
-        _writeCameraUpdate(update, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> updateCamera(CameraUpdate update) => _command(
+    (arena, completion) => raw.mln_map_update_camera(
+      _handle.raw,
+      _writeCameraUpdate(update, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   RenderSessionAttachment metalBorrowedTextureAttach(
     MetalBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_metal_borrowed_texture_attach(
-            _handle.raw,
-            _writeMetalBorrowedTextureDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_metal_borrowed_texture_attach(
+          _handle.raw,
+          _writeMetalBorrowedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 
@@ -6206,62 +5573,28 @@ final class MapHandle implements Finalizable {
     MetalOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_metal_owned_texture_attach(
-            _handle.raw,
-            _writeMetalOwnedTextureDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_metal_owned_texture_attach(
+          _handle.raw,
+          _writeMetalOwnedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 
@@ -6269,62 +5602,28 @@ final class MapHandle implements Finalizable {
     MetalSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_metal_surface_attach(
-            _handle.raw,
-            _writeMetalSurfaceDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_metal_surface_attach(
+          _handle.raw,
+          _writeMetalSurfaceDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 
@@ -6332,62 +5631,28 @@ final class MapHandle implements Finalizable {
     OpenglBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_opengl_borrowed_texture_attach(
-            _handle.raw,
-            _writeOpenglBorrowedTextureDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_opengl_borrowed_texture_attach(
+          _handle.raw,
+          _writeOpenglBorrowedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 
@@ -6395,62 +5660,28 @@ final class MapHandle implements Finalizable {
     OpenglOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_opengl_owned_texture_attach(
-            _handle.raw,
-            _writeOpenglOwnedTextureDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_opengl_owned_texture_attach(
+          _handle.raw,
+          _writeOpenglOwnedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 
@@ -6458,62 +5689,28 @@ final class MapHandle implements Finalizable {
     OpenglSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_opengl_surface_attach(
-            _handle.raw,
-            _writeOpenglSurfaceDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_opengl_surface_attach(
+          _handle.raw,
+          _writeOpenglSurfaceDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 
@@ -6521,62 +5718,28 @@ final class MapHandle implements Finalizable {
     VulkanBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_vulkan_borrowed_texture_attach(
-            _handle.raw,
-            _writeVulkanBorrowedTextureDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_vulkan_borrowed_texture_attach(
+          _handle.raw,
+          _writeVulkanBorrowedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 
@@ -6584,62 +5747,28 @@ final class MapHandle implements Finalizable {
     VulkanOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_vulkan_owned_texture_attach(
-            _handle.raw,
-            _writeVulkanOwnedTextureDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_vulkan_owned_texture_attach(
+          _handle.raw,
+          _writeVulkanOwnedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 
@@ -6647,62 +5776,28 @@ final class MapHandle implements Finalizable {
     VulkanSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_vulkan_surface_attach(
-            _handle.raw,
-            _writeVulkanSurfaceDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_vulkan_surface_attach(
+          _handle.raw,
+          _writeVulkanSurfaceDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 
@@ -6710,62 +5805,28 @@ final class MapHandle implements Finalizable {
     WebgpuBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_webgpu_borrowed_texture_attach(
-            _handle.raw,
-            _writeWebgpuBorrowedTextureDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_webgpu_borrowed_texture_attach(
+          _handle.raw,
+          _writeWebgpuBorrowedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 
@@ -6773,62 +5834,28 @@ final class MapHandle implements Finalizable {
     WebgpuOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_webgpu_owned_texture_attach(
-            _handle.raw,
-            _writeWebgpuOwnedTextureDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_webgpu_owned_texture_attach(
+          _handle.raw,
+          _writeWebgpuOwnedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 
@@ -6836,62 +5863,28 @@ final class MapHandle implements Finalizable {
     WebgpuSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
   ) {
-    RenderSessionHandle? created;
-    Object? adoptionError;
-    StackTrace? adoptionStack;
-    final completed = startNativeCompletion<void>(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        final registrations = _NativeRegistrations(_NativeCallbackPorts());
-        try {
-          final outSession = arena<Uint64>();
-          final status = raw.mln_webgpu_surface_attach(
-            _handle.raw,
-            _writeWebgpuSurfaceDescriptor(descriptor, arena),
-            _writeRenderSessionAttachOptions(options, arena, registrations),
-            outSession,
-            completion,
-            nativeDiagnostic,
-          );
-          if (status == nativeStatusOk) {
-            registrations.accept();
-            try {
-              created = _adoptOwned(
-                outSession.value,
-                () => (RenderSessionHandle._(
-                  this,
-                  NativeRenderSession(outSession.value),
-                ).._state.retain(registrations)),
-                (handle) {
-                  _check(
-                    raw.mln_render_session_dispose(handle, nativeDiagnostic),
-                  );
-                },
-              );
-            } catch (error, stack) {
-              adoptionError = error;
-              adoptionStack = stack;
-            }
-          }
-          return status;
-        } finally {
-          registrations.close();
-        }
-      }),
-      decode: (_) {},
-    );
-    if (adoptionError != null) {
-      completed.ignore();
-      Error.throwWithStackTrace(adoptionError!, adoptionStack!);
-    }
-    final owner = created!;
-    return RenderSessionAttachment(
-      owner,
-      completed.whenComplete(() {
-        owner.isClosed;
-      }),
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_webgpu_surface_attach(
+          _handle.raw,
+          _writeWebgpuSurfaceDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
     );
   }
 }
@@ -6913,9 +5906,7 @@ final class MapProjectionHandle implements Finalizable {
   BigInt get identity => uint64FromNative(_state.handleId);
 
   void close() => _state.close(
-    (handle) => withNativeArena((arena) {
-      return raw.mln_map_projection_close(handle.raw, nativeDiagnostic);
-    }),
+    (handle) => raw.mln_map_projection_close(handle.raw, nativeDiagnostic),
   );
   CameraOptions getCamera() => withNativeArena((arena) {
     final outCamera = arena<raw.mln_camera_options>();
@@ -7049,7 +6040,7 @@ final class RenderFrameBatchHandle implements Finalizable {
     _check(
       raw.mln_render_frame_batch_get(
         _handle.raw,
-        _generatedInteger(
+        _nativeInteger(
           indexValue,
           0,
           sizeOf<Size>() == 4 ? 4294967295 : 0x7fffffffffffffff,
@@ -7060,12 +6051,10 @@ final class RenderFrameBatchHandle implements Finalizable {
     );
     return _readRenderFrameResult(outResult.ref);
   });
-  void close() => _state.close(
-    (handle) => withNativeArena((arena) {
-      raw.mln_render_frame_batch_release(handle.raw);
-      return nativeStatusOk;
-    }),
-  );
+  void close() => _state.close((handle) {
+    raw.mln_render_frame_batch_release(handle.raw);
+    return nativeStatusOk;
+  });
 }
 
 /// Issued `mln_render_session` handle id.
@@ -7089,71 +6078,40 @@ final class RenderSessionHandle implements Finalizable {
 
   Future<void> metalBorrowedTextureSetTarget(
     MetalBorrowedTextureDescriptor descriptor,
-  ) => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_metal_borrowed_texture_set_target(
-        _handle.raw,
-        _writeMetalBorrowedTextureDescriptor(descriptor, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  ) => _run(
+    (arena, completion) => raw.mln_metal_borrowed_texture_set_target(
+      _handle.raw,
+      _writeMetalBorrowedTextureDescriptor(descriptor, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<void> metalSurfaceSetTarget(MetalSurfaceDescriptor descriptor) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
-        elementSize: 0,
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_metal_surface_set_target(
-            _handle.raw,
-            _writeMetalSurfaceDescriptor(descriptor, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) {},
-        claimBeforeDecode: false,
-      );
+  Future<void> metalSurfaceSetTarget(MetalSurfaceDescriptor descriptor) => _run(
+    (arena, completion) => raw.mln_metal_surface_set_target(
+      _handle.raw,
+      _writeMetalSurfaceDescriptor(descriptor, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<void> openglBorrowedTextureSetTarget(
     OpenglBorrowedTextureDescriptor descriptor,
-  ) => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_opengl_borrowed_texture_set_target(
-        _handle.raw,
-        _writeOpenglBorrowedTextureDescriptor(descriptor, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  ) => _run(
+    (arena, completion) => raw.mln_opengl_borrowed_texture_set_target(
+      _handle.raw,
+      _writeOpenglBorrowedTextureDescriptor(descriptor, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<void> openglSurfaceSetTarget(OpenglSurfaceDescriptor descriptor) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
-        elementSize: 0,
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_opengl_surface_set_target(
-            _handle.raw,
-            _writeOpenglSurfaceDescriptor(descriptor, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) {},
-        claimBeforeDecode: false,
+      _run(
+        (arena, completion) => raw.mln_opengl_surface_set_target(
+          _handle.raw,
+          _writeOpenglSurfaceDescriptor(descriptor, arena),
+          completion,
+          nativeDiagnostic,
+        ),
       );
   RenderAbandonResult abandon() => withNativeArena((arena) {
     final outResult = arena<raw.mln_render_abandon_result>();
@@ -7180,57 +6138,32 @@ final class RenderSessionHandle implements Finalizable {
       },
     );
   });
-  Future<void> barrier() => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_barrier(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<void> barrier() => _run(
+    (arena, completion) => raw.mln_render_session_barrier(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<void> clearData() => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_clear_data(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<void> clearData() => _run(
+    (arena, completion) => raw.mln_render_session_clear_data(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   void close() => _state.close(
-    (handle) => withNativeArena((arena) {
-      return raw.mln_render_session_destroy(handle.raw, nativeDiagnostic);
-    }),
+    (handle) => raw.mln_render_session_destroy(handle.raw, nativeDiagnostic),
   );
-  Future<void> detach() => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_detach(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<void> detach() => _run(
+    (arena, completion) => raw.mln_render_session_detach(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   void dispose() => _state.close(
-    (handle) => withNativeArena((arena) {
-      return raw.mln_render_session_dispose(handle.raw, nativeDiagnostic);
-    }),
+    (handle) => raw.mln_render_session_dispose(handle.raw, nativeDiagnostic),
   );
   RenderFrameBatchHandle drainFrameResults() => withNativeArena((arena) {
     final outBatch = arena<Uint64>();
@@ -7249,19 +6182,12 @@ final class RenderSessionHandle implements Finalizable {
       },
     );
   });
-  Future<void> dumpDebugLogs() => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_dump_debug_logs(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<void> dumpDebugLogs() => _run(
+    (arena, completion) => raw.mln_render_session_dump_debug_logs(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   RenderSessionCapabilities getCapabilities() => withNativeArena((arena) {
     final outCapabilities = arena<raw.mln_render_session_capabilities>();
@@ -7310,104 +6236,61 @@ final class RenderSessionHandle implements Finalizable {
     String extensionValue,
     String extensionField, {
     Uint8List? arguments,
-  }) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-    elementSize: sizeOf<raw.mln_buffer_view>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_query_feature_extensions(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        nativeBufferView(feature, arena),
-        nativeStringView(extensionValue, arena).value,
-        nativeStringView(extensionField, arena).value,
-        arguments == null
-            ? nullptr
-            : (() {
-                final storage = arena<raw.mln_buffer_view>();
-                storage.ref = nativeBufferView(arguments, arena);
-                return storage;
-              })(),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) =>
-        _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
-    claimBeforeDecode: false,
+  }) => _query(
+    _resultUint8List,
+    (arena, completion) => raw.mln_render_session_query_feature_extensions(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      nativeBufferView(feature, arena),
+      nativeStringView(extensionValue, arena).value,
+      nativeStringView(extensionField, arena).value,
+      arguments == null
+          ? nullptr
+          : (() {
+              final storage = arena<raw.mln_buffer_view>();
+              storage.ref = nativeBufferView(arguments, arena);
+              return storage;
+            })(),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<List<QueriedFeature>> queryRenderedFeatures(
     RenderedQueryGeometry geometry, {
     RenderedFeatureQueryOptions? options,
-  }) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE,
-    elementSize: sizeOf<raw.mln_queried_feature>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_query_rendered_features(
-        _handle.raw,
-        _writeRenderedQueryGeometry(geometry, arena),
-        options == null
-            ? nullptr
-            : _writeRenderedFeatureQueryOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => List<QueriedFeature>.unmodifiable(
-      List.generate(
-        result.value_count,
-        (index) => _readQueriedFeature(
-          result.value.cast<raw.mln_queried_feature>()[index],
-        ),
-      ),
+  }) => _queryList(
+    _resultQueriedFeature,
+    (arena, completion) => raw.mln_render_session_query_rendered_features(
+      _handle.raw,
+      _writeRenderedQueryGeometry(geometry, arena),
+      options == null
+          ? nullptr
+          : _writeRenderedFeatureQueryOptions(options, arena),
+      completion,
+      nativeDiagnostic,
     ),
-    claimBeforeDecode: false,
   );
   Future<List<QueriedFeature>> querySourceFeatures(
     String sourceId, {
     SourceFeatureQueryOptions? options,
-  }) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE,
-    elementSize: sizeOf<raw.mln_queried_feature>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_query_source_features(
-        _handle.raw,
-        nativeStringView(sourceId, arena).value,
-        options == null
-            ? nullptr
-            : _writeSourceFeatureQueryOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => List<QueriedFeature>.unmodifiable(
-      List.generate(
-        result.value_count,
-        (index) => _readQueriedFeature(
-          result.value.cast<raw.mln_queried_feature>()[index],
-        ),
-      ),
+  }) => _queryList(
+    _resultQueriedFeature,
+    (arena, completion) => raw.mln_render_session_query_source_features(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      options == null
+          ? nullptr
+          : _writeSourceFeatureQueryOptions(options, arena),
+      completion,
+      nativeDiagnostic,
     ),
-    claimBeforeDecode: false,
   );
-  Future<void> reduceMemoryUse() => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_reduce_memory_use(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<void> reduceMemoryUse() => _run(
+    (arena, completion) => raw.mln_render_session_reduce_memory_use(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   void requestFrame(FrameDemand demand) => withNativeArena((arena) {
     _check(
@@ -7418,22 +6301,20 @@ final class RenderSessionHandle implements Finalizable {
       ),
     );
   });
-  Future<CommandCompletion> resize(RenderTargetExtent extent) => _startCommand(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_resize(
-        _handle.raw,
-        _writeRenderTargetExtent(extent, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
+  Future<CommandCompletion> resize(RenderTargetExtent extent) => _command(
+    (arena, completion) => raw.mln_render_session_resize(
+      _handle.raw,
+      _writeRenderTargetExtent(extent, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   int serviceDriverWork(int maxWork) => withNativeArena((arena) {
     final outServiced = arena<Size>();
     _check(
       raw.mln_render_session_service_driver_work(
         _handle.raw,
-        _generatedInteger(
+        _nativeInteger(
           maxWork,
           0,
           sizeOf<Size>() == 4 ? 4294967295 : 0x7fffffffffffffff,
@@ -7444,91 +6325,51 @@ final class RenderSessionHandle implements Finalizable {
     );
     return outServiced.value;
   });
-  Future<TextureReadbackResult> textureReadPremultipliedRgba8() =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT,
-        elementSize: sizeOf<raw.mln_texture_readback_result>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_texture_read_premultiplied_rgba8(
-            _handle.raw,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => _readTextureReadbackResult(
-          result.value.cast<raw.mln_texture_readback_result>().ref,
-        ),
-        claimBeforeDecode: false,
-      );
+  Future<TextureReadbackResult> textureReadPremultipliedRgba8() => _query(
+    _resultTextureReadbackResult,
+    (arena, completion) => raw.mln_texture_read_premultiplied_rgba8(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<void> vulkanBorrowedTextureSetTarget(
     VulkanBorrowedTextureDescriptor descriptor,
-  ) => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_vulkan_borrowed_texture_set_target(
-        _handle.raw,
-        _writeVulkanBorrowedTextureDescriptor(descriptor, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  ) => _run(
+    (arena, completion) => raw.mln_vulkan_borrowed_texture_set_target(
+      _handle.raw,
+      _writeVulkanBorrowedTextureDescriptor(descriptor, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<void> vulkanSurfaceSetTarget(VulkanSurfaceDescriptor descriptor) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
-        elementSize: 0,
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_vulkan_surface_set_target(
-            _handle.raw,
-            _writeVulkanSurfaceDescriptor(descriptor, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) {},
-        claimBeforeDecode: false,
+      _run(
+        (arena, completion) => raw.mln_vulkan_surface_set_target(
+          _handle.raw,
+          _writeVulkanSurfaceDescriptor(descriptor, arena),
+          completion,
+          nativeDiagnostic,
+        ),
       );
   Future<void> webgpuBorrowedTextureSetTarget(
     WebgpuBorrowedTextureDescriptor descriptor,
-  ) => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_webgpu_borrowed_texture_set_target(
-        _handle.raw,
-        _writeWebgpuBorrowedTextureDescriptor(descriptor, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  ) => _run(
+    (arena, completion) => raw.mln_webgpu_borrowed_texture_set_target(
+      _handle.raw,
+      _writeWebgpuBorrowedTextureDescriptor(descriptor, arena),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<void> webgpuSurfaceSetTarget(WebgpuSurfaceDescriptor descriptor) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
-        elementSize: 0,
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_webgpu_surface_set_target(
-            _handle.raw,
-            _writeWebgpuSurfaceDescriptor(descriptor, arena),
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) {},
-        claimBeforeDecode: false,
+      _run(
+        (arena, completion) => raw.mln_webgpu_surface_set_target(
+          _handle.raw,
+          _writeWebgpuSurfaceDescriptor(descriptor, arena),
+          completion,
+          nativeDiagnostic,
+        ),
       );
 }
 
@@ -7570,12 +6411,10 @@ final class ResourceRequestHandle implements Finalizable {
       ),
     );
   });
-  void close() => _state.close(
-    (handle) => withNativeArena((arena) {
-      raw.mln_resource_request_release(handle.raw);
-      return nativeStatusOk;
-    }),
-  );
+  void close() => _state.close((handle) {
+    raw.mln_resource_request_release(handle.raw);
+    return nativeStatusOk;
+  });
   bool setCancelCallback(
     ResourceRequestCancelCallback callback,
   ) => withNativeArena((arena) {
@@ -7621,14 +6460,12 @@ final class ResourceRequestHandle implements Finalizable {
       }
     }
   });
-  void waitUntilRetired() => withNativeArena((arena) {
-    _check(
-      raw.mln_resource_request_wait_until_retired(
-        _state.handleId,
-        nativeDiagnostic,
-      ),
-    );
-  });
+  void waitUntilRetired() => _check(
+    raw.mln_resource_request_wait_until_retired(
+      _state.handleId,
+      nativeDiagnostic,
+    ),
+  );
 }
 
 /// Issued `mln_runtime` handle id.
@@ -7649,83 +6486,49 @@ final class RuntimeHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
-  Future<MapHandle> mapCreate(MapOptions options) => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_MAP,
-    elementSize: sizeOf<Uint64>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_map_create(
-        _handle.raw,
-        _writeMapOptions(options, arena),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => _adoptOwned(
-      result.value.cast<Uint64>().value,
-      () => MapHandle._(this, NativeMap(result.value.cast<Uint64>().value)),
+  Future<MapHandle> mapCreate(MapOptions options) => _queryOwned(
+    raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_MAP,
+    (arena, completion) => raw.mln_map_create(
+      _handle.raw,
+      _writeMapOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+    (handle) => _adoptOwned(
+      handle,
+      () => MapHandle._(this, NativeMap(handle)),
       (handle) {
         _check(raw.mln_map_dispose(handle, nativeDiagnostic));
       },
     ),
-    claimBeforeDecode: true,
   );
-  Future<void> barrier() => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_barrier(_handle.raw, completion, nativeDiagnostic);
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<void> barrier() => _run(
+    (arena, completion) =>
+        raw.mln_runtime_barrier(_handle.raw, completion, nativeDiagnostic),
   );
-  Future<void> clearHttpHeaderTransform() => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_clear_http_header_transform(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<void> clearHttpHeaderTransform() => _run(
+    (arena, completion) => raw.mln_runtime_clear_http_header_transform(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<void> clearResourceProvider() => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_clear_resource_provider(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<void> clearResourceProvider() => _run(
+    (arena, completion) => raw.mln_runtime_clear_resource_provider(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<void> clearResourceTransform() => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_clear_resource_transform(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<void> clearResourceTransform() => _run(
+    (arena, completion) => raw.mln_runtime_clear_resource_transform(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   void dispose() => _state.close(
-    (handle) => withNativeArena((arena) {
-      return raw.mln_runtime_dispose(handle.raw, nativeDiagnostic);
-    }),
+    (handle) => raw.mln_runtime_dispose(handle.raw, nativeDiagnostic),
   );
   EventBatchHandle drainEvents() => withNativeArena((arena) {
     final outBatch = arena<Uint64>();
@@ -7750,339 +6553,181 @@ final class RuntimeHandle implements Finalizable {
   Future<OfflineRegionInfo> offlineRegionCreate(
     OfflineRegionDefinition definition,
     Uint8List metadata,
-  ) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO,
-    elementSize: sizeOf<raw.mln_offline_region_info>(),
-    start: (completion) => withNativeArena((arena) {
-      final bytesmetadata = nativeBufferView(metadata, arena);
-      return raw.mln_runtime_offline_region_create(
-        _handle.raw,
-        _writeOfflineRegionDefinition(definition, arena),
-        bytesmetadata.data.cast(),
-        bytesmetadata.size,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => _readOfflineRegionInfo(
-      result.value.cast<raw.mln_offline_region_info>().ref,
+  ) => _query(_resultOfflineRegionInfo, (arena, completion) {
+    final bytesmetadata = nativeBufferView(metadata, arena);
+    return raw.mln_runtime_offline_region_create(
+      _handle.raw,
+      _writeOfflineRegionDefinition(definition, arena),
+      bytesmetadata.data.cast(),
+      bytesmetadata.size,
+      completion,
+      nativeDiagnostic,
+    );
+  });
+  Future<void> offlineRegionDelete(int regionId) => _run(
+    (arena, completion) => raw.mln_runtime_offline_region_delete(
+      _handle.raw,
+      regionId,
+      completion,
+      nativeDiagnostic,
     ),
-    claimBeforeDecode: false,
   );
-  Future<void> offlineRegionDelete(int regionId) => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_offline_region_delete(
-        _handle.raw,
-        regionId,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<OfflineRegionInfo?> offlineRegionGet(int regionId) => _queryOptional(
+    _resultOfflineRegionInfo,
+    (arena, completion) => raw.mln_runtime_offline_region_get(
+      _handle.raw,
+      regionId,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<OfflineRegionInfo?> offlineRegionGet(int regionId) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO,
-        elementSize: sizeOf<raw.mln_offline_region_info>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_runtime_offline_region_get(
-            _handle.raw,
-            regionId,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => result.value_count == 0
-            ? null
-            : _readOfflineRegionInfo(
-                result.value.cast<raw.mln_offline_region_info>().ref,
-              ),
-        claimBeforeDecode: false,
-      );
-  Future<OfflineRegionStatus> offlineRegionGetStatus(int regionId) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS,
-        elementSize: sizeOf<raw.mln_offline_region_status>(),
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_runtime_offline_region_get_status(
-            _handle.raw,
-            regionId,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) => _readOfflineRegionStatus(
-          result.value.cast<raw.mln_offline_region_status>().ref,
-        ),
-        claimBeforeDecode: false,
-      );
-  Future<void> offlineRegionInvalidate(int regionId) => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_offline_region_invalidate(
-        _handle.raw,
-        regionId,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  Future<OfflineRegionStatus> offlineRegionGetStatus(int regionId) => _query(
+    _resultOfflineRegionStatus,
+    (arena, completion) => raw.mln_runtime_offline_region_get_status(
+      _handle.raw,
+      regionId,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+  Future<void> offlineRegionInvalidate(int regionId) => _run(
+    (arena, completion) => raw.mln_runtime_offline_region_invalidate(
+      _handle.raw,
+      regionId,
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<void> offlineRegionSetDownloadState(
     int regionId,
     OfflineRegionDownloadState state,
-  ) => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_offline_region_set_download_state(
-        _handle.raw,
-        regionId,
-        state.rawValue,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+  ) => _run(
+    (arena, completion) => raw.mln_runtime_offline_region_set_download_state(
+      _handle.raw,
+      regionId,
+      state.rawValue,
+      completion,
+      nativeDiagnostic,
+    ),
   );
-  Future<void> offlineRegionSetObserved(int regionId, bool observed) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
-        elementSize: 0,
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_runtime_offline_region_set_observed(
-            _handle.raw,
-            regionId,
-            observed,
-            completion,
-            nativeDiagnostic,
-          );
-        }),
-        decode: (result) {},
-        claimBeforeDecode: false,
-      );
+  Future<void> offlineRegionSetObserved(int regionId, bool observed) => _run(
+    (arena, completion) => raw.mln_runtime_offline_region_set_observed(
+      _handle.raw,
+      regionId,
+      observed,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
   Future<OfflineRegionInfo> offlineRegionUpdateMetadata(
     int regionId,
     Uint8List metadata,
-  ) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO,
-    elementSize: sizeOf<raw.mln_offline_region_info>(),
-    start: (completion) => withNativeArena((arena) {
-      final bytesmetadata = nativeBufferView(metadata, arena);
-      return raw.mln_runtime_offline_region_update_metadata(
-        _handle.raw,
-        regionId,
-        bytesmetadata.data.cast(),
-        bytesmetadata.size,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => _readOfflineRegionInfo(
-      result.value.cast<raw.mln_offline_region_info>().ref,
+  ) => _query(_resultOfflineRegionInfo, (arena, completion) {
+    final bytesmetadata = nativeBufferView(metadata, arena);
+    return raw.mln_runtime_offline_region_update_metadata(
+      _handle.raw,
+      regionId,
+      bytesmetadata.data.cast(),
+      bytesmetadata.size,
+      completion,
+      nativeDiagnostic,
+    );
+  });
+  Future<List<OfflineRegionInfo>> offlineRegionsList() => _queryList(
+    _resultOfflineRegionInfo,
+    (arena, completion) => raw.mln_runtime_offline_regions_list(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
     ),
-    claimBeforeDecode: false,
-  );
-  Future<List<OfflineRegionInfo>> offlineRegionsList() => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO,
-    elementSize: sizeOf<raw.mln_offline_region_info>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_offline_regions_list(
-        _handle.raw,
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => List<OfflineRegionInfo>.unmodifiable(
-      List.generate(
-        result.value_count,
-        (index) => _readOfflineRegionInfo(
-          result.value.cast<raw.mln_offline_region_info>()[index],
-        ),
-      ),
-    ),
-    claimBeforeDecode: false,
   );
   Future<List<OfflineRegionInfo>> offlineRegionsMergeDatabase(
     String sideDatabasePath,
-  ) => startNativeCompletion(
-    copyKind: raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO,
-    elementSize: sizeOf<raw.mln_offline_region_info>(),
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_offline_regions_merge_database(
-        _handle.raw,
-        nativeUtf8CString(sideDatabasePath, arena).pointer.cast<Char>(),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) => List<OfflineRegionInfo>.unmodifiable(
-      List.generate(
-        result.value_count,
-        (index) => _readOfflineRegionInfo(
-          result.value.cast<raw.mln_offline_region_info>()[index],
-        ),
-      ),
+  ) => _queryList(
+    _resultOfflineRegionInfo,
+    (arena, completion) => raw.mln_runtime_offline_regions_merge_database(
+      _handle.raw,
+      nativeUtf8CString(sideDatabasePath, arena).pointer.cast<Char>(),
+      completion,
+      nativeDiagnostic,
     ),
-    claimBeforeDecode: false,
   );
   Future<void> close() => _state.closeAsync(
-    (handle) => startNativeCompletion(
-      copyKind:
-          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-      elementSize: 0,
-      start: (completion) => withNativeArena((arena) {
-        return raw.mln_runtime_release(
-          handle.raw,
-          completion,
-          nativeDiagnostic,
-        );
-      }),
-      decode: (result) {},
+    (handle) => _run(
+      (arena, completion) =>
+          raw.mln_runtime_release(handle.raw, completion, nativeDiagnostic),
     ),
   );
   Future<void> runAmbientCacheOperation(AmbientCacheOperation operation) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
-        elementSize: 0,
-        start: (completion) => withNativeArena((arena) {
-          return raw.mln_runtime_run_ambient_cache_operation(
+      _run(
+        (arena, completion) => raw.mln_runtime_run_ambient_cache_operation(
+          _handle.raw,
+          operation.rawValue,
+          completion,
+          nativeDiagnostic,
+        ),
+      );
+  void setEventMask(RuntimeEventMask mask) => _check(
+    raw.mln_runtime_set_event_mask(
+      _handle.raw,
+      mask.rawValue,
+      nativeDiagnostic,
+    ),
+  );
+  Future<void> setHttpHeaderTransform(HttpHeaderTransform transform) =>
+      _run((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackPorts);
+        return registrations.run(
+          () => raw.mln_runtime_set_http_header_transform(
             _handle.raw,
-            operation.rawValue,
+            registrations.add(
+              _prepareHttpHeaderTransform(transform, _callbackReleases),
+            ),
             completion,
             nativeDiagnostic,
-          );
-        }),
-        decode: (result) {},
-        claimBeforeDecode: false,
-      );
-  void setEventMask(RuntimeEventMask mask) => withNativeArena((arena) {
-    _check(
-      raw.mln_runtime_set_event_mask(
-        _handle.raw,
-        mask.rawValue,
-        nativeDiagnostic,
-      ),
-    );
-  });
-  Future<void> setHttpHeaderTransform(HttpHeaderTransform transform) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
-        elementSize: 0,
-        start: (completion) => withNativeArena((arena) {
-          final registrations = _NativeRegistrations(_callbackPorts);
-          try {
-            final status = raw.mln_runtime_set_http_header_transform(
-              _handle.raw,
-              registrations.prepareHttpHeaderTransform(transform),
-              completion,
-              nativeDiagnostic,
-            );
-            if (status == nativeStatusOk) {
-              registrations.accept();
-            }
-            return status;
-          } finally {
-            registrations.close();
-          }
-        }),
-        decode: (result) {},
-        claimBeforeDecode: false,
-      );
-  Future<void> setMaximumAmbientCacheSize(BigInt size) => startNativeCompletion(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
-    start: (completion) => withNativeArena((arena) {
-      return raw.mln_runtime_set_maximum_ambient_cache_size(
-        _handle.raw,
-        uint64ToNative(size, 'uint64_t'),
-        completion,
-        nativeDiagnostic,
-      );
-    }),
-    decode: (result) {},
-    claimBeforeDecode: false,
+          ),
+        );
+      });
+  Future<void> setMaximumAmbientCacheSize(BigInt size) => _run(
+    (arena, completion) => raw.mln_runtime_set_maximum_ambient_cache_size(
+      _handle.raw,
+      uint64ToNative(size, 'uint64_t'),
+      completion,
+      nativeDiagnostic,
+    ),
   );
   Future<void> setResourceProvider(ResourceProvider provider) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
-        elementSize: 0,
-        start: (completion) => withNativeArena((arena) {
-          final registrations = _NativeRegistrations(_callbackPorts);
-          try {
-            final status = raw.mln_runtime_set_resource_provider(
-              _handle.raw,
-              registrations.prepareResourceProvider(provider),
-              completion,
-              nativeDiagnostic,
-            );
-            if (status == nativeStatusOk) {
-              registrations.accept();
-            }
-            return status;
-          } finally {
-            registrations.close();
-          }
-        }),
-        decode: (result) {},
-        claimBeforeDecode: false,
-      );
+      _run((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackPorts);
+        return registrations.run(
+          () => raw.mln_runtime_set_resource_provider(
+            _handle.raw,
+            registrations.add(
+              _prepareResourceProvider(
+                provider,
+                _callbackReleases,
+                registrations.ports,
+              ),
+            ),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
   Future<void> setResourceTransform(ResourceTransform transform) =>
-      startNativeCompletion(
-        copyKind: raw
-            .mln_adapter_completion_copy_kind
-            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
-        elementSize: 0,
-        start: (completion) => withNativeArena((arena) {
-          final registrations = _NativeRegistrations(_callbackPorts);
-          try {
-            final status = raw.mln_runtime_set_resource_transform(
-              _handle.raw,
-              registrations.prepareResourceTransform(transform),
-              completion,
-              nativeDiagnostic,
-            );
-            if (status == nativeStatusOk) {
-              registrations.accept();
-            }
-            return status;
-          } finally {
-            registrations.close();
-          }
-        }),
-        decode: (result) {},
-        claimBeforeDecode: false,
-      );
+      _run((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackPorts);
+        return registrations.run(
+          () => raw.mln_runtime_set_resource_transform(
+            _handle.raw,
+            registrations.add(
+              _prepareResourceTransform(transform, _callbackReleases),
+            ),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
 }
 
 /// A new session and the completion of the attachment that created it.
@@ -8098,315 +6743,128 @@ final class RenderSessionAttachment {
 
 final class ScopedMetalOwnedTextureFrame {
   ScopedMetalOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
-    : _scope = _GeneratedNativeViewScope(
+    : _scope = _NativeViewScope(
         () => owner._handle,
         raw.mln_adapter_acquired_frame_view_begin,
         raw.mln_adapter_acquired_frame_view_end,
       );
   final MetalOwnedTextureFrame _value;
-  final _GeneratedNativeViewScope _scope;
+  final _NativeViewScope _scope;
   T withView<T>(T Function(ScopedMetalOwnedTextureFrame) use) =>
       _scope.use(() => use(this));
-  BigInt get generation {
-    _scope.checkActive();
-    return _value.generation;
-  }
-
-  int get width {
-    _scope.checkActive();
-    return _value.width;
-  }
-
-  int get height {
-    _scope.checkActive();
-    return _value.height;
-  }
-
-  double get scaleFactor {
-    _scope.checkActive();
-    return _value.scaleFactor;
-  }
-
-  BigInt get frameId {
-    _scope.checkActive();
-    return _value.frameId;
-  }
-
-  ScopedNativePointer get texture {
-    _scope.checkActive();
-    return ScopedNativePointer(
-      _value.texture.address,
-      checkValid: _scope.checkActive,
-      debugName: 'MetalOwnedTextureFrame.texture',
-    );
-  }
-
-  ScopedNativePointer get device {
-    _scope.checkActive();
-    return ScopedNativePointer(
-      _value.device.address,
-      checkValid: _scope.checkActive,
-      debugName: 'MetalOwnedTextureFrame.device',
-    );
-  }
-
-  BigInt get pixelFormat {
-    _scope.checkActive();
-    return _value.pixelFormat;
-  }
+  BigInt get generation => _scope.active(_value).generation;
+  int get width => _scope.active(_value).width;
+  int get height => _scope.active(_value).height;
+  double get scaleFactor => _scope.active(_value).scaleFactor;
+  BigInt get frameId => _scope.active(_value).frameId;
+  ScopedNativePointer get texture => ScopedNativePointer(
+    _value.texture.address,
+    checkValid: _scope.checkActive,
+    debugName: 'MetalOwnedTextureFrame.texture',
+  );
+  ScopedNativePointer get device => ScopedNativePointer(
+    _value.device.address,
+    checkValid: _scope.checkActive,
+    debugName: 'MetalOwnedTextureFrame.device',
+  );
+  BigInt get pixelFormat => _scope.active(_value).pixelFormat;
 }
 
 final class ScopedOpenglOwnedTextureFrame {
   ScopedOpenglOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
-    : _scope = _GeneratedNativeViewScope(
+    : _scope = _NativeViewScope(
         () => owner._handle,
         raw.mln_adapter_acquired_frame_view_begin,
         raw.mln_adapter_acquired_frame_view_end,
       );
   final OpenglOwnedTextureFrame _value;
-  final _GeneratedNativeViewScope _scope;
+  final _NativeViewScope _scope;
   T withView<T>(T Function(ScopedOpenglOwnedTextureFrame) use) =>
       _scope.use(() => use(this));
-  BigInt get generation {
-    _scope.checkActive();
-    return _value.generation;
-  }
-
-  int get width {
-    _scope.checkActive();
-    return _value.width;
-  }
-
-  int get height {
-    _scope.checkActive();
-    return _value.height;
-  }
-
-  double get scaleFactor {
-    _scope.checkActive();
-    return _value.scaleFactor;
-  }
-
-  BigInt get frameId {
-    _scope.checkActive();
-    return _value.frameId;
-  }
-
-  int get texture {
-    _scope.checkActive();
-    return _value.texture;
-  }
-
-  int get target {
-    _scope.checkActive();
-    return _value.target;
-  }
-
-  int get internalFormat {
-    _scope.checkActive();
-    return _value.internalFormat;
-  }
-
-  int get format {
-    _scope.checkActive();
-    return _value.format;
-  }
-
-  int get type {
-    _scope.checkActive();
-    return _value.type;
-  }
+  BigInt get generation => _scope.active(_value).generation;
+  int get width => _scope.active(_value).width;
+  int get height => _scope.active(_value).height;
+  double get scaleFactor => _scope.active(_value).scaleFactor;
+  BigInt get frameId => _scope.active(_value).frameId;
+  int get texture => _scope.active(_value).texture;
+  int get target => _scope.active(_value).target;
+  int get internalFormat => _scope.active(_value).internalFormat;
+  int get format => _scope.active(_value).format;
+  int get type => _scope.active(_value).type;
 }
 
 final class ScopedGpuSync {
   ScopedGpuSync._(AcquiredFrameHandle owner, this._value)
-    : _scope = _GeneratedNativeViewScope(
+    : _scope = _NativeViewScope(
         () => owner._handle,
         raw.mln_adapter_acquired_frame_view_begin,
         raw.mln_adapter_acquired_frame_view_end,
       );
   final GpuSync _value;
-  final _GeneratedNativeViewScope _scope;
+  final _NativeViewScope _scope;
   T withView<T>(T Function(ScopedGpuSync) use) => _scope.use(() => use(this));
-  GpuSyncKind get kind {
-    _scope.checkActive();
-    return _value.kind;
-  }
-
-  BigInt get object {
-    _scope.checkActive();
-    return _value.object;
-  }
-
-  BigInt get value {
-    _scope.checkActive();
-    return _value.value;
-  }
+  GpuSyncKind get kind => _scope.active(_value).kind;
+  BigInt get object => _scope.active(_value).object;
+  BigInt get value => _scope.active(_value).value;
 }
 
 final class ScopedVulkanOwnedTextureFrame {
   ScopedVulkanOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
-    : _scope = _GeneratedNativeViewScope(
+    : _scope = _NativeViewScope(
         () => owner._handle,
         raw.mln_adapter_acquired_frame_view_begin,
         raw.mln_adapter_acquired_frame_view_end,
       );
   final VulkanOwnedTextureFrame _value;
-  final _GeneratedNativeViewScope _scope;
+  final _NativeViewScope _scope;
   T withView<T>(T Function(ScopedVulkanOwnedTextureFrame) use) =>
       _scope.use(() => use(this));
-  BigInt get generation {
-    _scope.checkActive();
-    return _value.generation;
-  }
-
-  int get width {
-    _scope.checkActive();
-    return _value.width;
-  }
-
-  int get height {
-    _scope.checkActive();
-    return _value.height;
-  }
-
-  double get scaleFactor {
-    _scope.checkActive();
-    return _value.scaleFactor;
-  }
-
-  BigInt get frameId {
-    _scope.checkActive();
-    return _value.frameId;
-  }
-
-  BigInt get image {
-    _scope.checkActive();
-    return _value.image;
-  }
-
-  BigInt get imageView {
-    _scope.checkActive();
-    return _value.imageView;
-  }
-
-  ScopedNativePointer get device {
-    _scope.checkActive();
-    return ScopedNativePointer(
-      _value.device.address,
-      checkValid: _scope.checkActive,
-      debugName: 'VulkanOwnedTextureFrame.device',
-    );
-  }
-
-  int get format {
-    _scope.checkActive();
-    return _value.format;
-  }
-
-  int get layout {
-    _scope.checkActive();
-    return _value.layout;
-  }
+  BigInt get generation => _scope.active(_value).generation;
+  int get width => _scope.active(_value).width;
+  int get height => _scope.active(_value).height;
+  double get scaleFactor => _scope.active(_value).scaleFactor;
+  BigInt get frameId => _scope.active(_value).frameId;
+  BigInt get image => _scope.active(_value).image;
+  BigInt get imageView => _scope.active(_value).imageView;
+  ScopedNativePointer get device => ScopedNativePointer(
+    _value.device.address,
+    checkValid: _scope.checkActive,
+    debugName: 'VulkanOwnedTextureFrame.device',
+  );
+  int get format => _scope.active(_value).format;
+  int get layout => _scope.active(_value).layout;
 }
 
 final class ScopedWebgpuOwnedTextureFrame {
   ScopedWebgpuOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
-    : _scope = _GeneratedNativeViewScope(
+    : _scope = _NativeViewScope(
         () => owner._handle,
         raw.mln_adapter_acquired_frame_view_begin,
         raw.mln_adapter_acquired_frame_view_end,
       );
   final WebgpuOwnedTextureFrame _value;
-  final _GeneratedNativeViewScope _scope;
+  final _NativeViewScope _scope;
   T withView<T>(T Function(ScopedWebgpuOwnedTextureFrame) use) =>
       _scope.use(() => use(this));
-  BigInt get generation {
-    _scope.checkActive();
-    return _value.generation;
-  }
-
-  int get width {
-    _scope.checkActive();
-    return _value.width;
-  }
-
-  int get height {
-    _scope.checkActive();
-    return _value.height;
-  }
-
-  double get scaleFactor {
-    _scope.checkActive();
-    return _value.scaleFactor;
-  }
-
-  BigInt get frameId {
-    _scope.checkActive();
-    return _value.frameId;
-  }
-
-  ScopedNativePointer get texture {
-    _scope.checkActive();
-    return ScopedNativePointer(
-      _value.texture.address,
-      checkValid: _scope.checkActive,
-      debugName: 'WebgpuOwnedTextureFrame.texture',
-    );
-  }
-
-  ScopedNativePointer get textureView {
-    _scope.checkActive();
-    return ScopedNativePointer(
-      _value.textureView.address,
-      checkValid: _scope.checkActive,
-      debugName: 'WebgpuOwnedTextureFrame.textureView',
-    );
-  }
-
-  ScopedNativePointer get device {
-    _scope.checkActive();
-    return ScopedNativePointer(
-      _value.device.address,
-      checkValid: _scope.checkActive,
-      debugName: 'WebgpuOwnedTextureFrame.device',
-    );
-  }
-
-  int get format {
-    _scope.checkActive();
-    return _value.format;
-  }
-}
-
-final class _GeneratedNativeViewScope {
-  _GeneratedNativeViewScope(this.handle, this.begin, this.end);
-  final NativeHandle Function() handle;
-  final int Function(int, Pointer<Pointer<Void>>, Pointer<raw.mln_diagnostic>)
-  begin;
-  final void Function(Pointer<Void>) end;
-  int _active = 0;
-  void checkActive() {
-    if (_active == 0) {
-      throwInvalidState(
-        'borrowed native value requires an active withView callback',
-      );
-    }
-  }
-
-  T use<T>(T Function() callback) => withNativeArena((arena) {
-    final token = arena<Pointer<Void>>();
-    _check(begin(handle().raw, token, nativeDiagnostic));
-    _active++;
-    try {
-      final result = callback();
-      if (result is Future) {
-        throwInvalidArgument('withView callback must complete synchronously');
-      }
-      return result;
-    } finally {
-      _active--;
-      end(token.value);
-    }
-  });
+  BigInt get generation => _scope.active(_value).generation;
+  int get width => _scope.active(_value).width;
+  int get height => _scope.active(_value).height;
+  double get scaleFactor => _scope.active(_value).scaleFactor;
+  BigInt get frameId => _scope.active(_value).frameId;
+  ScopedNativePointer get texture => ScopedNativePointer(
+    _value.texture.address,
+    checkValid: _scope.checkActive,
+    debugName: 'WebgpuOwnedTextureFrame.texture',
+  );
+  ScopedNativePointer get textureView => ScopedNativePointer(
+    _value.textureView.address,
+    checkValid: _scope.checkActive,
+    debugName: 'WebgpuOwnedTextureFrame.textureView',
+  );
+  ScopedNativePointer get device => ScopedNativePointer(
+    _value.device.address,
+    checkValid: _scope.checkActive,
+    debugName: 'WebgpuOwnedTextureFrame.device',
+  );
+  int get format => _scope.active(_value).format;
 }
