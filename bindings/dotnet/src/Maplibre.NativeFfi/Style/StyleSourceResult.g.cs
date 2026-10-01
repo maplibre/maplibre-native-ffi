@@ -7,37 +7,10 @@ public sealed record StyleSourceResult
     public required StyleSourceInfo Info { get; set; }
     public string? Attribution { get; set; }
     public string? Url { get; set; }
-    private string[]? storageTileUrls;
     public string[]? TileUrls
     {
-        get => storageTileUrls?.ToArray();
-        set => storageTileUrls = value?.ToArray();
+        get => TileUrlsStorage?.ToArray();
+        set => TileUrlsStorage = ValueArray.CopyOptional(value);
     }
-    internal string[]? TileUrlsStorage
-    {
-        get => storageTileUrls;
-        init => storageTileUrls = value;
-    }
-
-    public bool Equals(StyleSourceResult? other) =>
-        other is not null
-        && EqualityComparer<StyleSourceInfo>.Default.Equals(Info, other.Info)
-        && EqualityComparer<string?>.Default.Equals(Attribution, other.Attribution)
-        && EqualityComparer<string?>.Default.Equals(Url, other.Url)
-        && global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceEquals(
-            TileUrlsStorage,
-            other.TileUrlsStorage
-        );
-
-    public override int GetHashCode()
-    {
-        var hash = new HashCode();
-        hash.Add(Info);
-        hash.Add(Attribution);
-        hash.Add(Url);
-        hash.Add(
-            global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceHashCode(TileUrlsStorage)
-        );
-        return hash.ToHashCode();
-    }
+    internal ValueArray<string>? TileUrlsStorage { get; set; }
 }

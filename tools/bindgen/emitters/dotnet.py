@@ -1088,6 +1088,7 @@ def emit(api: Api | BoundApi) -> Emission:
             f"global using Maplibre.NativeFfi.{namespace};\n"
             for namespace in sorted(namespaces | {"Map", "Runtime", "Style"})
         )
+        + "global using Maplibre.NativeFfi.Internal;\n"
         + "".join(
             f"global using Maplibre.NativeFfi.Internal.{namespace};\n"
             for namespace in ("C", "Callback", "Memory", "Pointer", "Struct")

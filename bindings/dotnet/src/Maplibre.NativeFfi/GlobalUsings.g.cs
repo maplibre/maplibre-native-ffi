@@ -1,5 +1,6 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 global using Maplibre.NativeFfi.Base;
+global using Maplibre.NativeFfi.Internal;
 global using Maplibre.NativeFfi.Internal.C;
 global using static Maplibre.NativeFfi.Internal.C.mln_animation_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_bound_option_field;

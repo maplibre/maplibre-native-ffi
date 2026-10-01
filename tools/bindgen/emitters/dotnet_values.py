@@ -634,13 +634,22 @@ class Values:
                 )
                 expression = f"{condition} ? {expression} : null"
             values.append(expression)
+        arrays = {
+            name: self.array_member(plan, name, fields) for name, fields in members
+        }
         if self.union_only(plan):
             copied = values[0]
-        elif any(field.presence and field.presence.mask for field in self.fields(plan)):
+        elif any(
+            field.presence and field.presence.mask for field in self.fields(plan)
+        ) or any(array for array, _ in arrays.values()):
             copied = (
                 "new() { "
                 + ", ".join(
-                    f"{name}{'Storage' if self.member_type(plan, name, fields).removesuffix('?').endswith('[]') else ''} = {value}"
+                    (
+                        f"{name}Storage = {'ValueArray.Optional(' if arrays[name][1] else 'new('}{value})"
+                        if arrays[name][0]
+                        else f"{name} = {value}"
+                    )
                     for (name, fields), value in zip(members, values, strict=True)
                 )
                 + "".join(
@@ -650,15 +659,7 @@ class Values:
                 + " }"
             )
         else:
-            adopt = (
-                ", true"
-                if any(
-                    self.public_type(field.value).removesuffix("?").endswith("[]")
-                    for field in self.fields(plan)
-                )
-                else ""
-            )
-            copied = "new(" + ", ".join(values) + adopt + ")"
+            copied = "new(" + ", ".join(values) + ")"
         extra = (
             ', string message = "", byte* record = null, nuint recordSize = 0'
             if plan.native in self.item_buffers
@@ -780,13 +781,13 @@ class Values:
         for name, fields in self.members(plan):
             if fields[0].value.kind == "callback":
                 continue
-            array = len(fields) == 1 and self.public_type(fields[0].value).removesuffix(
-                "?"
-            ).endswith("[]")
+            array, optional = self.array_member(plan, name, fields)
             expression = (
                 "value"
                 if self.union_only(plan)
-                else f"value.{name}{'Storage' if array else ''}"
+                else f"value.{name}Storage{'?' if optional else ''}.Items"
+                if array and len(fields) == 1
+                else f"value.{name}"
             )
             presence = fields[0].presence
             indent = "        "
@@ -1059,80 +1060,62 @@ class Values:
             f"        try {{ {guard}{statement} }}\n        catch {{ {failure} }}\n    }}\n"
         )
 
+    def array_member(
+        self, plan: ValuePlan, name: str, fields: tuple[FieldPlan, ...]
+    ) -> tuple[bool, bool]:
+        """Whether a member is an array, and whether that array is optional."""
+        type_ = self.member_type(plan, name, fields)
+        optional = bool(
+            fields[0].presence and fields[0].presence.mask
+        ) or type_.endswith("?")
+        return type_.removesuffix("?").endswith("[]"), optional
+
     def array_declaration(self, plan: ValuePlan) -> str:
+        """A value with array members, which keep their elements in ValueArray
+        storage so that record synthesis compares them element by element."""
         members = self.members(plan)
         masked = any(
             field.presence and field.presence.mask for field in self.fields(plan)
         )
         name = public_name(plan.native)
-        properties, equality, hashes, parameters, assignments = [], [], [], [], []
+        accessor = "set" if masked else "init"
+        properties, parameters, assignments = [], [], []
         for member, fields in members:
             type_ = self.member_type(plan, member, fields)
-            optional = bool(
-                fields[0].presence and fields[0].presence.mask
-            ) or type_.endswith("?")
+            array, optional = self.array_member(plan, member, fields)
             if optional and not type_.endswith("?"):
                 type_ += "?"
-            array = type_.removesuffix("?").endswith("[]")
             parameters.append(f"{type_} {member}")
+            assignments.append(f"        this.{member} = {member};")
             if array:
-                private = "storage" + member
-                storage_type = type_.removesuffix("?") + "?"
-                fallback = "" if optional else " ?? []"
+                element = type_.removesuffix("?").removesuffix("[]")
+                storage = f"ValueArray<{element}>{'?' if optional else ''}"
+                copy = "ValueArray.CopyOptional" if optional else "ValueArray.Copy"
                 properties.extend(
                     [
-                        f"    private {'readonly ' if not masked else ''}{storage_type} {private};",
-                        f"    public {type_} {member} {{ get => {private}?.ToArray(){fallback}; {'set' if masked else 'init'} => {private} = value?.ToArray(){fallback}; }}",
-                        f"    internal {type_} {member}Storage {{ get => {private}{fallback}; init => {private} = value; }}",
+                        f"    public {type_} {member} {{ get => {member}Storage{'?' if optional else ''}.ToArray(); {accessor} => {member}Storage = {copy}(value); }}",
+                        f"    internal {storage} {member}Storage {{ get; {accessor}; }}",
                     ]
                 )
-                equality.append(
-                    f"global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceEquals({member}Storage, other.{member}Storage)"
-                )
-                hashes.append(
-                    f"global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceHashCode({member}Storage)"
-                )
-                assignments.append(
-                    f"        this.{private} = adopt ? {member} : {member}?.ToArray(){fallback};"
-                )
-            else:
-                required = (
-                    "required "
-                    if masked
-                    and not optional
-                    and (type_ == "string" or self.is_reference_type(fields[0].value))
-                    else ""
-                )
-                properties.append(
-                    f"    public {required}{type_} {member} {{ get; {'set' if masked else 'init'}; }}"
-                )
-                equality.append(
-                    f"EqualityComparer<{type_}>.Default.Equals({member}, other.{member})"
-                )
-                hashes.append(member)
-                assignments.append(f"        this.{member} = {member};")
+                continue
+            required = (
+                "required "
+                if masked
+                and not optional
+                and (type_ == "string" or self.is_reference_type(fields[0].value))
+                else ""
+            )
+            properties.append(
+                f"    public {required}{type_} {member} {{ get; {accessor}; }}"
+            )
         declaration = f"public {'sealed record' if masked else 'readonly record struct'} {name}\n{{\n"
         if not masked:
-            arguments = ", ".join(member for member, _ in members)
-            declaration += f"    public {name}({', '.join(parameters)}) : this({arguments}, false) {{ }}\n"
             declaration += (
-                f"    internal {name}({', '.join(parameters)}, bool adopt)\n    {{\n"
+                f"    public {name}({', '.join(parameters)})\n    {{\n"
                 + "\n".join(assignments)
                 + "\n    }\n"
             )
-        declaration += "\n".join(properties) + "\n"
-        declaration += (
-            f"    public bool Equals({name}{'?' if masked else ''} other) => "
-            + ("other is not null && " if masked else "")
-            + " && ".join(equality)
-            + ";\n"
-        )
-        declaration += (
-            "    public override int GetHashCode()\n    {\n        var hash = new HashCode();\n"
-            + "".join(f"        hash.Add({expression});\n" for expression in hashes)
-            + "        return hash.ToHashCode();\n    }\n}\n"
-        )
-        return declaration
+        return declaration + "\n".join(properties) + "\n}\n"
 
     def declaration(self, plan: ValuePlan) -> str:
         if plan.response:

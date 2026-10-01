@@ -300,8 +300,8 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
             (root / "NativeCallbackGuard.cs").write_text(
                 (runtime.parent.parent / "Callback/NativeCallbackGuard.cs").read_text()
             )
-            (root / "ValueEquality.cs").write_text(
-                (runtime.parent.parent / "ValueEquality.cs").read_text()
+            (root / "ValueArray.cs").write_text(
+                (runtime.parent.parent / "ValueArray.cs").read_text()
             )
             (root / "NativeValues.cs").write_text(
                 (runtime.parent.parent / "Struct/NativeValues.cs").read_text()
@@ -323,6 +323,7 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
                 (root / name).write_text((errors / name).read_text())
             (root / "Program.cs").write_text(
                 """
+using Maplibre.NativeFfi.Internal;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Memory;
 using static Maplibre.NativeFfi.Internal.C.mln_camera_field;

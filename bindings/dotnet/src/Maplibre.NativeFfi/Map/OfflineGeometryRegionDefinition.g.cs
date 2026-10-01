@@ -12,20 +12,9 @@ public readonly record struct OfflineGeometryRegionDefinition
         float PixelRatio,
         bool IncludeIdeographs
     )
-        : this(StyleUrl, Geometry, MinZoom, MaxZoom, PixelRatio, IncludeIdeographs, false) { }
-
-    internal OfflineGeometryRegionDefinition(
-        string StyleUrl,
-        byte[] Geometry,
-        double MinZoom,
-        double MaxZoom,
-        float PixelRatio,
-        bool IncludeIdeographs,
-        bool adopt
-    )
     {
         this.StyleUrl = StyleUrl;
-        this.storageGeometry = adopt ? Geometry : Geometry?.ToArray() ?? [];
+        this.Geometry = Geometry;
         this.MinZoom = MinZoom;
         this.MaxZoom = MaxZoom;
         this.PixelRatio = PixelRatio;
@@ -33,44 +22,14 @@ public readonly record struct OfflineGeometryRegionDefinition
     }
 
     public string StyleUrl { get; init; }
-    private readonly byte[]? storageGeometry;
     public byte[] Geometry
     {
-        get => storageGeometry?.ToArray() ?? [];
-        init => storageGeometry = value?.ToArray() ?? [];
+        get => GeometryStorage.ToArray();
+        init => GeometryStorage = ValueArray.Copy(value);
     }
-    internal byte[] GeometryStorage
-    {
-        get => storageGeometry ?? [];
-        init => storageGeometry = value;
-    }
+    internal ValueArray<byte> GeometryStorage { get; init; }
     public double MinZoom { get; init; }
     public double MaxZoom { get; init; }
     public float PixelRatio { get; init; }
     public bool IncludeIdeographs { get; init; }
-
-    public bool Equals(OfflineGeometryRegionDefinition other) =>
-        EqualityComparer<string>.Default.Equals(StyleUrl, other.StyleUrl)
-        && global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceEquals(
-            GeometryStorage,
-            other.GeometryStorage
-        )
-        && EqualityComparer<double>.Default.Equals(MinZoom, other.MinZoom)
-        && EqualityComparer<double>.Default.Equals(MaxZoom, other.MaxZoom)
-        && EqualityComparer<float>.Default.Equals(PixelRatio, other.PixelRatio)
-        && EqualityComparer<bool>.Default.Equals(IncludeIdeographs, other.IncludeIdeographs);
-
-    public override int GetHashCode()
-    {
-        var hash = new HashCode();
-        hash.Add(StyleUrl);
-        hash.Add(
-            global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceHashCode(GeometryStorage)
-        );
-        hash.Add(MinZoom);
-        hash.Add(MaxZoom);
-        hash.Add(PixelRatio);
-        hash.Add(IncludeIdeographs);
-        return hash.ToHashCode();
-    }
 }

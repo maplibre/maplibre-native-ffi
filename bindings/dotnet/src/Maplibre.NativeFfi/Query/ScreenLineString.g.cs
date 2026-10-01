@@ -5,35 +5,14 @@ namespace Maplibre.NativeFfi.Query;
 public readonly record struct ScreenLineString
 {
     public ScreenLineString(ScreenPoint[] Points)
-        : this(Points, false) { }
-
-    internal ScreenLineString(ScreenPoint[] Points, bool adopt)
     {
-        this.storagePoints = adopt ? Points : Points?.ToArray() ?? [];
+        this.Points = Points;
     }
 
-    private readonly ScreenPoint[]? storagePoints;
     public ScreenPoint[] Points
     {
-        get => storagePoints?.ToArray() ?? [];
-        init => storagePoints = value?.ToArray() ?? [];
+        get => PointsStorage.ToArray();
+        init => PointsStorage = ValueArray.Copy(value);
     }
-    internal ScreenPoint[] PointsStorage
-    {
-        get => storagePoints ?? [];
-        init => storagePoints = value;
-    }
-
-    public bool Equals(ScreenLineString other) =>
-        global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceEquals(
-            PointsStorage,
-            other.PointsStorage
-        );
-
-    public override int GetHashCode()
-    {
-        var hash = new HashCode();
-        hash.Add(global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceHashCode(PointsStorage));
-        return hash.ToHashCode();
-    }
+    internal ValueArray<ScreenPoint> PointsStorage { get; init; }
 }

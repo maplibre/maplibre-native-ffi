@@ -4,52 +4,18 @@ namespace Maplibre.NativeFfi.Query;
 
 public sealed record SourceFeatureQueryOptions
 {
-    private string[]? storageSourceLayerIds;
     public string[]? SourceLayerIds
     {
-        get => storageSourceLayerIds?.ToArray();
-        set => storageSourceLayerIds = value?.ToArray();
+        get => SourceLayerIdsStorage?.ToArray();
+        set => SourceLayerIdsStorage = ValueArray.CopyOptional(value);
     }
-    internal string[]? SourceLayerIdsStorage
-    {
-        get => storageSourceLayerIds;
-        init => storageSourceLayerIds = value;
-    }
-    private byte[]? storageFilter;
+    internal ValueArray<string>? SourceLayerIdsStorage { get; set; }
     public byte[]? Filter
     {
-        get => storageFilter?.ToArray();
-        set => storageFilter = value?.ToArray();
+        get => FilterStorage?.ToArray();
+        set => FilterStorage = ValueArray.CopyOptional(value);
     }
-    internal byte[]? FilterStorage
-    {
-        get => storageFilter;
-        init => storageFilter = value;
-    }
-
-    public bool Equals(SourceFeatureQueryOptions? other) =>
-        other is not null
-        && global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceEquals(
-            SourceLayerIdsStorage,
-            other.SourceLayerIdsStorage
-        )
-        && global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceEquals(
-            FilterStorage,
-            other.FilterStorage
-        );
-
-    public override int GetHashCode()
-    {
-        var hash = new HashCode();
-        hash.Add(
-            global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceHashCode(
-                SourceLayerIdsStorage
-            )
-        );
-        hash.Add(global::Maplibre.NativeFfi.Internal.ValueEquality.SequenceHashCode(FilterStorage));
-        return hash.ToHashCode();
-    }
-
+    internal ValueArray<byte>? FilterStorage { get; set; }
     public static SourceFeatureQueryOptions Default
     {
         get
