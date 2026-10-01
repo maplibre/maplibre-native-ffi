@@ -1344,12 +1344,13 @@ MLN_API mln_status mln_runtime_barrier(
  * A process may exit at any point, including while runtimes, maps, and render
  * sessions are live and their work is in flight. Native threads keep running
  * until the operating system ends the process: nothing at exit stops them or
- * waits for them, and nothing that they use is destroyed. Once exit begins,
- * native code starts no host callback, release callbacks included. A callback
- * that is already running when exit begins may still be running. Exit begins
- * when the C runtime runs the exit handler that the library registers when it
- * first creates a runtime or installs the log callback. Exit handlers and
- * static destructors that the host registered before that run after it.
+ * waits for them, and the library destroys nothing that they use. Once exit
+ * begins, native code starts no host callback, release callbacks included. A
+ * callback that is already running when exit begins may still be running.
+ * Exit begins when the C runtime runs the exit handler that the library
+ * registers when it first creates a runtime or installs the log callback. Exit
+ * handlers and static destructors that the host registered before that run
+ * after it.
  *
  * A host that tears down state its callbacks use before that exit handler runs
  * MUST stop native callbacks into that state first. That covers a language
