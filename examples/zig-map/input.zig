@@ -14,11 +14,8 @@ const DragMode = enum {
 const keyboard_animation_ms = 160.0;
 const reset_animation_ms = 220.0;
 
-pub const Result = struct {
-    camera_changed: bool = false,
-};
-
-/// Decodes host input and updates the any-thread map directly.
+/// Decodes host input into camera commands. The map reports the resulting
+/// render update, which drives the next frame demand.
 pub const Controller = struct {
     drag_mode: DragMode = .none,
     drag_button: u8 = 0,
@@ -30,14 +27,14 @@ pub const Controller = struct {
         event: *const c.SDL_Event,
         state: *map_state.MapState,
         current_viewport: types.Viewport,
-    ) !Result {
+    ) !void {
         return switch (event.type) {
             c.SDL_EVENT_MOUSE_BUTTON_DOWN => try self.handleMouseButtonDown(event.button, state, current_viewport),
             c.SDL_EVENT_MOUSE_BUTTON_UP => try self.handleMouseButtonUp(event.button, state),
             c.SDL_EVENT_MOUSE_MOTION => try self.handleMouseMotion(event.motion, state, current_viewport),
             c.SDL_EVENT_MOUSE_WHEEL => try handleMouseWheel(event.wheel, state, current_viewport),
             c.SDL_EVENT_KEY_DOWN => try handleKeyDown(event.key, state, current_viewport),
-            else => .{},
+            else => {},
         };
     }
 
@@ -46,10 +43,10 @@ pub const Controller = struct {
         button: c.SDL_MouseButtonEvent,
         state: *map_state.MapState,
         current_viewport: types.Viewport,
-    ) !Result {
-        if (self.drag_mode != .none) return .{};
+    ) !void {
+        if (self.drag_mode != .none) return;
         const mode = dragModeForButton(button.button);
-        if (mode == .none) return .{};
+        if (mode == .none) return;
 
         const cursor = logicalPoint(button.x, button.y, current_viewport);
         self.last_x = cursor.x;
@@ -58,20 +55,18 @@ pub const Controller = struct {
         try state.setGesture(.begin);
         self.drag_mode = mode;
         self.drag_button = button.button;
-        return .{};
     }
 
     fn handleMouseButtonUp(
         self: *Controller,
         button: c.SDL_MouseButtonEvent,
         state: *map_state.MapState,
-    ) !Result {
-        if (button.button != c.SDL_BUTTON_LEFT and button.button != c.SDL_BUTTON_RIGHT) return .{};
-        if (button.button != self.drag_button) return .{};
+    ) !void {
+        if (button.button != c.SDL_BUTTON_LEFT and button.button != c.SDL_BUTTON_RIGHT) return;
+        if (button.button != self.drag_button) return;
         try self.endDrag(state);
         self.last_x = button.x;
         self.last_y = button.y;
-        return .{};
     }
 
     fn endDrag(self: *Controller, state: *map_state.MapState) !void {
@@ -86,7 +81,7 @@ pub const Controller = struct {
         motion: c.SDL_MouseMotionEvent,
         state: *map_state.MapState,
         current_viewport: types.Viewport,
-    ) !Result {
+    ) !void {
         const cursor = logicalPoint(motion.x, motion.y, current_viewport);
         const x = cursor.x;
         const y = cursor.y;
@@ -96,22 +91,21 @@ pub const Controller = struct {
         }
 
         switch (self.drag_mode) {
-            .none => return .{},
+            .none => {},
             .pan => {
                 const dx = x - self.last_x;
                 const dy = y - self.last_y;
-                if (dx == 0 and dy == 0) return .{};
+                if (dx == 0 and dy == 0) return;
                 try state.moveBy(dx, dy);
             },
             .rotate => {
                 const dx = x - self.last_x;
                 const dy = y - self.last_y;
-                if (dx == 0 and dy == 0) return .{};
+                if (dx == 0 and dy == 0) return;
                 try state.adjustBearing(dx * 0.5);
-                try state.pitchBy(dy / 2.0);
+                try state.pitchBy(dy * 0.5);
             },
         }
-        return .{ .camera_changed = true };
     }
 };
 
@@ -134,21 +128,20 @@ fn handleMouseWheel(
     wheel: c.SDL_MouseWheelEvent,
     state: *map_state.MapState,
     current_viewport: types.Viewport,
-) !Result {
+) !void {
     const delta: f64 = wheel.y;
-    if (delta == 0) return .{};
+    if (delta == 0) return;
 
     const anchor = logicalPoint(wheel.mouse_x, wheel.mouse_y, current_viewport);
     const scale = std.math.pow(f64, 2.0, delta * 0.25);
     try state.scaleBy(scale, anchor);
-    return .{ .camera_changed = true };
 }
 
 fn handleKeyDown(
     key: c.SDL_KeyboardEvent,
     state: *map_state.MapState,
     current_viewport: types.Viewport,
-) !Result {
+) !void {
     const pan_step = 120.0;
     const zoom_step = 1.25;
     const bearing_step = 10.0;
@@ -170,9 +163,8 @@ fn handleKeyDown(
         scancode(c.SDL_SCANCODE_RIGHTBRACKET) => try state.adjustPitchAnimated(pitch_step, keyboard_animation_ms),
         scancode(c.SDL_SCANCODE_LEFTBRACKET) => try state.adjustPitchAnimated(-pitch_step, keyboard_animation_ms),
         scancode(c.SDL_SCANCODE_0) => try state.resetOrientation(reset_animation_ms),
-        else => return .{},
+        else => {},
     }
-    return .{ .camera_changed = true };
 }
 
 fn dragModeForButton(button: u8) DragMode {

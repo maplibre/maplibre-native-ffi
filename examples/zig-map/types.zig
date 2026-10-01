@@ -6,17 +6,15 @@ pub const AppError = error{
     RuntimeCreateFailed,
     MapCreateFailed,
     EventDrainFailed,
-    TextureAttachFailed,
+    AttachFailed,
     StyleLoadFailed,
     CameraJumpFailed,
     CameraUpdateFailed,
-    TextureResizeFailed,
-    TextureRenderFailed,
-    SurfaceAttachFailed,
-    SurfaceResizeFailed,
-    SurfaceRenderFailed,
+    ResizeFailed,
+    RenderFailed,
     BackendSetupFailed,
     BackendDrawFailed,
+    SmokeFrameTimedOut,
 };
 
 pub const Viewport = struct {
@@ -27,6 +25,10 @@ pub const Viewport = struct {
     physical_width: u32,
     physical_height: u32,
     scale_factor: f64,
+
+    pub fn eql(self: Viewport, other: Viewport) bool {
+        return std.meta.eql(self, other);
+    }
 };
 
 pub const RenderTargetMode = enum {

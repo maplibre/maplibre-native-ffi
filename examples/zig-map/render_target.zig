@@ -1,272 +1,247 @@
+//! The backend-agnostic slice of the render target: the attached session, its
+//! frame demands and results, and the extent a viewport maps to.
+
 const std = @import("std");
 
 const maplibre = @import("maplibre_native_ffi");
 const diagnostics = @import("diagnostics.zig");
+const events = @import("events.zig");
 const types = @import("types.zig");
 
-/// One frame demand's outcome: whether the session rendered the demand, and
-/// whether the map asked for another frame while it rendered this one.
-pub const FrameOutcome = struct {
+/// What one drain of the frame-result queue found.
+pub const FrameResults = struct {
+    /// A demand rendered a frame.
     rendered: bool = false,
+    /// The map asked for another frame while it rendered one.
     needs_repaint: bool = false,
+    /// The target could not produce a frame, so the loop retries later.
+    target_not_ready: bool = false,
 };
+
+/// Caller-driver attach options whose wakes post `frame_results` and
+/// `driver_work` app events.
+pub fn attachOptions() maplibre.RenderSessionAttachOptions {
+    return .{
+        .driver = .caller_graphics_thread,
+        .requested_texture_ring_depth = 2,
+        .frame_wake = events.wake(.frame_results),
+        .driver_work_wake = events.wake(.driver_work),
+    };
+}
 
 /// An attached render session plus the monotonic demand tokens that tie each
 /// frame result back to the demand that produced it.
 pub const Session = struct {
-    pub const Target = union(enum) {
-        none,
-        texture: maplibre.RenderSession,
-        surface: maplibre.RenderSession,
-    };
-
-    /// The one ordered submission that can be outstanding: attach, resize,
-    /// target replacement, or detach.
-    const Pending = struct {
-        future: PendingFuture,
-        app_error: types.AppError,
-        message: []const u8,
-    };
-
-    target: Target = .none,
+    handle: ?maplibre.RenderSession = null,
     /// The map this session renders. Target replacement changes only the
     /// graphics resource, so those paths carry the extent to the map directly.
     map: ?*maplibre.Map = null,
+    /// Whether demands ask the driver to present, as a surface target does.
+    presents: bool = false,
     next_token: u64 = 0,
-    pending: ?Pending = null,
 
-    pub fn deinit(self: *Session) void {
-        const handle = self.nativeHandle() orelse {
-            self.discardPending();
-            return;
+    /// Services driver work until the attachment resolves, abandoning the
+    /// session when it does not.
+    pub fn attach(map: *maplibre.Map, attachment: anytype, presents: bool) !Session {
+        var owned = attachment;
+        defer owned.ready.deinit();
+        const session = Session{ .handle = owned.session, .map = map, .presents = presents };
+        serviceUntil(owned.session, &owned.ready) catch |err| {
+            diagnostics.logError("render target attach failed", err, null);
+            _ = maplibre.renderSessionAbandon(owned.session, null) catch {};
+            owned.session.deinit();
+            return types.AppError.AttachFailed;
         };
-        // The outstanding submission owns the completion slot the detach
-        // needs, so it finishes first.
-        var abandon = if (self.awaitPending()) |_| false else |_| true;
-        if (!abandon) {
-            if (maplibre.renderSessionDetach(handle.*, null)) |completion| {
-                self.beginPending(completion, self.detachError(), "render session detach failed");
-                abandon = if (self.awaitPending()) |_| false else |_| true;
-            } else |_| {
-                abandon = true;
+        return session;
+    }
+
+    /// Detaches through the driver, abandoning instead when that fails, then
+    /// destroys the session.
+    pub fn deinit(self: *Session) void {
+        var handle = self.handle orelse return;
+        self.handle = null;
+        var detached = false;
+        if (maplibre.renderSessionDetach(handle, null)) |future| {
+            var completion = future;
+            defer completion.deinit();
+            detached = if (serviceUntil(handle, &completion)) |_| true else |_| false;
+        } else |_| {}
+        if (!detached) _ = maplibre.renderSessionAbandon(handle, null) catch {};
+        handle.deinit();
+    }
+
+    /// Services every queued caller-driver item on the graphics thread.
+    pub fn service(self: *Session) !void {
+        var diagnostic: maplibre.Diagnostic = .{};
+        _ = maplibre.renderSessionServiceDriverWork(self.handle.?, 0, &diagnostic) catch |err| {
+            diagnostics.logError("render driver service failed", err, &diagnostic);
+            return types.AppError.BackendDrawFailed;
+        };
+    }
+
+    /// Demands a frame. A forced demand renders even without a newer map
+    /// update, which a retry after an undrawn frame needs.
+    pub fn requestFrame(self: *Session, force: bool) !void {
+        self.next_token += 1;
+        var diagnostic: maplibre.Diagnostic = .{};
+        maplibre.renderSessionRequestFrame(std.heap.smp_allocator, self.handle.?, .{
+            .flags = .{ .if_needed = !force, .present = self.presents },
+            .token = self.next_token,
+        }, &diagnostic) catch |err| {
+            diagnostics.logError("frame demand failed", err, &diagnostic);
+            return types.AppError.RenderFailed;
+        };
+    }
+
+    /// Drains every queued frame result.
+    pub fn drainResults(self: *Session) !FrameResults {
+        var results: FrameResults = .{};
+        var batch = maplibre.renderSessionDrainFrameResults(self.handle.?, null) catch |err| switch (err) {
+            error.NotReady => return results,
+            else => return err,
+        };
+        defer batch.deinit();
+        for (0..try maplibre.renderFrameBatchCount(batch, null)) |index| {
+            const result = try maplibre.renderFrameBatchGet(batch, index, null);
+            // No update and size pending wait for the map's next update,
+            // superseded demands have a newer one behind them, and no demand
+            // carries a timeout.
+            switch (result.disposition) {
+                .rendered => {
+                    results.rendered = true;
+                    results.needs_repaint = result.needs_repaint;
+                },
+                .target_not_ready => results.target_not_ready = true,
+                else => {},
             }
         }
-        if (abandon) _ = maplibre.renderSessionAbandon(handle.*, null) catch {};
-        handle.deinit();
-        self.discardPending();
-        self.target = .none;
-    }
-
-    pub fn nativeHandle(self: *Session) ?*maplibre.RenderSession {
-        return switch (self.target) {
-            .none => null,
-            .texture => |*value| value,
-            .surface => |*value| value,
-        };
-    }
-
-    pub fn textureHandle(self: *Session) !*maplibre.RenderSession {
-        return switch (self.target) {
-            .texture => |*texture| texture,
-            .none, .surface => types.AppError.TextureResizeFailed,
-        };
-    }
-
-    pub fn surfaceHandle(self: *Session) !*maplibre.RenderSession {
-        return switch (self.target) {
-            .surface => |*surface| surface,
-            .none, .texture => types.AppError.SurfaceAttachFailed,
-        };
-    }
-
-    /// Takes ownership of the future one ordered submission returned, so the
-    /// render loop can drive it instead of blocking the caller.
-    pub fn beginPending(
-        self: *Session,
-        future: anytype,
-        app_error: types.AppError,
-        message: []const u8,
-    ) void {
-        std.debug.assert(self.pending == null);
-        self.pending = .{ .future = PendingFuture.init(future), .app_error = app_error, .message = message };
-    }
-
-    /// Services caller-driver work and reports whether the outstanding
-    /// submission is still pending.
-    pub fn poll(self: *Session) !bool {
-        if (self.pending == null) return false;
-        const session = self.nativeHandle() orelse {
-            self.discardPending();
-            return false;
-        };
-        var serviced = true;
-        var diagnostic: maplibre.Diagnostic = .{};
-        _ = maplibre.renderSessionServiceDriverWork(session.*, 0, &diagnostic) catch |err| {
-            serviced = false;
-            diagnostics.logError(self.pending.?.message, err, &diagnostic);
-        };
-        if (serviced and !try self.pending.?.future.poll()) return true;
-        var pending = self.takePending().?;
-        defer pending.future.deinit();
-        if (!serviced) return pending.app_error;
-        pending.future.wait(&diagnostic) catch |err| {
-            diagnostics.logError(pending.message, err, &diagnostic);
-            return pending.app_error;
-        };
-        return false;
-    }
-
-    /// Services caller-driver work until the outstanding submission completes.
-    /// Startup and shutdown block here; the render loop polls instead.
-    pub fn awaitPending(self: *Session) !void {
-        while (try self.poll()) {}
+        return results;
     }
 
     /// Starts the session resize that carries the new logical extent to the
-    /// map. The render loop drives it to completion through `poll`.
-    pub fn startResize(self: *Session, viewport: types.Viewport) !void {
-        const session = self.nativeHandle() orelse return types.AppError.TextureResizeFailed;
-        const app_error = self.resizeError();
+    /// map. A later resize supersedes this one, so a live resize needs no
+    /// pacing.
+    pub fn resize(self: *Session, viewport: types.Viewport) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const completion = maplibre.renderSessionResize(std.heap.smp_allocator, session.*, extent(viewport), &diagnostic) catch |err| {
-            diagnostics.logError("render target resize failed", err, &diagnostic);
-            return app_error;
+        var completion = maplibre.renderSessionResize(std.heap.smp_allocator, self.handle.?, extent(viewport), &diagnostic) catch |err| {
+            diagnostics.logError("render session resize failed", err, &diagnostic);
+            return types.AppError.ResizeFailed;
         };
-        self.beginPending(completion, app_error, "render target resize failed");
+        completion.deinit();
     }
 
     /// Carries the new logical extent to the map on the paths where the
     /// session cannot: a caller-owned texture the host sizes, and a replaced
     /// surface target. Both change only the graphics resource.
     pub fn resizeMap(self: *Session, viewport: types.Viewport) !void {
-        const map = self.map orelse return self.resizeError();
         var diagnostic: maplibre.Diagnostic = .{};
-        var completion = maplibre.mapResize(map.*, .{ .width = viewport.logical_width, .height = viewport.logical_height, .scale_factor = viewport.scale_factor }, &diagnostic) catch |err| {
+        var completion = maplibre.mapResize(self.map.?.*, .{ .width = viewport.logical_width, .height = viewport.logical_height, .scale_factor = viewport.scale_factor }, &diagnostic) catch |err| {
             diagnostics.logError("map resize failed", err, &diagnostic);
-            return self.resizeError();
+            return types.AppError.ResizeFailed;
         };
         completion.deinit();
     }
 
-    /// Submits one frame demand, services caller-driver work, and reports the
-    /// outcome of the result carrying this demand's token.
-    pub fn renderUpdate(
-        self: *Session,
-        allocator: std.mem.Allocator,
-    ) !FrameOutcome {
-        const presents = self.target == .surface;
-        const session = self.nativeHandle() orelse return FrameOutcome{};
-        const app_error = if (presents)
-            types.AppError.SurfaceRenderFailed
-        else
-            types.AppError.TextureRenderFailed;
-        self.next_token += 1;
-        const token = self.next_token;
-        var diagnostic: maplibre.Diagnostic = .{};
-        maplibre.renderSessionRequestFrame(allocator, session.*, .{ .flags = .{ .if_needed = true, .present = presents }, .token = token }, &diagnostic) catch |err| {
-            diagnostics.logError("frame request failed", err, &diagnostic);
-            return app_error;
-        };
-        _ = maplibre.renderSessionServiceDriverWork(session.*, 0, &diagnostic) catch |err| {
-            diagnostics.logError("render driver service failed", err, &diagnostic);
-            return app_error;
-        };
-        // The batch owns the results for this frame.
-        var batch = maplibre.renderSessionDrainFrameResults(session.*, null) catch |err| switch (err) {
-            error.NotReady => return .{},
-            else => return err,
-        };
-        defer batch.deinit();
-        for (0..try maplibre.renderFrameBatchCount(batch, null)) |index| {
-            const result = try maplibre.renderFrameBatchGet(batch, index, null);
-            if (result.token != token) continue;
-            return .{
-                .rendered = result.disposition == .rendered,
-                .needs_repaint = result.needs_repaint,
+    /// Acquires the newest rendered frame, releasing any older one unsampled.
+    /// Returns null when the ring holds none.
+    pub fn acquireNewest(self: *Session) !?maplibre.AcquiredFrame {
+        var newest: ?maplibre.AcquiredFrame = null;
+        while (true) {
+            var diagnostic: maplibre.Diagnostic = .{};
+            const frame = maplibre.renderSessionAcquireFrame(self.handle.?, &diagnostic) catch |err| switch (err) {
+                error.NotReady => return newest,
+                else => {
+                    if (newest) |older| releaseFrame(older);
+                    diagnostics.logError("texture acquire failed", err, &diagnostic);
+                    return types.AppError.BackendDrawFailed;
+                },
             };
-        }
-        return .{};
-    }
-
-    fn resizeError(self: *const Session) types.AppError {
-        return if (self.target == .surface)
-            types.AppError.SurfaceResizeFailed
-        else
-            types.AppError.TextureResizeFailed;
-    }
-
-    fn detachError(self: *const Session) types.AppError {
-        return if (self.target == .surface)
-            types.AppError.SurfaceAttachFailed
-        else
-            types.AppError.TextureAttachFailed;
-    }
-
-    fn takePending(self: *Session) ?Pending {
-        const pending = self.pending;
-        self.pending = null;
-        return pending;
-    }
-
-    fn discardPending(self: *Session) void {
-        if (self.takePending()) |pending| {
-            var owned = pending;
-            owned.future.deinit();
+            if (newest) |older| releaseFrame(older);
+            newest = frame;
         }
     }
 };
 
-pub fn textureSession(map: *maplibre.Map, attachment: anytype) !Session {
-    return attachedSession(map, attachment, .{ .texture = attachment.session });
-}
-
-pub fn surfaceSession(map: *maplibre.Map, attachment: anytype) !Session {
-    return attachedSession(map, attachment, .{ .surface = attachment.session });
-}
-
-/// Services caller-driver work until the attachment resolves, abandoning the
-/// session when it does not.
-fn attachedSession(
-    map: *maplibre.Map,
-    attachment: anytype,
-    target: Session.Target,
-) !Session {
-    var owned = attachment;
-    var session = Session{ .target = target, .map = map };
-    errdefer {
-        _ = maplibre.renderSessionAbandon(owned.session, null) catch {};
-        owned.session.deinit();
+/// Services driver work until a lifecycle submission completes. Startup and
+/// shutdown block here. The driver's wake goes to the SDL loop rather than to
+/// this wait, so the loop yields between service calls instead.
+fn serviceUntil(handle: maplibre.RenderSession, future: *maplibre.Future(void)) !void {
+    var diagnostic: maplibre.Diagnostic = .{};
+    while (!try future.poll()) {
+        _ = maplibre.renderSessionServiceDriverWork(handle, 0, &diagnostic) catch |err| {
+            diagnostics.logError("render driver service failed", err, &diagnostic);
+            return err;
+        };
+        std.Thread.yield() catch {};
     }
-    session.beginPending(owned.ready, session.detachError(), "render target attach failed");
-    try session.awaitPending();
-    return session;
+    future.wait(&diagnostic) catch |err| {
+        diagnostics.logError("render session lifecycle failed", err, &diagnostic);
+        return err;
+    };
+}
+
+/// Releases a sampled frame. The compositor waits for its GPU work before
+/// returning, so CPU-complete consumer synchronization is accurate.
+pub fn releaseFrame(frame: maplibre.AcquiredFrame) void {
+    maplibre.acquiredFrameRelease(std.heap.smp_allocator, frame, .{ .kind = .cpu_complete }, null) catch |err| {
+        diagnostics.logError("texture release failed", err, null);
+    };
+}
+
+/// The caller-owned textures a borrowed-texture target hands over on resize,
+/// oldest first. The session renders into a texture until its replacement
+/// completes, so each outgoing texture stays alive until then.
+pub fn Replacements(comptime Texture: type) type {
+    return struct {
+        const Self = @This();
+        const Entry = struct {
+            completion: maplibre.Future(void),
+            texture: Texture,
+        };
+
+        entries: std.ArrayList(Entry) = .empty,
+
+        pub fn deinit(self: *Self) void {
+            self.entries.deinit(std.heap.smp_allocator);
+        }
+
+        /// Queues the texture a set_target call handed over, with that call's
+        /// completion.
+        pub fn push(self: *Self, completion: maplibre.Future(void), texture: Texture) !void {
+            try self.entries.append(std.heap.smp_allocator, .{ .completion = completion, .texture = texture });
+        }
+
+        /// Takes the oldest replacement whose set_target completed, or null
+        /// when none has. A failed replacement reports its error and stays
+        /// queued: the session may still render into it or the texture before
+        /// it, so neither is released before the session detaches.
+        pub fn takeCompleted(self: *Self) !?Texture {
+            if (self.entries.items.len == 0) return null;
+            const oldest = &self.entries.items[0];
+            if (!try oldest.completion.poll()) return null;
+            var diagnostic: maplibre.Diagnostic = .{};
+            oldest.completion.wait(&diagnostic) catch |err| {
+                diagnostics.logError("texture replacement failed", err, &diagnostic);
+                return types.AppError.ResizeFailed;
+            };
+            return self.takeOldest();
+        }
+
+        /// Takes the oldest replacement whatever its state, for teardown
+        /// after the session detached.
+        pub fn takeAny(self: *Self) ?Texture {
+            if (self.entries.items.len == 0) return null;
+            return self.takeOldest();
+        }
+
+        fn takeOldest(self: *Self) Texture {
+            var entry = self.entries.orderedRemove(0);
+            entry.completion.deinit();
+            return entry.texture;
+        }
+    };
 }
 
 pub fn extent(viewport: types.Viewport) maplibre.RenderTargetExtent {
     return .{ .width = viewport.logical_width, .height = viewport.logical_height, .scale_factor = viewport.scale_factor };
 }
-
-const PendingFuture = union(enum) {
-    ready: maplibre.Future(void),
-    command: maplibre.Future(maplibre.CommandCompletion),
-
-    fn init(future: anytype) PendingFuture {
-        return if (@TypeOf(future) == maplibre.Future(void)) .{ .ready = future } else .{ .command = future };
-    }
-    fn poll(self: *PendingFuture) !bool {
-        return switch (self.*) {
-            inline else => |*future| future.poll(),
-        };
-    }
-    fn wait(self: *PendingFuture, diagnostic: ?*maplibre.Diagnostic) !void {
-        switch (self.*) {
-            .ready => |*future| try future.wait(diagnostic),
-            .command => |*future| try (try future.wait(diagnostic)).statusError(),
-        }
-    }
-    fn deinit(self: *PendingFuture) void {
-        switch (self.*) {
-            inline else => |*future| future.deinit(),
-        }
-    }
-};

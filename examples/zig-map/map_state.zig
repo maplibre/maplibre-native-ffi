@@ -2,6 +2,7 @@ const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
 const diagnostics = @import("diagnostics.zig");
+const events = @import("events.zig");
 const types = @import("types.zig");
 
 pub const MapState = struct {
@@ -12,9 +13,12 @@ pub const MapState = struct {
     runtime: maplibre.Runtime,
     map: maplibre.Map,
 
-    pub fn init(allocator: std.mem.Allocator, viewport: types.Viewport, wake: maplibre.Wake, smoke: bool) !MapState {
+    /// Creates the runtime, whose event wake posts `runtime_events` app
+    /// events, and the map. A smoke run loads an inline style instead of
+    /// fetching one, so it needs no network.
+    pub fn init(allocator: std.mem.Allocator, viewport: types.Viewport, smoke: bool) !MapState {
         var diagnostic: maplibre.Diagnostic = .{};
-        var runtime = maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:", .event_wake = wake }, &diagnostic) catch |err| {
+        var runtime = maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:", .event_wake = events.wake(.runtime_events) }, &diagnostic) catch |err| {
             diagnostics.logError("runtime create failed", err, &diagnostic);
             return types.AppError.RuntimeCreateFailed;
         };
@@ -144,17 +148,17 @@ pub const MapState = struct {
         try self.cameraMutation(maplibre.mapCancelTransitions(self.map, &self.diagnostic));
     }
 
-    /// Drains runtime events, reporting whether the map requested another
-    /// frame.
+    /// Drains every queued runtime event and reports whether the map published
+    /// a render update.
     pub fn drainEvents(self: *MapState) !bool {
         var batch = maplibre.runtimeDrainEvents(self.runtime, null) catch |err| switch (err) {
             error.NotReady => return false,
             else => return err,
         };
         defer batch.deinit();
-        var events = try maplibre.eventBatchGet(self.allocator, batch, null);
-        defer events.deinit();
-        for (events.value.events) |event| {
+        var queued = try maplibre.eventBatchGet(self.allocator, batch, null);
+        defer queued.deinit();
+        for (queued.value.events) |event| {
             if (event.source_type != .map or event.source != self.map.raw) continue;
             if (event.type == .map_render_update_available) return true;
         }

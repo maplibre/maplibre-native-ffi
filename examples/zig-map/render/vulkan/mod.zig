@@ -25,65 +25,59 @@ pub const VulkanRenderTarget = union(enum) {
         mode: types.RenderTargetMode,
     ) !VulkanRenderTarget {
         return switch (mode) {
-            .owned_texture => .{ .owned_texture = try VulkanOwnedTextureBackend.init(allocator, window, viewport) },
+            .owned_texture => .{ .owned_texture = .{ .compositor = try VulkanTextureCompositor.init(allocator, window, viewport) } },
             .borrowed_texture => .{ .borrowed_texture = try VulkanBorrowedTextureBackend.init(allocator, window, viewport) },
-            .native_surface => .{ .native_surface = try VulkanSurfaceBackend.init(allocator, window, viewport) },
+            .native_surface => .{ .native_surface = .{ .context = try Context.init(allocator, window) } },
         };
     }
 
     /// Attaches the render session on the graphics thread.
     pub fn attach(self: *VulkanRenderTarget, map: *maplibre.Map, viewport: types.Viewport) !void {
         switch (self.*) {
-            .owned_texture => |*backend| try backend.attach(map, viewport),
-            .borrowed_texture => |*backend| try backend.attach(map, viewport),
-            .native_surface => |*backend| try backend.attach(map, viewport),
+            inline else => |*backend| try backend.attach(map, viewport),
         }
     }
 
     pub fn deinit(self: *VulkanRenderTarget) void {
         switch (self.*) {
-            .owned_texture => |*backend| backend.deinit(),
-            .borrowed_texture => |*backend| backend.deinit(),
-            .native_surface => |*backend| backend.deinit(),
+            inline else => |*backend| backend.deinit(),
         }
     }
 
-    pub fn resize(self: *VulkanRenderTarget, viewport: types.Viewport) !void {
-        switch (self.*) {
-            .owned_texture => |*backend| try backend.resize(viewport),
-            .borrowed_texture => |*backend| try backend.resize(viewport),
-            .native_surface => |*backend| try backend.resize(viewport),
-        }
-    }
-
-    /// Services caller-driver work, releases anything a completed target
-    /// replacement retired, and reports whether an ordered submission is still
-    /// outstanding.
-    pub fn pollPending(self: *VulkanRenderTarget) !bool {
+    pub fn session(self: *VulkanRenderTarget) *render_target.Session {
         return switch (self.*) {
-            .owned_texture => |*backend| backend.session.poll(),
-            .borrowed_texture => |*backend| backend.pollPending(),
-            .native_surface => |*backend| backend.session.poll(),
+            inline else => |*backend| &backend.session,
         };
     }
 
-    pub fn finishFrame(self: *VulkanRenderTarget) !void {
+    /// Starts the session resize or target replacement a new viewport needs.
+    pub fn resize(self: *VulkanRenderTarget, viewport: types.Viewport) !void {
         switch (self.*) {
-            .owned_texture => |*backend| try backend.finishFrame(),
-            .borrowed_texture => |*backend| try backend.finishFrame(),
-            .native_surface => |*backend| try backend.finishFrame(),
+            .owned_texture => |*backend| {
+                backend.compositor.resize(viewport);
+                try backend.session.resize(viewport);
+            },
+            .borrowed_texture => |*backend| try backend.resize(viewport),
+            .native_surface => |*backend| try backend.session.resize(viewport),
         }
     }
 
-    pub fn renderUpdate(
-        self: *VulkanRenderTarget,
-        allocator: std.mem.Allocator,
-        viewport: types.Viewport,
-    ) !render_target.FrameOutcome {
+    /// Services caller-driver work, then releases what completed target
+    /// replacements retired.
+    pub fn service(self: *VulkanRenderTarget) !void {
+        try self.session().service();
+        if (self.* == .borrowed_texture) try self.borrowed_texture.retireReplaced();
+    }
+
+    /// Shows the newest rendered frame, reporting false when no frame reached
+    /// the window.
+    pub fn present(self: *VulkanRenderTarget, viewport: types.Viewport) !bool {
+        _ = viewport;
         return switch (self.*) {
-            .owned_texture => |*backend| backend.renderUpdate(allocator, viewport),
-            .borrowed_texture => |*backend| backend.renderUpdate(allocator, viewport),
-            .native_surface => |*backend| backend.session.renderUpdate(allocator),
+            .owned_texture => |*backend| backend.present(),
+            .borrowed_texture => |*backend| backend.compositor.presentImageView(backend.image.view),
+            // The driver already presented the frame.
+            .native_surface => true,
         };
     }
 };
@@ -189,6 +183,9 @@ const VulkanTextureCompositor = struct {
         try self.commands.waitForFrameFence(self.context.device);
     }
 
+    /// Samples image_view into the next swapchain image and waits for the
+    /// sampling pass, so the caller may hand the image back to the session.
+    /// Reports false when the swapchain was out of date and nothing presented.
     fn presentImageView(self: *VulkanTextureCompositor, image_view: c.VkImageView) !bool {
         try self.waitForFrame();
 
@@ -257,129 +254,49 @@ const VulkanTextureCompositor = struct {
         if (present == c.VK_SUBOPTIMAL_KHR) {
             self.swapchain_stale = true;
         }
+        try self.waitForFrame();
         return true;
     }
 };
 
 const VulkanOwnedTextureBackend = struct {
     compositor: VulkanTextureCompositor,
-    session: render_target.Session,
-    pending_frame: ?maplibre.AcquiredFrame,
-
-    fn init(
-        allocator: std.mem.Allocator,
-        window: *c.SDL_Window,
-        viewport: types.Viewport,
-    ) !VulkanOwnedTextureBackend {
-        var self = VulkanOwnedTextureBackend{
-            .compositor = try VulkanTextureCompositor.init(allocator, window, viewport),
-            .session = .{},
-            .pending_frame = null,
-        };
-        errdefer self.deinit();
-        return self;
-    }
-
-    fn attach(self: *VulkanOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
-        self.session = try self.attachRenderTarget(map, viewport);
-    }
+    session: render_target.Session = .{},
 
     fn deinit(self: *VulkanOwnedTextureBackend) void {
         self.compositor.waitIdle();
-        self.releasePendingFrame();
         self.session.deinit();
         self.compositor.deinit();
     }
 
-    fn resize(self: *VulkanOwnedTextureBackend, viewport: types.Viewport) !void {
-        self.compositor.waitIdle();
-        self.releasePendingFrame();
-        self.compositor.resize(viewport);
-        try self.session.startResize(viewport);
-    }
-
-    fn finishFrame(self: *VulkanOwnedTextureBackend) !void {
-        if (self.pending_frame == null) return;
-        try self.compositor.waitForFrame();
-        self.releasePendingFrame();
-    }
-
-    fn attachRenderTarget(
-        self: *VulkanOwnedTextureBackend,
-        map: *maplibre.Map,
-        viewport: types.Viewport,
-    ) !render_target.Session {
+    fn attach(self: *VulkanOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const texture = maplibre.vulkanOwnedTextureAttach(std.heap.smp_allocator, map.*, .{
+        const attachment = maplibre.vulkanOwnedTextureAttach(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.compositor.context),
-        }, .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 2 }, &diagnostic) catch |err| {
+        }, render_target.attachOptions(), &diagnostic) catch |err| {
             diagnostics.logError("Vulkan texture attach failed", err, &diagnostic);
-            return types.AppError.TextureAttachFailed;
+            return types.AppError.AttachFailed;
         };
-        return render_target.textureSession(map, texture);
+        self.session = try render_target.Session.attach(map, attachment, false);
     }
 
-    fn drawAcquiredFrame(self: *VulkanOwnedTextureBackend, frame: maplibre.AcquiredFrame) !bool {
+    fn present(self: *VulkanOwnedTextureBackend) !bool {
+        // Without a new frame, the window keeps the one it already shows.
+        const frame = try self.session.acquireNewest() orelse return true;
+        defer render_target.releaseFrame(frame);
         const FrameContext = struct {
             backend: *VulkanOwnedTextureBackend,
             frame: maplibre.AcquiredFrame,
-            sync: maplibre.GpuSync = .{},
             fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
                 if (sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
-                var with_sync = context;
-                with_sync.sync = sync;
-                return maplibre.acquiredFrameGetVulkanTexture(bool, context.frame, with_sync, draw, null);
+                return maplibre.acquiredFrameGetVulkanTexture(bool, context.frame, context, draw, null);
             }
             fn draw(context: @This(), info: maplibre.VulkanOwnedTextureFrame) anyerror!bool {
                 return context.backend.compositor.presentImageView(vulkanHandleFromBits(c.VkImageView, info.image_view));
             }
         };
         return maplibre.acquiredFrameGetProducerSync(bool, frame, FrameContext{ .backend = self, .frame = frame }, FrameContext.producer, null);
-    }
-
-    fn renderUpdate(
-        self: *VulkanOwnedTextureBackend,
-        allocator: std.mem.Allocator,
-        viewport: types.Viewport,
-    ) !render_target.FrameOutcome {
-        _ = viewport;
-        var outcome = try self.session.renderUpdate(allocator);
-        if (!outcome.rendered) return outcome;
-        const texture = try self.session.textureHandle();
-        var diagnostic: maplibre.Diagnostic = .{};
-        const frame = maplibre.renderSessionAcquireFrame(texture.*, &diagnostic) catch |err| switch (err) {
-            error.NotReady => {
-                outcome.rendered = false;
-                return outcome;
-            },
-            else => {
-                diagnostics.logError("Vulkan texture acquire failed", err, &diagnostic);
-                return types.AppError.BackendDrawFailed;
-            },
-        };
-        var frame_owned = true;
-        errdefer if (frame_owned) maplibre.acquiredFrameRelease(std.heap.smp_allocator, frame, .{ .kind = .cpu_complete }, null) catch {};
-        if (!try self.drawAcquiredFrame(frame)) {
-            try maplibre.acquiredFrameRelease(std.heap.smp_allocator, frame, .{ .kind = .cpu_complete }, null);
-            frame_owned = false;
-            outcome.rendered = false;
-            return outcome;
-        }
-
-        // The frame stays leased until finishFrame waits on the compositor's
-        // fence, so the sampled image is not recycled mid-flight.
-        frame_owned = false;
-        self.pending_frame = frame;
-        return outcome;
-    }
-
-    fn releasePendingFrame(self: *VulkanOwnedTextureBackend) void {
-        if (self.pending_frame) |*frame| {
-            var diagnostic: maplibre.Diagnostic = .{};
-            maplibre.acquiredFrameRelease(std.heap.smp_allocator, frame.*, .{ .kind = .cpu_complete }, &diagnostic) catch |err| diagnostics.logError("Vulkan texture release failed", err, &diagnostic);
-        }
-        self.pending_frame = null;
     }
 };
 
@@ -474,11 +391,11 @@ const BorrowedImage = struct {
 
 const VulkanBorrowedTextureBackend = struct {
     compositor: VulkanTextureCompositor,
-    session: render_target.Session,
-    borrowed_image: BorrowedImage,
-    /// The image the session still renders into until the pending target
-    /// replacement completes.
-    retired_image: ?BorrowedImage = null,
+    session: render_target.Session = .{},
+    /// The image the session renders into as far as completed replacements
+    /// show.
+    image: BorrowedImage,
+    replacements: render_target.Replacements(BorrowedImage) = .{},
 
     fn init(
         allocator: std.mem.Allocator,
@@ -487,137 +404,80 @@ const VulkanBorrowedTextureBackend = struct {
     ) !VulkanBorrowedTextureBackend {
         var compositor = try VulkanTextureCompositor.init(allocator, window, viewport);
         errdefer compositor.deinit();
-        var self = VulkanBorrowedTextureBackend{
-            .borrowed_image = try BorrowedImage.init(&compositor.context, viewport),
-            .session = .{},
+        return .{
+            .image = try BorrowedImage.init(&compositor.context, viewport),
             .compositor = compositor,
         };
-        errdefer self.deinit();
-        return self;
-    }
-
-    fn attach(self: *VulkanBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
-        self.session = try self.attachRenderTarget(map, viewport);
     }
 
     fn deinit(self: *VulkanBorrowedTextureBackend) void {
         self.compositor.waitIdle();
         self.session.deinit();
-        self.releaseRetiredImage();
-        self.borrowed_image.deinit(self.compositor.context.device);
+        const device = self.compositor.context.device;
+        while (self.replacements.takeAny()) |image| {
+            var retired = image;
+            retired.deinit(device);
+        }
+        self.replacements.deinit();
+        self.image.deinit(device);
         self.compositor.deinit();
     }
 
-    fn pollPending(self: *VulkanBorrowedTextureBackend) !bool {
-        const pending = try self.session.poll();
-        if (!pending) self.releaseRetiredImage();
-        return pending;
-    }
-
-    fn releaseRetiredImage(self: *VulkanBorrowedTextureBackend) void {
-        if (self.retired_image) |*image| {
-            self.compositor.waitIdle();
-            image.deinit(self.compositor.context.device);
-        }
-        self.retired_image = null;
+    fn attach(self: *VulkanBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
+        var diagnostic: maplibre.Diagnostic = .{};
+        const attachment = maplibre.vulkanBorrowedTextureAttach(std.heap.smp_allocator, map.*, self.descriptor(self.image, viewport), render_target.attachOptions(), &diagnostic) catch |err| {
+            diagnostics.logError("Vulkan borrowed texture attach failed", err, &diagnostic);
+            return types.AppError.AttachFailed;
+        };
+        self.session = try render_target.Session.attach(map, attachment, false);
     }
 
     /// Follows a resized window: allocates an image at the new size and hands
     /// it to the live session, which stays attached.
     fn resize(self: *VulkanBorrowedTextureBackend, viewport: types.Viewport) !void {
-        const session = try self.session.textureHandle();
-        self.compositor.waitIdle();
         self.compositor.resize(viewport);
-
         var replacement = try BorrowedImage.init(&self.compositor.context, viewport);
         errdefer replacement.deinit(self.compositor.context.device);
         var diagnostic: maplibre.Diagnostic = .{};
-        const completion = maplibre.vulkanBorrowedTextureSetTarget(std.heap.smp_allocator, session.*, .{
-            .extent = render_target.extent(viewport),
-            .physical_width = viewport.physical_width,
-            .physical_height = viewport.physical_height,
-            .context = vulkanContextDescriptor(&self.compositor.context),
-            .image = vulkanHandleToBinding(replacement.image),
-            .image_view = vulkanHandleToBinding(replacement.view),
-            .format = c.VK_FORMAT_R8G8B8A8_UNORM,
-            .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
-            .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        }, &diagnostic) catch |err| {
+        var completion = maplibre.vulkanBorrowedTextureSetTarget(std.heap.smp_allocator, self.session.handle.?, self.descriptor(replacement, viewport), &diagnostic) catch |err| {
             diagnostics.logError("Vulkan borrowed texture set target failed", err, &diagnostic);
-            return types.AppError.TextureResizeFailed;
+            return types.AppError.ResizeFailed;
         };
-        self.session.beginPending(
-            completion,
-            types.AppError.TextureResizeFailed,
-            "Vulkan borrowed texture set target failed",
-        );
-        // The session keeps rendering into the outgoing image until the
-        // replacement commits, so it outlives this call.
-        self.retired_image = self.borrowed_image;
-        self.borrowed_image = replacement;
+        self.replacements.push(completion, replacement) catch |err| {
+            completion.deinit();
+            return err;
+        };
         try self.session.resizeMap(viewport);
     }
 
-    fn finishFrame(self: *VulkanBorrowedTextureBackend) !void {
-        try self.compositor.waitForFrame();
+    fn retireReplaced(self: *VulkanBorrowedTextureBackend) !void {
+        while (try self.replacements.takeCompleted()) |replacement| {
+            // The compositor waits for its own sampling, but the session's
+            // last render into the outgoing image may still be in flight.
+            self.compositor.waitIdle();
+            self.image.deinit(self.compositor.context.device);
+            self.image = replacement;
+        }
     }
 
-    fn attachRenderTarget(
-        self: *VulkanBorrowedTextureBackend,
-        map: *maplibre.Map,
-        viewport: types.Viewport,
-    ) !render_target.Session {
-        var diagnostic: maplibre.Diagnostic = .{};
-        const texture = maplibre.vulkanBorrowedTextureAttach(std.heap.smp_allocator, map.*, .{
+    fn descriptor(self: *const VulkanBorrowedTextureBackend, image: BorrowedImage, viewport: types.Viewport) maplibre.VulkanBorrowedTextureDescriptor {
+        return .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
             .context = vulkanContextDescriptor(&self.compositor.context),
-            .image = vulkanHandleToBinding(self.borrowed_image.image),
-            .image_view = vulkanHandleToBinding(self.borrowed_image.view),
+            .image = vulkanHandleToBinding(image.image),
+            .image_view = vulkanHandleToBinding(image.view),
             .format = c.VK_FORMAT_R8G8B8A8_UNORM,
             .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
             .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        }, .{ .driver = .caller_graphics_thread }, &diagnostic) catch |err| {
-            diagnostics.logError("Vulkan borrowed texture attach failed", err, &diagnostic);
-            return types.AppError.TextureAttachFailed;
         };
-        return render_target.textureSession(map, texture);
-    }
-
-    fn renderUpdate(
-        self: *VulkanBorrowedTextureBackend,
-        allocator: std.mem.Allocator,
-        viewport: types.Viewport,
-    ) !render_target.FrameOutcome {
-        _ = viewport;
-        var outcome = try self.session.renderUpdate(allocator);
-        if (!outcome.rendered) return outcome;
-        outcome.rendered = try self.compositor.presentImageView(self.borrowed_image.view);
-        return outcome;
     }
 };
 
 const VulkanSurfaceBackend = struct {
     context: Context,
-    session: render_target.Session,
-
-    fn init(
-        allocator: std.mem.Allocator,
-        window: *c.SDL_Window,
-        _: types.Viewport,
-    ) !VulkanSurfaceBackend {
-        var self = VulkanSurfaceBackend{
-            .context = try Context.init(allocator, window),
-            .session = .{},
-        };
-        errdefer self.deinit();
-        return self;
-    }
-
-    fn attach(self: *VulkanSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
-        self.session = try self.attachRenderTarget(map, viewport);
-    }
+    session: render_target.Session = .{},
 
     fn deinit(self: *VulkanSurfaceBackend) void {
         self.context.waitIdle();
@@ -625,27 +485,17 @@ const VulkanSurfaceBackend = struct {
         self.context.deinit();
     }
 
-    fn resize(self: *VulkanSurfaceBackend, viewport: types.Viewport) !void {
-        try self.session.startResize(viewport);
-    }
-
-    fn finishFrame(_: *VulkanSurfaceBackend) !void {}
-
-    fn attachRenderTarget(
-        self: *VulkanSurfaceBackend,
-        map: *maplibre.Map,
-        viewport: types.Viewport,
-    ) !render_target.Session {
+    fn attach(self: *VulkanSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const surface = maplibre.vulkanSurfaceAttach(std.heap.smp_allocator, map.*, .{
+        const attachment = maplibre.vulkanSurfaceAttach(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.context),
             .surface = vulkanHandleToBinding(self.context.surface),
-        }, .{ .driver = .caller_graphics_thread }, &diagnostic) catch |err| {
+        }, render_target.attachOptions(), &diagnostic) catch |err| {
             diagnostics.logError("Vulkan surface attach failed", err, &diagnostic);
-            return types.AppError.SurfaceAttachFailed;
+            return types.AppError.AttachFailed;
         };
-        return render_target.surfaceSession(map, surface);
+        self.session = try render_target.Session.attach(map, attachment, true);
     }
 };
 
