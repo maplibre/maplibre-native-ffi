@@ -52,11 +52,6 @@ final class _Library {
             Bool Function(Pointer<Void>, Pointer<_Context>),
             bool Function(Pointer<Void>, Pointer<_Context>)
           >('mln_test_graphics_get_context'),
-      makeCurrent = library
-          .lookupFunction<
-            Bool Function(Pointer<Void>),
-            bool Function(Pointer<Void>)
-          >('mln_test_graphics_make_current'),
       lastError = library
           .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
             'mln_test_graphics_last_error',
@@ -65,7 +60,6 @@ final class _Library {
   final Pointer<Void> Function(int) create;
   final void Function(Pointer<Void>) destroy;
   final bool Function(Pointer<Void>, Pointer<_Context>) getContext;
-  final bool Function(Pointer<Void>) makeCurrent;
   final Pointer<Utf8> Function() lastError;
 }
 
@@ -93,17 +87,27 @@ int _buildBackend() {
 }
 
 /// Whether this build can attach an owned texture to a core worker. A WGL
-/// session shares the host's context, which only the caller driver can
+/// session shares the host's context, which only a caller-driven session can
 /// drive.
 bool get buildHasCoreWorkerTexture => _buildBackend() != _backendWgl;
+
+/// Whether a core-worker session on this build exposes its frames to the host.
+/// Metal and Vulkan sessions do. An OpenGL session exposes frames only from a
+/// context that it shares with the host, which only a caller-driven session
+/// can drive.
+bool get buildExposesCoreWorkerFrames => switch (_buildBackend()) {
+  _backendMetal || _backendVulkan => true,
+  _ => false,
+};
 
 /// A device or context standing in for the host's.
 final class TestGraphics {
   TestGraphics._(this._handle, this._context);
 
-  /// Creates the build's backend context, which [close] destroys. A build
-  /// whose backend has no context here fails, rather than skipping.
-  factory TestGraphics.create() {
+  /// Creates the build's backend context, destroyed by a teardown that runs
+  /// after every session the test attaches to it. A build whose backend has
+  /// no context here fails, rather than skipping.
+  factory TestGraphics.open() {
     final handle = _library.create(_buildBackend());
     if (handle == nullptr) {
       fail('mln_test_graphics_create: ${_library.lastError().toDartString()}');
@@ -115,13 +119,7 @@ final class TestGraphics {
       _library.destroy(handle);
       fail('mln_test_graphics_get_context: $error');
     }
-    return TestGraphics._(handle, context);
-  }
-
-  /// Creates the build's backend context, destroyed by a teardown that runs
-  /// after every session the test attaches to it.
-  factory TestGraphics.open() {
-    final graphics = TestGraphics.create();
+    final graphics = TestGraphics._(handle, context);
     addTearDown(graphics.close);
     return graphics;
   }
@@ -130,32 +128,14 @@ final class TestGraphics {
   final Pointer<_Context> _context;
   var _closed = false;
 
-  bool get isOpengl =>
-      _context.ref.backend == _backendEgl ||
-      _context.ref.backend == _backendWgl;
-
-  /// Makes an OpenGL context current on the calling thread, as the host of a
-  /// caller-driven session does on its graphics thread.
-  void makeCurrent() {
-    if (!_library.makeCurrent(_handle)) {
-      fail(
-        'mln_test_graphics_make_current: '
-        '${_library.lastError().toDartString()}',
-      );
-    }
-  }
-
-  /// Attaches a session-owned texture on this context.
-  ///
-  /// A [shared] OpenGL session joins the host's context and takes the caller
-  /// driver; otherwise an EGL session creates a dedicated context on the core
-  /// worker. WGL has only the shared form.
+  /// Attaches a session-owned texture on this device for a core worker. On
+  /// EGL, the session creates a dedicated context that shares nothing with
+  /// the host's.
   RenderSessionAttachment attachOwnedTexture(
     MapHandle map,
     RenderTargetExtent extent,
-    RenderSessionAttachOptions options, {
-    required bool shared,
-  }) {
+    RenderSessionAttachOptions options,
+  ) {
     final context = _context.ref;
     NativePointer pointer(Pointer<Void> value) => NativePointer(value.address);
     switch (context.backend) {
@@ -190,16 +170,12 @@ final class TestGraphics {
           OpenglOwnedTextureDescriptor(
             extent: extent,
             context: OpenglContextDescriptor(
-              ownership: shared
-                  ? OpenglContextOwnership.shared
-                  : OpenglContextOwnership.dedicated,
+              ownership: OpenglContextOwnership.dedicated,
               data: OpenglContextDescriptorDataEgl(
                 EglContextDescriptor(
                   display: pointer(context.eglDisplay),
                   config: pointer(context.eglConfig),
-                  shareContext: shared
-                      ? pointer(context.eglContext)
-                      : NativePointer.nullPointer,
+                  shareContext: NativePointer.nullPointer,
                   clientApi: OpenglClientApi.gles,
                 ),
               ),
@@ -208,28 +184,11 @@ final class TestGraphics {
           options,
         );
       default:
-        if (!shared) fail('a WGL session always shares the host context');
-        return map.openglOwnedTextureAttach(
-          OpenglOwnedTextureDescriptor(
-            extent: extent,
-            context: OpenglContextDescriptor(
-              ownership: OpenglContextOwnership.shared,
-              data: OpenglContextDescriptorDataWgl(
-                WglContextDescriptor(
-                  deviceContext: pointer(context.wglDeviceContext),
-                  shareContext: pointer(context.wglContext),
-                  getProcAddress: pointer(context.getProcAddress),
-                ),
-              ),
-            ),
-          ),
-          options,
-        );
+        fail('a WGL texture has no core-worker session');
     }
   }
 
-  /// Destroys the context, on the thread that made it current when the
-  /// session was caller-driven. A second close does nothing.
+  /// Destroys the context. A second close does nothing.
   void close() {
     if (_closed) return;
     _closed = true;

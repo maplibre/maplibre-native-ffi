@@ -113,12 +113,15 @@ Runtime, map, camera, and projection calls remain valid when Dart resumes an
 isolate on another native thread after `await`. Attach a render session directly
 from its map on the isolate that will own the graphics session.
 
-A caller-driven render session is the exception: it belongs to the native thread
-that first services it, and `serviceDriverWork()` from any other thread throws
-`WrongThreadException`. Dart can resume an isolate on another thread after any
-`await`, so service such a session only within one synchronous stretch, from
-making its context current through its detach. A core-worker session has no such
-limit.
+Dart hosts render through core-worker sessions, on Metal, on Vulkan, or on an
+EGL context that the session creates for itself. That EGL context shares nothing
+with the host, so an EGL session renders to a surface or offers its texture as
+readback rather than as frames to sample. A caller-driven session belongs to the
+native thread that first services it, and `serviceDriverWork()` from any other
+thread throws `WrongThreadException`. Dart can resume an isolate on another
+thread after any `await`, so an isolate has no thread that it can keep for such
+a session. A WGL texture shares the host's context, which only a caller-driven
+session can drive, so a Dart host on Windows renders through Vulkan.
 
 A pending completion keeps its isolate alive, so every future that the binding
 returns resolves before the isolate finishes. Callback registrations leave the

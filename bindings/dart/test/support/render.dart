@@ -1,10 +1,5 @@
-/// Owned-texture render sessions on the build's backend.
-///
-/// A core-worker session is waited on through its frame wake. A caller-driven
-/// session belongs to the native thread that first services it, and Dart may
-/// resume an isolate on another thread after any await, so this isolate
-/// services one only inside a single synchronous stretch: from its context
-/// becoming current, through attachment and every frame, to its detach.
+/// Owned-texture render sessions on the build's backend, driven by their core
+/// worker and waited on through their frame wake.
 library;
 
 import 'dart:async';
@@ -67,7 +62,6 @@ final class WorkerSession {
         requestedTextureRingDepth: 1,
         frameWake: Wake(callback: () => worker._frames.notify()),
       ),
-      shared: false,
     );
     worker = WorkerSession._(attachment.session);
     addTearDown(() => _release(worker.session));
@@ -89,113 +83,6 @@ final class WorkerSession {
     fail('$_frameAttempts frame demands rendered nothing');
   }
 }
-
-/// A caller-driven session that the current synchronous stretch services.
-final class CallerDrivenSession {
-  CallerDrivenSession._(this.session);
-
-  final RenderSessionHandle session;
-  var _nextToken = 1;
-
-  /// Services driver work until [done] holds, failing after [waitDeadline].
-  ///
-  /// The loop never yields: a wake would reach this isolate only through its
-  /// event loop, and the next service could then run on another thread.
-  void serviceUntil(bool Function() done, String what) {
-    final clock = Stopwatch()..start();
-    while (true) {
-      session.serviceDriverWork(0);
-      if (done()) return;
-      if (clock.elapsed > waitDeadline) fail('timed out servicing $what');
-    }
-  }
-
-  /// Demands frames until one renders, and returns its result.
-  RenderFrameResult renderFrame() {
-    for (var attempt = 0; attempt < _frameAttempts; attempt++) {
-      final token = _requestFrame(session, _nextToken++);
-      RenderFrameResult? result;
-      serviceUntil(
-        () => (result = _takeResult(session, token)) != null,
-        'frame $token',
-      );
-      if (result!.disposition == RenderResult.rendered) return result!;
-    }
-    fail('$_frameAttempts frame demands rendered nothing');
-  }
-}
-
-/// Runs [body] on a caller-driven session attached to [map], all in one
-/// synchronous stretch that also creates and destroys the graphics context.
-///
-/// The stretch services the work [body] queued and detaches the session after
-/// [body] returns, or abandons it when [body] throws, and closes it. The attachment's and the detach's completions
-/// arrive through ports afterwards, without any more driver work, and the
-/// returned future awaits them before it returns what [body] returned.
-Future<T> withCallerDrivenSession<T>(
-  MapHandle map,
-  T Function(CallerDrivenSession driven) body,
-) async {
-  final completions = <Future<void>>[];
-  final T result;
-  try {
-    result = _callerDrivenStretch(map, body, completions);
-  } catch (_) {
-    // The failure that ended the stretch is the one to report.
-    for (final completion in completions) {
-      completion.ignore();
-    }
-    rethrow;
-  }
-  await within(Future.wait(completions), 'the session completions');
-  return result;
-}
-
-T _callerDrivenStretch<T>(
-  MapHandle map,
-  T Function(CallerDrivenSession driven) body,
-  List<Future<void>> completions,
-) {
-  final graphics = TestGraphics.create();
-  try {
-    if (graphics.isOpengl) graphics.makeCurrent();
-    final attachment = graphics.attachOwnedTexture(
-      map,
-      _extent,
-      const RenderSessionAttachOptions(
-        driver: RenderDriverKind.callerGraphicsThread,
-        requestedTextureRingDepth: 2,
-      ),
-      shared: true,
-    );
-    completions.add(attachment.completed);
-    final driven = CallerDrivenSession._(attachment.session);
-    try {
-      driven.serviceUntil(
-        () => _state(driven.session) != RenderSessionState.attaching,
-        'attachment',
-      );
-      expect(_state(driven.session), RenderSessionState.attached);
-      final result = body(driven);
-      // Work that [body] submitted, such as a readback, runs before the
-      // detach, whose submission retires the rendered frame.
-      driven.session.serviceDriverWork(0);
-      completions.add(driven.session.detach());
-      driven.serviceUntil(
-        () => _state(driven.session) == RenderSessionState.detached,
-        'detach',
-      );
-      return result;
-    } finally {
-      _release(driven.session);
-    }
-  } finally {
-    graphics.close();
-  }
-}
-
-RenderSessionState _state(RenderSessionHandle session) =>
-    session.getSnapshot().state;
 
 /// Abandons [session] unless it already released its target, then closes it.
 void _release(RenderSessionHandle session) {
