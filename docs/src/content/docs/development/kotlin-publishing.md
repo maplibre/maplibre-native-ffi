@@ -144,15 +144,13 @@ packageable native payload; it binds nothing in the helper and adds no keep rule
 of its own. Such a host still calls `mln_android_init` before creating a
 runtime.
 
-The Android target of `maplibre-native-ffi` carries the Kotlin API, the JavaCPP
-bridge classes, and `jni/<abi>/libjniMaplibreNativeC.so`, which is private to
-this binding. It publishes a consumer R8 rule for JavaCPP, which reads the
-generated presets class reflectively and derives the JNI library name from a
-live stack trace, so both survive minification only when R8 leaves the presets
-package and the JavaCPP runtime package alone. Apps that minify get that rule
-from the publication and add none of their own. The bridge links the NDK C++
-runtime statically, so this AAR carries the Android NDK notice under
-`META-INF/licenses` alongside the binary that embeds it.
+The Android target of `maplibre-native-ffi` carries the Kotlin API and
+`jni/<abi>/libmaplibre-native-ffi-jni.so`, the JNI shim that is private to this
+binding. When the shim loads, it registers its natives and looks up the Kotlin
+methods that its upcalls call, all by name. The publication's consumer R8 rule
+keeps those classes and members, so apps that minify add no rule of their own.
+The shim is C built with the NDK, and this AAR carries the Android NDK notice
+under `META-INF/licenses`.
 
 ### JVM
 
