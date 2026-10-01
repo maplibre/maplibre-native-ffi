@@ -1,6 +1,7 @@
-// A process that exits while a Vulkan core worker renders a session-owned
-// texture, with its runtime, map, resource provider, wakes, and log callback
-// all live. See render_probe.h.
+// A process that exits after abandoning two Vulkan sessions mid-frame, one on a
+// core worker and one on a host graphics thread, with its runtime, maps,
+// session handles, resource provider, wakes, and log callback all live. See
+// render_probe.h.
 
 #include "render_probe.h"
 
@@ -28,5 +29,5 @@ static mln_status attach(
 }
 
 int main(void) {
-  return probe_exit_while_rendering(MLN_TEST_GRAPHICS_BACKEND_VULKAN, attach);
+  return probe_exit_after_abandoning(MLN_TEST_GRAPHICS_BACKEND_VULKAN, attach);
 }

@@ -62,10 +62,12 @@ process exits with no harness teardown in between, and a crash or a nonzero
 status at exit fails its entry, `native-exit/<file>` under CTest. It links the
 shipped library, as the ABI suite does. A behavior belongs there only when
 process exit is what it promises. The programs leave native work running as they
-exit: live runtimes and maps loading a style, a core-worker render session with
-frames queued, and the resource provider, wakes, and log callback all installed.
-`exit/probe.h` holds what they share, and `exit/render_probe.h` the
-render-session program, which each backend's tagged file attaches. A program
+exit: live runtimes and maps loading a style, and the resource provider, wakes,
+and log callback all installed. The render-session program renders on a core
+worker and on a host graphics thread, and abandons both sessions mid-frame just
+before it returns, since a host ends every session's graphics calls before it
+exits. `exit/probe.h` holds what the programs share, and `exit/render_probe.h`
+the render-session program, which each backend's tagged file attaches. A program
 whose name ends in a backend tag builds only on matching presets, as a suite
 file does.
 
