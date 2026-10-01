@@ -398,11 +398,17 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
                 owned = next(
                     item for item in plan.owned_outputs if item.parameter == output.name
                 )
-                parent = (
-                    ", parent: self"
-                    if owned.parent_parameter == plan.receiver and plan.receiver
-                    else ""
-                )
+                parent = ""
+                if owned.parent_parameter and owned.parent_parameter == plan.receiver:
+                    parent = ", parent: self"
+                elif owned.parent_parameter:
+                    # A parent passed as another argument is that handle.
+                    position = next(
+                        i
+                        for i, p in enumerate(params)
+                        if p.name == owned.parent_parameter
+                    )
+                    parent = f", parent: bindingArg{position}"
                 storage.append(f"  var value{index}: {value.native} = 0")
                 types.append(value_types.public(value))
                 capture.append(

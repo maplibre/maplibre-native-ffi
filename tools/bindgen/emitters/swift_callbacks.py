@@ -46,7 +46,12 @@ def raw_type(type_):
         type_.declaration
         or SCALARS.get(
             type_.canonical,
-            {"char": "CChar", "void": "Void"}.get(
+            {
+                "char": "CChar",
+                "void": "Void",
+                "int": "CInt",
+                "unsigned int": "CUnsignedInt",
+            }.get(
                 type_.spelling.removeprefix("const "),
                 type_.spelling.removeprefix("const "),
             ),
@@ -123,6 +128,11 @@ def descriptor(values, plan):
     root_needed = " || ".join(
         f"{identifier(camel(field))} != nil" for field in registration.callbacks
     )
+    sized = (
+        f"\n    raw.size = UInt32(MemoryLayout<{plan.native}>.size)"
+        if any(field.role == "size" for field in plan.fields)
+        else ""
+    )
     declarations = f"""public struct {public}: Sendable {{
 {chr(10).join(fields)}
   public init({", ".join(arguments)}) {{
@@ -133,8 +143,7 @@ def descriptor(values, plan):
 {chr(10).join(defaults)}
   }}
   func nativeValue(arena: NativeInputArena) throws -> {plan.native} {{
-    var raw = {initial}
-    raw.size = UInt32(MemoryLayout<{plan.native}>.size)
+    var raw = {initial}{sized}
 {chr(10).join(materialize)}
     if {root_needed} {{
       raw.{registration.user_data} = arena.callback(self)
