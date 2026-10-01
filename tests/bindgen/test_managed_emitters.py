@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 from support import ROOT, parse, require_tool
 
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.emitters import dart, dotnet, dotnet_native, kotlin
+from tools.bindgen.emitters import dart, dart_native, dotnet, dotnet_native, kotlin
 from tools.bindgen.emitters.dotnet_values import Values
 from tools.bindgen.schema import validate
 
@@ -103,6 +103,21 @@ mln_status mln_map_readScale(mln_map map, const mln_completion *completion, mln_
             self.assertEqual(
                 set(emitter.coverage(owned)["generated"]) - {"mln_map_close"}, set()
             )
+
+    def test_native_declarations_reject_inline_array_fields(self):
+        # A pointer in place of an inline array would change the struct size.
+        for field in ("float m[4];", "mln_mat2 m;"):
+            api = self.parse(f"""
+typedef float mln_mat2[4];
+typedef struct mln_matrix {{ {field} }} mln_matrix;
+""")
+            bound = compile_api(api)
+            for emitter in (dotnet_native, dart_native):
+                with (
+                    self.subTest(field=field, emitter=emitter.__name__),
+                    self.assertRaisesRegex(ValueError, "field layout"),
+                ):
+                    emitter.generate(bound)
 
     def test_dart_commands_generate_on_any_owner(self):
         api = self.parse("""

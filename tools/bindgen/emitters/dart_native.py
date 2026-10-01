@@ -5,7 +5,8 @@ function, a `Struct` or `Union` per record, a top-level integer constant per
 C enum constant, and a `NativeFunction` typedef per callback typedef. Handle
 typedefs alias their integer carrier. The handwritten `native_abi.dart`
 declares `mln_diagnostic`, which the frontend strips from every signature it
-describes, and the library re-exports it.
+describes, and the library re-exports it. A fixed-size array field fails
+generation, because no current header needs its inline layout.
 """
 
 from __future__ import annotations
@@ -33,8 +34,14 @@ NATIVE = {
     "size_t": "Size",
     "intptr_t": "IntPtr",
     "uintptr_t": "UintPtr",
+    "short": "Short",
+    "unsigned short": "UnsignedShort",
     "int": "Int",
     "unsigned int": "UnsignedInt",
+    "long": "Long",
+    "unsigned long": "UnsignedLong",
+    "long long": "LongLong",
+    "unsigned long long": "UnsignedLongLong",
     "float": "Float",
     "double": "Double",
 }
@@ -63,13 +70,17 @@ class Declarations:
         self.records = self.api.records_by_name
         self.enums = {enum.name: enum for enum in self.api.enums}
 
-    def native(self, ctype: CType) -> str:
+    def native(self, ctype: CType, field: bool = False) -> str:
         """The `dart:ffi` native type of one C type."""
         if ctype.kind == "pointer" and ctype.pointee is not None:
             if ctype.pointee.kind == "function":
                 raise ValueError(f"{ctype.spelling}: name the callback typedef")
             return f"Pointer<{self.native(ctype.pointee)}>"
         if ctype.kind == "array" and ctype.element is not None:
+            if field:
+                # A parameter array decays to a pointer, but a field array
+                # sits inline, and a pointer would change the struct layout.
+                raise ValueError(f"{ctype.spelling}: no dart:ffi field layout")
             return f"Pointer<{self.native(ctype.element)}>"
         if ctype.kind == "void":
             return "Void"
@@ -82,7 +93,7 @@ class Declarations:
         if typedef is not None:
             if self.callback(typedef.type):
                 return name
-            return self.native(typedef.type)
+            return self.native(typedef.type, field)
         if name in NATIVE:
             return NATIVE[name]
         if ctype.canonical in NATIVE:
@@ -119,7 +130,7 @@ class Declarations:
         )
 
     def field(self, name: str, ctype: CType) -> str:
-        native = self.native(ctype)
+        native = self.native(ctype, field=True)
         if native in self.bound.handles:
             native = "Uint64"
         dart = dart_type(native)

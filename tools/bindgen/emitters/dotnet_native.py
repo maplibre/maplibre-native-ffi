@@ -5,7 +5,8 @@ function, a blittable struct per record, a C# enum per C enum, and a handle
 struct per handle typedef. Callback typedefs become unmanaged function pointer
 types at their use sites. The handwritten runtime declares `mln_diagnostic`,
 which the frontend strips from every signature it describes. A presence mask
-takes the type of the enum whose bits it carries.
+takes the type of the enum whose bits it carries. A fixed-size array field
+fails generation, because no current header needs its inline layout.
 """
 
 from __future__ import annotations
@@ -16,6 +17,9 @@ from tools.bindgen.names import pascal
 from tools.bindgen.semantic import BoundApi
 
 from .dotnet_values import SCALARS, typed_mask
+
+# C's long is 32 bits on Windows and pointer-sized elsewhere.
+C_LONG = {"long": "CLong", "unsigned long": "CULong"}
 
 HEADER = "// Generated from the C headers by tools/bindgen. Do not edit.\n"
 
@@ -55,11 +59,15 @@ class Declarations:
             or function.name in adapters
         ]
 
-    def type(self, ctype: CType, pointee: bool = False) -> str:
+    def type(self, ctype: CType, pointee: bool = False, field: bool = False) -> str:
         """The C# spelling of one C type at a field, parameter, or result."""
         if ctype.kind == "pointer" and ctype.pointee is not None:
             return self.pointer(ctype.pointee)
         if ctype.kind == "array" and ctype.element is not None:
+            if field:
+                # A parameter array decays to a pointer, but a field array
+                # sits inline, and a pointer would change the struct layout.
+                raise ValueError(f"{ctype.spelling}: no C# field layout")
             return self.pointer(ctype.element)
         if ctype.kind == "void":
             return "void"
@@ -74,7 +82,9 @@ class Declarations:
             return name
         typedef = self.typedefs.get(name)
         if typedef is not None and ctype.kind == "typedef":
-            return self.type(typedef.type, pointee)
+            return self.type(typedef.type, pointee, field)
+        if name in C_LONG:
+            return C_LONG[name]
         scalar = SCALARS.get(name) or SCALARS.get(ctype.canonical)
         if scalar == "bool":
             # A by-value C bool crosses as its byte; a pointer to one is a
@@ -112,7 +122,7 @@ class Declarations:
             return
         self.used_records.add(name)
         for field in self.records[name].fields:
-            self.type(field.type)
+            self.type(field.type, field=True)
 
     def function(self, function: Function) -> str:
         parameters = [
@@ -132,7 +142,7 @@ class Declarations:
         plan = self.bound.values.get(record.name)
         masks = {field.name: typed_mask(field) for field in plan.fields} if plan else {}
         fields = "".join(
-            f"    {'[FieldOffset(0)] ' if explicit else ''}public {masks.get(field.name) or self.type(field.type)} {identifier(field.name)};\n"
+            f"    {'[FieldOffset(0)] ' if explicit else ''}public {masks.get(field.name) or self.type(field.type, field=True)} {identifier(field.name)};\n"
             for field in record.fields
         )
         layout = "[StructLayout(LayoutKind.Explicit)]\n" if explicit else ""
