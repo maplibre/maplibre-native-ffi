@@ -87,8 +87,8 @@ private final class NativeCompletionState<Value: Sendable>:
   /// Blocks the calling thread until the completion runs.
   ///
   /// Native runs the completion on its own thread, so this suits a host that
-  /// must not return before native work finishes, such as one tearing a runtime
-  /// down before process exit.
+  /// must not return before native work finishes, such as one that releases a
+  /// runtime before tearing down state its callbacks use.
   func valueBlocking() throws -> Value {
     lock.lock()
     defer { lock.unlock() }

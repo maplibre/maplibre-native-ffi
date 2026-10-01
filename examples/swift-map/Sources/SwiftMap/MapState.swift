@@ -102,8 +102,8 @@ final class MapState {
     guard !isClosed else { return }
     isClosed = true
     eventRelay.callback = nil
-    // Awaiting both release completions keeps process exit ordered after native
-    // teardown.
+    // Awaiting both release completions lets native teardown finish before the
+    // app tears down state that the callbacks use.
     try await map.close()
     try await runtime.close()
   }

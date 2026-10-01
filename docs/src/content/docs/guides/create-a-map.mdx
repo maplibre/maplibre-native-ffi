@@ -54,8 +54,8 @@ reports invalid state and leaves the handle open while a live child or pending
 child creation prevents release. Successful map and runtime release consumes
 the public handle immediately; native teardown continues in submission order,
 and the runtime release completion reports when all of it, including released
-maps' teardown, has finished. Wait for that completion before exiting the
-process. A standalone projection snapshot does not keep either source handle
-open.
+maps' teardown, has finished. Wait for that completion before tearing down
+state that the runtime's callbacks use; a process may exit without waiting. A
+standalone projection snapshot does not keep either source handle open.
 
 <Code code={region(createMap, "release")} lang="c" title="create-map.c" />

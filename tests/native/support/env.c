@@ -98,8 +98,8 @@ mln_status mln_test_runtime_close(mln_runtime runtime) {
     mln_test_completion_destroy(&teardown);
     return status;
   }
-  // Waiting keeps process exit ordered after native teardown, which otherwise
-  // races MapLibre's process-wide singletons in short-lived hosts.
+  // The completion lives in this stack frame, and the caller reads the
+  // teardown status.
   const bool completed = mln_test_completion_wait(&teardown, -1);
   const mln_status teardown_status = mln_test_completion_status(&teardown);
   mln_test_completion_destroy(&teardown);

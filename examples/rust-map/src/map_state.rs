@@ -243,8 +243,8 @@ fn close_map(map: MapHandle) -> std::result::Result<(), String> {
     }
 }
 
-/// Closes a runtime and waits for native teardown, so the process exits after
-/// MapLibre's threads and resources are gone rather than racing them.
+/// Closes a runtime and waits for native teardown, so MapLibre's threads stop
+/// before the app tears down state that the callbacks use.
 fn close_runtime(runtime: RuntimeHandle) -> std::result::Result<(), String> {
     let teardown = runtime.release().map_err(|error| error.to_string())?;
     match teardown.wait(Duration::from_secs(30)) {

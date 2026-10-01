@@ -58,8 +58,8 @@ pub const MapState = struct {
     }
 
     pub fn deinit(self: *MapState) void {
-        // Awaiting both release completions keeps process exit ordered after
-        // native teardown.
+        // Awaiting both release completions lets native teardown finish before
+        // the app tears down state that the callbacks use.
         if (maplibre.mapRelease(self.map, null)) |future| {
             var teardown = future;
             _ = teardown.wait(null) catch {};

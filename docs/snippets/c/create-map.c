@@ -53,7 +53,7 @@ static void runtime_torn_down(
 ) {
   (void)result;
   // Signal the host's own shutdown gate here; after this callback returns, no
-  // library thread runs, so the process may exit.
+  // library thread runs, so the host may tear down state its callbacks use.
   (void)user_data;
 }
 

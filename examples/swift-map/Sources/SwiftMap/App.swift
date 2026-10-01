@@ -53,8 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     true
   }
 
-  /// Native teardown is asynchronous, so the reply waits for it rather than
-  /// letting the process exit while the runtime is still releasing.
+  /// Native teardown is asynchronous, so the reply waits for it before the app
+  /// tears down state that the callbacks use.
   func applicationShouldTerminate(_: NSApplication) -> NSApplication
     .TerminateReply
   {

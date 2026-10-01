@@ -149,8 +149,9 @@ impl<T: maplibre_core::handle::NativeHandle> Drop for NativeHandleState<T> {
 /// The longest interpreter shutdown waits for its runtimes to retire.
 const EXIT_RETIREMENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// An owner that interpreter shutdown retires, because a process must not exit
-/// while a runtime is live or its release completion has not run.
+/// An owner that interpreter shutdown retires. The interpreter finalizes before
+/// the C runtime's exit handlers run, so native callbacks into it must stop
+/// first, and releasing each runtime and waiting for its completion stops them.
 trait ExitOwner: Send + Sync {
     fn is_runtime(&self) -> bool;
     /// Takes the handle from an idle owner, so neither close nor finalization
@@ -250,7 +251,7 @@ unsafe extern "C" fn release_exit_release(user_data: *mut c_void) {
 
 /// Disposes every owner the interpreter still holds, then releases each
 /// runtime and waits for its retirement, so no native thread can call into a
-/// finalized interpreter or run while the process exits.
+/// finalized interpreter.
 #[pyfunction]
 fn retire_owners_at_exit(py: Python<'_>) {
     let owners: Vec<Arc<dyn ExitOwner>> =

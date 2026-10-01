@@ -222,8 +222,8 @@ void map_state_deinit(map_state* state) {
     if (status != MLN_STATUS_OK) {
       diagnostics_log_status("runtime release failed", status, &diagnostic);
     } else {
-      // Waiting for the completion keeps process exit ordered after native
-      // teardown.
+      // The completion writes to this stack frame, so it must run before the
+      // function returns.
       while (!atomic_load_explicit(&teardown.completed, memory_order_acquire)) {
         yield_to_runtime();
       }

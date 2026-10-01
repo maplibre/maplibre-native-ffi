@@ -77,8 +77,8 @@ func newRuntimeMapState(v viewport, smoke bool) (*runtimeMapState, error) {
 
 func (state *runtimeMapState) Close() error {
 	var result error
-	// Awaiting both release completions keeps process exit ordered after
-	// native teardown.
+	// Awaiting both release completions lets native teardown finish before
+	// the app tears down state that the callbacks use.
 	if state.mapRef != nil {
 		teardown, err := state.mapRef.Close()
 		result = errors.Join(result, err)
