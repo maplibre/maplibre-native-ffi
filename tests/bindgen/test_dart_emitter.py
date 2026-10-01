@@ -15,7 +15,8 @@ from support import (
     require_tool,
 )
 
-from tools.bindgen.emitters import dart
+from tools.bindgen.compiler import compile_api
+from tools.bindgen.emitters import dart, dart_native
 from tools.bindgen.schema import validate
 
 BINDING = ROOT / "bindings/dart"
@@ -50,19 +51,18 @@ class DartEmitterTests(unittest.TestCase):
             )
             (root / "render").mkdir()
             shutil.copy(BINDING / "lib/src/render/native_pointer.dart", root / "render")
-            # The probe groups name no handle owners, so the probe's values
-            # library takes the binding's without its runtime import.
-            (root / "values.dart").write_text(
-                "".join(
-                    line
-                    for line in (BINDING / "lib/src/values.dart")
-                    .read_text()
-                    .splitlines(keepends=True)
-                    if "runtime/runtime.dart" not in line
-                )
-            )
+            shutil.copy(BINDING / "lib/src/values.dart", root)
+            # The probe groups name no handle owners, so an empty library
+            # stands in for the runtime that the binding's values import.
+            (root / "runtime").mkdir()
+            (root / "runtime/runtime.dart").write_text("library;\n")
             (root / "generated_values.dart").write_text(dart.generate_values(api))
             (root / "generated_operations.dart").write_text(dart.generate(api))
+            (root / "maplibre_native_c.g.dart").write_text(
+                dart_native.generate(compile_api(api))
+            )
+            for name in ("native_abi.dart", "native_asset.dart"):
+                shutil.copy(BINDING / "lib/src/internal/c" / name, root)
             for path in (FIXTURES / "probes/dart").glob("*.dart"):
                 shutil.copy(path, root)
             dart_tool.run(
