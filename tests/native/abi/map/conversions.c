@@ -2,11 +2,7 @@
 // batches, answered from the committed camera. The invalid inputs these
 // conversions reject are in camera.c.
 
-#include <stddef.h>
-
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static mln_screen_point pixel_for(mln_map map, mln_lat_lng coordinate) {
   mln_test_completion query =

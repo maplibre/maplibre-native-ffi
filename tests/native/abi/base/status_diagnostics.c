@@ -1,14 +1,7 @@
 // The status and diagnostic contract every call shares, the buffer handle
 // boundary, and what the library reports about its own build.
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void a_failed_call_writes_its_diagnostic_and_a_successful_call_clears_it(
   void

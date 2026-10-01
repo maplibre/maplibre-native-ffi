@@ -5,13 +5,8 @@
 // submission and some by the command, so each row reads the status from
 // whichever stage refused it.
 
-#include <stdbool.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 typedef struct geojson_case {
   const char* label;

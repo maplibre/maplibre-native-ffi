@@ -2,16 +2,8 @@
 // reaches validation, so a value out of range fails naming its field, and a
 // source whose every field is set in range is added.
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static const char point_collection[] =
   "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","

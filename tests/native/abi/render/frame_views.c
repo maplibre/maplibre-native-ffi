@@ -1,16 +1,9 @@
 // Borrowed views of an acquired frame, and disposal of a frame, which a
 // binding's finalizer uses in place of a synchronized release.
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
 #include "maplibre_native_c/callback_adapter.h"
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static mln_acquired_frame render_and_acquire(
   const mln_test_render_fixture* fixture

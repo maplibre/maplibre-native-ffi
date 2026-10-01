@@ -3,15 +3,8 @@
 // change in its pixels. A frame result reports whether the map wants another
 // frame.
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 typedef struct idle_probe {
   mln_runtime runtime;

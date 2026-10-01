@@ -12,10 +12,8 @@
 #include "maplibre_native_c.h"
 #include "runtime/runtime.hpp"
 #include "support/frames.h"
-#include "support/harness.h"
 #include "support/map.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 namespace {
 

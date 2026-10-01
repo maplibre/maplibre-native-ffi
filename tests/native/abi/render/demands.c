@@ -2,15 +2,8 @@
 // backpressure, barriers and resizes ordered with demands, demands past the
 // ring depth, and the keep-alive demands a still image needs.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
 #include "support/frames.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static mln_render_session_snapshot read_snapshot(mln_render_session session) {
   mln_render_session_snapshot snapshot = {

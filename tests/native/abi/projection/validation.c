@@ -3,11 +3,8 @@
 // are in projection.c.
 
 #include <math.h>
-#include <string.h>
 
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static mln_map_projection create_projection(mln_map map) {
   mln_test_completion completion =

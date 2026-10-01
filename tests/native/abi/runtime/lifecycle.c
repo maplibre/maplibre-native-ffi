@@ -1,14 +1,7 @@
 // Runtime and map lifecycle through the public ABI: creation and its
 // validation, stale and foreign handles, ordered barriers, and release.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void runtime_creation_returns_a_runtime(void) {
   const mln_runtime_options options = mln_runtime_options_default();

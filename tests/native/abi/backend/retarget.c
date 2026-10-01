@@ -5,15 +5,8 @@
 // The targets come from tests/graphics for the preset's backend, so the
 // browser presets, whose canvases JavaScript owns, have no cases here.
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/host_graphics.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 #if !defined(__EMSCRIPTEN__)
 

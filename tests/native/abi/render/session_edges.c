@@ -2,14 +2,9 @@
 // release, a readback needs a rendered frame, and a source query takes no
 // options.
 
-#include <stdbool.h>
-#include <string.h>
-
 #include "support/frames.h"
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void detach_fixture(mln_test_render_fixture* fixture) {
   mln_test_completion detach = mln_test_completion_default(0);

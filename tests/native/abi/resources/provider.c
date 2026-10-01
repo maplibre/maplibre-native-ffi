@@ -2,18 +2,9 @@
 // their cancel callbacks, what a request tells the provider, and how a
 // provider's answer reaches the map, including through the ambient cache.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/map.h"
 #include "support/resources.h"
-#include "support/tables.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static const char unsupported_scheme_style_url[] =
   "jar:file:/packaged/style.json";

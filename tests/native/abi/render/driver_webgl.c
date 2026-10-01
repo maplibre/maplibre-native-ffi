@@ -1,12 +1,8 @@
 // A WebGL surface whose OffscreenCanvas the host transfers to the library,
 // which the core worker then drives.
 
-#include <stdint.h>
-
 #include "support/frames.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void transferred_offscreen_canvas_runs_on_core_worker(void) {
   mln_runtime runtime = mln_test_create_runtime();

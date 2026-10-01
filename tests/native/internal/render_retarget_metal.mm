@@ -8,9 +8,7 @@
 #import <objc/runtime.h>
 
 #include "internal/support/driver_blocker.hpp"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 @interface MLNTestDeallocationProbe : NSObject
 

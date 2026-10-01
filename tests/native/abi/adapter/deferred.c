@@ -1,17 +1,9 @@
 // Deferred callbacks, which answer MapLibre at once and hand a copy of each
 // call to a listener.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
 #include "maplibre_native_c/callback_adapter.h"
 #include "support/adapter.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static const uint8_t inline_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";

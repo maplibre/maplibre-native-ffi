@@ -4,21 +4,13 @@
 // that is still in flight when its map goes away. The browser's HTTP client
 // runs against the runner's routes in browser_http_emscripten.c instead.
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #if defined(_WIN32)
 #include <windows.h>
 #endif
 
-#include "support/harness.h"
 #include "support/map.h"
 #include "support/resources.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 #if !defined(__EMSCRIPTEN__)
 #include "support/http_server.h"

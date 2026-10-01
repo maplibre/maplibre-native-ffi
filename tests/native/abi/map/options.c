@@ -3,15 +3,8 @@
 // only through resize, and every commit publishes a generation of its own.
 
 #include <math.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static mln_map_snapshot read_snapshot(mln_map map) {
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};

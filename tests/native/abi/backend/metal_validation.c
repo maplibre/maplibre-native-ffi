@@ -2,14 +2,9 @@
 // reach a device. Every build validates a Metal descriptor before it reports
 // that it carries no Metal backend, so these tables run on every preset.
 
-#include <stddef.h>
-#include <stdint.h>
-
 #include "support/attach_table.h"
-#include "support/harness.h"
 #include "support/host_graphics.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 MLN_TEST_DESCRIPTOR_EDITS(metal_surface, mln_metal_surface_descriptor)
 MLN_TEST_OVERFLOW_EDIT(metal_surface)

@@ -1,15 +1,9 @@
 // Rendered frames: readback as an ordered operation, acquired frames after
 // abandon, and the repaint flag while the map animates.
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
 #include "support/frames.h"
 
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void texture_readback_is_an_ordered_owned_operation_result(void) {
   mln_runtime runtime = mln_test_create_runtime();

@@ -1,10 +1,6 @@
-#include <stdint.h>
-#include <string.h>
 
 #include "maplibre_native_c.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // Matches a substring so tests do not depend on the exact diagnostic wording.
 static bool last_error_mentions(const char* fragment) {

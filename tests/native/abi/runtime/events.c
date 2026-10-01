@@ -2,15 +2,7 @@
 // batch layout and lifetime, mask validation, and the suppression a cleared
 // mask bit causes at push time.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static const uint64_t unknown_mask_bit = UINT64_C(1) << 63U;
 

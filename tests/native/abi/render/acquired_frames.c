@@ -3,17 +3,9 @@
 // makes of its frame and output.
 
 #include <math.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 
-#include "support/harness.h"
 #include "support/style.h"
-#include "support/tables.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 enum frame_backend {
   FRAME_BACKEND_METAL,

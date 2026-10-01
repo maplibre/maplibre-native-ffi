@@ -9,17 +9,8 @@
 // tile yields its features. A tile the map cannot decode yields none, so that
 // case waits instead for the tile parse warning that map.h documents.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/map.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // The source carries "encoding":"mlt" so the tiles parse as MapLibre Tiles, and
 // a layer references it because a source only loads tiles once one does. The

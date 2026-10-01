@@ -3,17 +3,9 @@
 // messages without a Dart VM. A message is an integer, or an array of integers
 // and native pointers in the Dart_CObject layout of native API version 2.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
 #include "maplibre_native_c/callback_adapter.h"
 #include "support/adapter.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // The Dart_CObject types and union members that the adapter posts.
 enum {

@@ -6,13 +6,8 @@
 // this covers the browser target alone.
 
 #include <maplibre_native_c.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // The layer id the runner's document carries, which identifies the response as
 // the served one.

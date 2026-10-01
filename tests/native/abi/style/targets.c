@@ -2,13 +2,8 @@
 // taken: each fails at commit with the reason. The reads of a missing target
 // that find nothing are in images.c and sources.c.
 
-#include <stdbool.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static const mln_lat_lng corners[4] = {
   {.latitude = 1.0, .longitude = 0.0},

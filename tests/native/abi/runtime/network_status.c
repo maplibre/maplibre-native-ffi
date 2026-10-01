@@ -3,15 +3,8 @@
 // so each runs inside restoring_network_status(), which sets it back online
 // even when an assertion fails.
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/resources.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 #if !defined(__EMSCRIPTEN__)
 #include "support/http_server.h"

@@ -3,13 +3,6 @@
 // clears the callback and restores the default mask even when an assertion
 // fails.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #endif
@@ -27,9 +20,7 @@
 #endif
 
 #include "maplibre_native_c/callback_adapter.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void restore_log_defaults(void) {
   (void)mln_log_clear_callback(NULL);

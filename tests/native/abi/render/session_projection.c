@@ -2,15 +2,8 @@
 // frame rendered with, which later map changes do not reach and which outlives
 // the session.
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
-#include "support/harness.h"
 #include "support/style.h"
-#include "support/tables.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void render_one_frame(const mln_test_render_fixture* fixture) {
   TEST_ASSERT_EQUAL_UINT32(

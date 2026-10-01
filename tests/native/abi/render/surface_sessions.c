@@ -5,14 +5,8 @@
 // The browser presets have no host surface, since JavaScript owns their
 // canvases.
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
 #include "support/frames.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 #if !defined(__EMSCRIPTEN__)
 

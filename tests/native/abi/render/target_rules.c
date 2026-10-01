@@ -2,15 +2,10 @@
 // backend cannot wait on and, for a texture the host created, frame
 // acquisition.
 
-#include <stdint.h>
-#include <string.h>
-
 #include "support/frames.h"
-#include "support/harness.h"
 #include "support/host_graphics.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void a_frame_release_the_backend_cannot_wait_on_keeps_the_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();

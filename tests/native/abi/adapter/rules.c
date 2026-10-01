@@ -5,17 +5,9 @@
 // a rule set a replacement URL. Provider rules answer a real style request.
 // The requests use a custom scheme, so none of them reaches the network.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
 #include "maplibre_native_c/callback_adapter.h"
 #include "support/adapter.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static const uint8_t inline_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";

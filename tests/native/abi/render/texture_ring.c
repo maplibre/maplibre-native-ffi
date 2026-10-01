@@ -1,11 +1,7 @@
 // A session-owned texture ring across a resize.
 
-#include <stdint.h>
-
 #include "support/frames.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void release_frame(mln_acquired_frame* frame) {
   const mln_gpu_sync sync = mln_gpu_sync_default();

@@ -1,14 +1,8 @@
 // Prepared GeoJSON options: the clustering fields decide which points a
 // rendered source holds. The validation of each field is in source_options.c.
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // Three points close enough to cluster at zoom 0 under a 60-pixel radius.
 static const char nearby_points[] =

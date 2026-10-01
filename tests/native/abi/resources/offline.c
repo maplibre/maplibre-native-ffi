@@ -2,13 +2,6 @@
 // to deletion, merging another database's regions, and a download that a
 // resource provider serves.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #if defined(_WIN32)
 #include <io.h>
 #include <sys/stat.h>
@@ -16,11 +9,8 @@
 #include <sys/stat.h>
 #endif
 
-#include "support/harness.h"
 #include "support/resources.h"
-#include "support/tables.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static const char offline_style_url[] = "custom://offline/style.json";
 static const char offline_tile_url[] = "custom://offline/tiles/0/0/0.pbf";

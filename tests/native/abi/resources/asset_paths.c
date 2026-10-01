@@ -1,12 +1,7 @@
 // An asset:// style resolves under the runtime's asset path.
 
-#include <stdio.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/resources.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // Android resolves asset:// against the application's packaged assets, which
 // need mln_android_init, and the browser and OpenHarmony have no asset

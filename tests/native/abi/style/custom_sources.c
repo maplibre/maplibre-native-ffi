@@ -7,16 +7,8 @@
 // The release callback is the only report that the host's state is no longer
 // referenced, and it runs whatever the map's event mask.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // Written from MapLibre threads and read from the test thread, so atomic. Each
 // callback pulses, so the waits below wake on it.

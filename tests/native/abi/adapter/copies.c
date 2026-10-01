@@ -3,18 +3,10 @@
 // result passes through an adapter completion, and the delivered record must
 // hold equal content in storage of its own.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
 #include "adapter_copy_cases_generated.inc"
 #include "maplibre_native_c/callback_adapter.h"
 #include "support/adapter.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // Passes one result through an adapter completion and returns the record it
 // delivered, or null for the failure channel.

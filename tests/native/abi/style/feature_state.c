@@ -1,13 +1,8 @@
 // Feature state: the map-owned store behind set, get, and remove, the
 // selectors that address it, and its delivery to the renderer.
 
-#include <stdbool.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static mln_feature_state_selector selector_for(
   const char* source_id, const char* source_layer_id, const char* feature_id

@@ -2,14 +2,8 @@
 // session, a map in another mode refuses the request, only one request is
 // pending at a time, and closing the map cancels the pending one.
 
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/map.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static mln_map create_map_in_mode(mln_runtime runtime, uint32_t map_mode) {
   mln_map_options options = mln_map_options_default();

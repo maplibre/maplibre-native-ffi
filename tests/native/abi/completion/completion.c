@@ -1,10 +1,6 @@
 // Raw C ABI coverage for one-shot completions and direct queue wakes.
 
-#include <stdatomic.h>
-
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 typedef struct callback_probe {
   atomic_uint calls;

@@ -3,13 +3,9 @@
 // the location indicator setters.
 
 #include <math.h>
-#include <stdbool.h>
-#include <string.h>
 
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void add_source(mln_map map, const char* id) {
   MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(

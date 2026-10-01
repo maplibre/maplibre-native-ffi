@@ -1,10 +1,6 @@
 // The coordinates a projection fit refuses: a fit needs at least one point.
 
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // A fit to no coordinates is refused, and leaves the projection's camera where
 // it was.

@@ -1,9 +1,7 @@
 // An ambient cache operation that a runtime accepted before its release still
 // runs to completion after the handle stops resolving.
 
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void an_accepted_cache_operation_completes_after_the_runtime_releases(
   void

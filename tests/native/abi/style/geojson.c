@@ -2,14 +2,8 @@
 // handle on many sources, the synchronous tiling override, and URL data served
 // through a resource provider.
 
-#include <stdbool.h>
-#include <stdio.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // One point at the map's center, named so a query can tell datasets apart.
 #define POINT_COLLECTION(name)                                           \

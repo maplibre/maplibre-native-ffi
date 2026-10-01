@@ -5,14 +5,8 @@
 // Route matching happens before the handle is read, so these cases drive the
 // callback directly with a synthesized request rather than through a loader.
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
 #include "maplibre_native_c/callback_adapter.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static const char alias_url[] = "maplibre://maps/style";
 static const char resolved_url[] = "https://maps.localhost/style.json";

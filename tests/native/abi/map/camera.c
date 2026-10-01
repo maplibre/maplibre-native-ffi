@@ -4,14 +4,8 @@
 // and ordered conversions and scales observe the committed camera.
 
 #include <math.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
 
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static mln_map create_square_map(mln_runtime runtime, uint32_t side) {
   mln_map_options options = mln_map_options_default();

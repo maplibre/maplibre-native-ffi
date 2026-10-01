@@ -6,19 +6,9 @@
 // lies about 14 pixels from the center.
 
 #include <math.h>
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include "support/harness.h"
 #include "support/style.h"
-#include "support/tables.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // Two points, "west" at x 18 and "east" at x 46 on the center row. The
 // "circles" layer draws both and the "halos" layer draws only the east one.

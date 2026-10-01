@@ -1,9 +1,7 @@
 // Sessions that own their EGL context: the dedicated ownership mode, which
 // only an EGL provider offers.
 
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static void finish_render_barrier(const mln_test_render_fixture* fixture) {
   mln_test_completion completion = mln_test_completion_default(0);

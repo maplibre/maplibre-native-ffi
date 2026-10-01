@@ -1,14 +1,8 @@
 // The ambient cache: each maintenance operation, and a new budget, observed
 // through what the next request for a cached resource tells the provider.
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/resources.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static const char cached_style_url[] = "custom://ambient/style.json";
 static const char cached_style_json[] =

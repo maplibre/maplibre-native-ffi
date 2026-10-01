@@ -2,13 +2,7 @@
 // reports its end once, a cancellation stops it where it stands, and gesture
 // phases mark the map around a camera write.
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static mln_camera_options test_camera(void) {
   mln_camera_options camera = mln_camera_options_default();

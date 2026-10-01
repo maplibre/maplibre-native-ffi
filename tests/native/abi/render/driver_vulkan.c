@@ -2,13 +2,9 @@
 // checks a context the submission accepted once the driver has it: the other
 // backends reject a bad descriptor at submission or cannot fail after it.
 
-#include <stdint.h>
-
 #include "mln_test_graphics.h"
 #include "support/frames.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // A failed attach still published its session, which the host owns: it
 // abandons and destroys the session, and the map's session slot comes back.

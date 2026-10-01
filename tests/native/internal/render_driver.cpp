@@ -11,10 +11,8 @@
 #include "internal/support/sync_points.hpp"
 #include "maplibre_native_c.h"
 #include "support/frames.h"
-#include "support/harness.h"
 #include "support/test_support.h"
 #include "testing/render_clock.hpp"
-#include "unity.h"
 
 namespace {
 

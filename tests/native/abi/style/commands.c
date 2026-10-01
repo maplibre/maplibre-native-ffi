@@ -3,13 +3,9 @@
 // values (global state, transitions, and light) that belong to no layer.
 
 #include <math.h>
-#include <stdbool.h>
-#include <string.h>
 
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static bool source_exists(mln_map map, const char* id) {
   mln_test_completion completion =

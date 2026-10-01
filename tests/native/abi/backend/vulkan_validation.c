@@ -2,14 +2,9 @@
 // reach a device. Every build validates a Vulkan descriptor before it reports
 // that it carries no Vulkan backend, so these tables run on every preset.
 
-#include <stddef.h>
-#include <stdint.h>
-
 #include "support/attach_table.h"
-#include "support/harness.h"
 #include "support/host_graphics.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // Non-dispatchable handles whose value lies entirely in the high 32 bits: a
 // carrier that truncated them to a 32-bit pointer would pass null.

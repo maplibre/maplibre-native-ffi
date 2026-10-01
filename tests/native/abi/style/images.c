@@ -1,13 +1,8 @@
 // Runtime style images: the metadata, pixels, and stretch intervals a copy
 // returns for the image a host set.
 
-#include <stdbool.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 typedef struct stretch_probe {
   atomic_bool done;

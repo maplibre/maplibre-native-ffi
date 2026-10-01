@@ -4,14 +4,8 @@
 // no map at all.
 
 #include <math.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
 
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 static mln_map_projection create_projection(mln_map map) {
   mln_test_completion completion =

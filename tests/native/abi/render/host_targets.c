@@ -3,14 +3,8 @@
 // The browser presets have no such fixtures, because JavaScript owns their
 // canvases.
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/host_graphics.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 #if !defined(__EMSCRIPTEN__)
 static void finish_render_barrier(const mln_test_render_fixture* fixture) {

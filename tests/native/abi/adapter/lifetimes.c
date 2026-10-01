@@ -1,16 +1,9 @@
 // Adapter owners that end native lifetimes for a host: arenas, owner tokens,
 // and the retirement call that custom source callbacks receive.
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
 #include "maplibre_native_c/callback_adapter.h"
 #include "support/adapter.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // What an adopted release saw when it ran.
 typedef struct release_probe {

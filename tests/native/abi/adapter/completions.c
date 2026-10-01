@@ -1,16 +1,9 @@
 // Adapter completions: descriptor validation, the failure channel, ownership
 // of an owned result through adoption or destruction, and rejection.
 
-#include <stdatomic.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
 #include "maplibre_native_c/callback_adapter.h"
 #include "support/adapter.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // The arguments of one mln_adapter_completion_create() call.
 typedef struct create_arguments {

@@ -4,15 +4,9 @@
 // backend, so these tables run on every preset. The descriptors name the
 // preset's provider, or EGL on a build without OpenGL.
 
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-
 #include "support/attach_table.h"
-#include "support/harness.h"
 #include "support/host_graphics.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 #if defined(MLN_FFI_TEST_OPENGL_WGL)
 #define PRESET_PLATFORM MLN_OPENGL_CONTEXT_PLATFORM_WGL

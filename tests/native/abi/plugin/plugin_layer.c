@@ -4,14 +4,9 @@
 // is its own shared library, registered through the function this library
 // exports, the way a host loads one.
 
-#include <stdint.h>
-#include <string.h>
-
 #include "maplibre_native_c/plugin.h"
 #include "square_plugin.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // One point at the camera center, which the 64x64 fixture places at (32, 32),
 // under a square wide enough to cover the center pixel and no corner.

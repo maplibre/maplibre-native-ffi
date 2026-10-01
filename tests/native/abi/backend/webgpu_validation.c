@@ -2,13 +2,8 @@
 // reach a device. Every build validates a WebGPU descriptor before it reports
 // that it carries no WebGPU backend, so these tables run on every preset.
 
-#include <stddef.h>
-#include <stdint.h>
-
 #include "support/attach_table.h"
-#include "support/harness.h"
 #include "support/test_support.h"
-#include "unity.h"
 
 // Any value but WGPUTextureFormat_Undefined: validation rejects that one and
 // takes the rest as given.
