@@ -249,7 +249,9 @@ def declaration(values, value):
             present = f"raw.{path} & c.{bit} != 0" if bit else f"raw.{path}"
             mark = f"raw.{path} |= c.{bit}" if bit else f"raw.{path} = true"
             writes.append(
-                f"        if (self.{local}) |item| {{ {mark}; {raw} = {encode(values, field.value, 'item')}; }}"
+                f"        marshal.present(&raw.{path}, {'c.' + bit if bit else 'true'}, &{raw}, self.{local});"
+                if not dynamic(field.value)
+                else f"        if (self.{local}) |item| {{ {mark}; {raw} = {encode(values, field.value, 'item')}; }}"
             )
             captures.append(
                 f"            .{local} = if ({present}) {copied} else null,"

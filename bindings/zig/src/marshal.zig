@@ -94,6 +94,28 @@ pub fn copyView(allocator: std.mem.Allocator, raw: c.mln_buffer_view) status.Err
     return allocator.dupe(u8, @as([*]const u8, @ptrCast(raw.data orelse return error.NativeError))[0..raw.size]);
 }
 
+/// Converts a binding value that needs no allocator to the native value of
+/// type `Target`: a generated value converts itself, and any other value
+/// passes unchanged.
+pub fn nativeOf(comptime Target: type, value: anytype) Target {
+    const Value = @TypeOf(value);
+    if (Value == Target) return value;
+    switch (@typeInfo(Value)) {
+        .@"struct", .@"enum", .@"union" => if (@hasDecl(Value, "toNative")) return value.toNative(),
+        else => {},
+    }
+    return value;
+}
+
+/// Writes an optional value into a presence-masked native field. A present
+/// value is converted into `field` and marks `presence`: a bool presence
+/// becomes true, and a mask gains `bit`. A null value leaves both unchanged.
+pub fn present(presence: anytype, comptime bit: anytype, field: anytype, value: anytype) void {
+    const item = value orelse return;
+    if (@TypeOf(presence.*) == bool) presence.* = true else presence.* |= bit;
+    field.* = nativeOf(@TypeOf(field.*), item);
+}
+
 /// The native conversions of a generated enum, which keeps values that this
 /// binding does not name.
 pub fn EnumMethods(comptime T: type) type {

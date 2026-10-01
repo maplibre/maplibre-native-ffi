@@ -96,26 +96,11 @@ pub const AnimationOptions = struct {
     pub fn toNative(self: AnimationOptions) c.mln_animation_options {
         var raw = c.mln_animation_options_default();
         raw.fields = 0;
-        if (self.duration_ms) |item| {
-            raw.fields |= c.MLN_ANIMATION_OPTION_DURATION;
-            raw.duration_ms = item;
-        }
-        if (self.velocity) |item| {
-            raw.fields |= c.MLN_ANIMATION_OPTION_VELOCITY;
-            raw.velocity = item;
-        }
-        if (self.min_zoom) |item| {
-            raw.fields |= c.MLN_ANIMATION_OPTION_MIN_ZOOM;
-            raw.min_zoom = item;
-        }
-        if (self.easing) |item| {
-            raw.fields |= c.MLN_ANIMATION_OPTION_EASING;
-            raw.easing = item.toNative();
-        }
-        if (self.transition_id) |item| {
-            raw.fields |= c.MLN_ANIMATION_OPTION_TRANSITION_ID;
-            raw.transition_id = item;
-        }
+        marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_DURATION, &raw.duration_ms, self.duration_ms);
+        marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_VELOCITY, &raw.velocity, self.velocity);
+        marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
+        marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_EASING, &raw.easing, self.easing);
+        marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_TRANSITION_ID, &raw.transition_id, self.transition_id);
         return raw;
     }
     pub fn fromNative(raw: c.mln_animation_options) AnimationOptions {
@@ -157,26 +142,11 @@ pub const BoundOptions = struct {
         var raw = c.mln_bound_options_default();
         raw.fields = 0;
         if (self.unbounded) raw.fields |= c.MLN_BOUND_OPTION_UNBOUNDED;
-        if (self.bounds) |item| {
-            raw.fields |= c.MLN_BOUND_OPTION_BOUNDS;
-            raw.bounds = item.toNative();
-        }
-        if (self.min_zoom) |item| {
-            raw.fields |= c.MLN_BOUND_OPTION_MIN_ZOOM;
-            raw.min_zoom = item;
-        }
-        if (self.max_zoom) |item| {
-            raw.fields |= c.MLN_BOUND_OPTION_MAX_ZOOM;
-            raw.max_zoom = item;
-        }
-        if (self.min_pitch) |item| {
-            raw.fields |= c.MLN_BOUND_OPTION_MIN_PITCH;
-            raw.min_pitch = item;
-        }
-        if (self.max_pitch) |item| {
-            raw.fields |= c.MLN_BOUND_OPTION_MAX_PITCH;
-            raw.max_pitch = item;
-        }
+        marshal.present(&raw.fields, c.MLN_BOUND_OPTION_BOUNDS, &raw.bounds, self.bounds);
+        marshal.present(&raw.fields, c.MLN_BOUND_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
+        marshal.present(&raw.fields, c.MLN_BOUND_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
+        marshal.present(&raw.fields, c.MLN_BOUND_OPTION_MIN_PITCH, &raw.min_pitch, self.min_pitch);
+        marshal.present(&raw.fields, c.MLN_BOUND_OPTION_MAX_PITCH, &raw.max_pitch, self.max_pitch);
         return raw;
     }
     pub fn fromNative(raw: c.mln_bound_options) BoundOptions {
@@ -211,10 +181,7 @@ pub const CameraDelta = struct {
         raw.kind = self.kind.toNative();
         raw.offset = self.offset.toNative();
         raw.amount = self.amount;
-        if (self.anchor) |item| {
-            raw.has_anchor = true;
-            raw.anchor = item.toNative();
-        }
+        marshal.present(&raw.has_anchor, true, &raw.anchor, self.anchor);
         raw.animation = self.animation.toNative();
         return raw;
     }
@@ -260,18 +227,9 @@ pub const CameraFitOptions = struct {
     pub fn toNative(self: CameraFitOptions) c.mln_camera_fit_options {
         var raw = c.mln_camera_fit_options_default();
         raw.fields = 0;
-        if (self.padding) |item| {
-            raw.fields |= c.MLN_CAMERA_FIT_OPTION_PADDING;
-            raw.padding = item.toNative();
-        }
-        if (self.bearing) |item| {
-            raw.fields |= c.MLN_CAMERA_FIT_OPTION_BEARING;
-            raw.bearing = item;
-        }
-        if (self.pitch) |item| {
-            raw.fields |= c.MLN_CAMERA_FIT_OPTION_PITCH;
-            raw.pitch = item;
-        }
+        marshal.present(&raw.fields, c.MLN_CAMERA_FIT_OPTION_PADDING, &raw.padding, self.padding);
+        marshal.present(&raw.fields, c.MLN_CAMERA_FIT_OPTION_BEARING, &raw.bearing, self.bearing);
+        marshal.present(&raw.fields, c.MLN_CAMERA_FIT_OPTION_PITCH, &raw.pitch, self.pitch);
         return raw;
     }
     pub fn fromNative(raw: c.mln_camera_fit_options) CameraFitOptions {
@@ -321,38 +279,14 @@ pub const CameraOptions = struct {
             raw.latitude = item.latitude;
             raw.longitude = item.longitude;
         }
-        if (self.center_altitude) |item| {
-            raw.fields |= c.MLN_CAMERA_OPTION_CENTER_ALTITUDE;
-            raw.center_altitude = item;
-        }
-        if (self.padding) |item| {
-            raw.fields |= c.MLN_CAMERA_OPTION_PADDING;
-            raw.padding = item.toNative();
-        }
-        if (self.anchor) |item| {
-            raw.fields |= c.MLN_CAMERA_OPTION_ANCHOR;
-            raw.anchor = item.toNative();
-        }
-        if (self.zoom) |item| {
-            raw.fields |= c.MLN_CAMERA_OPTION_ZOOM;
-            raw.zoom = item;
-        }
-        if (self.bearing) |item| {
-            raw.fields |= c.MLN_CAMERA_OPTION_BEARING;
-            raw.bearing = item;
-        }
-        if (self.pitch) |item| {
-            raw.fields |= c.MLN_CAMERA_OPTION_PITCH;
-            raw.pitch = item;
-        }
-        if (self.roll) |item| {
-            raw.fields |= c.MLN_CAMERA_OPTION_ROLL;
-            raw.roll = item;
-        }
-        if (self.field_of_view) |item| {
-            raw.fields |= c.MLN_CAMERA_OPTION_FOV;
-            raw.field_of_view = item;
-        }
+        marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_CENTER_ALTITUDE, &raw.center_altitude, self.center_altitude);
+        marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_PADDING, &raw.padding, self.padding);
+        marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_ANCHOR, &raw.anchor, self.anchor);
+        marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_ZOOM, &raw.zoom, self.zoom);
+        marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_BEARING, &raw.bearing, self.bearing);
+        marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_PITCH, &raw.pitch, self.pitch);
+        marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_ROLL, &raw.roll, self.roll);
+        marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_FOV, &raw.field_of_view, self.field_of_view);
         return raw;
     }
     pub fn fromNative(raw: c.mln_camera_options) CameraOptions {
@@ -495,34 +429,13 @@ pub const CustomGeometrySourceOptions = struct {
         var raw = c.mln_custom_geometry_source_options_default();
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_custom_geometry_source_options);
-        if (self.min_zoom) |item| {
-            raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
-            raw.min_zoom = item;
-        }
-        if (self.max_zoom) |item| {
-            raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
-            raw.max_zoom = item;
-        }
-        if (self.tolerance) |item| {
-            raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
-            raw.tolerance = item;
-        }
-        if (self.tile_size) |item| {
-            raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
-            raw.tile_size = item;
-        }
-        if (self.buffer) |item| {
-            raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
-            raw.buffer = item;
-        }
-        if (self.clip) |item| {
-            raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
-            raw.clip = item;
-        }
-        if (self.wrap) |item| {
-            raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
-            raw.wrap = item;
-        }
+        marshal.present(&raw.fields, c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
+        marshal.present(&raw.fields, c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
+        marshal.present(&raw.fields, c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE, &raw.tolerance, self.tolerance);
+        marshal.present(&raw.fields, c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE, &raw.tile_size, self.tile_size);
+        marshal.present(&raw.fields, c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER, &raw.buffer, self.buffer);
+        marshal.present(&raw.fields, c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP, &raw.clip, self.clip);
+        marshal.present(&raw.fields, c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP, &raw.wrap, self.wrap);
         raw.fetch_tile = if (self.fetch_tile != null) fetch_tileTrampoline else null;
         raw.cancel_tile = if (self.cancel_tile != null) cancel_tileTrampoline else null;
         if (!(self.fetch_tile == null and self.cancel_tile == null)) {
@@ -601,14 +514,8 @@ pub const CustomMvtVectorSourceOptions = struct {
         var raw = c.mln_custom_mvt_vector_source_options_default();
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_custom_mvt_vector_source_options);
-        if (self.min_zoom) |item| {
-            raw.fields |= c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
-            raw.min_zoom = item;
-        }
-        if (self.max_zoom) |item| {
-            raw.fields |= c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
-            raw.max_zoom = item;
-        }
+        marshal.present(&raw.fields, c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
+        marshal.present(&raw.fields, c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
         raw.fetch_tile = if (self.fetch_tile != null) fetch_tileTrampoline else null;
         raw.cancel_tile = if (self.cancel_tile != null) cancel_tileTrampoline else null;
         if (!(self.fetch_tile == null and self.cancel_tile == null)) {
@@ -813,14 +720,8 @@ pub const FreeCameraOptions = struct {
     pub fn toNative(self: FreeCameraOptions) c.mln_free_camera_options {
         var raw = c.mln_free_camera_options_default();
         raw.fields = 0;
-        if (self.position) |item| {
-            raw.fields |= c.MLN_FREE_CAMERA_OPTION_POSITION;
-            raw.position = item.toNative();
-        }
-        if (self.orientation) |item| {
-            raw.fields |= c.MLN_FREE_CAMERA_OPTION_ORIENTATION;
-            raw.orientation = item.toNative();
-        }
+        marshal.present(&raw.fields, c.MLN_FREE_CAMERA_OPTION_POSITION, &raw.position, self.position);
+        marshal.present(&raw.fields, c.MLN_FREE_CAMERA_OPTION_ORIENTATION, &raw.orientation, self.orientation);
         return raw;
     }
     pub fn fromNative(raw: c.mln_free_camera_options) FreeCameraOptions {
@@ -873,54 +774,21 @@ pub const GeojsonSourceOptions = struct {
         var raw = c.mln_geojson_source_options_default();
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_geojson_source_options);
-        if (self.min_zoom) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
-            raw.min_zoom = item;
-        }
-        if (self.max_zoom) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
-            raw.max_zoom = item;
-        }
-        if (self.tolerance) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
-            raw.tolerance = item;
-        }
-        if (self.cluster_max_zoom) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
-            raw.cluster_max_zoom = item;
-        }
+        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
+        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
+        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE, &raw.tolerance, self.tolerance);
+        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM, &raw.cluster_max_zoom, self.cluster_max_zoom);
         if (self.cluster_properties) |item| {
             raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
             raw.cluster_properties = marshal.view(item);
         }
-        if (self.tile_size) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
-            raw.tile_size = item;
-        }
-        if (self.buffer) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_BUFFER;
-            raw.buffer = item;
-        }
-        if (self.cluster_radius) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
-            raw.cluster_radius = item;
-        }
-        if (self.cluster_min_points) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
-            raw.cluster_min_points = item;
-        }
-        if (self.line_metrics) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
-            raw.line_metrics = item;
-        }
-        if (self.cluster) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
-            raw.cluster = item;
-        }
-        if (self.synchronous_tiling) |item| {
-            raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
-            raw.synchronous_tiling = item;
-        }
+        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE, &raw.tile_size, self.tile_size);
+        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_BUFFER, &raw.buffer, self.buffer);
+        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS, &raw.cluster_radius, self.cluster_radius);
+        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, self.cluster_min_points);
+        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS, &raw.line_metrics, self.line_metrics);
+        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER, &raw.cluster, self.cluster);
+        marshal.present(&raw.fields, c.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING, &raw.synchronous_tiling, self.synchronous_tiling);
         return raw;
     }
 
@@ -1318,30 +1186,12 @@ pub const MapTileOptions = struct {
     pub fn toNative(self: MapTileOptions) c.mln_map_tile_options {
         var raw = c.mln_map_tile_options_default();
         raw.fields = 0;
-        if (self.prefetch_zoom_delta) |item| {
-            raw.fields |= c.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
-            raw.prefetch_zoom_delta = item;
-        }
-        if (self.lod_min_radius) |item| {
-            raw.fields |= c.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
-            raw.lod_min_radius = item;
-        }
-        if (self.lod_scale) |item| {
-            raw.fields |= c.MLN_MAP_TILE_OPTION_LOD_SCALE;
-            raw.lod_scale = item;
-        }
-        if (self.lod_pitch_threshold) |item| {
-            raw.fields |= c.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
-            raw.lod_pitch_threshold = item;
-        }
-        if (self.lod_zoom_shift) |item| {
-            raw.fields |= c.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
-            raw.lod_zoom_shift = item;
-        }
-        if (self.lod_mode) |item| {
-            raw.fields |= c.MLN_MAP_TILE_OPTION_LOD_MODE;
-            raw.lod_mode = item.toNative();
-        }
+        marshal.present(&raw.fields, c.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA, &raw.prefetch_zoom_delta, self.prefetch_zoom_delta);
+        marshal.present(&raw.fields, c.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS, &raw.lod_min_radius, self.lod_min_radius);
+        marshal.present(&raw.fields, c.MLN_MAP_TILE_OPTION_LOD_SCALE, &raw.lod_scale, self.lod_scale);
+        marshal.present(&raw.fields, c.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD, &raw.lod_pitch_threshold, self.lod_pitch_threshold);
+        marshal.present(&raw.fields, c.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT, &raw.lod_zoom_shift, self.lod_zoom_shift);
+        marshal.present(&raw.fields, c.MLN_MAP_TILE_OPTION_LOD_MODE, &raw.lod_mode, self.lod_mode);
         return raw;
     }
     pub fn fromNative(raw: c.mln_map_tile_options) MapTileOptions {
@@ -1379,22 +1229,10 @@ pub const MapViewportOptions = struct {
     pub fn toNative(self: MapViewportOptions) c.mln_map_viewport_options {
         var raw = c.mln_map_viewport_options_default();
         raw.fields = 0;
-        if (self.north_orientation) |item| {
-            raw.fields |= c.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
-            raw.north_orientation = item.toNative();
-        }
-        if (self.constrain_mode) |item| {
-            raw.fields |= c.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
-            raw.constrain_mode = item.toNative();
-        }
-        if (self.viewport_mode) |item| {
-            raw.fields |= c.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
-            raw.viewport_mode = item.toNative();
-        }
-        if (self.frustum_offset) |item| {
-            raw.fields |= c.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
-            raw.frustum_offset = item.toNative();
-        }
+        marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION, &raw.north_orientation, self.north_orientation);
+        marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE, &raw.constrain_mode, self.constrain_mode);
+        marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE, &raw.viewport_mode, self.viewport_mode);
+        marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET, &raw.frustum_offset, self.frustum_offset);
         return raw;
     }
     pub fn fromNative(raw: c.mln_map_viewport_options) MapViewportOptions {
@@ -1966,18 +1804,9 @@ pub const ProjectionMode = struct {
     pub fn toNative(self: ProjectionMode) c.mln_projection_mode {
         var raw = c.mln_projection_mode_default();
         raw.fields = 0;
-        if (self.axonometric) |item| {
-            raw.fields |= c.MLN_PROJECTION_MODE_AXONOMETRIC;
-            raw.axonometric = item;
-        }
-        if (self.x_skew) |item| {
-            raw.fields |= c.MLN_PROJECTION_MODE_X_SKEW;
-            raw.x_skew = item;
-        }
-        if (self.y_skew) |item| {
-            raw.fields |= c.MLN_PROJECTION_MODE_Y_SKEW;
-            raw.y_skew = item;
-        }
+        marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_AXONOMETRIC, &raw.axonometric, self.axonometric);
+        marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_X_SKEW, &raw.x_skew, self.x_skew);
+        marshal.present(&raw.fields, c.MLN_PROJECTION_MODE_Y_SKEW, &raw.y_skew, self.y_skew);
         return raw;
     }
     pub fn fromNative(raw: c.mln_projection_mode) ProjectionMode {
@@ -2581,14 +2410,8 @@ pub const ResourceRequest = struct {
         raw.priority = self.priority.toNative();
         raw.usage = self.usage.toNative();
         raw.storage_policy = self.storage_policy.toNative();
-        if (self.prior_modified_unix_ms) |item| {
-            raw.has_prior_modified = true;
-            raw.prior_modified_unix_ms = item;
-        }
-        if (self.prior_expires_unix_ms) |item| {
-            raw.has_prior_expires = true;
-            raw.prior_expires_unix_ms = item;
-        }
+        marshal.present(&raw.has_prior_modified, true, &raw.prior_modified_unix_ms, self.prior_modified_unix_ms);
+        marshal.present(&raw.has_prior_expires, true, &raw.prior_expires_unix_ms, self.prior_expires_unix_ms);
         raw.prior_etag = if (self.prior_etag) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
         raw.prior_data = @ptrCast(self.prior_data.ptr);
         raw.prior_data_size = std.math.cast(@TypeOf(raw.prior_data_size), self.prior_data.len) orelse return error.InvalidArgument;
@@ -2636,19 +2459,10 @@ pub const ResourceResponse = struct {
         raw.byte_count = std.math.cast(@TypeOf(raw.byte_count), self.bytes.len) orelse return error.InvalidArgument;
         raw.error_message = if (self.error_message) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
         raw.must_revalidate = self.must_revalidate;
-        if (self.modified_unix_ms) |item| {
-            raw.has_modified = true;
-            raw.modified_unix_ms = item;
-        }
-        if (self.expires_unix_ms) |item| {
-            raw.has_expires = true;
-            raw.expires_unix_ms = item;
-        }
+        marshal.present(&raw.has_modified, true, &raw.modified_unix_ms, self.modified_unix_ms);
+        marshal.present(&raw.has_expires, true, &raw.expires_unix_ms, self.expires_unix_ms);
         raw.etag = if (self.etag) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
-        if (self.retry_after_unix_ms) |item| {
-            raw.has_retry_after = true;
-            raw.retry_after_unix_ms = item;
-        }
+        marshal.present(&raw.has_retry_after, true, &raw.retry_after_unix_ms, self.retry_after_unix_ms);
         return raw;
     }
 
@@ -3239,18 +3053,9 @@ pub const StyleImageInfo = struct {
         raw.byte_length = self.byte_length;
         raw.stretch_x_count = self.stretch_x_count;
         raw.stretch_y_count = self.stretch_y_count;
-        if (self.content) |item| {
-            raw.has_content = true;
-            raw.content = item.toNative();
-        }
-        if (self.text_fit_width) |item| {
-            raw.has_text_fit_width = true;
-            raw.text_fit_width = item.toNative();
-        }
-        if (self.text_fit_height) |item| {
-            raw.has_text_fit_height = true;
-            raw.text_fit_height = item.toNative();
-        }
+        marshal.present(&raw.has_content, true, &raw.content, self.content);
+        marshal.present(&raw.has_text_fit_width, true, &raw.text_fit_width, self.text_fit_width);
+        marshal.present(&raw.has_text_fit_height, true, &raw.text_fit_height, self.text_fit_height);
         raw.pixel_ratio = self.pixel_ratio;
         raw.sdf = self.sdf;
         return raw;
@@ -3321,26 +3126,11 @@ pub const StyleImageOptions = struct {
             };
         }
         raw.stretch_y_count = std.math.cast(@TypeOf(raw.stretch_y_count), if (self.stretch_y) |items| items.len else 0) orelse return error.InvalidArgument;
-        if (self.content) |item| {
-            raw.fields |= c.MLN_STYLE_IMAGE_OPTION_CONTENT;
-            raw.content = item.toNative();
-        }
-        if (self.text_fit_width) |item| {
-            raw.fields |= c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
-            raw.text_fit_width = item.toNative();
-        }
-        if (self.text_fit_height) |item| {
-            raw.fields |= c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
-            raw.text_fit_height = item.toNative();
-        }
-        if (self.pixel_ratio) |item| {
-            raw.fields |= c.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
-            raw.pixel_ratio = item;
-        }
-        if (self.sdf) |item| {
-            raw.fields |= c.MLN_STYLE_IMAGE_OPTION_SDF;
-            raw.sdf = item;
-        }
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_OPTION_CONTENT, &raw.content, self.content);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH, &raw.text_fit_width, self.text_fit_width);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT, &raw.text_fit_height, self.text_fit_height);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO, &raw.pixel_ratio, self.pixel_ratio);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_OPTION_SDF, &raw.sdf, self.sdf);
         return raw;
     }
 
@@ -3574,30 +3364,12 @@ pub const StyleSourceInfo = struct {
         raw.type = self.type.toNative();
         raw.id_size = self.id_size;
         raw.is_volatile = self.is_volatile;
-        if (self.attribution_size) |item| {
-            raw.has_attribution = true;
-            raw.attribution_size = item;
-        }
-        if (self.url_size) |item| {
-            raw.fields |= c.MLN_STYLE_SOURCE_INFO_URL;
-            raw.url_size = item;
-        }
-        if (self.bounds) |item| {
-            raw.fields |= c.MLN_STYLE_SOURCE_INFO_BOUNDS;
-            raw.bounds = item.toNative();
-        }
-        if (self.tile_size) |item| {
-            raw.fields |= c.MLN_STYLE_SOURCE_INFO_TILE_SIZE;
-            raw.tile_size = item;
-        }
-        if (self.vector_encoding) |item| {
-            raw.fields |= c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
-            raw.vector_encoding = item.toNative();
-        }
-        if (self.raster_encoding) |item| {
-            raw.fields |= c.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;
-            raw.raster_encoding = item.toNative();
-        }
+        marshal.present(&raw.has_attribution, true, &raw.attribution_size, self.attribution_size);
+        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_URL, &raw.url_size, self.url_size);
+        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_BOUNDS, &raw.bounds, self.bounds);
+        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_TILE_SIZE, &raw.tile_size, self.tile_size);
+        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING, &raw.vector_encoding, self.vector_encoding);
+        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING, &raw.raster_encoding, self.raster_encoding);
         return raw;
     }
     pub fn fromNative(raw: c.mln_style_source_info) StyleSourceInfo {
@@ -3784,38 +3556,17 @@ pub const StyleTileSourceOptions = struct {
         var raw = c.mln_style_tile_source_options_default();
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_style_tile_source_options);
-        if (self.min_zoom) |item| {
-            raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
-            raw.min_zoom = item;
-        }
-        if (self.max_zoom) |item| {
-            raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
-            raw.max_zoom = item;
-        }
+        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
+        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, self.max_zoom);
         if (self.attribution) |item| {
             raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
             raw.attribution = marshal.view(item);
         }
-        if (self.scheme) |item| {
-            raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
-            raw.scheme = item.toNative();
-        }
-        if (self.bounds) |item| {
-            raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
-            raw.bounds = item.toNative();
-        }
-        if (self.tile_size) |item| {
-            raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
-            raw.tile_size = item;
-        }
-        if (self.vector_encoding) |item| {
-            raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
-            raw.vector_encoding = item.toNative();
-        }
-        if (self.raster_encoding) |item| {
-            raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
-            raw.raster_encoding = item.toNative();
-        }
+        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME, &raw.scheme, self.scheme);
+        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS, &raw.bounds, self.bounds);
+        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE, &raw.tile_size, self.tile_size);
+        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING, &raw.vector_encoding, self.vector_encoding);
+        marshal.present(&raw.fields, c.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING, &raw.raster_encoding, self.raster_encoding);
         return raw;
     }
 
@@ -3854,18 +3605,9 @@ pub const StyleTransitionOptions = struct {
     pub fn toNative(self: StyleTransitionOptions) c.mln_style_transition_options {
         var raw = c.mln_style_transition_options_default();
         raw.fields = 0;
-        if (self.duration_ms) |item| {
-            raw.fields |= c.MLN_STYLE_TRANSITION_OPTION_DURATION;
-            raw.duration_ms = item;
-        }
-        if (self.delay_ms) |item| {
-            raw.fields |= c.MLN_STYLE_TRANSITION_OPTION_DELAY;
-            raw.delay_ms = item;
-        }
-        if (self.enable_placement_transitions) |item| {
-            raw.fields |= c.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
-            raw.enable_placement_transitions = item;
-        }
+        marshal.present(&raw.fields, c.MLN_STYLE_TRANSITION_OPTION_DURATION, &raw.duration_ms, self.duration_ms);
+        marshal.present(&raw.fields, c.MLN_STYLE_TRANSITION_OPTION_DELAY, &raw.delay_ms, self.delay_ms);
+        marshal.present(&raw.fields, c.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS, &raw.enable_placement_transitions, self.enable_placement_transitions);
         return raw;
     }
     pub fn fromNative(raw: c.mln_style_transition_options) StyleTransitionOptions {

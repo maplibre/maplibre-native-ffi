@@ -233,12 +233,11 @@ class Values:
             if optional:
                 mask, bit = identifier(field.presence.mask), field.presence.bit
                 present = f"raw.{mask} & c.{bit} != 0" if bit else f"raw.{mask}"
-                set_presence = f"raw.{mask} |= c.{bit}" if bit else f"raw.{mask} = true"
                 copies.append(
                     f"            .{local} = if ({present}) {copy} else null,"
                 )
                 writes.append(
-                    f"        if (self.{local}) |item| {{ {set_presence}; raw.{local} = {self.materialize(field.value, 'item')}; }}"
+                    f"        marshal.present(&raw.{mask}, {'c.' + bit if bit else 'true'}, &raw.{local}, self.{local});"
                 )
             else:
                 copies.append(f"            .{local} = {copy},")
