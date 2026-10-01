@@ -31,10 +31,60 @@ fn isSmokeRun(init_args: std.process.Init) bool {
     return std.mem.eql(u8, value, "1");
 }
 
-fn waitForSessionFuture(session: *maplibre.RenderSession, future: *binding.Future(void), diagnostic: ?*binding.Diagnostic) !void {
-    if (!uses_caller_driver) return future.wait(diagnostic);
-    while (!try future.poll()) _ = try maplibre.renderSessionServiceDriverWork(session.*, 0, null);
-    try future.wait(diagnostic);
+/// How long the example waits for native work before it gives up.
+const native_work_timeout: std.Io.Clock.Duration = .{ .raw = .fromSeconds(60), .clock = .awake };
+
+/// The thread that renders waits on this between drains, and every native
+/// wake sets it: runtime events, frame results, and caller-driver work.
+const WakeSignal = struct {
+    io: std.Io,
+    event: std.Io.Event = .unset,
+
+    fn wake(self: *WakeSignal) binding.Wake {
+        return .{ .context = self, .callback = notify };
+    }
+
+    fn notify(context: ?*anyopaque) binding.Error!void {
+        const self: *WakeSignal = @ptrCast(@alignCast(context.?));
+        self.event.set(self.io);
+    }
+
+    /// Clears the signal before a round of drains, so a wake that arrives
+    /// during the round ends the next wait at once.
+    fn reset(self: *WakeSignal) void {
+        self.event.reset();
+    }
+
+    fn wait(self: *WakeSignal, deadline: std.Io.Clock.Timestamp) !void {
+        self.event.waitTimeout(self.io, .{ .deadline = deadline }) catch |err| switch (err) {
+            error.Timeout => {
+                if (std.Io.Clock.Timestamp.now(self.io, .awake).raw.nanoseconds >= deadline.raw.nanoseconds) {
+                    return error.NativeWorkTimedOut;
+                }
+            },
+            else => return err,
+        };
+    }
+};
+
+/// Waits for a session future. A caller driver services its work between
+/// driver wakes, so the future can progress; a core worker needs no help.
+fn waitForSessionFuture(
+    session: maplibre.RenderSession,
+    future: anytype,
+    signal: *WakeSignal,
+    diagnostic: ?*binding.Diagnostic,
+) !@TypeOf(future.*).Value {
+    if (uses_caller_driver) {
+        const deadline = std.Io.Clock.Timestamp.now(signal.io, .awake).addDuration(native_work_timeout);
+        while (true) {
+            signal.reset();
+            _ = try maplibre.renderSessionServiceDriverWork(session, 0, null);
+            if (try future.poll()) break;
+            try signal.wait(deadline);
+        }
+    }
+    return future.wait(diagnostic);
 }
 
 pub fn main(init_args: std.process.Init) !void {
@@ -52,7 +102,8 @@ pub fn main(init_args: std.process.Init) !void {
     var diagnostic: binding.Diagnostic = .{};
     errdefer if (diagnostic.message().len != 0) std.log.err("{s}", .{diagnostic.message()});
 
-    var runtime = try maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:" }, &diagnostic);
+    var signal = WakeSignal{ .io = init_args.io };
+    var runtime = try maplibre.runtimeCreate(allocator, .{ .cache_path = ":memory:", .event_wake = signal.wake() }, &diagnostic);
     defer runtime.deinit();
     defer if (maplibre.runtimeRelease(runtime, null)) |future| {
         var teardown = future;
@@ -62,6 +113,9 @@ pub fn main(init_args: std.process.Init) !void {
 
     var options = try maplibre.mapOptionsDefault();
     options.map_mode = .static;
+    // Each map update demands a frame, until one renders the fully loaded
+    // still image.
+    options.event_mask = .{ .map_render_update_available = true };
     var map_future = try maplibre.mapCreate(allocator, runtime, options, &diagnostic);
     defer map_future.deinit();
     var map = try map_future.wait(&diagnostic);
@@ -72,9 +126,6 @@ pub fn main(init_args: std.process.Init) !void {
         teardown.deinit();
     } else |_| {};
 
-    // This example selects no event types: the still-image request and the
-    // readback report through their own futures, and a frame that does not
-    // render arrives as the demand's disposition.
     var resize = try maplibre.mapResize(map, .{ .width = width, .height = height, .scale_factor = 1.0 }, &diagnostic);
     resize.deinit();
     try setInitialCamera(allocator, &map);
@@ -84,17 +135,15 @@ pub fn main(init_args: std.process.Init) !void {
         try maplibre.mapSetStyleUrl(allocator, map, style_url, &diagnostic);
     style.deinit();
 
-    var barrier = try maplibre.runtimeBarrier(runtime, &diagnostic);
-    defer barrier.deinit();
-    try barrier.wait(&diagnostic);
-
     var context = try OwnedTextureContext.init();
     defer context.deinit();
     try renderWithDriver(
         init_args.io,
         allocator,
+        &runtime,
         &map,
         &context,
+        &signal,
         output_path,
     );
 }
@@ -104,11 +153,13 @@ pub fn main(init_args: std.process.Init) !void {
 fn renderWithDriver(
     io: std.Io,
     allocator: std.mem.Allocator,
+    runtime: *maplibre.Runtime,
     map: *maplibre.Map,
     context: *OwnedTextureContext,
+    signal: *WakeSignal,
     output_path: []const u8,
 ) !void {
-    var attachment = try attachOwnedTexture(allocator, context, map, .{
+    var attachment = try attachOwnedTexture(allocator, context, map, signal, .{
         .width = width,
         .height = height,
         .scale_factor = 1.0,
@@ -119,14 +170,14 @@ fn renderWithDriver(
         attachment.session.deinit();
     };
     defer attachment.ready.deinit();
-    try waitForSessionFuture(&attachment.session, &attachment.ready, null);
+    try waitForSessionFuture(attachment.session, &attachment.ready, signal, null);
 
     var session = attachment.session;
     defer {
         var detach = maplibre.renderSessionDetach(session, null) catch null;
         if (detach) |*completion| {
             defer completion.deinit();
-            waitForSessionFuture(&session, completion, null) catch {
+            waitForSessionFuture(session, completion, signal, null) catch {
                 _ = maplibre.renderSessionAbandon(session, null) catch {};
             };
         } else {
@@ -138,65 +189,75 @@ fn renderWithDriver(
 
     var still_image = try maplibre.mapRequestStillImage(map.*, null);
     defer still_image.deinit();
-
-    try maplibre.renderSessionRequestFrame(allocator, session, .{ .token = 1 }, null);
-    try waitForRenderedFrame(io, allocator, &session, &still_image, 1);
+    try renderStillImage(allocator, runtime, map, session, &still_image, signal);
 
     var readback = try maplibre.textureReadPremultipliedRgba8(allocator, session, null);
     defer readback.deinit();
-    if (uses_caller_driver) {
-        while (!try readback.poll()) _ = try maplibre.renderSessionServiceDriverWork(session, 0, null);
-    }
-    var image = try readback.wait(null);
+    var image = try waitForSessionFuture(session, &readback, signal, null);
     defer image.deinit();
 
     try writePpm(io, allocator, output_path, image.value.data, image.value.info);
     std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image.value.info.width, image.value.info.height });
 }
 
-fn waitForRenderedFrame(
-    io: std.Io,
+/// Demands a frame for each map update until a rendered frame completes the
+/// still image. The thread sleeps between wakes.
+fn renderStillImage(
     allocator: std.mem.Allocator,
-    session: *maplibre.RenderSession,
+    runtime: *maplibre.Runtime,
+    map: *maplibre.Map,
+    session: maplibre.RenderSession,
     still_image: *binding.Future(void),
-    token: u64,
+    signal: *WakeSignal,
 ) !void {
+    const deadline = std.Io.Clock.Timestamp.now(signal.io, .awake).addDuration(native_work_timeout);
+    var next_token: u64 = 1;
+    try maplibre.renderSessionRequestFrame(allocator, session, .{ .token = next_token }, null);
     var rendered = false;
-    var demand_pending = true;
-    for (0..10_000) |_| {
-        if (uses_caller_driver) {
-            _ = try maplibre.renderSessionServiceDriverWork(session.*, 0, null);
-        }
-        var results = maplibre.renderSessionDrainFrameResults(session.*, null) catch |err| switch (err) {
-            error.NotReady => {
-                try io.sleep(.fromMilliseconds(1), .awake);
-                continue;
-            },
+    while (true) {
+        signal.reset();
+        if (uses_caller_driver) _ = try maplibre.renderSessionServiceDriverWork(session, 0, null);
+        var demand = try drainRenderUpdates(allocator, runtime, map);
+        var results = maplibre.renderSessionDrainFrameResults(session, null) catch |err| switch (err) {
+            error.NotReady => null,
             else => return err,
         };
-        defer results.deinit();
-        for (0..try maplibre.renderFrameBatchCount(results, null)) |index| {
-            const result = try maplibre.renderFrameBatchGet(results, index, null);
-            if (result.token != token) continue;
-            demand_pending = false;
-            switch (result.disposition) {
-                .rendered => rendered = true,
-                .no_update, .size_pending, .target_not_ready => {},
-                else => return error.FrameNotRendered,
+        if (results) |*batch| {
+            defer batch.deinit();
+            for (0..try maplibre.renderFrameBatchCount(batch.*, null)) |index| {
+                const result = try maplibre.renderFrameBatchGet(batch.*, index, null);
+                switch (result.disposition) {
+                    .rendered => {
+                        rendered = true;
+                        demand = demand or result.needs_repaint;
+                    },
+                    // These wait for the map's next update, which demands
+                    // another frame.
+                    .no_update, .size_pending, .target_not_ready, .superseded => {},
+                    else => return error.FrameNotRendered,
+                }
             }
         }
-        const still_completed = try still_image.poll();
-        if (still_completed) {
-            try still_image.wait(null);
-            if (rendered) return;
+        if (rendered and try still_image.poll()) return still_image.wait(null);
+        if (demand) {
+            next_token += 1;
+            try maplibre.renderSessionRequestFrame(allocator, session, .{ .token = next_token }, null);
         }
-        if (!demand_pending) {
-            try maplibre.renderSessionRequestFrame(allocator, session.*, .{ .token = token }, null);
-            demand_pending = true;
-        }
-        try io.sleep(.fromMilliseconds(1), .awake);
+        try signal.wait(deadline);
     }
-    return error.FrameResultTimedOut;
+}
+
+/// Drains every queued runtime event and reports whether the map published a
+/// render update.
+fn drainRenderUpdates(allocator: std.mem.Allocator, runtime: *maplibre.Runtime, map: *maplibre.Map) !bool {
+    var batch = try maplibre.runtimeDrainEvents(runtime.*, null);
+    defer batch.deinit();
+    var queued = try maplibre.eventBatchGet(allocator, batch, null);
+    defer queued.deinit();
+    for (queued.value.events) |event| {
+        if (event.source_type == .map and event.source == map.raw and event.type == .map_render_update_available) return true;
+    }
+    return false;
 }
 
 fn logAndValidateRenderBackend() !void {
@@ -250,29 +311,38 @@ fn attachOwnedTexture(
     allocator: std.mem.Allocator,
     context: *OwnedTextureContext,
     map: *maplibre.Map,
+    signal: *WakeSignal,
     extent: maplibre.RenderTargetExtent,
 ) !Attachment {
+    const wakes: maplibre.RenderSessionAttachOptions = .{
+        .requested_texture_ring_depth = 1,
+        .frame_wake = signal.wake(),
+        .driver_work_wake = if (uses_caller_driver) signal.wake() else .{},
+    };
     const result = if (build_options.supports_vulkan)
         try maplibre.vulkanOwnedTextureAttach(allocator, map.*, .{
             .extent = extent,
             .context = context.descriptor(),
-        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 }, null)
+        }, withDriver(wakes, .core_worker), null)
     else if (build_options.supports_metal)
         try maplibre.metalOwnedTextureAttach(allocator, map.*, .{
             .extent = extent,
             .context = context.descriptor(),
-        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 }, null)
+        }, withDriver(wakes, .core_worker), null)
     else if (build_options.supports_opengl)
         try maplibre.openglOwnedTextureAttach(allocator, map.*, .{
             .extent = extent,
             .context = context.descriptor(),
-        }, .{
-            .driver = if (supports_egl) .core_worker else .caller_graphics_thread,
-            .requested_texture_ring_depth = 1,
-        }, null)
+        }, withDriver(wakes, if (supports_egl) .core_worker else .caller_graphics_thread), null)
     else
         return error.RenderBackendUnavailable;
     return .{ .session = result.session, .ready = result.ready };
+}
+
+fn withDriver(options: maplibre.RenderSessionAttachOptions, driver: maplibre.RenderDriverKind) maplibre.RenderSessionAttachOptions {
+    var with_driver = options;
+    with_driver.driver = driver;
+    return with_driver;
 }
 
 const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
