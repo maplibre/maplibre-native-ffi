@@ -2,6 +2,7 @@
   "files": [
     "bindings/.gitattributes",
     "bindings/dart/lib/src/generated_values.dart",
+    "bindings/dart/lib/src/internal/c/maplibre_native_c.g.dart",
     "bindings/dart/lib/src/runtime/generated_operations.dart",
     "bindings/dotnet/src/Maplibre.NativeFfi/Base/BufferHandle.Operations.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Base/Maplibre.Operations.g.cs",

@@ -1,5 +1,6 @@
-// FFI declarations for the values and keywords groups of protocols.h, which the
-// Dart binding would otherwise take from ffigen.
+// FFI declarations for the values and keywords groups of protocols.h. The probe
+// looks them up in its stub library, where the binding's generated `@Native`
+// declarations resolve a code asset.
 // ignore_for_file: non_constant_identifier_names, camel_case_types
 import 'dart:ffi';
 import 'dart:io';

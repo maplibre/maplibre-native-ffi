@@ -481,7 +481,6 @@ run = 'python3 ci/kotlin_release.py "$@"'
 
 [tasks."bindings:generate"]
 description = "Regenerate native declarations and public binding APIs from C headers."
-depends = ["//bindings/dart:ffigen"]
 run = "uv run --no-sync python -m tools.bindgen generate"
 
 [tasks."bindings:check"]

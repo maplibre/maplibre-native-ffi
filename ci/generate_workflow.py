@@ -213,7 +213,6 @@ def hygiene_job() -> dict:
             "mise run bindings:test-generator",
             env={"MLN_BINDGEN_REQUIRE_TOOLCHAINS": "1"},
         ),
-        run("mise run --force //bindings/dart:ffigen"),
         run("mise run bindings:check"),
         run("dprint output-resolved-config > /dev/null"),
         run("mise run fix"),

@@ -16,14 +16,14 @@ mise run //bindings/dart:test linux-gnu-x64-vulkan
 mise run //bindings/dart:build:mobile android-arm64-egl
 mise run //bindings/dart:build:mobile ios-arm64-metal
 mise run //bindings/dart:build:mobile ios-simulator-arm64-metal
-mise run --force //bindings/dart:ffigen
 ```
 
 The test task builds the selected CMake preset, points the build hook at the
 resulting install prefix, analyzes the package, and runs the Dart tests. The
-private raw declarations are checked in so Git and pub package consumers receive
-a complete library; CI regenerates them and fails on any diff. Generation is
-configured in `tool/ffigen.dart`.
+private raw declarations in `lib/src/internal/c/maplibre_native_c.g.dart` are
+checked in so Git and pub package consumers receive a complete library.
+`mise run bindings:generate` writes them with the rest of the generated binding,
+and `mise run bindings:check` fails on any diff.
 
 The suite tests what the binding adds on top of the C API: handle ownership,
 completions, callback ports, generated value shapes, rendering through a
@@ -52,11 +52,6 @@ hook reads the install prefix from `.dart_tool/maplibre_native_install_dir`
 rather than from an environment variable; the mise tasks write it. Without that
 file the hook downloads the artifact matching the target from the snapshot
 release, which is what a consumer taking this package as a git dependency gets.
-
-Dart runs the hook for `dart run` as well as `dart test`, so regenerating the
-bindings resolves a library it never calls. Run the test task first and the
-pointer already names a local build; on its own,
-`mise run //bindings/dart:ffigen` downloads one.
 
 ## Android host integration
 

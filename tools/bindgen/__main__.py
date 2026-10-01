@@ -20,7 +20,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
     from . import native_capture
-    from .emitters import dart, dotnet, go, kotlin, python, rust, swift, zig
+    from .emitters import (
+        dart,
+        dart_native,
+        dotnet,
+        go,
+        kotlin,
+        python,
+        rust,
+        swift,
+        zig,
+    )
 
     bound = compile_api(api)
     if bound.diagnostics:
@@ -59,6 +69,7 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
         bound
     )
     outputs["bindings/dart/lib/src/generated_values.dart"] = dart.generate_values(bound)
+    outputs[dart_native.PATH] = dart_native.generate(bound)
     outputs.update(
         {
             f"bindings/kotlin/{path}": source

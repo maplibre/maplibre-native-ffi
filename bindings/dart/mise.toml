@@ -25,20 +25,6 @@ raw_args = true
 dir = "../.."
 run = "dart format"
 
-[tasks.ffigen]
-run = "dart --packages=.dart_tool/package_config.json tool/ffigen.dart"
-sources = [
-  "tool/ffigen.dart",
-  "hook/build.dart",
-  "lib/src/internal/c/native_asset.dart",
-  "pubspec.yaml",
-  "pubspec.lock",
-  "../../include/maplibre_native_c.h",
-  "../../include/maplibre_native_c/**/*.h",
-  "../../third_party/maplibre-native/include/mln/plugin/plugin_api.h",
-]
-outputs = ["lib/src/internal/c/maplibre_native_c.g.dart"]
-
 [tasks.api]
 description = "Generate Dart API reference HTML with dart doc."
 run = '''
