@@ -71,13 +71,17 @@ internal fun readSize(address: Long): ULong = readAddress(address).toULong()
 
 internal fun writeSize(address: Long, value: ULong) = writeAddress(address, value.toLong())
 
-/** Narrows a native count to a list index, refusing one a Kotlin collection cannot hold. */
+/**
+ * Narrows a native count to a list index, refusing one a Kotlin collection cannot hold.
+ *
+ * The unsigned values these helpers take are compared as signed Longs, because unsigned comparison
+ * on Android needs API 26. A value past Long.MAX_VALUE turns negative and fails the same checks.
+ */
 internal fun count(value: ULong): Int {
-  require(value <= Int.MAX_VALUE.toULong()) { "native count $value exceeds Int.MAX_VALUE" }
-  return value.toInt()
+  val signed = value.toLong()
+  require(signed in 0..Int.MAX_VALUE) { "native count $value exceeds Int.MAX_VALUE" }
+  return signed.toInt()
 }
-
-internal fun count(value: Long): Int = count(value.toULong())
 
 /** Copies [count] bytes from [pointer], which may be null only when [count] is zero. */
 internal fun readBytes(pointer: Long, count: ULong): ByteArray {
@@ -90,7 +94,8 @@ internal fun readBytes(pointer: Long, count: ULong): ByteArray {
 /** Copies a NUL-terminated UTF-8 string. */
 internal fun readCString(pointer: Long): String {
   require(pointer != 0L) { "native string pointer is null" }
-  return NativeMemory.getBytes(pointer, count(NativeMemory.stringLength(pointer))).decodeToString()
+  return NativeMemory.getBytes(pointer, count(NativeMemory.stringLength(pointer).toULong()))
+    .decodeToString()
 }
 
 internal fun readCStringOrNull(pointer: Long): String? =
@@ -114,8 +119,11 @@ internal fun readViewStringOrNull(address: Long): String? =
  * window that reaches outside the arena.
  */
 internal fun readItem(data: Long, size: ULong, offset: ULong, length: ULong): ByteArray {
-  require(offset <= size && length <= size - offset) { "native item lies outside its arena" }
-  return readBytes(data + offset.toLong(), length)
+  val (total, start, count) = Triple(size.toLong(), offset.toLong(), length.toLong())
+  require(total >= 0 && start in 0..total && count in 0..(total - start)) {
+    "native item lies outside its arena"
+  }
+  return readBytes(data + start, length)
 }
 
 /** Copies [count] elements of [stride] bytes each, starting at [pointer]. */
@@ -139,6 +147,6 @@ internal inline fun <T> readStrided(
   size: Int,
   read: (Long) -> T,
 ): List<T> {
-  require(stride >= size.toULong()) { "native stride $stride is below the element size $size" }
+  require(stride.toLong() >= size) { "native stride $stride is below the element size $size" }
   return readArray(pointer, count, stride.toLong(), read)
 }
