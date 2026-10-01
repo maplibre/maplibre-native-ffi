@@ -188,6 +188,10 @@ runtime. The render target chooses one of the driver contracts described in
 - A caller-driver session stores typed native work until the render loop
   services it with the graphics context usable.
 - Runtime, map, and render-session control calls may run on any host thread.
+- Map and session commands MUST reach native code in input order, so that a
+  gesture's begin, deltas, and end stay paired and the newest resize applies
+  last. Where a binding call leaves the calling thread before it submits, the
+  example MUST queue each command behind the one before it.
 - Completion and wake callbacks may run on any native thread. A wake callback
   MUST only schedule later receiver work and return promptly.
 - When the binding exposes wakes, event wakes schedule a full runtime-event
@@ -288,7 +292,8 @@ Order MUST be:
 4. Create the runtime and arrange an event drain through its wake or a host
    polling cadence.
 5. Start and await map creation with the initial extent.
-6. Select the event types that the example reads.
+6. Select the event types that the example reads, either in the map creation
+   options or before the style loads.
 7. Submit the style and initial camera commands.
 8. Start render-target attachment and arrange frame-result drains and driver
    service through wakes or an independent host polling cadence.
@@ -330,10 +335,12 @@ changing map state.
 ### Frame loop
 
 The selected driver renders. The core coalesces frame demands and replaces a
-pending resize with a later one, so the render loop keeps no frame schedule of
+pending resize with a later one, so the render loop needs no frame schedule of
 its own. It submits frame demand when the map reports a render update, when a
-rendered result asks for another frame, and for a paced retry. Runtime events
-tell the loop when to demand a frame, and frame results report what rendered.
+rendered result asks for another frame, and for a paced retry. A host toolkit
+that paces frames from a display source MAY demand from that source instead, as
+[Cadence and results](#cadence-and-results) describes. Runtime events tell the
+loop when to demand a frame, and frame results report what rendered.
 
 #### Render loop events
 
@@ -509,9 +516,11 @@ table:
 
 - Create an exportable texture sized to the viewport.
 - Attach with the borrowed-texture descriptor referencing host-owned handles.
-- After a rendered result, sample the newest texture whose attachment or
-  replacement has completed through the compositor path. The session renders
-  into the outgoing texture until a replacement completes.
+- After a rendered result, sample the newest texture that a rendered frame has
+  drawn into through the compositor path. The session renders into the outgoing
+  texture until a replacement completes, and a completed replacement holds no
+  frame yet. Once a replacement completes, demand a frame, and sample the
+  replacement after that demand or a newer one reports a rendered result.
 - On resize, allocate a replacement and start the backend target-replacement
   future, then submit a map resize with the same extent. Retain both allocations
   until the replacement's outcome is known.
