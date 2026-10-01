@@ -1,4 +1,12 @@
-"""Lower resolved operations through the shared Zig owner and completion runtimes."""
+"""Lower resolved operations to calls into the Zig operation runtime.
+
+A generated operation names its native function, its receiver access, and the
+binding value for each remaining native parameter. bindings/zig/src/call.zig
+admits the call, holds the receiver and handle arguments, encodes inputs,
+retains callback roots, and decodes outputs and completion results.
+"""
+
+from dataclasses import replace
 
 from .zig import (
     DIAGNOSTIC_PARAMETER,
@@ -8,7 +16,29 @@ from .zig import (
     identifier,
     status_call,
 )
-from .zig_dynamic_values import decode, dynamic, encode
+from .zig_dynamic_values import dynamic
+
+# Names that a generated operation body refers to besides its parameters.
+RESERVED = {
+    "allocator",
+    "diagnostic",
+    "call",
+    "c",
+    "std",
+    "status",
+    "completion",
+    "owner",
+    "callback",
+    "marshal",
+    "diagnostics",
+    "started",
+    "out",
+    "text",
+}
+
+
+def element(value):
+    return value.element if value.kind == "reference" else value
 
 
 def validate_input(function, name, value):
@@ -28,6 +58,79 @@ def validate_input(function, name, value):
     for field in value.fields:
         if field.role not in {"reserved", "count", "size", "presence_mask", "tag"}:
             validate_input(function, name + "." + field.name, field.value)
+
+
+def access(plan, values, decision):
+    if plan.scoped_receiver:
+        return "scoped"
+    if not plan.receiver:
+        return "none"
+    if plan.receiver_access == "issued":
+        return "issued"
+    if plan.consumes:
+        return "close"
+    if decision:
+        return "complete"
+    borrowed = any(
+        dynamic(element(p.value)) and element(p.value).kind != "handle"
+        for p in plan.outputs
+    )
+    return "borrow" if borrowed else "lease"
+
+
+def owned(values, value):
+    """The public type of a value, wrapped in OwnedValue when it copies storage."""
+    public = values.public(value)
+    return f"OwnedValue({public})" if dynamic(value) else public
+
+
+def parent_of(plan, owner):
+    """The call.Parent that an adopted handle retains."""
+    parent = owner.parent_parameter
+    if parent is None:
+        return ".none"
+    if parent == plan.receiver:
+        return ".receiver"
+    # Arguments are the parameters after the receiver, without the completion.
+    arguments = [
+        p.name
+        for p in plan.function.parameters
+        if p.name != (plan.receiver or plan.scoped_receiver)
+        and not (plan.completion and p.name == plan.completion.parameter)
+    ]
+    return f".{{ .argument = {arguments.index(parent)} }}"
+
+
+def copier(plan, values):
+    """The call.zig copier for a completion's result, and its value type."""
+    result = plan.result
+    if plan.execution == "command":
+        return "call.command", "completion.CommandCompletion"
+    if result is None:
+        return "call.unit", "void"
+    values.add(result)
+    if plan.completion.result_owner:
+        handle = values.public(result)
+        where = parent_of(plan, plan.completion.result_owner)
+        return f"call.handle({handle}, c.{result.native}, {where})", handle
+    if result.nullable and result.optional == "empty":
+        raise failure(plan.function, "result is both nullable and optional")
+    content = replace(result, nullable=False, optional=None)
+    if result.kind == "array":
+        if result.stride or result.item_buffer:
+            raise failure(plan.function, "strided array results need a record copy")
+        item = result.element
+        values.add(item)
+        copy = f"call.slice({values.public(item)}, {values.native_type(item)})"
+        public = f"OwnedValue([]const {values.public(item)})"
+    else:
+        public = owned(values, content)
+        copy = f"call.value({public}, {values.native_type(content)})"
+    if result.nullable:
+        return f"call.orNull({copy})", "?" + public
+    if result.optional == "empty":
+        return f"call.orEmpty({copy}, {values.native_type(content)})", "?" + public
+    return copy, public
 
 
 def operation(plan, api, values):
@@ -53,367 +156,159 @@ def operation(plan, api, values):
         return direct(plan, values)
     inputs = {p.name: p.value for p in plan.inputs}
     outputs = {p.name: p.value for p in plan.outputs}
-    names = {p.name: f"binding_arg_{i}" for i, p in enumerate(function.parameters)}
-    owned = {p.parameter: p for p in plan.owned_outputs}
-    declarations, setup, arguments, output_values = [], [], [], []
-    completion = plan.completion
-    needs_allocator = False
-    receiver = inputs.get(plan.receiver)
-    while receiver and receiver.kind == "reference":
-        receiver = receiver.element
-    leases = {}
+    owned_outputs = {p.parameter: p for p in plan.owned_outputs}
+    receiver_name = plan.receiver or plan.scoped_receiver
+    names = {}
+    for parameter in function.parameters:
+        public = parameter.name
+        while public in RESERVED or public in names.values():
+            public += "_input"
+        names[parameter.name] = identifier(public)
     length_sources = {
-        v.length: names[n]
+        v.length: n
         for n, v in inputs.items()
         if v.kind in {"array", "buffer"}
         and v.length
         and v.length != "nul"
         and not v.length.isdigit()
     }
-    for parameter_index, parameter in enumerate(function.parameters):
+    signature, arguments, results = [], [], []
+    needs_allocator = False
+    completion = plan.completion
+    for parameter in function.parameters:
         name = parameter.name
         local = names[name]
-        value = inputs.get(name)
         if completion and name == completion.parameter:
             continue
         if name in length_sources:
-            source = length_sources[name]
-            value = next(v for v in inputs.values() if v.length == name)
-            length = (
-                f"if ({source}) |items| items.len else 0"
-                if value.nullable or value.optional == "empty"
-                else f"{source}.len"
-            )
-            if parameter.type.declaration != "size_t":
-                # A narrower native count rejects a slice it cannot describe.
-                count = f'@typeInfo(@TypeOf(c.{function.name})).@"fn".params[{parameter_index}].type.?'
-                length = f"std.math.cast({count}, {length}) orelse return error.InvalidArgument"
-            arguments.append(length)
+            source = names[length_sources[name]]
+            counted = next(v for v in inputs.values() if v.length == name)
+            optional = counted.nullable or counted.optional == "empty"
+            arguments.append(f"call.len({source})" if optional else f"{source}.len")
             continue
         if name in outputs and not (name == plan.receiver and plan.consumes):
-            value = outputs[name]
-            if value.kind == "reference":
-                value = value.element
+            value = element(outputs[name])
             values.add(value)
-            setup.append(
-                f"var {local}: {values.native_type(value)} = std.mem.zeroes({values.native_type(value)});"
+            label = identifier(name.removeprefix("out_"))
+            if name in owned_outputs:
+                results.append((label, values.public(value)))
+                where = parent_of(plan, owned_outputs[name])
+                arguments.append(f"call.adopt({values.public(value)}, {where})")
+                continue
+            if completion:
+                raise failure(function, "completion immediate output needs ownership")
+            public = owned(values, value)
+            needs_allocator |= dynamic(value)
+            results.append((label, public))
+            sized = value.kind == "record" and any(
+                field.role == "size" for field in value.fields
             )
-            if value.kind == "record":
-                for field in value.fields:
-                    if field.role == "size":
-                        setup.append(
-                            f"{local}.{identifier(field.name)} = @sizeOf({values.native_type(value)});"
-                        )
-            arguments.append(f"&{local}")
-            output_values.append((name, local, value))
+            arguments.append(f"call.{'sizedOut' if sized else 'out'}({public})")
             continue
+        value = inputs.get(name)
         if value is None:
             raise failure(function, f"parameter {name} has no resolved input")
         validate_input(function, name, value)
-        target = value.element if value.kind == "reference" else value
-        if target.kind == "handle":
-            values.add(target)
-            declarations.append(f"{local}: {values.public(target)}")
-            lease = local + "_lease"
-            leases[name] = lease
-            if plan.receiver_access == "issued" and name == plan.receiver:
-                arguments.append(local + ".raw")
-                continue
-            if plan.consumes and name == plan.receiver:
-                setup.append(
-                    f"const {lease} = try {local}.beginClose() orelse "
-                    + (
-                        "return try completion.completed(void, {});"
-                        if completion
-                        else "return;"
-                    )
-                )
-                setup.append(f"errdefer {lease}.rollback();")
-                setup.append(
-                    f"var {local}_native = {lease}.native;"
-                    if parameter.type.kind == "pointer"
-                    else f"const {local}_native = {lease}.native;"
-                )
-                arguments.append(
-                    ("&" if parameter.type.kind == "pointer" else "")
-                    + local
-                    + "_native"
-                )
-            else:
-                if decision:
-                    setup.extend(
-                        [
-                            f"const {lease} = try {local}.beginComplete();",
-                            f"errdefer {lease}.finishComplete(false);",
-                        ]
-                    )
-                else:
-                    access = (
-                        "borrow"
-                        if name == plan.receiver
-                        and any(
-                            dynamic(
-                                p.value.element
-                                if p.value.kind == "reference"
-                                else p.value
-                            )
-                            and (
-                                p.value.element
-                                if p.value.kind == "reference"
-                                else p.value
-                            ).kind
-                            != "handle"
-                            for p in plan.outputs
-                        )
-                        else "lease"
-                    )
-                    setup.extend(
-                        [
-                            f"const {lease} = try {local}.{access}();",
-                            f"defer {lease}.release();",
-                        ]
-                    )
-                arguments.append(lease + ".native")
+        target = element(value)
+        values.add(target if target.kind == "handle" else value)
+        signature.append(
+            f"{local}: {values.public(target if target.kind == 'handle' else value)}"
+        )
+        if name == receiver_name:
             continue
-        values.add(value)
-        declarations.append(f"{local}: {values.public(value)}")
         if value.kind == "reference" and value.element.response:
             arguments.append(local + ".native")
-        elif value.kind == "reference":
-            needs_allocator = True
-            arguments.append(
-                encode(values, value, local).replace("allocator", "input_allocator")
-            )
-        else:
+            continue
+        if target.kind != "handle":
             needs_allocator |= (
-                dynamic(value)
+                value.kind == "reference"
+                or dynamic(value)
                 and value.kind != "buffer"
                 or value.kind == "buffer"
                 and value.length == "nul"
             )
-            encoded = encode(values, value, local).replace(
-                "allocator", "input_allocator"
-            )
+        if value.kind == "buffer" and value.length == "nul":
             arguments.append(
-                f'@as(@typeInfo(@TypeOf(c.{function.name})).@"fn".params[{parameter_index}].type.?, {encoded})'
+                f"if ({local}) |text| call.cString(text) else null"
+                if value.nullable or value.optional == "empty"
+                else f"call.cString({local})"
             )
-    policy_owner = (
-        names[plan.receiver] + ".raw"
-        if plan.receiver
-        else f"@intFromPtr({names[plan.scoped_receiver]}.native)"
-        if plan.scoped_receiver
-        else "0"
-    )
-    setup[:0] = [
-        f'try callback.{"checkScoped" if plan.scoped_receiver else "check"}("{plan.name}", {policy_owner});',
-        "var root_storage: callback.Roots = .{};",
-        "const roots = &root_storage;",
-        "defer roots.deinit();",
-    ]
-    body = []
-    receiver_lease = leases.get(plan.receiver)
+            continue
+        arguments.append(local)
+    mode = access(plan, values, decision)
+    receiver = names[receiver_name] if receiver_name else "{}"
     diagnostic = "diagnostic" if function.diagnostic else "null"
-    if function.diagnostic:
-        declarations.append(DIAGNOSTIC_PARAMETER)
-    close_commit = [f"{receiver_lease}.commit();"] if plan.consumes else []
-
-    def parent_anchor(owner):
-        return (
-            leases[owner.parent_parameter] + ".anchor()"
-            if owner.parent_parameter
-            else "null"
-        )
-
-    def capture(value, local, owner=None):
-        if owner:
-            return f"try {values.public(value)}.adopt({local}, {parent_anchor(owner)})"
-        return decode(values, value, local)
-
+    args = ".{ " + ", ".join(arguments) + " }" if arguments else ".{}"
+    head = f'"{plan.name}", .{mode}, {receiver}'
     if completion:
         if not function.diagnostic:
             raise failure(function, "completion start requires a diagnostic parameter")
-        body.append("const native_arguments = .{ " + ", ".join(arguments) + " };")
-        result = plan.result
-        if plan.execution == "command":
-            public, copier = "completion.CommandCompletion", "completion.command"
-            submit = f"completion.submit({public}, {diagnostic}, {copier}, c.{plan.name}, native_arguments)"
-        elif result is None:
-            public = "void"
-            submit = f"completion.submit(void, {diagnostic}, completion.unit, c.{plan.name}, native_arguments)"
-        elif completion.result_owner:
-            values.add(result)
-            public = values.public(result)
-            parent = parent_anchor(completion.result_owner)
-            body.append(
-                f"const result_context = OwnerCopyContext{{ .parent = if (@as(?owner.Anchor, {parent})) |anchor| anchor.retain() else null }};"
+        copy, value_type = copier(plan, values)
+        needs_allocator |= "OwnedValue" in value_type
+        allocator = "allocator" if needs_allocator else "null"
+        submit = f"call.submit({head}, {copy}, {allocator}, {diagnostic}, {args})"
+        future = f"completion.Future({value_type})"
+        if results:
+            fields = ", ".join(f"{label}: {typ}" for label, typ in results)
+            return_type = f"struct {{ {fields}, ready: {future} }}"
+            picks = (
+                [f".{results[0][0]} = started.outputs"]
+                if len(results) == 1
+                else [
+                    f".{label} = started.outputs[{index}]"
+                    for index, (label, _) in enumerate(results)
+                ]
             )
-            copier = f"struct {{ fn copy(raw: *const c.mln_completion_result, context: *OwnerCopyContext) status.Error!{public} {{ return {public}.adopt(try completion.value(c.{result.native})(raw), context.parent); }} }}.copy"
-            submit = f"completion.submitWithCopyContext({public}, OwnerCopyContext, {diagnostic}, {copier}, result_context, c.{plan.name}, native_arguments)"
+            body = [
+                f"const started = try {submit};",
+                "return .{ " + ", ".join(picks) + ", .ready = started.ready };",
+            ]
         else:
-            values.add(result)
-            public = values.public(result)
-            is_dynamic = dynamic(result)
-            nullable = result.nullable
-            empty_optional = result.optional == "empty"
-            # Completion nullability describes the payload pointer, independent of an empty buffer.
-            from dataclasses import replace
-
-            content = replace(result, nullable=False, optional=None)
-            public = values.public(content)
-            if is_dynamic:
-                needs_allocator = True
-                public = f"OwnedValue({public})"
-            if nullable or empty_optional:
-                public = "?" + public
-            expression = decode(values, content, "raw_value")
-            if result.kind == "array":
-                expression = decode(
-                    values,
-                    content,
-                    "@as(?[*]const "
-                    + values.native_type(result.element)
-                    + ", @ptrCast(@alignCast(result.value)))",
-                    "result",
-                )
-                raw_setup = ""
-            else:
-                raw_setup = f"const raw_value = try completion.value({values.native_type(content)})(result);"
-            null_check = "if (result.value == null) return null;" if nullable else ""
-            empty_check = (
-                "if (raw_value.size == 0) return null;"
-                if empty_optional and result.kind == "buffer"
-                else "if (result.value_count == 0) return null;"
-                if empty_optional
-                else ""
-            )
-            if is_dynamic:
-                copied = f"{raw_setup} {empty_check} var arena = std.heap.ArenaAllocator.init(target.*); errdefer arena.deinit(); const copy_allocator = arena.allocator(); const copied_value = {expression.replace('allocator', 'copy_allocator')}; return .{{ .arena = arena, .value = copied_value }};"
-                copier = f"struct {{ fn copy(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!{public} {{ {null_check} {copied} }} }}.copy"
-                submit = f"completion.submitWithCopyContext({public}, std.mem.Allocator, {diagnostic}, {copier}, allocator, c.{plan.name}, native_arguments)"
-            else:
-                copier = f"struct {{ fn copy(result: *const c.mln_completion_result) status.Error!{public} {{ {null_check} {raw_setup} return {expression}; }} }}.copy"
-                submit = f"completion.submit({public}, {diagnostic}, {copier}, c.{plan.name}, native_arguments)"
-        return_type = f"completion.Future({public})"
-        body.append(
-            f"var readiness = try {submit};"
-            if output_values
-            else f"const readiness = try {submit};"
-        )
-        body.append("roots.accept();")
-        body.extend(close_commit)
-        if output_values:
-            body.append("errdefer readiness.deinit();")
-            fields, copies = [], []
-            for name, local, value in output_values:
-                if name not in owned:
-                    raise failure(
-                        function, "completion immediate output needs ownership"
-                    )
-                label = identifier(name.removeprefix("out_"))
-                fields.append(f"{label}: {values.public(value)}")
-                copies.append(f".{label} = {capture(value, local, owned[name])}")
-            return_type = "struct { " + ", ".join(fields) + f", ready: {return_type} }}"
-            body.append("return .{ " + ", ".join(copies) + ", .ready = readiness }; ")
-        else:
-            body.append("return readiness;")
-    else:
-        call = f"c.{plan.name}({', '.join(arguments)})"
+            return_type = future
+            body = [f"return {submit};"]
+    elif function.return_type.kind == "void" or (
+        plan.result and function.return_type.spelling != "mln_status"
+    ):
+        result_type = "void"
         if plan.result:
             values.add(plan.result)
-            value = plan.result
-            return_type = values.public(value)
-            body.append(f"const raw_result = {call};")
-            body.append("roots.accept();")
-            expression = decode(values, value, "raw_result")
-            if dynamic(value):
-                needs_allocator = True
-                return_type = f"OwnedValue({return_type})"
-                body.extend(
-                    [
-                        "var arena = std.heap.ArenaAllocator.init(allocator);",
-                        "errdefer arena.deinit();",
-                        "const output_allocator = arena.allocator();",
-                    ]
-                )
-                body.append(
-                    "const copied_value = "
-                    + expression.replace("allocator", "output_allocator")
-                    + ";"
-                )
-                expression = ".{ .arena = arena, .value = copied_value }"
-            body.append(f"return {expression};")
-        else:
-            native_call = (
-                f"{call};"
-                if function.return_type.kind == "void"
-                else status_call(function, arguments, diagnostic)
-            )
-            body.append(
-                f"if (!{receiver_lease}.deferred) {{ {native_call} }}"
-                if plan.consumes
-                else native_call
-            )
-            if decision:
-                body.append(f"{receiver_lease}.finishComplete(true);")
-            body.append("roots.accept();")
-            body.extend(close_commit)
-            fields, copies = [], []
-            borrowed = any(dynamic(value) for _, _, value in output_values)
-            if borrowed:
-                needs_allocator = True
-                body.extend(
-                    [
-                        "var arena = std.heap.ArenaAllocator.init(allocator);",
-                        "errdefer arena.deinit();",
-                        "const output_allocator = arena.allocator();",
-                    ]
-                )
-            for name, local, value in output_values:
-                fields.append(
-                    (identifier(name.removeprefix("out_")), values.public(value))
-                )
-                copies.append(
-                    capture(value, local, owned.get(name)).replace(
-                        "allocator", "output_allocator"
-                    )
-                )
+            result_type = owned(values, plan.result)
+            needs_allocator |= dynamic(plan.result)
+        allocator = "allocator" if needs_allocator else "null"
+        return_type = result_type
+        body = [f"return call.direct({head}, {result_type}, {allocator}, {args});"]
+    else:
+        if not function.diagnostic:
+            raise failure(function, "status result requires a diagnostic parameter")
+        if len(results) > 1 and any("OwnedValue" in typ for _, typ in results):
+            raise failure(function, "several outputs that copy storage need one arena")
+        allocator = "allocator" if needs_allocator else "null"
+        invoke = f"call.invoke({head}, {allocator}, {diagnostic}, {args})"
+        if len(results) > 1:
             return_type = (
-                "void"
-                if not fields
-                else fields[0][1]
-                if len(fields) == 1
-                else "struct { "
-                + ", ".join(f"{name}: {typ}" for name, typ in fields)
+                "struct { "
+                + ", ".join(f"{label}: {typ}" for label, typ in results)
                 + " }"
             )
-            expression = (
-                copies[0]
-                if len(copies) == 1
-                else ".{ "
+            body = [
+                f"const out = try {invoke};",
+                "return .{ "
                 + ", ".join(
-                    f".{field[0]} = {copied}" for field, copied in zip(fields, copies)
+                    f".{label} = out[{index}]"
+                    for index, (label, _) in enumerate(results)
                 )
-                + " }"
-            )
-            if borrowed:
-                return_type = f"OwnedValue({return_type})"
-                body.append("const copied_value = " + expression + ";")
-                expression = ".{ .arena = arena, .value = copied_value }"
-            if fields:
-                body.append(f"return {expression};")
-    if needs_allocator:
-        declarations.insert(0, "allocator: std.mem.Allocator")
-        if any("input_allocator" in item for item in [*setup, *arguments]):
-            setup[:0] = [
-                "var input_arena = std.heap.ArenaAllocator.init(allocator);",
-                "defer input_arena.deinit();",
-                "const input_allocator = input_arena.allocator();",
+                + " };",
             ]
+        else:
+            return_type = results[0][1] if results else "void"
+            body = [f"return {invoke};"]
+    if needs_allocator:
+        signature.insert(0, "allocator: std.mem.Allocator")
+    if function.diagnostic:
+        signature.append(DIAGNOSTIC_PARAMETER)
     code = (
-        f"pub fn {camel(plan.name.removeprefix('mln_'))}({', '.join(declarations)}) status.Error!{return_type} {{\n    "
-        + "\n    ".join(
-            [*(DIAGNOSTIC_PREAMBLE if function.diagnostic else []), *setup, *body]
-        )
+        f"pub fn {camel(plan.name.removeprefix('mln_'))}({', '.join(signature)}) status.Error!{return_type} {{\n    "
+        + "\n    ".join(body)
         + "\n}\n"
     )
     return code, "global", "", None

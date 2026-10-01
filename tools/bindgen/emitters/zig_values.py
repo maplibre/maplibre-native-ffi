@@ -263,13 +263,6 @@ class Values:
         }};
     }}
 }};
-fn copy{public}Value(result: *const c.mln_completion_result) status.Error!{public} {{
-    return {public}.fromNative(try completion.value(c.{value.native})(result));
-}}
-fn copyOptional{public}Value(result: *const c.mln_completion_result) status.Error!?{public} {{
-    if (result.value == null) return null;
-    return try copy{public}Value(result);
-}}
 """
 
     def enumeration(self, value):
@@ -300,27 +293,28 @@ fn copyOptional{public}Value(result: *const c.mln_completion_result) status.Erro
                 for key, number in value.enum_values
                 if number > 0 and number & (number - 1) == 0
             ]
-            known = 0
-            for _, number in single:
-                known |= number
             fields = "\n".join(f"    {local}: bool = false," for local, _ in single)
-            constants = "\n".join(
-                f"    pub const {identifier(key.removeprefix(prefix).lower())} = fromNative({number});"
+            constants = "".join(
+                f"    pub const {identifier(key.removeprefix(prefix).lower())} = fromNative({number});\n"
                 for key, number in value.enum_values
                 if number == 0 or number & (number - 1) != 0
             )
-            capture = ", ".join(
-                f".{local} = raw & {number} != 0" for local, number in single
+            bits = ", ".join(str(number) for _, number in single)
+            methods = "".join(
+                f"    pub const {method} = methods.{method};\n"
+                for method in (
+                    "fromNative",
+                    "toNative",
+                    "contains",
+                    "isEmpty",
+                    "unionWith",
+                )
             )
-            bits = "\n".join(
-                f"        if (self.{local}) raw |= {number};"
-                for local, number in single
-            )
-            return f"pub const {public} = struct {{\n{fields}\n    unknown_bits: {raw} = 0,\n{constants}\n    pub fn fromNative(raw: {raw}) {public} {{ return .{{ {capture}, .unknown_bits = raw & ~@as({raw}, {known}) }}; }}\n    pub fn toNative(self: {public}) {raw} {{ var raw = self.unknown_bits;\n{bits}\n        return raw; }}\n    pub fn contains(self: {public}, other: {public}) bool {{ return self.toNative() & other.toNative() == other.toNative(); }}\n    pub fn isEmpty(self: {public}) bool {{ return self.toNative() == 0; }}\n    pub fn unionWith(self: {public}, other: {public}) {public} {{ return fromNative(self.toNative() | other.toNative()); }}\n}};\n"
+            return f"pub const {public} = struct {{\n{fields}\n    unknown_bits: {raw} = 0,\n    pub const native_bits = [_]{raw}{{ {bits} }};\n    const methods = marshal.FlagMethods(@This());\n{methods}{constants}}};\n"
         members = "\n".join(
             f"    {identifier(key.removeprefix(prefix).lower())} = {number},"
             for number, key in {
                 number: key for key, number in reversed(value.enum_values)
             }.items()
         )
-        return f"pub const {public} = enum({raw}) {{\n{members}\n    _,\n    pub fn fromNative(raw: {raw}) {public} {{ return @enumFromInt(raw); }}\n    pub fn toNative(self: {public}) {raw} {{ return @intFromEnum(self); }}\n}};\n"
+        return f"pub const {public} = enum({raw}) {{\n{members}\n    _,\n    pub const fromNative = marshal.EnumMethods(@This()).fromNative;\n    pub const toNative = marshal.EnumMethods(@This()).toNative;\n}};\n"

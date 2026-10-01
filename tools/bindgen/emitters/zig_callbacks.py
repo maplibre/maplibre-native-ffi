@@ -66,7 +66,7 @@ def parts(values, value):
             if plan.result.ctype.kind == "void"
             else f"return {plan.failure if plan.failure.isdigit() else 'c.' + plan.failure};"
             if plan.failure not in {None, "contain"}
-            else "return std.mem.zeroes(CallbackResult(c." + plan.native + "));"
+            else "return std.mem.zeroes(marshal.CallbackResult(c." + plan.native + "));"
         )
         converted = []
         for parameter in parameters:
@@ -120,18 +120,23 @@ def parts(values, value):
             decision_setup = f"const request = try {request_type}.beginDecision({raw_request}); errdefer _ = request.finishDecision(false); "
             action = f"const result = {call} catch {{ return if (request.finishDecision(false)) c.{decision.accept} else c.{decision.pass_through}; }}; return if (request.finishDecision(result.toNative() == c.{decision.accept})) c.{decision.accept} else c.{decision.pass_through};"
         # Decode errors are contained at the C callback boundary.
-        body = f"fn invoke({', '.join(names[p.name] + ': CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) status.Error!CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} "
+        body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) status.Error!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} "
         if any("allocator" in expression for expression in converted):
             body += "var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator); defer arena.deinit(); const allocator = arena.allocator(); "
         body += action + " }"
         body = body.replace("native_arg_", "callback_arg_")
         args = ", ".join(names[p.name] for p in plan.parameters)
         trampoline_signature = ", ".join(
-            names[p.name] + ": CallbackArg(c." + plan.native + ", " + str(i) + ")"
+            names[p.name]
+            + ": marshal.CallbackArg(c."
+            + plan.native
+            + ", "
+            + str(i)
+            + ")"
             for i, p in enumerate(plan.parameters)
         )
         trampolines.append(
-            f"    fn {trampoline}({trampoline_signature}) callconv(.c) CallbackResult(c.{plan.native}) {{ return struct {{ {body} }}.invoke({args}) catch {{ {fallback} }}; }}"
+            f"    fn {trampoline}({trampoline_signature}) callconv(.c) marshal.CallbackResult(c.{plan.native}) {{ return struct {{ {body} }}.invoke({args}) catch {{ {fallback} }}; }}"
         )
     empty = " and ".join(
         f"self.{identifier(name)} == null" for name in registration.callbacks

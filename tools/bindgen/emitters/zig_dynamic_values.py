@@ -34,14 +34,14 @@ def encode(values, value, source, depth=0):
         return f"if ({source}) |{item}| {encode(values, replace(value, nullable=False, optional=None), item, depth + 1)} else {fallback}"
     if value.kind == "buffer":
         if value.length == "nul":
-            return f"try cString(allocator, {source})"
+            return f"try marshal.cString(allocator, {source})"
         return (
-            f"view({source})"
+            f"marshal.view({source})"
             if value.buffer_form == "view"
             else f"@ptrCast({source}.ptr)"
         )
     if value.kind == "reference":
-        return f"try store(allocator, {encode(values, value.element, source)})"
+        return f"try marshal.store(allocator, {encode(values, value.element, source)})"
     if value.kind == "array":
         if value.element.kind == "scalar" and value.ctype.kind != "array":
             return f"{source}.ptr"
@@ -81,7 +81,7 @@ def decode(values, value, source, context="raw"):
                 else f"{context}.{identifier(value.length)}"
             )
             source = f".{{ .data = {source}, .size = {count} }}"
-        return f"try copyView(allocator, {source})"
+        return f"try marshal.copyView(allocator, {source})"
     if value.kind == "reference":
         return decode(
             values,
@@ -99,7 +99,7 @@ def decode(values, value, source, context="raw"):
         items = (
             source
             if fixed
-            else f"try nativeSlice({values.native_type(value.element)}, {source}, {count})"
+            else f"try marshal.nativeSlice({values.native_type(value.element)}, {source}, {count})"
         )
         storage = (
             f"var copied: [{value.length}]{values.public(value.element)} = undefined;"
@@ -109,9 +109,9 @@ def decode(values, value, source, context="raw"):
         copied = decode(values, value.element, "item", context)
         if value.item_buffer:
             buf = value.item_buffer
-            copied = f"blk_item: {{ var converted = {copied}; converted.{identifier(buf.field)} = try copyArenaString(allocator, {context}.{identifier(buf.data)}, {context}.{identifier(buf.size)}, item.{identifier(buf.offset)}, item.{identifier(buf.length)}); break :blk_item converted; }}"
+            copied = f"blk_item: {{ var converted = {copied}; converted.{identifier(buf.field)} = try marshal.copyArenaString(allocator, {context}.{identifier(buf.data)}, {context}.{identifier(buf.size)}, item.{identifier(buf.offset)}, item.{identifier(buf.length)}); break :blk_item converted; }}"
         if value.stride:
-            return f"blk: {{ {storage} for (0..{count}) |index| {{ const item = try stridedAt({values.native_type(value.element)}, {source}, {count}, {context}.{identifier(value.stride)}, index); copied[index] = {copied}; }} break :blk copied; }}"
+            return f"blk: {{ {storage} for (0..{count}) |index| {{ const item = try marshal.stridedAt({values.native_type(value.element)}, {source}, {count}, {context}.{identifier(value.stride)}, index); copied[index] = {copied}; }} break :blk copied; }}"
         return f"blk: {{ {storage} for ({items}, 0..) |item, index| copied[index] = {copied}; break :blk copied; }}"
     if value.kind == "union":
         cases = ", ".join(
@@ -295,15 +295,5 @@ def declaration(values, value):
         }};
     }}
 }};
-fn copy{typ}Value(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!OwnedValue({typ}) {{
-    var arena = std.heap.ArenaAllocator.init(target.*);
-    errdefer arena.deinit();
-    const value = try {typ}.fromNative(arena.allocator(), try completion.value(c.{value.native})(result));
-    return .{{ .arena = arena, .value = value }};
-}}
-fn copyOptional{typ}Value(result: *const c.mln_completion_result, target: *std.mem.Allocator) status.Error!?OwnedValue({typ}) {{
-    if (result.value_count == 0) return null;
-    return try copy{typ}Value(result, target);
-}}
 """
     )
