@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Map;
 
 public readonly partial record struct CameraUpdate(
@@ -17,8 +13,8 @@ public readonly partial record struct CameraUpdate(
     {
         get
         {
-            using var call = Enter(null, "mln_camera_update_default");
-            return CopyCameraUpdate(NativeMethods.mln_camera_update_default());
+            using var call = NativeCall.Enter(null, "mln_camera_update_default");
+            return GeneratedValues.CopyCameraUpdate(NativeMethods.mln_camera_update_default());
         }
     }
 }

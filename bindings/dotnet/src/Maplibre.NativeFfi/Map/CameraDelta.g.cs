@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Map;
 
 public sealed record CameraDelta
@@ -17,8 +13,8 @@ public sealed record CameraDelta
     {
         get
         {
-            using var call = Enter(null, "mln_camera_delta_default");
-            return CopyCameraDelta(NativeMethods.mln_camera_delta_default());
+            using var call = NativeCall.Enter(null, "mln_camera_delta_default");
+            return GeneratedValues.CopyCameraDelta(NativeMethods.mln_camera_delta_default());
         }
     }
 }

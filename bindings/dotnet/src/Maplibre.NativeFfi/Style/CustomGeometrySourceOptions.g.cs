@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Style;
 
 public sealed record CustomGeometrySourceOptions
@@ -21,8 +17,8 @@ public sealed record CustomGeometrySourceOptions
     {
         get
         {
-            using var call = Enter(null, "mln_custom_geometry_source_options_default");
-            return CopyCustomGeometrySourceOptions(
+            using var call = NativeCall.Enter(null, "mln_custom_geometry_source_options_default");
+            return GeneratedValues.CopyCustomGeometrySourceOptions(
                 NativeMethods.mln_custom_geometry_source_options_default()
             );
         }

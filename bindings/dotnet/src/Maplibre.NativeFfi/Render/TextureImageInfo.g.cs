@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Render;
 
 public readonly partial record struct TextureImageInfo(
@@ -17,8 +13,10 @@ public readonly partial record struct TextureImageInfo(
     {
         get
         {
-            using var call = Enter(null, "mln_texture_image_info_default");
-            return CopyTextureImageInfo(NativeMethods.mln_texture_image_info_default());
+            using var call = NativeCall.Enter(null, "mln_texture_image_info_default");
+            return GeneratedValues.CopyTextureImageInfo(
+                NativeMethods.mln_texture_image_info_default()
+            );
         }
     }
 }

@@ -2,7 +2,6 @@
 #nullable enable
 using static Maplibre.NativeFfi.Internal.NativeCall;
 using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
 
 namespace Maplibre.NativeFfi.Map;
 

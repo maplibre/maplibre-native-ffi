@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Render;
 
 public readonly partial record struct FrameDemand(
@@ -17,8 +13,8 @@ public readonly partial record struct FrameDemand(
     {
         get
         {
-            using var call = Enter(null, "mln_frame_demand_default");
-            return CopyFrameDemand(NativeMethods.mln_frame_demand_default());
+            using var call = NativeCall.Enter(null, "mln_frame_demand_default");
+            return GeneratedValues.CopyFrameDemand(NativeMethods.mln_frame_demand_default());
         }
     }
 }

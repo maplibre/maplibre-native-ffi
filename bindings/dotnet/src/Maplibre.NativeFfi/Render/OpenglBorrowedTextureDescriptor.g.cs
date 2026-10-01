@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Render;
 
 public readonly partial record struct OpenglBorrowedTextureDescriptor(
@@ -19,8 +15,11 @@ public readonly partial record struct OpenglBorrowedTextureDescriptor(
     {
         get
         {
-            using var call = Enter(null, "mln_opengl_borrowed_texture_descriptor_default");
-            return CopyOpenglBorrowedTextureDescriptor(
+            using var call = NativeCall.Enter(
+                null,
+                "mln_opengl_borrowed_texture_descriptor_default"
+            );
+            return GeneratedValues.CopyOpenglBorrowedTextureDescriptor(
                 NativeMethods.mln_opengl_borrowed_texture_descriptor_default()
             );
         }

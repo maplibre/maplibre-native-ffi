@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Style;
 
 public sealed record StyleImageInfo
@@ -23,8 +19,8 @@ public sealed record StyleImageInfo
     {
         get
         {
-            using var call = Enter(null, "mln_style_image_info_default");
-            return CopyStyleImageInfo(NativeMethods.mln_style_image_info_default());
+            using var call = NativeCall.Enter(null, "mln_style_image_info_default");
+            return GeneratedValues.CopyStyleImageInfo(NativeMethods.mln_style_image_info_default());
         }
     }
 }

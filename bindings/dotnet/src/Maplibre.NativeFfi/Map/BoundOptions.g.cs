@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Map;
 
 public sealed record BoundOptions
@@ -18,8 +14,8 @@ public sealed record BoundOptions
     {
         get
         {
-            using var call = Enter(null, "mln_bound_options_default");
-            return CopyBoundOptions(NativeMethods.mln_bound_options_default());
+            using var call = NativeCall.Enter(null, "mln_bound_options_default");
+            return GeneratedValues.CopyBoundOptions(NativeMethods.mln_bound_options_default());
         }
     }
 }

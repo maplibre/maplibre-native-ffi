@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Runtime;
 
 public readonly partial record struct RuntimeOptions(
@@ -18,8 +14,8 @@ public readonly partial record struct RuntimeOptions(
     {
         get
         {
-            using var call = Enter(null, "mln_runtime_options_default");
-            return CopyRuntimeOptions(NativeMethods.mln_runtime_options_default());
+            using var call = NativeCall.Enter(null, "mln_runtime_options_default");
+            return GeneratedValues.CopyRuntimeOptions(NativeMethods.mln_runtime_options_default());
         }
     }
 }

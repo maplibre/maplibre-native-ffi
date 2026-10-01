@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Style;
 
 public sealed record CustomMvtVectorSourceOptions
@@ -16,8 +12,8 @@ public sealed record CustomMvtVectorSourceOptions
     {
         get
         {
-            using var call = Enter(null, "mln_custom_mvt_vector_source_options_default");
-            return CopyCustomMvtVectorSourceOptions(
+            using var call = NativeCall.Enter(null, "mln_custom_mvt_vector_source_options_default");
+            return GeneratedValues.CopyCustomMvtVectorSourceOptions(
                 NativeMethods.mln_custom_mvt_vector_source_options_default()
             );
         }

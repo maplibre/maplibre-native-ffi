@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Map;
 
 public sealed record AnimationOptions
@@ -17,8 +13,10 @@ public sealed record AnimationOptions
     {
         get
         {
-            using var call = Enter(null, "mln_animation_options_default");
-            return CopyAnimationOptions(NativeMethods.mln_animation_options_default());
+            using var call = NativeCall.Enter(null, "mln_animation_options_default");
+            return GeneratedValues.CopyAnimationOptions(
+                NativeMethods.mln_animation_options_default()
+            );
         }
     }
 }

@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Style;
 
 public sealed record StyleTransitionOptions
@@ -15,8 +11,10 @@ public sealed record StyleTransitionOptions
     {
         get
         {
-            using var call = Enter(null, "mln_style_transition_options_default");
-            return CopyStyleTransitionOptions(NativeMethods.mln_style_transition_options_default());
+            using var call = NativeCall.Enter(null, "mln_style_transition_options_default");
+            return GeneratedValues.CopyStyleTransitionOptions(
+                NativeMethods.mln_style_transition_options_default()
+            );
         }
     }
 }

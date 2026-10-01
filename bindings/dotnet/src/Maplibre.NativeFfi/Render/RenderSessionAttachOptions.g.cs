@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Render;
 
 public readonly partial record struct RenderSessionAttachOptions(
@@ -17,8 +13,8 @@ public readonly partial record struct RenderSessionAttachOptions(
     {
         get
         {
-            using var call = Enter(null, "mln_render_session_attach_options_default");
-            return CopyRenderSessionAttachOptions(
+            using var call = NativeCall.Enter(null, "mln_render_session_attach_options_default");
+            return GeneratedValues.CopyRenderSessionAttachOptions(
                 NativeMethods.mln_render_session_attach_options_default()
             );
         }

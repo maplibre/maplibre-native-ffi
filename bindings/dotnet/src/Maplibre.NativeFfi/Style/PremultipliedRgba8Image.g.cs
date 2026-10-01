@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Style;
 
 public readonly record struct PremultipliedRgba8Image
@@ -29,8 +25,8 @@ public readonly record struct PremultipliedRgba8Image
     {
         get
         {
-            using var call = Enter(null, "mln_premultiplied_rgba8_image_default");
-            return CopyPremultipliedRgba8Image(
+            using var call = NativeCall.Enter(null, "mln_premultiplied_rgba8_image_default");
+            return GeneratedValues.CopyPremultipliedRgba8Image(
                 NativeMethods.mln_premultiplied_rgba8_image_default()
             );
         }

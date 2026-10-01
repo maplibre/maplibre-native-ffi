@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Query;
 
 public sealed record SourceFeatureQueryOptions
@@ -24,8 +20,8 @@ public sealed record SourceFeatureQueryOptions
     {
         get
         {
-            using var call = Enter(null, "mln_source_feature_query_options_default");
-            return CopySourceFeatureQueryOptions(
+            using var call = NativeCall.Enter(null, "mln_source_feature_query_options_default");
+            return GeneratedValues.CopySourceFeatureQueryOptions(
                 NativeMethods.mln_source_feature_query_options_default()
             );
         }

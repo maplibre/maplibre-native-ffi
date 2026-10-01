@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Map;
 
 public sealed record CameraFitOptions
@@ -15,8 +11,10 @@ public sealed record CameraFitOptions
     {
         get
         {
-            using var call = Enter(null, "mln_camera_fit_options_default");
-            return CopyCameraFitOptions(NativeMethods.mln_camera_fit_options_default());
+            using var call = NativeCall.Enter(null, "mln_camera_fit_options_default");
+            return GeneratedValues.CopyCameraFitOptions(
+                NativeMethods.mln_camera_fit_options_default()
+            );
         }
     }
 }

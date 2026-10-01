@@ -2,8 +2,6 @@
 #nullable enable
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
 
 namespace Maplibre.NativeFfi.Internal.Struct;

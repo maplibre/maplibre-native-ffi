@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Render;
 
 public readonly partial record struct OpenglSurfaceDescriptor(
@@ -16,8 +12,8 @@ public readonly partial record struct OpenglSurfaceDescriptor(
     {
         get
         {
-            using var call = Enter(null, "mln_opengl_surface_descriptor_default");
-            return CopyOpenglSurfaceDescriptor(
+            using var call = NativeCall.Enter(null, "mln_opengl_surface_descriptor_default");
+            return GeneratedValues.CopyOpenglSurfaceDescriptor(
                 NativeMethods.mln_opengl_surface_descriptor_default()
             );
         }

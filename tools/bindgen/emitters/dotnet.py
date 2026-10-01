@@ -165,13 +165,13 @@ HEADER = (
     "// Generated from the C headers by tools/bindgen. Do not edit.\n#nullable enable\n"
 )
 
-# A file that calls the generated helpers imports their members itself, which
-# keeps short names such as Check out of handwritten files.
-HELPERS = (
+# Operations and converters import the members of the helpers they call
+# themselves, which keeps short names such as Check out of handwritten files.
+OPERATION_HELPERS = (
     "using static Maplibre.NativeFfi.Internal.NativeCall;\n"
-    "using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;\n"
-    "using static Maplibre.NativeFfi.Internal.Struct.NativeValues;\n\n"
+    "using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;\n\n"
 )
+VALUE_HELPERS = "using static Maplibre.NativeFfi.Internal.Struct.NativeValues;\n"
 
 
 def native_call(function: Function, arguments: str, diagnostic: str) -> str:
@@ -1153,7 +1153,7 @@ def emit(api: Api | BoundApi) -> Emission:
         bases = f" : {', '.join(interfaces)}" if interfaces else ""
         files[f"{namespace}/{owner}.Operations.g.cs"] = (
             HEADER
-            + HELPERS
+            + OPERATION_HELPERS
             + f"namespace Maplibre.NativeFfi{'.' + namespace if owner != 'Maplibre' else ''};\n\n"
             f"public {'static' if owner == 'Maplibre' else 'sealed'} unsafe partial class {owner}{bases}\n{{\n"
             + "\n".join(body)
@@ -1189,7 +1189,7 @@ def emit(api: Api | BoundApi) -> Emission:
     )
     files["Internal/Struct/GeneratedValues.g.cs"] = (
         HEADER
-        + HELPERS
+        + VALUE_HELPERS
         + "using System.Runtime.CompilerServices;\nusing System.Runtime.InteropServices;\n\n"
         + "namespace Maplibre.NativeFfi.Internal.Struct;\n\ninternal static unsafe class GeneratedValues\n{\n"
         + "\n".join(converters)
@@ -1204,8 +1204,8 @@ def emit(api: Api | BoundApi) -> Emission:
             default = (
                 f"    public static {public_type(name)} Default\n    {{\n"
                 "        get\n        {\n"
-                f'            using var call = Enter(null, "{plan.default}");\n'
-                f"            return Copy{public_type(name)}(NativeMethods.{plan.default}());\n"
+                f'            using var call = NativeCall.Enter(null, "{plan.default}");\n'
+                f"            return GeneratedValues.Copy{public_type(name)}(NativeMethods.{plan.default}());\n"
                 "        }\n    }\n"
             )
             if declaration.rstrip().endswith(";"):
@@ -1213,10 +1213,7 @@ def emit(api: Api | BoundApi) -> Emission:
             else:
                 declaration = declaration.rstrip()[:-1] + default + "}\n"
         files[f"{namespace}/{public_type(name)}.g.cs"] = (
-            HEADER
-            + (HELPERS if plan.default else "")
-            + f"namespace Maplibre.NativeFfi.{namespace};\n\n"
-            + declaration
+            HEADER + f"namespace Maplibre.NativeFfi.{namespace};\n\n" + declaration
         )
     # The completion runtime reads results through the completion record's
     # callbacks, so the enums those results carry, such as a command

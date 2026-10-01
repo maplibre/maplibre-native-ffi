@@ -1,9 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using static Maplibre.NativeFfi.Internal.NativeCall;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
-
 namespace Maplibre.NativeFfi.Render;
 
 public readonly partial record struct VulkanOwnedTextureDescriptor(
@@ -15,8 +11,8 @@ public readonly partial record struct VulkanOwnedTextureDescriptor(
     {
         get
         {
-            using var call = Enter(null, "mln_vulkan_owned_texture_descriptor_default");
-            return CopyVulkanOwnedTextureDescriptor(
+            using var call = NativeCall.Enter(null, "mln_vulkan_owned_texture_descriptor_default");
+            return GeneratedValues.CopyVulkanOwnedTextureDescriptor(
                 NativeMethods.mln_vulkan_owned_texture_descriptor_default()
             );
         }
