@@ -6,6 +6,7 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_animation_options_default`.
   static func animationOptionsDefault() throws -> AnimationOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_animation_options_default"
@@ -21,6 +22,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_bound_options_default`.
   static func boundOptionsDefault() throws -> BoundOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_bound_options_default"
@@ -36,6 +38,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_camera_delta_default`.
   static func cameraDeltaDefault() throws -> CameraDelta {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_camera_delta_default"
@@ -51,6 +54,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_camera_fit_options_default`.
   static func cameraFitOptionsDefault() throws -> CameraFitOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_camera_fit_options_default"
@@ -66,6 +70,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_camera_options_default`.
   static func cameraOptionsDefault() throws -> CameraOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_camera_options_default"
@@ -81,6 +86,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_camera_update_default`.
   static func cameraUpdateDefault() throws -> CameraUpdate {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_camera_update_default"
@@ -96,6 +102,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_free_camera_options_default`.
   static func freeCameraOptionsDefault() throws -> FreeCameraOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_free_camera_options_default"
@@ -111,6 +118,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_map_tile_options_default`.
   static func mapTileOptionsDefault() throws -> MapTileOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_map_tile_options_default"
@@ -126,6 +134,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_map_viewport_options_default`.
   static func mapViewportOptionsDefault() throws -> MapViewportOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_map_viewport_options_default"
@@ -141,6 +150,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_projection_mode_default`.
   static func projectionModeDefault() throws -> ProjectionMode {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_projection_mode_default"

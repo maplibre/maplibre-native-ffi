@@ -11,6 +11,7 @@ public extension Maplibre {
     -> LatLng
   {
     try mapNativeFailure {
+      try NativeAbi.ensureCompatible()
       try NativeCallbackGuard.check(
         owner: nil,
         operation: "mln_lat_lng_for_projected_meters"
@@ -37,6 +38,7 @@ public extension Maplibre {
     -> ProjectedMeters
   {
     try mapNativeFailure {
+      try NativeAbi.ensureCompatible()
       try NativeCallbackGuard.check(
         owner: nil,
         operation: "mln_projected_meters_for_lat_lng"

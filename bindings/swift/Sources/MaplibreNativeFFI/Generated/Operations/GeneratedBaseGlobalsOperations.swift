@@ -6,6 +6,7 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_c_version`.
   static func cVersion() throws -> UInt32 {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(owner: nil, operation: "mln_c_version")
 
     let arena = NativeInputArena()
@@ -17,6 +18,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_supported_render_backend_mask`.
   static func supportedRenderBackendMask() throws -> RenderBackendFlag {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_supported_render_backend_mask"

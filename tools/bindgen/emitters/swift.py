@@ -245,8 +245,11 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
     )
     if claim:
         receiver_setup += "\n      let claim = try self.handle.beginClaim()\n      defer { claim.end() }"
+    # An entry point without a receiver can be a program's first call, so it
+    # checks the loaded library's C ABI version before anything reaches C.
     receiver_setup = (
-        f'      try NativeCallbackGuard.check(owner: {"self" if receiver else "nil"}, operation: "{function.name}")\n'
+        ("" if receiver else "      try NativeAbi.ensureCompatible()\n")
+        + f'      try NativeCallbackGuard.check(owner: {"self" if receiver else "nil"}, operation: "{function.name}")\n'
         + receiver_setup
     )
     record = None

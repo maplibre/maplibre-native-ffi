@@ -39,7 +39,7 @@ def protocol_header(
 
 
 # Fixture switches that change the base declarations rather than add a shape.
-_BASE_SWITCHES = {"STANDARD_TYPES", "COMPLETION_RUNTIME"}
+_BASE_SWITCHES = {"STANDARD_TYPES", "COMPLETION_RUNTIME", "ABI_VERSION"}
 
 
 def protocol_groups() -> tuple[str, ...]:

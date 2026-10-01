@@ -6,6 +6,7 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_plugin_get_register_function_v1`.
   static func pluginGetRegisterFunctionV1() throws -> NativePointer {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_plugin_get_register_function_v1"

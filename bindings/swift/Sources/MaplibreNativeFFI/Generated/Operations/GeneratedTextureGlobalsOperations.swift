@@ -8,6 +8,7 @@ public extension Maplibre {
   static func metalBorrowedTextureDescriptorDefault() throws
     -> MetalBorrowedTextureDescriptor
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_metal_borrowed_texture_descriptor_default"
@@ -25,6 +26,7 @@ public extension Maplibre {
   static func metalOwnedTextureDescriptorDefault() throws
     -> MetalOwnedTextureDescriptor
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_metal_owned_texture_descriptor_default"
@@ -42,6 +44,7 @@ public extension Maplibre {
   static func openglBorrowedTextureDescriptorDefault() throws
     -> OpenglBorrowedTextureDescriptor
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_opengl_borrowed_texture_descriptor_default"
@@ -59,6 +62,7 @@ public extension Maplibre {
   static func openglOwnedTextureDescriptorDefault() throws
     -> OpenglOwnedTextureDescriptor
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_opengl_owned_texture_descriptor_default"
@@ -74,6 +78,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_texture_image_info_default`.
   static func textureImageInfoDefault() throws -> TextureImageInfo {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_texture_image_info_default"
@@ -91,6 +96,7 @@ public extension Maplibre {
   static func vulkanBorrowedTextureDescriptorDefault() throws
     -> VulkanBorrowedTextureDescriptor
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_vulkan_borrowed_texture_descriptor_default"
@@ -108,6 +114,7 @@ public extension Maplibre {
   static func vulkanOwnedTextureDescriptorDefault() throws
     -> VulkanOwnedTextureDescriptor
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_vulkan_owned_texture_descriptor_default"
@@ -125,6 +132,7 @@ public extension Maplibre {
   static func webgpuBorrowedTextureDescriptorDefault() throws
     -> WebgpuBorrowedTextureDescriptor
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_webgpu_borrowed_texture_descriptor_default"
@@ -142,6 +150,7 @@ public extension Maplibre {
   static func webgpuOwnedTextureDescriptorDefault() throws
     -> WebgpuOwnedTextureDescriptor
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_webgpu_owned_texture_descriptor_default"

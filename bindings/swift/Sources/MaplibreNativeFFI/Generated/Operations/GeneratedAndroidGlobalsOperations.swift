@@ -11,6 +11,7 @@ public extension Maplibre {
     context bindingArg2: NativePointer
   ) throws {
     try mapNativeFailure {
+      try NativeAbi.ensureCompatible()
       try NativeCallbackGuard.check(owner: nil, operation: "mln_android_init")
 
       let arena = NativeInputArena()

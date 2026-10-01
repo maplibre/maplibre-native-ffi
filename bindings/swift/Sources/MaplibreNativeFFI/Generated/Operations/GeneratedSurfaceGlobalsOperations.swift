@@ -6,6 +6,7 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_metal_surface_descriptor_default`.
   static func metalSurfaceDescriptorDefault() throws -> MetalSurfaceDescriptor {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_metal_surface_descriptor_default"
@@ -23,6 +24,7 @@ public extension Maplibre {
   static func openglSurfaceDescriptorDefault() throws
     -> OpenglSurfaceDescriptor
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_opengl_surface_descriptor_default"
@@ -40,6 +42,7 @@ public extension Maplibre {
   static func vulkanSurfaceDescriptorDefault() throws
     -> VulkanSurfaceDescriptor
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_vulkan_surface_descriptor_default"
@@ -57,6 +60,7 @@ public extension Maplibre {
   static func webgpuSurfaceDescriptorDefault() throws
     -> WebgpuSurfaceDescriptor
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_webgpu_surface_descriptor_default"

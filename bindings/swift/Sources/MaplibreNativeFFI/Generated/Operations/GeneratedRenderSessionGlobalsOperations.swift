@@ -6,6 +6,7 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_frame_demand_default`.
   static func frameDemandDefault() throws -> FrameDemand {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_frame_demand_default"

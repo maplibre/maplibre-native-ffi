@@ -34,6 +34,7 @@ public extension Maplibre {
   /// Calls `mln_network_status_get`.
   static func networkStatusGet() throws -> NetworkStatus {
     try mapNativeFailure {
+      try NativeAbi.ensureCompatible()
       try NativeCallbackGuard.check(
         owner: nil,
         operation: "mln_network_status_get"
@@ -55,6 +56,7 @@ public extension Maplibre {
   /// Calls `mln_network_status_set`.
   static func networkStatusSet(status bindingArg0: NetworkStatus) throws {
     try mapNativeFailure {
+      try NativeAbi.ensureCompatible()
       try NativeCallbackGuard.check(
         owner: nil,
         operation: "mln_network_status_set"
@@ -103,6 +105,7 @@ public extension Maplibre {
     -> RuntimeHandle
   {
     try mapNativeFailure {
+      try NativeAbi.ensureCompatible()
       try NativeCallbackGuard.check(owner: nil, operation: "mln_runtime_create")
 
       let arena = NativeInputArena()
@@ -121,6 +124,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_runtime_options_default`.
   static func runtimeOptionsDefault() throws -> RuntimeOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_runtime_options_default"

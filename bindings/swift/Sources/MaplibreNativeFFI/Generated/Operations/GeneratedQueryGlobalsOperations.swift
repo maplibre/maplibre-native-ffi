@@ -8,6 +8,7 @@ public extension Maplibre {
   static func renderedFeatureQueryOptionsDefault() throws
     -> RenderedFeatureQueryOptions
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_rendered_feature_query_options_default"
@@ -25,6 +26,7 @@ public extension Maplibre {
   static func renderedQueryGeometryBox(box bindingArg0: ScreenBox) throws
     -> RenderedQueryGeometry
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_rendered_query_geometry_box"
@@ -44,6 +46,7 @@ public extension Maplibre {
   ) throws
     -> RenderedQueryGeometry
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_rendered_query_geometry_line_string"
@@ -64,6 +67,7 @@ public extension Maplibre {
   static func renderedQueryGeometryPoint(point bindingArg0: ScreenPoint) throws
     -> RenderedQueryGeometry
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_rendered_query_geometry_point"
@@ -81,6 +85,7 @@ public extension Maplibre {
   static func sourceFeatureQueryOptionsDefault() throws
     -> SourceFeatureQueryOptions
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_source_feature_query_options_default"

@@ -13,7 +13,8 @@
 // Groups that declare fixed-width types include the standard headers.
 #if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) || \
   defined(MLN_PROTOCOL_PRESENCE_MASK) ||                              \
-  defined(MLN_PROTOCOL_COMPLETION_RUNTIME)
+  defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                         \
+  defined(MLN_PROTOCOL_ABI_VERSION)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_DECISION)
@@ -102,6 +103,12 @@ typedef struct mln_completion {
 } mln_completion;
 #endif
 typedef unsigned long long mln_runtime;
+
+#ifdef MLN_PROTOCOL_ABI_VERSION
+// The C ABI version query, for a probe that compiles a binding's handwritten
+// runtime, which checks the version before its first call.
+BIND("execution=immediate") uint32_t mln_c_version(void);
+#endif
 
 // The map is a plain value unless a test asks for one of its owner forms.
 #if defined(MLN_PROTOCOL_MAP_CLOSE)

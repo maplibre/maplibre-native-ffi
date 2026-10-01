@@ -51,3 +51,16 @@ import Testing
     #expect(binding?.diagnostic == "MapHandle is closed")
   }
 }
+
+/// A library that reports another C ABI version yields the binding's mismatch
+/// error, which carries no native status, and the loaded library's own version
+/// passes the check that every receiverless entry point runs first.
+@Test func aLibraryWithAnotherCAbiVersionIsRejected() throws {
+  let error = try #require(NativeAbi.mismatch(actual: expectedCAbiVersion + 1))
+  #expect(error.kind == .abiVersionMismatch)
+  #expect(error.rawStatus == nil)
+  #expect(error.diagnostic.contains("expected \(expectedCAbiVersion)"))
+
+  #expect(NativeAbi.mismatch(actual: expectedCAbiVersion) == nil)
+  try NativeAbi.ensureCompatible()
+}

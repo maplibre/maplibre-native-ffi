@@ -6,6 +6,7 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_map_options_default`.
   static func mapOptionsDefault() throws -> MapOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_map_options_default"

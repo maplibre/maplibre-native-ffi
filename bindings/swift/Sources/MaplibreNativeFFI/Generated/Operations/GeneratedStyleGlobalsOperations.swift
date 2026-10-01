@@ -8,6 +8,7 @@ public extension Maplibre {
   static func customGeometrySourceOptionsDefault() throws
     -> CustomGeometrySourceOptions
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_custom_geometry_source_options_default"
@@ -25,6 +26,7 @@ public extension Maplibre {
   static func customMvtVectorSourceOptionsDefault() throws
     -> CustomMvtVectorSourceOptions
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_custom_mvt_vector_source_options_default"
@@ -44,6 +46,7 @@ public extension Maplibre {
     options bindingArg1: GeojsonSourceOptions? = nil
   ) throws -> GeojsonSourceDataHandle {
     try mapNativeFailure {
+      try NativeAbi.ensureCompatible()
       try NativeCallbackGuard.check(
         owner: nil,
         operation: "mln_geojson_source_data_create"
@@ -68,6 +71,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_geojson_source_options_default`.
   static func geojsonSourceOptionsDefault() throws -> GeojsonSourceOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_geojson_source_options_default"
@@ -85,6 +89,7 @@ public extension Maplibre {
   static func premultipliedRgba8ImageDefault() throws
     -> PremultipliedRgba8Image
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_premultiplied_rgba8_image_default"
@@ -100,6 +105,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_style_image_info_default`.
   static func styleImageInfoDefault() throws -> StyleImageInfo {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_style_image_info_default"
@@ -115,6 +121,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_style_image_options_default`.
   static func styleImageOptionsDefault() throws -> StyleImageOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_style_image_options_default"
@@ -130,6 +137,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_style_tile_source_options_default`.
   static func styleTileSourceOptionsDefault() throws -> StyleTileSourceOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_style_tile_source_options_default"
@@ -145,6 +153,7 @@ public extension Maplibre {
 public extension Maplibre {
   /// Calls `mln_style_transition_options_default`.
   static func styleTransitionOptionsDefault() throws -> StyleTransitionOptions {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_style_transition_options_default"

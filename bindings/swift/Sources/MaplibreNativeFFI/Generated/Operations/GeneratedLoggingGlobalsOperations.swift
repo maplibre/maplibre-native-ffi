@@ -7,6 +7,7 @@ public extension Maplibre {
   /// Calls `mln_log_clear_callback`.
   static func logClearCallback() throws {
     try mapNativeFailure {
+      try NativeAbi.ensureCompatible()
       try NativeCallbackGuard.check(
         owner: nil,
         operation: "mln_log_clear_callback"
@@ -27,6 +28,7 @@ public extension Maplibre {
   /// Calls `mln_log_set_async_severity_mask`.
   static func logSetAsyncSeverityMask(mask bindingArg0: LogSeverityMask) throws {
     try mapNativeFailure {
+      try NativeAbi.ensureCompatible()
       try NativeCallbackGuard.check(
         owner: nil,
         operation: "mln_log_set_async_severity_mask"
@@ -53,6 +55,7 @@ public extension Maplibre {
     Int64,
     String
   ) throws -> UInt32)?) throws {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(owner: nil, operation: "mln_log_set_callback")
     try mapNativeFailure {
       let arena = NativeInputArena()

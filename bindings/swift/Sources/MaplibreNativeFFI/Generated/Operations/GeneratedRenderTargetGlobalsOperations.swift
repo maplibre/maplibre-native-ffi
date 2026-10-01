@@ -6,6 +6,7 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_gpu_sync_default`.
   static func gpuSyncDefault() throws -> GpuSync {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(owner: nil, operation: "mln_gpu_sync_default")
 
     let arena = NativeInputArena()
@@ -20,6 +21,7 @@ public extension Maplibre {
   static func openglSupportedContextProviderMask() throws
     -> OpenglContextProviderFlag
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_opengl_supported_context_provider_mask"
@@ -37,6 +39,7 @@ public extension Maplibre {
   static func renderSessionAttachOptionsDefault() throws
     -> RenderSessionAttachOptions
   {
+    try NativeAbi.ensureCompatible()
     try NativeCallbackGuard.check(
       owner: nil,
       operation: "mln_render_session_attach_options_default"
@@ -57,6 +60,7 @@ public extension Maplibre {
     -> (width: UInt32, height: UInt32)
   {
     try mapNativeFailure {
+      try NativeAbi.ensureCompatible()
       try NativeCallbackGuard.check(
         owner: nil,
         operation: "mln_render_target_extent_physical_size"

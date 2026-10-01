@@ -18,6 +18,9 @@ static mln_status fail(mln_diagnostic* diagnostic, const char* message) {
   return MLN_STATUS_INVALID_ARGUMENT;
 }
 
+// Reports the C ABI version that every binding's handwritten runtime expects.
+uint32_t mln_c_version(void) { return 0; }
+
 // Returns its input, so a probe sees what its binding encoded, as decoded.
 mln_status mln_probe_roundtrip(
   mln_probe_options input, mln_probe_options* out_options,

@@ -5,7 +5,10 @@
 
 [cases]
 "ERR-01" = "bindings/swift/Tests/MaplibreNativeFFITests/ErrorTests.swift::aFailedCallMapsItsStatusAndCarriesItsDiagnostic"
-"ERR-02" = { na = "The binding has no load step to check: SwiftPM links the library that pkg-config names at build time, through a module map over that install's own header" }
+# The test injects another version into the check. That the check runs before
+# any other call rests on the generated entry points without a receiver, each
+# of which calls NativeAbi.ensureCompatible() first.
+"ERR-02" = "bindings/swift/Tests/MaplibreNativeFFITests/ErrorTests.swift::aLibraryWithAnotherCAbiVersionIsRejected"
 "LIFE-01" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::closingAHandleTwiceDoesNothingTheSecondTime"
 "LIFE-02" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aRefusedCloseLeavesTheRuntimeUsableAndALaterCloseSucceeds"
 "LIFE-03" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aBorrowOnAnotherThreadHoldsOffAClose"

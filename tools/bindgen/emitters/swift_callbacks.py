@@ -327,7 +327,7 @@ def direct_operation(plan, values):
         result_type = ""
     parameter_type = f"({typ})?" if optional else f"@escaping {typ}"
     body = f"""  {"static " if optional else ""}func {method}(_ callback: {parameter_type}) throws{result_type} {{
-    try NativeCallbackGuard.check(owner: {"nil" if optional else "self"}, operation: "{function}")
+    {"try NativeAbi.ensureCompatible()" + chr(10) + "    " if optional else ""}try NativeCallbackGuard.check(owner: {"nil" if optional else "self"}, operation: "{function}")
     {"return " if result_type else ""}try mapNativeFailure {{
       {(chr(10) + "      ").join(lines)}
     }}
