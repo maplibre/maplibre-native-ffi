@@ -594,46 +594,6 @@ static void a_region_invalidation_refetches_only_the_tiles_inside_it(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void tile_delivery_and_invalidate_accept_an_empty_tile(void) {
-  const custom_kind* kind = &kinds[1];
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  custom_probe probe;
-  init_probe(&probe);
-
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
-  add_source(kind, map, &probe);
-
-  mln_test_completion info =
-    mln_test_completion_default(sizeof(mln_style_source_result));
-  MLN_TEST_OK(mln_map_get_style_source_info(
-    map, MLN_BUFFER_LITERAL("custom-mvt-vector"), &info.descriptor, NULL
-  ));
-  mln_style_source_result source_result = {0};
-  MLN_TEST_OK(mln_test_completion_finish_value(
-    &info, &source_result, sizeof(source_result)
-  ));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR, source_result.info.type
-  );
-
-  const mln_buffer_view empty = {.data = NULL, .size = 0};
-  MLN_TEST_AWAIT_OK(mln_map_set_custom_mvt_vector_source_tile_data(
-    map, MLN_BUFFER_LITERAL("custom-mvt-vector"), root_tile, empty,
-    &completion.descriptor, NULL
-  ));
-  MLN_TEST_AWAIT_OK(mln_map_set_custom_mvt_vector_source_tile_error(
-    map, MLN_BUFFER_LITERAL("custom-mvt-vector"), root_tile,
-    MLN_BUFFER_LITERAL("missing"), &completion.descriptor, NULL
-  ));
-  MLN_TEST_OK(submit_and_settle(kind, map, kind->invalidate_root));
-
-  mln_test_destroy_map(map);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
-  mln_test_destroy_runtime(runtime);
-}
-
 static uint32_t source_type(mln_map map, const char* id) {
   mln_test_completion info =
     mln_test_completion_default(sizeof(mln_style_source_result));
@@ -645,9 +605,160 @@ static uint32_t source_type(mln_map map, const char* id) {
   return result.info.type;
 }
 
-// Each kind takes every option it declares and reports its own source type,
-// and rejects a maximum zoom that is not a tile zoom before the call returns.
-static void custom_sources_take_every_option_they_declare(void) {
+// Tile data and errors go to a tile inside its zoom level's grid of a custom
+// source of the matching kind that exists. An empty tile is data, and a tile
+// operation against the other kind is accepted and then fails on the worker.
+static void tile_operations_check_their_tile_and_source_kind(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  custom_probe geometry_probe;
+  custom_probe mvt_probe;
+  init_probe(&geometry_probe);
+  init_probe(&mvt_probe);
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  add_source(&kinds[0], map, &geometry_probe);
+  add_source(&kinds[1], map, &mvt_probe);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR, source_type(map, "custom-geometry")
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR,
+    source_type(map, "custom-mvt-vector")
+  );
+
+  const mln_buffer_view geometry = MLN_BUFFER_LITERAL("custom-geometry");
+  const mln_buffer_view mvt = MLN_BUFFER_LITERAL("custom-mvt-vector");
+  const mln_buffer_view empty = {.data = NULL, .size = 0};
+  const mln_buffer_view no_features =
+    MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}");
+  const mln_buffer_view missing = MLN_BUFFER_LITERAL("missing");
+  MLN_TEST_AWAIT_OK(mln_map_set_custom_mvt_vector_source_tile_data(
+    map, mvt, root_tile, empty, &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_custom_mvt_vector_source_tile_error(
+    map, mvt, root_tile, missing, &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(submit_and_settle(&kinds[1], map, kinds[1].invalidate_root));
+
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "within zoom bounds",
+    mln_map_set_custom_geometry_source_tile_data(
+      map, geometry, (mln_canonical_tile_id){.z = 1, .x = 2, .y = 0},
+      no_features, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_NOT_FOUND, "does not exist",
+    mln_map_set_custom_mvt_vector_source_tile_data(
+      map, missing, root_tile, empty, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_custom_mvt_vector_source_tile_data(
+      map, geometry, root_tile, empty, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_custom_mvt_vector_source_tile_error(
+      map, geometry, root_tile, missing, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_invalidate_custom_mvt_vector_source_tile(
+      map, geometry, root_tile, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_custom_geometry_source_tile_data(
+      map, mvt, root_tile, no_features, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_invalidate_custom_geometry_source_tile(
+      map, mvt, root_tile, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_invalidate_custom_geometry_source_region(
+      map, mvt, (mln_lat_lng_bounds){{-1, -1}, {1, 1}}, &completion.descriptor,
+      NULL
+    )
+  );
+
+  mln_test_destroy_map(map);
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&geometry_probe.release_count));
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&mvt_probe.release_count));
+  mln_test_destroy_runtime(runtime);
+}
+
+// Every custom geometry option field, each set to a value in range.
+static mln_custom_geometry_source_options every_geometry_option(
+  custom_probe* probe
+) {
+  mln_custom_geometry_source_options options =
+    mln_custom_geometry_source_options_default();
+  options.fields = MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM |
+                   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM |
+                   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE |
+                   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE |
+                   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER |
+                   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP |
+                   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
+  options.min_zoom = 1;
+  options.max_zoom = 12;
+  options.tolerance = 0.5;
+  options.tile_size = 256;
+  options.buffer = 64;
+  options.clip = true;
+  options.wrap = true;
+  options.fetch_tile = probe_fetch_tile;
+  options.user_data = probe;
+  options.release_user_data = probe_release;
+  return options;
+}
+
+static void fractional_max_zoom(mln_custom_geometry_source_options* options) {
+  options->max_zoom = 4.5;
+}
+static void inverted_zoom(mln_custom_geometry_source_options* options) {
+  options->min_zoom = 10.0;
+  options->max_zoom = 4.0;
+}
+static void negative_tolerance(mln_custom_geometry_source_options* options) {
+  options->tolerance = -1.0;
+}
+static void empty_tiles(mln_custom_geometry_source_options* options) {
+  options->tile_size = 0;
+}
+static void oversized_buffer(mln_custom_geometry_source_options* options) {
+  options->buffer = 70000;
+}
+
+static const struct {
+  const char* label;
+  void (*mutate)(mln_custom_geometry_source_options* options);
+  const char* fragment;
+} geometry_option_cases[] = {
+  {"fractional max zoom", fractional_max_zoom,
+   "max_zoom must be an integer within [0, 32]"},
+  {"inverted zoom range", inverted_zoom,
+   "min_zoom must be less than or equal to max_zoom"},
+  {"negative tolerance", negative_tolerance, "tolerance"},
+  {"empty tiles", empty_tiles, "tile_size"},
+  {"oversized buffer", oversized_buffer, "buffer"},
+};
+
+// Each kind takes every option it declares, and rejects a value out of range
+// before the call returns, naming its field. A rejected add never references
+// the host's state, so only the accepted adds release it, once each.
+static void custom_sources_take_and_validate_every_option(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
@@ -657,32 +768,34 @@ static void custom_sources_take_every_option_they_declare(void) {
   init_probe(&mvt_probe);
 
   mln_custom_geometry_source_options geometry =
-    mln_custom_geometry_source_options_default();
-  geometry.fields = MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM |
-                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM |
-                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE |
-                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE |
-                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER |
-                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP |
-                    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
-  geometry.min_zoom = 1;
-  geometry.max_zoom = 12;
-  geometry.tolerance = 0.5;
-  geometry.tile_size = 256;
-  geometry.buffer = 64;
-  geometry.clip = true;
-  geometry.wrap = true;
-  geometry.fetch_tile = probe_fetch_tile;
-  geometry.user_data = &geometry_probe;
-  geometry.release_user_data = probe_release;
+    every_geometry_option(&geometry_probe);
   MLN_TEST_AWAIT_OK(mln_map_add_custom_geometry_source(
     map, MLN_BUFFER_LITERAL("every-geometry-option"), &geometry,
     &completion.descriptor, NULL
   ));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR,
-    source_type(map, "every-geometry-option")
-  );
+  for (size_t index = 0;
+       index < sizeof(geometry_option_cases) / sizeof(geometry_option_cases[0]);
+       index += 1) {
+    geometry = every_geometry_option(&geometry_probe);
+    geometry_option_cases[index].mutate(&geometry);
+    char id[24];
+    snprintf(id, sizeof(id), "geometry-%zu", index);
+    mln_test_completion completion = mln_test_completion_default(0);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      MLN_STATUS_INVALID_ARGUMENT,
+      mln_map_add_custom_geometry_source(
+        map, mln_test_view_of(id), &geometry, &completion.descriptor,
+        MLN_TEST_DIAGNOSTIC
+      ),
+      geometry_option_cases[index].label
+    );
+    TEST_ASSERT_NOT_NULL_MESSAGE(
+      strstr(mln_test_last_error(), geometry_option_cases[index].fragment),
+      geometry_option_cases[index].label
+    );
+    mln_test_completion_reject(&completion);
+    mln_test_completion_destroy(&completion);
+  }
 
   mln_custom_mvt_vector_source_options mvt =
     mln_custom_mvt_vector_source_options_default();
@@ -697,86 +810,30 @@ static void custom_sources_take_every_option_they_declare(void) {
     map, MLN_BUFFER_LITERAL("every-mvt-option"), &mvt, &completion.descriptor,
     NULL
   ));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR,
-    source_type(map, "every-mvt-option")
-  );
-
-  mln_custom_mvt_vector_source_options past_the_last_zoom = mvt;
-  past_the_last_zoom.max_zoom = 33;
+  mln_custom_mvt_vector_source_options rejected = mvt;
+  rejected.max_zoom = 33;
   MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "max_zoom",
+    "max_zoom must be an integer within [0, 32]",
     mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL("past-the-last-zoom"), &past_the_last_zoom,
+      map, MLN_BUFFER_LITERAL("past-the-last-zoom"), &rejected,
       &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
-
-  mln_test_destroy_map(map);
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&geometry_probe.release_count));
-  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&mvt_probe.release_count));
-  mln_test_destroy_runtime(runtime);
-}
-
-static void tile_operations_reject_the_other_custom_source_kind(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  custom_probe geometry_probe;
-  custom_probe mvt_probe;
-  init_probe(&geometry_probe);
-  init_probe(&mvt_probe);
-
-  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
-  add_source(&kinds[0], map, &geometry_probe);
-  add_source(&kinds[1], map, &mvt_probe);
-
-  // A tile operation against the other custom source kind is accepted, then
-  // fails application on the worker.
-  const mln_buffer_view geometry = MLN_BUFFER_LITERAL("custom-geometry");
-  const mln_buffer_view mvt = MLN_BUFFER_LITERAL("custom-mvt-vector");
-  const mln_buffer_view empty = {.data = NULL, .size = 0};
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_custom_mvt_vector_source_tile_data(
-      map, geometry, root_tile, empty, &completion.descriptor, NULL
+  rejected.max_zoom = 4.5;
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "max_zoom must be an integer within [0, 32]",
+    mln_map_add_custom_mvt_vector_source(
+      map, MLN_BUFFER_LITERAL("mvt-fractional"), &rejected,
+      &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_custom_mvt_vector_source_tile_error(
-      map, geometry, root_tile, MLN_BUFFER_LITERAL("missing"),
-      &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_invalidate_custom_mvt_vector_source_tile(
-      map, geometry, root_tile, &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_custom_geometry_source_tile_data(
-      map, mvt, root_tile,
-      MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
-      &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_invalidate_custom_geometry_source_tile(
-      map, mvt, root_tile, &completion.descriptor, NULL
-    )
-  );
-  const mln_lat_lng_bounds bounds = {
-    .southwest = {.latitude = -1.0, .longitude = -1.0},
-    .northeast = {.latitude = 1.0, .longitude = 1.0},
-  };
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_invalidate_custom_geometry_source_region(
-      map, mvt, bounds, &completion.descriptor, NULL
+  rejected.min_zoom = 10.0;
+  rejected.max_zoom = 4.0;
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "min_zoom must be less than or equal to max_zoom",
+    mln_map_add_custom_mvt_vector_source(
+      map, MLN_BUFFER_LITERAL("mvt-inverted"), &rejected,
+      &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
 
@@ -794,7 +851,6 @@ MLN_TEST_GROUP {
   RUN_TEST(fetches_follow_the_rendered_tiles);
   RUN_TEST(a_delivered_tile_becomes_features_and_invalidation_refetches_it);
   RUN_TEST(a_region_invalidation_refetches_only_the_tiles_inside_it);
-  RUN_TEST(tile_delivery_and_invalidate_accept_an_empty_tile);
-  RUN_TEST(tile_operations_reject_the_other_custom_source_kind);
-  RUN_TEST(custom_sources_take_every_option_they_declare);
+  RUN_TEST(tile_operations_check_their_tile_and_source_kind);
+  RUN_TEST(custom_sources_take_and_validate_every_option);
 }

@@ -1,277 +1,235 @@
-// Inputs the style functions reject that no other case sends: invalid GeoJSON
-// data and cluster properties, empty source, layer, and image IDs, an empty
-// image source URL, an empty or missing tile list, images without pixels,
-// invalid light JSON, and style JSON with an embedded NUL. Some are refused at
-// submission and some by the command, so each row reads the status from
-// whichever stage refused it.
+// Style commands that refuse their input or their target: empty IDs, URLs, and
+// tile lists, images without pixels, invalid light and style JSON, and sources
+// whose ID is taken or whose kind does not take the command.
 
 #include "support/style.h"
 #include "support/test_support.h"
 
-typedef struct geojson_case {
-  const char* label;
-  const char* data;
-  // A cluster_properties value to set, or null to set none.
-  const char* cluster_properties;
-  bool cluster;
-  const char* fragment;
-} geojson_case;
-
-static void geojson_data_rejects_invalid_documents_and_properties(void) {
-  static const char points[] =
-    "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
-    "\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},"
-    "\"properties\":{\"rank\":1}}]}";
-  static const geojson_case cases[] = {
-    {"an unknown geometry type",
-     "{\"type\":\"Unsupported\",\"coordinates\":[]}", NULL, false,
-     "is invalid"},
-    {"a clustered line string",
-     "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
-     "\"geometry\":{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]},"
-     "\"properties\":{}}]}",
-     NULL, true, "line string"},
-    {"empty cluster properties", points, "", true, "must not be empty"},
-    {"cluster properties that are not JSON", points, "{\"total\":NaN}", true,
-     "cluster_properties"},
-  };
-  for (size_t index = 0; index < sizeof(cases) / sizeof(cases[0]); index += 1) {
-    const geojson_case* row = &cases[index];
-    mln_geojson_source_options options = mln_geojson_source_options_default();
-    if (row->cluster) {
-      options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
-      options.cluster = true;
-    }
-    if (row->cluster_properties != NULL) {
-      options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-      options.cluster_properties = mln_test_view_of(row->cluster_properties);
-    }
-    mln_geojson_source_data data = MLN_HANDLE_NULL;
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_INVALID_ARGUMENT,
-      mln_geojson_source_data_create(
-        mln_test_view_of(row->data), &options, &data, MLN_TEST_DIAGNOSTIC
-      ),
-      row->label
-    );
-    TEST_ASSERT_EQUAL_UINT64_MESSAGE(MLN_HANDLE_NULL, data, row->label);
-    TEST_ASSERT_NOT_NULL_MESSAGE(
-      strstr(mln_test_last_error(), row->fragment), row->label
-    );
-  }
-}
+// Some inputs are refused at submission and some by the command, so this reads
+// the status and diagnostic from whichever stage refused `expression`, which
+// submits with `completion.descriptor` and `&diagnostic`.
+#define EXPECT_REFUSED(fragment, expression)                                \
+  do {                                                                      \
+    mln_test_completion completion = mln_test_completion_default(0);        \
+    mln_diagnostic diagnostic = {.size = sizeof(mln_diagnostic)};           \
+    mln_status status = (expression);                                       \
+    const char* message = diagnostic.message;                               \
+    if (status == MLN_STATUS_OK) {                                          \
+      status = mln_test_completion_finish(&completion);                     \
+      message = mln_test_completion_diagnostic(&completion);                \
+    } else {                                                                \
+      mln_test_completion_reject(&completion);                              \
+    }                                                                       \
+    TEST_ASSERT_EQUAL_INT_MESSAGE(                                          \
+      MLN_STATUS_INVALID_ARGUMENT, status, #expression                      \
+    );                                                                      \
+    TEST_ASSERT_NOT_NULL_MESSAGE(strstr(message, (fragment)), #expression); \
+    mln_test_completion_destroy(&completion);                               \
+  } while (false)
 
 static void ignore_tile(void* user_data, mln_canonical_tile_id tile_id) {
   (void)user_data;
   (void)tile_id;
 }
 
-static const mln_lat_lng image_corners[] = {
-  {.latitude = 1, .longitude = 1},
-  {.latitude = 1, .longitude = 2},
-  {.latitude = 0, .longitude = 2},
-  {.latitude = 0, .longitude = 1},
-};
-
-static mln_premultiplied_rgba8_image image_without_pixels(void) {
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
-  image.width = 1;
-  image.height = 1;
-  image.stride = 4;
-  image.byte_length = 4;
-  return image;
-}
-
-static mln_status add_unnamed_custom_geometry_source(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  mln_custom_geometry_source_options options =
-    mln_custom_geometry_source_options_default();
-  options.fetch_tile = ignore_tile;
-  return mln_map_add_custom_geometry_source(
-    map, MLN_BUFFER_LITERAL(""), &options, completion, diagnostic
-  );
-}
-
-static mln_status add_unnamed_custom_mvt_source(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  mln_custom_mvt_vector_source_options options =
-    mln_custom_mvt_vector_source_options_default();
-  options.fetch_tile = ignore_tile;
-  return mln_map_add_custom_mvt_vector_source(
-    map, MLN_BUFFER_LITERAL(""), &options, completion, diagnostic
-  );
-}
-
-static mln_status add_unnamed_geojson_url_source(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  return mln_map_add_geojson_source_url(
-    map, MLN_BUFFER_LITERAL(""), MLN_BUFFER_LITERAL("fixture://points.geojson"),
-    NULL, completion, diagnostic
-  );
-}
-
-static mln_status read_unnamed_source(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  return mln_map_get_style_source_info(
-    map, MLN_BUFFER_LITERAL(""), completion, diagnostic
-  );
-}
-
-static mln_status read_unnamed_layer(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  return mln_map_get_style_layer_info(
-    map, MLN_BUFFER_LITERAL(""), completion, diagnostic
-  );
-}
-
-static mln_status add_vector_source_without_tiles(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  static const mln_buffer_view no_tiles[1] = {{0}};
-  return mln_map_add_vector_source_tiles(
-    map, MLN_BUFFER_LITERAL("empty"), no_tiles, 0, NULL, completion, diagnostic
-  );
-}
-
-static mln_status add_vector_source_with_missing_tiles(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  return mln_map_add_vector_source_tiles(
-    map, MLN_BUFFER_LITERAL("missing"), NULL, 1, NULL, completion, diagnostic
-  );
-}
-
-static mln_status add_unnamed_image_source(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  return mln_map_add_image_source_url(
-    map, MLN_BUFFER_LITERAL(""), image_corners, 4,
-    MLN_BUFFER_LITERAL("fixture://image.png"), completion, diagnostic
-  );
-}
-
-static mln_status add_image_source_without_a_url(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  return mln_map_add_image_source_url(
-    map, MLN_BUFFER_LITERAL("image"), image_corners, 4, MLN_BUFFER_LITERAL(""),
-    completion, diagnostic
-  );
-}
-
-static mln_status set_image_without_pixels(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  const mln_premultiplied_rgba8_image image = image_without_pixels();
-  return mln_map_set_style_image(
-    map, MLN_BUFFER_LITERAL("marker"), &image, NULL, completion, diagnostic
-  );
-}
-
-static mln_status add_image_source_without_pixels(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  const mln_premultiplied_rgba8_image image = image_without_pixels();
-  return mln_map_add_image_source_image(
-    map, MLN_BUFFER_LITERAL("image"), image_corners, 4, &image, completion,
-    diagnostic
-  );
-}
-
-static mln_status set_light_to_invalid_json(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  return mln_map_set_style_light_property(
-    map, MLN_BUFFER_LITERAL("intensity"), MLN_BUFFER_LITERAL("{"), completion,
-    diagnostic
-  );
-}
-
-static mln_status set_style_json_with_a_nul(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-) {
-  static const char json[] = "{\0}";
-  return mln_map_set_style_json(
-    map, (mln_buffer_view){.data = json, .size = sizeof(json) - 1}, completion,
-    diagnostic
-  );
-}
-
-typedef struct command_case {
-  const char* label;
-  mln_status (*submit)(mln_map, const mln_completion*, mln_diagnostic*);
-  const char* fragment;
-} command_case;
+static const mln_lat_lng corners[4] = {{1, 1}, {1, 2}, {0, 2}, {0, 1}};
 
 static void style_commands_reject_invalid_inputs(void) {
-  static const command_case cases[] = {
-    {"an unnamed custom geometry source", add_unnamed_custom_geometry_source,
-     "source_id must not be empty"},
-    {"an unnamed custom MVT source", add_unnamed_custom_mvt_source,
-     "source_id must not be empty"},
-    {"an unnamed GeoJSON URL source", add_unnamed_geojson_url_source,
-     "source_id must not be empty"},
-    {"a read of an unnamed source", read_unnamed_source,
-     "source_id must not be empty"},
-    {"a read of an unnamed layer", read_unnamed_layer,
-     "layer_id must not be empty"},
-    {"a vector source without tiles", add_vector_source_without_tiles,
-     "tile_count must be greater than 0"},
-    {"a vector source whose tile list is missing",
-     add_vector_source_with_missing_tiles, "tiles must not be null"},
-    {"an unnamed image source", add_unnamed_image_source,
-     "source_id must not be empty"},
-    {"an image source without a URL", add_image_source_without_a_url,
-     "url must not be empty"},
-    {"an image without pixels", set_image_without_pixels,
-     "pixels must not be null"},
-    {"an image source without pixels", add_image_source_without_pixels,
-     "pixels must not be null"},
-    {"light JSON that does not parse", set_light_to_invalid_json,
-     "style light property"},
-    // Run last: a style that fails to load leaves the map without its
-    // style.
-    {"style JSON with an embedded NUL", set_style_json_with_a_nul,
-     "must not contain embedded NUL"},
-  };
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_style_serve(runtime, NULL, 0);
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(
-    runtime, map,
-    MLN_BUFFER_LITERAL(
-      "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\","
-      "\"type\":\"background\"}]}"
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  const mln_buffer_view unnamed = MLN_BUFFER_LITERAL("");
+  const mln_buffer_view png = MLN_BUFFER_LITERAL("fixture://image.png");
+  const char* empty_source_id = "source_id must not be empty";
+
+  mln_custom_geometry_source_options geometry =
+    mln_custom_geometry_source_options_default();
+  geometry.fetch_tile = ignore_tile;
+  EXPECT_REFUSED(
+    empty_source_id,
+    mln_map_add_custom_geometry_source(
+      map, unnamed, &geometry, &completion.descriptor, &diagnostic
     )
   );
-  for (size_t index = 0; index < sizeof(cases) / sizeof(cases[0]); index += 1) {
-    const command_case* row = &cases[index];
-    mln_test_completion completion = mln_test_completion_default(0);
-    mln_diagnostic diagnostic = {.size = sizeof(mln_diagnostic)};
-    mln_status status = row->submit(map, &completion.descriptor, &diagnostic);
-    const char* message = diagnostic.message;
-    if (status == MLN_STATUS_OK) {
-      status = mln_test_completion_finish(&completion);
-      message = mln_test_completion_diagnostic(&completion);
-    } else {
-      mln_test_completion_reject(&completion);
-    }
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_INVALID_ARGUMENT, status, row->label
-    );
-    TEST_ASSERT_NOT_NULL_MESSAGE(strstr(message, row->fragment), row->label);
-    mln_test_completion_destroy(&completion);
-  }
+  mln_custom_mvt_vector_source_options mvt =
+    mln_custom_mvt_vector_source_options_default();
+  mvt.fetch_tile = ignore_tile;
+  EXPECT_REFUSED(
+    empty_source_id, mln_map_add_custom_mvt_vector_source(
+                       map, unnamed, &mvt, &completion.descriptor, &diagnostic
+                     )
+  );
+  EXPECT_REFUSED(
+    empty_source_id,
+    mln_map_add_geojson_source_url(
+      map, unnamed, MLN_BUFFER_LITERAL("fixture://points.geojson"), NULL,
+      &completion.descriptor, &diagnostic
+    )
+  );
+  EXPECT_REFUSED(
+    empty_source_id, mln_map_get_style_source_info(
+                       map, unnamed, &completion.descriptor, &diagnostic
+                     )
+  );
+  EXPECT_REFUSED(
+    "layer_id must not be empty",
+    mln_map_get_style_layer_info(
+      map, unnamed, &completion.descriptor, &diagnostic
+    )
+  );
+  static const mln_buffer_view no_tiles[1] = {{0}};
+  EXPECT_REFUSED(
+    "tile_count must be greater than 0",
+    mln_map_add_vector_source_tiles(
+      map, MLN_BUFFER_LITERAL("empty"), no_tiles, 0, NULL,
+      &completion.descriptor, &diagnostic
+    )
+  );
+  EXPECT_REFUSED(
+    "tiles must not be null", mln_map_add_vector_source_tiles(
+                                map, MLN_BUFFER_LITERAL("missing"), NULL, 1,
+                                NULL, &completion.descriptor, &diagnostic
+                              )
+  );
+  EXPECT_REFUSED(
+    empty_source_id,
+    mln_map_add_image_source_url(
+      map, unnamed, corners, 4, png, &completion.descriptor, &diagnostic
+    )
+  );
+  EXPECT_REFUSED(
+    "url must not be empty", mln_map_add_image_source_url(
+                               map, MLN_BUFFER_LITERAL("image"), corners, 4,
+                               unnamed, &completion.descriptor, &diagnostic
+                             )
+  );
+  mln_premultiplied_rgba8_image no_pixels =
+    mln_premultiplied_rgba8_image_default();
+  no_pixels.width = 1;
+  no_pixels.height = 1;
+  no_pixels.stride = 4;
+  no_pixels.byte_length = 4;
+  EXPECT_REFUSED(
+    "pixels must not be null", mln_map_set_style_image(
+                                 map, MLN_BUFFER_LITERAL("marker"), &no_pixels,
+                                 NULL, &completion.descriptor, &diagnostic
+                               )
+  );
+  EXPECT_REFUSED(
+    "pixels must not be null", mln_map_add_image_source_image(
+                                 map, MLN_BUFFER_LITERAL("image"), corners, 4,
+                                 &no_pixels, &completion.descriptor, &diagnostic
+                               )
+  );
+  EXPECT_REFUSED(
+    "style light property",
+    mln_map_set_style_light_property(
+      map, MLN_BUFFER_LITERAL("intensity"), MLN_BUFFER_LITERAL("{"),
+      &completion.descriptor, &diagnostic
+    )
+  );
+  // Last: a style that fails to load leaves the map without its style.
+  static const char nul_json[] = "{\0}";
+  EXPECT_REFUSED(
+    "must not contain embedded NUL",
+    mln_map_set_style_json(
+      map, mln_test_buffer_view(nul_json, sizeof(nul_json) - 1),
+      &completion.descriptor, &diagnostic
+    )
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A command whose target is taken or of the wrong kind fails at commit with
+// the reason.
+static void source_commands_fail_on_a_taken_or_wrong_target(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  static mln_test_style_route routes[] = {
+    {.url = "fixture://taken.geojson", .body = "{}"},
+  };
+  mln_test_style_serve(runtime, routes, 1);
+  const mln_buffer_view taken = MLN_BUFFER_LITERAL("taken");
+  const mln_buffer_view png = MLN_BUFFER_LITERAL("fixture://image.png");
+  const mln_buffer_view geojson_url =
+    MLN_BUFFER_LITERAL("fixture://taken.geojson");
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, taken, MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
+    &completion.descriptor, NULL
+  ));
+
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "style source",
+    mln_map_add_style_source_json(
+      map, MLN_BUFFER_LITERAL("unknown-type"),
+      MLN_BUFFER_LITERAL("{\"type\":\"no-such-source-type\"}"),
+      &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "source already exists",
+    mln_map_add_geojson_source_url(
+      map, taken, geojson_url, NULL, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "source already exists",
+    mln_map_add_image_source_url(
+      map, taken, corners, 4, png, &completion.descriptor, NULL
+    )
+  );
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "not an image source",
+    mln_map_set_image_source_url(map, taken, png, &completion.descriptor, NULL)
+  );
+
+  mln_geojson_source_data data = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_geojson_source_data_create(
+    MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
+    NULL, &data, MLN_TEST_DIAGNOSTIC
+  ));
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "source_id must not be empty",
+    mln_map_add_geojson_source_data(
+      map, MLN_BUFFER_LITERAL(""), data, &completion.descriptor, NULL
+    )
+  );
+  mln_geojson_source_data_destroy(data);
+
+  // A URL update and the synchronous tiling override belong to GeoJSON
+  // sources alone. internal/geojson_tiling.cpp shows that the override
+  // reaches the next frame.
+  const mln_buffer_view image = MLN_BUFFER_LITERAL("image");
+  MLN_TEST_AWAIT_OK(mln_map_add_image_source_url(
+    map, image, corners, 4, png, &completion.descriptor, NULL
+  ));
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",
+    mln_map_set_geojson_source_url(
+      map, image, geojson_url, &completion.descriptor, NULL
+    )
+  );
+  const mln_buffer_view tiles[] = {
+    MLN_BUFFER_LITERAL("fixture://tiles/{z}/{x}/{y}.mvt"),
+  };
+  const mln_buffer_view vector = MLN_BUFFER_LITERAL("vector");
+  MLN_TEST_AWAIT_OK(mln_map_add_vector_source_tiles(
+    map, vector, tiles, 1, NULL, &completion.descriptor, NULL
+  ));
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",
+    mln_map_set_geojson_source_synchronous_tiling(
+      map, vector, true, &completion.descriptor, NULL
+    )
+  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(geojson_data_rejects_invalid_documents_and_properties);
   RUN_TEST(style_commands_reject_invalid_inputs);
+  RUN_TEST(source_commands_fail_on_a_taken_or_wrong_target);
 }

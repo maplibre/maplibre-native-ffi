@@ -1,6 +1,6 @@
-// GeoJSON sources: prepared data and its options, installing one prepared
-// handle on many sources, the synchronous tiling override, and URL data served
-// through a resource provider.
+// GeoJSON sources: preparing data and validating its options, installing one
+// prepared handle on many sources, matching data to a source's options, the
+// clustering fields, and URL data served through a resource provider.
 
 #include "support/style.h"
 #include "support/test_support.h"
@@ -11,8 +11,7 @@
   "\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},"             \
   "\"properties\":{\"name\":\"" name "\"}}]}"
 
-static const char point_style_json[] =
-  "{\"version\":8,\"sources\":{},\"layers\":[]}";
+#define EMPTY_COLLECTION "{\"type\":\"FeatureCollection\",\"features\":[]}"
 
 static mln_geojson_source_data prepare(
   const char* json, const mln_geojson_source_options* options
@@ -21,6 +20,7 @@ static mln_geojson_source_data prepare(
   MLN_TEST_OK(mln_geojson_source_data_create(
     mln_test_view_of(json), options, &data, MLN_TEST_DIAGNOSTIC
   ));
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
   return data;
 }
 
@@ -41,21 +41,20 @@ typedef struct source_query {
   const mln_test_render_fixture* fixture;
   const char* const* sources;
   size_t source_count;
-  // The name every source must hold exactly one feature under.
-  const char* name;
-  mln_test_feature_list last;
+  // The features each source must hold, and text the first must contain.
+  size_t count;
+  const char* text;
 } source_query;
 
-static bool sources_hold_the_name(void* context) {
-  source_query* query = context;
-  char property[64];
-  snprintf(property, sizeof(property), "\"name\":\"%s\"", query->name);
+static bool sources_hold_the_features(void* context) {
+  const source_query* query = context;
   for (size_t index = 0; index < query->source_count; index += 1) {
-    query->last =
+    const mln_test_feature_list list =
       mln_test_style_query_source(query->fixture, query->sources[index], NULL);
     if (
-      query->last.status != MLN_STATUS_OK || query->last.count != 1 ||
-      strstr(query->last.features[0].feature, property) == NULL
+      list.status != MLN_STATUS_OK || list.count != query->count ||
+      (query->text != NULL &&
+       strstr(list.features[0].feature, query->text) == NULL)
     ) {
       return false;
     }
@@ -63,134 +62,308 @@ static bool sources_hold_the_name(void* context) {
   return true;
 }
 
-// Prepared GeoJSON data creation is synchronous and touches no runtime or
-// map, so validation reports through status and the call's diagnostic.
-static void geojson_source_data_create_rejects_unsafe_raw_values(void) {
-  static const char trailing_geojson[] =
-    "{\"type\":\"FeatureCollection\",\"features\":[]}garbage";
-  mln_geojson_source_data trailing_data = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID(mln_geojson_source_data_create(
-    MLN_BUFFER_LITERAL(trailing_geojson), NULL, &trailing_data, NULL
-  ));
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, trailing_data);
+static void defaults(mln_geojson_source_options* options) { (void)options; }
 
-  static const char nul_geojson[] =
-    "{\"type\":\"FeatureCollection\",\"features\":[]}\0garbage";
-  mln_geojson_source_data nul_data = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID(mln_geojson_source_data_create(
-    (mln_buffer_view){.data = nul_geojson, .size = sizeof(nul_geojson) - 1},
-    NULL, &nul_data, NULL
-  ));
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, nul_data);
+static void clustered(mln_geojson_source_options* options) {
+  options->fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  options->cluster = true;
+}
+
+// Every option field, each set to a value in range.
+static void every_option(mln_geojson_source_options* options) {
+  options->fields =
+    MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM | MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM |
+    MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES |
+    MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE | MLN_GEOJSON_SOURCE_OPTION_BUFFER |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
+    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
+    MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+  options->min_zoom = 2.0;
+  options->max_zoom = 14.0;
+  options->tolerance = 0.5;
+  options->cluster_max_zoom = 12.0;
+  options->cluster_properties =
+    MLN_BUFFER_LITERAL("{\"total\":[\"+\",[\"get\",\"weight\"]]}");
+  options->tile_size = 256;
+  options->buffer = 64;
+  options->cluster_radius = 40;
+  options->cluster_min_points = 3;
+  options->line_metrics = false;
+  options->cluster = true;
+  options->synchronous_tiling = true;
+}
+
+static void undersized(mln_geojson_source_options* options) {
+  options->size = sizeof(uint32_t);
+}
+static void empty_cluster_properties(mln_geojson_source_options* options) {
+  every_option(options);
+  options->cluster_properties = MLN_BUFFER_LITERAL("");
+}
+static void cluster_properties_not_json(mln_geojson_source_options* options) {
+  every_option(options);
+  options->cluster_properties = MLN_BUFFER_LITERAL("{\"total\":NaN}");
+}
+// Cluster properties are expressions, so a JSON object of plain values fails
+// MapLibre Native's conversion.
+static void plain_cluster_properties(mln_geojson_source_options* options) {
+  every_option(options);
+  options->cluster_properties = MLN_BUFFER_LITERAL("{\"total\":5}");
+}
+static void cluster_properties_array(mln_geojson_source_options* options) {
+  every_option(options);
+  options->cluster_properties = MLN_BUFFER_LITERAL("[]");
+}
+static void inverted_zoom_range(mln_geojson_source_options* options) {
+  every_option(options);
+  options->min_zoom = 10.0;
+  options->max_zoom = 4.0;
+}
+static void fractional_max_zoom(mln_geojson_source_options* options) {
+  every_option(options);
+  options->max_zoom = 2.5;
+}
+static void negative_tolerance(mln_geojson_source_options* options) {
+  every_option(options);
+  options->tolerance = -1.0;
+}
+static void cluster_zoom_out_of_range(mln_geojson_source_options* options) {
+  every_option(options);
+  options->cluster_max_zoom = 300.0;
+}
+static void fractional_cluster_zoom(mln_geojson_source_options* options) {
+  every_option(options);
+  options->cluster_max_zoom = 1.5;
+}
+static void empty_tiles(mln_geojson_source_options* options) {
+  every_option(options);
+  options->tile_size = 0;
+}
+static void oversized_buffer(mln_geojson_source_options* options) {
+  every_option(options);
+  options->buffer = 70000;
+}
+static void oversized_cluster_radius(mln_geojson_source_options* options) {
+  every_option(options);
+  options->cluster_radius = 70000;
+}
+
+static const char trailing_bytes[] = EMPTY_COLLECTION "garbage";
+static const char embedded_nul[] = EMPTY_COLLECTION "\0garbage";
+static const char point_and_collection[] =
+  "{\"type\":\"FeatureCollection\",\"features\":["
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+  "\"coordinates\":[-122.5,37.7]},\"properties\":{}},"
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"GeometryCollection\","
+  "\"geometries\":[{\"type\":\"Point\",\"coordinates\":[-122.4,37.8]}]},"
+  "\"properties\":{}}]}";
+static const char bare_point[] =
+  "{\"type\":\"Point\",\"coordinates\":[-122.5,37.7]}";
+static const char single_feature[] =
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+  "\"coordinates\":[-122.5,37.7]},\"properties\":{}}";
+
+// One document and options that preparation must refuse, and the fragments its
+// diagnostic must contain.
+typedef struct geojson_data_case {
+  const char* label;
+  const char* data;
+  // Bytes of `data` to pass, or 0 for its length.
+  size_t size;
+  // Edits default options, or null to pass null options.
+  void (*options)(mln_geojson_source_options* options);
+  const char* fragments[3];
+} geojson_data_case;
+
+static const geojson_data_case geojson_data_cases[] = {
+  {"an unknown geometry type",
+   "{\"type\":\"Unsupported\",\"coordinates\":[]}",
+   0,
+   defaults,
+   {"is invalid"}},
+  {"bytes after the document", trailing_bytes, 0, NULL, {NULL}},
+  {"an embedded NUL", embedded_nul, sizeof(embedded_nul) - 1, NULL, {NULL}},
+  {"undersized options", EMPTY_COLLECTION, 0, undersized, {NULL}},
+  {"empty cluster properties",
+   POINT_COLLECTION("a"),
+   0,
+   empty_cluster_properties,
+   {"must not be empty"}},
+  {"cluster properties that are not JSON",
+   POINT_COLLECTION("a"),
+   0,
+   cluster_properties_not_json,
+   {"cluster_properties"}},
+  {"cluster properties of plain values",
+   EMPTY_COLLECTION,
+   0,
+   plain_cluster_properties,
+   {"GeoJSON source options"}},
+  {"cluster properties that are not an object",
+   POINT_COLLECTION("a"),
+   0,
+   cluster_properties_array,
+   {"cluster_properties must contain a JSON object"}},
+  {"inverted zoom range",
+   POINT_COLLECTION("a"),
+   0,
+   inverted_zoom_range,
+   {"min_zoom must be less than or equal to max_zoom"}},
+  {"fractional max zoom",
+   POINT_COLLECTION("a"),
+   0,
+   fractional_max_zoom,
+   {"max_zoom"}},
+  {"negative tolerance",
+   POINT_COLLECTION("a"),
+   0,
+   negative_tolerance,
+   {"tolerance"}},
+  {"cluster zoom out of range",
+   POINT_COLLECTION("a"),
+   0,
+   cluster_zoom_out_of_range,
+   {"cluster_max_zoom"}},
+  {"fractional cluster zoom",
+   POINT_COLLECTION("a"),
+   0,
+   fractional_cluster_zoom,
+   {"cluster_max_zoom"}},
+  {"empty tiles", POINT_COLLECTION("a"), 0, empty_tiles, {"tile_size"}},
+  {"oversized buffer", POINT_COLLECTION("a"), 0, oversized_buffer, {"buffer"}},
+  {"oversized cluster radius",
+   POINT_COLLECTION("a"),
+   0,
+   oversized_cluster_radius,
+   {"cluster_radius"}},
+  // Supercluster reads every feature geometry as a point, and MapLibre Native
+  // clusters feature collections only, so clustering refuses anything else up
+  // front, naming the feature and the constraint.
+  {"a clustered line string",
+   "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
+   "\"geometry\":{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]},"
+   "\"properties\":{}}]}",
+   0,
+   clustered,
+   {"line string"}},
+  {"a clustered geometry collection",
+   point_and_collection,
+   0,
+   clustered,
+   {"point geometry on every feature", "feature 1", "geometry collection"}},
+  {"a clustered bare geometry",
+   bare_point,
+   0,
+   clustered,
+   {"requires a feature collection", "a bare geometry"}},
+  {"a clustered single feature",
+   single_feature,
+   0,
+   clustered,
+   {"a single feature"}},
+};
+
+// Preparation is synchronous and touches no runtime or map, so validation
+// reports through status and the call's diagnostic, and leaves the output
+// handle null.
+static void geojson_data_preparation_validates_documents_and_options(void) {
+  for (size_t index = 0;
+       index < sizeof(geojson_data_cases) / sizeof(geojson_data_cases[0]);
+       index += 1) {
+    const geojson_data_case* row = &geojson_data_cases[index];
+    mln_geojson_source_options options = mln_geojson_source_options_default();
+    if (row->options != NULL) {
+      row->options(&options);
+    }
+    const size_t size = row->size == 0 ? strlen(row->data) : row->size;
+    mln_geojson_source_data data = MLN_HANDLE_NULL;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(
+      MLN_STATUS_INVALID_ARGUMENT,
+      mln_geojson_source_data_create(
+        mln_test_buffer_view(row->data, size),
+        row->options == NULL ? NULL : &options, &data, MLN_TEST_DIAGNOSTIC
+      ),
+      row->label
+    );
+    TEST_ASSERT_EQUAL_UINT64_MESSAGE(MLN_HANDLE_NULL, data, row->label);
+    for (size_t fragment = 0; fragment < 3; fragment += 1) {
+      if (row->fragments[fragment] != NULL) {
+        TEST_ASSERT_NOT_NULL_MESSAGE(
+          strstr(mln_test_last_error(), row->fragments[fragment]), row->label
+        );
+      }
+    }
+  }
 
   // A populated output handle is rejected rather than silently overwritten.
-  static const char empty_collection[] =
-    "{\"type\":\"FeatureCollection\",\"features\":[]}";
-  mln_geojson_source_data populated = prepare(empty_collection, NULL);
+  mln_geojson_source_data populated = prepare(EMPTY_COLLECTION, NULL);
   mln_geojson_source_data reused = populated;
   MLN_TEST_INVALID(mln_geojson_source_data_create(
-    MLN_BUFFER_LITERAL(empty_collection), NULL, &reused, NULL
+    MLN_BUFFER_LITERAL(EMPTY_COLLECTION), NULL, &reused, NULL
   ));
   mln_geojson_source_data_destroy(populated);
 
-  // Unsafe raw options reject data preparation up front.
-  mln_geojson_source_options short_size = mln_geojson_source_options_default();
-  short_size.size = sizeof(uint32_t);
-  mln_geojson_source_data short_size_data = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID(mln_geojson_source_data_create(
-    MLN_BUFFER_LITERAL(empty_collection), &short_size, &short_size_data, NULL
-  ));
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, short_size_data);
-
-  // Cluster properties are expressions, so a JSON object of plain values
-  // fails MapLibre Native's conversion.
-  mln_geojson_source_options unconvertible =
-    mln_geojson_source_options_default();
-  unconvertible.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
-                         MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-  unconvertible.cluster = true;
-  unconvertible.cluster_properties = MLN_BUFFER_LITERAL("{\"total\":5}");
-  mln_geojson_source_data unconvertible_data = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID(mln_geojson_source_data_create(
-    MLN_BUFFER_LITERAL(empty_collection), &unconvertible, &unconvertible_data,
-    MLN_TEST_DIAGNOSTIC
-  ));
-  TEST_ASSERT_NOT_NULL_MESSAGE(
-    strstr(mln_test_last_error(), "GeoJSON source options"),
-    mln_test_last_error()
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, unconvertible_data);
+  // Every field in range prepares. The clustering constraints belong to
+  // clustering alone, so the same data tiles fine without it, and an empty
+  // collection carries nothing to cluster, so a later update supplies them.
+  mln_geojson_source_options options = mln_geojson_source_options_default();
+  every_option(&options);
+  mln_geojson_source_data_destroy(prepare(POINT_COLLECTION("a"), &options));
+  mln_geojson_source_data_destroy(prepare(point_and_collection, NULL));
+  mln_geojson_source_data_destroy(prepare(bare_point, NULL));
+  options = mln_geojson_source_options_default();
+  clustered(&options);
+  mln_geojson_source_data_destroy(prepare(EMPTY_COLLECTION, &options));
 }
 
-// Supercluster reads every feature geometry as a point, so data preparation
-// rejects other geometry up front and names the feature and constraint.
-static void clustered_geojson_data_reports_non_point_geometry(void) {
-  static const char data[] =
-    "{\"type\":\"FeatureCollection\",\"features\":["
-    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
-    "\"coordinates\":[-122.5,37.7]},\"properties\":{}},"
-    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"GeometryCollection\","
-    "\"geometries\":[{\"type\":\"Point\",\"coordinates\":[-122.4,37.8]}]},"
-    "\"properties\":{}}]}";
+// Data prepared with every field installs on a source, and a URL source takes
+// the same options. A URL source checks the same fields: the numeric ones when
+// the call submits, and the cluster properties in the command, which parses
+// them.
+static void geojson_sources_take_and_validate_their_options(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_style_serve(runtime, NULL, 0);
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  const mln_buffer_view url = MLN_BUFFER_LITERAL("fixture://points.geojson");
 
-  mln_geojson_source_options clustered = mln_geojson_source_options_default();
-  clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
-  clustered.cluster = true;
-  mln_geojson_source_data prepared = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID(mln_geojson_source_data_create(
-    MLN_BUFFER_LITERAL(data), &clustered, &prepared, MLN_TEST_DIAGNOSTIC
+  mln_geojson_source_options options = mln_geojson_source_options_default();
+  every_option(&options);
+  mln_geojson_source_data data = prepare(POINT_COLLECTION("a"), &options);
+  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
+    map, MLN_BUFFER_LITERAL("prepared"), data, &completion.descriptor, NULL
   ));
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, prepared);
-
-  const char* message = mln_test_last_error();
-  TEST_ASSERT_NOT_NULL(message);
-  TEST_ASSERT_NOT_NULL(strstr(message, "point geometry on every feature"));
-  TEST_ASSERT_NOT_NULL(strstr(message, "feature 1"));
-  TEST_ASSERT_NOT_NULL(strstr(message, "geometry collection"));
-
-  // The constraint belongs to clustering alone, so the same data tiles fine
-  // without it.
-  mln_geojson_source_data_destroy(prepare(data, NULL));
-}
-
-static void clustered_geojson_data_requires_a_feature_collection(void) {
-  static const char bare_geometry[] =
-    "{\"type\":\"Point\",\"coordinates\":[-122.5,37.7]}";
-  static const char single_feature[] =
-    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
-    "\"coordinates\":[-122.5,37.7]},\"properties\":{}}";
-
-  mln_geojson_source_options clustered = mln_geojson_source_options_default();
-  clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
-  clustered.cluster = true;
-
-  // MapLibre Native clusters feature collections only, so both of these would
-  // tile unclustered rather than honouring the requested cluster option.
-  mln_geojson_source_data prepared = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID(mln_geojson_source_data_create(
-    MLN_BUFFER_LITERAL(bare_geometry), &clustered, &prepared,
-    MLN_TEST_DIAGNOSTIC
+  mln_geojson_source_data_destroy(data);
+  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_url(
+    map, MLN_BUFFER_LITERAL("points"), url, &options, &completion.descriptor,
+    NULL
   ));
-  const char* message = mln_test_last_error();
-  TEST_ASSERT_NOT_NULL(message);
-  TEST_ASSERT_NOT_NULL(strstr(message, "requires a feature collection"));
-  TEST_ASSERT_NOT_NULL(strstr(message, "a bare geometry"));
 
-  MLN_TEST_INVALID(mln_geojson_source_data_create(
-    MLN_BUFFER_LITERAL(single_feature), &clustered, &prepared,
-    MLN_TEST_DIAGNOSTIC
-  ));
-  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "a single feature"));
-
-  // The constraint belongs to clustering alone, so the same data tiles fine
-  // without it.
-  mln_geojson_source_data_destroy(prepare(bare_geometry, NULL));
-
-  // An empty feature collection carries nothing to cluster, so it stays
-  // accepted and a later update supplies the features to cluster.
-  mln_geojson_source_data_destroy(
-    prepare("{\"type\":\"FeatureCollection\",\"features\":[]}", &clustered)
+  options = mln_geojson_source_options_default();
+  inverted_zoom_range(&options);
+  MLN_TEST_EXPECT_COMMAND_REJECTED(
+    "min_zoom must be less than or equal to max_zoom",
+    mln_map_add_geojson_source_url(
+      map, MLN_BUFFER_LITERAL("inverted"), url, &options,
+      &completion.descriptor, MLN_TEST_DIAGNOSTIC
+    )
   );
+  options = mln_geojson_source_options_default();
+  cluster_properties_array(&options);
+  MLN_TEST_EXPECT_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT,
+    "cluster_properties must contain a JSON object",
+    mln_map_add_geojson_source_url(
+      map, MLN_BUFFER_LITERAL("array-properties"), url, &options,
+      &completion.descriptor, NULL
+    )
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
 
 // The submit-time lease keeps the prepared index alive, so one handle serves
@@ -199,9 +372,7 @@ static void clustered_geojson_data_requires_a_feature_collection(void) {
 static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(
-    runtime, map, MLN_BUFFER_LITERAL(point_style_json)
-  );
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
   static const char* const sources[] = {"first", "second", "third"};
   mln_geojson_source_data data = prepare(POINT_COLLECTION("shared"), NULL);
   for (size_t index = 0; index < 3; index += 1) {
@@ -234,10 +405,11 @@ static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
     .fixture = &fixture,
     .sources = sources,
     .source_count = 3,
-    .name = "shared",
+    .count = 1,
+    .text = "\"name\":\"shared\"",
   };
   TEST_ASSERT_TRUE(mln_test_style_render_until(
-    &fixture, sources_hold_the_name, &query, "every source's feature"
+    &fixture, sources_hold_the_features, &query, "every source's feature"
   ));
 
   mln_test_render_fixture_destroy(&fixture);
@@ -283,31 +455,28 @@ static void prepared_data_must_match_the_source_options(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   static const char points[] = POINT_COLLECTION("clustered");
+  const mln_buffer_view id = MLN_BUFFER_LITERAL("clustered");
 
-  mln_geojson_source_options clustered = mln_geojson_source_options_default();
-  clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
-                     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-  clustered.cluster = true;
-  clustered.cluster_properties = MLN_BUFFER_LITERAL(
+  mln_geojson_source_options source = mln_geojson_source_options_default();
+  clustered(&source);
+  source.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+  source.cluster_properties = MLN_BUFFER_LITERAL(
     "{\"total\":[\"+\",[\"get\",\"rank\"]],\"top\":[\"max\",[\"get\","
     "\"rank\"]]}"
   );
-  mln_geojson_source_data source_data = prepare(points, &clustered);
-  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
-    map, MLN_BUFFER_LITERAL("clustered"), source_data, &completion.descriptor,
-    NULL
-  ));
-  mln_geojson_source_data_destroy(source_data);
+  mln_geojson_source_data data = prepare(points, &source);
+  MLN_TEST_AWAIT_OK(
+    mln_map_add_geojson_source_data(map, id, data, &completion.descriptor, NULL)
+  );
+  mln_geojson_source_data_destroy(data);
 
   // Data prepared without clustering tiles inconsistently with the source.
-  mln_geojson_source_data plain = prepare(points, NULL);
+  data = prepare(points, NULL);
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "do not match",
-    mln_map_set_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("clustered"), plain, &completion.descriptor, NULL
-    )
+    mln_map_set_geojson_source_data(map, id, data, &completion.descriptor, NULL)
   );
-  mln_geojson_source_data_destroy(plain);
+  mln_geojson_source_data_destroy(data);
 
   static const cluster_match_case cases[] = {
     {"the same JSON", NULL, MLN_STATUS_OK},
@@ -335,15 +504,15 @@ static void prepared_data_must_match_the_source_options(void) {
      MLN_STATUS_INVALID_ARGUMENT},
   };
   for (size_t index = 0; index < sizeof(cases) / sizeof(cases[0]); index += 1) {
-    mln_geojson_source_options variant = clustered;
+    mln_geojson_source_options variant = source;
     if (cases[index].cluster_properties != NULL) {
       variant.cluster_properties =
         mln_test_view_of(cases[index].cluster_properties);
     }
-    mln_geojson_source_data data = prepare(points, &variant);
+    data = prepare(points, &variant);
     mln_test_completion completion = mln_test_completion_default(0);
     MLN_TEST_OK(mln_map_set_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("clustered"), data, &completion.descriptor, NULL
+      map, id, data, &completion.descriptor, NULL
     ));
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       cases[index].expected, mln_test_completion_settle(&completion),
@@ -363,14 +532,14 @@ static void prepared_data_must_match_the_source_options(void) {
   };
   for (size_t index = 0; index < sizeof(fields) / sizeof(fields[0]);
        index += 1) {
-    mln_geojson_source_options variant = clustered;
+    mln_geojson_source_options variant = source;
     variant.fields |= fields[index].field;
     fields[index].change(&variant);
-    mln_geojson_source_data data = prepare(points, &variant);
+    data = prepare(points, &variant);
     MLN_TEST_EXPECT_COMMAND_FAILED(
       MLN_STATUS_INVALID_ARGUMENT, "do not match",
       mln_map_set_geojson_source_data(
-        map, MLN_BUFFER_LITERAL("clustered"), data, &completion.descriptor, NULL
+        map, id, data, &completion.descriptor, NULL
       )
     );
     mln_geojson_source_data_destroy(data);
@@ -380,30 +549,76 @@ static void prepared_data_must_match_the_source_options(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The synchronous tiling override belongs to GeoJSON sources alone.
-// internal/geojson_tiling.cpp shows that it reaches the next frame.
-static void the_synchronous_tiling_override_rejects_other_sources(void) {
+// Three points close enough to cluster at zoom 0 under a 60-pixel radius.
+static const char nearby_points[] =
+  "{\"type\":\"FeatureCollection\",\"features\":["
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+  "\"coordinates\":[0,0]},\"properties\":{}},"
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+  "\"coordinates\":[0.001,0.001]},\"properties\":{}},"
+  "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+  "\"coordinates\":[0.002,0.002]},\"properties\":{}}]}";
+
+// Renders the nearby points with `options` and waits until the source holds
+// `count` features, the first of which contains `text` when it is non-null.
+static void render_nearby_points(
+  const mln_geojson_source_options* options, size_t count, const char* text
+) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(
-    runtime, map, MLN_BUFFER_LITERAL(point_style_json)
-  );
-  const mln_buffer_view tiles[] = {
-    MLN_BUFFER_LITERAL("fixture://tiles/{z}/{x}/{y}.mvt"),
-  };
-  MLN_TEST_AWAIT_OK(mln_map_add_vector_source_tiles(
-    map, MLN_BUFFER_LITERAL("vector"), tiles, 1, NULL, &completion.descriptor,
-    NULL
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
+  mln_geojson_source_data data = prepare(nearby_points, options);
+  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
+    map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, NULL
   ));
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",
-    mln_map_set_geojson_source_synchronous_tiling(
-      map, MLN_BUFFER_LITERAL("vector"), true, &completion.descriptor, NULL
-    )
-  );
+  mln_geojson_source_data_destroy(data);
+  draw_source(map, "points");
 
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  static const char* const sources[] = {"points"};
+  source_query query = {
+    .fixture = &fixture,
+    .sources = sources,
+    .source_count = 1,
+    .count = count,
+    .text = text,
+  };
+  TEST_ASSERT_TRUE(mln_test_style_render_until(
+    &fixture, sources_hold_the_features, &query, "clustered source"
+  ));
+
+  mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
+}
+
+// The clustering fields decide which points a rendered source holds: within
+// the radius, two points are enough for one cluster of all three, and
+// requiring four leaves the three unclustered.
+static void clustering_fields_decide_which_points_the_source_holds(void) {
+  mln_geojson_source_options options = mln_geojson_source_options_default();
+  options.fields =
+    MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM | MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM |
+    MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
+    MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE | MLN_GEOJSON_SOURCE_OPTION_BUFFER |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
+    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  options.min_zoom = 0.0;
+  options.max_zoom = 20.0;
+  options.tolerance = 0.5;
+  options.cluster_max_zoom = 20.0;
+  options.tile_size = 256;
+  options.buffer = 64;
+  options.cluster_radius = 60;
+  options.cluster_min_points = 2;
+  options.line_metrics = true;
+  options.cluster = true;
+  render_nearby_points(&options, 1, "\"point_count\":3");
+  options.cluster_min_points = 4;
+  render_nearby_points(&options, 3, NULL);
 }
 
 // A URL source loads its data through the runtime's resource provider when it
@@ -418,9 +633,7 @@ static void a_url_source_loads_through_the_resource_provider(void) {
     {.url = "fixture://second.geojson", .body = POINT_COLLECTION("second")},
   };
   mln_test_style_serve(runtime, routes, 2);
-  mln_test_load_style_and_wait(
-    runtime, map, MLN_BUFFER_LITERAL(point_style_json)
-  );
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
   MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_url(
     map, MLN_BUFFER_LITERAL("points"),
     MLN_BUFFER_LITERAL("fixture://first.geojson"), NULL, &completion.descriptor,
@@ -435,10 +648,11 @@ static void a_url_source_loads_through_the_resource_provider(void) {
     .fixture = &fixture,
     .sources = sources,
     .source_count = 1,
-    .name = "first",
+    .count = 1,
+    .text = "\"name\":\"first\"",
   };
   TEST_ASSERT_TRUE(mln_test_style_render_until(
-    &fixture, sources_hold_the_name, &query, "the first URL's feature"
+    &fixture, sources_hold_the_features, &query, "the first URL's feature"
   ));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&routes[0].requests));
 
@@ -446,40 +660,11 @@ static void a_url_source_loads_through_the_resource_provider(void) {
     map, MLN_BUFFER_LITERAL("points"),
     MLN_BUFFER_LITERAL("fixture://second.geojson"), &completion.descriptor, NULL
   ));
-  query.name = "second";
+  query.text = "\"name\":\"second\"";
   TEST_ASSERT_TRUE(mln_test_style_render_until(
-    &fixture, sources_hold_the_name, &query, "the second URL's feature"
+    &fixture, sources_hold_the_features, &query, "the second URL's feature"
   ));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&routes[1].requests));
-
-  // A URL update belongs to GeoJSON sources alone.
-  MLN_TEST_AWAIT_OK(mln_map_add_image_source_image(
-    map, MLN_BUFFER_LITERAL("image"),
-    (const mln_lat_lng[4]){
-      {.latitude = 1.0, .longitude = 0.0},
-      {.latitude = 1.0, .longitude = 1.0},
-      {.latitude = 0.0, .longitude = 1.0},
-      {.latitude = 0.0, .longitude = 0.0},
-    },
-    4,
-    &(const mln_premultiplied_rgba8_image){
-      .size = sizeof(mln_premultiplied_rgba8_image),
-      .width = 1,
-      .height = 1,
-      .stride = 4,
-      .pixels = (const uint8_t[4]){0, 0, 0, 0},
-      .byte_length = 4,
-    },
-    &completion.descriptor, NULL
-  ));
-  MLN_TEST_EXPECT_COMMAND_FAILED(
-    MLN_STATUS_INVALID_ARGUMENT, "not a GeoJSON source",
-    mln_map_set_geojson_source_url(
-      map, MLN_BUFFER_LITERAL("image"),
-      MLN_BUFFER_LITERAL("fixture://first.geojson"), &completion.descriptor,
-      NULL
-    )
-  );
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -487,11 +672,10 @@ static void a_url_source_loads_through_the_resource_provider(void) {
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(geojson_source_data_create_rejects_unsafe_raw_values);
-  RUN_TEST(clustered_geojson_data_reports_non_point_geometry);
-  RUN_TEST(clustered_geojson_data_requires_a_feature_collection);
+  RUN_TEST(geojson_data_preparation_validates_documents_and_options);
+  RUN_TEST(geojson_sources_take_and_validate_their_options);
   RUN_TEST(one_prepared_handle_serves_many_sources_and_outlives_itself);
   RUN_TEST(prepared_data_must_match_the_source_options);
-  RUN_TEST(the_synchronous_tiling_override_rejects_other_sources);
+  RUN_TEST(clustering_fields_decide_which_points_the_source_holds);
   RUN_TEST(a_url_source_loads_through_the_resource_provider);
 }

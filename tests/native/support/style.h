@@ -14,6 +14,7 @@
 #include "env.h"
 #include "maplibre_native_c.h"
 #include "render.h"
+#include "status.h"
 #include "unity.h"
 #include "wait.h"
 
@@ -37,13 +38,13 @@ static inline mln_buffer_view mln_test_view_of(const char* text) {
 #define MLN_TEST_EXPECT_COMMAND_FAILED(terminal_status, fragment, expression) \
   do {                                                                        \
     mln_test_completion completion = mln_test_completion_default(0);          \
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, (expression));                       \
-    TEST_ASSERT_EQUAL_INT(                                                    \
-      (terminal_status), mln_test_completion_finish(&completion)              \
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, (expression), #expression);  \
+    TEST_ASSERT_EQUAL_INT_MESSAGE(                                            \
+      (terminal_status), mln_test_completion_finish(&completion), #expression \
     );                                                                        \
-    TEST_ASSERT_EQUAL_UINT32(                                                 \
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(                                         \
       MLN_COMMAND_DISPOSITION_FAILED,                                         \
-      mln_test_completion_disposition(&completion)                            \
+      mln_test_completion_disposition(&completion), #expression               \
     );                                                                        \
     TEST_ASSERT_NOT_NULL_MESSAGE(                                             \
       strstr(mln_test_completion_diagnostic(&completion), (fragment)),        \
@@ -58,7 +59,7 @@ static inline mln_buffer_view mln_test_view_of(const char* text) {
 #define MLN_TEST_EXPECT_COMMAND_REJECTED(fragment, expression)         \
   do {                                                                 \
     mln_test_completion completion = mln_test_completion_default(0);   \
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, (expression));  \
+    MLN_TEST_INVALID(expression);                                      \
     TEST_ASSERT_NOT_NULL_MESSAGE(                                      \
       strstr(mln_test_last_error(), (fragment)), mln_test_last_error() \
     );                                                                 \

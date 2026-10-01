@@ -5,20 +5,9 @@
 // URL sources start loading as soon as they are added, so every case that adds
 // one serves the suite's resources through a provider that fails the rest.
 
-#include <stdbool.h>
-#include <stdio.h>
-#include <string.h>
-
-#include "support/harness.h"
 #include "support/resources.h"
 #include "support/style.h"
 #include "support/test_support.h"
-#include "unity.h"
-
-// Fails every request, for cases whose URL sources must never load.
-static void serve_nothing(mln_runtime runtime) {
-  mln_test_style_serve(runtime, NULL, 0);
-}
 
 // Reads a source's metadata, and reports whether the source exists.
 static bool read_source(
@@ -46,14 +35,38 @@ static bool source_exists(mln_map map, const char* id) {
   return read_source(map, id, &result);
 }
 
-enum tile_source_kind {
-  TILE_SOURCE_VECTOR,
-  TILE_SOURCE_RASTER,
-  TILE_SOURCE_RASTER_DEM,
-};
+static void add_source_json(mln_map map, const char* id, const char* json) {
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, mln_test_view_of(id), mln_test_view_of(json), &completion.descriptor,
+    NULL
+  ));
+}
+
+enum tile_source_kind { VECTOR, RASTER, RASTER_DEM };
 
 static const mln_buffer_view fixture_tiles[] = {
   MLN_BUFFER_LITERAL("fixture://tiles/{z}/{x}/{y}"),
+};
+
+typedef mln_status (*add_url_source)(
+  mln_map, mln_buffer_view, mln_buffer_view,
+  const mln_style_tile_source_options*, const mln_completion*, mln_diagnostic*
+);
+typedef mln_status (*add_tiles_source)(
+  mln_map, mln_buffer_view, const mln_buffer_view*, size_t,
+  const mln_style_tile_source_options*, const mln_completion*, mln_diagnostic*
+);
+
+// Indexed by tile_source_kind.
+static const add_url_source url_adders[] = {
+  mln_map_add_vector_source_url,
+  mln_map_add_raster_source_url,
+  mln_map_add_raster_dem_source_url,
+};
+static const add_tiles_source tiles_adders[] = {
+  mln_map_add_vector_source_tiles,
+  mln_map_add_raster_source_tiles,
+  mln_map_add_raster_dem_source_tiles,
 };
 
 static mln_status add_tile_source(
@@ -62,34 +75,15 @@ static mln_status add_tile_source(
   const mln_completion* completion, mln_diagnostic* diagnostic
 ) {
   const mln_buffer_view source_id = mln_test_view_of(id);
-  const mln_buffer_view url = MLN_BUFFER_LITERAL("fixture://tiles.json");
-  switch (kind) {
-    case TILE_SOURCE_VECTOR:
-      return from_url ? mln_map_add_vector_source_url(
-                          map, source_id, url, options, completion, diagnostic
-                        )
-                      : mln_map_add_vector_source_tiles(
-                          map, source_id, fixture_tiles, 1, options, completion,
-                          diagnostic
-                        );
-    case TILE_SOURCE_RASTER:
-      return from_url ? mln_map_add_raster_source_url(
-                          map, source_id, url, options, completion, diagnostic
-                        )
-                      : mln_map_add_raster_source_tiles(
-                          map, source_id, fixture_tiles, 1, options, completion,
-                          diagnostic
-                        );
-    case TILE_SOURCE_RASTER_DEM:
-      return from_url ? mln_map_add_raster_dem_source_url(
-                          map, source_id, url, options, completion, diagnostic
-                        )
-                      : mln_map_add_raster_dem_source_tiles(
-                          map, source_id, fixture_tiles, 1, options, completion,
-                          diagnostic
-                        );
+  if (from_url) {
+    return url_adders[kind](
+      map, source_id, MLN_BUFFER_LITERAL("fixture://tiles.json"), options,
+      completion, diagnostic
+    );
   }
-  return MLN_STATUS_NATIVE_ERROR;
+  return tiles_adders[kind](
+    map, source_id, fixture_tiles, 1, options, completion, diagnostic
+  );
 }
 
 static void explicit_zoom_scheme_and_bounds(
@@ -102,10 +96,7 @@ static void explicit_zoom_scheme_and_bounds(
   options->min_zoom = 2.0;
   options->max_zoom = 12.0;
   options->scheme = MLN_STYLE_TILE_SCHEME_TMS;
-  options->bounds = (mln_lat_lng_bounds){
-    .southwest = {.latitude = -10.0, .longitude = -20.0},
-    .northeast = {.latitude = 10.0, .longitude = 20.0},
-  };
+  options->bounds = (mln_lat_lng_bounds){{-10.0, -20.0}, {10.0, 20.0}};
 }
 static void mlt_encoding(mln_style_tile_source_options* options) {
   options->fields |= MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
@@ -139,19 +130,59 @@ static void xyz_scheme(mln_style_tile_source_options* options) {
   options->scheme = MLN_STYLE_TILE_SCHEME_XYZ;
 }
 
-// One source a row adds and the metadata it must then report. A zero field
-// in `absent` is not checked; every bit in it must be missing from fields.
+// One source a row adds and the metadata it must then report: what the row's
+// edit sets, or the defaults for null options. Every bit in `absent` must be
+// missing from fields.
 typedef struct effective_options_case {
   const char* label;
   enum tile_source_kind kind;
   bool from_url;
-  // Edits the defaults; null passes null options.
   void (*mutate)(mln_style_tile_source_options* options);
   uint32_t type;
   uint32_t present;
   uint32_t absent;
-  mln_style_tile_source_options expected;
 } effective_options_case;
+
+enum {
+  TILEJSON = MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_TILE_SIZE,
+  URL_INFO = MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_TILE_SIZE,
+  VECTOR_ENCODING = MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING,
+  RASTER_ENCODING = MLN_STYLE_SOURCE_INFO_RASTER_ENCODING,
+  URL_OR_ENCODING =
+    MLN_STYLE_SOURCE_INFO_URL | VECTOR_ENCODING | RASTER_ENCODING,
+};
+
+static const effective_options_case effective_cases[] = {
+  {"vector tiles, null options", VECTOR, false, NULL,
+   MLN_STYLE_SOURCE_TYPE_VECTOR, TILEJSON | VECTOR_ENCODING,
+   MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_BOUNDS | RASTER_ENCODING},
+  {"vector tiles, explicit zoom, scheme, and bounds", VECTOR, false,
+   explicit_zoom_scheme_and_bounds, MLN_STYLE_SOURCE_TYPE_VECTOR,
+   TILEJSON | MLN_STYLE_SOURCE_INFO_BOUNDS, 0},
+  {"vector tiles, MLT", VECTOR, false, mlt_encoding,
+   MLN_STYLE_SOURCE_TYPE_VECTOR, TILEJSON | VECTOR_ENCODING, 0},
+  {"raster tiles, null options", RASTER, false, NULL,
+   MLN_STYLE_SOURCE_TYPE_RASTER, TILEJSON, URL_OR_ENCODING},
+  {"raster tiles, 256 px", RASTER, false, small_tiles,
+   MLN_STYLE_SOURCE_TYPE_RASTER, TILEJSON, 0},
+  {"raster DEM tiles, null options", RASTER_DEM, false, NULL,
+   MLN_STYLE_SOURCE_TYPE_RASTER_DEM, TILEJSON, URL_OR_ENCODING},
+  {"raster DEM tiles, Terrarium", RASTER_DEM, false, terrarium_encoding,
+   MLN_STYLE_SOURCE_TYPE_RASTER_DEM, TILEJSON | RASTER_ENCODING, 0},
+  {"raster DEM tiles, Mapbox", RASTER_DEM, false, mapbox_encoding,
+   MLN_STYLE_SOURCE_TYPE_RASTER_DEM, TILEJSON | RASTER_ENCODING, 0},
+  {"raster tiles, explicit XYZ", RASTER, false, xyz_scheme,
+   MLN_STYLE_SOURCE_TYPE_RASTER, TILEJSON, 0},
+  {"vector URL, null options", VECTOR, true, NULL, MLN_STYLE_SOURCE_TYPE_VECTOR,
+   URL_INFO | VECTOR_ENCODING, MLN_STYLE_SOURCE_INFO_TILEJSON},
+  {"vector URL, zoom range and MLT", VECTOR, true, url_zoom_and_mlt,
+   MLN_STYLE_SOURCE_TYPE_VECTOR, URL_INFO | VECTOR_ENCODING,
+   MLN_STYLE_SOURCE_INFO_TILEJSON},
+  {"raster URL, 256 px", RASTER, true, small_tiles,
+   MLN_STYLE_SOURCE_TYPE_RASTER, URL_INFO, MLN_STYLE_SOURCE_INFO_TILEJSON},
+  {"raster DEM URL, null options", RASTER_DEM, true, NULL,
+   MLN_STYLE_SOURCE_TYPE_RASTER_DEM, URL_INFO, MLN_STYLE_SOURCE_INFO_TILEJSON},
+};
 
 // A source reports what its options set and the documented default for what
 // they omit, including null options, and reports an encoding only for the
@@ -159,133 +190,64 @@ typedef struct effective_options_case {
 static void tile_sources_report_their_effective_options(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  serve_nothing(runtime);
-  const mln_style_tile_source_options defaults =
-    mln_style_tile_source_options_default();
-  mln_style_tile_source_options explicit_options = defaults;
-  explicit_zoom_scheme_and_bounds(&explicit_options);
-  mln_style_tile_source_options small = defaults;
-  small_tiles(&small);
-  mln_style_tile_source_options mlt = defaults;
-  mlt_encoding(&mlt);
-  mln_style_tile_source_options terrarium = defaults;
-  terrarium_encoding(&terrarium);
-  mln_style_tile_source_options url_mlt = defaults;
-  url_zoom_and_mlt(&url_mlt);
-  mln_style_tile_source_options mapbox = defaults;
-  mapbox_encoding(&mapbox);
-  mln_style_tile_source_options xyz = defaults;
-  xyz_scheme(&xyz);
+  mln_test_style_serve(runtime, NULL, 0);
 
-  const uint32_t tilejson =
-    MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_TILE_SIZE;
-  const effective_options_case cases[] = {
-    {"vector tiles, null options", TILE_SOURCE_VECTOR, false, NULL,
-     MLN_STYLE_SOURCE_TYPE_VECTOR,
-     tilejson | MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING,
-     MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_BOUNDS |
-       MLN_STYLE_SOURCE_INFO_RASTER_ENCODING,
-     defaults},
-    {"vector tiles, explicit zoom, scheme, and bounds", TILE_SOURCE_VECTOR,
-     false, explicit_zoom_scheme_and_bounds, MLN_STYLE_SOURCE_TYPE_VECTOR,
-     tilejson | MLN_STYLE_SOURCE_INFO_BOUNDS, 0, explicit_options},
-    {"vector tiles, MLT", TILE_SOURCE_VECTOR, false, mlt_encoding,
-     MLN_STYLE_SOURCE_TYPE_VECTOR,
-     tilejson | MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING, 0, mlt},
-    {"raster tiles, null options", TILE_SOURCE_RASTER, false, NULL,
-     MLN_STYLE_SOURCE_TYPE_RASTER, tilejson,
-     MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING |
-       MLN_STYLE_SOURCE_INFO_RASTER_ENCODING,
-     defaults},
-    {"raster tiles, 256 px", TILE_SOURCE_RASTER, false, small_tiles,
-     MLN_STYLE_SOURCE_TYPE_RASTER, tilejson, 0, small},
-    {"raster DEM tiles, null options", TILE_SOURCE_RASTER_DEM, false, NULL,
-     MLN_STYLE_SOURCE_TYPE_RASTER_DEM, tilejson,
-     MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING |
-       MLN_STYLE_SOURCE_INFO_RASTER_ENCODING,
-     defaults},
-    {"raster DEM tiles, Terrarium", TILE_SOURCE_RASTER_DEM, false,
-     terrarium_encoding, MLN_STYLE_SOURCE_TYPE_RASTER_DEM,
-     tilejson | MLN_STYLE_SOURCE_INFO_RASTER_ENCODING, 0, terrarium},
-    {"raster DEM tiles, Mapbox", TILE_SOURCE_RASTER_DEM, false, mapbox_encoding,
-     MLN_STYLE_SOURCE_TYPE_RASTER_DEM,
-     tilejson | MLN_STYLE_SOURCE_INFO_RASTER_ENCODING, 0, mapbox},
-    {"raster tiles, explicit XYZ", TILE_SOURCE_RASTER, false, xyz_scheme,
-     MLN_STYLE_SOURCE_TYPE_RASTER, tilejson, 0, xyz},
-    {"vector URL, null options", TILE_SOURCE_VECTOR, true, NULL,
-     MLN_STYLE_SOURCE_TYPE_VECTOR,
-     MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_TILE_SIZE |
-       MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING,
-     MLN_STYLE_SOURCE_INFO_TILEJSON, defaults},
-    {"vector URL, zoom range and MLT", TILE_SOURCE_VECTOR, true,
-     url_zoom_and_mlt, MLN_STYLE_SOURCE_TYPE_VECTOR,
-     MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_TILE_SIZE |
-       MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING,
-     MLN_STYLE_SOURCE_INFO_TILEJSON, url_mlt},
-    {"raster URL, 256 px", TILE_SOURCE_RASTER, true, small_tiles,
-     MLN_STYLE_SOURCE_TYPE_RASTER,
-     MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_TILE_SIZE,
-     MLN_STYLE_SOURCE_INFO_TILEJSON, small},
-    {"raster DEM URL, null options", TILE_SOURCE_RASTER_DEM, true, NULL,
-     MLN_STYLE_SOURCE_TYPE_RASTER_DEM,
-     MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_TILE_SIZE,
-     MLN_STYLE_SOURCE_INFO_TILEJSON, defaults},
-  };
-
-  for (size_t index = 0; index < sizeof(cases) / sizeof(cases[0]); index += 1) {
-    const effective_options_case* row = &cases[index];
+  for (size_t index = 0;
+       index < sizeof(effective_cases) / sizeof(effective_cases[0]);
+       index += 1) {
+    const effective_options_case* row = &effective_cases[index];
+    const char* label = row->label;
     char id[16];
     snprintf(id, sizeof(id), "source-%zu", index);
-    mln_style_tile_source_options options = defaults;
+    mln_style_tile_source_options expected =
+      mln_style_tile_source_options_default();
     if (row->mutate != NULL) {
-      row->mutate(&options);
+      row->mutate(&expected);
     }
     mln_test_completion completion = mln_test_completion_default(0);
     MLN_TEST_OK_MESSAGE(
       add_tile_source(
         map, row->kind, id, row->from_url,
-        row->mutate == NULL ? NULL : &options, &completion.descriptor, NULL
+        row->mutate == NULL ? NULL : &expected, &completion.descriptor, NULL
       ),
-      row->label
+      label
     );
-    MLN_TEST_OK_MESSAGE(mln_test_completion_settle(&completion), row->label);
+    MLN_TEST_OK_MESSAGE(mln_test_completion_settle(&completion), label);
 
     mln_style_source_result result;
-    TEST_ASSERT_TRUE_MESSAGE(read_source(map, id, &result), row->label);
+    TEST_ASSERT_TRUE_MESSAGE(read_source(map, id, &result), label);
     const mln_style_source_info* info = &result.info;
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(row->type, info->type, row->label);
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(row->type, info->type, label);
     TEST_ASSERT_EQUAL_HEX32_MESSAGE(
-      row->present, info->fields & row->present, row->label
+      row->present, info->fields & row->present, label
     );
-    TEST_ASSERT_EQUAL_HEX32_MESSAGE(0, info->fields & row->absent, row->label);
+    TEST_ASSERT_EQUAL_HEX32_MESSAGE(0, info->fields & row->absent, label);
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-      row->expected.tile_size, info->tile_size, row->label
+      expected.tile_size, info->tile_size, label
     );
     if ((info->fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-      TEST_ASSERT_EQUAL_size_t_MESSAGE(1, info->tile_count, row->label);
+      TEST_ASSERT_EQUAL_size_t_MESSAGE(1, info->tile_count, label);
       TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-        row->expected.min_zoom, info->min_zoom, row->label
+        expected.min_zoom, info->min_zoom, label
       );
       TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-        row->expected.max_zoom, info->max_zoom, row->label
+        expected.max_zoom, info->max_zoom, label
       );
-      TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-        row->expected.scheme, info->scheme, row->label
-      );
+      TEST_ASSERT_EQUAL_UINT32_MESSAGE(expected.scheme, info->scheme, label);
     }
     if ((info->fields & MLN_STYLE_SOURCE_INFO_BOUNDS) != 0) {
       TEST_ASSERT_EQUAL_MEMORY_MESSAGE(
-        &row->expected.bounds, &info->bounds, sizeof(info->bounds), row->label
+        &expected.bounds, &info->bounds, sizeof(info->bounds), label
       );
     }
-    if ((info->fields & MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) != 0) {
+    if ((info->fields & VECTOR_ENCODING) != 0) {
       TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-        row->expected.vector_encoding, info->vector_encoding, row->label
+        expected.vector_encoding, info->vector_encoding, label
       );
     }
-    if ((info->fields & MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0) {
+    if ((info->fields & RASTER_ENCODING) != 0) {
       TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-        row->expected.raster_encoding, info->raster_encoding, row->label
+        expected.raster_encoding, info->raster_encoding, label
       );
     }
   }
@@ -311,74 +273,60 @@ static mln_status submit_tile_source_call(
   );
 }
 
-static void as_vector(void* descriptor) {
-  ((tile_source_call*)descriptor)->kind = TILE_SOURCE_VECTOR;
+// Sets `field` on a validation row's options, and returns them for the row to
+// set the field's value.
+static mln_style_tile_source_options* edit(void* descriptor, uint32_t field) {
+  tile_source_call* call = descriptor;
+  call->options.fields |= field;
+  return &call->options;
 }
+
 static void undersized_options(void* descriptor) {
-  ((tile_source_call*)descriptor)->options.size -= 1;
+  edit(descriptor, 0)->size -= 1;
 }
 static void unknown_option_bit(void* descriptor) {
-  ((tile_source_call*)descriptor)->options.fields |= UINT32_C(1) << 31;
+  edit(descriptor, UINT32_C(1) << 31);
 }
 static void negative_min_zoom(void* descriptor) {
-  tile_source_call* call = descriptor;
-  call->options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
-  call->options.min_zoom = -1.0;
+  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM)->min_zoom = -1.0;
 }
 static void min_zoom_above_max_zoom(void* descriptor) {
-  tile_source_call* call = descriptor;
-  call->options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM |
-                          MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
-  call->options.min_zoom = 10.0;
-  call->options.max_zoom = 4.0;
+  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM)->min_zoom = 10.0;
+  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM)->max_zoom = 4.0;
 }
 static void unknown_scheme(void* descriptor) {
-  tile_source_call* call = descriptor;
-  call->options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
-  call->options.scheme = 7;
+  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_SCHEME)->scheme = 7;
 }
 static void zero_tile_size(void* descriptor) {
-  tile_source_call* call = descriptor;
-  call->options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
-  call->options.tile_size = 0;
+  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE)->tile_size = 0;
 }
 static void oversized_tile_size(void* descriptor) {
-  tile_source_call* call = descriptor;
-  call->options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
-  call->options.tile_size = 65536;
+  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE)->tile_size = 65536;
 }
 static void null_attribution_bytes(void* descriptor) {
-  tile_source_call* call = descriptor;
-  call->options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
-  call->options.attribution = (mln_buffer_view){.data = NULL, .size = 3};
+  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION)->attribution =
+    (mln_buffer_view){.data = NULL, .size = 3};
 }
 static void out_of_range_bounds(void* descriptor) {
-  tile_source_call* call = descriptor;
-  call->options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
-  call->options.bounds = (mln_lat_lng_bounds){
-    .southwest = {.latitude = -100.0, .longitude = 0.0},
-    .northeast = {.latitude = 10.0, .longitude = 10.0},
-  };
+  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS)->bounds =
+    (mln_lat_lng_bounds){{-100.0, 0.0}, {10.0, 10.0}};
 }
 static void vector_encoding_on_raster_dem(void* descriptor) {
-  tile_source_call* call = descriptor;
-  call->options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
-  call->options.vector_encoding = MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
+  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING)
+    ->vector_encoding = MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
 }
 static void unknown_vector_encoding(void* descriptor) {
-  tile_source_call* call = descriptor;
-  as_vector(descriptor);
-  call->options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
-  call->options.vector_encoding = 9;
+  ((tile_source_call*)descriptor)->kind = VECTOR;
+  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING)
+    ->vector_encoding = 9;
 }
 static void raster_encoding_on_vector(void* descriptor) {
-  as_vector(descriptor);
-  terrarium_encoding(&((tile_source_call*)descriptor)->options);
+  ((tile_source_call*)descriptor)->kind = VECTOR;
+  terrarium_encoding(edit(descriptor, 0));
 }
 static void unknown_raster_encoding(void* descriptor) {
-  tile_source_call* call = descriptor;
-  call->options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
-  call->options.raster_encoding = 9;
+  edit(descriptor, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING)
+    ->raster_encoding = 9;
 }
 
 // Tile source options are checked before the call returns, so a malformed
@@ -416,7 +364,7 @@ static void tile_source_options_are_validated_at_submission(void) {
      MLN_STATUS_INVALID_ARGUMENT, "raster_encoding is invalid"},
   };
   const tile_source_call defaults = {
-    .kind = TILE_SOURCE_RASTER_DEM,
+    .kind = RASTER_DEM,
     .options = mln_style_tile_source_options_default(),
   };
   mln_test_run_validation_table(
@@ -427,9 +375,9 @@ static void tile_source_options_are_validated_at_submission(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Reads a source's URL or attribution copy, or "" when there is none.
-static void read_source_text(
-  mln_map map, const char* id, bool attribution, char* out, bool* found
+// Reads a source's URL or attribution copy, and reports whether it has one.
+static bool read_source_text(
+  mln_map map, const char* id, bool attribution, char* out
 ) {
   const mln_buffer_view view = mln_test_view_of(id);
   mln_test_completion completion = mln_test_completion_buffer_view();
@@ -440,7 +388,9 @@ static void read_source_text(
         )
       : mln_map_copy_style_source_url(map, view, &completion.descriptor, NULL)
   );
-  MLN_TEST_OK(mln_test_style_finish_text(&completion, out, 64, found));
+  bool found = false;
+  MLN_TEST_OK(mln_test_style_finish_text(&completion, out, 64, &found));
+  return found;
 }
 
 // A URL source reports the URL it was added with, or last set to, and an
@@ -449,10 +399,10 @@ static void read_source_text(
 static void sources_copy_their_url_and_attribution(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  serve_nothing(runtime);
+  mln_test_style_serve(runtime, NULL, 0);
 
   MLN_TEST_AWAIT_OK(add_tile_source(
-    map, TILE_SOURCE_RASTER, "remote", true, NULL, &completion.descriptor, NULL
+    map, RASTER, "remote", true, NULL, &completion.descriptor, NULL
   ));
   mln_style_tile_source_options attributed =
     mln_style_tile_source_options_default();
@@ -461,7 +411,7 @@ static void sources_copy_their_url_and_attribution(void) {
   attributed.attribution = mln_test_view_of(attribution);
   mln_test_completion add = mln_test_completion_default(0);
   MLN_TEST_OK(add_tile_source(
-    map, TILE_SOURCE_VECTOR, "inline", false, &attributed, &add.descriptor, NULL
+    map, VECTOR, "inline", false, &attributed, &add.descriptor, NULL
   ));
   // The command copied the attribution before it returned.
   memset(attribution, 'x', strlen(attribution));
@@ -477,31 +427,21 @@ static void sources_copy_their_url_and_attribution(void) {
   ));
 
   char text[64];
-  bool found = false;
-  read_source_text(map, "remote", false, text, &found);
-  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_TRUE(read_source_text(map, "remote", false, text));
   TEST_ASSERT_EQUAL_STRING("fixture://tiles.json", text);
-  read_source_text(map, "geojson", false, text, &found);
-  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_TRUE(read_source_text(map, "geojson", false, text));
   TEST_ASSERT_EQUAL_STRING("fixture://second.geojson", text);
-  read_source_text(map, "inline", true, text, &found);
-  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_TRUE(read_source_text(map, "inline", true, text));
   TEST_ASSERT_EQUAL_STRING("Fixture tiles", text);
   mln_style_source_result result;
   TEST_ASSERT_TRUE(read_source(map, "inline", &result));
   TEST_ASSERT_TRUE(result.info.has_attribution);
-  TEST_ASSERT_EQUAL_size_t(
-    strlen("Fixture tiles"), result.info.attribution_size
-  );
+  TEST_ASSERT_EQUAL_size_t(strlen(text), result.info.attribution_size);
 
-  read_source_text(map, "inline", false, text, &found);
-  TEST_ASSERT_FALSE(found);
-  read_source_text(map, "remote", true, text, &found);
-  TEST_ASSERT_FALSE(found);
-  read_source_text(map, "missing", false, text, &found);
-  TEST_ASSERT_FALSE(found);
-  read_source_text(map, "missing", true, text, &found);
-  TEST_ASSERT_FALSE(found);
+  TEST_ASSERT_FALSE(read_source_text(map, "inline", false, text));
+  TEST_ASSERT_FALSE(read_source_text(map, "remote", true, text));
+  TEST_ASSERT_FALSE(read_source_text(map, "missing", false, text));
+  TEST_ASSERT_FALSE(read_source_text(map, "missing", true, text));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -515,17 +455,11 @@ static void source_ids_list_in_style_order(void) {
   mln_test_load_style_and_wait(
     runtime, map,
     MLN_BUFFER_LITERAL(
-      "{\"version\":8,\"sources\":{\"first\":{\"type\":\"geojson\",\"data\":"
-      "{\"type\":\"FeatureCollection\",\"features\":[]}},\"second\":{"
-      "\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
-      "\"features\":[]}}},\"layers\":[]}"
+      "{\"version\":8,\"sources\":{\"first\":" MLN_TEST_EMPTY_GEOJSON_SOURCE
+      ",\"second\":" MLN_TEST_EMPTY_GEOJSON_SOURCE "},\"layers\":[]}"
     )
   );
-  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
-    map, MLN_BUFFER_LITERAL("third"),
-    MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
-    NULL
-  ));
+  add_source_json(map, "third", MLN_TEST_EMPTY_GEOJSON_SOURCE);
   MLN_TEST_AWAIT_OK(mln_map_remove_style_source(
     map, MLN_BUFFER_LITERAL("first"), &completion.descriptor, NULL
   ));
@@ -543,8 +477,7 @@ typedef struct tile_urls_probe {
   mln_status status;
   size_t value_count;
   size_t tile_url_count;
-  char first[64];
-  char second[64];
+  char urls[2][64];
 } tile_urls_probe;
 
 static void copy_tile_urls(
@@ -556,39 +489,35 @@ static void copy_tile_urls(
   if (result->value_count == 1) {
     const mln_style_source_tile_urls_result* urls = result->value;
     probe->tile_url_count = urls->tile_url_count;
-    if (urls->tile_url_count > 0) {
+    for (size_t index = 0; index < urls->tile_url_count && index < 2;
+         index += 1) {
       snprintf(
-        probe->first, sizeof(probe->first), "%.*s",
-        (int)urls->tile_urls[0].size, (const char*)urls->tile_urls[0].data
-      );
-    }
-    if (urls->tile_url_count > 1) {
-      snprintf(
-        probe->second, sizeof(probe->second), "%.*s",
-        (int)urls->tile_urls[1].size, (const char*)urls->tile_urls[1].data
+        probe->urls[index], sizeof(probe->urls[index]), "%.*s",
+        (int)urls->tile_urls[index].size,
+        (const char*)urls->tile_urls[index].data
       );
     }
   }
   mln_test_flag_set(&probe->done);
 }
 
-static void read_tile_urls(
-  mln_runtime runtime, mln_map map, mln_buffer_view source_id,
-  tile_urls_probe* probe
+static tile_urls_probe read_tile_urls(
+  mln_runtime runtime, mln_map map, const char* source_id
 ) {
-  *probe = (tile_urls_probe){.status = MLN_STATUS_INVALID_STATE};
-  atomic_init(&probe->done, false);
+  tile_urls_probe probe = {.status = MLN_STATUS_INVALID_STATE};
+  atomic_init(&probe.done, false);
   const mln_completion completion = {
     .size = sizeof(mln_completion),
     .callback = copy_tile_urls,
-    .user_data = probe,
+    .user_data = &probe,
   };
-  MLN_TEST_OK(
-    mln_map_get_style_source_tile_urls(map, source_id, &completion, NULL)
-  );
+  MLN_TEST_OK(mln_map_get_style_source_tile_urls(
+    map, mln_test_view_of(source_id), &completion, NULL
+  ));
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_TRUE(atomic_load(&probe->done));
-  MLN_TEST_OK(probe->status);
+  TEST_ASSERT_TRUE(atomic_load(&probe.done));
+  MLN_TEST_OK(probe.status);
+  return probe;
 }
 
 // A found source completes with one result even when it holds no inline tile
@@ -596,7 +525,7 @@ static void read_tile_urls(
 static void style_source_tile_urls_distinguish_empty_from_missing(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  serve_nothing(runtime);
+  mln_test_style_serve(runtime, NULL, 0);
   const mln_buffer_view tiles[] = {
     MLN_BUFFER_LITERAL("fixture://a/{z}/{x}/{y}.mvt"),
     MLN_BUFFER_LITERAL("fixture://b/{z}/{x}/{y}.mvt"),
@@ -606,25 +535,29 @@ static void style_source_tile_urls_distinguish_empty_from_missing(void) {
     NULL
   ));
   MLN_TEST_AWAIT_OK(add_tile_source(
-    map, TILE_SOURCE_VECTOR, "remote", true, NULL, &completion.descriptor, NULL
+    map, VECTOR, "remote", true, NULL, &completion.descriptor, NULL
   ));
 
-  tile_urls_probe probe;
-  read_tile_urls(runtime, map, MLN_BUFFER_LITERAL("inline"), &probe);
+  tile_urls_probe probe = read_tile_urls(runtime, map, "inline");
   TEST_ASSERT_EQUAL_size_t(1, probe.value_count);
   TEST_ASSERT_EQUAL_size_t(2, probe.tile_url_count);
-  TEST_ASSERT_EQUAL_STRING("fixture://a/{z}/{x}/{y}.mvt", probe.first);
-  TEST_ASSERT_EQUAL_STRING("fixture://b/{z}/{x}/{y}.mvt", probe.second);
+  TEST_ASSERT_EQUAL_STRING("fixture://a/{z}/{x}/{y}.mvt", probe.urls[0]);
+  TEST_ASSERT_EQUAL_STRING("fixture://b/{z}/{x}/{y}.mvt", probe.urls[1]);
 
-  read_tile_urls(runtime, map, MLN_BUFFER_LITERAL("remote"), &probe);
+  probe = read_tile_urls(runtime, map, "remote");
   TEST_ASSERT_EQUAL_size_t(1, probe.value_count);
   TEST_ASSERT_EQUAL_size_t(0, probe.tile_url_count);
-
-  read_tile_urls(runtime, map, MLN_BUFFER_LITERAL("missing"), &probe);
+  probe = read_tile_urls(runtime, map, "missing");
   TEST_ASSERT_EQUAL_size_t(0, probe.value_count);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
+}
+
+static bool source_is_volatile(mln_map map) {
+  mln_style_source_result result;
+  TEST_ASSERT_TRUE(read_source(map, "volatile-vector", &result));
+  return result.info.is_volatile;
 }
 
 static void style_source_volatility_round_trips(void) {
@@ -634,9 +567,7 @@ static void style_source_volatility_round_trips(void) {
   MLN_TEST_AWAIT_OK(mln_map_add_vector_source_tiles(
     map, source_id, fixture_tiles, 1, NULL, &completion.descriptor, NULL
   ));
-  mln_style_source_result result;
-  TEST_ASSERT_TRUE(read_source(map, "volatile-vector", &result));
-  TEST_ASSERT_FALSE(result.info.is_volatile);
+  TEST_ASSERT_FALSE(source_is_volatile(map));
 
   // The committed toggle publishes a snapshot generation, so volatility is an
   // ordered command rather than a synchronous write.
@@ -650,14 +581,12 @@ static void style_source_volatility_round_trips(void) {
   );
   TEST_ASSERT_NOT_EQUAL_UINT64(0, mln_test_completion_generation(&enable));
   mln_test_completion_destroy(&enable);
-  TEST_ASSERT_TRUE(read_source(map, "volatile-vector", &result));
-  TEST_ASSERT_TRUE(result.info.is_volatile);
+  TEST_ASSERT_TRUE(source_is_volatile(map));
 
   MLN_TEST_AWAIT_OK(mln_map_set_style_source_volatile(
     map, source_id, false, &completion.descriptor, NULL
   ));
-  TEST_ASSERT_TRUE(read_source(map, "volatile-vector", &result));
-  TEST_ASSERT_FALSE(result.info.is_volatile);
+  TEST_ASSERT_FALSE(source_is_volatile(map));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -666,11 +595,8 @@ static void style_source_volatility_round_trips(void) {
 static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
-    map, MLN_BUFFER_LITERAL("in-use"),
-    MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
-    NULL
-  ));
+  const mln_buffer_view in_use = MLN_BUFFER_LITERAL("in-use");
+  add_source_json(map, "in-use", MLN_TEST_EMPTY_GEOJSON_SOURCE);
   MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
     map,
     MLN_BUFFER_LITERAL(
@@ -681,51 +607,49 @@ static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_STATE, "used by a layer",
-    mln_map_remove_style_source(
-      map, MLN_BUFFER_LITERAL("in-use"), &completion.descriptor, NULL
-    )
+    mln_map_remove_style_source(map, in_use, &completion.descriptor, NULL)
   );
   TEST_ASSERT_TRUE(source_exists(map, "in-use"));
 
   MLN_TEST_AWAIT_OK(mln_map_remove_style_layer(
     map, MLN_BUFFER_LITERAL("user"), &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_remove_style_source(
-    map, MLN_BUFFER_LITERAL("in-use"), &completion.descriptor, NULL
-  ));
+  MLN_TEST_AWAIT_OK(
+    mln_map_remove_style_source(map, in_use, &completion.descriptor, NULL)
+  );
   TEST_ASSERT_FALSE(source_exists(map, "in-use"));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-static void read_image_source_coordinates(
-  mln_map map, const char* id, mln_lat_lng out[4]
-) {
+// Reads an image source's corners into `out`, and reports whether the source
+// had any: a missing one completes with no value.
+static bool read_corners(mln_map map, const char* id, mln_lat_lng out[4]) {
   mln_test_completion completion =
     mln_test_completion_default(4 * sizeof(mln_lat_lng));
   MLN_TEST_OK(mln_map_get_image_source_coordinates(
     map, mln_test_view_of(id), &completion.descriptor, NULL
   ));
   MLN_TEST_OK(mln_test_completion_finish(&completion));
-  TEST_ASSERT_EQUAL_size_t(4, mln_test_completion_value_count(&completion));
-  TEST_ASSERT_TRUE(
-    mln_test_completion_copy_value(&completion, out, 4 * sizeof(mln_lat_lng))
-  );
+  const size_t count = mln_test_completion_value_count(&completion);
+  if (count != 0) {
+    TEST_ASSERT_EQUAL_size_t(4, count);
+    TEST_ASSERT_TRUE(
+      mln_test_completion_copy_value(&completion, out, 4 * sizeof(*out))
+    );
+  }
   mln_test_completion_destroy(&completion);
+  return count != 0;
 }
+
+static const mln_lat_lng corners[4] = {{1, 2}, {1, 3}, {0, 3}, {0, 2}};
 
 // Image sources hold four corner coordinates and an image, from a URL or from
 // inline pixels, and the typed updates reject every other source kind.
 static void image_sources_hold_corners_and_pixels(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  serve_nothing(runtime);
-  const mln_lat_lng corners[4] = {
-    {.latitude = 1.0, .longitude = 2.0},
-    {.latitude = 1.0, .longitude = 3.0},
-    {.latitude = 0.0, .longitude = 3.0},
-    {.latitude = 0.0, .longitude = 2.0},
-  };
+  mln_test_style_serve(runtime, NULL, 0);
   const uint8_t pixels[16] = {
     255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
   };
@@ -735,79 +659,68 @@ static void image_sources_hold_corners_and_pixels(void) {
   image.stride = 8;
   image.pixels = pixels;
   image.byte_length = sizeof(pixels);
+  const mln_buffer_view inline_image = MLN_BUFFER_LITERAL("inline-image");
+  const mln_buffer_view remote_image = MLN_BUFFER_LITERAL("remote-image");
+  const mln_buffer_view geojson = MLN_BUFFER_LITERAL("geojson");
+  const mln_buffer_view png = MLN_BUFFER_LITERAL("fixture://image.png");
 
   MLN_TEST_AWAIT_OK(mln_map_add_image_source_image(
-    map, MLN_BUFFER_LITERAL("inline-image"), corners, 4, &image,
-    &completion.descriptor, NULL
+    map, inline_image, corners, 4, &image, &completion.descriptor, NULL
   ));
   MLN_TEST_AWAIT_OK(mln_map_add_image_source_url(
-    map, MLN_BUFFER_LITERAL("remote-image"), corners, 4,
-    MLN_BUFFER_LITERAL("fixture://image.png"), &completion.descriptor, NULL
+    map, remote_image, corners, 4, png, &completion.descriptor, NULL
   ));
   mln_style_source_result result;
   TEST_ASSERT_TRUE(read_source(map, "inline-image", &result));
   TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_IMAGE, result.info.type);
 
   mln_lat_lng read[4];
-  read_image_source_coordinates(map, "remote-image", read);
+  TEST_ASSERT_TRUE(read_corners(map, "remote-image", read));
   TEST_ASSERT_EQUAL_MEMORY(corners, read, sizeof(corners));
 
-  const mln_lat_lng moved[4] = {
-    {.latitude = 5.0, .longitude = 6.0},
-    {.latitude = 5.0, .longitude = 7.0},
-    {.latitude = 4.0, .longitude = 7.0},
-    {.latitude = 4.0, .longitude = 6.0},
-  };
+  const mln_lat_lng moved[4] = {{5, 6}, {5, 7}, {4, 7}, {4, 6}};
   MLN_TEST_AWAIT_OK(mln_map_set_image_source_coordinates(
-    map, MLN_BUFFER_LITERAL("inline-image"), moved, 4, &completion.descriptor,
-    NULL
+    map, inline_image, moved, 4, &completion.descriptor, NULL
   ));
-  read_image_source_coordinates(map, "inline-image", read);
+  TEST_ASSERT_TRUE(read_corners(map, "inline-image", read));
   TEST_ASSERT_EQUAL_MEMORY(moved, read, sizeof(moved));
   // A URL source takes inline pixels, and an inline one takes a URL.
   MLN_TEST_AWAIT_OK(mln_map_set_image_source_image(
-    map, MLN_BUFFER_LITERAL("remote-image"), &image, &completion.descriptor,
-    NULL
+    map, remote_image, &image, &completion.descriptor, NULL
   ));
   MLN_TEST_AWAIT_OK(mln_map_set_image_source_url(
-    map, MLN_BUFFER_LITERAL("inline-image"),
-    MLN_BUFFER_LITERAL("fixture://image.png"), &completion.descriptor, NULL
+    map, inline_image, png, &completion.descriptor, NULL
   ));
 
   // Coordinates come in fours, and pixels must cover the image, before the
   // call returns.
   mln_completion discard = mln_test_discard_completion();
   MLN_TEST_INVALID(mln_map_set_image_source_coordinates(
-    map, MLN_BUFFER_LITERAL("inline-image"), moved, 3, &discard, NULL
+    map, inline_image, moved, 3, &discard, NULL
   ));
   MLN_TEST_EXPECT_COMMAND_REJECTED(
     "must be 4", mln_map_add_image_source_url(
-                   map, MLN_BUFFER_LITERAL("one-corner"), moved, 1,
-                   MLN_BUFFER_LITERAL("fixture://image.png"),
+                   map, MLN_BUFFER_LITERAL("one-corner"), moved, 1, png,
                    &completion.descriptor, MLN_TEST_DIAGNOSTIC
                  )
   );
   mln_premultiplied_rgba8_image short_image = image;
   short_image.byte_length = 15;
   MLN_TEST_INVALID(mln_map_set_image_source_image(
-    map, MLN_BUFFER_LITERAL("inline-image"), &short_image, &discard, NULL
+    map, inline_image, &short_image, &discard, NULL
   ));
 
-  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
-    map, MLN_BUFFER_LITERAL("geojson"),
-    MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
-    NULL
-  ));
+  add_source_json(map, "geojson", MLN_TEST_EMPTY_GEOJSON_SOURCE);
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not an image source",
     mln_map_set_image_source_coordinates(
-      map, MLN_BUFFER_LITERAL("geojson"), moved, 4, &completion.descriptor, NULL
+      map, geojson, moved, 4, &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not an image source",
     mln_map_set_image_source_image(
-      map, MLN_BUFFER_LITERAL("geojson"), &image, &completion.descriptor, NULL
+      map, geojson, &image, &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
@@ -817,20 +730,12 @@ static void image_sources_hold_corners_and_pixels(void) {
     )
   );
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_get_image_source_coordinates(
-      map, MLN_BUFFER_LITERAL("geojson"), &completion.descriptor, NULL
-    )
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_image_source_coordinates(
+                                   map, geojson, &completion.descriptor, NULL
+                                 )
   );
   // A missing source has no coordinates to report, which is not a failure.
-  mln_test_completion missing =
-    mln_test_completion_default(4 * sizeof(mln_lat_lng));
-  MLN_TEST_OK(mln_map_get_image_source_coordinates(
-    map, MLN_BUFFER_LITERAL("missing"), &missing.descriptor, NULL
-  ));
-  MLN_TEST_OK(mln_test_completion_finish(&missing));
-  TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&missing));
-  mln_test_completion_destroy(&missing);
+  TEST_ASSERT_FALSE(read_corners(map, "missing", read));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -843,12 +748,6 @@ static void an_image_source_requests_its_url_as_an_image(void) {
   mln_test_provider* provider = mln_test_provider_create(NULL, 0);
   mln_test_provider_install(runtime, provider);
   mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
-  const mln_lat_lng corners[4] = {
-    {.latitude = 1.0, .longitude = 2.0},
-    {.latitude = 1.0, .longitude = 3.0},
-    {.latitude = 0.0, .longitude = 3.0},
-    {.latitude = 0.0, .longitude = 2.0},
-  };
   MLN_TEST_AWAIT_OK(mln_map_add_image_source_url(
     map, MLN_BUFFER_LITERAL("remote-image"), corners, 4,
     MLN_BUFFER_LITERAL("fixture://image.png"), &completion.descriptor, NULL

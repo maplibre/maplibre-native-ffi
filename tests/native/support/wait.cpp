@@ -386,6 +386,23 @@ extern "C" auto mln_test_completion_finish_value(
   return status;
 }
 
+extern "C" auto mln_test_completion_finish_optional(
+  mln_test_completion* completion, void* out_value, const size_t value_size,
+  bool* out_found
+) -> mln_status {
+  auto status = mln_test_completion_finish(completion);
+  *out_found =
+    status == MLN_STATUS_OK && mln_test_completion_value_count(completion) != 0;
+  if (
+    *out_found &&
+    !mln_test_completion_copy_value(completion, out_value, value_size)
+  ) {
+    status = MLN_STATUS_NATIVE_ERROR;
+  }
+  mln_test_completion_destroy(completion);
+  return status;
+}
+
 extern "C" auto mln_test_completion_poll(mln_test_completion* completion)
   -> bool {
   auto* probe = state(completion);

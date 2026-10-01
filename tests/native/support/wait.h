@@ -118,6 +118,13 @@ mln_status mln_test_completion_settle(mln_test_completion* completion);
 mln_status mln_test_completion_finish_value(
   mln_test_completion* completion, void* out_value, size_t value_size
 );
+// The same for a query that may deliver no value, such as a read of a missing
+// style entity: `*out_found` reports whether a value arrived, and only then is
+// it copied.
+mln_status mln_test_completion_finish_optional(
+  mln_test_completion* completion, void* out_value, size_t value_size,
+  bool* out_found
+);
 bool mln_test_completion_poll(mln_test_completion* completion);
 mln_status mln_test_completion_status(mln_test_completion* completion);
 uint32_t mln_test_completion_disposition(mln_test_completion* completion);

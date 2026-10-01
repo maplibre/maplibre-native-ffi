@@ -30,30 +30,10 @@ static void copy_stretches(
   mln_test_flag_set(&probe->done);
 }
 
-static void style_image_stretches_are_borrowed_by_the_completion(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  const uint8_t pixel[4] = {0, 0, 0, 0};
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
-  image.width = 1;
-  image.height = 1;
-  image.stride = 4;
-  image.pixels = pixel;
-  image.byte_length = sizeof(pixel);
-  const mln_image_stretch stretch_x = {.from = 0.0f, .to = 1.0f};
-  const mln_image_stretch stretch_y = {.from = 0.0f, .to = 1.0f};
-  mln_style_image_options options = mln_style_image_options_default();
-  options.fields =
-    MLN_STYLE_IMAGE_OPTION_STRETCH_X | MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
-  options.stretch_x = &stretch_x;
-  options.stretch_x_count = 1;
-  options.stretch_y = &stretch_y;
-  options.stretch_y_count = 1;
-  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
-    map, MLN_BUFFER_LITERAL("probe-stretches"), &image, &options,
-    &completion.descriptor, NULL
-  ));
-
+// Copies an image's stretches inside the completion, which borrows them.
+static stretch_probe read_stretches(
+  mln_runtime runtime, mln_map map, const char* id
+) {
   stretch_probe probe = {.status = MLN_STATUS_INVALID_STATE};
   atomic_init(&probe.done, false);
   const mln_completion completion = {
@@ -62,35 +42,12 @@ static void style_image_stretches_are_borrowed_by_the_completion(void) {
     .user_data = &probe,
   };
   MLN_TEST_OK(mln_map_copy_style_image_stretches(
-    map, MLN_BUFFER_LITERAL("probe-stretches"), &completion, NULL
+    map, mln_test_view_of(id), &completion, NULL
   ));
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_TRUE(atomic_load(&probe.done));
   MLN_TEST_OK(probe.status);
-  TEST_ASSERT_EQUAL_size_t(1, probe.x_count);
-  TEST_ASSERT_EQUAL_size_t(1, probe.y_count);
-  TEST_ASSERT_EQUAL_MEMORY(&stretch_x, &probe.x, sizeof(stretch_x));
-  TEST_ASSERT_EQUAL_MEMORY(&stretch_y, &probe.y, sizeof(stretch_y));
-
-  // A missing image is no value, not a failure.
-  stretch_probe missing = {
-    .status = MLN_STATUS_INVALID_STATE, .value_count = 1
-  };
-  atomic_init(&missing.done, false);
-  const mln_completion missing_completion = {
-    .size = sizeof(mln_completion),
-    .callback = copy_stretches,
-    .user_data = &missing,
-  };
-  MLN_TEST_OK(mln_map_copy_style_image_stretches(
-    map, MLN_BUFFER_LITERAL("missing"), &missing_completion, NULL
-  ));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_TRUE(atomic_load(&missing.done));
-  MLN_TEST_OK(missing.status);
-  TEST_ASSERT_EQUAL_size_t(0, missing.value_count);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
+  return probe;
 }
 
 static mln_style_image_info read_image_info(mln_map map, const char* id) {
@@ -99,40 +56,48 @@ static mln_style_image_info read_image_info(mln_map map, const char* id) {
   MLN_TEST_OK(mln_map_get_style_image_info(
     map, mln_test_view_of(id), &completion.descriptor, NULL
   ));
-  MLN_TEST_OK(mln_test_completion_finish(&completion));
-  TEST_ASSERT_EQUAL_size_t(1, mln_test_completion_value_count(&completion));
   mln_style_image_result result = {0};
-  TEST_ASSERT_TRUE(
-    mln_test_completion_copy_value(&completion, &result, sizeof(result))
+  MLN_TEST_OK(
+    mln_test_completion_finish_value(&completion, &result, sizeof(result))
   );
-  mln_test_completion_destroy(&completion);
   return result.info;
 }
 
-static mln_status copy_pixels(
-  mln_map map, const char* id, uint8_t* out, size_t capacity, bool* found
-) {
+// Copies an image's pixels into `out`, and reports whether the image exists.
+static bool copy_pixels(mln_map map, const char* id, uint8_t out[16]) {
   mln_test_completion completion = mln_test_completion_buffer_view();
   MLN_TEST_OK(mln_map_copy_style_image_premultiplied_rgba8(
     map, mln_test_view_of(id), &completion.descriptor, NULL
   ));
-  const mln_status status = mln_test_completion_finish(&completion);
-  *found = mln_test_completion_value_count(&completion) == 1;
-  if (*found) {
+  MLN_TEST_OK(mln_test_completion_finish(&completion));
+  // The view borrows the completion's storage, so copy before destroying it.
+  const bool found = mln_test_completion_value_count(&completion) == 1;
+  if (found) {
     mln_buffer_view view = {0};
     TEST_ASSERT_TRUE(
       mln_test_completion_copy_value(&completion, &view, sizeof(view))
     );
-    TEST_ASSERT_LESS_OR_EQUAL_size_t(capacity, view.size);
+    TEST_ASSERT_EQUAL_size_t(16, view.size);
     memcpy(out, view.data, view.size);
   }
   mln_test_completion_destroy(&completion);
-  return status;
+  return found;
 }
 
-// A copy reports the metadata the host set, and returns the pixels tightly
-// packed whatever stride they arrived with.
-static void style_images_copy_their_metadata_and_packed_pixels(void) {
+static void set_image(
+  mln_map map, const char* id, const mln_premultiplied_rgba8_image* image,
+  const mln_style_image_options* options
+) {
+  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
+    map, mln_test_view_of(id), image, options, &completion.descriptor, NULL
+  ));
+}
+
+// A copy reports the metadata the host set, including only the text fit it
+// names, and returns the pixels tightly packed whatever stride they arrived
+// with. A stretch copy borrows the intervals for the completion. A missing
+// image reads as no value rather than a failure.
+static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   // Two rows of two pixels, each row padded to three pixels.
@@ -156,66 +121,74 @@ static void style_images_copy_their_metadata_and_packed_pixels(void) {
                    MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
   options.pixel_ratio = 2.0f;
   options.sdf = true;
-  options.content = (mln_image_content){
-    .left = 0.0f, .top = 0.0f, .right = 2.0f, .bottom = 1.0f
-  };
+  options.content = (mln_image_content){0.0f, 0.0f, 2.0f, 1.0f};
   options.text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
   options.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY;
-  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
-    map, MLN_BUFFER_LITERAL("marker"), &image, &options, &completion.descriptor,
-    NULL
-  ));
+  set_image(map, "marker", &image, &options);
 
-  mln_style_image_info expected = mln_style_image_info_default();
-  expected.width = 2;
-  expected.height = 2;
-  expected.stride = 8;
-  expected.byte_length = sizeof(packed);
-  expected.content = options.content;
-  expected.text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
-  expected.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY;
-  expected.pixel_ratio = 2.0f;
-  expected.sdf = true;
-  expected.has_content = true;
-  expected.has_text_fit_width = true;
-  expected.has_text_fit_height = true;
-  const mln_style_image_info info = read_image_info(map, "marker");
-  TEST_ASSERT_EQUAL_UINT32(expected.width, info.width);
-  TEST_ASSERT_EQUAL_UINT32(expected.height, info.height);
-  TEST_ASSERT_EQUAL_UINT32(expected.stride, info.stride);
-  TEST_ASSERT_EQUAL_size_t(expected.byte_length, info.byte_length);
-  TEST_ASSERT_EQUAL_FLOAT(expected.pixel_ratio, info.pixel_ratio);
-  TEST_ASSERT_EQUAL(expected.sdf, info.sdf);
-  TEST_ASSERT_EQUAL(expected.has_content, info.has_content);
+  mln_style_image_info info = read_image_info(map, "marker");
+  TEST_ASSERT_EQUAL_UINT32(2, info.width);
+  TEST_ASSERT_EQUAL_UINT32(2, info.height);
+  TEST_ASSERT_EQUAL_UINT32(8, info.stride);
+  TEST_ASSERT_EQUAL_size_t(sizeof(packed), info.byte_length);
+  TEST_ASSERT_EQUAL_FLOAT(2.0f, info.pixel_ratio);
+  TEST_ASSERT_TRUE(info.sdf);
+  TEST_ASSERT_TRUE(info.has_content);
   TEST_ASSERT_EQUAL_MEMORY(
-    &expected.content, &info.content, sizeof(info.content)
+    &options.content, &info.content, sizeof(info.content)
   );
-  TEST_ASSERT_EQUAL(expected.has_text_fit_width, info.has_text_fit_width);
-  TEST_ASSERT_EQUAL_UINT32(expected.text_fit_width, info.text_fit_width);
-  TEST_ASSERT_EQUAL(expected.has_text_fit_height, info.has_text_fit_height);
-  TEST_ASSERT_EQUAL_UINT32(expected.text_fit_height, info.text_fit_height);
+  TEST_ASSERT_TRUE(info.has_text_fit_width);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL, info.text_fit_width
+  );
+  TEST_ASSERT_TRUE(info.has_text_fit_height);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY, info.text_fit_height
+  );
   TEST_ASSERT_EQUAL_size_t(0, info.stretch_x_count);
-
   uint8_t copied[16] = {0};
-  bool found = false;
-  MLN_TEST_OK(copy_pixels(map, "marker", copied, sizeof(copied), &found));
-  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_TRUE(copy_pixels(map, "marker", copied));
   TEST_ASSERT_EQUAL_MEMORY(packed, copied, sizeof(packed));
 
   // Replacing an image replaces its metadata too, back to the defaults.
-  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
-    map, MLN_BUFFER_LITERAL("marker"), &image, NULL, &completion.descriptor,
-    NULL
-  ));
-  const mln_style_image_info replaced = read_image_info(map, "marker");
+  set_image(map, "marker", &image, NULL);
+  info = read_image_info(map, "marker");
   const mln_style_image_info defaults = mln_style_image_info_default();
-  TEST_ASSERT_EQUAL_FLOAT(defaults.pixel_ratio, replaced.pixel_ratio);
-  TEST_ASSERT_EQUAL(defaults.sdf, replaced.sdf);
-  TEST_ASSERT_EQUAL(defaults.has_content, replaced.has_content);
+  TEST_ASSERT_EQUAL_FLOAT(defaults.pixel_ratio, info.pixel_ratio);
+  TEST_ASSERT_EQUAL(defaults.sdf, info.sdf);
+  TEST_ASSERT_EQUAL(defaults.has_content, info.has_content);
 
-  MLN_TEST_OK(copy_pixels(map, "missing", copied, sizeof(copied), &found));
-  TEST_ASSERT_FALSE(found);
+  options = mln_style_image_options_default();
+  options.fields = MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+  options.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
+  set_image(map, "label", &image, &options);
+  info = read_image_info(map, "label");
+  TEST_ASSERT_FALSE(info.has_text_fit_width);
+  TEST_ASSERT_TRUE(info.has_text_fit_height);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL, info.text_fit_height
+  );
 
+  const mln_image_stretch stretch_x = {.from = 0.0f, .to = 1.0f};
+  const mln_image_stretch stretch_y = {.from = 0.5f, .to = 2.0f};
+  options = mln_style_image_options_default();
+  options.fields =
+    MLN_STYLE_IMAGE_OPTION_STRETCH_X | MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
+  options.stretch_x = &stretch_x;
+  options.stretch_x_count = 1;
+  options.stretch_y = &stretch_y;
+  options.stretch_y_count = 1;
+  set_image(map, "stretched", &image, &options);
+  stretch_probe stretches = read_stretches(runtime, map, "stretched");
+  TEST_ASSERT_EQUAL_size_t(1, stretches.x_count);
+  TEST_ASSERT_EQUAL_size_t(1, stretches.y_count);
+  TEST_ASSERT_EQUAL_MEMORY(&stretch_x, &stretches.x, sizeof(stretch_x));
+  TEST_ASSERT_EQUAL_MEMORY(&stretch_y, &stretches.y, sizeof(stretch_y));
+
+  TEST_ASSERT_FALSE(copy_pixels(map, "missing", copied));
+  TEST_ASSERT_EQUAL_size_t(
+    0, read_stretches(runtime, map, "missing").value_count
+  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -240,12 +213,8 @@ static void style_image_inputs_are_validated_at_submission(void) {
     )
   );
 
-  const mln_image_stretch invalid[] = {
-    {.from = 0.5f, .to = 0.5f},
-    {.from = 2.0f, .to = 1.0f},
-  };
-  for (size_t index = 0; index < sizeof(invalid) / sizeof(invalid[0]);
-       index += 1) {
+  const mln_image_stretch invalid[] = {{0.5f, 0.5f}, {2.0f, 1.0f}};
+  for (size_t index = 0; index < 2; index += 1) {
     mln_style_image_options options = mln_style_image_options_default();
     options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_X;
     options.stretch_x = &invalid[index];
@@ -262,37 +231,7 @@ static void style_image_inputs_are_validated_at_submission(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Only a text fit the host names reads back.
-static void style_images_read_back_only_the_text_fit_the_host_names(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  const uint8_t pixels[16] = {0};
-  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
-  image.width = 2;
-  image.height = 2;
-  image.stride = 8;
-  image.pixels = pixels;
-  image.byte_length = sizeof(pixels);
-  mln_style_image_options options = mln_style_image_options_default();
-  options.fields = MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
-  options.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
-  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
-    map, MLN_BUFFER_LITERAL("label"), &image, &options, &completion.descriptor,
-    NULL
-  ));
-  const mln_style_image_info info = read_image_info(map, "label");
-  TEST_ASSERT_FALSE(info.has_text_fit_width);
-  TEST_ASSERT_TRUE(info.has_text_fit_height);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL, info.text_fit_height
-  );
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 MLN_TEST_GROUP {
-  RUN_TEST(style_image_stretches_are_borrowed_by_the_completion);
-  RUN_TEST(style_images_copy_their_metadata_and_packed_pixels);
-  RUN_TEST(style_images_read_back_only_the_text_fit_the_host_names);
+  RUN_TEST(style_images_copy_their_metadata_pixels_and_stretches);
   RUN_TEST(style_image_inputs_are_validated_at_submission);
 }
