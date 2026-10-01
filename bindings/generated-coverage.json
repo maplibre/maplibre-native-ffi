@@ -284,7 +284,6 @@
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedSurfaceValues.swift",
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedTextureValues.swift",
     "bindings/swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedWakeValues.swift",
-    "bindings/zig/src/generated_api.zig",
     "bindings/zig/src/maplibre_native_ffi.zig",
     "include/maplibre_native_c/callback_capture_generated.h",
     "src/c_api/callback_capture_generated.inc",

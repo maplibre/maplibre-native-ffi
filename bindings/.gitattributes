@@ -284,5 +284,4 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedSurfaceValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedTextureValues.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Values/GeneratedWakeValues.swift linguist-generated=true
-/zig/src/generated_api.zig linguist-generated=true
 /zig/src/maplibre_native_ffi.zig linguist-generated=true

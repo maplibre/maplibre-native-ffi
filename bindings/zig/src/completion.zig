@@ -5,7 +5,7 @@ const diagnostics = @import("diagnostics.zig");
 const status = @import("status.zig");
 const sync = @import("sync.zig");
 
-pub const CommandDisposition = @import("generated_api.zig").CommandDisposition;
+pub const CommandDisposition = @import("maplibre_native_ffi.zig").CommandDisposition;
 
 pub const CommandCompletion = struct {
     disposition: CommandDisposition,
