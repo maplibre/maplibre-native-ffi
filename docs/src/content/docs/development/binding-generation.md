@@ -151,6 +151,11 @@ the binding's mise configuration and skips when that toolchain is missing. The
 CI hygiene job sets `MLN_BINDGEN_REQUIRE_TOOLCHAINS=1`, which turns each skip
 into a failure.
 
+The generator also writes the FFI declarations of the Rust `-sys` crate, which
+Rust and Python share. A layout probe compiles those declarations beside a C
+program over the real headers. It checks that every record, handle, and enum has
+the size, alignment, and field offsets that the C compiler gives it.
+
 The generator also writes one synthesized result for each completion copy kind
 to `tests/native/abi/adapter/adapter_copy_cases_generated.inc`.
 `tests/native/abi/adapter/copies.c` passes each result through an adapter

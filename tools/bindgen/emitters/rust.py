@@ -853,6 +853,15 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     files["crates/maplibre-native-ffi-core/src/generated.rs"] = marker + "\n".join(
         declarations
     )
+    from . import rust_sys
+
+    sys_declarations = rust_sys.declarations(bound)
+    files[rust_sys.PATH] = sys_declarations.render()
+    # An operation calls its C function through the -sys declaration.
+    for name, reason in sys_declarations.unsupported.items():
+        if name in generated:
+            generated.remove(name)
+        unsupported.setdefault(name, reason)
     return files, generated, unsupported
 
 

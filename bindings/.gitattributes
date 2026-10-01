@@ -226,6 +226,7 @@
 /python/python/maplibre_native_ffi/api.py linguist-generated=true
 /python/src/generated_operations.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi-core/src/generated.rs linguist-generated=true
+/rust/crates/maplibre-native-ffi-sys/src/generated.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/acquired_frame.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/buffer.rs linguist-generated=true
 /rust/crates/maplibre-native-ffi/src/generated/event_batch.rs linguist-generated=true

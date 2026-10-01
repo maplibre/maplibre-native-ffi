@@ -17,10 +17,12 @@ metal = ["maplibre-native-ffi-sys/metal"]
 opengl = ["maplibre-native-ffi-sys/opengl"]
 vulkan = ["maplibre-native-ffi-sys/vulkan"]
 webgpu = ["maplibre-native-ffi-sys/webgpu"]
+# Binds the browser fixtures' WebGPU header for the browser test suite, which
+# scripts/test-rust-browser.sh runs. Nothing else needs it.
+browser-fixtures = ["dep:bindgen"]
 
-# Binds the browser fixtures' WebGPU header.
 [build-dependencies]
-bindgen = "0.72.1"
+bindgen = { version = "0.72.1", optional = true }
 
 [dev-dependencies]
 # The tests make the C ABI check see another version.

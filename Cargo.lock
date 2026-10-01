@@ -1050,7 +1050,6 @@ dependencies = [
 name = "maplibre-native-ffi-sys"
 version = "0.0.0"
 dependencies = [
- "bindgen",
  "flate2",
  "mln-ffi-platform",
  "serde",

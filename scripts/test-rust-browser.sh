@@ -65,6 +65,7 @@ cargo_support_tests() {
 cargo_binding_test() {
   cargo test \
     -p maplibre-native-ffi \
+    --features browser-fixtures \
     --target wasm32-unknown-emscripten \
     -Zbuild-std=std,panic_abort \
     "$@"
@@ -122,6 +123,7 @@ cargo clippy \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
   -p maplibre-native-ffi \
+  --features maplibre-native-ffi/browser-fixtures \
   --target wasm32-unknown-emscripten \
   -Zbuild-std=std,panic_abort \
   --all-targets -- -D warnings
