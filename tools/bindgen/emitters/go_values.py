@@ -385,6 +385,17 @@ class Values:
             )
         self.fail(value, "missing native input conversion")
 
+    def converter(self, value):
+        """A function value that converts one binding value and the arena to
+        native, for the kinds whose conversion writes nothing else."""
+        if value.kind == "record":
+            return f"native{public(value.native)}"
+        if value.kind in {"scalar", "enum"}:
+            go = self.type(value, optional=False)
+            helper = "bindingBool" if go == "bool" else "bindingNumber"
+            return f"{helper}[{go}, {self.c_type(value)}]"
+        return None
+
     def c_type(self, value):
         if value.ctype.pointee:
             pointee = value.ctype.pointee
@@ -480,9 +491,19 @@ class Values:
                             if f.presence.bit
                             else f"bool(raw.{field(f.presence.mask)})"
                         )
-                        lines.append(
-                            f"if {condition} {{ copied := {convert}; result.{member} = {'copied' if v.kind == 'array' else '&copied'} }}"
-                        )
+                        if v.kind == "array":
+                            lines.append(
+                                f"if {condition} {{ result.{member} = {convert} }}"
+                            )
+                        else:
+                            copied = (
+                                public(inner.native)
+                                if group
+                                else self.type(replace(v, nullable=False))
+                            )
+                            lines.append(
+                                f"result.{member} = bindingPresent({condition}, func() {copied} {{ return {convert} }})"
+                            )
                     else:
                         lines.append(f"result.{member} = {convert}")
                 chunks.append(
@@ -549,7 +570,17 @@ class Values:
                             if f.presence.bit
                             else f"raw.{field(f.presence.mask)} = true"
                         )
-                        lines.append(f"if {expr} != nil {{ {body}; {mask} }}")
+                        convert = None if group else self.converter(f.value)
+                        if convert and f.presence.bit:
+                            lines.append(
+                                f"bindingMasked(&raw.{field(f.presence.mask)}, C.{f.presence.bit}, &raw.{field(f.name)}, {expr}, arena, {convert})"
+                            )
+                        elif convert:
+                            lines.append(
+                                f"bindingFlagged(&raw.{field(f.presence.mask)}, &raw.{field(f.name)}, {expr}, arena, {convert})"
+                            )
+                        else:
+                            lines.append(f"if {expr} != nil {{ {body}; {mask} }}")
                     else:
                         lines.append(body)
                 if value.registration:

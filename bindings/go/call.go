@@ -273,79 +273,12 @@ func bindingOptionalView[T ~string | ~[]byte](value *T, arena *bindingArena) C.m
 	return bindingView(*value, arena)
 }
 
-// bindingNullableBytes borrows optional text or bytes by address, keeping
-// present empty text distinct from absent text with a non-null address.
-func bindingNullableBytes[T ~string | ~[]byte](value *T, arena *bindingArena) unsafe.Pointer {
-	if value == nil {
-		return nil
-	}
-	pointer := arena.bytes([]byte(*value))
-	if pointer == nil {
-		pointer = arena.allocate(1)
-	}
-	return pointer
-}
-
-// bindingOptionalBytes borrows optional text or bytes by address, which native
-// reads as absent when empty.
-func bindingOptionalBytes[T ~string | ~[]byte](value *T, arena *bindingArena) unsafe.Pointer {
-	if value == nil {
-		return nil
-	}
-	return arena.bytes([]byte(*value))
-}
-
 // bindingOptionalCString copies optional text with a terminating NUL.
 func bindingOptionalCString(value *string, arena *bindingArena) *C.char {
 	if value == nil {
 		return nil
 	}
 	return arena.cstring(*value)
-}
-
-// bindingLen returns the length of optional text or bytes, or zero.
-func bindingLen[T ~string | ~[]byte](value *T) int {
-	if value == nil {
-		return 0
-	}
-	return len(*value)
-}
-
-// bindingStore copies a native value into the arena and returns its address.
-func bindingStore[T any](value T, arena *bindingArena) *T {
-	pointer := (*T)(arena.allocate(unsafe.Sizeof(value)))
-	*pointer = value
-	return pointer
-}
-
-// bindingStoreOptional converts and stores an optional value, or returns nil.
-func bindingStoreOptional[In, Out any](value *In, arena *bindingArena, convert func(In, *bindingArena) Out) *Out {
-	if value == nil {
-		return nil
-	}
-	return bindingStore(convert(*value, arena), arena)
-}
-
-// bindingArray converts items into a native array in the arena. An empty
-// array has a null address.
-func bindingArray[In, Out any](items []In, arena *bindingArena, convert func(In, *bindingArena) Out) *Out {
-	var zero Out
-	pointer := (*Out)(arena.array(len(items), unsafe.Sizeof(zero)))
-	converted := unsafe.Slice(pointer, len(items))
-	for i, item := range items {
-		converted[i] = convert(item, arena)
-	}
-	return pointer
-}
-
-// bindingNullableArray converts items like bindingArray, keeping a present
-// empty array distinct from an absent one with a non-null address.
-func bindingNullableArray[In, Out any](items []In, arena *bindingArena, convert func(In, *bindingArena) Out) *Out {
-	pointer := bindingArray(items, arena, convert)
-	if items != nil && pointer == nil {
-		pointer = (*Out)(arena.allocate(1))
-	}
-	return pointer
 }
 
 // Completion result conversions. Each returns a converter that copies a

@@ -88,10 +88,11 @@ func bindingElement(p unsafe.Pointer,i int,stride uint64,size,align uintptr) uns
 type bindingTarget struct { operation uint32 }
 func bindingGlobal(operation uint32) bindingTarget { return bindingTarget{operation} }
 func bindingGet[T any](target bindingTarget, call func(*bindingArena, uint64, *C.mln_diagnostic) int32, result func(*bindingArena) T) (T, error) { a := &bindingArena{}; defer a.close(); bindingAdmission(target.operation, 0); bindingCheck(func(d *C.mln_diagnostic) int32 { return call(a, 0, d) }); return result(a), nil }
-func bindingLen[T ~string | ~[]byte](value *T) int { if value == nil { return 0 }; return len(*value) }
-func bindingNullableBytes[T ~string | ~[]byte](value *T, a *bindingArena) unsafe.Pointer { if value == nil { return nil }; p := a.bytes([]byte(*value)); if p == nil { p = a.allocate(1) }; return p }
 """.replace("FIXTURES", str(FIXTURES)).replace("SCALAR", scalar)
                 )
+                # The value conversions need no C declarations, so the probe
+                # compiles the binding's own file over the arena above.
+                shutil.copy(ROOT / "bindings/go/convert.go", root / "convert.go")
                 (root / "values_test.go").write_text(
                     """package maplibre
 import "testing"

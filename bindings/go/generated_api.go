@@ -922,26 +922,11 @@ type AnimationOptions struct {
 
 func copyAnimationOptions(raw C.mln_animation_options) AnimationOptions {
 	var result AnimationOptions
-	if raw.fields&C.MLN_ANIMATION_OPTION_DURATION != 0 {
-		copied := float64(raw.duration_ms)
-		result.DurationMs = &copied
-	}
-	if raw.fields&C.MLN_ANIMATION_OPTION_VELOCITY != 0 {
-		copied := float64(raw.velocity)
-		result.Velocity = &copied
-	}
-	if raw.fields&C.MLN_ANIMATION_OPTION_MIN_ZOOM != 0 {
-		copied := float64(raw.min_zoom)
-		result.MinZoom = &copied
-	}
-	if raw.fields&C.MLN_ANIMATION_OPTION_EASING != 0 {
-		copied := copyUnitBezier(raw.easing)
-		result.Easing = &copied
-	}
-	if raw.fields&C.MLN_ANIMATION_OPTION_TRANSITION_ID != 0 {
-		copied := uint64(raw.transition_id)
-		result.TransitionId = &copied
-	}
+	result.DurationMs = bindingPresent(raw.fields&C.MLN_ANIMATION_OPTION_DURATION != 0, func() float64 { return float64(raw.duration_ms) })
+	result.Velocity = bindingPresent(raw.fields&C.MLN_ANIMATION_OPTION_VELOCITY != 0, func() float64 { return float64(raw.velocity) })
+	result.MinZoom = bindingPresent(raw.fields&C.MLN_ANIMATION_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
+	result.Easing = bindingPresent(raw.fields&C.MLN_ANIMATION_OPTION_EASING != 0, func() UnitBezier { return copyUnitBezier(raw.easing) })
+	result.TransitionId = bindingPresent(raw.fields&C.MLN_ANIMATION_OPTION_TRANSITION_ID != 0, func() uint64 { return uint64(raw.transition_id) })
 	return result
 }
 
@@ -949,26 +934,11 @@ func nativeAnimationOptions(input AnimationOptions, arena *bindingArena) C.mln_a
 	raw := C.mln_animation_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.DurationMs != nil {
-		raw.duration_ms = C.double((*input.DurationMs))
-		raw.fields |= C.MLN_ANIMATION_OPTION_DURATION
-	}
-	if input.Velocity != nil {
-		raw.velocity = C.double((*input.Velocity))
-		raw.fields |= C.MLN_ANIMATION_OPTION_VELOCITY
-	}
-	if input.MinZoom != nil {
-		raw.min_zoom = C.double((*input.MinZoom))
-		raw.fields |= C.MLN_ANIMATION_OPTION_MIN_ZOOM
-	}
-	if input.Easing != nil {
-		raw.easing = nativeUnitBezier((*input.Easing), arena)
-		raw.fields |= C.MLN_ANIMATION_OPTION_EASING
-	}
-	if input.TransitionId != nil {
-		raw.transition_id = C.uint64_t((*input.TransitionId))
-		raw.fields |= C.MLN_ANIMATION_OPTION_TRANSITION_ID
-	}
+	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_DURATION, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_VELOCITY, &raw.velocity, input.Velocity, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_EASING, &raw.easing, input.Easing, arena, nativeUnitBezier)
+	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_TRANSITION_ID, &raw.transition_id, input.TransitionId, arena, bindingNumber[uint64, C.uint64_t])
 	return raw
 }
 
@@ -987,26 +957,11 @@ type BoundOptions struct {
 
 func copyBoundOptions(raw C.mln_bound_options) BoundOptions {
 	var result BoundOptions
-	if raw.fields&C.MLN_BOUND_OPTION_BOUNDS != 0 {
-		copied := copyLatLngBounds(raw.bounds)
-		result.Bounds = &copied
-	}
-	if raw.fields&C.MLN_BOUND_OPTION_MIN_ZOOM != 0 {
-		copied := float64(raw.min_zoom)
-		result.MinZoom = &copied
-	}
-	if raw.fields&C.MLN_BOUND_OPTION_MAX_ZOOM != 0 {
-		copied := float64(raw.max_zoom)
-		result.MaxZoom = &copied
-	}
-	if raw.fields&C.MLN_BOUND_OPTION_MIN_PITCH != 0 {
-		copied := float64(raw.min_pitch)
-		result.MinPitch = &copied
-	}
-	if raw.fields&C.MLN_BOUND_OPTION_MAX_PITCH != 0 {
-		copied := float64(raw.max_pitch)
-		result.MaxPitch = &copied
-	}
+	result.Bounds = bindingPresent(raw.fields&C.MLN_BOUND_OPTION_BOUNDS != 0, func() LatLngBounds { return copyLatLngBounds(raw.bounds) })
+	result.MinZoom = bindingPresent(raw.fields&C.MLN_BOUND_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
+	result.MaxZoom = bindingPresent(raw.fields&C.MLN_BOUND_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
+	result.MinPitch = bindingPresent(raw.fields&C.MLN_BOUND_OPTION_MIN_PITCH != 0, func() float64 { return float64(raw.min_pitch) })
+	result.MaxPitch = bindingPresent(raw.fields&C.MLN_BOUND_OPTION_MAX_PITCH != 0, func() float64 { return float64(raw.max_pitch) })
 	result.Unbounded = raw.fields&C.MLN_BOUND_OPTION_UNBOUNDED != 0
 	return result
 }
@@ -1015,26 +970,11 @@ func nativeBoundOptions(input BoundOptions, arena *bindingArena) C.mln_bound_opt
 	raw := C.mln_bound_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.Bounds != nil {
-		raw.bounds = nativeLatLngBounds((*input.Bounds), arena)
-		raw.fields |= C.MLN_BOUND_OPTION_BOUNDS
-	}
-	if input.MinZoom != nil {
-		raw.min_zoom = C.double((*input.MinZoom))
-		raw.fields |= C.MLN_BOUND_OPTION_MIN_ZOOM
-	}
-	if input.MaxZoom != nil {
-		raw.max_zoom = C.double((*input.MaxZoom))
-		raw.fields |= C.MLN_BOUND_OPTION_MAX_ZOOM
-	}
-	if input.MinPitch != nil {
-		raw.min_pitch = C.double((*input.MinPitch))
-		raw.fields |= C.MLN_BOUND_OPTION_MIN_PITCH
-	}
-	if input.MaxPitch != nil {
-		raw.max_pitch = C.double((*input.MaxPitch))
-		raw.fields |= C.MLN_BOUND_OPTION_MAX_PITCH
-	}
+	bindingMasked(&raw.fields, C.MLN_BOUND_OPTION_BOUNDS, &raw.bounds, input.Bounds, arena, nativeLatLngBounds)
+	bindingMasked(&raw.fields, C.MLN_BOUND_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_BOUND_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_BOUND_OPTION_MIN_PITCH, &raw.min_pitch, input.MinPitch, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_BOUND_OPTION_MAX_PITCH, &raw.max_pitch, input.MaxPitch, arena, bindingNumber[float64, C.double])
 	if input.Unbounded {
 		raw.fields |= C.MLN_BOUND_OPTION_UNBOUNDED
 	}
@@ -1056,10 +996,7 @@ func copyCameraDelta(raw C.mln_camera_delta) CameraDelta {
 	result.Kind = CameraDeltaKind(raw.kind)
 	result.Offset = copyScreenPoint(raw.offset)
 	result.Amount = float64(raw.amount)
-	if bool(raw.has_anchor) {
-		copied := copyScreenPoint(raw.anchor)
-		result.Anchor = &copied
-	}
+	result.Anchor = bindingPresent(bool(raw.has_anchor), func() ScreenPoint { return copyScreenPoint(raw.anchor) })
 	result.Animation = copyAnimationOptions(raw.animation)
 	return result
 }
@@ -1071,10 +1008,7 @@ func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delt
 	raw.kind = C.uint32_t(input.Kind)
 	raw.offset = nativeScreenPoint(input.Offset, arena)
 	raw.amount = C.double(input.Amount)
-	if input.Anchor != nil {
-		raw.anchor = nativeScreenPoint((*input.Anchor), arena)
-		raw.has_anchor = true
-	}
+	bindingFlagged(&raw.has_anchor, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
 	raw.animation = nativeAnimationOptions(input.Animation, arena)
 	return raw
 }
@@ -1089,18 +1023,9 @@ type CameraFitOptions struct {
 
 func copyCameraFitOptions(raw C.mln_camera_fit_options) CameraFitOptions {
 	var result CameraFitOptions
-	if raw.fields&C.MLN_CAMERA_FIT_OPTION_PADDING != 0 {
-		copied := copyEdgeInsets(raw.padding)
-		result.Padding = &copied
-	}
-	if raw.fields&C.MLN_CAMERA_FIT_OPTION_BEARING != 0 {
-		copied := float64(raw.bearing)
-		result.Bearing = &copied
-	}
-	if raw.fields&C.MLN_CAMERA_FIT_OPTION_PITCH != 0 {
-		copied := float64(raw.pitch)
-		result.Pitch = &copied
-	}
+	result.Padding = bindingPresent(raw.fields&C.MLN_CAMERA_FIT_OPTION_PADDING != 0, func() EdgeInsets { return copyEdgeInsets(raw.padding) })
+	result.Bearing = bindingPresent(raw.fields&C.MLN_CAMERA_FIT_OPTION_BEARING != 0, func() float64 { return float64(raw.bearing) })
+	result.Pitch = bindingPresent(raw.fields&C.MLN_CAMERA_FIT_OPTION_PITCH != 0, func() float64 { return float64(raw.pitch) })
 	return result
 }
 
@@ -1108,18 +1033,9 @@ func nativeCameraFitOptions(input CameraFitOptions, arena *bindingArena) C.mln_c
 	raw := C.mln_camera_fit_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.Padding != nil {
-		raw.padding = nativeEdgeInsets((*input.Padding), arena)
-		raw.fields |= C.MLN_CAMERA_FIT_OPTION_PADDING
-	}
-	if input.Bearing != nil {
-		raw.bearing = C.double((*input.Bearing))
-		raw.fields |= C.MLN_CAMERA_FIT_OPTION_BEARING
-	}
-	if input.Pitch != nil {
-		raw.pitch = C.double((*input.Pitch))
-		raw.fields |= C.MLN_CAMERA_FIT_OPTION_PITCH
-	}
+	bindingMasked(&raw.fields, C.MLN_CAMERA_FIT_OPTION_PADDING, &raw.padding, input.Padding, arena, nativeEdgeInsets)
+	bindingMasked(&raw.fields, C.MLN_CAMERA_FIT_OPTION_BEARING, &raw.bearing, input.Bearing, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_FIT_OPTION_PITCH, &raw.pitch, input.Pitch, arena, bindingNumber[float64, C.double])
 	return raw
 }
 
@@ -1141,47 +1057,22 @@ type CameraOptions struct {
 
 func copyCameraOptions(raw C.mln_camera_options) CameraOptions {
 	var result CameraOptions
-	if raw.fields&C.MLN_CAMERA_OPTION_CENTER != 0 {
-		copied := func() LatLng {
+	result.Center = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_CENTER != 0, func() LatLng {
+		return func() LatLng {
 			var inner LatLng
 			inner.Latitude = float64(raw.latitude)
 			inner.Longitude = float64(raw.longitude)
 			return inner
 		}()
-		result.Center = &copied
-	}
-	if raw.fields&C.MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0 {
-		copied := float64(raw.center_altitude)
-		result.CenterAltitude = &copied
-	}
-	if raw.fields&C.MLN_CAMERA_OPTION_PADDING != 0 {
-		copied := copyEdgeInsets(raw.padding)
-		result.Padding = &copied
-	}
-	if raw.fields&C.MLN_CAMERA_OPTION_ANCHOR != 0 {
-		copied := copyScreenPoint(raw.anchor)
-		result.Anchor = &copied
-	}
-	if raw.fields&C.MLN_CAMERA_OPTION_ZOOM != 0 {
-		copied := float64(raw.zoom)
-		result.Zoom = &copied
-	}
-	if raw.fields&C.MLN_CAMERA_OPTION_BEARING != 0 {
-		copied := float64(raw.bearing)
-		result.Bearing = &copied
-	}
-	if raw.fields&C.MLN_CAMERA_OPTION_PITCH != 0 {
-		copied := float64(raw.pitch)
-		result.Pitch = &copied
-	}
-	if raw.fields&C.MLN_CAMERA_OPTION_ROLL != 0 {
-		copied := float64(raw.roll)
-		result.Roll = &copied
-	}
-	if raw.fields&C.MLN_CAMERA_OPTION_FOV != 0 {
-		copied := float64(raw.field_of_view)
-		result.FieldOfView = &copied
-	}
+	})
+	result.CenterAltitude = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0, func() float64 { return float64(raw.center_altitude) })
+	result.Padding = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_PADDING != 0, func() EdgeInsets { return copyEdgeInsets(raw.padding) })
+	result.Anchor = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_ANCHOR != 0, func() ScreenPoint { return copyScreenPoint(raw.anchor) })
+	result.Zoom = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_ZOOM != 0, func() float64 { return float64(raw.zoom) })
+	result.Bearing = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_BEARING != 0, func() float64 { return float64(raw.bearing) })
+	result.Pitch = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_PITCH != 0, func() float64 { return float64(raw.pitch) })
+	result.Roll = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_ROLL != 0, func() float64 { return float64(raw.roll) })
+	result.FieldOfView = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_FOV != 0, func() float64 { return float64(raw.field_of_view) })
 	return result
 }
 
@@ -1194,38 +1085,14 @@ func nativeCameraOptions(input CameraOptions, arena *bindingArena) C.mln_camera_
 		raw.longitude = C.double(input.Center.Longitude)
 		raw.fields |= C.MLN_CAMERA_OPTION_CENTER
 	}
-	if input.CenterAltitude != nil {
-		raw.center_altitude = C.double((*input.CenterAltitude))
-		raw.fields |= C.MLN_CAMERA_OPTION_CENTER_ALTITUDE
-	}
-	if input.Padding != nil {
-		raw.padding = nativeEdgeInsets((*input.Padding), arena)
-		raw.fields |= C.MLN_CAMERA_OPTION_PADDING
-	}
-	if input.Anchor != nil {
-		raw.anchor = nativeScreenPoint((*input.Anchor), arena)
-		raw.fields |= C.MLN_CAMERA_OPTION_ANCHOR
-	}
-	if input.Zoom != nil {
-		raw.zoom = C.double((*input.Zoom))
-		raw.fields |= C.MLN_CAMERA_OPTION_ZOOM
-	}
-	if input.Bearing != nil {
-		raw.bearing = C.double((*input.Bearing))
-		raw.fields |= C.MLN_CAMERA_OPTION_BEARING
-	}
-	if input.Pitch != nil {
-		raw.pitch = C.double((*input.Pitch))
-		raw.fields |= C.MLN_CAMERA_OPTION_PITCH
-	}
-	if input.Roll != nil {
-		raw.roll = C.double((*input.Roll))
-		raw.fields |= C.MLN_CAMERA_OPTION_ROLL
-	}
-	if input.FieldOfView != nil {
-		raw.field_of_view = C.double((*input.FieldOfView))
-		raw.fields |= C.MLN_CAMERA_OPTION_FOV
-	}
+	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_CENTER_ALTITUDE, &raw.center_altitude, input.CenterAltitude, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_PADDING, &raw.padding, input.Padding, arena, nativeEdgeInsets)
+	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
+	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_ZOOM, &raw.zoom, input.Zoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_BEARING, &raw.bearing, input.Bearing, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_PITCH, &raw.pitch, input.Pitch, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_ROLL, &raw.roll, input.Roll, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_FOV, &raw.field_of_view, input.FieldOfView, arena, bindingNumber[float64, C.double])
 	return raw
 }
 
@@ -1307,34 +1174,13 @@ type CustomGeometrySourceOptions struct {
 
 func copyCustomGeometrySourceOptions(raw C.mln_custom_geometry_source_options) CustomGeometrySourceOptions {
 	var result CustomGeometrySourceOptions
-	if raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM != 0 {
-		copied := float64(raw.min_zoom)
-		result.MinZoom = &copied
-	}
-	if raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM != 0 {
-		copied := float64(raw.max_zoom)
-		result.MaxZoom = &copied
-	}
-	if raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE != 0 {
-		copied := float64(raw.tolerance)
-		result.Tolerance = &copied
-	}
-	if raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE != 0 {
-		copied := uint32(raw.tile_size)
-		result.TileSize = &copied
-	}
-	if raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER != 0 {
-		copied := uint32(raw.buffer)
-		result.Buffer = &copied
-	}
-	if raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP != 0 {
-		copied := bool(raw.clip)
-		result.Clip = &copied
-	}
-	if raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP != 0 {
-		copied := bool(raw.wrap)
-		result.Wrap = &copied
-	}
+	result.MinZoom = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
+	result.MaxZoom = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
+	result.Tolerance = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE != 0, func() float64 { return float64(raw.tolerance) })
+	result.TileSize = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
+	result.Buffer = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER != 0, func() uint32 { return uint32(raw.buffer) })
+	result.Clip = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP != 0, func() bool { return bool(raw.clip) })
+	result.Wrap = bindingPresent(raw.fields&C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP != 0, func() bool { return bool(raw.wrap) })
 	return result
 }
 
@@ -1342,34 +1188,13 @@ func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena 
 	raw := C.mln_custom_geometry_source_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.MinZoom != nil {
-		raw.min_zoom = C.double((*input.MinZoom))
-		raw.fields |= C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
-	}
-	if input.MaxZoom != nil {
-		raw.max_zoom = C.double((*input.MaxZoom))
-		raw.fields |= C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
-	}
-	if input.Tolerance != nil {
-		raw.tolerance = C.double((*input.Tolerance))
-		raw.fields |= C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
-	}
-	if input.TileSize != nil {
-		raw.tile_size = C.uint32_t((*input.TileSize))
-		raw.fields |= C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
-	}
-	if input.Buffer != nil {
-		raw.buffer = C.uint32_t((*input.Buffer))
-		raw.fields |= C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
-	}
-	if input.Clip != nil {
-		raw.clip = C.bool((*input.Clip))
-		raw.fields |= C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP
-	}
-	if input.Wrap != nil {
-		raw.wrap = C.bool((*input.Wrap))
-		raw.fields |= C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
-	}
+	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE, &raw.tolerance, input.Tolerance, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE, &raw.tile_size, input.TileSize, arena, bindingNumber[uint32, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER, &raw.buffer, input.Buffer, arena, bindingNumber[uint32, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP, &raw.clip, input.Clip, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP, &raw.wrap, input.Wrap, arena, bindingBool[bool, C.bool])
 	if input.FetchTile != nil || input.CancelTile != nil {
 		raw.user_data = arena.register(input, 0)
 		raw.release_user_data = C.mln_custom_geometry_source_release_callback(C.binding_release_forbid)
@@ -1396,14 +1221,8 @@ type CustomMvtVectorSourceOptions struct {
 
 func copyCustomMvtVectorSourceOptions(raw C.mln_custom_mvt_vector_source_options) CustomMvtVectorSourceOptions {
 	var result CustomMvtVectorSourceOptions
-	if raw.fields&C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM != 0 {
-		copied := float64(raw.min_zoom)
-		result.MinZoom = &copied
-	}
-	if raw.fields&C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM != 0 {
-		copied := float64(raw.max_zoom)
-		result.MaxZoom = &copied
-	}
+	result.MinZoom = bindingPresent(raw.fields&C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
+	result.MaxZoom = bindingPresent(raw.fields&C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
 	return result
 }
 
@@ -1411,14 +1230,8 @@ func nativeCustomMvtVectorSourceOptions(input CustomMvtVectorSourceOptions, aren
 	raw := C.mln_custom_mvt_vector_source_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.MinZoom != nil {
-		raw.min_zoom = C.double((*input.MinZoom))
-		raw.fields |= C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
-	}
-	if input.MaxZoom != nil {
-		raw.max_zoom = C.double((*input.MaxZoom))
-		raw.fields |= C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
-	}
+	bindingMasked(&raw.fields, C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
 	if input.FetchTile != nil || input.CancelTile != nil {
 		raw.user_data = arena.register(input, 0)
 		raw.release_user_data = C.mln_custom_mvt_vector_source_release_callback(C.binding_release_forbid)
@@ -1552,14 +1365,8 @@ type FreeCameraOptions struct {
 
 func copyFreeCameraOptions(raw C.mln_free_camera_options) FreeCameraOptions {
 	var result FreeCameraOptions
-	if raw.fields&C.MLN_FREE_CAMERA_OPTION_POSITION != 0 {
-		copied := copyVec3(raw.position)
-		result.Position = &copied
-	}
-	if raw.fields&C.MLN_FREE_CAMERA_OPTION_ORIENTATION != 0 {
-		copied := copyQuaternion(raw.orientation)
-		result.Orientation = &copied
-	}
+	result.Position = bindingPresent(raw.fields&C.MLN_FREE_CAMERA_OPTION_POSITION != 0, func() Vec3 { return copyVec3(raw.position) })
+	result.Orientation = bindingPresent(raw.fields&C.MLN_FREE_CAMERA_OPTION_ORIENTATION != 0, func() Quaternion { return copyQuaternion(raw.orientation) })
 	return result
 }
 
@@ -1567,14 +1374,8 @@ func nativeFreeCameraOptions(input FreeCameraOptions, arena *bindingArena) C.mln
 	raw := C.mln_free_camera_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.Position != nil {
-		raw.position = nativeVec3((*input.Position), arena)
-		raw.fields |= C.MLN_FREE_CAMERA_OPTION_POSITION
-	}
-	if input.Orientation != nil {
-		raw.orientation = nativeQuaternion((*input.Orientation), arena)
-		raw.fields |= C.MLN_FREE_CAMERA_OPTION_ORIENTATION
-	}
+	bindingMasked(&raw.fields, C.MLN_FREE_CAMERA_OPTION_POSITION, &raw.position, input.Position, arena, nativeVec3)
+	bindingMasked(&raw.fields, C.MLN_FREE_CAMERA_OPTION_ORIENTATION, &raw.orientation, input.Orientation, arena, nativeQuaternion)
 	return raw
 }
 
@@ -1599,54 +1400,18 @@ type GeojsonSourceOptions struct {
 
 func copyGeojsonSourceOptions(raw C.mln_geojson_source_options) GeojsonSourceOptions {
 	var result GeojsonSourceOptions
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM != 0 {
-		copied := float64(raw.min_zoom)
-		result.MinZoom = &copied
-	}
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM != 0 {
-		copied := float64(raw.max_zoom)
-		result.MaxZoom = &copied
-	}
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE != 0 {
-		copied := float64(raw.tolerance)
-		result.Tolerance = &copied
-	}
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0 {
-		copied := float64(raw.cluster_max_zoom)
-		result.ClusterMaxZoom = &copied
-	}
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES != 0 {
-		copied := bindingBytes(raw.cluster_properties.data, uint64(raw.cluster_properties.size))
-		result.ClusterProperties = &copied
-	}
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE != 0 {
-		copied := uint32(raw.tile_size)
-		result.TileSize = &copied
-	}
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0 {
-		copied := uint32(raw.buffer)
-		result.Buffer = &copied
-	}
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0 {
-		copied := uint32(raw.cluster_radius)
-		result.ClusterRadius = &copied
-	}
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0 {
-		copied := uint32(raw.cluster_min_points)
-		result.ClusterMinPoints = &copied
-	}
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS != 0 {
-		copied := bool(raw.line_metrics)
-		result.LineMetrics = &copied
-	}
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER != 0 {
-		copied := bool(raw.cluster)
-		result.Cluster = &copied
-	}
-	if raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING != 0 {
-		copied := bool(raw.synchronous_tiling)
-		result.SynchronousTiling = &copied
-	}
+	result.MinZoom = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
+	result.MaxZoom = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
+	result.Tolerance = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE != 0, func() float64 { return float64(raw.tolerance) })
+	result.ClusterMaxZoom = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM != 0, func() float64 { return float64(raw.cluster_max_zoom) })
+	result.ClusterProperties = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES != 0, func() []byte { return bindingBytes(raw.cluster_properties.data, uint64(raw.cluster_properties.size)) })
+	result.TileSize = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
+	result.Buffer = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_BUFFER != 0, func() uint32 { return uint32(raw.buffer) })
+	result.ClusterRadius = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS != 0, func() uint32 { return uint32(raw.cluster_radius) })
+	result.ClusterMinPoints = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS != 0, func() uint32 { return uint32(raw.cluster_min_points) })
+	result.LineMetrics = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS != 0, func() bool { return bool(raw.line_metrics) })
+	result.Cluster = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER != 0, func() bool { return bool(raw.cluster) })
+	result.SynchronousTiling = bindingPresent(raw.fields&C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING != 0, func() bool { return bool(raw.synchronous_tiling) })
 	return result
 }
 
@@ -1654,54 +1419,21 @@ func nativeGeojsonSourceOptions(input GeojsonSourceOptions, arena *bindingArena)
 	raw := C.mln_geojson_source_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.MinZoom != nil {
-		raw.min_zoom = C.double((*input.MinZoom))
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
-	}
-	if input.MaxZoom != nil {
-		raw.max_zoom = C.double((*input.MaxZoom))
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
-	}
-	if input.Tolerance != nil {
-		raw.tolerance = C.double((*input.Tolerance))
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
-	}
-	if input.ClusterMaxZoom != nil {
-		raw.cluster_max_zoom = C.double((*input.ClusterMaxZoom))
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
-	}
+	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE, &raw.tolerance, input.Tolerance, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM, &raw.cluster_max_zoom, input.ClusterMaxZoom, arena, bindingNumber[float64, C.double])
 	if input.ClusterProperties != nil {
 		raw.cluster_properties = C.mln_buffer_view{data: arena.bytes((*input.ClusterProperties)), size: C.size_t(len((*input.ClusterProperties)))}
 		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
 	}
-	if input.TileSize != nil {
-		raw.tile_size = C.uint32_t((*input.TileSize))
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
-	}
-	if input.Buffer != nil {
-		raw.buffer = C.uint32_t((*input.Buffer))
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_BUFFER
-	}
-	if input.ClusterRadius != nil {
-		raw.cluster_radius = C.uint32_t((*input.ClusterRadius))
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
-	}
-	if input.ClusterMinPoints != nil {
-		raw.cluster_min_points = C.uint32_t((*input.ClusterMinPoints))
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
-	}
-	if input.LineMetrics != nil {
-		raw.line_metrics = C.bool((*input.LineMetrics))
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
-	}
-	if input.Cluster != nil {
-		raw.cluster = C.bool((*input.Cluster))
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER
-	}
-	if input.SynchronousTiling != nil {
-		raw.synchronous_tiling = C.bool((*input.SynchronousTiling))
-		raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING
-	}
+	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE, &raw.tile_size, input.TileSize, arena, bindingNumber[uint32, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_BUFFER, &raw.buffer, input.Buffer, arena, bindingNumber[uint32, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS, &raw.cluster_radius, input.ClusterRadius, arena, bindingNumber[uint32, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS, &raw.cluster_min_points, input.ClusterMinPoints, arena, bindingNumber[uint32, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS, &raw.line_metrics, input.LineMetrics, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER, &raw.cluster, input.Cluster, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING, &raw.synchronous_tiling, input.SynchronousTiling, arena, bindingBool[bool, C.bool])
 	return raw
 }
 
@@ -1953,30 +1685,12 @@ type MapTileOptions struct {
 
 func copyMapTileOptions(raw C.mln_map_tile_options) MapTileOptions {
 	var result MapTileOptions
-	if raw.fields&C.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA != 0 {
-		copied := uint32(raw.prefetch_zoom_delta)
-		result.PrefetchZoomDelta = &copied
-	}
-	if raw.fields&C.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS != 0 {
-		copied := float64(raw.lod_min_radius)
-		result.LodMinRadius = &copied
-	}
-	if raw.fields&C.MLN_MAP_TILE_OPTION_LOD_SCALE != 0 {
-		copied := float64(raw.lod_scale)
-		result.LodScale = &copied
-	}
-	if raw.fields&C.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD != 0 {
-		copied := float64(raw.lod_pitch_threshold)
-		result.LodPitchThreshold = &copied
-	}
-	if raw.fields&C.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT != 0 {
-		copied := float64(raw.lod_zoom_shift)
-		result.LodZoomShift = &copied
-	}
-	if raw.fields&C.MLN_MAP_TILE_OPTION_LOD_MODE != 0 {
-		copied := TileLodMode(raw.lod_mode)
-		result.LodMode = &copied
-	}
+	result.PrefetchZoomDelta = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA != 0, func() uint32 { return uint32(raw.prefetch_zoom_delta) })
+	result.LodMinRadius = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS != 0, func() float64 { return float64(raw.lod_min_radius) })
+	result.LodScale = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_LOD_SCALE != 0, func() float64 { return float64(raw.lod_scale) })
+	result.LodPitchThreshold = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD != 0, func() float64 { return float64(raw.lod_pitch_threshold) })
+	result.LodZoomShift = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT != 0, func() float64 { return float64(raw.lod_zoom_shift) })
+	result.LodMode = bindingPresent(raw.fields&C.MLN_MAP_TILE_OPTION_LOD_MODE != 0, func() TileLodMode { return TileLodMode(raw.lod_mode) })
 	return result
 }
 
@@ -1984,30 +1698,12 @@ func nativeMapTileOptions(input MapTileOptions, arena *bindingArena) C.mln_map_t
 	raw := C.mln_map_tile_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.PrefetchZoomDelta != nil {
-		raw.prefetch_zoom_delta = C.uint32_t((*input.PrefetchZoomDelta))
-		raw.fields |= C.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA
-	}
-	if input.LodMinRadius != nil {
-		raw.lod_min_radius = C.double((*input.LodMinRadius))
-		raw.fields |= C.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS
-	}
-	if input.LodScale != nil {
-		raw.lod_scale = C.double((*input.LodScale))
-		raw.fields |= C.MLN_MAP_TILE_OPTION_LOD_SCALE
-	}
-	if input.LodPitchThreshold != nil {
-		raw.lod_pitch_threshold = C.double((*input.LodPitchThreshold))
-		raw.fields |= C.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD
-	}
-	if input.LodZoomShift != nil {
-		raw.lod_zoom_shift = C.double((*input.LodZoomShift))
-		raw.fields |= C.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT
-	}
-	if input.LodMode != nil {
-		raw.lod_mode = C.uint32_t((*input.LodMode))
-		raw.fields |= C.MLN_MAP_TILE_OPTION_LOD_MODE
-	}
+	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA, &raw.prefetch_zoom_delta, input.PrefetchZoomDelta, arena, bindingNumber[uint32, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS, &raw.lod_min_radius, input.LodMinRadius, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_SCALE, &raw.lod_scale, input.LodScale, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD, &raw.lod_pitch_threshold, input.LodPitchThreshold, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT, &raw.lod_zoom_shift, input.LodZoomShift, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MAP_TILE_OPTION_LOD_MODE, &raw.lod_mode, input.LodMode, arena, bindingNumber[TileLodMode, C.uint32_t])
 	return raw
 }
 
@@ -2024,22 +1720,10 @@ type MapViewportOptions struct {
 
 func copyMapViewportOptions(raw C.mln_map_viewport_options) MapViewportOptions {
 	var result MapViewportOptions
-	if raw.fields&C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION != 0 {
-		copied := NorthOrientation(raw.north_orientation)
-		result.NorthOrientation = &copied
-	}
-	if raw.fields&C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE != 0 {
-		copied := ConstrainMode(raw.constrain_mode)
-		result.ConstrainMode = &copied
-	}
-	if raw.fields&C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE != 0 {
-		copied := ViewportMode(raw.viewport_mode)
-		result.ViewportMode = &copied
-	}
-	if raw.fields&C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET != 0 {
-		copied := copyEdgeInsets(raw.frustum_offset)
-		result.FrustumOffset = &copied
-	}
+	result.NorthOrientation = bindingPresent(raw.fields&C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION != 0, func() NorthOrientation { return NorthOrientation(raw.north_orientation) })
+	result.ConstrainMode = bindingPresent(raw.fields&C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE != 0, func() ConstrainMode { return ConstrainMode(raw.constrain_mode) })
+	result.ViewportMode = bindingPresent(raw.fields&C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE != 0, func() ViewportMode { return ViewportMode(raw.viewport_mode) })
+	result.FrustumOffset = bindingPresent(raw.fields&C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET != 0, func() EdgeInsets { return copyEdgeInsets(raw.frustum_offset) })
 	return result
 }
 
@@ -2047,22 +1731,10 @@ func nativeMapViewportOptions(input MapViewportOptions, arena *bindingArena) C.m
 	raw := C.mln_map_viewport_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.NorthOrientation != nil {
-		raw.north_orientation = C.uint32_t((*input.NorthOrientation))
-		raw.fields |= C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
-	}
-	if input.ConstrainMode != nil {
-		raw.constrain_mode = C.uint32_t((*input.ConstrainMode))
-		raw.fields |= C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE
-	}
-	if input.ViewportMode != nil {
-		raw.viewport_mode = C.uint32_t((*input.ViewportMode))
-		raw.fields |= C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
-	}
-	if input.FrustumOffset != nil {
-		raw.frustum_offset = nativeEdgeInsets((*input.FrustumOffset), arena)
-		raw.fields |= C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET
-	}
+	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION, &raw.north_orientation, input.NorthOrientation, arena, bindingNumber[NorthOrientation, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE, &raw.constrain_mode, input.ConstrainMode, arena, bindingNumber[ConstrainMode, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE, &raw.viewport_mode, input.ViewportMode, arena, bindingNumber[ViewportMode, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET, &raw.frustum_offset, input.FrustumOffset, arena, nativeEdgeInsets)
 	return raw
 }
 
@@ -2544,18 +2216,9 @@ type ProjectionMode struct {
 
 func copyProjectionMode(raw C.mln_projection_mode) ProjectionMode {
 	var result ProjectionMode
-	if raw.fields&C.MLN_PROJECTION_MODE_AXONOMETRIC != 0 {
-		copied := bool(raw.axonometric)
-		result.Axonometric = &copied
-	}
-	if raw.fields&C.MLN_PROJECTION_MODE_X_SKEW != 0 {
-		copied := float64(raw.x_skew)
-		result.XSkew = &copied
-	}
-	if raw.fields&C.MLN_PROJECTION_MODE_Y_SKEW != 0 {
-		copied := float64(raw.y_skew)
-		result.YSkew = &copied
-	}
+	result.Axonometric = bindingPresent(raw.fields&C.MLN_PROJECTION_MODE_AXONOMETRIC != 0, func() bool { return bool(raw.axonometric) })
+	result.XSkew = bindingPresent(raw.fields&C.MLN_PROJECTION_MODE_X_SKEW != 0, func() float64 { return float64(raw.x_skew) })
+	result.YSkew = bindingPresent(raw.fields&C.MLN_PROJECTION_MODE_Y_SKEW != 0, func() float64 { return float64(raw.y_skew) })
 	return result
 }
 
@@ -2563,18 +2226,9 @@ func nativeProjectionMode(input ProjectionMode, arena *bindingArena) C.mln_proje
 	raw := C.mln_projection_mode_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.Axonometric != nil {
-		raw.axonometric = C.bool((*input.Axonometric))
-		raw.fields |= C.MLN_PROJECTION_MODE_AXONOMETRIC
-	}
-	if input.XSkew != nil {
-		raw.x_skew = C.double((*input.XSkew))
-		raw.fields |= C.MLN_PROJECTION_MODE_X_SKEW
-	}
-	if input.YSkew != nil {
-		raw.y_skew = C.double((*input.YSkew))
-		raw.fields |= C.MLN_PROJECTION_MODE_Y_SKEW
-	}
+	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_AXONOMETRIC, &raw.axonometric, input.Axonometric, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_X_SKEW, &raw.x_skew, input.XSkew, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_PROJECTION_MODE_Y_SKEW, &raw.y_skew, input.YSkew, arena, bindingNumber[float64, C.double])
 	return raw
 }
 
@@ -2617,18 +2271,9 @@ type QueriedFeature struct {
 func copyQueriedFeature(raw C.mln_queried_feature) QueriedFeature {
 	var result QueriedFeature
 	result.Feature = bindingBytes(raw.feature.data, uint64(raw.feature.size))
-	if raw.fields&C.MLN_QUERIED_FEATURE_SOURCE_ID != 0 {
-		copied := bindingString(raw.source_id.data, uint64(raw.source_id.size))
-		result.SourceId = &copied
-	}
-	if raw.fields&C.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0 {
-		copied := bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size))
-		result.SourceLayerId = &copied
-	}
-	if raw.fields&C.MLN_QUERIED_FEATURE_STATE != 0 {
-		copied := bindingBytes(raw.state.data, uint64(raw.state.size))
-		result.State = &copied
-	}
+	result.SourceId = bindingPresent(raw.fields&C.MLN_QUERIED_FEATURE_SOURCE_ID != 0, func() string { return bindingString(raw.source_id.data, uint64(raw.source_id.size)) })
+	result.SourceLayerId = bindingPresent(raw.fields&C.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0, func() string { return bindingString(raw.source_layer_id.data, uint64(raw.source_layer_id.size)) })
+	result.State = bindingPresent(raw.fields&C.MLN_QUERIED_FEATURE_STATE != 0, func() []byte { return bindingBytes(raw.state.data, uint64(raw.state.size)) })
 	return result
 }
 
@@ -2775,7 +2420,7 @@ type RenderedFeatureQueryOptions struct {
 func copyRenderedFeatureQueryOptions(raw C.mln_rendered_feature_query_options) RenderedFeatureQueryOptions {
 	var result RenderedFeatureQueryOptions
 	if raw.fields&C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS != 0 {
-		copied := func() []string {
+		result.LayerIds = func() []string {
 			length := bindingLength(uint64(raw.layer_id_count))
 			result := make([]string, length)
 			for i := range result {
@@ -2784,7 +2429,6 @@ func copyRenderedFeatureQueryOptions(raw C.mln_rendered_feature_query_options) R
 			}
 			return result
 		}()
-		result.LayerIds = copied
 	}
 	result.Filter = func() *[]byte {
 		if raw.filter == nil {
@@ -2937,23 +2581,16 @@ func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
 	result.Priority = ResourcePriority(raw.priority)
 	result.Usage = ResourceUsage(raw.usage)
 	result.StoragePolicy = ResourceStoragePolicy(raw.storage_policy)
-	if bool(raw.has_range) {
-		copied := func() ResourceRequestRange {
+	result.Range = bindingPresent(bool(raw.has_range), func() ResourceRequestRange {
+		return func() ResourceRequestRange {
 			var inner ResourceRequestRange
 			inner.Start = uint64(raw.range_start)
 			inner.End = uint64(raw.range_end)
 			return inner
 		}()
-		result.Range = &copied
-	}
-	if bool(raw.has_prior_modified) {
-		copied := int64(raw.prior_modified_unix_ms)
-		result.PriorModifiedUnixMs = &copied
-	}
-	if bool(raw.has_prior_expires) {
-		copied := int64(raw.prior_expires_unix_ms)
-		result.PriorExpiresUnixMs = &copied
-	}
+	})
+	result.PriorModifiedUnixMs = bindingPresent(bool(raw.has_prior_modified), func() int64 { return int64(raw.prior_modified_unix_ms) })
+	result.PriorExpiresUnixMs = bindingPresent(bool(raw.has_prior_expires), func() int64 { return int64(raw.prior_expires_unix_ms) })
 	result.PriorEtag = func() *string {
 		if raw.prior_etag == nil {
 			return nil
@@ -2998,21 +2635,12 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 		raw.error_message = arena.cstring((*input.ErrorMessage))
 	}
 	raw.must_revalidate = C.bool(input.MustRevalidate)
-	if input.ModifiedUnixMs != nil {
-		raw.modified_unix_ms = C.int64_t((*input.ModifiedUnixMs))
-		raw.has_modified = true
-	}
-	if input.ExpiresUnixMs != nil {
-		raw.expires_unix_ms = C.int64_t((*input.ExpiresUnixMs))
-		raw.has_expires = true
-	}
+	bindingFlagged(&raw.has_modified, &raw.modified_unix_ms, input.ModifiedUnixMs, arena, bindingNumber[int64, C.int64_t])
+	bindingFlagged(&raw.has_expires, &raw.expires_unix_ms, input.ExpiresUnixMs, arena, bindingNumber[int64, C.int64_t])
 	if input.Etag != nil {
 		raw.etag = arena.cstring((*input.Etag))
 	}
-	if input.RetryAfterUnixMs != nil {
-		raw.retry_after_unix_ms = C.int64_t((*input.RetryAfterUnixMs))
-		raw.has_retry_after = true
-	}
+	bindingFlagged(&raw.has_retry_after, &raw.retry_after_unix_ms, input.RetryAfterUnixMs, arena, bindingNumber[int64, C.int64_t])
 	return raw
 }
 
@@ -3310,7 +2938,7 @@ type SourceFeatureQueryOptions struct {
 func copySourceFeatureQueryOptions(raw C.mln_source_feature_query_options) SourceFeatureQueryOptions {
 	var result SourceFeatureQueryOptions
 	if raw.fields&C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS != 0 {
-		copied := func() []string {
+		result.SourceLayerIds = func() []string {
 			length := bindingLength(uint64(raw.source_layer_id_count))
 			result := make([]string, length)
 			for i := range result {
@@ -3319,7 +2947,6 @@ func copySourceFeatureQueryOptions(raw C.mln_source_feature_query_options) Sourc
 			}
 			return result
 		}()
-		result.SourceLayerIds = copied
 	}
 	result.Filter = func() *[]byte {
 		if raw.filter == nil {
@@ -3380,18 +3007,9 @@ func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
 	result.ByteLength = uint(raw.byte_length)
 	result.StretchXCount = uint(raw.stretch_x_count)
 	result.StretchYCount = uint(raw.stretch_y_count)
-	if bool(raw.has_content) {
-		copied := copyImageContent(raw.content)
-		result.Content = &copied
-	}
-	if bool(raw.has_text_fit_width) {
-		copied := StyleImageTextFit(raw.text_fit_width)
-		result.TextFitWidth = &copied
-	}
-	if bool(raw.has_text_fit_height) {
-		copied := StyleImageTextFit(raw.text_fit_height)
-		result.TextFitHeight = &copied
-	}
+	result.Content = bindingPresent(bool(raw.has_content), func() ImageContent { return copyImageContent(raw.content) })
+	result.TextFitWidth = bindingPresent(bool(raw.has_text_fit_width), func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_width) })
+	result.TextFitHeight = bindingPresent(bool(raw.has_text_fit_height), func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_height) })
 	result.PixelRatio = float32(raw.pixel_ratio)
 	result.Sdf = bool(raw.sdf)
 	return result
@@ -3409,18 +3027,9 @@ func nativeStyleImageInfo(input StyleImageInfo, arena *bindingArena) C.mln_style
 	raw.byte_length = C.size_t(input.ByteLength)
 	raw.stretch_x_count = C.size_t(input.StretchXCount)
 	raw.stretch_y_count = C.size_t(input.StretchYCount)
-	if input.Content != nil {
-		raw.content = nativeImageContent((*input.Content), arena)
-		raw.has_content = true
-	}
-	if input.TextFitWidth != nil {
-		raw.text_fit_width = C.uint32_t((*input.TextFitWidth))
-		raw.has_text_fit_width = true
-	}
-	if input.TextFitHeight != nil {
-		raw.text_fit_height = C.uint32_t((*input.TextFitHeight))
-		raw.has_text_fit_height = true
-	}
+	bindingFlagged(&raw.has_content, &raw.content, input.Content, arena, nativeImageContent)
+	bindingFlagged(&raw.has_text_fit_width, &raw.text_fit_width, input.TextFitWidth, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
+	bindingFlagged(&raw.has_text_fit_height, &raw.text_fit_height, input.TextFitHeight, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
 	raw.pixel_ratio = C.float(input.PixelRatio)
 	raw.sdf = C.bool(input.Sdf)
 	return raw
@@ -3443,7 +3052,7 @@ type StyleImageOptions struct {
 func copyStyleImageOptions(raw C.mln_style_image_options) StyleImageOptions {
 	var result StyleImageOptions
 	if raw.fields&C.MLN_STYLE_IMAGE_OPTION_STRETCH_X != 0 {
-		copied := func() []ImageStretch {
+		result.StretchX = func() []ImageStretch {
 			length := bindingLength(uint64(raw.stretch_x_count))
 			result := make([]ImageStretch, length)
 			for i := range result {
@@ -3452,10 +3061,9 @@ func copyStyleImageOptions(raw C.mln_style_image_options) StyleImageOptions {
 			}
 			return result
 		}()
-		result.StretchX = copied
 	}
 	if raw.fields&C.MLN_STYLE_IMAGE_OPTION_STRETCH_Y != 0 {
-		copied := func() []ImageStretch {
+		result.StretchY = func() []ImageStretch {
 			length := bindingLength(uint64(raw.stretch_y_count))
 			result := make([]ImageStretch, length)
 			for i := range result {
@@ -3464,28 +3072,12 @@ func copyStyleImageOptions(raw C.mln_style_image_options) StyleImageOptions {
 			}
 			return result
 		}()
-		result.StretchY = copied
 	}
-	if raw.fields&C.MLN_STYLE_IMAGE_OPTION_CONTENT != 0 {
-		copied := copyImageContent(raw.content)
-		result.Content = &copied
-	}
-	if raw.fields&C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH != 0 {
-		copied := StyleImageTextFit(raw.text_fit_width)
-		result.TextFitWidth = &copied
-	}
-	if raw.fields&C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT != 0 {
-		copied := StyleImageTextFit(raw.text_fit_height)
-		result.TextFitHeight = &copied
-	}
-	if raw.fields&C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO != 0 {
-		copied := float32(raw.pixel_ratio)
-		result.PixelRatio = &copied
-	}
-	if raw.fields&C.MLN_STYLE_IMAGE_OPTION_SDF != 0 {
-		copied := bool(raw.sdf)
-		result.Sdf = &copied
-	}
+	result.Content = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_OPTION_CONTENT != 0, func() ImageContent { return copyImageContent(raw.content) })
+	result.TextFitWidth = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_width) })
+	result.TextFitHeight = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_height) })
+	result.PixelRatio = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO != 0, func() float32 { return float32(raw.pixel_ratio) })
+	result.Sdf = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_OPTION_SDF != 0, func() bool { return bool(raw.sdf) })
 	return result
 }
 
@@ -3515,26 +3107,11 @@ func nativeStyleImageOptions(input StyleImageOptions, arena *bindingArena) C.mln
 		}
 		raw.fields |= C.MLN_STYLE_IMAGE_OPTION_STRETCH_Y
 	}
-	if input.Content != nil {
-		raw.content = nativeImageContent((*input.Content), arena)
-		raw.fields |= C.MLN_STYLE_IMAGE_OPTION_CONTENT
-	}
-	if input.TextFitWidth != nil {
-		raw.text_fit_width = C.uint32_t((*input.TextFitWidth))
-		raw.fields |= C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
-	}
-	if input.TextFitHeight != nil {
-		raw.text_fit_height = C.uint32_t((*input.TextFitHeight))
-		raw.fields |= C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
-	}
-	if input.PixelRatio != nil {
-		raw.pixel_ratio = C.float((*input.PixelRatio))
-		raw.fields |= C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
-	}
-	if input.Sdf != nil {
-		raw.sdf = C.bool((*input.Sdf))
-		raw.fields |= C.MLN_STYLE_IMAGE_OPTION_SDF
-	}
+	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_CONTENT, &raw.content, input.Content, arena, nativeImageContent)
+	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH, &raw.text_fit_width, input.TextFitWidth, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT, &raw.text_fit_height, input.TextFitHeight, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO, &raw.pixel_ratio, input.PixelRatio, arena, bindingNumber[float32, C.float])
+	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_OPTION_SDF, &raw.sdf, input.Sdf, arena, bindingBool[bool, C.bool])
 	return raw
 }
 
@@ -3690,16 +3267,10 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	result.Type = StyleSourceType(raw._type)
 	result.IdSize = uint(raw.id_size)
 	result.IsVolatile = bool(raw.is_volatile)
-	if bool(raw.has_attribution) {
-		copied := uint(raw.attribution_size)
-		result.AttributionSize = &copied
-	}
-	if raw.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0 {
-		copied := uint(raw.url_size)
-		result.UrlSize = &copied
-	}
-	if raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
-		copied := func() StyleSourceTileInfo {
+	result.AttributionSize = bindingPresent(bool(raw.has_attribution), func() uint { return uint(raw.attribution_size) })
+	result.UrlSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() uint { return uint(raw.url_size) })
+	result.Tilejson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo {
+		return func() StyleSourceTileInfo {
 			var inner StyleSourceTileInfo
 			inner.TileCount = uint(raw.tile_count)
 			inner.MinZoom = float64(raw.min_zoom)
@@ -3707,24 +3278,11 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 			inner.Scheme = StyleTileScheme(raw.scheme)
 			return inner
 		}()
-		result.Tilejson = &copied
-	}
-	if raw.fields&C.MLN_STYLE_SOURCE_INFO_BOUNDS != 0 {
-		copied := copyLatLngBounds(raw.bounds)
-		result.Bounds = &copied
-	}
-	if raw.fields&C.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0 {
-		copied := uint32(raw.tile_size)
-		result.TileSize = &copied
-	}
-	if raw.fields&C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0 {
-		copied := StyleVectorTileEncoding(raw.vector_encoding)
-		result.VectorEncoding = &copied
-	}
-	if raw.fields&C.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING != 0 {
-		copied := StyleRasterDemEncoding(raw.raster_encoding)
-		result.RasterEncoding = &copied
-	}
+	})
+	result.Bounds = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_BOUNDS != 0, func() LatLngBounds { return copyLatLngBounds(raw.bounds) })
+	result.TileSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
+	result.VectorEncoding = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0, func() StyleVectorTileEncoding { return StyleVectorTileEncoding(raw.vector_encoding) })
+	result.RasterEncoding = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING != 0, func() StyleRasterDemEncoding { return StyleRasterDemEncoding(raw.raster_encoding) })
 	return result
 }
 
@@ -3738,16 +3296,10 @@ type StyleSourceResult struct {
 func copyStyleSourceResult(raw C.mln_style_source_result) StyleSourceResult {
 	var result StyleSourceResult
 	result.Info = copyStyleSourceInfo(raw.info)
-	if bool(raw.info.has_attribution) {
-		copied := bindingString(raw.attribution.data, uint64(raw.attribution.size))
-		result.Attribution = &copied
-	}
-	if raw.info.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0 {
-		copied := bindingString(raw.url.data, uint64(raw.url.size))
-		result.Url = &copied
-	}
+	result.Attribution = bindingPresent(bool(raw.info.has_attribution), func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
+	result.Url = bindingPresent(raw.info.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() string { return bindingString(raw.url.data, uint64(raw.url.size)) })
 	if raw.info.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
-		copied := func() []string {
+		result.TileUrls = func() []string {
 			length := bindingLength(uint64(raw.tile_url_count))
 			result := make([]string, length)
 			for i := range result {
@@ -3756,7 +3308,6 @@ func copyStyleSourceResult(raw C.mln_style_source_result) StyleSourceResult {
 			}
 			return result
 		}()
-		result.TileUrls = copied
 	}
 	return result
 }
@@ -3806,38 +3357,14 @@ type StyleTileSourceOptions struct {
 
 func copyStyleTileSourceOptions(raw C.mln_style_tile_source_options) StyleTileSourceOptions {
 	var result StyleTileSourceOptions
-	if raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM != 0 {
-		copied := float64(raw.min_zoom)
-		result.MinZoom = &copied
-	}
-	if raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM != 0 {
-		copied := float64(raw.max_zoom)
-		result.MaxZoom = &copied
-	}
-	if raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION != 0 {
-		copied := bindingString(raw.attribution.data, uint64(raw.attribution.size))
-		result.Attribution = &copied
-	}
-	if raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME != 0 {
-		copied := StyleTileScheme(raw.scheme)
-		result.Scheme = &copied
-	}
-	if raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS != 0 {
-		copied := copyLatLngBounds(raw.bounds)
-		result.Bounds = &copied
-	}
-	if raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE != 0 {
-		copied := uint32(raw.tile_size)
-		result.TileSize = &copied
-	}
-	if raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING != 0 {
-		copied := StyleVectorTileEncoding(raw.vector_encoding)
-		result.VectorEncoding = &copied
-	}
-	if raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING != 0 {
-		copied := StyleRasterDemEncoding(raw.raster_encoding)
-		result.RasterEncoding = &copied
-	}
+	result.MinZoom = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM != 0, func() float64 { return float64(raw.min_zoom) })
+	result.MaxZoom = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM != 0, func() float64 { return float64(raw.max_zoom) })
+	result.Attribution = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION != 0, func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
+	result.Scheme = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME != 0, func() StyleTileScheme { return StyleTileScheme(raw.scheme) })
+	result.Bounds = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS != 0, func() LatLngBounds { return copyLatLngBounds(raw.bounds) })
+	result.TileSize = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
+	result.VectorEncoding = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING != 0, func() StyleVectorTileEncoding { return StyleVectorTileEncoding(raw.vector_encoding) })
+	result.RasterEncoding = bindingPresent(raw.fields&C.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING != 0, func() StyleRasterDemEncoding { return StyleRasterDemEncoding(raw.raster_encoding) })
 	return result
 }
 
@@ -3845,38 +3372,17 @@ func nativeStyleTileSourceOptions(input StyleTileSourceOptions, arena *bindingAr
 	raw := C.mln_style_tile_source_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.MinZoom != nil {
-		raw.min_zoom = C.double((*input.MinZoom))
-		raw.fields |= C.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM
-	}
-	if input.MaxZoom != nil {
-		raw.max_zoom = C.double((*input.MaxZoom))
-		raw.fields |= C.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM
-	}
+	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
 	if input.Attribution != nil {
 		raw.attribution = C.mln_buffer_view{data: arena.bytes([]byte((*input.Attribution))), size: C.size_t(len((*input.Attribution)))}
 		raw.fields |= C.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION
 	}
-	if input.Scheme != nil {
-		raw.scheme = C.uint32_t((*input.Scheme))
-		raw.fields |= C.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME
-	}
-	if input.Bounds != nil {
-		raw.bounds = nativeLatLngBounds((*input.Bounds), arena)
-		raw.fields |= C.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS
-	}
-	if input.TileSize != nil {
-		raw.tile_size = C.uint32_t((*input.TileSize))
-		raw.fields |= C.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
-	}
-	if input.VectorEncoding != nil {
-		raw.vector_encoding = C.uint32_t((*input.VectorEncoding))
-		raw.fields |= C.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
-	}
-	if input.RasterEncoding != nil {
-		raw.raster_encoding = C.uint32_t((*input.RasterEncoding))
-		raw.fields |= C.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-	}
+	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME, &raw.scheme, input.Scheme, arena, bindingNumber[StyleTileScheme, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS, &raw.bounds, input.Bounds, arena, nativeLatLngBounds)
+	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE, &raw.tile_size, input.TileSize, arena, bindingNumber[uint32, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING, &raw.vector_encoding, input.VectorEncoding, arena, bindingNumber[StyleVectorTileEncoding, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING, &raw.raster_encoding, input.RasterEncoding, arena, bindingNumber[StyleRasterDemEncoding, C.uint32_t])
 	return raw
 }
 
@@ -3892,18 +3398,9 @@ type StyleTransitionOptions struct {
 
 func copyStyleTransitionOptions(raw C.mln_style_transition_options) StyleTransitionOptions {
 	var result StyleTransitionOptions
-	if raw.fields&C.MLN_STYLE_TRANSITION_OPTION_DURATION != 0 {
-		copied := float64(raw.duration_ms)
-		result.DurationMs = &copied
-	}
-	if raw.fields&C.MLN_STYLE_TRANSITION_OPTION_DELAY != 0 {
-		copied := float64(raw.delay_ms)
-		result.DelayMs = &copied
-	}
-	if raw.fields&C.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS != 0 {
-		copied := bool(raw.enable_placement_transitions)
-		result.EnablePlacementTransitions = &copied
-	}
+	result.DurationMs = bindingPresent(raw.fields&C.MLN_STYLE_TRANSITION_OPTION_DURATION != 0, func() float64 { return float64(raw.duration_ms) })
+	result.DelayMs = bindingPresent(raw.fields&C.MLN_STYLE_TRANSITION_OPTION_DELAY != 0, func() float64 { return float64(raw.delay_ms) })
+	result.EnablePlacementTransitions = bindingPresent(raw.fields&C.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS != 0, func() bool { return bool(raw.enable_placement_transitions) })
 	return result
 }
 
@@ -3911,18 +3408,9 @@ func nativeStyleTransitionOptions(input StyleTransitionOptions, arena *bindingAr
 	raw := C.mln_style_transition_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.DurationMs != nil {
-		raw.duration_ms = C.double((*input.DurationMs))
-		raw.fields |= C.MLN_STYLE_TRANSITION_OPTION_DURATION
-	}
-	if input.DelayMs != nil {
-		raw.delay_ms = C.double((*input.DelayMs))
-		raw.fields |= C.MLN_STYLE_TRANSITION_OPTION_DELAY
-	}
-	if input.EnablePlacementTransitions != nil {
-		raw.enable_placement_transitions = C.bool((*input.EnablePlacementTransitions))
-		raw.fields |= C.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
-	}
+	bindingMasked(&raw.fields, C.MLN_STYLE_TRANSITION_OPTION_DURATION, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_STYLE_TRANSITION_OPTION_DELAY, &raw.delay_ms, input.DelayMs, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS, &raw.enable_placement_transitions, input.EnablePlacementTransitions, arena, bindingBool[bool, C.bool])
 	return raw
 }
 
