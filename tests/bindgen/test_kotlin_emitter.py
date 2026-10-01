@@ -1,6 +1,5 @@
 """The Kotlin emitter's layouts and native shims, checked by the C compiler."""
 
-import shutil
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -49,9 +48,7 @@ def layout_assertions(api, width: int) -> str:
 
 class KotlinLayoutTests(unittest.TestCase):
     def compile(self, headers, source: str, width: int, *includes: Path):
-        clang = shutil.which("clang")
-        if clang is None:
-            self.skipTest("clang is not installed")
+        clang = require_tool(self, "clang").executable
         with TemporaryDirectory() as directory:
             check = Path(directory) / "check.c"
             check.write_text(
