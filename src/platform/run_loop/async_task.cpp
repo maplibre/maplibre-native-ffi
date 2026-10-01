@@ -10,12 +10,12 @@
 namespace mln {
 namespace util {
 
-class AsyncTaskState : public platform::emscripten::RunLoopWake::Runnable,
+class AsyncTaskState : public platform::RunLoopWake::Runnable,
                        public std::enable_shared_from_this<AsyncTaskState> {
  public:
   explicit AsyncTaskState(std::function<void()> fn)
       : wake(
-          static_cast<platform::emscripten::RunLoopWake*>(
+          static_cast<platform::RunLoopWake*>(
             RunLoop::getLoopHandle()
           )
         ),
@@ -51,7 +51,7 @@ class AsyncTaskState : public platform::emscripten::RunLoopWake::Runnable,
   }
 
  private:
-  platform::emscripten::RunLoopWake* wake;
+  platform::RunLoopWake* wake;
   std::atomic<bool> queued{false};
   std::atomic<bool> alive{true};
   std::function<void()> task;

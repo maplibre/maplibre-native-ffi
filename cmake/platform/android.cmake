@@ -44,9 +44,6 @@ function(mln_ffi_configure_platform target)
   include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
 
   set(MLN_FFI_VENDOR_ANDROID_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/android/src/async_task.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/android/src/run_loop.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/android/src/timer.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/collator.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
@@ -60,6 +57,9 @@ function(mln_ffi_configure_platform target)
       ${PROJECT_SOURCE_DIR}/src/platform/android/asset_manager.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/logging_logcat.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/thread.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/run_loop/async_task.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/run_loop/run_loop.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/run_loop/timer.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
 

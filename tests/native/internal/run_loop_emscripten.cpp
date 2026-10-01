@@ -1,4 +1,4 @@
-// The browser run loop's scheduling: src/platform/emscripten/run_loop.cpp.
+// The browser run loop's scheduling: src/platform/run_loop/run_loop.cpp.
 
 #include <array>
 #include <atomic>
@@ -13,7 +13,7 @@
 
 #include <emscripten/heap.h>
 
-#include "platform/emscripten/run_loop_wake.hpp"
+#include "platform/run_loop/run_loop_wake.hpp"
 #include "support/harness.h"
 #include "testing/sync_point.hpp"
 #include "unity.h"
@@ -26,7 +26,7 @@ using mln::testing::SyncPoint;
 // captures its readiness cutoff and before it examines the queued task,
 // including work sent during dispatch whose next delay must not overflow.
 void queued_async_task_runs_when_clock_advances_during_dispatch() {
-  using mln::platform::emscripten::RunLoopWake;
+  using mln::platform::RunLoopWake;
   struct AdvanceClock final : RunLoopWake::Runnable {
     auto dueTime() const -> mln::TimePoint override {
       const auto next = mln::Clock::now() + std::chrono::milliseconds{1};
@@ -94,7 +94,7 @@ void stop_returns_after_its_worker_destroys_the_loop() {
   mln::testing::set_sync_point_handler(
     [](SyncPoint point, void*) noexcept {
       if (
-        point == SyncPoint::EmscriptenRunLoopStopSubmitted &&
+        point == SyncPoint::RunLoopStopSubmitted &&
         std::this_thread::get_id() == probe.stopper && !probe.joined.load()
       ) {
         probe.worker->join();

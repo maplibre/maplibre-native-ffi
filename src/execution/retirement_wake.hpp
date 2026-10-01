@@ -7,62 +7,21 @@
 #include <mln/util/async_task.hpp>
 #include <mln/util/run_loop.hpp>
 
-#if defined(__ANDROID__)
-#include <cerrno>
-#include <cstdint>
-#include <stdexcept>
-
-#include <sys/eventfd.h>
-#include <unistd.h>
-#elif defined(__EMSCRIPTEN__)
+// Android and the browser run the library's own run loop; see
+// src/platform/run_loop.
+#if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
 #include <atomic>
 
-#include "platform/emscripten/run_loop_wake.hpp"
+#include "platform/run_loop/run_loop_wake.hpp"
 #endif
 
 namespace mln::core {
 
-// Android and browser AsyncTask implementations allocate a list entry on send.
+// The library's run loop allocates a list entry on each AsyncTask send.
 // Retirement reserves its registration so sending only signals existing state.
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
 class RetirementWake {
- public:
-  explicit RetirementWake(std::function<void()> callback)
-      : loop_(mln::util::RunLoop::Get()),
-        fd_(eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC)) {
-    if (fd_ < 0) throw std::runtime_error{"retirement eventfd creation failed"};
-    try {
-      loop_->addWatch(
-        fd_, mln::util::RunLoop::Event::Read,
-        [callback = std::move(callback)](int fd, mln::util::RunLoop::Event) {
-          std::uint64_t count;
-          while (read(fd, &count, sizeof(count)) < 0 && errno == EINTR) {
-          }
-          callback();
-        }
-      );
-    } catch (...) {
-      close(fd_);
-      throw;
-    }
-  }
-  ~RetirementWake() {
-    loop_->removeWatch(fd_);
-    close(fd_);
-  }
-  auto send() noexcept -> void {
-    const std::uint64_t one = 1;
-    while (write(fd_, &one, sizeof(one)) < 0 && errno == EINTR) {
-    }
-  }
-
- private:
-  mln::util::RunLoop* loop_;
-  int fd_;
-};
-#elif defined(__EMSCRIPTEN__)
-class RetirementWake {
-  struct State : mln::platform::emscripten::RunLoopWake::Runnable {
+  struct State : mln::platform::RunLoopWake::Runnable {
     explicit State(std::function<void()> callback)
         : callback(std::move(callback)) {}
     auto dueTime() const -> mln::TimePoint override {
@@ -81,7 +40,7 @@ class RetirementWake {
  public:
   explicit RetirementWake(std::function<void()> callback)
       : wake_(
-          static_cast<mln::platform::emscripten::RunLoopWake*>(
+          static_cast<mln::platform::RunLoopWake*>(
             mln::util::RunLoop::getLoopHandle()
           )
         ),
@@ -95,7 +54,7 @@ class RetirementWake {
   }
 
  private:
-  mln::platform::emscripten::RunLoopWake* wake_;
+  mln::platform::RunLoopWake* wake_;
   std::shared_ptr<State> state_;
 };
 #else

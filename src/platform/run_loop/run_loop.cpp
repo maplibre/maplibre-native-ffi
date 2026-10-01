@@ -1,8 +1,15 @@
-// Every browser thread that owns a MapLibre run loop runs it continuously. A
-// pthread may block on its condition variable while timers and submitted work
-// wake it, so no loop here depends on returning to the browser event loop.
+// The library's own MapLibre run loop, for Android and the browser. Every thread
+// that owns one runs it continuously and blocks on a condition variable that
+// timers and submitted work wake. The loop calls nothing outside the C++
+// standard library:
 //
-// FD watches have no browser equivalent, so addWatch() throws.
+// - A browser pthread blocks here, so no loop depends on returning to the
+//   browser event loop.
+// - MapLibre's Android loop polls through ALooper_pollOnce(), which flushes the
+//   thread's binder commands on every poll. libbinder tears down its thread
+//   state when the process exits, so a thread that polled during exit crashed.
+//
+// Nothing on either platform watches a file descriptor, so addWatch() throws.
 
 #include <cassert>
 #include <memory>
@@ -22,7 +29,7 @@ namespace util {
 class RunLoop::Impl {
  public:
   RunLoop::Type type = RunLoop::Type::Default;
-  platform::emscripten::RunLoopWake wake;
+  platform::RunLoopWake wake;
   bool running = false;
 };
 
@@ -86,7 +93,7 @@ void RunLoop::stop() {
   // invoke() publishes and wakes under the queue lock. The worker can destroy
   // this loop as soon as that lock is released, so touch no members afterwards.
   invoke([this] { impl->running = false; });
-  mln::testing::hit(mln::testing::SyncPoint::EmscriptenRunLoopStopSubmitted);
+  mln::testing::hit(mln::testing::SyncPoint::RunLoopStopSubmitted);
 }
 
 void RunLoop::updateTime() {}
@@ -118,7 +125,7 @@ void RunLoop::waitForEmpty(
 }
 
 void RunLoop::addWatch(int, Event, std::function<void(int, Event)>&&) {
-  throw std::runtime_error("RunLoop::addWatch is not supported on Emscripten");
+  throw std::runtime_error("RunLoop::addWatch is not supported");
 }
 
 void RunLoop::removeWatch(int) {}

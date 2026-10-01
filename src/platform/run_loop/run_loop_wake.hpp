@@ -9,7 +9,7 @@
 
 #include <mln/util/chrono.hpp>
 
-namespace mln::platform::emscripten {
+namespace mln::platform {
 
 struct RunLoopWake {
   class Runnable {
@@ -107,4 +107,4 @@ struct RunLoopWake {
   }
 };
 
-}  // namespace mln::platform::emscripten
+}  // namespace mln::platform

@@ -12,12 +12,12 @@
 namespace mln {
 namespace util {
 
-class TimerState : public platform::emscripten::RunLoopWake::Runnable,
+class TimerState : public platform::RunLoopWake::Runnable,
                    public std::enable_shared_from_this<TimerState> {
  public:
   TimerState()
       : wake(
-          static_cast<platform::emscripten::RunLoopWake*>(
+          static_cast<platform::RunLoopWake*>(
             RunLoop::getLoopHandle()
           )
         ) {}
@@ -60,7 +60,7 @@ class TimerState : public platform::emscripten::RunLoopWake::Runnable,
   }
 
  private:
-  platform::emscripten::RunLoopWake* wake;
+  platform::RunLoopWake* wake;
   TimePoint due = TimePoint::max();
   Duration repeat = Duration::zero();
 

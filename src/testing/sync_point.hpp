@@ -59,9 +59,9 @@ enum class SyncPoint : std::uint8_t {
   // the map's pending still-image request, reported as partial so that it
   // cannot complete the image.
   StillImageFrameHeldBack,
-  // An Emscripten run loop's stop() has submitted its stop task, and the loop
-  // may already be destroyed.
-  EmscriptenRunLoopStopSubmitted,
+  // A run loop in src/platform/run_loop has submitted its stop task from
+  // stop(), and the loop may already be destroyed.
+  RunLoopStopSubmitted,
   // A GeoJSON data's sequenced worker holds the data and is about to slice one
   // tile for an asynchronous request. Synchronous tiling slices inline and
   // never reaches it. No lock is held, so a parked worker delays only the
