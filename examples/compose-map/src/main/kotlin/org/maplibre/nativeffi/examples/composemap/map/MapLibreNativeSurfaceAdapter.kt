@@ -26,6 +26,7 @@ import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.generated.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
+import org.maplibre.nativeffi.generated.Wake
 import org.maplibre.nativeffi.generated.WglContextDescriptor
 import org.maplibre.nativeffi.render.NativePointer
 
@@ -54,7 +55,9 @@ internal object MapLibreNativeSurfaceAdapter {
     return BorrowedTarget(
       sessionKey = SessionKey.Metal(target.device, target.pixelFormat),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map -> map.metalBorrowedTextureAttach(descriptor, callerDriverOptions) },
+      attach = { map, driverWorkWake ->
+        map.metalBorrowedTextureAttach(descriptor, callerDriverOptions(driverWorkWake))
+      },
       setTarget = { session -> session.metalBorrowedTextureSetTarget(descriptor) },
     )
   }
@@ -81,7 +84,9 @@ internal object MapLibreNativeSurfaceAdapter {
           finalLayout = target.finalLayout,
         ),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map -> map.vulkanBorrowedTextureAttach(descriptor, callerDriverOptions) },
+      attach = { map, driverWorkWake ->
+        map.vulkanBorrowedTextureAttach(descriptor, callerDriverOptions(driverWorkWake))
+      },
       setTarget = { session -> session.vulkanBorrowedTextureSetTarget(descriptor) },
     )
   }
@@ -99,7 +104,9 @@ internal object MapLibreNativeSurfaceAdapter {
     return BorrowedTarget(
       sessionKey = SessionKey.OpenGl(target.context),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map -> map.openglBorrowedTextureAttach(descriptor, callerDriverOptions) },
+      attach = { map, driverWorkWake ->
+        map.openglBorrowedTextureAttach(descriptor, callerDriverOptions(driverWorkWake))
+      },
       setTarget = { session -> session.openglBorrowedTextureSetTarget(descriptor) },
     )
   }
@@ -137,12 +144,20 @@ internal object MapLibreNativeSurfaceAdapter {
   class BorrowedTarget(
     val sessionKey: SessionKey,
     val targetKey: TargetKey,
-    val attach: (MapHandle) -> RenderSessionAttachment,
+    /** Attaches a session whose driver work raises the given wake. */
+    val attach: (MapHandle, Wake) -> RenderSessionAttachment,
     val setTarget: (RenderSessionHandle) -> Deferred<Unit>,
   )
 
-  private val callerDriverOptions =
-    RenderSessionAttachOptions(driver = RenderDriverKind.CALLER_GRAPHICS_THREAD)
+  /**
+   * Each draw drains the frame results its demand produced, so the session raises only its
+   * driver-work wake, for work that arrives outside a draw.
+   */
+  private fun callerDriverOptions(driverWorkWake: Wake) =
+    RenderSessionAttachOptions(
+      driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
+      driverWorkWake = driverWorkWake,
+    )
 }
 
 private fun SurfaceExtent.toRenderTargetExtent(): RenderTargetExtent =
