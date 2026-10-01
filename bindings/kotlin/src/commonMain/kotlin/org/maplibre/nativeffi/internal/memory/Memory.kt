@@ -40,6 +40,9 @@ internal fun readU32(address: Long): UInt = NativeMemory.getInt(address).toUInt(
 
 internal fun writeU32(address: Long, value: UInt) = NativeMemory.putInt(address, value.toInt())
 
+/** Sets the [bits] of the `uint32_t` mask at [address], marking those fields present. */
+internal fun markPresent(address: Long, bits: UInt) = writeU32(address, readU32(address) or bits)
+
 internal fun readI64(address: Long): Long = NativeMemory.getLong(address)
 
 internal fun writeI64(address: Long, value: Long) = NativeMemory.putLong(address, value)

@@ -54,7 +54,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     nativeCall(this, binding, "mln_runtime_drain_events") {
       val out = allocate(8)
       check(C.mln_runtime_drain_events(handle, out, diagnostic))
-      adopt(readI64(out), GeneratedOwnerDisposal::eventBatch) { EventBatchHandle(it) }
+      adopt(out, GeneratedOwnerDisposal::eventBatch) { EventBatchHandle(it) }
     }
 
   public fun getEventMask(): RuntimeEventMask =

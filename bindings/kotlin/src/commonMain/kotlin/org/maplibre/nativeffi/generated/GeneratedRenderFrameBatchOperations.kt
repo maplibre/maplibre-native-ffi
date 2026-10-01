@@ -18,7 +18,7 @@ public abstract class GeneratedRenderFrameBatchOperations internal constructor()
 
   public fun get(indexValue: ULong): RenderFrameResult =
     nativeCall(this, binding, "mln_render_frame_batch_get") {
-      val out = allocate(48, 8).also { writeU32(it, 48.toUInt()) }
+      val out = sized(48, 8)
       check(C.mln_render_frame_batch_get(handle, indexValue.toLong(), out, diagnostic))
       readRenderFrameResult(out)
     }

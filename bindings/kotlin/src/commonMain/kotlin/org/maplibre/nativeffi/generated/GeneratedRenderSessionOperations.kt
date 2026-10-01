@@ -68,7 +68,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
 
   public fun abandon(): RenderAbandonResult =
     nativeCall(this, binding, "mln_render_session_abandon") {
-      val out = allocate(16, 4).also { writeU32(it, 16.toUInt()) }
+      val out = sized(16, 4)
       check(C.mln_render_session_abandon(handle, out, diagnostic))
       readRenderAbandonResult(out)
     }
@@ -77,7 +77,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     nativeCall(this, binding, "mln_render_session_acquire_frame") {
       val out = allocate(8)
       check(C.mln_render_session_acquire_frame(handle, out, diagnostic))
-      adopt(readI64(out), GeneratedOwnerDisposal::acquiredFrame) {
+      adopt(out, GeneratedOwnerDisposal::acquiredFrame) {
         AcquiredFrameHandle(it, this@GeneratedRenderSessionOperations as RenderSessionHandle)
       }
     }
@@ -111,7 +111,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     nativeCall(this, binding, "mln_render_session_drain_frame_results") {
       val out = allocate(8)
       check(C.mln_render_session_drain_frame_results(handle, out, diagnostic))
-      adopt(readI64(out), GeneratedOwnerDisposal::renderFrameBatch) { RenderFrameBatchHandle(it) }
+      adopt(out, GeneratedOwnerDisposal::renderFrameBatch) { RenderFrameBatchHandle(it) }
     }
 
   public fun dumpDebugLogs(): Deferred<Unit> =
@@ -121,14 +121,14 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
 
   public fun getCapabilities(): RenderSessionCapabilities =
     nativeCall(this, binding, "mln_render_session_get_capabilities") {
-      val out = allocate(16, 4).also { writeU32(it, 16.toUInt()) }
+      val out = sized(16, 4)
       check(C.mln_render_session_get_capabilities(handle, out, diagnostic))
       readRenderSessionCapabilities(out)
     }
 
   public fun getSnapshot(): RenderSessionSnapshot =
     nativeCall(this, binding, "mln_render_session_get_snapshot") {
-      val out = allocate(104, 8).also { writeU32(it, 104.toUInt()) }
+      val out = sized(104, 8)
       check(C.mln_render_session_get_snapshot(handle, out, diagnostic))
       readRenderSessionSnapshot(out)
     }
@@ -137,7 +137,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     nativeCall(this, binding, "mln_render_session_projection_create") {
       val out = allocate(8)
       check(C.mln_render_session_projection_create(handle, out, diagnostic))
-      adopt(readI64(out), GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
+      adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
     }
 
   public fun queryFeatureExtensions(

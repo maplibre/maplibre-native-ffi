@@ -10,9 +10,11 @@ import org.maplibre.nativeffi.internal.callback.CallbackScope
 import org.maplibre.nativeffi.internal.lifecycle.DecisionOwnerState
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.OwnerState
+import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive
 import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
 import org.maplibre.nativeffi.internal.memory.NativeArena
+import org.maplibre.nativeffi.internal.memory.readAddress
 import org.maplibre.nativeffi.internal.memory.readI64
 import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.internal.status.Status
@@ -46,9 +48,65 @@ internal class NativeCall(val handle: Long, val completion: Long = 0L) : NativeA
     scope?.accept(owner)
   }
 
-  /** Adopts the owned handle that native wrote, disposing it if [create] fails. */
-  fun <T> adopt(raw: Long, dispose: (Long) -> Unit, create: (Long) -> T): T =
-    adoptOwned(raw, dispose, create)
+  /** Adopts the owned handle that native wrote to [out], disposing it if [create] fails. */
+  fun <T> adopt(out: Long, dispose: (Long) -> Unit, create: (Long) -> T): T =
+    adoptOwned(readI64(out), dispose, create)
+
+  /**
+   * Adopts the owned handle at [out] like [adopt], then roots this call's registrations in the
+   * [callbacks] of the new owner, releasing it through [drop] if that fails.
+   */
+  fun <T> adoptRegistered(
+    out: Long,
+    dispose: (Long) -> Unit,
+    create: (Long) -> T,
+    callbacks: (T) -> CallbackOwner,
+    drop: (T) -> Unit,
+  ): T =
+    adopt(out, dispose, create).let { owner -> accept(owner, callbacks(owner)) { drop(owner) } }
+
+  /**
+   * Runs an attach: [submit] receives an out slot and a completion, writes the new owner to the
+   * slot at once, and reports readiness through the completion. A refused call throws before
+   * anything is adopted. Otherwise the owner is adopted as [adoptRegistered] does, or as [adopt]
+   * does when [callbacks] is null, and [result] pairs it with the readiness.
+   */
+  fun <H, R> attach(
+    submit: (out: Long, completion: Long) -> Int,
+    dispose: (Long) -> Unit,
+    create: (Long) -> H,
+    callbacks: ((H) -> CallbackOwner)?,
+    drop: (H) -> Unit,
+    result: (H, Deferred<Unit>) -> R,
+  ): R {
+    val out = allocate(8)
+    val ready = CompletionBridge.unitChecked { completion -> check(submit(out, completion)) }
+    val owner =
+      if (callbacks == null) adopt(out, dispose, create)
+      else adoptRegistered(out, dispose, create, callbacks, drop)
+    return result(owner, ready)
+  }
+
+  /**
+   * Runs [block] on a borrowed view: [begin] opens it and writes its token to a slot, and [end]
+   * closes it with that token. Values read through the [ViewScope] stop working once [block]
+   * returns.
+   */
+  inline fun <T> borrowView(
+    begin: (token: Long) -> Int,
+    end: (Long) -> Unit,
+    block: (ViewScope) -> T,
+  ): T {
+    val token = allocate(8)
+    check(begin(token))
+    val scope = ViewScope()
+    try {
+      return block(scope)
+    } finally {
+      scope.close()
+      end(readAddress(token))
+    }
+  }
 
   /** Roots this call's registrations in a new [owner], disposing it if that fails. */
   fun <T> accept(owner: T, callbacks: CallbackOwner, dispose: () -> Unit): T =
@@ -209,7 +267,7 @@ internal fun nativeComplete(
 
 /**
  * Runs the C operation [name] on a callback response at [address], which [scope] keeps valid only
- * on the callback's thread while it runs.
+ * on the callback's thread while it runs. The body passes [address] as [NativeCall.handle].
  */
 internal fun <T> nativeRespond(
   scope: CallbackScope,
@@ -220,7 +278,7 @@ internal fun <T> nativeRespond(
   ensureNativeLibrary()
   scope.ensureActive()
   CallbackAdmission.check(address, name)
-  return NativeCall(0L).use { it.body() }
+  return NativeCall(address).use { it.body() }
 }
 
 /** Runs [state]'s synchronous release, the C operation [name]. */

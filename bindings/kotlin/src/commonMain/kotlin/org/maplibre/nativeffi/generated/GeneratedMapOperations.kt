@@ -400,7 +400,7 @@ public abstract class GeneratedMapOperations internal constructor() {
 
   public fun cameraSnapshotGet(): MapCameraSnapshotGetResult =
     nativeCall(this, binding, "mln_map_camera_snapshot_get") {
-      val out0 = allocate(120, 8).also { writeU32(it, 120.toUInt()) }
+      val out0 = sized(120, 8)
       val out1 = allocate(8)
       check(C.mln_map_camera_snapshot_get(handle, out0, out1, diagnostic))
       MapCameraSnapshotGetResult(camera = readCameraOptions(out0), generation = readU64(out1))
@@ -1468,7 +1468,7 @@ public abstract class GeneratedMapOperations internal constructor() {
 
   public fun snapshotGet(): MapSnapshot =
     nativeCall(this, binding, "mln_map_snapshot_get") {
-      val out = allocate(456, 8).also { writeU32(it, 456.toUInt()) }
+      val out = sized(456, 8)
       check(C.mln_map_snapshot_get(handle, out, diagnostic))
       readMapSnapshot(out)
     }
@@ -1493,9 +1493,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_metal_borrowed_texture_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_metal_borrowed_texture_attach(
             handle,
             writeMetalBorrowedTextureDescriptor(descriptor),
@@ -1504,14 +1503,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 
@@ -1520,9 +1517,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_metal_owned_texture_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_metal_owned_texture_attach(
             handle,
             writeMetalOwnedTextureDescriptor(descriptor),
@@ -1531,14 +1527,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 
@@ -1547,9 +1541,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_metal_surface_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_metal_surface_attach(
             handle,
             writeMetalSurfaceDescriptor(descriptor),
@@ -1558,14 +1551,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 
@@ -1574,9 +1565,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_opengl_borrowed_texture_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_opengl_borrowed_texture_attach(
             handle,
             writeOpenglBorrowedTextureDescriptor(descriptor),
@@ -1585,14 +1575,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 
@@ -1601,9 +1589,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_opengl_owned_texture_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_opengl_owned_texture_attach(
             handle,
             writeOpenglOwnedTextureDescriptor(descriptor),
@@ -1612,14 +1599,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 
@@ -1628,9 +1613,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_opengl_surface_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_opengl_surface_attach(
             handle,
             writeOpenglSurfaceDescriptor(descriptor),
@@ -1639,14 +1623,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 
@@ -1655,9 +1637,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_vulkan_borrowed_texture_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_vulkan_borrowed_texture_attach(
             handle,
             writeVulkanBorrowedTextureDescriptor(descriptor),
@@ -1666,14 +1647,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 
@@ -1682,9 +1661,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_vulkan_owned_texture_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_vulkan_owned_texture_attach(
             handle,
             writeVulkanOwnedTextureDescriptor(descriptor),
@@ -1693,14 +1671,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 
@@ -1709,9 +1685,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_vulkan_surface_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_vulkan_surface_attach(
             handle,
             writeVulkanSurfaceDescriptor(descriptor),
@@ -1720,14 +1695,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 
@@ -1736,9 +1709,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_webgpu_borrowed_texture_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_webgpu_borrowed_texture_attach(
             handle,
             writeWebgpuBorrowedTextureDescriptor(descriptor),
@@ -1747,14 +1719,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 
@@ -1763,9 +1733,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_webgpu_owned_texture_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_webgpu_owned_texture_attach(
             handle,
             writeWebgpuOwnedTextureDescriptor(descriptor),
@@ -1774,14 +1743,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 
@@ -1790,9 +1757,8 @@ public abstract class GeneratedMapOperations internal constructor() {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment =
     nativeCall(this, binding, "mln_webgpu_surface_attach") {
-      val out = allocate(8)
-      val ready = CompletionBridge.unitChecked { completion ->
-        check(
+      attach(
+        { out, completion ->
           C.mln_webgpu_surface_attach(
             handle,
             writeWebgpuSurfaceDescriptor(descriptor),
@@ -1801,14 +1767,12 @@ public abstract class GeneratedMapOperations internal constructor() {
             completion,
             diagnostic,
           )
-        )
-      }
-      RenderSessionAttachment(
-        adopt(readI64(out), GeneratedOwnerDisposal::renderSession) {
-            RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle)
-          }
-          .let { accept(it, it.bindingCallbacks) { it.dispose() } },
-        ready,
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
       )
     }
 }

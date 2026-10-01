@@ -4,6 +4,7 @@ package org.maplibre.nativeffi.generated
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.call.NativeCall
+import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.memory.*
 import org.maplibre.nativeffi.render.NativePointer
 
@@ -21,51 +22,51 @@ internal fun NativeArena.putGeojsonSourceOptions(target: Long, value: GeojsonSou
   C.mln_geojson_source_options_default(target)
   writeU32(target + 4, 0u)
   value.minZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeF64(target + 8, it)
   }
   value.maxZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeF64(target + 16, it)
   }
   value.tolerance?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     writeF64(target + 24, it)
   }
   value.clusterMaxZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 8u)
+    markPresent(target + 4, 8u)
     writeF64(target + 32, it)
   }
   value.clusterProperties?.let {
-    writeU32(target + 4, readU32(target + 4) or 16u)
+    markPresent(target + 4, 16u)
     putView(target + 40, it)
   }
   value.tileSize?.let {
-    writeU32(target + 4, readU32(target + 4) or 32u)
+    markPresent(target + 4, 32u)
     writeU32(target + w(48, 56), it)
   }
   value.buffer?.let {
-    writeU32(target + 4, readU32(target + 4) or 64u)
+    markPresent(target + 4, 64u)
     writeU32(target + w(52, 60), it)
   }
   value.clusterRadius?.let {
-    writeU32(target + 4, readU32(target + 4) or 128u)
+    markPresent(target + 4, 128u)
     writeU32(target + w(56, 64), it)
   }
   value.clusterMinPoints?.let {
-    writeU32(target + 4, readU32(target + 4) or 256u)
+    markPresent(target + 4, 256u)
     writeU32(target + w(60, 68), it)
   }
   value.lineMetrics?.let {
-    writeU32(target + 4, readU32(target + 4) or 512u)
+    markPresent(target + 4, 512u)
     writeBool(target + w(64, 72), it)
   }
   value.cluster?.let {
-    writeU32(target + 4, readU32(target + 4) or 1024u)
+    markPresent(target + 4, 1024u)
     writeBool(target + w(65, 73), it)
   }
   value.synchronousTiling?.let {
-    writeU32(target + 4, readU32(target + 4) or 2048u)
+    markPresent(target + 4, 2048u)
     writeBool(target + w(66, 74), it)
   }
 }
@@ -134,31 +135,31 @@ internal fun NativeCall.putCustomGeometrySourceOptions(
   C.mln_custom_geometry_source_options_default(target)
   writeU32(target, w(64, 80).toUInt())
   value.minZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeF64(target + w(24, 32), it)
   }
   value.maxZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeF64(target + w(32, 40), it)
   }
   value.tolerance?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     writeF64(target + w(40, 48), it)
   }
   value.tileSize?.let {
-    writeU32(target + 4, readU32(target + 4) or 8u)
+    markPresent(target + 4, 8u)
     writeU32(target + w(48, 56), it)
   }
   value.buffer?.let {
-    writeU32(target + 4, readU32(target + 4) or 16u)
+    markPresent(target + 4, 16u)
     writeU32(target + w(52, 60), it)
   }
   value.clip?.let {
-    writeU32(target + 4, readU32(target + 4) or 32u)
+    markPresent(target + 4, 32u)
     writeBool(target + w(56, 64), it)
   }
   value.wrap?.let {
-    writeU32(target + 4, readU32(target + 4) or 64u)
+    markPresent(target + 4, 64u)
     writeBool(target + w(57, 65), it)
   }
   if (value.fetchTile == null && value.cancelTile == null) return
@@ -184,11 +185,11 @@ internal fun NativeCall.putCustomMvtVectorSourceOptions(
   C.mln_custom_mvt_vector_source_options_default(target)
   writeU32(target, w(48, 56).toUInt())
   value.minZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeF64(target + w(24, 32), it)
   }
   value.maxZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeF64(target + w(32, 40), it)
   }
   if (value.fetchTile == null && value.cancelTile == null) return
@@ -224,35 +225,35 @@ internal fun NativeArena.putStyleTileSourceOptions(target: Long, value: StyleTil
   C.mln_style_tile_source_options_default(target)
   writeU32(target + 4, 0u)
   value.minZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeF64(target + 8, it)
   }
   value.maxZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeF64(target + 16, it)
   }
   value.attribution?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     putView(target + 24, it)
   }
   value.scheme?.let {
-    writeU32(target + 4, readU32(target + 4) or 8u)
+    markPresent(target + 4, 8u)
     writeU32(target + w(32, 40), it.rawValue)
   }
   value.bounds?.let {
-    writeU32(target + 4, readU32(target + 4) or 16u)
+    markPresent(target + 4, 16u)
     putLatLngBounds(target + w(40, 48), it)
   }
   value.tileSize?.let {
-    writeU32(target + 4, readU32(target + 4) or 32u)
+    markPresent(target + 4, 32u)
     writeU32(target + w(72, 80), it)
   }
   value.vectorEncoding?.let {
-    writeU32(target + 4, readU32(target + 4) or 64u)
+    markPresent(target + 4, 64u)
     writeU32(target + w(76, 84), it.rawValue)
   }
   value.rasterEncoding?.let {
-    writeU32(target + 4, readU32(target + 4) or 128u)
+    markPresent(target + 4, 128u)
     writeU32(target + w(80, 88), it.rawValue)
   }
 }
@@ -280,15 +281,15 @@ internal fun NativeArena.putCameraFitOptions(target: Long, value: CameraFitOptio
   C.mln_camera_fit_options_default(target)
   writeU32(target + 4, 0u)
   value.padding?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     putEdgeInsets(target + 8, it)
   }
   value.bearing?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeF64(target + 40, it)
   }
   value.pitch?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     writeF64(target + 48, it)
   }
 }
@@ -308,15 +309,15 @@ internal fun NativeArena.putFeatureStateSelector(target: Long, value: FeatureSta
   writeU32(target, w(40, 72).toUInt())
   putView(target + 8, value.sourceId)
   value.sourceLayerId?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     putView(target + w(16, 24), it)
   }
   value.featureId?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     putView(target + w(24, 40), it)
   }
   value.stateKey?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     putView(target + w(32, 56), it)
   }
 }
@@ -337,40 +338,40 @@ internal fun NativeArena.putCameraOptions(target: Long, value: CameraOptions) {
   C.mln_camera_options_default(target)
   writeU32(target + 4, 0u)
   value.center?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeF64(target + 8, it.latitude)
     writeF64(target + 16, it.longitude)
   }
   value.centerAltitude?.let {
-    writeU32(target + 4, readU32(target + 4) or 16u)
+    markPresent(target + 4, 16u)
     writeF64(target + 24, it)
   }
   value.padding?.let {
-    writeU32(target + 4, readU32(target + 4) or 32u)
+    markPresent(target + 4, 32u)
     putEdgeInsets(target + 32, it)
   }
   value.anchor?.let {
-    writeU32(target + 4, readU32(target + 4) or 64u)
+    markPresent(target + 4, 64u)
     putScreenPoint(target + 64, it)
   }
   value.zoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeF64(target + 80, it)
   }
   value.bearing?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     writeF64(target + 88, it)
   }
   value.pitch?.let {
-    writeU32(target + 4, readU32(target + 4) or 8u)
+    markPresent(target + 4, 8u)
     writeF64(target + 96, it)
   }
   value.roll?.let {
-    writeU32(target + 4, readU32(target + 4) or 128u)
+    markPresent(target + 4, 128u)
     writeF64(target + 104, it)
   }
   value.fieldOfView?.let {
-    writeU32(target + 4, readU32(target + 4) or 256u)
+    markPresent(target + 4, 256u)
     writeF64(target + 112, it)
   }
 }
@@ -390,25 +391,25 @@ internal fun NativeArena.writeLogicalExtent(value: LogicalExtent): Long =
 internal fun NativeArena.putBoundOptions(target: Long, value: BoundOptions) {
   C.mln_bound_options_default(target)
   writeU32(target + 4, 0u)
-  if (value.unbounded) writeU32(target + 4, readU32(target + 4) or 32u)
+  if (value.unbounded) markPresent(target + 4, 32u)
   value.bounds?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     putLatLngBounds(target + 8, it)
   }
   value.minZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeF64(target + 40, it)
   }
   value.maxZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     writeF64(target + 48, it)
   }
   value.minPitch?.let {
-    writeU32(target + 4, readU32(target + 4) or 8u)
+    markPresent(target + 4, 8u)
     writeF64(target + 56, it)
   }
   value.maxPitch?.let {
-    writeU32(target + 4, readU32(target + 4) or 16u)
+    markPresent(target + 4, 16u)
     writeF64(target + 64, it)
   }
 }
@@ -420,11 +421,11 @@ internal fun NativeArena.putFreeCameraOptions(target: Long, value: FreeCameraOpt
   C.mln_free_camera_options_default(target)
   writeU32(target + 4, 0u)
   value.position?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     putVec3(target + 8, it)
   }
   value.orientation?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     putQuaternion(target + 32, it)
   }
 }
@@ -436,15 +437,15 @@ internal fun NativeArena.putProjectionMode(target: Long, value: ProjectionMode) 
   C.mln_projection_mode_default(target)
   writeU32(target + 4, 0u)
   value.axonometric?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeBool(target + 8, it)
   }
   value.xSkew?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeF64(target + 16, it)
   }
   value.ySkew?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     writeF64(target + 24, it)
   }
 }
@@ -456,33 +457,33 @@ internal fun NativeArena.putStyleImageOptions(target: Long, value: StyleImageOpt
   C.mln_style_image_options_default(target)
   writeU32(target + 4, 0u)
   value.stretchX?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     writeAddress(target + 8, array(it, 8, 4) { at, item -> putImageStretch(at, item) })
     writeSize(target + w(12, 16), it.size.toULong())
   }
   value.stretchY?.let {
-    writeU32(target + 4, readU32(target + 4) or 8u)
+    markPresent(target + 4, 8u)
     writeAddress(target + w(16, 24), array(it, 8, 4) { at, item -> putImageStretch(at, item) })
     writeSize(target + w(20, 32), it.size.toULong())
   }
   value.content?.let {
-    writeU32(target + 4, readU32(target + 4) or 16u)
+    markPresent(target + 4, 16u)
     putImageContent(target + w(24, 40), it)
   }
   value.textFitWidth?.let {
-    writeU32(target + 4, readU32(target + 4) or 32u)
+    markPresent(target + 4, 32u)
     writeU32(target + w(40, 56), it.rawValue)
   }
   value.textFitHeight?.let {
-    writeU32(target + 4, readU32(target + 4) or 64u)
+    markPresent(target + 4, 64u)
     writeU32(target + w(44, 60), it.rawValue)
   }
   value.pixelRatio?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeF32(target + w(48, 64), it)
   }
   value.sdf?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeBool(target + w(52, 68), it)
   }
 }
@@ -494,15 +495,15 @@ internal fun NativeArena.putStyleTransitionOptions(target: Long, value: StyleTra
   C.mln_style_transition_options_default(target)
   writeU32(target + 4, 0u)
   value.durationMs?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeF64(target + 8, it)
   }
   value.delayMs?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeF64(target + 16, it)
   }
   value.enablePlacementTransitions?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     writeBool(target + 24, it)
   }
 }
@@ -514,27 +515,27 @@ internal fun NativeArena.putMapTileOptions(target: Long, value: MapTileOptions) 
   C.mln_map_tile_options_default(target)
   writeU32(target + 4, 0u)
   value.prefetchZoomDelta?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeU32(target + 8, it)
   }
   value.lodMinRadius?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeF64(target + 16, it)
   }
   value.lodScale?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     writeF64(target + 24, it)
   }
   value.lodPitchThreshold?.let {
-    writeU32(target + 4, readU32(target + 4) or 8u)
+    markPresent(target + 4, 8u)
     writeF64(target + 32, it)
   }
   value.lodZoomShift?.let {
-    writeU32(target + 4, readU32(target + 4) or 16u)
+    markPresent(target + 4, 16u)
     writeF64(target + 40, it)
   }
   value.lodMode?.let {
-    writeU32(target + 4, readU32(target + 4) or 32u)
+    markPresent(target + 4, 32u)
     writeU32(target + 48, it.rawValue)
   }
 }
@@ -546,19 +547,19 @@ internal fun NativeArena.putMapViewportOptions(target: Long, value: MapViewportO
   C.mln_map_viewport_options_default(target)
   writeU32(target + 4, 0u)
   value.northOrientation?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeU32(target + 8, it.rawValue)
   }
   value.constrainMode?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeU32(target + 12, it.rawValue)
   }
   value.viewportMode?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     writeU32(target + 16, it.rawValue)
   }
   value.frustumOffset?.let {
-    writeU32(target + 4, readU32(target + 4) or 8u)
+    markPresent(target + 4, 8u)
     putEdgeInsets(target + 24, it)
   }
 }
@@ -854,7 +855,7 @@ internal fun NativeArena.putRenderedFeatureQueryOptions(
   C.mln_rendered_feature_query_options_default(target)
   writeU32(target + 4, 0u)
   value.layerIds?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeAddress(
       target + 8,
       array(it, 2 * NativeMemory.addressSize, NativeMemory.addressSize) { at, item ->
@@ -877,7 +878,7 @@ internal fun NativeArena.putSourceFeatureQueryOptions(
   C.mln_source_feature_query_options_default(target)
   writeU32(target + 4, 0u)
   value.sourceLayerIds?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeAddress(
       target + 8,
       array(it, 2 * NativeMemory.addressSize, NativeMemory.addressSize) { at, item ->
@@ -931,7 +932,7 @@ internal fun NativeArena.writeResourceResponse(value: ResourceResponse): Long =
 
 internal fun readMetalOwnedTextureFrame(
   source: Long,
-  scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null,
+  scope: ViewScope? = null,
 ): MetalOwnedTextureFrame =
   MetalOwnedTextureFrame(
       generation = readU64(source + 8),
@@ -953,7 +954,7 @@ internal fun readMetalOwnedTextureFrame(
 
 internal fun readOpenglOwnedTextureFrame(
   source: Long,
-  scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null,
+  scope: ViewScope? = null,
 ): OpenglOwnedTextureFrame =
   OpenglOwnedTextureFrame(
       generation = readU64(source + 8),
@@ -969,10 +970,7 @@ internal fun readOpenglOwnedTextureFrame(
     )
     .also { it.bindingScope = scope }
 
-internal fun readGpuSync(
-  source: Long,
-  scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null,
-): GpuSync =
+internal fun readGpuSync(source: Long, scope: ViewScope? = null): GpuSync =
   GpuSync(
       kind = GpuSyncKind(readU32(source + 4)),
       `object` = readU64(source + 8),
@@ -992,7 +990,7 @@ internal fun readRenderFrameResult(source: Long): RenderFrameResult =
 
 internal fun readVulkanOwnedTextureFrame(
   source: Long,
-  scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null,
+  scope: ViewScope? = null,
 ): VulkanOwnedTextureFrame =
   VulkanOwnedTextureFrame(
       generation = readU64(source + 8),
@@ -1013,7 +1011,7 @@ internal fun readVulkanOwnedTextureFrame(
 
 internal fun readWebgpuOwnedTextureFrame(
   source: Long,
-  scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null,
+  scope: ViewScope? = null,
 ): WebgpuOwnedTextureFrame =
   WebgpuOwnedTextureFrame(
       generation = readU64(source + 8),
@@ -1645,23 +1643,23 @@ internal fun NativeArena.putAnimationOptions(target: Long, value: AnimationOptio
   C.mln_animation_options_default(target)
   writeU32(target + 4, 0u)
   value.durationMs?.let {
-    writeU32(target + 4, readU32(target + 4) or 1u)
+    markPresent(target + 4, 1u)
     writeF64(target + 8, it)
   }
   value.velocity?.let {
-    writeU32(target + 4, readU32(target + 4) or 2u)
+    markPresent(target + 4, 2u)
     writeF64(target + 16, it)
   }
   value.minZoom?.let {
-    writeU32(target + 4, readU32(target + 4) or 4u)
+    markPresent(target + 4, 4u)
     writeF64(target + 24, it)
   }
   value.easing?.let {
-    writeU32(target + 4, readU32(target + 4) or 8u)
+    markPresent(target + 4, 8u)
     putUnitBezier(target + 32, it)
   }
   value.transitionId?.let {
-    writeU32(target + 4, readU32(target + 4) or 16u)
+    markPresent(target + 4, 16u)
     writeU64(target + 64, it)
   }
 }

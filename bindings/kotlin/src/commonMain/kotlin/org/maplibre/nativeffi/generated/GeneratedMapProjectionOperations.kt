@@ -16,7 +16,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
 
   public fun getCamera(): CameraOptions =
     nativeCall(this, binding, "mln_map_projection_get_camera") {
-      val out = allocate(120, 8).also { writeU32(it, 120.toUInt()) }
+      val out = sized(120, 8)
       check(C.mln_map_projection_get_camera(handle, out, diagnostic))
       readCameraOptions(out)
     }

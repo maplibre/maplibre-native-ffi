@@ -29,6 +29,10 @@ internal open class NativeArena : AutoCloseable {
     return block
   }
 
+  /** Allocates a record whose leading `uint32_t size` field holds its [size]. */
+  fun sized(size: Int, alignment: Int): Long =
+    allocate(size, alignment).also { writeU32(it, size.toUInt()) }
+
   private fun block(size: Long): Long = NativeMemory.allocate(size).also { blocks.add(it) }
 
   /** Copies [value] and returns its address, which is valid even when [value] is empty. */

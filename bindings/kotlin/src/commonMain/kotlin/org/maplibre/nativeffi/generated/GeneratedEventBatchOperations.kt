@@ -11,7 +11,7 @@ public abstract class GeneratedEventBatchOperations internal constructor() {
 
   public fun get(): RuntimeEventBatchView =
     nativeCall(this, binding, "mln_event_batch_get", Access.READ) {
-      val out = allocate(w(24, 40), w(4, 8)).also { writeU32(it, w(24, 40).toUInt()) }
+      val out = sized(w(24, 40), w(4, 8))
       check(C.mln_event_batch_get(handle, out, diagnostic))
       readRuntimeEventBatchView(out)
     }

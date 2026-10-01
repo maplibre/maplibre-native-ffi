@@ -48,6 +48,12 @@ class Native:
             return self.call(function, arguments)
         return f"check({self.call(function, [*arguments, 'diagnostic'])})"
 
+    def status(self, function, arguments):
+        """The status-returning call for a runtime helper that checks it."""
+        if not function.diagnostic:
+            raise Unsupported("helper-checked call requires a status and diagnostic")
+        return self.call(function, [*arguments, "diagnostic"])
+
 
 def parameter_name(native):
     local = identifier(native)
@@ -200,25 +206,57 @@ def declaration(params, defaults=None):
     return ", ".join(result)
 
 
-def call_arguments(plan, values):
-    """The native-call carrier for each C parameter of [plan], in C order."""
-    lengths = {
+def counted_inputs(plan):
+    """The array and buffer inputs that C takes with a separate length, by length parameter."""
+    return {
         p.value.length: p
         for p in plan.inputs
         if p.value.kind in {"array", "buffer"}
         and p.value.length not in {None, "nul", "1"}
     }
+
+
+def encoded_text(plan):
+    """The UTF-8 inputs with a separate length, which a call encodes once into a local."""
+    return [
+        p
+        for p in counted_inputs(plan).values()
+        if p.value.kind == "buffer" and p.value.encoding == "utf8"
+    ]
+
+
+def encodings(plan):
+    """The statements that encode each of [plan]'s `encoded_text` inputs, to start a body."""
+    statements = []
+    for parameter in encoded_text(plan):
+        local = parameter_name(parameter.name)
+        nullable = "?" if parameter.value.nullable or parameter.value.optional else ""
+        statements.append(f"val {local}Utf8 = {local}{nullable}.encodeToByteArray(); ")
+    return "".join(statements)
+
+
+def call_arguments(plan, values):
+    """The native-call carrier for each C parameter of [plan], in C order.
+
+    An `encoded_text` input refers to the local that `encodings` declares.
+    """
+    lengths = counted_inputs(plan)
+    encoded = {p.name for p in encoded_text(plan)}
+
+    def source(parameter):
+        local = parameter_name(parameter.name)
+        if parameter.name in encoded:
+            return replace(parameter.value, encoding="bytes"), local + "Utf8"
+        return parameter.value, local
+
     result = []
     for parameter in plan.inputs:
         if parameter.name == plan.receiver:
             result.append("handle")
         elif parameter.name in lengths:
-            source = lengths[parameter.name]
-            result.append(values.length(source.value, parameter_name(source.name)))
+            result.append(values.length(*source(lengths[parameter.name])))
         else:
-            result.append(
-                values.argument(parameter.value, parameter_name(parameter.name))
-            )
+            result.append(values.argument(*source(parameter)))
     return result
 
 
@@ -236,7 +274,11 @@ def output_storage(value, values):
                 f"allocate({values.size(value.native)}, {values.align(value.native)})"
             )
             size = next((f for f in value.fields if f.role == "size"), None)
-            if size:
+            if size and values.sized(value, size):
+                allocation = (
+                    f"sized({values.size(value.native)}, {values.align(value.native)})"
+                )
+            elif size:
                 allocation += (
                     ".also { "
                     + values.write_scalar(
@@ -327,7 +369,7 @@ def operation(plan, values, native):
     if not plan.completion:
         return immediate(plan, values, native)
     arguments = call_arguments(plan, values) + ["completion"]
-    body = native.checked(plan.function, arguments)
+    body = encodings(plan) + native.checked(plan.function, arguments)
     head = f"  public fun {method}({declaration(params)}): Deferred<{result_type}> ="
     owners = receiver_arguments(plan)
     callbacks = ", bindingCallbacks" if plan.registrations else ""
@@ -363,7 +405,7 @@ def immediate(plan, values, native):
     if decoded:
         setup.append(decoded)
     helper = f'nativeCall({receiver_arguments(plan)}, "{plan.name}"{access(plan)})'
-    body = "; ".join(setup)
+    body = encodings(plan) + "; ".join(setup)
     return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
 
@@ -379,7 +421,8 @@ def multiple_outputs(plan, values, native):
     setup.append(native.checked(plan.function, arguments))
     setup.append(f"{result_type}({', '.join(copied)})")
     helper = f'nativeCall({receiver_arguments(plan)}, "{plan.name}"{access(plan)})'
-    return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {'; '.join(setup)} }}\n"
+    body = encodings(plan) + "; ".join(setup)
+    return f"  public fun {method}({declaration(params)}): {result_type} = {helper} {{ {body} }}\n"
 
 
 def disposal_method(handle):
@@ -429,7 +472,7 @@ def owned(plan, values, native):
     owners = receiver_arguments(plan)
     if plan.completion and not immediate_owner:
         arguments.append("completion")
-        body = native.checked(plan.function, arguments)
+        body = encodings(plan) + native.checked(plan.function, arguments)
         drop = "it." + disposal_method(handle) + "()"
         return (
             f'{head} nativeSubmitOwned({owners}, "{plan.name}", {create}, {disposal(handle)}, '
@@ -437,22 +480,24 @@ def owned(plan, values, native):
         )
     arguments.append("out")
     registered = any(values.needs_registration(p.value) for p in inputs)
-    adopted = f"adopt(readI64(out), {disposal(handle)}) {create}"
+    callbacks = "{ it.bindingCallbacks }" if registered else "null"
+    drop = f"{{ it.{disposal_method(handle)}() }}"
     if registered:
-        adopted += f".let {{ accept(it, it.bindingCallbacks) {{ it.{disposal_method(handle)}() }} }}"
-    setup = ["val out = allocate(8)"]
+        adopted = (
+            f"adoptRegistered(out, {disposal(handle)}, {create}, {callbacks}, {drop})"
+        )
+    else:
+        adopted = f"adopt(out, {disposal(handle)}) {create}"
     if attachment:
         arguments.append("completion")
-        setup.append(
-            "val ready = CompletionBridge.unitChecked { completion -> "
-            + native.checked(plan.function, arguments)
-            + " }"
+        call = native.status(plan.function, arguments)
+        body = (
+            f"attach({{ out, completion -> {call} }}, {disposal(handle)}, {create}, "
+            f"{callbacks}, {drop}, ::{returns})"
         )
-        setup.append(f"{returns}({adopted}, ready)")
     else:
-        setup.append(native.checked(plan.function, arguments))
-        setup.append(adopted)
-    return f'{head} nativeCall({owners}, "{plan.name}") {{ {"; ".join(setup)} }}\n'
+        body = f"val out = allocate(8); {native.checked(plan.function, arguments)}; {adopted}"
+    return f'{head} nativeCall({owners}, "{plan.name}") {{ {encodings(plan)}{body} }}\n'
 
 
 def lifecycle(plan, values, native):
@@ -479,7 +524,7 @@ def lifecycle(plan, values, native):
     if plan.completion:
         arguments.append("completion")
     setup.append(native.checked(plan.function, arguments))
-    body = "; ".join(setup)
+    body = encodings(plan) + "; ".join(setup)
     if plan.completion:
         return (
             f"  public fun {method}({declaration(params, defaults)}): Deferred<Unit> = "
@@ -499,17 +544,15 @@ def view(plan, values, native):
     method = "with" + method[0].upper() + method[1:]
     functions = values.bound.source.functions_by_name
     allocation, _decoded = output_storage(result, values)
-    begin = native.checked(functions[owner.view_begin], ["handle", "token"])
-    end = native.checked(functions[owner.view_end], ["readAddress(token)"])
+    begin = native.status(functions[owner.view_begin], ["handle", "it"])
+    end = native.checked(functions[owner.view_end], ["it"])
     read = native.checked(plan.function, ["handle", "out"])
     decoded = values.decode(result, "out", "scope")
     return (
         f"  public fun <T> {method}(block: ({result_type}) -> T): T = "
         f'nativeCall({receiver_arguments(plan)}, "{plan.name}") {{ '
-        f"val token = allocate(8); {begin}; "
-        "val scope = org.maplibre.nativeffi.internal.lifecycle.ViewScope(); "
-        f"try {{ val out = {allocation}; {read}; block({decoded}) }} "
-        f"finally {{ scope.close(); {end} }} }}\n"
+        f"borrowView({{ {begin} }}, {{ {end} }}) {{ scope -> "
+        f"val out = {allocation}; {read}; block({decoded}) }} }}\n"
     )
 
 

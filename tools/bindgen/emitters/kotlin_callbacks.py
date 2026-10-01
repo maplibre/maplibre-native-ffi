@@ -463,6 +463,7 @@ def operation(plan, values, native):
     from .kotlin_operations import (
         call_arguments,
         declaration,
+        encodings,
         parameter_name,
         receiver_arguments,
     )
@@ -488,7 +489,8 @@ def operation(plan, values, native):
         if decision and plan.name == decision.cancelled:
             arguments.append("out")
             body = (
-                "val out = allocate(1); "
+                encodings(plan)
+                + "val out = allocate(1); "
                 + native.checked(plan.function, arguments)
                 + "; readBool(out)"
             )
@@ -499,13 +501,17 @@ def operation(plan, values, native):
         if decision:
             return (
                 f"  public fun {method}({declaration(params)}): Unit = "
-                f'nativeComplete(this, binding, "{plan.name}") {{ {native.checked(plan.function, arguments)} }}\n'
+                f'nativeComplete(this, binding, "{plan.name}") '
+                f"{{ {encodings(plan)}{native.checked(plan.function, arguments)} }}\n"
             )
         scoped = parameter_name(plan.scoped_receiver)
+        # nativeRespond has checked the scope and passes the response as the call's handle.
+        index = [p.name for p in plan.inputs].index(plan.scoped_receiver)
+        arguments[index] = "handle"
         return (
             f"  public fun {method}({declaration(params)}): Unit = "
             f'nativeRespond({scoped}.bindingScope, {scoped}.bindingAddress, "{plan.name}") '
-            f"{{ {native.checked(plan.function, arguments)} }}\n"
+            f"{{ {encodings(plan)}{native.checked(plan.function, arguments)} }}\n"
         )
     if not plan.registrations or plan.owned_outputs:
         return None
@@ -523,7 +529,7 @@ def operation(plan, values, native):
     return (
         f"  public fun {method}({', '.join(f'{n}: {t}' for n, t in params)}): Deferred<{result}> = "
         f'{helper}({receiver_arguments(plan)}, "{plan.name}", bindingCallbacks) '
-        f"{{ {native.checked(plan.function, arguments)} }}\n"
+        f"{{ {encodings(plan)}{native.checked(plan.function, arguments)} }}\n"
     )
 
 
