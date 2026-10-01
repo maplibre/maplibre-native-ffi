@@ -4,8 +4,9 @@ import os
 import QuartzCore
 import UIKit
 
-/// The display-paced render loop. This view owns the layer, gesture decoding,
-/// runtime, map, Metal objects, and render session on the main thread.
+/// The map view. It owns the layer, gesture decoding, the Metal objects, and
+/// the render loop, which owns the map and the render session, on the main
+/// thread.
 @MainActor
 final class MetalMapView: UIView {
   static let willTerminateMapViews = Notification
@@ -15,20 +16,12 @@ final class MetalMapView: UIView {
     category: "MapView"
   )
   private var graphics: MetalGraphicsContext?
-  private var mapState: MapState?
-  private var renderTarget: MetalRenderTarget?
-  private var setupTask: Task<Void, Never>?
-  private var displayLink: CADisplayLink?
-  private var frameTask: Task<Void, Never>?
+  private var loop: RenderLoop?
+  private var startup: Task<Void, Never>?
   private var shutdownTask: Task<Void, Never>?
-  private var pendingUpdates: Task<Void, Never>?
   private var currentViewport: Viewport?
-  private var renderRequested = true
-  private var didLogStartupStatus = false
   private var viewVisible = false
   private var appForeground = true
-  private var isShutDown = false
-  private var pendingResize = false
 
   /// The recognizers with a gesture still open. Pinch, rotation, and shove
   /// recognize simultaneously and report to the map as one gesture.
@@ -65,8 +58,7 @@ final class MetalMapView: UIView {
   deinit {
     NotificationCenter.default.removeObserver(self)
     MainActor.assumeIsolated {
-      stopHostLoop()
-      renderTarget?.abandon()
+      loop?.abandon()
     }
   }
 
@@ -74,7 +66,8 @@ final class MetalMapView: UIView {
     super.didMoveToWindow()
     viewVisible = window != nil
     if viewVisible {
-      refreshAndStartIfNeeded()
+      updatePresenting()
+      refreshViewport()
     } else {
       // Leaving the window ends this view's map: release the session, then the
       // map, then the runtime.
@@ -89,214 +82,86 @@ final class MetalMapView: UIView {
 
   @objc private func enterForeground() {
     appForeground = true
-    refreshAndStartIfNeeded()
+    updatePresenting()
+    refreshViewport()
   }
 
   @objc private func enterBackground() {
     appForeground = false
-    stopHostLoop()
+    updatePresenting()
   }
 
   @objc private func closeMap() {
-    stopHostLoop()
     beginTeardown()
   }
 
-  /// Closes the session before closing the map; a map with an
-  /// attached session cannot be destroyed.
-  private func beginTeardown() {
-    guard !isShutDown else { return }
-    isShutDown = true
-    stopHostLoop()
-    if frameTask == nil {
-      finishTeardown()
-    }
+  /// Demands frames only while the view is visible in the foreground. The
+  /// native scheduler keeps loading, and driver wakes keep being serviced.
+  private func updatePresenting() {
+    loop?.isPresenting = viewVisible && appForeground
   }
 
-  private func finishTeardown() {
+  /// Closes the render loop once startup settles.
+  private func beginTeardown() {
     guard shutdownTask == nil else { return }
-    let target = renderTarget
-    renderTarget = nil
-    let setup = setupTask
-    // A failing update reaches here from inside the update chain, so the chain
-    // is dropped rather than awaited; `isShutDown` stops every queued update
-    // before it touches the map.
-    pendingUpdates = nil
+    let startup = startup
     shutdownTask = Task { @MainActor in
-      await setup?.value
+      await startup?.value
       do {
-        try await target?.close()
-        try await self.mapState?.close()
+        try await self.loop?.close()
       } catch {
         self.log.error("\(String(describing: error), privacy: .public)")
       }
-      self.mapState = nil
+      self.loop = nil
     }
   }
 
-  @objc private func displayLinkTick() {
-    guard frameTask == nil, !isShutDown else { return }
-    frameTask = Task { @MainActor in
-      await renderDisplayFrame()
-      frameTask = nil
-      if isShutDown {
-        finishTeardown()
-      }
-    }
-  }
-
-  private func renderDisplayFrame() async {
-    guard !isShutDown else { return }
-    await attachIfNeeded()
-    guard !isShutDown,
-          let renderTarget,
-          let viewport = currentViewport,
-          !viewport.isEmpty
-    else { return }
-
-    do {
-      if pendingResize {
-        try await renderTarget.resize(viewport)
-        pendingResize = false
-      }
-      if renderRequested {
-        renderRequested = false
-        let rendered = try renderTarget.renderFrame()
-        if !rendered {
-          renderRequested = true
-        }
-      }
-    } catch {
-      showError(error)
-      beginTeardown()
-    }
-  }
-
-  /// Attaches the render session on the graphics thread that services it.
-  private func attachIfNeeded() async {
-    guard renderTarget == nil,
-          let graphics,
-          let viewport = currentViewport,
-          !viewport.isEmpty,
-          let renderMap = mapState?.mapHandle
-    else { return }
-
-    do {
-      renderTarget = try await MetalRenderTarget.attach(
-        map: renderMap,
-        graphics: graphics,
-        viewport: viewport
-      )
-      // The viewport can change while the attach is in flight; the session
-      // was attached at the captured extent, so carry any later change into
-      // the next tick's session resize.
-      pendingResize = currentViewport != viewport
-      if !didLogStartupStatus {
+  /// Starts the loop once a non-empty viewport is known, because the map takes
+  /// its initial extent from it.
+  private func startIfNeeded(viewport: Viewport) {
+    guard startup == nil, shutdownTask == nil, let graphics else { return }
+    startup = Task { @MainActor in
+      do {
+        let loop = try await RenderLoop.start(
+          graphics: graphics,
+          viewport: viewport
+        )
+        loop.onFailure = { [weak self] in self?.fail($0) }
+        self.loop = loop
+        updatePresenting()
         log.info("render target: native-surface")
         log.info(
           "render target status: renders directly to the host view surface"
         )
-        didLogStartupStatus = true
-      }
-      renderRequested = true
-    } catch {
-      showError(error)
-      beginTeardown()
-    }
-  }
-
-  private func refreshAndStartIfNeeded() {
-    guard !isShutDown else { return }
-    refreshViewport()
-    if viewVisible, appForeground {
-      renderRequested = true
-      startHostLoop()
-    }
-  }
-
-  private func startHostLoop() {
-    guard displayLink == nil else { return }
-    let link = CADisplayLink(target: self, selector: #selector(displayLinkTick))
-    link.add(to: .main, forMode: .common)
-    displayLink = link
-  }
-
-  private func stopHostLoop() {
-    displayLink?.invalidate()
-    displayLink = nil
-  }
-
-  /// Creates the map once a non-empty viewport is known, because the map takes
-  /// its initial extent from it.
-  private func startMapStateIfNeeded(viewport: Viewport) {
-    guard mapState == nil, setupTask == nil, !isShutDown else { return }
-    setupTask = Task { @MainActor [weak self] in
-      guard let self else { return }
-      var setupFailure: Error?
-      do {
-        let state = try await MapState(viewport: viewport)
-        if self.isShutDown {
-          try await state.close()
-        } else {
-          if let latest = self.currentViewport, !latest.isEmpty,
-             latest != viewport
-          {
-            try await state.resize(LogicalExtent(
-              width: latest.logicalWidth,
-              height: latest.logicalHeight,
-              scaleFactor: latest.scaleFactor
-            ))
-          }
-          self.mapState = state
-          state.scheduleEventDrains(
-            onRenderRequested: { [weak self] in
-              self?.renderRequested = true
-            },
-            onFailure: { [weak self] error in
-              self?.showError(error)
-              self?.beginTeardown()
-            }
-          )
-          self.renderRequested = true
+        // The viewport can change while startup is in flight.
+        if let latest = currentViewport, latest != viewport, !latest.isEmpty {
+          loop.resize(latest)
         }
       } catch {
-        setupFailure = error
-      }
-      self.setupTask = nil
-      if let setupFailure {
-        self.showError(setupFailure)
-        self.beginTeardown()
+        fail(error)
       }
     }
   }
 
   private func refreshViewport() {
-    guard !isShutDown, let graphics else { return }
+    guard shutdownTask == nil, let graphics else { return }
     let viewport = readViewport()
     guard viewport != currentViewport else { return }
     viewport
       .log(currentViewport == nil ? "initial viewport" : "resized viewport")
-    if viewport.isEmpty {
-      currentViewport = viewport
-      return
-    }
-
-    graphics.resize(viewport)
     currentViewport = viewport
-    pendingResize = renderTarget != nil
-    if !pendingResize {
-      // With no session attached the map is the only extent authority; a live
-      // session carries the extent through its own resize on the next tick.
-      updateMap { state in
-        try await state.resize(LogicalExtent(
-          width: viewport.logicalWidth,
-          height: viewport.logicalHeight,
-          scaleFactor: viewport.scaleFactor
-        ))
-      }
+    guard !viewport.isEmpty else { return }
+    graphics.resize(viewport)
+    if let loop {
+      loop.resize(viewport)
+    } else {
+      startIfNeeded(viewport: viewport)
     }
-    renderRequested = true
-    startMapStateIfNeeded(viewport: viewport)
+  }
+
+  private func fail(_ error: Error) {
+    showError(error)
+    beginTeardown()
   }
 
   private func readViewport() -> Viewport {
@@ -376,35 +241,16 @@ final class MetalMapView: UIView {
     )
   }
 
-  /// Submits one camera command. Each task awaits the one before it, so a
-  /// gesture-begin submission always reaches the map ahead of the deltas the
-  /// same gesture produces; main-actor isolation alone gives exclusion, not
-  /// order.
-  private func updateMap(
-    _ update: @escaping @MainActor (MapState) async throws -> Void
-  ) {
-    guard !isShutDown, mapState != nil else { return }
-    renderRequested = true
-    let previous = pendingUpdates
-    pendingUpdates = Task { @MainActor in
-      await previous?.value
-      guard !self.isShutDown, let state = self.mapState else { return }
-      do {
-        try await update(state)
-      } catch {
-        self.showError(error)
-        self.beginTeardown()
-      }
-    }
+  /// The map that gestures drive, once the loop is running.
+  private var mapState: MapState? {
+    shutdownTask == nil ? loop?.mapState : nil
   }
 
   /// Opens the gesture bracket for the first recognizer to begin.
   private func beginGesture(_ recognizer: UIGestureRecognizer) {
     if openGestures.isEmpty {
-      updateMap { state in
-        try await state.cancelTransitions()
-        try await state.setGestureInProgress(true)
-      }
+      mapState?.cancelTransitions()
+      mapState?.setGestureInProgress(true)
     }
     openGestures.insert(ObjectIdentifier(recognizer))
   }
@@ -416,7 +262,7 @@ final class MetalMapView: UIView {
       return
     }
     if openGestures.isEmpty {
-      updateMap { try await $0.setGestureInProgress(false) }
+      mapState?.setGestureInProgress(false)
     }
   }
 
@@ -429,12 +275,7 @@ final class MetalMapView: UIView {
       let translation = recognizer.translation(in: self)
       recognizer.setTranslation(.zero, in: self)
       guard translation != .zero else { return }
-      updateMap { state in
-        try await state.moveBy(
-          dx: Double(translation.x),
-          dy: Double(translation.y)
-        )
-      }
+      mapState?.moveBy(dx: Double(translation.x), dy: Double(translation.y))
     default:
       endGesture(recognizer)
     }
@@ -450,7 +291,7 @@ final class MetalMapView: UIView {
       recognizer.scale = 1.0
       guard scale.isFinite, scale > 0 else { return }
       let anchor = screenPoint(recognizer.location(in: self))
-      updateMap { try await $0.scaleBy(scale, anchor: anchor) }
+      mapState?.scaleBy(scale, anchor: anchor)
     default:
       endGesture(recognizer)
     }
@@ -466,12 +307,10 @@ final class MetalMapView: UIView {
       recognizer.rotation = 0
       guard deltaRadians != 0 else { return }
       let anchor = screenPoint(recognizer.location(in: self))
-      updateMap {
-        try await $0.adjustBearing(
-          delta: -Double(deltaRadians * 180 / .pi),
-          anchor: anchor
-        )
-      }
+      mapState?.adjustBearing(
+        delta: -Double(deltaRadians * 180 / .pi),
+        anchor: anchor
+      )
     default:
       endGesture(recognizer)
     }
@@ -488,9 +327,7 @@ final class MetalMapView: UIView {
       let translation = recognizer.translation(in: self)
       recognizer.setTranslation(.zero, in: self)
       guard translation.y != 0 else { return }
-      updateMap {
-        try await $0.adjustPitch(delta: -Double(translation.y) * 0.1)
-      }
+      mapState?.adjustPitch(delta: -Double(translation.y) * 0.1)
     default:
       endGesture(recognizer)
     }
@@ -498,12 +335,10 @@ final class MetalMapView: UIView {
 
   @objc private func handleDoubleTap(_ recognizer: UITapGestureRecognizer) {
     let anchor = screenPoint(recognizer.location(in: self))
-    updateMap {
-      try await $0.zoomToNextStep(
-        anchor: anchor,
-        animation: MaplibreNativeFFI.AnimationOptions(durationMs: 160)
-      )
-    }
+    mapState?.zoomToNextStep(
+      anchor: anchor,
+      animation: MaplibreNativeFFI.AnimationOptions(durationMs: 160)
+    )
   }
 
   private func screenPoint(_ point: CGPoint) -> ScreenPoint {

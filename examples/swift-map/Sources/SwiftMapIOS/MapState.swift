@@ -30,26 +30,24 @@ struct Viewport: Equatable {
   }
 }
 
-/// Runtime and map state owned by the main render loop.
+/// The runtime and map, driven by the native scheduler thread the runtime
+/// owns. Camera and resize calls submit commands without waiting for them.
 @MainActor
 final class MapState {
   private let runtime: RuntimeHandle
-  private let map: MapHandle
+  let map: MapHandle
   private var isClosed = false
-  private let eventRelay: EventRelay
+  /// Reports a command that failed after native code accepted it.
+  var onFailure: (@MainActor (Error) -> Void)?
 
-  init(viewport: Viewport) async throws {
+  /// Creates the map. `eventWake` reports queued runtime events.
+  init(viewport: Viewport, eventWake: Wake) async throws {
     precondition(
       !viewport.isEmpty,
       "cannot create MapState with an empty viewport"
     )
-    let eventRelay = EventRelay()
-    self.eventRelay = eventRelay
     let runtime = try Maplibre.runtimeCreate(
-      options: RuntimeOptions(
-        cachePath: ":memory:",
-        eventWake: Wake(callback: { Task { @MainActor in eventRelay.fire() } })
-      )
+      options: RuntimeOptions(cachePath: ":memory:", eventWake: eventWake)
     )
     let map: MapHandle
     do {
@@ -59,7 +57,8 @@ final class MapState {
           height: viewport.logicalHeight,
           scaleFactor: viewport.scaleFactor
         ),
-        mapMode: .continuous
+        mapMode: .continuous,
+        eventMask: [.mapRenderUpdateAvailable]
       ))
     } catch {
       try? await runtime.close()
@@ -68,7 +67,6 @@ final class MapState {
 
     self.runtime = runtime
     self.map = map
-    try await map.setEventMask(mask: [.mapRenderUpdateAvailable])
     _ = try await map.setStyleUrl(url:
       "https://tiles.openfreemap.org/styles/bright")
     _ = try await map.updateCamera(update: CameraUpdate(camera: CameraOptions(
@@ -77,114 +75,93 @@ final class MapState {
       bearing: 12,
       pitch: 30
     )))
-    _ = try await map.requestRepaint()
-  }
-
-  var mapHandle: MapHandle {
-    map
-  }
-
-  func scheduleEventDrains(
-    onRenderRequested: @escaping @MainActor @Sendable () -> Void,
-    onFailure: @escaping @MainActor @Sendable (Error) -> Void
-  ) {
-    eventRelay.callback = { [weak self] in
-      guard let self, !self.isClosed else { return }
-      do { if try self.drainEvents() { onRenderRequested() } }
-      catch { onFailure(error) }
-    }
-    eventRelay.fire()
   }
 
   func close() async throws {
     guard !isClosed else { return }
     isClosed = true
-    eventRelay.callback = nil
     // Awaiting both release completions lets native teardown finish before the
     // app tears down state that the callbacks use.
     try await map.close()
     try await runtime.close()
   }
 
-  private func drainEvents() throws -> Bool {
-    var renderPending = false
-    let batch: EventBatchHandle
-    do { batch = try runtime.drainEvents() }
-    catch let error as MaplibreError
-      where error.kind == .notReady { return false }
+  /// Drains every queued runtime event and reports whether the map published
+  /// a render update.
+  func drainEvents() throws -> Bool {
+    guard !isClosed else { return false }
+    let batch = try runtime.drainEvents()
     defer { try? batch.close() }
-    for event in try batch.get().events
-      where event.sourceType == .map && event.source == map.id
-    {
-      if event.type == .mapRenderUpdateAvailable {
-        renderPending = true
-      }
+    return try batch.get().events.contains {
+      $0.sourceType == .map && $0.source == map.id &&
+        $0.type == .mapRenderUpdateAvailable
     }
-    return renderPending
   }
 
-  func resize(_ extent: LogicalExtent) async throws {
-    _ = try await map.resize(extent: extent)
-  }
-
-  func setGestureInProgress(_ inProgress: Bool) async throws {
-    _ = try await map.updateCamera(update: CameraUpdate(
+  func setGestureInProgress(_ inProgress: Bool) {
+    submit { _ = try await $0.updateCamera(update: CameraUpdate(
       camera: CameraOptions(),
       gesturePhase: inProgress ? .begin : .end
-    ))
+    )) }
   }
 
-  func cancelTransitions() async throws {
-    _ = try await map.cancelTransitions()
+  func cancelTransitions() {
+    submit { _ = try await $0.cancelTransitions() }
   }
 
-  func moveBy(dx: Double, dy: Double) async throws {
-    _ = try await map.applyCameraDelta(delta:
-      CameraDelta(offset: ScreenPoint(x: dx, y: dy)))
+  func moveBy(dx: Double, dy: Double) {
+    submit { _ = try await $0.applyCameraDelta(delta:
+      CameraDelta(offset: ScreenPoint(x: dx, y: dy))) }
   }
 
-  func scaleBy(_ scale: Double, anchor: ScreenPoint) async throws {
-    _ = try await map.applyCameraDelta(delta: CameraDelta(
+  func scaleBy(_ scale: Double, anchor: ScreenPoint) {
+    submit { _ = try await $0.applyCameraDelta(delta: CameraDelta(
       kind: .scale,
       amount: scale,
       anchor: anchor
-    ))
+    )) }
   }
 
-  func adjustBearing(delta: Double, anchor: ScreenPoint) async throws {
-    _ = try await map.applyCameraDelta(delta: CameraDelta(
+  func adjustBearing(delta: Double, anchor: ScreenPoint) {
+    submit { _ = try await $0.applyCameraDelta(delta: CameraDelta(
       kind: .bearing,
       amount: delta,
       anchor: anchor
-    ))
+    )) }
   }
 
-  func adjustPitch(delta: Double) async throws {
-    _ = try await map.applyCameraDelta(delta: CameraDelta(
+  func adjustPitch(delta: Double) {
+    submit { _ = try await $0.applyCameraDelta(delta: CameraDelta(
       kind: .pitch,
       amount: delta
-    ))
+    )) }
   }
 
-  /// Eases to the next whole zoom level, `round(zoom) + 1`, about `anchor`.
-  func zoomToNextStep(
-    anchor: ScreenPoint,
-    animation: AnimationOptions
-  ) async throws {
-    let zoom = try map.cameraSnapshotGet().camera.zoom ?? 0
-    _ = try await map.applyCameraDelta(delta: CameraDelta(
-      kind: .scale,
-      amount: pow(2.0, (zoom.rounded() + 1) - zoom),
-      anchor: anchor,
-      animation: animation
-    ))
+  /// Eases to the next whole zoom level, `round(zoom) + 1`, about `anchor`,
+  /// from the zoom of the latest published camera snapshot.
+  func zoomToNextStep(anchor: ScreenPoint, animation: AnimationOptions) {
+    submit {
+      let zoom = try $0.cameraSnapshotGet().camera.zoom ?? 0
+      _ = try await $0.applyCameraDelta(delta: CameraDelta(
+        kind: .scale,
+        amount: pow(2.0, (zoom.rounded() + 1) - zoom),
+        anchor: anchor,
+        animation: animation
+      ))
+    }
   }
-}
 
-@MainActor
-private final class EventRelay {
-  var callback: (() -> Void)?
-  func fire() {
-    callback?()
+  /// Submits one command. The command reaches native code when its task
+  /// starts, before the task first suspends, and tasks that the main actor
+  /// creates for itself start in creation order, so commands keep input order.
+  private func submit(
+    _ command: @escaping @MainActor @Sendable (MapHandle) async throws -> Void
+  ) {
+    guard !isClosed else { return }
+    let map = map
+    Task { @MainActor [weak self] in
+      do { try await command(map) }
+      catch { self?.onFailure?(error) }
+    }
   }
 }

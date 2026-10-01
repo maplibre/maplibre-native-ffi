@@ -40,22 +40,35 @@ final class MetalGraphicsContext {
   }
 }
 
-/// The render session for the host `CAMetalLayer`. The display link services
-/// driver work on the graphics thread. Every operation remains isolated to the
-/// main actor.
+/// What one drain of the frame-result queue found.
+struct FrameResults {
+  /// A demand rendered and presented a frame.
+  var rendered = false
+  /// The map asked for another frame while it rendered one.
+  var needsRepaint = false
+  /// The target could not produce a frame, so the loop retries later.
+  var targetNotReady = false
+}
+
+/// The render session for the host `CAMetalLayer`. A driver wake services
+/// caller-driver work on the main thread that owns the Metal objects.
 @MainActor
 final class MetalRenderTarget {
   private let session: RenderSessionHandle
+  private let driverRelay: DriverRelay
+  private var nextToken: UInt64 = 0
 
-  private init(session: RenderSessionHandle) {
+  private init(session: RenderSessionHandle, driverRelay: DriverRelay) {
     self.session = session
+    self.driverRelay = driverRelay
   }
 
-  /// Attaches a session against the map owned by the view.
+  /// Attaches a session against the map. `frameWake` reports frame results.
   static func attach(
     map: MapHandle,
     graphics: MetalGraphicsContext,
-    viewport: Viewport
+    viewport: Viewport,
+    frameWake: Wake
   ) async throws -> MetalRenderTarget {
     let driverRelay = DriverRelay()
     let attachment = try map.metalSurfaceAttach(
@@ -66,6 +79,7 @@ final class MetalRenderTarget {
       ),
       options: .init(
         driver: .callerGraphicsThread,
+        frameWake: frameWake,
         driverWorkWake: driverRelay.wake
       )
     )
@@ -74,7 +88,7 @@ final class MetalRenderTarget {
       driverRelay.session = session
       _ = try session.serviceDriverWork(maxWork: 0)
       try await attachment.completion.value
-      return MetalRenderTarget(session: session)
+      return MetalRenderTarget(session: session, driverRelay: driverRelay)
     } catch {
       _ = try? session.abandon()
       try? session.close()
@@ -82,27 +96,50 @@ final class MetalRenderTarget {
     }
   }
 
-  func resize(_ viewport: Viewport) async throws {
-    try await session.resize(extent: viewport.extent)
+  /// Starts the session resize, reporting an asynchronous failure through
+  /// `onFailure`. A later resize supersedes an earlier one that has not
+  /// applied yet.
+  func resize(
+    _ viewport: Viewport,
+    onFailure: @escaping @MainActor (Error) -> Void
+  ) {
+    let session = session
+    Task { @MainActor in
+      do { try await session.resize(extent: viewport.extent) }
+      catch { onFailure(error) }
+    }
   }
 
-  /// Services graphics work, submits one display-link-paced frame demand, and
-  /// reports whether the loop may rest. It reports false when no frame reached
-  /// the screen and when the map asked for another frame while this one
-  /// rendered, so the loop demands one more.
-  func renderFrame() throws -> Bool {
-    try session.requestFrame(demand: FrameDemand(flags: [.ifNeeded, .present]))
-    _ = try session.serviceDriverWork(maxWork: 0)
+  /// Demands a presented frame. A forced demand renders even without a newer
+  /// map update, which a retry after an undrawn frame needs.
+  func requestFrame(force: Bool = false) throws {
+    nextToken += 1
+    try session.requestFrame(demand: FrameDemand(
+      flags: force ? [.present] : [.ifNeeded, .present],
+      token: nextToken
+    ))
+  }
+
+  /// Drains every queued frame result.
+  func drainResults() throws -> FrameResults {
     let batch: RenderFrameBatchHandle
     do { batch = try session.drainFrameResults() }
     catch let error as MaplibreError
-      where error.kind == .notReady { return false }
+      where error.kind == .notReady { return FrameResults() }
     defer { try? batch.close() }
-    let count = try batch.count()
-    guard count > 0 else { return false }
-    let result = try batch.get(index: count - 1)
-    guard result.disposition == .rendered else { return false }
-    return !result.needsRepaint
+    var results = FrameResults()
+    // No update and size pending wait for the map's next update, superseded
+    // demands have a newer one behind them, and no demand carries a timeout.
+    for index in try 0 ..< (batch.count()) {
+      let result = try batch.get(index: index)
+      if result.disposition == .rendered {
+        results.rendered = true
+        results.needsRepaint = result.needsRepaint
+      } else if result.disposition == .targetNotReady {
+        results.targetNotReady = true
+      }
+    }
+    return results
   }
 
   func close() async throws {
