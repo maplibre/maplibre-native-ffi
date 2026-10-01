@@ -1341,8 +1341,9 @@ MLN_API mln_status mln_runtime_barrier(
  * callback returns. A host that outlives its runtimes may pass a discarding
  * completion.
  *
- * A process may exit at any point, including while runtimes, maps, and render
- * sessions are live and their work is in flight. Native threads keep running
+ * A process may exit at any point, including while runtimes and maps are live
+ * and their work is in flight. Render sessions may stay live too, once their
+ * graphics calls have ended as described below. Native threads keep running
  * until the operating system ends the process: nothing at exit stops them or
  * waits for them, and the library destroys nothing that they use. Once exit
  * begins, native code dispatches no further callback that the host registered
@@ -1368,6 +1369,17 @@ MLN_API mln_status mln_runtime_barrier(
  * that the host registered; and elsewhere, those that the host registered
  * after the library's exit handler. Releasing each runtime and waiting for its
  * release completion stops its callbacks.
+ *
+ * A render session's driver calls use the host's graphics driver, and some
+ * drivers, such as MoltenVK, the Vulkan loader, and Mesa, tear down their own
+ * state in exit handlers and static destructors that run before the library's
+ * exit handler. So before the process calls exit() or returns from main, the
+ * host MUST end the graphics calls of every render session it attached. To end
+ * them, abandon the session, or detach it and wait for the detach completion.
+ * A host that drives a session on its own graphics thread stops driver service
+ * first. Abandon returns once the session's in-flight driver call has ended,
+ * so an exit path can end a session that is mid-frame. A disposed session's
+ * graphics calls have ended once its wake release callbacks have run.
  *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.

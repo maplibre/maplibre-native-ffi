@@ -4,8 +4,8 @@ namespace mln::core {
 
 // Process exit with live runtimes.
 //
-// A process may exit while runtimes, maps, and render sessions are live and
-// native threads are at work. Nothing at exit stops or joins those threads;
+// A process may exit while runtimes and maps are live and native threads are
+// at work. Nothing at exit stops or joins those threads;
 // they keep running until the operating system ends the process. Three rules
 // keep that safe:
 //
@@ -16,6 +16,12 @@ namespace mln::core {
 // - Once exit begins, native code starts no host callback. Every call into a
 //   host function pointer checks process_exiting() first and skips the call.
 //   A callback whose check passed just before exit began may still start.
+//
+// Graphics drivers are host state that the library cannot keep alive: some
+// tear themselves down in exit handlers registered after this one, which run
+// first. So the host ends every render session's graphics calls before it
+// exits, and nothing here waits for a driver call, which can be inside a host
+// callback that blocks once exit begins.
 
 // Registers the exit handler that marks the start of process exit, once per
 // process. Called before the library first hands host callbacks to native
