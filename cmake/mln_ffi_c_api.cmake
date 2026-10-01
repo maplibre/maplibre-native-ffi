@@ -86,7 +86,26 @@ function(mln_ffi_set_c_api_output_properties target)
       maplibre-native-c)
 endfunction()
 
+# The library's threads keep running while the process exits: nothing at exit
+# stops or joins them, and the operating system reclaims them once exit ends.
+# The objects with static storage duration that those threads read must
+# therefore outlive them, so no C++ source in the library registers a static
+# destructor, neither ours nor MapLibre Native's. The flag also drops
+# thread-local destructors, so per-thread state that must be destroyed when
+# its thread ends, such as a cache that owns memory, is declared
+# [[clang::always_destroy]].
+function(mln_ffi_no_static_destructors_option out_var)
+  if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    set(flag "/clang:-fno-c++-static-destructors")
+  else()
+    set(flag "-fno-c++-static-destructors")
+  endif()
+  set(${out_var} "$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:${flag}>" PARENT_SCOPE)
+endfunction()
+
 function(mln_ffi_configure_c_api_compile_options target)
+  mln_ffi_no_static_destructors_option(no_static_destructors)
+  target_compile_options(${target} PRIVATE ${no_static_destructors})
   if(MSVC)
     target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/GR->)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")

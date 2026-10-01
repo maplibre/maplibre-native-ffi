@@ -1066,8 +1066,7 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  * This entry point is callable from any thread and touches no runtime or map,
  * so a host prepares data on a worker thread and installs it on the map owner
  * thread. The prepared data is immutable; create, read, and destroy may each
- * happen on different threads. A process that has no runtime may exit as soon
- * as this call returns.
+ * happen on different threads.
  *
  * *out_data must be MLN_HANDLE_NULL on entry. On success it receives an owned
  * handle the host releases with mln_geojson_source_data_destroy(). Installing

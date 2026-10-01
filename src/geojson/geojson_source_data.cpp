@@ -2,7 +2,6 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
-#include <future>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -185,47 +184,23 @@ class SerializedGeoJsonData final : public mln::style::GeoJSONData {
 // tasklet in flight can be that scheduler's last owner, and destroying a
 // ThreadedScheduler on its own worker thread aborts the process on
 // thread::join of the current thread (issue #644).
-//
-// A pinned thread outlives static destruction, so it must not be starting up
-// when the process exits: a MapLibre worker reads the platform settings
-// singleton as its first step. Pinning a scheduler therefore records a future
-// that its thread has run one task, and every caller that pins the scheduler
-// waits on it, including a caller that shares a fresh slot with a concurrent
-// one. Host threads never run on a sequenced scheduler, so the wait cannot
-// block the thread it waits for.
 auto pin_sequenced_scheduler(const std::shared_ptr<mln::Scheduler>& scheduler)
   -> void {
-  struct PinnedScheduler {
-    std::shared_ptr<mln::Scheduler> scheduler;
-    std::shared_future<void> started;
-  };
   struct PinnedSchedulers {
     std::mutex mutex;
-    std::vector<PinnedScheduler> schedulers;
+    std::vector<std::shared_ptr<mln::Scheduler>> schedulers;
   };
   // Leaked so process exit, not a static destructor joining worker threads
   // mid-teardown, reclaims the pinned threads.
   static auto* pinned = new PinnedSchedulers();
-  auto started = std::shared_future<void>{};
-  {
-    const std::scoped_lock lock(pinned->mutex);
-    auto& schedulers = pinned->schedulers;
-    const auto found = std::find_if(
-      schedulers.begin(), schedulers.end(),
-      [&scheduler](const PinnedScheduler& entry) {
-        return entry.scheduler == scheduler;
-      }
-    );
-    if (found != schedulers.end()) {
-      started = found->started;
-    } else {
-      auto first_task = std::make_shared<std::promise<void>>();
-      started = first_task->get_future().share();
-      schedulers.push_back({scheduler, started});
-      scheduler->schedule([first_task]() { first_task->set_value(); });
-    }
+  const std::scoped_lock lock(pinned->mutex);
+  auto& schedulers = pinned->schedulers;
+  if (
+    std::find(schedulers.begin(), schedulers.end(), scheduler) ==
+    schedulers.end()
+  ) {
+    schedulers.push_back(scheduler);
   }
-  started.wait();
 }
 
 }  // namespace

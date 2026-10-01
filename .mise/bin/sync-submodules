@@ -56,7 +56,6 @@ mlt_vendor_paths=(
 mln_patches=(
   "$repo_root/patches/maplibre-native/0002-windows-local-file-urls.patch"
   "$repo_root/patches/maplibre-native/0004-opengl-valid-api-calls.patch"
-  "$repo_root/patches/maplibre-native/0006-process-lifetime-logging.patch"
   "$repo_root/patches/maplibre-native/0007-retain-active-on-demand-images.patch"
   "$repo_root/patches/maplibre-native/0009-synchronous-symbol-dependencies.patch"
   "$repo_root/patches/maplibre-native/0011-opengl-uniform-block-order.patch"
@@ -75,7 +74,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0030-custom-geometry-query-before-data.patch"
   "$repo_root/patches/maplibre-native/0031-webgpu-frame-stats.patch"
   "$repo_root/patches/maplibre-native/0032-in-memory-database-reset.patch"
-  "$repo_root/patches/maplibre-native/0033-process-lifetime-thread-state.patch"
+  "$repo_root/patches/maplibre-native/0033-destroy-thread-local-run-loop.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the

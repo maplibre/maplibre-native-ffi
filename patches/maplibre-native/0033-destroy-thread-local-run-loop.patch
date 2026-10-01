@@ -1,0 +1,15 @@
+diff --git a/src/mln/actor/scheduler.cpp b/src/mln/actor/scheduler.cpp
+index 6caba3b..f6240bc 100644
+--- a/src/mln/actor/scheduler.cpp
++++ b/src/mln/actor/scheduler.cpp
+@@ -26,7 +26,9 @@ void Scheduler::SetCurrent(Scheduler* scheduler) {
+ 
+ Scheduler* Scheduler::GetCurrent(bool init) {
+     if (!localScheduler && init) {
+-        static thread_local util::RunLoop runLoop;
++        // Destroyed when its thread ends, even in a build that drops static
++        // and thread-local destructors.
++        [[clang::always_destroy]] static thread_local util::RunLoop runLoop;
+         SetCurrent(&runLoop);
+     }
+     return localScheduler;

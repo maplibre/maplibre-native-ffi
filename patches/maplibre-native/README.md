@@ -17,14 +17,6 @@ strict implementations and the API 26 Android emulator from turning stale errors
 into false allocation failures. Upstream:
 [maplibre-native#4578](https://github.com/maplibre/maplibre-native/pull/4578).
 
-`0006-process-lifetime-logging.patch` gives the global logger, its observer,
-mutex, severity settings, and scheduler process lifetime. This prevents static
-destruction from joining a logging worker whose thread-local cleanup must detach
-from an already shut down host VM. Explicit observer replacement and removal
-still release the previous observer. Hosts remove observers before tearing down
-their environment; the Node SDK uses its environment cleanup hook. Upstream:
-[maplibre-native#4574](https://github.com/maplibre/maplibre-native/pull/4574).
-
 `0007-retain-active-on-demand-images.patch` keeps present on-demand images
 registered to their requestor when the same request also needs missing images.
 This prevents cache cleanup from evicting active tile dependencies. The patch
@@ -163,14 +155,14 @@ the working directory, which deleted any such file there and failed where the
 directory was read-only. The C suite's ambient cache reset case covers it.
 Upstream: not yet filed.
 
-`0033-process-lifetime-thread-state.patch` gives process lifetime to the state
-that a MapLibre thread reads as it starts: the platform settings singleton,
-which holds thread priorities, and the network status observer set, which each
-online file source thread joins. A file source thread that started while the
-process exited otherwise locked a mutex that static destruction had already
-destroyed. The Zig binding's shutdown probe, which returns from main with a
-runtime and a map live, crashed this way in about one run in five on the Android
-emulator. Upstream: not yet filed.
+`0033-destroy-thread-local-run-loop.patch` keeps the destructor of the run loop
+that `Scheduler::GetCurrent()` creates for a thread with no scheduler. The
+library compiles MapLibre Native without static destructors, so that nothing a
+MapLibre thread reads is destroyed while the process exits, and that option also
+drops thread-local destructors. The run loop is the one piece of MapLibre
+thread-local state that owns resources, so the patch marks it
+`[[clang::always_destroy]]` to free it when its thread ends. Upstream: not
+applicable; it serves this build's compile options.
 
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
