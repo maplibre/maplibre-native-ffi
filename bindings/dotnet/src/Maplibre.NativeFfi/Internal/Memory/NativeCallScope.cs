@@ -150,11 +150,12 @@ internal sealed unsafe partial class NativeCallScope : IDisposable
 
     internal TNative* Array<TNative, TPublic>(
         IReadOnlyList<TPublic> values,
-        Func<TPublic, TNative> convert
+        Func<TPublic, TNative> convert,
+        [CallerArgumentExpression(nameof(values))] string? name = null
     )
         where TNative : unmanaged
     {
-        ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(values, name);
         var pointer = Allocate<TNative>(values.Count);
         for (var index = 0; index < values.Count; index++)
             pointer[index] = convert(values[index]);

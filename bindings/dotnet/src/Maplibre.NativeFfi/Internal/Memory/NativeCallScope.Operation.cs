@@ -14,11 +14,11 @@ namespace Maplibre.NativeFfi.Internal.Memory;
 /// </summary>
 internal sealed unsafe partial class NativeCallScope
 {
-    private readonly object? owner;
+    private readonly INativeOwner? owner;
     private List<INativeReader>? readers;
 
     /// <summary>Enters <paramref name="operation"/> on behalf of its receiver, or of no receiver.</summary>
-    internal NativeCallScope(object? owner, string operation)
+    internal NativeCallScope(INativeOwner? owner, string operation)
     {
         NativeCall.Enter(owner, operation).Dispose();
         this.owner = owner;
@@ -175,7 +175,7 @@ internal sealed unsafe partial class NativeCallScope
     // when it has none.
     private Task<T> Accepted<T>(Task<T> task)
     {
-        Accept(registrations is null ? null : (owner as INativeOwner)?.CallbackOwner);
+        Accept(registrations is null ? null : owner?.CallbackOwner);
         return task;
     }
 

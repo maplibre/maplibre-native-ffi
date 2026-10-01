@@ -158,11 +158,19 @@ def public_type(name: str) -> str:
     return pascal(name.removeprefix("mln_"))
 
 
-# Generated sources take their imports from GlobalUsings.g.cs. The compiler
-# treats a .g.cs file as generated code, which disables nullable annotations
-# unless the file enables them.
+# Generated sources take their namespace imports from GlobalUsings.g.cs. The
+# compiler treats a .g.cs file as generated code, which disables nullable
+# annotations unless the file enables them.
 HEADER = (
     "// Generated from the C headers by tools/bindgen. Do not edit.\n#nullable enable\n"
+)
+
+# A file that calls the generated helpers imports their members itself, which
+# keeps short names such as Check out of handwritten files.
+HELPERS = (
+    "using static Maplibre.NativeFfi.Internal.NativeCall;\n"
+    "using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;\n"
+    "using static Maplibre.NativeFfi.Internal.Struct.NativeValues;\n\n"
 )
 
 
@@ -701,21 +709,25 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         and function.name != handle_plan.release
     )
     # Entering checks the callback guard, keeps the receiver reachable, and, for
-    # an owner-less operation, loads the native library.
+    # an owner-less operation, loads the native library. A scope that enters
+    # for its receiver roots registrations in it, so only an owner can.
     if reads:
         entry = [f'using var read = state.Read(this, "{function.name}");']
         if scoped:
             entry.append("using var scope = new NativeCallScope();")
         args[0] = "read.Handle"
-    elif scoped or asynchronous:
+    elif (scoped or asynchronous) and not plan.scoped_receiver:
         entry = [
             f'using var scope = new NativeCallScope({owner_expression}, "{function.name}");'
         ]
     else:
         entry = [f'using var call = Enter({owner_expression}, "{function.name}");']
-    if decision_completion:
-        entry.append("using var claim = state.BeginClaim();")
-    prologue = entry + prologue
+        if scoped:
+            entry.append("using var scope = new NativeCallScope();")
+    # The claim follows argument conversion, so an argument error leaves the
+    # request open.
+    claim = ["using var claim = state.BeginClaim();"] if decision_completion else []
+    prologue = entry + prologue + claim
     arguments = ", ".join(args)
     name = operation_name(function, factory or receiver)
     modifiers = "public static" if static else "public"
@@ -1093,9 +1105,6 @@ def emit(api: Api | BoundApi) -> Emission:
             f"global using Maplibre.NativeFfi.Internal.{namespace};\n"
             for namespace in ("C", "Callback", "Memory", "Pointer", "Struct")
         )
-        + "global using static Maplibre.NativeFfi.Internal.NativeCall;\n"
-        "global using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;\n"
-        "global using static Maplibre.NativeFfi.Internal.Struct.NativeValues;\n"
         # Generated values name presence bits without their enum.
         + "".join(
             f"global using static Maplibre.NativeFfi.Internal.C.{enum};\n"
@@ -1144,6 +1153,7 @@ def emit(api: Api | BoundApi) -> Emission:
         bases = f" : {', '.join(interfaces)}" if interfaces else ""
         files[f"{namespace}/{owner}.Operations.g.cs"] = (
             HEADER
+            + HELPERS
             + f"namespace Maplibre.NativeFfi{'.' + namespace if owner != 'Maplibre' else ''};\n\n"
             f"public {'static' if owner == 'Maplibre' else 'sealed'} unsafe partial class {owner}{bases}\n{{\n"
             + "\n".join(body)
@@ -1179,6 +1189,7 @@ def emit(api: Api | BoundApi) -> Emission:
     )
     files["Internal/Struct/GeneratedValues.g.cs"] = (
         HEADER
+        + HELPERS
         + "using System.Runtime.CompilerServices;\nusing System.Runtime.InteropServices;\n\n"
         + "namespace Maplibre.NativeFfi.Internal.Struct;\n\ninternal static unsafe class GeneratedValues\n{\n"
         + "\n".join(converters)
@@ -1202,7 +1213,10 @@ def emit(api: Api | BoundApi) -> Emission:
             else:
                 declaration = declaration.rstrip()[:-1] + default + "}\n"
         files[f"{namespace}/{public_type(name)}.g.cs"] = (
-            HEADER + f"namespace Maplibre.NativeFfi.{namespace};\n\n" + declaration
+            HEADER
+            + (HELPERS if plan.default else "")
+            + f"namespace Maplibre.NativeFfi.{namespace};\n\n"
+            + declaration
         )
     # The completion runtime reads results through the completion record's
     # callbacks, so the enums those results carry, such as a command

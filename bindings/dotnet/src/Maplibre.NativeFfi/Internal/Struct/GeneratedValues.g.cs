@@ -2,6 +2,9 @@
 #nullable enable
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using static Maplibre.NativeFfi.Internal.NativeCall;
+using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
+using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
 
 namespace Maplibre.NativeFfi.Internal.Struct;
 
@@ -1741,9 +1744,8 @@ internal static unsafe class GeneratedValues
             );
             native.layer_id_count = checked((nuint)fieldLayerIds.Length);
         }
-        native.filter = value.FilterStorage?.Items is null
-            ? null
-            : scope.Value(scope.Buffer(value.FilterStorage?.Items));
+        var fieldFilter = value.FilterStorage?.Items;
+        native.filter = fieldFilter is null ? null : scope.Value(scope.Buffer(fieldFilter));
         return native;
     }
 
@@ -2406,9 +2408,8 @@ internal static unsafe class GeneratedValues
             );
             native.source_layer_id_count = checked((nuint)fieldSourceLayerIds.Length);
         }
-        native.filter = value.FilterStorage?.Items is null
-            ? null
-            : scope.Value(scope.Buffer(value.FilterStorage?.Items));
+        var fieldFilter = value.FilterStorage?.Items;
+        native.filter = fieldFilter is null ? null : scope.Value(scope.Buffer(fieldFilter));
         return native;
     }
 

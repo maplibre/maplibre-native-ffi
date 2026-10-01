@@ -23,11 +23,8 @@ global using static Maplibre.NativeFfi.Internal.C.mln_style_tile_source_option_f
 global using static Maplibre.NativeFfi.Internal.C.mln_style_transition_option_field;
 global using Maplibre.NativeFfi.Internal.Callback;
 global using Maplibre.NativeFfi.Internal.Memory;
-global using static Maplibre.NativeFfi.Internal.NativeCall;
 global using Maplibre.NativeFfi.Internal.Pointer;
 global using Maplibre.NativeFfi.Internal.Struct;
-global using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-global using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
 global using Maplibre.NativeFfi.Logging;
 global using Maplibre.NativeFfi.Map;
 global using Maplibre.NativeFfi.Query;

@@ -3,9 +3,10 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Maplibre.NativeFfi.Internal.C;
 
-// Each status-returning call declares an mln_diagnostic on its stack, and native
-// writes the message before returning, so zeroing the 4 KB buffer on every call
-// buys nothing. Code that needs zeroed stack memory initializes it explicitly.
+// Completion submissions and releases declare an mln_diagnostic on their stack,
+// and native writes the message before returning, so zeroing the 4 KB buffer on
+// every call buys nothing. Code that needs zeroed stack memory initializes it
+// explicitly.
 [module: SkipLocalsInit]
 
 namespace Maplibre.NativeFfi.Internal.Status;

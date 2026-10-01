@@ -814,6 +814,11 @@ class Values:
                 )
                 expression = local
                 indent = "            "
+            elif array and optional:
+                # A local lets nullable analysis see the absence check.
+                local = f"field{name}"
+                lines.append(f"        var {local} = {expression};")
+                expression = local
             for field in fields:
                 if field.value.kind == "union":
                     tag = next(

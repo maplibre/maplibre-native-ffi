@@ -1,5 +1,9 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
+using static Maplibre.NativeFfi.Internal.NativeCall;
+using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
+using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
+
 namespace Maplibre.NativeFfi.Runtime;
 
 public sealed unsafe partial class ResourceRequestHandle
@@ -56,8 +60,8 @@ public sealed unsafe partial class ResourceRequestHandle
     public void Complete(ResourceResponse response)
     {
         using var scope = new NativeCallScope(this, "mln_resource_request_complete");
-        using var claim = state.BeginClaim();
         var nativeResponse = NativeResourceResponse(response, scope);
+        using var claim = state.BeginClaim();
         Check(NativeMethods.mln_resource_request_complete(Handle, &nativeResponse, Diagnostic));
         scope.Accept();
         claim.Accept();

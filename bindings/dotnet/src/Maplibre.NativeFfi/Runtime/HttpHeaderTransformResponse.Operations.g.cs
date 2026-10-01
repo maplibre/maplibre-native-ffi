@@ -1,12 +1,17 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
+using static Maplibre.NativeFfi.Internal.NativeCall;
+using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
+using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
+
 namespace Maplibre.NativeFfi.Runtime;
 
 public sealed unsafe partial class HttpHeaderTransformResponse
 {
     public void Set(string name, string value)
     {
-        using var scope = new NativeCallScope(this, "mln_http_header_transform_response_set");
+        using var call = Enter(this, "mln_http_header_transform_response_set");
+        using var scope = new NativeCallScope();
         var bufferName = scope.Utf8(name);
         var bufferValue = scope.Utf8(value);
         Check(
