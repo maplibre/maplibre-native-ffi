@@ -313,4 +313,4 @@ class Values:
         conformance = (
             "OptionSet" if value.enum_kind == "bitmask" else "RawRepresentable"
         )
-        return f"public struct {public}: {conformance}, Equatable, Hashable, Sendable {{\n  public let rawValue: {raw}\n  public init(rawValue: {raw}) {{ self.rawValue = rawValue }}\n  init(raw: {raw}) {{ self.rawValue = raw }}\n  func nativeValue() -> {raw} {{ rawValue }}\n{members}\n}}\n"
+        return f"public struct {public}: {conformance}, NativeOpenValue, Equatable, Hashable, Sendable {{\n  public let rawValue: {raw}\n  public init(rawValue: {raw}) {{ self.rawValue = rawValue }}\n{members}\n}}\n"

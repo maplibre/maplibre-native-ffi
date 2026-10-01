@@ -8,92 +8,59 @@ public extension Maplibre {
   static func renderedFeatureQueryOptionsDefault() throws
     -> RenderedFeatureQueryOptions
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_rendered_feature_query_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_rendered_feature_query_options_default()
-    return try RenderedFeatureQueryOptions(raw: value)
+    try nativeDirect("mln_rendered_feature_query_options_default") { _ in
+      try RenderedFeatureQueryOptions(
+        raw: mln_rendered_feature_query_options_default()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_rendered_query_geometry_box`.
   static func renderedQueryGeometryBox(box bindingArg0: ScreenBox) throws
     -> RenderedQueryGeometry
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_rendered_query_geometry_box"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_rendered_query_geometry_box(bindingArg0.nativeValue())
-    return try RenderedQueryGeometry(raw: value)
+    try nativeDirect("mln_rendered_query_geometry_box") { _ in
+      try RenderedQueryGeometry(raw: mln_rendered_query_geometry_box(bindingArg0
+          .nativeValue()))
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_rendered_query_geometry_line_string`.
   static func renderedQueryGeometryLineString(
     points bindingArg0: [ScreenPoint]
   ) throws
     -> RenderedQueryGeometry
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_rendered_query_geometry_line_string"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = try mln_rendered_query_geometry_line_string(
-      arena.array(bindingArg0.map { $0.nativeValue() }),
-      NativeInputArena.count(bindingArg0.count)
-    )
-    return try RenderedQueryGeometry(raw: value)
+    try nativeDirect("mln_rendered_query_geometry_line_string") { arena in
+      try RenderedQueryGeometry(
+        raw: mln_rendered_query_geometry_line_string(
+          arena.array(bindingArg0.map { $0.nativeValue() }),
+          NativeInputArena.count(bindingArg0.count)
+        )
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_rendered_query_geometry_point`.
   static func renderedQueryGeometryPoint(point bindingArg0: ScreenPoint) throws
     -> RenderedQueryGeometry
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_rendered_query_geometry_point"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_rendered_query_geometry_point(bindingArg0.nativeValue())
-    return try RenderedQueryGeometry(raw: value)
+    try nativeDirect("mln_rendered_query_geometry_point") { _ in
+      try RenderedQueryGeometry(
+        raw: mln_rendered_query_geometry_point(bindingArg0
+          .nativeValue())
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_source_feature_query_options_default`.
   static func sourceFeatureQueryOptionsDefault() throws
     -> SourceFeatureQueryOptions
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_source_feature_query_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_source_feature_query_options_default()
-    return try SourceFeatureQueryOptions(raw: value)
+    try nativeDirect("mln_source_feature_query_options_default") { _ in
+      try SourceFeatureQueryOptions(
+        raw: mln_source_feature_query_options_default()
+      )
+    }
   }
 }

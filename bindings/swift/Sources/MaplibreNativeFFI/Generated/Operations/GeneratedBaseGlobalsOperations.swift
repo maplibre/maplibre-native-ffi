@@ -6,27 +6,13 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_c_version`.
   static func cVersion() throws -> UInt32 {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(owner: nil, operation: "mln_c_version")
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    return mln_c_version()
+    try nativeDirect("mln_c_version") { _ in mln_c_version() }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_supported_render_backend_mask`.
   static func supportedRenderBackendMask() throws -> RenderBackendFlag {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_supported_render_backend_mask"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_supported_render_backend_mask()
-    return RenderBackendFlag(rawValue: value)
+    try nativeDirect("mln_supported_render_backend_mask") { _ in
+      RenderBackendFlag(rawValue: mln_supported_render_backend_mask())
+    }
   }
 }

@@ -8,157 +8,94 @@ public extension Maplibre {
   static func metalBorrowedTextureDescriptorDefault() throws
     -> MetalBorrowedTextureDescriptor
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_metal_borrowed_texture_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_metal_borrowed_texture_descriptor_default()
-    return MetalBorrowedTextureDescriptor(raw: value)
+    try nativeDirect("mln_metal_borrowed_texture_descriptor_default") { _ in
+      MetalBorrowedTextureDescriptor(
+        raw: mln_metal_borrowed_texture_descriptor_default()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_metal_owned_texture_descriptor_default`.
   static func metalOwnedTextureDescriptorDefault() throws
     -> MetalOwnedTextureDescriptor
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_metal_owned_texture_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_metal_owned_texture_descriptor_default()
-    return MetalOwnedTextureDescriptor(raw: value)
+    try nativeDirect("mln_metal_owned_texture_descriptor_default") { _ in
+      MetalOwnedTextureDescriptor(
+        raw: mln_metal_owned_texture_descriptor_default()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_opengl_borrowed_texture_descriptor_default`.
   static func openglBorrowedTextureDescriptorDefault() throws
     -> OpenglBorrowedTextureDescriptor
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_opengl_borrowed_texture_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_opengl_borrowed_texture_descriptor_default()
-    return try OpenglBorrowedTextureDescriptor(raw: value)
+    try nativeDirect("mln_opengl_borrowed_texture_descriptor_default") { _ in
+      try OpenglBorrowedTextureDescriptor(
+        raw: mln_opengl_borrowed_texture_descriptor_default()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_opengl_owned_texture_descriptor_default`.
   static func openglOwnedTextureDescriptorDefault() throws
     -> OpenglOwnedTextureDescriptor
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_opengl_owned_texture_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_opengl_owned_texture_descriptor_default()
-    return try OpenglOwnedTextureDescriptor(raw: value)
+    try nativeDirect("mln_opengl_owned_texture_descriptor_default") { _ in
+      try OpenglOwnedTextureDescriptor(
+        raw: mln_opengl_owned_texture_descriptor_default()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_texture_image_info_default`.
   static func textureImageInfoDefault() throws -> TextureImageInfo {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_texture_image_info_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_texture_image_info_default()
-    return TextureImageInfo(raw: value)
+    try nativeDirect("mln_texture_image_info_default") { _ in
+      TextureImageInfo(raw: mln_texture_image_info_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_vulkan_borrowed_texture_descriptor_default`.
   static func vulkanBorrowedTextureDescriptorDefault() throws
     -> VulkanBorrowedTextureDescriptor
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_vulkan_borrowed_texture_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_vulkan_borrowed_texture_descriptor_default()
-    return VulkanBorrowedTextureDescriptor(raw: value)
+    try nativeDirect("mln_vulkan_borrowed_texture_descriptor_default") { _ in
+      VulkanBorrowedTextureDescriptor(
+        raw: mln_vulkan_borrowed_texture_descriptor_default()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_vulkan_owned_texture_descriptor_default`.
   static func vulkanOwnedTextureDescriptorDefault() throws
     -> VulkanOwnedTextureDescriptor
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_vulkan_owned_texture_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_vulkan_owned_texture_descriptor_default()
-    return VulkanOwnedTextureDescriptor(raw: value)
+    try nativeDirect("mln_vulkan_owned_texture_descriptor_default") { _ in
+      VulkanOwnedTextureDescriptor(
+        raw: mln_vulkan_owned_texture_descriptor_default()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_webgpu_borrowed_texture_descriptor_default`.
   static func webgpuBorrowedTextureDescriptorDefault() throws
     -> WebgpuBorrowedTextureDescriptor
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_webgpu_borrowed_texture_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_webgpu_borrowed_texture_descriptor_default()
-    return WebgpuBorrowedTextureDescriptor(raw: value)
+    try nativeDirect("mln_webgpu_borrowed_texture_descriptor_default") { _ in
+      WebgpuBorrowedTextureDescriptor(
+        raw: mln_webgpu_borrowed_texture_descriptor_default()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_webgpu_owned_texture_descriptor_default`.
   static func webgpuOwnedTextureDescriptorDefault() throws
     -> WebgpuOwnedTextureDescriptor
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_webgpu_owned_texture_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_webgpu_owned_texture_descriptor_default()
-    return WebgpuOwnedTextureDescriptor(raw: value)
+    try nativeDirect("mln_webgpu_owned_texture_descriptor_default") { _ in
+      WebgpuOwnedTextureDescriptor(
+        raw: mln_webgpu_owned_texture_descriptor_default()
+      )
+    }
   }
 }

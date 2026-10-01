@@ -8,160 +8,81 @@ public extension Maplibre {
   static func customGeometrySourceOptionsDefault() throws
     -> CustomGeometrySourceOptions
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_custom_geometry_source_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_custom_geometry_source_options_default()
-    return try CustomGeometrySourceOptions(raw: value)
+    try nativeDirect("mln_custom_geometry_source_options_default") { _ in
+      try CustomGeometrySourceOptions(
+        raw: mln_custom_geometry_source_options_default()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_custom_mvt_vector_source_options_default`.
   static func customMvtVectorSourceOptionsDefault() throws
     -> CustomMvtVectorSourceOptions
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_custom_mvt_vector_source_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_custom_mvt_vector_source_options_default()
-    return try CustomMvtVectorSourceOptions(raw: value)
+    try nativeDirect("mln_custom_mvt_vector_source_options_default") { _ in
+      try CustomMvtVectorSourceOptions(
+        raw: mln_custom_mvt_vector_source_options_default()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_geojson_source_data_create`.
   static func geojsonSourceDataCreate(
     data bindingArg0: Data,
     options bindingArg1: GeojsonSourceOptions? = nil
   ) throws -> GeojsonSourceDataHandle {
-    try mapNativeFailure {
-      try NativeAbi.ensureCompatible()
-      try NativeCallbackGuard.check(
-        owner: nil,
-        operation: "mln_geojson_source_data_create"
+    var value0: mln_geojson_source_data = 0
+    return try nativeInvoke("mln_geojson_source_data_create") { _, arena, diagnostic in
+      try mln_geojson_source_data_create(
+        arena.view(bindingArg0),
+        bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
+        &value0,
+        diagnostic
       )
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_geojson_source_data = 0
-      try checkStatus { diagnostic in
-        try arena.submit { try mln_geojson_source_data_create(
-          arena.view(bindingArg0),
-          bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
-          &value0,
-          diagnostic
-        ) }
-      }
-      return try GeojsonSourceDataHandle(adopting: value0)
-    }
+    } result: { try GeojsonSourceDataHandle(adopting: value0) }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_geojson_source_options_default`.
   static func geojsonSourceOptionsDefault() throws -> GeojsonSourceOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_geojson_source_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_geojson_source_options_default()
-    return try GeojsonSourceOptions(raw: value)
+    try nativeDirect("mln_geojson_source_options_default") { _ in
+      try GeojsonSourceOptions(raw: mln_geojson_source_options_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_premultiplied_rgba8_image_default`.
   static func premultipliedRgba8ImageDefault() throws
     -> PremultipliedRgba8Image
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_premultiplied_rgba8_image_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_premultiplied_rgba8_image_default()
-    return try PremultipliedRgba8Image(raw: value)
+    try nativeDirect("mln_premultiplied_rgba8_image_default") { _ in
+      try PremultipliedRgba8Image(raw: mln_premultiplied_rgba8_image_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_style_image_info_default`.
   static func styleImageInfoDefault() throws -> StyleImageInfo {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_style_image_info_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_style_image_info_default()
-    return StyleImageInfo(raw: value)
+    try nativeDirect("mln_style_image_info_default") { _ in
+      StyleImageInfo(raw: mln_style_image_info_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_style_image_options_default`.
   static func styleImageOptionsDefault() throws -> StyleImageOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_style_image_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_style_image_options_default()
-    return try StyleImageOptions(raw: value)
+    try nativeDirect("mln_style_image_options_default") { _ in
+      try StyleImageOptions(raw: mln_style_image_options_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_style_tile_source_options_default`.
   static func styleTileSourceOptionsDefault() throws -> StyleTileSourceOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_style_tile_source_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_style_tile_source_options_default()
-    return try StyleTileSourceOptions(raw: value)
+    try nativeDirect("mln_style_tile_source_options_default") { _ in
+      try StyleTileSourceOptions(raw: mln_style_tile_source_options_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_style_transition_options_default`.
   static func styleTransitionOptionsDefault() throws -> StyleTransitionOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_style_transition_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_style_transition_options_default()
-    return StyleTransitionOptions(raw: value)
+    try nativeDirect("mln_style_transition_options_default") { _ in
+      StyleTransitionOptions(raw: mln_style_transition_options_default())
+    }
   }
 }

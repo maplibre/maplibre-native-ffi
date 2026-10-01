@@ -6,159 +6,71 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_animation_options_default`.
   static func animationOptionsDefault() throws -> AnimationOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_animation_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_animation_options_default()
-    return AnimationOptions(raw: value)
+    try nativeDirect("mln_animation_options_default") { _ in
+      AnimationOptions(raw: mln_animation_options_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_bound_options_default`.
   static func boundOptionsDefault() throws -> BoundOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_bound_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_bound_options_default()
-    return BoundOptions(raw: value)
+    try nativeDirect("mln_bound_options_default") { _ in
+      BoundOptions(raw: mln_bound_options_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_camera_delta_default`.
   static func cameraDeltaDefault() throws -> CameraDelta {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_camera_delta_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_camera_delta_default()
-    return CameraDelta(raw: value)
+    try nativeDirect("mln_camera_delta_default") { _ in
+      CameraDelta(raw: mln_camera_delta_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_camera_fit_options_default`.
   static func cameraFitOptionsDefault() throws -> CameraFitOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_camera_fit_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_camera_fit_options_default()
-    return CameraFitOptions(raw: value)
+    try nativeDirect("mln_camera_fit_options_default") { _ in
+      CameraFitOptions(raw: mln_camera_fit_options_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_camera_options_default`.
   static func cameraOptionsDefault() throws -> CameraOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_camera_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_camera_options_default()
-    return CameraOptions(raw: value)
+    try nativeDirect("mln_camera_options_default") { _ in
+      CameraOptions(raw: mln_camera_options_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_camera_update_default`.
   static func cameraUpdateDefault() throws -> CameraUpdate {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_camera_update_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_camera_update_default()
-    return CameraUpdate(raw: value)
+    try nativeDirect("mln_camera_update_default") { _ in
+      CameraUpdate(raw: mln_camera_update_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_free_camera_options_default`.
   static func freeCameraOptionsDefault() throws -> FreeCameraOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_free_camera_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_free_camera_options_default()
-    return FreeCameraOptions(raw: value)
+    try nativeDirect("mln_free_camera_options_default") { _ in
+      FreeCameraOptions(raw: mln_free_camera_options_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_map_tile_options_default`.
   static func mapTileOptionsDefault() throws -> MapTileOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_map_tile_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_map_tile_options_default()
-    return MapTileOptions(raw: value)
+    try nativeDirect("mln_map_tile_options_default") { _ in
+      MapTileOptions(raw: mln_map_tile_options_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_map_viewport_options_default`.
   static func mapViewportOptionsDefault() throws -> MapViewportOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_map_viewport_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_map_viewport_options_default()
-    return MapViewportOptions(raw: value)
+    try nativeDirect("mln_map_viewport_options_default") { _ in
+      MapViewportOptions(raw: mln_map_viewport_options_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_projection_mode_default`.
   static func projectionModeDefault() throws -> ProjectionMode {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_projection_mode_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_projection_mode_default()
-    return ProjectionMode(raw: value)
+    try nativeDirect("mln_projection_mode_default") { _ in
+      ProjectionMode(raw: mln_projection_mode_default())
+    }
   }
 }

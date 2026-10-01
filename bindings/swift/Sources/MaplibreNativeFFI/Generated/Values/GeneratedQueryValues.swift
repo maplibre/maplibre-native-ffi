@@ -70,18 +70,12 @@ public struct QueriedFeature: Equatable, Hashable, Sendable {
   }
 }
 
-public struct QueriedFeatureField: OptionSet, Equatable, Hashable, Sendable {
+public struct QueriedFeatureField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let sourceId: QueriedFeatureField = .init(rawValue: 1)
@@ -89,20 +83,12 @@ public struct QueriedFeatureField: OptionSet, Equatable, Hashable, Sendable {
   public static let state: QueriedFeatureField = .init(rawValue: 4)
 }
 
-public struct RenderedFeatureQueryOptionField: OptionSet, Equatable, Hashable,
-  Sendable
+public struct RenderedFeatureQueryOptionField: OptionSet, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let ids: RenderedFeatureQueryOptionField = .init(rawValue: 1)
@@ -240,20 +226,12 @@ public enum RenderedQueryGeometryData: Equatable, Hashable, Sendable {
   }
 }
 
-public struct RenderedQueryGeometryType: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct RenderedQueryGeometryType: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let point: RenderedQueryGeometryType = .init(rawValue: 1)
@@ -317,20 +295,12 @@ public struct ScreenLineString: Equatable, Hashable, Sendable {
   }
 }
 
-public struct SourceFeatureQueryOptionField: OptionSet, Equatable, Hashable,
-  Sendable
+public struct SourceFeatureQueryOptionField: OptionSet, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let ids: SourceFeatureQueryOptionField = .init(rawValue: 1)

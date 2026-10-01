@@ -220,39 +220,33 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
         raise unsupported(function, "method name is reserved by the handle runtime")
     method = identifier(method)
     args = [
-        *(
-            ["try nativePointer" if plan.scoped_receiver else "handle.raw"]
-            if receiver
-            else []
-        ),
+        *(["try nativePointer" if plan.scoped_receiver else "raw"] if receiver else []),
         *arguments,
         *(["completion"] if completion else []),
     ]
     call = native_call(function, *args)
-    submit_try = "try " if "try " in call else ""
-    doc = f"  /// Calls `{function.name}`.\n"
+    if "try " in call:
+        call = "try " + call
+    doc = f"/// Calls `{function.name}`.\n"
     modifier = "" if receiver else "static "
-    receiver_setup = (
-        "      let access = try self.handle.borrow()\n      defer { access.end(); withExtendedLifetime(self) {} }\n      let handle = access.handle"
-        if receiver and not plan.scoped_receiver
-        else ""
-    )
-    if plan.receiver_access == "issued" and receiver:
-        receiver_setup = "      let handle = self.handle.issued\n      defer { withExtendedLifetime(self) {} }"
     claim = any(
         callback.decision and callback.decision.complete == function.name
         for callback in value_types.bound.callbacks.values()
     )
-    if claim:
-        receiver_setup += "\n      let claim = try self.handle.beginClaim()\n      defer { claim.end() }"
-    # An entry point without a receiver can be a program's first call, so it
-    # checks the loaded library's C ABI version before anything reaches C.
-    receiver_setup = (
-        ("" if receiver else "      try NativeAbi.ensureCompatible()\n")
-        + f'      try NativeCallbackGuard.check(owner: {"self" if receiver else "nil"}, operation: "{function.name}")\n'
-        + receiver_setup
+    access = (
+        ", .issued"
+        if plan.receiver_access == "issued" and receiver
+        else ", .claim"
+        if claim
+        else ""
     )
-    record = None
+    # A handle operation calls its receiver's NativeReceiver helpers. A
+    # callback-scoped response names itself as the owner its call acts on, and
+    # a global call has neither.
+    target = f'"{function.name}"{access}'
+    if plan.scoped_receiver:
+        target = f'owner: self, "{function.name}"'
+    signature = f"{modifier}func {method}({', '.join(declarations)})"
     if outputs and completion:
         if len(outputs) != 1 or len(plan.completion.immediate_owners) != 1:
             raise unsupported(
@@ -267,38 +261,28 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
         )
         parent = ", parent: self" if owned.parent_parameter == plan.receiver else ""
         return (
-            f"""public extension {owner} {{
-{doc}  {modifier}func {method}({", ".join(declarations)}) throws -> {result} {{
-    try mapNativeFailure {{
-{receiver_setup}
-      let arena = NativeInputArena()
-      defer {{ withExtendedLifetime(arena) {{}} }}
-      var value0: {owned.handle.native} = 0
-      let future = try NativeCompletion.startUnit {{ completion, diagnostic in {submit_try}arena.submit {{ {call} }} }}
-      let owner = try {public}(adopting: value0{parent})
-      return {result}({member}: owner, completion: Task {{ [owner] in
-        defer {{ withExtendedLifetime(owner) {{}} }}
-        try await mapNativeFailure {{ try await future.value() }}
-      }})
-    }}
-  }}
+            f"""{doc}{signature} throws -> {result} {{
+  var value0: {owned.handle.native} = 0
+  return try nativeAttach({target}, as: {result}.init) {{ raw, arena, completion, diagnostic in {call} }} adopt: {{ try {public}(adopting: value0{parent}) }}
 }}
 """,
-            None,
+            owner,
         )
     if completion and execution in ("query", "command", "operation", "lifecycle"):
         shape = function.metadata.get("shape")
         result_type = function.metadata.get("result")
         nullable = function.metadata.get("nullable") == "true"
         empty_optional = function.metadata.get("optional") == "empty"
+        start = "Start"
+        conversion = ""
         if execution == "command":
             if shape != "none" or result_type != "void":
                 raise unsupported(
                     function, "typed command result needs a conversion rule"
                 )
-            result, start, conversion = "CommandCompletion", "startCommand", ""
+            result, start = "CommandCompletion", "Command"
         elif shape == "none" and result_type == "void":
-            result, start, conversion = "Void", "startUnit", ""
+            result, start = "Void", "Unit"
         else:
             if (
                 plan.result
@@ -314,13 +298,11 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
                     else ""
                 )
                 conversion = f"try {result}(adopting: NativeCompletion.value(result, as: {plan.result.native}.self){parent})"
-                start = "start"
             elif function.metadata.get("ownership") != "borrowed":
                 raise unsupported(
                     function,
                     "payload needs a borrowed ownership rule or an owned-result adapter",
                 )
-            start = "start"
             if plan.result and plan.result.kind == "handle":
                 pass
             elif shape == "value" and result_type in SCALARS:
@@ -372,22 +354,15 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
             elif nullable:
                 result += "?"
                 conversion = f"if {'result.pointee.value == nil' if shape == 'array' else 'result.pointee.value_count == 0'} {{ return nil }}; return {conversion}"
-            conversion = f" {{ result in {conversion} }}"
-        attribute = "  @discardableResult\n" if execution == "command" else ""
+            conversion = f", convert: {{ result in {conversion} }}"
+        attribute = "@discardableResult\n" if execution == "command" else ""
+        returns = "" if result == "Void" else f" -> {result}"
         return (
-            f"""public extension {owner} {{
-{doc}{attribute}
-  {modifier}func {method}({", ".join(declarations)}) async throws -> {result} {{
-    try await awaitNative {{
-{receiver_setup}
-      let arena = NativeInputArena()
-      defer {{ withExtendedLifetime(arena) {{}} }}
-      return try NativeCompletion.{start}({{ completion, diagnostic in {submit_try}arena.submit {{ {call} }} }}){conversion}
-    }}
-  }}
+            f"""{doc}{attribute}{signature} async throws{returns} {{
+  try await native{start}({target}{conversion}) {{ raw, arena, completion, diagnostic in {call} }}
 }}
 """,
-            record,
+            owner,
         )
     if (
         execution in {"immediate", "snapshot", "event_batch", "render_driver"}
@@ -400,22 +375,17 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
                 raise unsupported(
                     function, "a returned value cannot carry a status diagnostic"
                 )
+            if receiver:
+                raise unsupported(function, "a returned value needs a global call")
             value_types.add(plan.result)
             result = value_types.public(plan.result)
-            raw = "value"
-            copied = decode(value_types, plan.result, raw)
+            copied = decode(value_types, plan.result, call)
             return (
-                f"""public extension {owner} {{
-{doc}  {modifier}func {method}({", ".join(declarations)}) throws -> {result} {{
-{receiver_setup}
-    let arena = NativeInputArena()
-    defer {{ withExtendedLifetime(arena) {{}} }}
-    let value = {call}
-    return {copied}
-  }}
+                f"""{doc}{signature} throws -> {result} {{
+  try nativeDirect({target}) {{ arena in {copied} }}
 }}
 """,
-                None,
+                owner,
             )
         output_plans = {parameter.name: parameter.value for parameter in plan.outputs}
         capture, storage, types = [], [], []
@@ -433,7 +403,7 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
                     if owned.parent_parameter == plan.receiver and plan.receiver
                     else ""
                 )
-                storage.append(f"      var value{index}: {value.native} = 0")
+                storage.append(f"  var value{index}: {value.native} = 0")
                 types.append(value_types.public(value))
                 capture.append(
                     f"try {value_types.public(value)}(adopting: value{index}{parent})"
@@ -446,15 +416,23 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
                 initial = f"{value.default}()" if value.default else f"{raw}()"
             else:
                 initial = "false" if raw == "Bool" else "0"
-            storage.append(f"      var value{index}: {raw} = {initial}")
+            storage.append(f"  var value{index}: {raw} = {initial}")
             if not value.default:
                 for field in value.fields:
                     if field.role == "size":
                         storage.append(
-                            f"      value{index}.{identifier(field.name)} = UInt32(MemoryLayout<{raw}>.size)"
+                            f"  value{index}.{identifier(field.name)} = UInt32(MemoryLayout<{raw}>.size)"
                         )
             capture.append(value_types.copy(value, f"value{index}"))
-        hook = "      claim.accept()\n" if claim else ""
+        invoke = f"nativeInvoke({target}) {{ raw, arena, diagnostic in {call} }}"
+        if not outputs:
+            return (
+                f"""{doc}{signature} throws {{
+  try {invoke}
+}}
+""",
+                owner,
+            )
         result = (
             types[0]
             if len(types) == 1
@@ -467,20 +445,12 @@ def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | No
         )
         copied = capture[0] if len(capture) == 1 else "(" + ", ".join(capture) + ")"
         return (
-            f"""public extension {owner} {{
-{doc}  {modifier}func {method}({", ".join(declarations)}) throws -> {result} {{
-    try mapNativeFailure {{
-{receiver_setup}
-      let arena = NativeInputArena()
-      defer {{ withExtendedLifetime(arena) {{}} }}
+            f"""{doc}{signature} throws -> {result} {{
 {chr(10).join(storage)}
-      {checked(f"{submit_try}arena.submit {{ {call} }}")}
-{hook}      return {copied}
-    }}
-  }}
+  return try {invoke} result: {{ {copied} }}
 }}
 """,
-            None,
+            owner,
         )
     raise unsupported(function, "execution/handle lifecycle needs a supported rule")
 
@@ -504,7 +474,10 @@ def lower(
         function = plan.function
         previous = dict(value_types.used)
         try:
-            chunk, _ = operation(plan, api, value_types)
+            chunk, extended = operation(plan, api, value_types)
+            if extended:
+                # Operations on one type share one extension per file.
+                chunk = (extended, chunk)
             receiver = next(
                 (item.value for item in plan.inputs if item.name == plan.receiver), None
             )
@@ -543,10 +516,31 @@ def lower(
     return dict(chunks), generated, failures
 
 
+def render(bodies: list) -> str:
+    """Joins a file's declarations, gathering members by the type they extend."""
+    members: dict[str, list[str]] = {}
+    parts: list = []
+    for body in bodies:
+        if isinstance(body, str):
+            parts.append(body)
+            continue
+        extended, member = body
+        if extended not in members:
+            members[extended] = []
+            parts.append(extended)
+        members[extended].append(member)
+    return "\n".join(
+        f"public extension {part} {{\n" + "\n".join(members[part]) + "}\n"
+        if part in members
+        else part
+        for part in parts
+    )
+
+
 def generate(api: Api | BoundApi) -> dict[str, str]:
     chunks, _, _ = lower(api)
     prefix = "// Code generated by tools/bindgen; DO NOT EDIT.\n\ninternal import CMaplibreNativeC\nimport Foundation\n\n"
-    return {path: prefix + "\n".join(bodies) for path, bodies in sorted(chunks.items())}
+    return {path: prefix + render(bodies) for path, bodies in sorted(chunks.items())}
 
 
 def coverage(api: Api | BoundApi) -> dict:

@@ -6,2257 +6,1278 @@ import Foundation
 public extension MapHandle {
   /// Calls `mln_map_add_color_relief_layer`.
   @discardableResult
-
   func addColorReliefLayer(
     layerId bindingArg0: String,
     sourceId bindingArg1: String,
     beforeLayerId bindingArg2: String? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_color_relief_layer"
+    try await nativeCommand("mln_map_add_color_relief_layer") { raw, arena, completion, diagnostic in
+      mln_map_add_color_relief_layer(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_add_color_relief_layer(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_custom_geometry_source`.
   @discardableResult
-
   func addCustomGeometrySource(
     sourceId bindingArg0: String,
     options bindingArg1: CustomGeometrySourceOptions
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_custom_geometry_source"
+    try await nativeCommand("mln_map_add_custom_geometry_source") { raw, arena, completion, diagnostic in
+      try mln_map_add_custom_geometry_source(
+        raw,
+        arena.view(bindingArg0),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_custom_geometry_source(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_custom_mvt_vector_source`.
   @discardableResult
-
   func addCustomMvtVectorSource(
     sourceId bindingArg0: String,
     options bindingArg1: CustomMvtVectorSourceOptions
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_custom_mvt_vector_source"
+    try await nativeCommand("mln_map_add_custom_mvt_vector_source") { raw, arena, completion, diagnostic in
+      try mln_map_add_custom_mvt_vector_source(
+        raw,
+        arena.view(bindingArg0),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_custom_mvt_vector_source(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_geojson_source_data`.
   @discardableResult
-
   func addGeojsonSourceData(
     sourceId bindingArg0: String,
     data bindingArg1: GeojsonSourceDataHandle
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_geojson_source_data"
+    try await nativeCommand("mln_map_add_geojson_source_data") { raw, arena, completion, diagnostic in
+      try mln_map_add_geojson_source_data(
+        raw,
+        arena.view(bindingArg0),
+        arena.borrow(bindingArg1.handle),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_geojson_source_data(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.borrow(bindingArg1.handle),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_geojson_source_url`.
   @discardableResult
-
   func addGeojsonSourceUrl(
     sourceId bindingArg0: String,
     url bindingArg1: String,
     options bindingArg2: GeojsonSourceOptions? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_geojson_source_url"
+    try await nativeCommand("mln_map_add_geojson_source_url") { raw, arena, completion, diagnostic in
+      try mln_map_add_geojson_source_url(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_geojson_source_url(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_hillshade_layer`.
   @discardableResult
-
   func addHillshadeLayer(
     layerId bindingArg0: String,
     sourceId bindingArg1: String,
     beforeLayerId bindingArg2: String? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_hillshade_layer"
+    try await nativeCommand("mln_map_add_hillshade_layer") { raw, arena, completion, diagnostic in
+      mln_map_add_hillshade_layer(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_add_hillshade_layer(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            bindingArg2.map { arena.view($0) } ?? mln_buffer_view(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_image_source_image`.
   @discardableResult
-
   func addImageSourceImage(
     sourceId bindingArg0: String,
     coordinates bindingArg1: [LatLng],
     image bindingArg3: PremultipliedRgba8Image
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_image_source_image"
+    try await nativeCommand("mln_map_add_image_source_image") { raw, arena, completion, diagnostic in
+      try mln_map_add_image_source_image(
+        raw,
+        arena.view(bindingArg0),
+        arena.array(bindingArg1.map { $0.nativeValue() }),
+        NativeInputArena.count(bindingArg1.count),
+        arena.store(bindingArg3.nativeValue(arena: arena)),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_image_source_image(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.array(bindingArg1.map { $0.nativeValue() }),
-            NativeInputArena.count(bindingArg1.count),
-            arena.store(bindingArg3.nativeValue(arena: arena)),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_image_source_url`.
   @discardableResult
-
   func addImageSourceUrl(
     sourceId bindingArg0: String,
     coordinates bindingArg1: [LatLng],
     url bindingArg3: String
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_image_source_url"
+    try await nativeCommand("mln_map_add_image_source_url") { raw, arena, completion, diagnostic in
+      try mln_map_add_image_source_url(
+        raw,
+        arena.view(bindingArg0),
+        arena.array(bindingArg1.map { $0.nativeValue() }),
+        NativeInputArena.count(bindingArg1.count),
+        arena.view(bindingArg3),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_image_source_url(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.array(bindingArg1.map { $0.nativeValue() }),
-            NativeInputArena.count(bindingArg1.count),
-            arena.view(bindingArg3),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_location_indicator_layer`.
   @discardableResult
-
   func addLocationIndicatorLayer(
     layerId bindingArg0: String,
     beforeLayerId bindingArg1: String? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_location_indicator_layer"
+    try await nativeCommand("mln_map_add_location_indicator_layer") { raw, arena, completion, diagnostic in
+      mln_map_add_location_indicator_layer(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_add_location_indicator_layer(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_raster_dem_source_tiles`.
   @discardableResult
-
   func addRasterDemSourceTiles(
     sourceId bindingArg0: String,
     tiles bindingArg1: [String],
     options bindingArg3: StyleTileSourceOptions? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_raster_dem_source_tiles"
+    try await nativeCommand("mln_map_add_raster_dem_source_tiles") { raw, arena, completion, diagnostic in
+      try mln_map_add_raster_dem_source_tiles(
+        raw,
+        arena.view(bindingArg0),
+        arena.array(bindingArg1.map { arena.view($0) }),
+        NativeInputArena.count(bindingArg1.count),
+        bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_raster_dem_source_tiles(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.array(bindingArg1.map { arena.view($0) }),
-            NativeInputArena.count(bindingArg1.count),
-            bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_raster_dem_source_url`.
   @discardableResult
-
   func addRasterDemSourceUrl(
     sourceId bindingArg0: String,
     url bindingArg1: String,
     options bindingArg2: StyleTileSourceOptions? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_raster_dem_source_url"
+    try await nativeCommand("mln_map_add_raster_dem_source_url") { raw, arena, completion, diagnostic in
+      try mln_map_add_raster_dem_source_url(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_raster_dem_source_url(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_raster_source_tiles`.
   @discardableResult
-
   func addRasterSourceTiles(
     sourceId bindingArg0: String,
     tiles bindingArg1: [String],
     options bindingArg3: StyleTileSourceOptions? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_raster_source_tiles"
+    try await nativeCommand("mln_map_add_raster_source_tiles") { raw, arena, completion, diagnostic in
+      try mln_map_add_raster_source_tiles(
+        raw,
+        arena.view(bindingArg0),
+        arena.array(bindingArg1.map { arena.view($0) }),
+        NativeInputArena.count(bindingArg1.count),
+        bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_raster_source_tiles(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.array(bindingArg1.map { arena.view($0) }),
-            NativeInputArena.count(bindingArg1.count),
-            bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_raster_source_url`.
   @discardableResult
-
   func addRasterSourceUrl(
     sourceId bindingArg0: String,
     url bindingArg1: String,
     options bindingArg2: StyleTileSourceOptions? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_raster_source_url"
+    try await nativeCommand("mln_map_add_raster_source_url") { raw, arena, completion, diagnostic in
+      try mln_map_add_raster_source_url(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_raster_source_url(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_style_layer_json`.
   @discardableResult
-
   func addStyleLayerJson(
     layerJson bindingArg0: Data,
     beforeLayerId bindingArg1: String? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_style_layer_json"
+    try await nativeCommand("mln_map_add_style_layer_json") { raw, arena, completion, diagnostic in
+      mln_map_add_style_layer_json(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_add_style_layer_json(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_style_source_json`.
   @discardableResult
-
   func addStyleSourceJson(
     sourceId bindingArg0: String,
     sourceJson bindingArg1: Data
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_style_source_json"
+    try await nativeCommand("mln_map_add_style_source_json") { raw, arena, completion, diagnostic in
+      mln_map_add_style_source_json(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_add_style_source_json(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_vector_source_tiles`.
   @discardableResult
-
   func addVectorSourceTiles(
     sourceId bindingArg0: String,
     tiles bindingArg1: [String],
     options bindingArg3: StyleTileSourceOptions? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_vector_source_tiles"
+    try await nativeCommand("mln_map_add_vector_source_tiles") { raw, arena, completion, diagnostic in
+      try mln_map_add_vector_source_tiles(
+        raw,
+        arena.view(bindingArg0),
+        arena.array(bindingArg1.map { arena.view($0) }),
+        NativeInputArena.count(bindingArg1.count),
+        bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_vector_source_tiles(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.array(bindingArg1.map { arena.view($0) }),
-            NativeInputArena.count(bindingArg1.count),
-            bindingArg3.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_add_vector_source_url`.
   @discardableResult
-
   func addVectorSourceUrl(
     sourceId bindingArg0: String,
     url bindingArg1: String,
     options bindingArg2: StyleTileSourceOptions? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_add_vector_source_url"
+    try await nativeCommand("mln_map_add_vector_source_url") { raw, arena, completion, diagnostic in
+      try mln_map_add_vector_source_url(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_add_vector_source_url(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_copy_layer_source_id`.
-
+  /// Calls `mln_map_copy_layer_source_id`.
   func copyLayerSourceId(layerId bindingArg0: String) async throws -> String? {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_copy_layer_source_id"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_copy_layer_source_id(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.value(
-          result,
-          as: mln_buffer_view.self
-        ).size == 0 ? nil : try NativeCompletion.string(result) }
-    }
+    try await nativeStart(
+      "mln_map_copy_layer_source_id",
+      convert: { result in try NativeCompletion.value(
+        result,
+        as: mln_buffer_view.self
+      ).size == 0 ? nil : try NativeCompletion.string(result) }
+    ) { raw, arena, completion, diagnostic in mln_map_copy_layer_source_id(
+      raw,
+      arena.view(bindingArg0),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_copy_layer_source_layer`.
-
+  /// Calls `mln_map_copy_layer_source_layer`.
   func copyLayerSourceLayer(layerId bindingArg0: String) async throws
     -> String?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_copy_layer_source_layer"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_copy_layer_source_layer(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.value(
-          result,
-          as: mln_buffer_view.self
-        ).size == 0 ? nil : try NativeCompletion.string(result) }
-    }
+    try await nativeStart(
+      "mln_map_copy_layer_source_layer",
+      convert: { result in try NativeCompletion.value(
+        result,
+        as: mln_buffer_view.self
+      ).size == 0 ? nil : try NativeCompletion.string(result) }
+    ) { raw, arena, completion, diagnostic in mln_map_copy_layer_source_layer(
+      raw,
+      arena.view(bindingArg0),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_copy_style_image_premultiplied_rgba8`.
-
+  /// Calls `mln_map_copy_style_image_premultiplied_rgba8`.
   func copyStyleImagePremultipliedRgba8(
     imageId bindingArg0: String
   ) async throws
     -> Data?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_copy_style_image_premultiplied_rgba8"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_copy_style_image_premultiplied_rgba8(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_copy_style_image_premultiplied_rgba8",
+      convert: { result in
+        if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                      .data(result)
-        }
+                  .data(result)
+      }
+    ) { raw, arena, completion, diagnostic in
+      mln_map_copy_style_image_premultiplied_rgba8(
+        raw,
+        arena.view(bindingArg0),
+        completion,
+        diagnostic
+      )
     }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_copy_style_image_stretches`.
-
+  /// Calls `mln_map_copy_style_image_stretches`.
   func copyStyleImageStretches(imageId bindingArg0: String) async throws
     -> StyleImageStretchesResult?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_copy_style_image_stretches"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_copy_style_image_stretches(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_copy_style_image_stretches",
+      convert: { result in
+        if result.pointee
           .value_count ==
-          0 { return nil
-            }; return try StyleImageStretchesResult(raw: NativeCompletion.value(
-              result,
-              as: mln_style_image_stretches_result.self
-            ))
-        }
+          0
+        { return nil
+        }; return try StyleImageStretchesResult(raw: NativeCompletion.value(
+          result,
+          as: mln_style_image_stretches_result.self
+        ))
+      }
+    ) { raw, arena, completion, diagnostic in
+      mln_map_copy_style_image_stretches(
+        raw,
+        arena.view(bindingArg0),
+        completion,
+        diagnostic
+      )
     }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_copy_style_source_attribution`.
-
+  /// Calls `mln_map_copy_style_source_attribution`.
   func copyStyleSourceAttribution(sourceId bindingArg0: String) async throws
     -> String?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_copy_style_source_attribution"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_copy_style_source_attribution(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_copy_style_source_attribution",
+      convert: { result in
+        if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                      .string(result)
-        }
+                  .string(result)
+      }
+    ) { raw, arena, completion, diagnostic in
+      mln_map_copy_style_source_attribution(
+        raw,
+        arena.view(bindingArg0),
+        completion,
+        diagnostic
+      )
     }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_copy_style_source_url`.
-
+  /// Calls `mln_map_copy_style_source_url`.
   func copyStyleSourceUrl(sourceId bindingArg0: String) async throws
     -> String?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_copy_style_source_url"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_copy_style_source_url(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_copy_style_source_url",
+      convert: { result in
+        if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                      .string(result)
-        }
-    }
+                  .string(result)
+      }
+    ) { raw, arena, completion, diagnostic in mln_map_copy_style_source_url(
+      raw,
+      arena.view(bindingArg0),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_get_global_state`.
-
+  /// Calls `mln_map_get_global_state`.
   func getGlobalState() async throws -> Data {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_get_global_state"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_get_global_state(
-            handle.raw,
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.data(result) }
-    }
+    try await nativeStart(
+      "mln_map_get_global_state",
+      convert: { result in try NativeCompletion.data(result) }
+    ) { raw, _, completion, diagnostic in mln_map_get_global_state(
+      raw,
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_get_image_source_coordinates`.
-
+  /// Calls `mln_map_get_image_source_coordinates`.
   func getImageSourceCoordinates(sourceId bindingArg0: String) async throws
     -> [LatLng]?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_get_image_source_coordinates"
+    try await nativeStart(
+      "mln_map_get_image_source_coordinates",
+      convert: { result in
+        if result.pointee
+          .value == nil { return nil }; return try NativeCompletion
+                  .values(
+                    result,
+                    as: mln_lat_lng.self
+                  ).map { LatLng(raw: $0) }
+      }
+    ) { raw, arena, completion, diagnostic in
+      mln_map_get_image_source_coordinates(
+        raw,
+        arena.view(bindingArg0),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_get_image_source_coordinates(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
-          .value == nil { return nil }; return try NativeCompletion.values(
-              result,
-              as: mln_lat_lng.self
-            ).map { LatLng(raw: $0) }
-        }
     }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_get_layer_filter`.
-
+  /// Calls `mln_map_get_layer_filter`.
   func getLayerFilter(layerId bindingArg0: String) async throws -> Data? {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_get_layer_filter"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_get_layer_filter(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_get_layer_filter",
+      convert: { result in
+        if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                      .data(result)
-        }
-    }
+                  .data(result)
+      }
+    ) { raw, arena, completion, diagnostic in mln_map_get_layer_filter(
+      raw,
+      arena.view(bindingArg0),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_get_layer_property`.
-
+  /// Calls `mln_map_get_layer_property`.
   func getLayerProperty(
     layerId bindingArg0: String,
     propertyName bindingArg1: String
   ) async throws -> Data? {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_get_layer_property"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_get_layer_property(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_get_layer_property",
+      convert: { result in
+        if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                      .data(result)
-        }
-    }
+                  .data(result)
+      }
+    ) { raw, arena, completion, diagnostic in mln_map_get_layer_property(
+      raw,
+      arena.view(bindingArg0),
+      arena.view(bindingArg1),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_get_style_image_info`.
-
+  /// Calls `mln_map_get_style_image_info`.
   func getStyleImageInfo(imageId bindingArg0: String) async throws
     -> StyleImageResult?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_get_style_image_info"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_get_style_image_info(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_get_style_image_info",
+      convert: { result in
+        if result.pointee
           .value_count ==
-          0 { return nil
-            }; return try StyleImageResult(raw: NativeCompletion.value(
-              result,
-              as: mln_style_image_result.self
-            ))
-        }
-    }
+          0
+        { return nil
+        }; return try StyleImageResult(raw: NativeCompletion.value(
+          result,
+          as: mln_style_image_result.self
+        ))
+      }
+    ) { raw, arena, completion, diagnostic in mln_map_get_style_image_info(
+      raw,
+      arena.view(bindingArg0),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_get_style_layer_info`.
-
+  /// Calls `mln_map_get_style_layer_info`.
   func getStyleLayerInfo(layerId bindingArg0: String) async throws
     -> StyleLayerResult?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_get_style_layer_info"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_get_style_layer_info(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_get_style_layer_info",
+      convert: { result in
+        if result.pointee
           .value_count ==
-          0 { return nil
-            }; return try StyleLayerResult(raw: NativeCompletion.value(
-              result,
-              as: mln_style_layer_result.self
-            ))
-        }
-    }
+          0
+        { return nil
+        }; return try StyleLayerResult(raw: NativeCompletion.value(
+          result,
+          as: mln_style_layer_result.self
+        ))
+      }
+    ) { raw, arena, completion, diagnostic in mln_map_get_style_layer_info(
+      raw,
+      arena.view(bindingArg0),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_get_style_layer_json`.
-
+  /// Calls `mln_map_get_style_layer_json`.
   func getStyleLayerJson(layerId bindingArg0: String) async throws -> Data? {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_get_style_layer_json"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_get_style_layer_json(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_get_style_layer_json",
+      convert: { result in
+        if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                      .data(result)
-        }
-    }
+                  .data(result)
+      }
+    ) { raw, arena, completion, diagnostic in mln_map_get_style_layer_json(
+      raw,
+      arena.view(bindingArg0),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_get_style_light_property`.
-
+  /// Calls `mln_map_get_style_light_property`.
   func getStyleLightProperty(propertyName bindingArg0: String) async throws
     -> Data?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_get_style_light_property"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_get_style_light_property(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_get_style_light_property",
+      convert: { result in
+        if result.pointee
           .value_count == 0 { return nil }; return try NativeCompletion
-                      .data(result)
-        }
-    }
+                  .data(result)
+      }
+    ) { raw, arena, completion, diagnostic in mln_map_get_style_light_property(
+      raw,
+      arena.view(bindingArg0),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_get_style_source_info`.
-
+  /// Calls `mln_map_get_style_source_info`.
   func getStyleSourceInfo(sourceId bindingArg0: String) async throws
     -> StyleSourceResult?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_get_style_source_info"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_get_style_source_info(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_get_style_source_info",
+      convert: { result in
+        if result.pointee
           .value_count ==
-          0 { return nil
-            }; return try StyleSourceResult(raw: NativeCompletion.value(
-              result,
-              as: mln_style_source_result.self
-            ))
-        }
-    }
+          0
+        { return nil
+        }; return try StyleSourceResult(raw: NativeCompletion.value(
+          result,
+          as: mln_style_source_result.self
+        ))
+      }
+    ) { raw, arena, completion, diagnostic in mln_map_get_style_source_info(
+      raw,
+      arena.view(bindingArg0),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_get_style_source_tile_urls`.
-
+  /// Calls `mln_map_get_style_source_tile_urls`.
   func getStyleSourceTileUrls(sourceId bindingArg0: String) async throws
     -> StyleSourceTileUrlsResult?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_get_style_source_tile_urls"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_get_style_source_tile_urls(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_map_get_style_source_tile_urls",
+      convert: { result in
+        if result.pointee
           .value_count ==
-          0 { return nil
-            }; return try StyleSourceTileUrlsResult(raw: NativeCompletion.value(
-              result,
-              as: mln_style_source_tile_urls_result.self
-            ))
-        }
-    }
-  }
-}
-
-public extension MapHandle {
-  // Calls `mln_map_get_style_transition_options`.
-
-  func getStyleTransitionOptions() async throws -> StyleTransitionOptions {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_get_style_transition_options"
+          0
+        { return nil
+        }; return try StyleSourceTileUrlsResult(raw: NativeCompletion.value(
+          result,
+          as: mln_style_source_tile_urls_result.self
+        ))
+      }
+    ) { raw, arena, completion, diagnostic in
+      mln_map_get_style_source_tile_urls(
+        raw,
+        arena.view(bindingArg0),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_get_style_transition_options(
-            handle.raw,
-            completion,
-            diagnostic
-          ) } }) { result in try StyleTransitionOptions(
-          raw: NativeCompletion.value(
-            result,
-            as: mln_style_transition_options.self
-          )
-        ) }
     }
   }
-}
 
-public extension MapHandle {
+  /// Calls `mln_map_get_style_transition_options`.
+  func getStyleTransitionOptions() async throws -> StyleTransitionOptions {
+    try await nativeStart(
+      "mln_map_get_style_transition_options",
+      convert: { result in
+        try StyleTransitionOptions(raw: NativeCompletion.value(
+          result,
+          as: mln_style_transition_options.self
+        ))
+      }
+    ) { raw, _, completion, diagnostic in mln_map_get_style_transition_options(
+      raw,
+      completion,
+      diagnostic
+    ) }
+  }
+
   /// Calls `mln_map_invalidate_custom_geometry_source_region`.
   @discardableResult
-
   func invalidateCustomGeometrySourceRegion(
     sourceId bindingArg0: String,
     bounds bindingArg1: LatLngBounds
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_invalidate_custom_geometry_source_region"
+    try await nativeCommand("mln_map_invalidate_custom_geometry_source_region") { raw, arena, completion, diagnostic in
+      mln_map_invalidate_custom_geometry_source_region(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_invalidate_custom_geometry_source_region(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.nativeValue(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_invalidate_custom_geometry_source_tile`.
   @discardableResult
-
   func invalidateCustomGeometrySourceTile(
     sourceId bindingArg0: String,
     tileId bindingArg1: CanonicalTileId
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_invalidate_custom_geometry_source_tile"
+    try await nativeCommand("mln_map_invalidate_custom_geometry_source_tile") { raw, arena, completion, diagnostic in
+      mln_map_invalidate_custom_geometry_source_tile(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_invalidate_custom_geometry_source_tile(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.nativeValue(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_invalidate_custom_mvt_vector_source_tile`.
   @discardableResult
-
   func invalidateCustomMvtVectorSourceTile(
     sourceId bindingArg0: String,
     tileId bindingArg1: CanonicalTileId
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_invalidate_custom_mvt_vector_source_tile"
+    try await nativeCommand("mln_map_invalidate_custom_mvt_vector_source_tile") { raw, arena, completion, diagnostic in
+      mln_map_invalidate_custom_mvt_vector_source_tile(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_invalidate_custom_mvt_vector_source_tile(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.nativeValue(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_list_style_layer_ids`.
-
+  /// Calls `mln_map_list_style_layer_ids`.
   func listStyleLayerIds() async throws -> [String] {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_list_style_layer_ids"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_list_style_layer_ids(
-            handle.raw,
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.values(
-          result,
-          as: mln_buffer_view.self
-        ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } }
-    }
+    try await nativeStart(
+      "mln_map_list_style_layer_ids",
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_buffer_view.self
+      ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } }
+    ) { raw, _, completion, diagnostic in mln_map_list_style_layer_ids(
+      raw,
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_list_style_layers`.
-
+  /// Calls `mln_map_list_style_layers`.
   func listStyleLayers() async throws -> [StyleLayerEntry] {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_list_style_layers"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_list_style_layers(
-            handle.raw,
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.values(
-          result,
-          as: mln_style_layer_entry.self
-        ).map { try StyleLayerEntry(raw: $0) } }
-    }
+    try await nativeStart(
+      "mln_map_list_style_layers",
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_style_layer_entry.self
+      ).map { try StyleLayerEntry(raw: $0) } }
+    ) { raw, _, completion, diagnostic in mln_map_list_style_layers(
+      raw,
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_list_style_source_ids`.
-
+  /// Calls `mln_map_list_style_source_ids`.
   func listStyleSourceIds() async throws -> [String] {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_list_style_source_ids"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_list_style_source_ids(
-            handle.raw,
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.values(
-          result,
-          as: mln_buffer_view.self
-        ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } }
-    }
+    try await nativeStart(
+      "mln_map_list_style_source_ids",
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_buffer_view.self
+      ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } }
+    ) { raw, _, completion, diagnostic in mln_map_list_style_source_ids(
+      raw,
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_move_style_layer`.
   @discardableResult
-
   func moveStyleLayer(
     layerId bindingArg0: String,
     beforeLayerId bindingArg1: String? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_move_style_layer"
+    try await nativeCommand("mln_map_move_style_layer") { raw, arena, completion, diagnostic in
+      mln_map_move_style_layer(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_move_style_layer(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_remove_style_image`.
   @discardableResult
-
   func removeStyleImage(imageId bindingArg0: String) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_remove_style_image"
+    try await nativeCommand("mln_map_remove_style_image") { raw, arena, completion, diagnostic in
+      mln_map_remove_style_image(
+        raw,
+        arena.view(bindingArg0),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_remove_style_image(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_remove_style_layer`.
   @discardableResult
-
   func removeStyleLayer(layerId bindingArg0: String) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_remove_style_layer"
+    try await nativeCommand("mln_map_remove_style_layer") { raw, arena, completion, diagnostic in
+      mln_map_remove_style_layer(
+        raw,
+        arena.view(bindingArg0),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_remove_style_layer(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_remove_style_source`.
   @discardableResult
-
   func removeStyleSource(sourceId bindingArg0: String) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_remove_style_source"
+    try await nativeCommand("mln_map_remove_style_source") { raw, arena, completion, diagnostic in
+      mln_map_remove_style_source(
+        raw,
+        arena.view(bindingArg0),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_remove_style_source(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_custom_geometry_source_tile_data`.
   @discardableResult
-
   func setCustomGeometrySourceTileData(
     sourceId bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     data bindingArg2: Data
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_custom_geometry_source_tile_data"
+    try await nativeCommand("mln_map_set_custom_geometry_source_tile_data") { raw, arena, completion, diagnostic in
+      mln_map_set_custom_geometry_source_tile_data(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        arena.view(bindingArg2),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_custom_geometry_source_tile_data(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.nativeValue(),
-            arena.view(bindingArg2),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_custom_mvt_vector_source_tile_data`.
   @discardableResult
-
   func setCustomMvtVectorSourceTileData(
     sourceId bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     data bindingArg2: Data
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_custom_mvt_vector_source_tile_data"
+    try await nativeCommand("mln_map_set_custom_mvt_vector_source_tile_data") { raw, arena, completion, diagnostic in
+      mln_map_set_custom_mvt_vector_source_tile_data(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        arena.view(bindingArg2),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_custom_mvt_vector_source_tile_data(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.nativeValue(),
-            arena.view(bindingArg2),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_custom_mvt_vector_source_tile_error`.
   @discardableResult
-
   func setCustomMvtVectorSourceTileError(
     sourceId bindingArg0: String,
     tileId bindingArg1: CanonicalTileId,
     message bindingArg2: String
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_custom_mvt_vector_source_tile_error"
+    try await nativeCommand("mln_map_set_custom_mvt_vector_source_tile_error") { raw, arena, completion, diagnostic in
+      mln_map_set_custom_mvt_vector_source_tile_error(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        arena.view(bindingArg2),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_custom_mvt_vector_source_tile_error(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.nativeValue(),
-            arena.view(bindingArg2),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_geojson_source_data`.
   @discardableResult
-
   func setGeojsonSourceData(
     sourceId bindingArg0: String,
     data bindingArg1: GeojsonSourceDataHandle
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_geojson_source_data"
+    try await nativeCommand("mln_map_set_geojson_source_data") { raw, arena, completion, diagnostic in
+      try mln_map_set_geojson_source_data(
+        raw,
+        arena.view(bindingArg0),
+        arena.borrow(bindingArg1.handle),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_set_geojson_source_data(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.borrow(bindingArg1.handle),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_geojson_source_synchronous_tiling`.
   @discardableResult
-
   func setGeojsonSourceSynchronousTiling(
     sourceId bindingArg0: String,
     enabled bindingArg1: Bool
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_geojson_source_synchronous_tiling"
+    try await nativeCommand("mln_map_set_geojson_source_synchronous_tiling") { raw, arena, completion, diagnostic in
+      mln_map_set_geojson_source_synchronous_tiling(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_geojson_source_synchronous_tiling(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_geojson_source_url`.
   @discardableResult
-
   func setGeojsonSourceUrl(
     sourceId bindingArg0: String,
     url bindingArg1: String
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_geojson_source_url"
+    try await nativeCommand("mln_map_set_geojson_source_url") { raw, arena, completion, diagnostic in
+      mln_map_set_geojson_source_url(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_geojson_source_url(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_global_state_property`.
   @discardableResult
-
   func setGlobalStateProperty(
     propertyName bindingArg0: String,
     value bindingArg1: Data
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_global_state_property"
+    try await nativeCommand("mln_map_set_global_state_property") { raw, arena, completion, diagnostic in
+      mln_map_set_global_state_property(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_global_state_property(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_image_source_coordinates`.
   @discardableResult
-
   func setImageSourceCoordinates(
     sourceId bindingArg0: String,
     coordinates bindingArg1: [LatLng]
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_image_source_coordinates"
+    try await nativeCommand("mln_map_set_image_source_coordinates") { raw, arena, completion, diagnostic in
+      try mln_map_set_image_source_coordinates(
+        raw,
+        arena.view(bindingArg0),
+        arena.array(bindingArg1.map { $0.nativeValue() }),
+        NativeInputArena.count(bindingArg1.count),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_set_image_source_coordinates(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.array(bindingArg1.map { $0.nativeValue() }),
-            NativeInputArena.count(bindingArg1.count),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_image_source_image`.
   @discardableResult
-
   func setImageSourceImage(
     sourceId bindingArg0: String,
     image bindingArg1: PremultipliedRgba8Image
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_image_source_image"
+    try await nativeCommand("mln_map_set_image_source_image") { raw, arena, completion, diagnostic in
+      try mln_map_set_image_source_image(
+        raw,
+        arena.view(bindingArg0),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_set_image_source_image(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_image_source_url`.
   @discardableResult
-
   func setImageSourceUrl(
     sourceId bindingArg0: String,
     url bindingArg1: String
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_image_source_url"
+    try await nativeCommand("mln_map_set_image_source_url") { raw, arena, completion, diagnostic in
+      mln_map_set_image_source_url(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_image_source_url(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_layer_filter`.
   @discardableResult
-
   func setLayerFilter(
     layerId bindingArg0: String,
     filter bindingArg1: Data? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_layer_filter"
+    try await nativeCommand("mln_map_set_layer_filter") { raw, arena, completion, diagnostic in
+      mln_map_set_layer_filter(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { arena.store(arena.view($0)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_layer_filter(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.map { arena.store(arena.view($0)) },
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_layer_max_zoom`.
   @discardableResult
-
   func setLayerMaxZoom(
     layerId bindingArg0: String,
     maxZoom bindingArg1: Double
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_layer_max_zoom"
+    try await nativeCommand("mln_map_set_layer_max_zoom") { raw, arena, completion, diagnostic in
+      mln_map_set_layer_max_zoom(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_layer_max_zoom(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_layer_min_zoom`.
   @discardableResult
-
   func setLayerMinZoom(
     layerId bindingArg0: String,
     minZoom bindingArg1: Double
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_layer_min_zoom"
+    try await nativeCommand("mln_map_set_layer_min_zoom") { raw, arena, completion, diagnostic in
+      mln_map_set_layer_min_zoom(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_layer_min_zoom(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_layer_property`.
   @discardableResult
-
   func setLayerProperty(
     layerId bindingArg0: String,
     propertyName bindingArg1: String,
     value bindingArg2: Data
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_layer_property"
+    try await nativeCommand("mln_map_set_layer_property") { raw, arena, completion, diagnostic in
+      mln_map_set_layer_property(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        arena.view(bindingArg2),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_layer_property(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            arena.view(bindingArg2),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_layer_source_id`.
   @discardableResult
-
   func setLayerSourceId(
     layerId bindingArg0: String,
     sourceId bindingArg1: String
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_layer_source_id"
+    try await nativeCommand("mln_map_set_layer_source_id") { raw, arena, completion, diagnostic in
+      mln_map_set_layer_source_id(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_layer_source_id(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_layer_source_layer`.
   @discardableResult
-
   func setLayerSourceLayer(
     layerId bindingArg0: String,
     sourceLayer bindingArg1: String? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_layer_source_layer"
+    try await nativeCommand("mln_map_set_layer_source_layer") { raw, arena, completion, diagnostic in
+      mln_map_set_layer_source_layer(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_layer_source_layer(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_layer_visibility`.
   @discardableResult
-
   func setLayerVisibility(
     layerId bindingArg0: String,
     visibility bindingArg1: StyleLayerVisibility
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_layer_visibility"
+    try await nativeCommand("mln_map_set_layer_visibility") { raw, arena, completion, diagnostic in
+      mln_map_set_layer_visibility(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_layer_visibility(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.nativeValue(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_location_indicator_accuracy_radius`.
   @discardableResult
-
   func setLocationIndicatorAccuracyRadius(
     layerId bindingArg0: String,
     radius bindingArg1: Double
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_location_indicator_accuracy_radius"
+    try await nativeCommand("mln_map_set_location_indicator_accuracy_radius") { raw, arena, completion, diagnostic in
+      mln_map_set_location_indicator_accuracy_radius(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_location_indicator_accuracy_radius(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_location_indicator_bearing`.
   @discardableResult
-
   func setLocationIndicatorBearing(
     layerId bindingArg0: String,
     bearing bindingArg1: Double
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_location_indicator_bearing"
+    try await nativeCommand("mln_map_set_location_indicator_bearing") { raw, arena, completion, diagnostic in
+      mln_map_set_location_indicator_bearing(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_location_indicator_bearing(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_location_indicator_image_name`.
   @discardableResult
-
   func setLocationIndicatorImageName(
     layerId bindingArg0: String,
     imageKind bindingArg1: LocationIndicatorImageKind,
     imageId bindingArg2: String
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_location_indicator_image_name"
+    try await nativeCommand("mln_map_set_location_indicator_image_name") { raw, arena, completion, diagnostic in
+      mln_map_set_location_indicator_image_name(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        arena.view(bindingArg2),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_location_indicator_image_name(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.nativeValue(),
-            arena.view(bindingArg2),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_location_indicator_location`.
   @discardableResult
-
   func setLocationIndicatorLocation(
     layerId bindingArg0: String,
     coordinate bindingArg1: LatLng,
     altitude bindingArg2: Double
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_location_indicator_location"
+    try await nativeCommand("mln_map_set_location_indicator_location") { raw, arena, completion, diagnostic in
+      mln_map_set_location_indicator_location(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        bindingArg2,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_location_indicator_location(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.nativeValue(),
-            bindingArg2,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_style_image`.
   @discardableResult
-
   func setStyleImage(
     imageId bindingArg0: String,
     image bindingArg1: PremultipliedRgba8Image,
     options bindingArg2: StyleImageOptions? = nil
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_style_image"
+    try await nativeCommand("mln_map_set_style_image") { raw, arena, completion, diagnostic in
+      try mln_map_set_style_image(
+        raw,
+        arena.view(bindingArg0),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          try arena.submit { try mln_map_set_style_image(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_style_light_json`.
   @discardableResult
-
   func setStyleLightJson(lightJson bindingArg0: Data) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_style_light_json"
+    try await nativeCommand("mln_map_set_style_light_json") { raw, arena, completion, diagnostic in
+      mln_map_set_style_light_json(
+        raw,
+        arena.view(bindingArg0),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_style_light_json(
-            handle.raw,
-            arena.view(bindingArg0),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_style_light_property`.
   @discardableResult
-
   func setStyleLightProperty(
     propertyName bindingArg0: String,
     value bindingArg1: Data
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_style_light_property"
+    try await nativeCommand("mln_map_set_style_light_property") { raw, arena, completion, diagnostic in
+      mln_map_set_style_light_property(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_style_light_property(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_style_source_volatile`.
   @discardableResult
-
   func setStyleSourceVolatile(
     sourceId bindingArg0: String,
     isVolatile bindingArg1: Bool
   ) async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_style_source_volatile"
+    try await nativeCommand("mln_map_set_style_source_volatile") { raw, arena, completion, diagnostic in
+      mln_map_set_style_source_volatile(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_style_source_volatile(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_style_transition_options`.
   @discardableResult
-
   func setStyleTransitionOptions(
     options bindingArg0: StyleTransitionOptions
   ) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_style_transition_options"
+    try await nativeCommand("mln_map_set_style_transition_options") { raw, arena, completion, diagnostic in
+      mln_map_set_style_transition_options(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_style_transition_options(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
 }

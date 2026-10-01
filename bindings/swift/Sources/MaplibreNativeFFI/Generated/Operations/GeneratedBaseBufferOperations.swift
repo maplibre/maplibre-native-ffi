@@ -5,30 +5,20 @@ import Foundation
 
 public extension BufferHandle {
   func close() throws {
-    try NativeCallbackGuard.check(owner: self, operation: "mln_buffer_destroy")
-    try mapNativeFailure { try handle.closeOnce { live in
-      mln_buffer_destroy(live.raw)
-    } }
+    try nativeClose("mln_buffer_destroy") { raw in mln_buffer_destroy(raw) }
   }
-}
 
-public extension BufferHandle {
   /// Calls `mln_buffer_get`.
   func get() throws -> Data {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(owner: self, operation: "mln_buffer_get")
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_buffer_view()
-      try checkStatus { diagnostic in arena.submit { mln_buffer_get(
-        handle.raw,
+    var value0 = mln_buffer_view()
+    return try nativeInvoke("mln_buffer_get") { raw, _, diagnostic in
+      mln_buffer_get(
+        raw,
         &value0,
         diagnostic
-      ) } }
-      return try NativeString.copyData(data: value0.data, size: value0.size)
+      )
+    } result: {
+      try NativeString.copyData(data: value0.data, size: value0.size)
     }
   }
 }

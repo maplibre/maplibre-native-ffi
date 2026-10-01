@@ -6,15 +6,8 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_frame_demand_default`.
   static func frameDemandDefault() throws -> FrameDemand {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_frame_demand_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_frame_demand_default()
-    return FrameDemand(raw: value)
+    try nativeDirect("mln_frame_demand_default") { _ in
+      FrameDemand(raw: mln_frame_demand_default())
+    }
   }
 }

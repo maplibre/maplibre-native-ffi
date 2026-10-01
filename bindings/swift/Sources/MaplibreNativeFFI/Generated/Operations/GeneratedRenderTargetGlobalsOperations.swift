@@ -6,79 +6,48 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_gpu_sync_default`.
   static func gpuSyncDefault() throws -> GpuSync {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(owner: nil, operation: "mln_gpu_sync_default")
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_gpu_sync_default()
-    return GpuSync(raw: value)
+    try nativeDirect("mln_gpu_sync_default") { _ in
+      GpuSync(raw: mln_gpu_sync_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_opengl_supported_context_provider_mask`.
   static func openglSupportedContextProviderMask() throws
     -> OpenglContextProviderFlag
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_opengl_supported_context_provider_mask"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_opengl_supported_context_provider_mask()
-    return OpenglContextProviderFlag(rawValue: value)
+    try nativeDirect("mln_opengl_supported_context_provider_mask") { _ in
+      OpenglContextProviderFlag(
+        rawValue: mln_opengl_supported_context_provider_mask()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_render_session_attach_options_default`.
   static func renderSessionAttachOptionsDefault() throws
     -> RenderSessionAttachOptions
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_render_session_attach_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_render_session_attach_options_default()
-    return try RenderSessionAttachOptions(raw: value)
+    try nativeDirect("mln_render_session_attach_options_default") { _ in
+      try RenderSessionAttachOptions(
+        raw: mln_render_session_attach_options_default()
+      )
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_render_target_extent_physical_size`.
   static func renderTargetExtentPhysicalSize(
     extent bindingArg0: RenderTargetExtent
   ) throws
     -> (width: UInt32, height: UInt32)
   {
-    try mapNativeFailure {
-      try NativeAbi.ensureCompatible()
-      try NativeCallbackGuard.check(
-        owner: nil,
-        operation: "mln_render_target_extent_physical_size"
+    var value0: UInt32 = 0
+    var value1: UInt32 = 0
+    return try nativeInvoke("mln_render_target_extent_physical_size") { _, arena, diagnostic in
+      mln_render_target_extent_physical_size(
+        arena.store(bindingArg0.nativeValue()),
+        &value0,
+        &value1,
+        diagnostic
       )
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: UInt32 = 0
-      var value1: UInt32 = 0
-      try checkStatus { diagnostic in
-        arena.submit { mln_render_target_extent_physical_size(
-          arena.store(bindingArg0.nativeValue()),
-          &value0,
-          &value1,
-          diagnostic
-        ) }
-      }
-      return (value0, value1)
-    }
+    } result: { (value0, value1) }
   }
 }

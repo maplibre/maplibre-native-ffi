@@ -5,12 +5,8 @@ import Foundation
 
 public extension GeojsonSourceDataHandle {
   func close() throws {
-    try NativeCallbackGuard.check(
-      owner: self,
-      operation: "mln_geojson_source_data_destroy"
-    )
-    try mapNativeFailure { try handle.closeOnce { live in
-      mln_geojson_source_data_destroy(live.raw)
-    } }
+    try nativeClose("mln_geojson_source_data_destroy") { raw in
+      mln_geojson_source_data_destroy(raw)
+    }
   }
 }

@@ -6,36 +6,20 @@ import Foundation
 public extension EventBatchHandle {
   /// Calls `mln_event_batch_get`.
   func get() throws -> RuntimeEventBatchView {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_event_batch_get"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_runtime_event_batch_view()
-      value0.size = UInt32(MemoryLayout<mln_runtime_event_batch_view>.size)
-      try checkStatus { diagnostic in arena.submit { mln_event_batch_get(
-        handle.raw,
+    var value0 = mln_runtime_event_batch_view()
+    value0.size = UInt32(MemoryLayout<mln_runtime_event_batch_view>.size)
+    return try nativeInvoke("mln_event_batch_get") { raw, _, diagnostic in
+      mln_event_batch_get(
+        raw,
         &value0,
         diagnostic
-      ) } }
-      return try RuntimeEventBatchView(raw: value0)
-    }
+      )
+    } result: { try RuntimeEventBatchView(raw: value0) }
   }
-}
 
-public extension EventBatchHandle {
   func close() throws {
-    try NativeCallbackGuard.check(
-      owner: self,
-      operation: "mln_event_batch_release"
-    )
-    try mapNativeFailure { try handle.closeOnce { live in
-      mln_event_batch_release(live.raw)
-    } }
+    try nativeClose("mln_event_batch_release") { raw in
+      mln_event_batch_release(raw)
+    }
   }
 }

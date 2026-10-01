@@ -6,44 +6,18 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_log_clear_callback`.
   static func logClearCallback() throws {
-    try mapNativeFailure {
-      try NativeAbi.ensureCompatible()
-      try NativeCallbackGuard.check(
-        owner: nil,
-        operation: "mln_log_clear_callback"
-      )
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in
-        arena.submit { mln_log_clear_callback(diagnostic) }
-      }
-      return ()
+    try nativeInvoke("mln_log_clear_callback") { _, _, diagnostic in
+      mln_log_clear_callback(diagnostic)
     }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_log_set_async_severity_mask`.
   static func logSetAsyncSeverityMask(mask bindingArg0: LogSeverityMask) throws {
-    try mapNativeFailure {
-      try NativeAbi.ensureCompatible()
-      try NativeCallbackGuard.check(
-        owner: nil,
-        operation: "mln_log_set_async_severity_mask"
+    try nativeInvoke("mln_log_set_async_severity_mask") { _, _, diagnostic in
+      mln_log_set_async_severity_mask(
+        bindingArg0.nativeValue(),
+        diagnostic
       )
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in
-        arena.submit { mln_log_set_async_severity_mask(
-          bindingArg0.nativeValue(),
-          diagnostic
-        ) }
-      }
-      return ()
     }
   }
 }

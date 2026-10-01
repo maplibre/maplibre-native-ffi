@@ -10,51 +10,27 @@ public extension Maplibre {
   ) throws
     -> LatLng
   {
-    try mapNativeFailure {
-      try NativeAbi.ensureCompatible()
-      try NativeCallbackGuard.check(
-        owner: nil,
-        operation: "mln_lat_lng_for_projected_meters"
+    var value0 = mln_lat_lng()
+    return try nativeInvoke("mln_lat_lng_for_projected_meters") { _, _, diagnostic in
+      mln_lat_lng_for_projected_meters(
+        bindingArg0.nativeValue(),
+        &value0,
+        diagnostic
       )
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_lat_lng()
-      try checkStatus { diagnostic in
-        arena.submit { mln_lat_lng_for_projected_meters(
-          bindingArg0.nativeValue(),
-          &value0,
-          diagnostic
-        ) }
-      }
-      return LatLng(raw: value0)
-    }
+    } result: { LatLng(raw: value0) }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_projected_meters_for_lat_lng`.
   static func projectedMetersForLatLng(coordinate bindingArg0: LatLng) throws
     -> ProjectedMeters
   {
-    try mapNativeFailure {
-      try NativeAbi.ensureCompatible()
-      try NativeCallbackGuard.check(
-        owner: nil,
-        operation: "mln_projected_meters_for_lat_lng"
+    var value0 = mln_projected_meters()
+    return try nativeInvoke("mln_projected_meters_for_lat_lng") { _, _, diagnostic in
+      mln_projected_meters_for_lat_lng(
+        bindingArg0.nativeValue(),
+        &value0,
+        diagnostic
       )
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_projected_meters()
-      try checkStatus { diagnostic in
-        arena.submit { mln_projected_meters_for_lat_lng(
-          bindingArg0.nativeValue(),
-          &value0,
-          diagnostic
-        ) }
-      }
-      return ProjectedMeters(raw: value0)
-    }
+    } result: { ProjectedMeters(raw: value0) }
   }
 }

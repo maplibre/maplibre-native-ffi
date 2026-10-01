@@ -4,338 +4,200 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RuntimeHandle {
-  // Calls `mln_map_create`.
-
+  /// Calls `mln_map_create`.
   func mapCreate(options bindingArg0: MapOptions) async throws -> MapHandle {
-    try await awaitNative {
-      try NativeCallbackGuard.check(owner: self, operation: "mln_map_create")
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in arena.submit { mln_map_create(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          completion,
-          diagnostic
-        ) } }) { result in try MapHandle(
-          adopting: NativeCompletion.value(result, as: mln_map.self),
-          parent: self
-        ) }
-    }
+    try await nativeStart(
+      "mln_map_create",
+      convert: { result in try MapHandle(
+        adopting: NativeCompletion.value(result, as: mln_map.self),
+        parent: self
+      ) }
+    ) { raw, arena, completion, diagnostic in mln_map_create(
+      raw,
+      arena.store(bindingArg0.nativeValue()),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_offline_region_create`.
-
+  /// Calls `mln_runtime_offline_region_create`.
   func offlineRegionCreate(
     definition bindingArg0: OfflineRegionDefinition,
     metadata bindingArg1: Data
   ) async throws -> OfflineRegionInfo {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_offline_region_create"
+    try await nativeStart(
+      "mln_runtime_offline_region_create",
+      convert: { result in try OfflineRegionInfo(raw: NativeCompletion.value(
+        result,
+        as: mln_offline_region_info.self
+      )) }
+    ) { raw, arena, completion, diagnostic in
+      try mln_runtime_offline_region_create(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        arena.view(bindingArg1).data?.assumingMemoryBound(to: UInt8.self),
+        NativeInputArena.count(bindingArg1.count),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          try arena.submit { try mln_runtime_offline_region_create(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue(arena: arena)),
-            arena.view(bindingArg1).data?.assumingMemoryBound(to: UInt8.self),
-            NativeInputArena.count(bindingArg1.count),
-            completion,
-            diagnostic
-          ) } }) { result in try OfflineRegionInfo(raw: NativeCompletion.value(
-          result,
-          as: mln_offline_region_info.self
-        )) }
     }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_offline_region_delete`.
-
+  /// Calls `mln_runtime_offline_region_delete`.
   func offlineRegionDelete(regionId bindingArg0: Int64) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_offline_region_delete"
+    try await nativeUnit("mln_runtime_offline_region_delete") { raw, _, completion, diagnostic in
+      mln_runtime_offline_region_delete(
+        raw,
+        bindingArg0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_runtime_offline_region_delete(
-            handle.raw,
-            bindingArg0,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_offline_region_get`.
-
+  /// Calls `mln_runtime_offline_region_get`.
   func offlineRegionGet(regionId bindingArg0: Int64) async throws
     -> OfflineRegionInfo?
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_offline_region_get"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_runtime_offline_region_get(
-            handle.raw,
-            bindingArg0,
-            completion,
-            diagnostic
-          ) } }) { result in if result.pointee
+    try await nativeStart(
+      "mln_runtime_offline_region_get",
+      convert: { result in
+        if result.pointee
           .value_count ==
-          0 { return nil
-            }; return try OfflineRegionInfo(raw: NativeCompletion.value(
-              result,
-              as: mln_offline_region_info.self
-            ))
-        }
-    }
+          0
+        { return nil
+        }; return try OfflineRegionInfo(raw: NativeCompletion.value(
+          result,
+          as: mln_offline_region_info.self
+        ))
+      }
+    ) { raw, _, completion, diagnostic in mln_runtime_offline_region_get(
+      raw,
+      bindingArg0,
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_offline_region_get_status`.
-
+  /// Calls `mln_runtime_offline_region_get_status`.
   func offlineRegionGetStatus(regionId bindingArg0: Int64) async throws
     -> OfflineRegionStatus
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_offline_region_get_status"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_runtime_offline_region_get_status(
-            handle.raw,
-            bindingArg0,
-            completion,
-            diagnostic
-          ) }
-        }) { result in try OfflineRegionStatus(raw: NativeCompletion.value(
-          result,
-          as: mln_offline_region_status.self
-        )) }
-    }
+    try await nativeStart(
+      "mln_runtime_offline_region_get_status",
+      convert: { result in try OfflineRegionStatus(raw: NativeCompletion.value(
+        result,
+        as: mln_offline_region_status.self
+      )) }
+    ) { raw, _, completion, diagnostic in mln_runtime_offline_region_get_status(
+      raw,
+      bindingArg0,
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_offline_region_invalidate`.
-
+  /// Calls `mln_runtime_offline_region_invalidate`.
   func offlineRegionInvalidate(regionId bindingArg0: Int64) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_offline_region_invalidate"
+    try await nativeUnit("mln_runtime_offline_region_invalidate") { raw, _, completion, diagnostic in
+      mln_runtime_offline_region_invalidate(
+        raw,
+        bindingArg0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_runtime_offline_region_invalidate(
-            handle.raw,
-            bindingArg0,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_offline_region_set_download_state`.
-
+  /// Calls `mln_runtime_offline_region_set_download_state`.
   func offlineRegionSetDownloadState(
     regionId bindingArg0: Int64,
     state bindingArg1: OfflineRegionDownloadState
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_offline_region_set_download_state"
+    try await nativeUnit("mln_runtime_offline_region_set_download_state") { raw, _, completion, diagnostic in
+      mln_runtime_offline_region_set_download_state(
+        raw,
+        bindingArg0,
+        bindingArg1.nativeValue(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_runtime_offline_region_set_download_state(
-            handle.raw,
-            bindingArg0,
-            bindingArg1.nativeValue(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_offline_region_set_observed`.
-
+  /// Calls `mln_runtime_offline_region_set_observed`.
   func offlineRegionSetObserved(
     regionId bindingArg0: Int64,
     observed bindingArg1: Bool
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_offline_region_set_observed"
+    try await nativeUnit("mln_runtime_offline_region_set_observed") { raw, _, completion, diagnostic in
+      mln_runtime_offline_region_set_observed(
+        raw,
+        bindingArg0,
+        bindingArg1,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_runtime_offline_region_set_observed(
-            handle.raw,
-            bindingArg0,
-            bindingArg1,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_offline_region_update_metadata`.
-
+  /// Calls `mln_runtime_offline_region_update_metadata`.
   func offlineRegionUpdateMetadata(
     regionId bindingArg0: Int64,
     metadata bindingArg1: Data
   ) async throws -> OfflineRegionInfo {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_offline_region_update_metadata"
+    try await nativeStart(
+      "mln_runtime_offline_region_update_metadata",
+      convert: { result in try OfflineRegionInfo(raw: NativeCompletion.value(
+        result,
+        as: mln_offline_region_info.self
+      )) }
+    ) { raw, arena, completion, diagnostic in
+      try mln_runtime_offline_region_update_metadata(
+        raw,
+        bindingArg0,
+        arena.view(bindingArg1).data?.assumingMemoryBound(to: UInt8.self),
+        NativeInputArena.count(bindingArg1.count),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          try arena.submit { try mln_runtime_offline_region_update_metadata(
-            handle.raw,
-            bindingArg0,
-            arena.view(bindingArg1).data?.assumingMemoryBound(to: UInt8.self),
-            NativeInputArena.count(bindingArg1.count),
-            completion,
-            diagnostic
-          ) } }) { result in try OfflineRegionInfo(raw: NativeCompletion.value(
-          result,
-          as: mln_offline_region_info.self
-        )) }
     }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_offline_regions_list`.
-
+  /// Calls `mln_runtime_offline_regions_list`.
   func offlineRegionsList() async throws -> [OfflineRegionInfo] {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_offline_regions_list"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_runtime_offline_regions_list(
-            handle.raw,
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.values(
-          result,
-          as: mln_offline_region_info.self
-        ).map { try OfflineRegionInfo(raw: $0) } }
-    }
+    try await nativeStart(
+      "mln_runtime_offline_regions_list",
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_offline_region_info.self
+      ).map { try OfflineRegionInfo(raw: $0) } }
+    ) { raw, _, completion, diagnostic in mln_runtime_offline_regions_list(
+      raw,
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_offline_regions_merge_database`.
-
+  /// Calls `mln_runtime_offline_regions_merge_database`.
   func offlineRegionsMergeDatabase(
     sideDatabasePath bindingArg0: String
   ) async throws
     -> [OfflineRegionInfo]
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_offline_regions_merge_database"
+    try await nativeStart(
+      "mln_runtime_offline_regions_merge_database",
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_offline_region_info.self
+      ).map { try OfflineRegionInfo(raw: $0) } }
+    ) { raw, arena, completion, diagnostic in
+      try mln_runtime_offline_regions_merge_database(
+        raw,
+        arena.cString(bindingArg0),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          try arena.submit { try mln_runtime_offline_regions_merge_database(
-            handle.raw,
-            arena.cString(bindingArg0),
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.values(
-          result,
-          as: mln_offline_region_info.self
-        ).map { try OfflineRegionInfo(raw: $0) } }
     }
   }
 }

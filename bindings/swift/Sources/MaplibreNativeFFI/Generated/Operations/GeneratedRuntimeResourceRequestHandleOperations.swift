@@ -6,67 +6,41 @@ import Foundation
 public extension ResourceRequestHandle {
   /// Calls `mln_resource_request_cancelled`.
   func cancelled() throws -> Bool {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_resource_request_cancelled"
+    var value0 = false
+    return try nativeInvoke("mln_resource_request_cancelled") { raw, _, diagnostic in
+      mln_resource_request_cancelled(
+        raw,
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = false
-      try checkStatus { diagnostic in
-        arena.submit { mln_resource_request_cancelled(
-          handle.raw,
-          &value0,
-          diagnostic
-        ) }
-      }
-      return value0
-    }
+    } result: { value0 }
   }
-}
 
-public extension ResourceRequestHandle {
   /// Calls `mln_resource_request_complete`.
   func complete(response bindingArg0: ResourceResponse) throws {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_resource_request_complete"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let claim = try self.handle.beginClaim()
-      defer { claim.end() }
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
+    try nativeInvoke("mln_resource_request_complete",
+                     .claim)
+    { raw, arena, diagnostic in try mln_resource_request_complete(
+      raw,
+      arena.store(bindingArg0.nativeValue(arena: arena)),
+      diagnostic
+    ) }
+  }
 
-      try checkStatus { diagnostic in
-        try arena.submit { try mln_resource_request_complete(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue(arena: arena)),
-          diagnostic
-        ) }
-      }
-      claim.accept()
-      return ()
+  func close() throws {
+    try nativeClose("mln_resource_request_release") { raw in
+      mln_resource_request_release(raw)
     }
   }
-}
 
-public extension ResourceRequestHandle {
-  func close() throws {
-    try NativeCallbackGuard.check(
-      owner: self,
-      operation: "mln_resource_request_release"
-    )
-    try mapNativeFailure { try handle.closeOnce { live in
-      mln_resource_request_release(live.raw)
-    } }
+  /// Calls `mln_resource_request_wait_until_retired`.
+  func waitUntilRetired() throws {
+    try nativeInvoke("mln_resource_request_wait_until_retired",
+                     .issued)
+    { raw, _, diagnostic in mln_resource_request_wait_until_retired(
+      raw,
+      diagnostic
+    ) }
   }
 }
 
@@ -121,28 +95,4 @@ private func invokeMlnResourceRequestSetCancelCallback(
   )
   defer { admission.end() }
   do { try box.value.value() } catch { return }
-}
-
-public extension ResourceRequestHandle {
-  /// Calls `mln_resource_request_wait_until_retired`.
-  func waitUntilRetired() throws {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_resource_request_wait_until_retired"
-      )
-      let handle = self.handle.issued
-      defer { withExtendedLifetime(self) {} }
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in
-        arena.submit { mln_resource_request_wait_until_retired(
-          handle.raw,
-          diagnostic
-        ) }
-      }
-      return ()
-    }
-  }
 }

@@ -89,18 +89,12 @@ public struct GpuSync: Equatable, Hashable, Sendable {
   }
 }
 
-public struct GpuSyncKind: RawRepresentable, Equatable, Hashable, Sendable {
+public struct GpuSyncKind: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let cpuComplete: GpuSyncKind = .init(rawValue: 0)
@@ -132,18 +126,12 @@ public struct MetalContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-public struct OpenglClientApi: RawRepresentable, Equatable, Hashable, Sendable {
+public struct OpenglClientApi: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let unspecified: OpenglClientApi = .init(rawValue: 0)
@@ -227,40 +215,24 @@ public enum OpenglContextDescriptorData: Equatable, Hashable, Sendable {
   }
 }
 
-public struct OpenglContextOwnership: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct OpenglContextOwnership: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let shared: OpenglContextOwnership = .init(rawValue: 0)
   public static let dedicated: OpenglContextOwnership = .init(rawValue: 1)
 }
 
-public struct OpenglContextPlatform: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct OpenglContextPlatform: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let unspecified: OpenglContextPlatform = .init(rawValue: 0)
@@ -269,20 +241,12 @@ public struct OpenglContextPlatform: RawRepresentable, Equatable, Hashable,
   public static let webgl: OpenglContextPlatform = .init(rawValue: 3)
 }
 
-public struct OpenglContextProviderFlag: OptionSet, Equatable, Hashable,
-  Sendable
+public struct OpenglContextProviderFlag: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let wgl: OpenglContextProviderFlag = .init(rawValue: 1)
@@ -290,20 +254,12 @@ public struct OpenglContextProviderFlag: OptionSet, Equatable, Hashable,
   public static let webgl: OpenglContextProviderFlag = .init(rawValue: 4)
 }
 
-public struct RenderDriverKind: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct RenderDriverKind: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let coreWorker: RenderDriverKind = .init(rawValue: 1)
@@ -390,20 +346,13 @@ public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
   }
 }
 
-public struct RenderSessionCapabilityFlag: OptionSet, Equatable, Hashable,
-  Sendable
+public struct RenderSessionCapabilityFlag: OptionSet, NativeOpenValue,
+  Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let frameAcquisition: RenderSessionCapabilityFlag =
@@ -565,20 +514,12 @@ public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-public struct WebglContextKind: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct WebglContextKind: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let existing: WebglContextKind = .init(rawValue: 0)

@@ -12,7 +12,7 @@ struct NativeAcquiredFrameHandle: NativeHandle {
   }
 }
 
-public final class AcquiredFrameHandle: @unchecked Sendable {
+public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeAcquiredFrameHandle>
   init(adopting raw: mln_acquired_frame, parent: RenderSessionHandle) throws {
     handle = try NativeHandleBox(
@@ -44,7 +44,7 @@ struct NativeBufferHandle: NativeHandle {
   }
 }
 
-public final class BufferHandle: @unchecked Sendable {
+public final class BufferHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeBufferHandle>
   init(adopting raw: mln_buffer) throws {
     handle = try NativeHandleBox(
@@ -75,7 +75,7 @@ struct NativeEventBatchHandle: NativeHandle {
   }
 }
 
-public final class EventBatchHandle: @unchecked Sendable {
+public final class EventBatchHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeEventBatchHandle>
   init(adopting raw: mln_event_batch) throws {
     handle = try NativeHandleBox(
@@ -106,7 +106,9 @@ struct NativeGeojsonSourceDataHandle: NativeHandle {
   }
 }
 
-public final class GeojsonSourceDataHandle: @unchecked Sendable {
+public final class GeojsonSourceDataHandle: @unchecked Sendable,
+  NativeReceiver
+{
   let handle: NativeHandleBox<NativeGeojsonSourceDataHandle>
   init(adopting raw: mln_geojson_source_data) throws {
     handle = try NativeHandleBox(
@@ -138,7 +140,7 @@ struct NativeMapHandle: NativeHandle {
   }
 }
 
-public final class MapHandle: @unchecked Sendable {
+public final class MapHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeMapHandle>
   init(adopting raw: mln_map, parent: RuntimeHandle) throws {
     handle = try NativeHandleBox(
@@ -170,7 +172,7 @@ struct NativeMapProjectionHandle: NativeHandle {
   }
 }
 
-public final class MapProjectionHandle: @unchecked Sendable {
+public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeMapProjectionHandle>
   init(adopting raw: mln_map_projection) throws {
     handle = try NativeHandleBox(
@@ -201,7 +203,7 @@ struct NativeRenderFrameBatchHandle: NativeHandle {
   }
 }
 
-public final class RenderFrameBatchHandle: @unchecked Sendable {
+public final class RenderFrameBatchHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeRenderFrameBatchHandle>
   init(adopting raw: mln_render_frame_batch) throws {
     handle = try NativeHandleBox(
@@ -233,7 +235,7 @@ struct NativeRenderSessionHandle: NativeHandle {
   }
 }
 
-public final class RenderSessionHandle: @unchecked Sendable {
+public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeRenderSessionHandle>
   init(adopting raw: mln_render_session, parent: MapHandle) throws {
     handle = try NativeHandleBox(
@@ -265,7 +267,7 @@ struct NativeResourceRequestHandle: NativeHandle {
   }
 }
 
-public final class ResourceRequestHandle: @unchecked Sendable {
+public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeResourceRequestHandle>
   init(
     adopting raw: mln_resource_request_handle,
@@ -301,7 +303,7 @@ struct NativeRuntimeHandle: NativeHandle {
   }
 }
 
-public final class RuntimeHandle: @unchecked Sendable {
+public final class RuntimeHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeRuntimeHandle>
   init(adopting raw: mln_runtime) throws {
     handle = try NativeHandleBox(

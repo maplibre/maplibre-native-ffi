@@ -6,69 +6,35 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_metal_surface_descriptor_default`.
   static func metalSurfaceDescriptorDefault() throws -> MetalSurfaceDescriptor {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_metal_surface_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_metal_surface_descriptor_default()
-    return MetalSurfaceDescriptor(raw: value)
+    try nativeDirect("mln_metal_surface_descriptor_default") { _ in
+      MetalSurfaceDescriptor(raw: mln_metal_surface_descriptor_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_opengl_surface_descriptor_default`.
   static func openglSurfaceDescriptorDefault() throws
     -> OpenglSurfaceDescriptor
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_opengl_surface_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_opengl_surface_descriptor_default()
-    return try OpenglSurfaceDescriptor(raw: value)
+    try nativeDirect("mln_opengl_surface_descriptor_default") { _ in
+      try OpenglSurfaceDescriptor(raw: mln_opengl_surface_descriptor_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_vulkan_surface_descriptor_default`.
   static func vulkanSurfaceDescriptorDefault() throws
     -> VulkanSurfaceDescriptor
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_vulkan_surface_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_vulkan_surface_descriptor_default()
-    return VulkanSurfaceDescriptor(raw: value)
+    try nativeDirect("mln_vulkan_surface_descriptor_default") { _ in
+      VulkanSurfaceDescriptor(raw: mln_vulkan_surface_descriptor_default())
+    }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_webgpu_surface_descriptor_default`.
   static func webgpuSurfaceDescriptorDefault() throws
     -> WebgpuSurfaceDescriptor
   {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_webgpu_surface_descriptor_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_webgpu_surface_descriptor_default()
-    return WebgpuSurfaceDescriptor(raw: value)
+    try nativeDirect("mln_webgpu_surface_descriptor_default") { _ in
+      WebgpuSurfaceDescriptor(raw: mln_webgpu_surface_descriptor_default())
+    }
   }
 }

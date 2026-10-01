@@ -3,18 +3,12 @@
 internal import CMaplibreNativeC
 import Foundation
 
-public struct LogEvent: RawRepresentable, Equatable, Hashable, Sendable {
+public struct LogEvent: RawRepresentable, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let general: LogEvent = .init(rawValue: 0)
@@ -36,18 +30,12 @@ public struct LogEvent: RawRepresentable, Equatable, Hashable, Sendable {
   public static let timing: LogEvent = .init(rawValue: 16)
 }
 
-public struct LogSeverity: RawRepresentable, Equatable, Hashable, Sendable {
+public struct LogSeverity: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let info: LogSeverity = .init(rawValue: 1)
@@ -55,18 +43,12 @@ public struct LogSeverity: RawRepresentable, Equatable, Hashable, Sendable {
   public static let error: LogSeverity = .init(rawValue: 3)
 }
 
-public struct LogSeverityMask: OptionSet, Equatable, Hashable, Sendable {
+public struct LogSeverityMask: OptionSet, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let info: LogSeverityMask = .init(rawValue: 2)

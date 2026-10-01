@@ -41,25 +41,7 @@ public struct FrameDemand: Equatable, Hashable, Sendable {
   }
 }
 
-public struct FrameDemandFlag: OptionSet, Equatable, Hashable, Sendable {
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
-  }
-
-  public static let ifNeeded: FrameDemandFlag = .init(rawValue: 1)
-  public static let present: FrameDemandFlag = .init(rawValue: 2)
-}
-
-public struct RenderAbandonDisposition: RawRepresentable, Equatable, Hashable,
+public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
   public let rawValue: UInt32
@@ -67,12 +49,16 @@ public struct RenderAbandonDisposition: RawRepresentable, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
-  init(raw: UInt32) {
-    rawValue = raw
-  }
+  public static let ifNeeded: FrameDemandFlag = .init(rawValue: 1)
+  public static let present: FrameDemandFlag = .init(rawValue: 2)
+}
 
-  func nativeValue() -> UInt32 {
-    rawValue
+public struct RenderAbandonDisposition: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
   }
 
   public static let clean: RenderAbandonDisposition = .init(rawValue: 0)
@@ -159,18 +145,12 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   }
 }
 
-public struct RenderResult: RawRepresentable, Equatable, Hashable, Sendable {
+public struct RenderResult: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let rendered: RenderResult = .init(rawValue: 0)
@@ -274,20 +254,12 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   }
 }
 
-public struct RenderSessionState: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct RenderSessionState: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let attaching: RenderSessionState = .init(rawValue: 1)

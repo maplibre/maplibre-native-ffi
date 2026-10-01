@@ -6,399 +6,188 @@ import Foundation
 public extension RenderSessionHandle {
   /// Calls `mln_render_session_abandon`.
   func abandon() throws -> RenderAbandonResult {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_abandon"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_render_abandon_result()
-      value0.size = UInt32(MemoryLayout<mln_render_abandon_result>.size)
-      try checkStatus { diagnostic in arena.submit { mln_render_session_abandon(
-        handle.raw,
+    var value0 = mln_render_abandon_result()
+    value0.size = UInt32(MemoryLayout<mln_render_abandon_result>.size)
+    return try nativeInvoke("mln_render_session_abandon") { raw, _, diagnostic in
+      mln_render_session_abandon(
+        raw,
         &value0,
         diagnostic
-      ) } }
-      return RenderAbandonResult(raw: value0)
-    }
+      )
+    } result: { RenderAbandonResult(raw: value0) }
   }
-}
 
-public extension RenderSessionHandle {
   /// Calls `mln_render_session_acquire_frame`.
   func acquireFrame() throws -> AcquiredFrameHandle {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_acquire_frame"
+    var value0: mln_acquired_frame = 0
+    return try nativeInvoke("mln_render_session_acquire_frame") { raw, _, diagnostic in
+      mln_render_session_acquire_frame(
+        raw,
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_acquired_frame = 0
-      try checkStatus { diagnostic in
-        arena.submit { mln_render_session_acquire_frame(
-          handle.raw,
-          &value0,
-          diagnostic
-        ) }
-      }
-      return try AcquiredFrameHandle(adopting: value0, parent: self)
-    }
+    } result: { try AcquiredFrameHandle(adopting: value0, parent: self) }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_render_session_barrier`.
-
+  /// Calls `mln_render_session_barrier`.
   func barrier() async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_barrier"
+    try await nativeUnit("mln_render_session_barrier") { raw, _, completion, diagnostic in
+      mln_render_session_barrier(
+        raw,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_render_session_barrier(
-            handle.raw,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_render_session_clear_data`.
-
+  /// Calls `mln_render_session_clear_data`.
   func clearData() async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_clear_data"
+    try await nativeUnit("mln_render_session_clear_data") { raw, _, completion, diagnostic in
+      mln_render_session_clear_data(
+        raw,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_render_session_clear_data(
-            handle.raw,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
   func close() throws {
-    try NativeCallbackGuard.check(
-      owner: self,
-      operation: "mln_render_session_destroy"
-    )
-    try mapNativeFailure { try handle.closeOnce { live in
-      try checkStatus { diagnostic in mln_render_session_destroy(
-        live.raw,
+    try nativeClose("mln_render_session_destroy") { raw, diagnostic in
+      mln_render_session_destroy(
+        raw,
         diagnostic
-      ) }
-    } }
-  }
-}
-
-public extension RenderSessionHandle {
-  // Calls `mln_render_session_detach`.
-
-  func detach() async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_detach"
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_render_session_detach(
-            handle.raw,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
-  func dispose() throws {
-    try NativeCallbackGuard.check(
-      owner: self,
-      operation: "mln_render_session_dispose"
-    )
-    try mapNativeFailure { try handle.closeOnce { live in
-      try checkStatus { diagnostic in mln_render_session_dispose(
-        live.raw,
+  /// Calls `mln_render_session_detach`.
+  func detach() async throws {
+    try await nativeUnit("mln_render_session_detach") { raw, _, completion, diagnostic in
+      mln_render_session_detach(
+        raw,
+        completion,
         diagnostic
-      ) }
-    } }
+      )
+    }
   }
-}
 
-public extension RenderSessionHandle {
+  func dispose() throws {
+    try nativeClose("mln_render_session_dispose") { raw, diagnostic in
+      mln_render_session_dispose(
+        raw,
+        diagnostic
+      )
+    }
+  }
+
   /// Calls `mln_render_session_drain_frame_results`.
   func drainFrameResults() throws -> RenderFrameBatchHandle {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_drain_frame_results"
+    var value0: mln_render_frame_batch = 0
+    return try nativeInvoke("mln_render_session_drain_frame_results") { raw, _, diagnostic in
+      mln_render_session_drain_frame_results(
+        raw,
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_frame_batch = 0
-      try checkStatus { diagnostic in
-        arena.submit { mln_render_session_drain_frame_results(
-          handle.raw,
-          &value0,
-          diagnostic
-        ) }
-      }
-      return try RenderFrameBatchHandle(adopting: value0)
-    }
+    } result: { try RenderFrameBatchHandle(adopting: value0) }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_render_session_dump_debug_logs`.
-
+  /// Calls `mln_render_session_dump_debug_logs`.
   func dumpDebugLogs() async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_dump_debug_logs"
+    try await nativeUnit("mln_render_session_dump_debug_logs") { raw, _, completion, diagnostic in
+      mln_render_session_dump_debug_logs(
+        raw,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_render_session_dump_debug_logs(
-            handle.raw,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
   /// Calls `mln_render_session_get_capabilities`.
   func getCapabilities() throws -> RenderSessionCapabilities {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_get_capabilities"
+    var value0 = mln_render_session_capabilities()
+    value0.size = UInt32(MemoryLayout<mln_render_session_capabilities>.size)
+    return try nativeInvoke("mln_render_session_get_capabilities") { raw, _, diagnostic in
+      mln_render_session_get_capabilities(
+        raw,
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_render_session_capabilities()
-      value0.size = UInt32(MemoryLayout<mln_render_session_capabilities>.size)
-      try checkStatus { diagnostic in
-        arena.submit { mln_render_session_get_capabilities(
-          handle.raw,
-          &value0,
-          diagnostic
-        ) }
-      }
-      return RenderSessionCapabilities(raw: value0)
-    }
+    } result: { RenderSessionCapabilities(raw: value0) }
   }
-}
 
-public extension RenderSessionHandle {
   /// Calls `mln_render_session_get_snapshot`.
   func getSnapshot() throws -> RenderSessionSnapshot {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_get_snapshot"
+    var value0 = mln_render_session_snapshot()
+    value0.size = UInt32(MemoryLayout<mln_render_session_snapshot>.size)
+    return try nativeInvoke("mln_render_session_get_snapshot") { raw, _, diagnostic in
+      mln_render_session_get_snapshot(
+        raw,
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_render_session_snapshot()
-      value0.size = UInt32(MemoryLayout<mln_render_session_snapshot>.size)
-      try checkStatus { diagnostic in
-        arena.submit { mln_render_session_get_snapshot(
-          handle.raw,
-          &value0,
-          diagnostic
-        ) }
-      }
-      return RenderSessionSnapshot(raw: value0)
-    }
+    } result: { RenderSessionSnapshot(raw: value0) }
   }
-}
 
-public extension RenderSessionHandle {
   /// Calls `mln_render_session_projection_create`.
   func projectionCreate() throws -> MapProjectionHandle {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_projection_create"
+    var value0: mln_map_projection = 0
+    return try nativeInvoke("mln_render_session_projection_create") { raw, _, diagnostic in
+      mln_render_session_projection_create(
+        raw,
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_map_projection = 0
-      try checkStatus { diagnostic in
-        arena.submit { mln_render_session_projection_create(
-          handle.raw,
-          &value0,
-          diagnostic
-        ) }
-      }
-      return try MapProjectionHandle(adopting: value0)
-    }
+    } result: { try MapProjectionHandle(adopting: value0) }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_render_session_reduce_memory_use`.
-
+  /// Calls `mln_render_session_reduce_memory_use`.
   func reduceMemoryUse() async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_reduce_memory_use"
+    try await nativeUnit("mln_render_session_reduce_memory_use") { raw, _, completion, diagnostic in
+      mln_render_session_reduce_memory_use(
+        raw,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_render_session_reduce_memory_use(
-            handle.raw,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
   /// Calls `mln_render_session_request_frame`.
   func requestFrame(demand bindingArg0: FrameDemand) throws {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_request_frame"
+    try nativeInvoke("mln_render_session_request_frame") { raw, arena, diagnostic in
+      mln_render_session_request_frame(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in
-        arena.submit { mln_render_session_request_frame(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          diagnostic
-        ) }
-      }
-      return ()
     }
   }
-}
 
-public extension RenderSessionHandle {
   /// Calls `mln_render_session_resize`.
   @discardableResult
-
   func resize(extent bindingArg0: RenderTargetExtent) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_resize"
+    try await nativeCommand("mln_render_session_resize") { raw, arena, completion, diagnostic in
+      mln_render_session_resize(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_render_session_resize(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
   /// Calls `mln_render_session_service_driver_work`.
   func serviceDriverWork(maxWork bindingArg0: Int) throws -> Int {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_service_driver_work"
+    var value0 = 0
+    return try nativeInvoke("mln_render_session_service_driver_work") { raw, _, diagnostic in
+      mln_render_session_service_driver_work(
+        raw,
+        bindingArg0,
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = 0
-      try checkStatus { diagnostic in
-        arena.submit { mln_render_session_service_driver_work(
-          handle.raw,
-          bindingArg0,
-          &value0,
-          diagnostic
-        ) }
-      }
-      return value0
-    }
+    } result: { value0 }
   }
 }

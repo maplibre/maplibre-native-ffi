@@ -4,8 +4,7 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
-  // Calls `mln_render_session_query_feature_extensions`.
-
+  /// Calls `mln_render_session_query_feature_extensions`.
   func queryFeatureExtensions(
     sourceId bindingArg0: String,
     feature bindingArg1: Data,
@@ -13,94 +12,64 @@ public extension RenderSessionHandle {
     extensionField bindingArg3: String,
     arguments bindingArg4: Data? = nil
   ) async throws -> Data {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_query_feature_extensions"
+    try await nativeStart(
+      "mln_render_session_query_feature_extensions",
+      convert: { result in try NativeCompletion.data(result) }
+    ) { raw, arena, completion, diagnostic in
+      mln_render_session_query_feature_extensions(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        arena.view(bindingArg2),
+        arena.view(bindingArg3),
+        bindingArg4.map { arena.store(arena.view($0)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_render_session_query_feature_extensions(
-            handle.raw,
-            arena.view(bindingArg0),
-            arena.view(bindingArg1),
-            arena.view(bindingArg2),
-            arena.view(bindingArg3),
-            bindingArg4.map { arena.store(arena.view($0)) },
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.data(result) }
     }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_render_session_query_rendered_features`.
-
+  /// Calls `mln_render_session_query_rendered_features`.
   func queryRenderedFeatures(
     geometry bindingArg0: RenderedQueryGeometry,
     options bindingArg1: RenderedFeatureQueryOptions? = nil
   ) async throws -> [QueriedFeature] {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_query_rendered_features"
+    try await nativeStart(
+      "mln_render_session_query_rendered_features",
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_queried_feature.self
+      ).map { try QueriedFeature(raw: $0) } }
+    ) { raw, arena, completion, diagnostic in
+      try mln_render_session_query_rendered_features(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          try arena.submit { try mln_render_session_query_rendered_features(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue(arena: arena)),
-            bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.values(
-          result,
-          as: mln_queried_feature.self
-        ).map { try QueriedFeature(raw: $0) } }
     }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_render_session_query_source_features`.
-
+  /// Calls `mln_render_session_query_source_features`.
   func querySourceFeatures(
     sourceId bindingArg0: String,
     options bindingArg1: SourceFeatureQueryOptions? = nil
   ) async throws -> [QueriedFeature] {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_session_query_source_features"
+    try await nativeStart(
+      "mln_render_session_query_source_features",
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_queried_feature.self
+      ).map { try QueriedFeature(raw: $0) } }
+    ) { raw, arena, completion, diagnostic in
+      try mln_render_session_query_source_features(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          try arena.submit { try mln_render_session_query_source_features(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.map { try arena.store($0.nativeValue(arena: arena)) },
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.values(
-          result,
-          as: mln_queried_feature.self
-        ).map { try QueriedFeature(raw: $0) } }
     }
   }
 }

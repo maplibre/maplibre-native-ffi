@@ -61,35 +61,26 @@ def consumed(plan, owner, values):
     method = "close" if is_release else "dispose"
     if plan.completion:
         return (
-            f'''public extension {owner} {{
-  func close() async throws {{
-    guard let future = try startClose() else {{ return }}
-    try await mapNativeFailure {{ try await future.value() }}
-  }}
-  internal func startClose() throws -> NativeFuture<Void>? {{
-    try NativeCallbackGuard.check(owner: self, operation: "{function.name}")
-    var future: NativeFuture<Void>?
-    try handle.closeOnce {{ live in
-      future = try NativeCompletion.startUnit {{ completion, diagnostic in {native_call(function, "live.raw", "completion")} }}
-    }}
-    return future
-  }}
+            f"""func close() async throws {{
+  guard let future = try startClose() else {{ return }}
+  try await mapNativeFailure {{ try await future.value() }}
 }}
-''',
-            None,
+internal func startClose() throws -> NativeFuture<Void>? {{
+  try nativeStartClose("{function.name}") {{ raw, completion, diagnostic in {native_call(function, "raw", "completion")} }}
+}}
+""",
+            owner,
         )
-    value = function.return_type.kind == "void"
-    call = native_call(function, "live.raw")
-    statement = call if value else checked(call)
+    # The closure's parameters select the overload: a status-returning close
+    # takes the diagnostic, so its status is always checked.
+    call = native_call(function, "raw")
+    parameters = "raw" if function.return_type.kind == "void" else "raw, diagnostic"
     return (
-        f'''public extension {owner} {{
-  func {method}() throws {{
-    try NativeCallbackGuard.check(owner: self, operation: "{function.name}")
-    try mapNativeFailure {{ try handle.closeOnce {{ live in {statement} }} }}
-  }}
+        f"""func {method}() throws {{
+  try nativeClose("{function.name}") {{ {parameters} in {call} }}
 }}
-''',
-        None,
+""",
+        owner,
     )
 
 
@@ -146,7 +137,7 @@ def owner_declarations(bound):
         if decision:
             parent += ", pendingDecision: Bool = false"
             passed += ", pendingDecision: pendingDecision"
-        chunks.append(f'''public final class {owner}: @unchecked Sendable {{
+        chunks.append(f'''public final class {owner}: @unchecked Sendable, NativeReceiver {{
   let handle: NativeHandleBox<{raw}>
   init(adopting raw: {handle.native}{parent}) throws {{
     handle = try NativeHandleBox(typeName: "{owner}", handle: {raw}(raw: raw){passed})

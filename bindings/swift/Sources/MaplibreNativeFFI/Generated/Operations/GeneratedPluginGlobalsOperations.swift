@@ -6,15 +6,11 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_plugin_get_register_function_v1`.
   static func pluginGetRegisterFunctionV1() throws -> NativePointer {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_plugin_get_register_function_v1"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_plugin_get_register_function_v1()
-    return NativePointer(bitPattern: unsafeBitCast(value, to: UInt.self))
+    try nativeDirect("mln_plugin_get_register_function_v1") { _ in
+      NativePointer(bitPattern: unsafeBitCast(
+        mln_plugin_get_register_function_v1(),
+        to: UInt.self
+      ))
+    }
   }
 }

@@ -4,351 +4,172 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RuntimeHandle {
-  // Calls `mln_runtime_barrier`.
-
+  /// Calls `mln_runtime_barrier`.
   func barrier() async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_barrier"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_runtime_barrier(
-            handle.raw,
-            completion,
-            diagnostic
-          ) }
-        }
-    }
-  }
-}
-
-public extension RuntimeHandle {
-  // Calls `mln_runtime_clear_http_header_transform`.
-
-  func clearHttpHeaderTransform() async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_clear_http_header_transform"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_runtime_clear_http_header_transform(
-            handle.raw,
-            completion,
-            diagnostic
-          ) }
-        }
-    }
-  }
-}
-
-public extension RuntimeHandle {
-  // Calls `mln_runtime_clear_resource_provider`.
-
-  func clearResourceProvider() async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_clear_resource_provider"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_runtime_clear_resource_provider(
-            handle.raw,
-            completion,
-            diagnostic
-          ) }
-        }
-    }
-  }
-}
-
-public extension RuntimeHandle {
-  // Calls `mln_runtime_clear_resource_transform`.
-
-  func clearResourceTransform() async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_clear_resource_transform"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_runtime_clear_resource_transform(
-            handle.raw,
-            completion,
-            diagnostic
-          ) }
-        }
-    }
-  }
-}
-
-public extension RuntimeHandle {
-  func dispose() throws {
-    try NativeCallbackGuard.check(owner: self, operation: "mln_runtime_dispose")
-    try mapNativeFailure { try handle.closeOnce { live in
-      try checkStatus { diagnostic in mln_runtime_dispose(
-        live.raw,
+    try await nativeUnit("mln_runtime_barrier") { raw, _, completion, diagnostic in
+      mln_runtime_barrier(
+        raw,
+        completion,
         diagnostic
-      ) }
-    } }
+      )
+    }
   }
-}
 
-public extension RuntimeHandle {
+  /// Calls `mln_runtime_clear_http_header_transform`.
+  func clearHttpHeaderTransform() async throws {
+    try await nativeUnit("mln_runtime_clear_http_header_transform") { raw, _, completion, diagnostic in
+      mln_runtime_clear_http_header_transform(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Calls `mln_runtime_clear_resource_provider`.
+  func clearResourceProvider() async throws {
+    try await nativeUnit("mln_runtime_clear_resource_provider") { raw, _, completion, diagnostic in
+      mln_runtime_clear_resource_provider(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Calls `mln_runtime_clear_resource_transform`.
+  func clearResourceTransform() async throws {
+    try await nativeUnit("mln_runtime_clear_resource_transform") { raw, _, completion, diagnostic in
+      mln_runtime_clear_resource_transform(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  func dispose() throws {
+    try nativeClose("mln_runtime_dispose") { raw, diagnostic in
+      mln_runtime_dispose(
+        raw,
+        diagnostic
+      )
+    }
+  }
+
   /// Calls `mln_runtime_drain_events`.
   func drainEvents() throws -> EventBatchHandle {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_drain_events"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_event_batch = 0
-      try checkStatus { diagnostic in arena.submit { mln_runtime_drain_events(
-        handle.raw,
+    var value0: mln_event_batch = 0
+    return try nativeInvoke("mln_runtime_drain_events") { raw, _, diagnostic in
+      mln_runtime_drain_events(
+        raw,
         &value0,
         diagnostic
-      ) } }
-      return try EventBatchHandle(adopting: value0)
-    }
+      )
+    } result: { try EventBatchHandle(adopting: value0) }
   }
-}
 
-public extension RuntimeHandle {
   /// Calls `mln_runtime_get_event_mask`.
   func getEventMask() throws -> RuntimeEventMask {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_get_event_mask"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: UInt64 = 0
-      try checkStatus { diagnostic in arena.submit { mln_runtime_get_event_mask(
-        handle.raw,
+    var value0: UInt64 = 0
+    return try nativeInvoke("mln_runtime_get_event_mask") { raw, _, diagnostic in
+      mln_runtime_get_event_mask(
+        raw,
         &value0,
         diagnostic
-      ) } }
-      return RuntimeEventMask(rawValue: value0)
-    }
+      )
+    } result: { RuntimeEventMask(rawValue: value0) }
   }
-}
 
-public extension RuntimeHandle {
   func close() async throws {
     guard let future = try startClose() else { return }
     try await mapNativeFailure { try await future.value() }
   }
 
   internal func startClose() throws -> NativeFuture<Void>? {
-    try NativeCallbackGuard.check(owner: self, operation: "mln_runtime_release")
-    var future: NativeFuture<Void>?
-    try handle.closeOnce { live in
-      future = try NativeCompletion
-        .startUnit { completion, diagnostic in mln_runtime_release(
-          live.raw,
-          completion,
-          diagnostic
-        ) }
+    try nativeStartClose("mln_runtime_release") { raw, completion, diagnostic in
+      mln_runtime_release(
+        raw,
+        completion,
+        diagnostic
+      )
     }
-    return future
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_run_ambient_cache_operation`.
-
+  /// Calls `mln_runtime_run_ambient_cache_operation`.
   func runAmbientCacheOperation(
     operation bindingArg0: AmbientCacheOperation
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_run_ambient_cache_operation"
+    try await nativeUnit("mln_runtime_run_ambient_cache_operation") { raw, _, completion, diagnostic in
+      mln_runtime_run_ambient_cache_operation(
+        raw,
+        bindingArg0.nativeValue(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_runtime_run_ambient_cache_operation(
-            handle.raw,
-            bindingArg0.nativeValue(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RuntimeHandle {
   /// Calls `mln_runtime_set_event_mask`.
   func setEventMask(mask bindingArg0: RuntimeEventMask) throws {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_set_event_mask"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in arena.submit { mln_runtime_set_event_mask(
-        handle.raw,
+    try nativeInvoke("mln_runtime_set_event_mask") { raw, _, diagnostic in
+      mln_runtime_set_event_mask(
+        raw,
         bindingArg0.nativeValue(),
         diagnostic
-      ) } }
-      return ()
+      )
     }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_set_http_header_transform`.
-
+  /// Calls `mln_runtime_set_http_header_transform`.
   func setHttpHeaderTransform(
     transform bindingArg0: HttpHeaderTransform
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_set_http_header_transform"
+    try await nativeUnit("mln_runtime_set_http_header_transform") { raw, arena, completion, diagnostic in
+      try mln_runtime_set_http_header_transform(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_runtime_set_http_header_transform(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue(arena: arena)),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_set_maximum_ambient_cache_size`.
-
+  /// Calls `mln_runtime_set_maximum_ambient_cache_size`.
   func setMaximumAmbientCacheSize(size bindingArg0: UInt64) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_set_maximum_ambient_cache_size"
+    try await nativeUnit("mln_runtime_set_maximum_ambient_cache_size") { raw, _, completion, diagnostic in
+      mln_runtime_set_maximum_ambient_cache_size(
+        raw,
+        bindingArg0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_runtime_set_maximum_ambient_cache_size(
-            handle.raw,
-            bindingArg0,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_set_resource_provider`.
-
+  /// Calls `mln_runtime_set_resource_provider`.
   func setResourceProvider(provider bindingArg0: ResourceProvider) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_set_resource_provider"
+    try await nativeUnit("mln_runtime_set_resource_provider") { raw, arena, completion, diagnostic in
+      try mln_runtime_set_resource_provider(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_runtime_set_resource_provider(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue(arena: arena)),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RuntimeHandle {
-  // Calls `mln_runtime_set_resource_transform`.
-
+  /// Calls `mln_runtime_set_resource_transform`.
   func setResourceTransform(
     transform bindingArg0: ResourceTransform
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_runtime_set_resource_transform"
+    try await nativeUnit("mln_runtime_set_resource_transform") { raw, arena, completion, diagnostic in
+      try mln_runtime_set_resource_transform(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_runtime_set_resource_transform(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue(arena: arena)),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
 }

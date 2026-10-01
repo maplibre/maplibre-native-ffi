@@ -6,15 +6,8 @@ import Foundation
 public extension Maplibre {
   /// Calls `mln_map_options_default`.
   static func mapOptionsDefault() throws -> MapOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_map_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_map_options_default()
-    return MapOptions(raw: value)
+    try nativeDirect("mln_map_options_default") { _ in
+      MapOptions(raw: mln_map_options_default())
+    }
   }
 }

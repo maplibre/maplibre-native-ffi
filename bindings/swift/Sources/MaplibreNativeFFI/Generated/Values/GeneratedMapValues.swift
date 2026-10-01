@@ -3,18 +3,12 @@
 internal import CMaplibreNativeC
 import Foundation
 
-public struct AnimationOptionField: OptionSet, Equatable, Hashable, Sendable {
+public struct AnimationOptionField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let duration: AnimationOptionField = .init(rawValue: 1)
@@ -86,18 +80,12 @@ public struct AnimationOptions: Equatable, Hashable, Sendable {
   }
 }
 
-public struct BoundOptionField: OptionSet, Equatable, Hashable, Sendable {
+public struct BoundOptionField: OptionSet, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let bounds: BoundOptionField = .init(rawValue: 1)
@@ -219,18 +207,12 @@ public struct CameraDelta: Equatable, Hashable, Sendable {
   }
 }
 
-public struct CameraDeltaKind: RawRepresentable, Equatable, Hashable, Sendable {
+public struct CameraDeltaKind: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let move: CameraDeltaKind = .init(rawValue: 0)
@@ -239,18 +221,12 @@ public struct CameraDeltaKind: RawRepresentable, Equatable, Hashable, Sendable {
   public static let pitch: CameraDeltaKind = .init(rawValue: 3)
 }
 
-public struct CameraFitOptionField: OptionSet, Equatable, Hashable, Sendable {
+public struct CameraFitOptionField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let padding: CameraFitOptionField = .init(rawValue: 1)
@@ -302,18 +278,13 @@ public struct CameraFitOptions: Equatable, Hashable, Sendable {
   }
 }
 
-public struct CameraOptionField: OptionSet, Equatable, Hashable, Sendable {
+public struct CameraOptionField: OptionSet, NativeOpenValue, Equatable,
+  Hashable,
+  Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let center: CameraOptionField = .init(rawValue: 1)
@@ -488,20 +459,12 @@ public struct CameraUpdate: Equatable, Hashable, Sendable {
   }
 }
 
-public struct CameraUpdateMode: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct CameraUpdateMode: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let jump: CameraUpdateMode = .init(rawValue: 0)
@@ -509,18 +472,12 @@ public struct CameraUpdateMode: RawRepresentable, Equatable, Hashable,
   public static let fly: CameraUpdateMode = .init(rawValue: 2)
 }
 
-public struct ConstrainMode: RawRepresentable, Equatable, Hashable, Sendable {
+public struct ConstrainMode: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let none: ConstrainMode = .init(rawValue: 0)
@@ -636,20 +593,12 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
   }
 }
 
-public struct FeatureStateSelectorField: OptionSet, Equatable, Hashable,
-  Sendable
+public struct FeatureStateSelectorField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let sourceLayerId: FeatureStateSelectorField =
@@ -658,18 +607,12 @@ public struct FeatureStateSelectorField: OptionSet, Equatable, Hashable,
   public static let stateKey: FeatureStateSelectorField = .init(rawValue: 4)
 }
 
-public struct FreeCameraOptionField: OptionSet, Equatable, Hashable, Sendable {
+public struct FreeCameraOptionField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let position: FreeCameraOptionField = .init(rawValue: 1)
@@ -713,18 +656,12 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
   }
 }
 
-public struct GesturePhase: RawRepresentable, Equatable, Hashable, Sendable {
+public struct GesturePhase: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let none: GesturePhase = .init(rawValue: 0)
@@ -823,18 +760,12 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   }
 }
 
-public struct MapDebugOption: OptionSet, Equatable, Hashable, Sendable {
+public struct MapDebugOption: OptionSet, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let tileBorders: MapDebugOption = .init(rawValue: 2)
@@ -846,18 +777,12 @@ public struct MapDebugOption: OptionSet, Equatable, Hashable, Sendable {
   public static let depthBuffer: MapDebugOption = .init(rawValue: 128)
 }
 
-public struct MapMode: RawRepresentable, Equatable, Hashable, Sendable {
+public struct MapMode: RawRepresentable, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let continuous: MapMode = .init(rawValue: 0)
@@ -999,18 +924,12 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   }
 }
 
-public struct MapTileOptionField: OptionSet, Equatable, Hashable, Sendable {
+public struct MapTileOptionField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let prefetchZoomDelta: MapTileOptionField = .init(rawValue: 1)
@@ -1094,18 +1013,12 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
   }
 }
 
-public struct MapViewportOptionField: OptionSet, Equatable, Hashable, Sendable {
+public struct MapViewportOptionField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let northOrientation: MapViewportOptionField =
@@ -1171,20 +1084,12 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
   }
 }
 
-public struct NorthOrientation: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct NorthOrientation: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let up: NorthOrientation = .init(rawValue: 0)
@@ -1500,18 +1405,12 @@ public struct ProjectionMode: Equatable, Hashable, Sendable {
   }
 }
 
-public struct ProjectionModeField: OptionSet, Equatable, Hashable, Sendable {
+public struct ProjectionModeField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let axonometric: ProjectionModeField = .init(rawValue: 1)
@@ -1585,18 +1484,12 @@ public struct ScreenPoint: Equatable, Hashable, Sendable {
   }
 }
 
-public struct TileLodMode: RawRepresentable, Equatable, Hashable, Sendable {
+public struct TileLodMode: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let `default`: TileLodMode = .init(rawValue: 0)
@@ -1674,18 +1567,12 @@ public struct Vec3: Equatable, Hashable, Sendable {
   }
 }
 
-public struct ViewportMode: RawRepresentable, Equatable, Hashable, Sendable {
+public struct ViewportMode: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let `default`: ViewportMode = .init(rawValue: 0)

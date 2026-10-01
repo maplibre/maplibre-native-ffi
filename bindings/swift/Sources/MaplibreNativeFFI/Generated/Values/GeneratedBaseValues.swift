@@ -3,18 +3,13 @@
 internal import CMaplibreNativeC
 import Foundation
 
-public struct RenderBackendFlag: OptionSet, Equatable, Hashable, Sendable {
+public struct RenderBackendFlag: OptionSet, NativeOpenValue, Equatable,
+  Hashable,
+  Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let metal: RenderBackendFlag = .init(rawValue: 1)
@@ -23,18 +18,12 @@ public struct RenderBackendFlag: OptionSet, Equatable, Hashable, Sendable {
   public static let webgpu: RenderBackendFlag = .init(rawValue: 8)
 }
 
-public struct Status: RawRepresentable, Equatable, Hashable, Sendable {
+public struct Status: RawRepresentable, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
   public let rawValue: Int32
   public init(rawValue: Int32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: Int32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> Int32 {
-    rawValue
   }
 
   public static let ok: Status = .init(rawValue: 0)

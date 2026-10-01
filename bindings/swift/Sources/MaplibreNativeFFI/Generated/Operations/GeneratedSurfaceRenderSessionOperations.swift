@@ -4,117 +4,59 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
-  // Calls `mln_metal_surface_set_target`.
-
+  /// Calls `mln_metal_surface_set_target`.
   func metalSurfaceSetTarget(
     descriptor bindingArg0: MetalSurfaceDescriptor
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_metal_surface_set_target"
+    try await nativeUnit("mln_metal_surface_set_target") { raw, arena, completion, diagnostic in
+      mln_metal_surface_set_target(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_metal_surface_set_target(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_opengl_surface_set_target`.
-
+  /// Calls `mln_opengl_surface_set_target`.
   func openglSurfaceSetTarget(
     descriptor bindingArg0: OpenglSurfaceDescriptor
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_opengl_surface_set_target"
+    try await nativeUnit("mln_opengl_surface_set_target") { raw, arena, completion, diagnostic in
+      try mln_opengl_surface_set_target(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_opengl_surface_set_target(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue(arena: arena)),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_vulkan_surface_set_target`.
-
+  /// Calls `mln_vulkan_surface_set_target`.
   func vulkanSurfaceSetTarget(
     descriptor bindingArg0: VulkanSurfaceDescriptor
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_vulkan_surface_set_target"
+    try await nativeUnit("mln_vulkan_surface_set_target") { raw, arena, completion, diagnostic in
+      mln_vulkan_surface_set_target(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_vulkan_surface_set_target(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_webgpu_surface_set_target`.
-
+  /// Calls `mln_webgpu_surface_set_target`.
   func webgpuSurfaceSetTarget(
     descriptor bindingArg0: WebgpuSurfaceDescriptor
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_webgpu_surface_set_target"
+    try await nativeUnit("mln_webgpu_surface_set_target") { raw, arena, completion, diagnostic in
+      mln_webgpu_surface_set_target(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_webgpu_surface_set_target(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
 }

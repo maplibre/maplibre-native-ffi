@@ -5,74 +5,47 @@ import Foundation
 
 public extension AcquiredFrameHandle {
   func dispose() throws {
-    try NativeCallbackGuard.check(
-      owner: self,
-      operation: "mln_acquired_frame_dispose"
-    )
-    try mapNativeFailure { try handle.closeOnce { live in
-      try checkStatus { diagnostic in mln_acquired_frame_dispose(
-        live.raw,
+    try nativeClose("mln_acquired_frame_dispose") { raw, diagnostic in
+      mln_acquired_frame_dispose(
+        raw,
         diagnostic
-      ) }
-    } }
+      )
+    }
   }
-}
 
-public extension AcquiredFrameHandle {
   func withProducerSync<Result>(_ body: (GpuSyncView) throws -> Result) throws
     -> Result
   {
-    try NativeCallbackGuard.check(
-      owner: self,
-      operation: "mln_acquired_frame_get_producer_sync"
-    )
-    return try mapNativeFailure {
-      let access = try handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      var token: UnsafeMutableRawPointer?
-      try checkStatus { diagnostic in mln_adapter_acquired_frame_view_begin(
-        access.handle.raw,
-        &token,
+    var raw = mln_gpu_sync_default()
+    raw.size = UInt32(MemoryLayout<mln_gpu_sync>.size)
+    return try nativeView(
+      "mln_acquired_frame_get_producer_sync",
+      reading: raw,
+      begin: { raw, token, diagnostic in mln_adapter_acquired_frame_view_begin(
+        raw,
+        token,
+        diagnostic
+      ) },
+      end: { mln_adapter_acquired_frame_view_end($0) },
+      get: { raw, value, diagnostic in mln_acquired_frame_get_producer_sync(
+        raw,
+        value,
         diagnostic
       ) }
-      let scope = NativeViewScope()
-      defer { scope.expire(); mln_adapter_acquired_frame_view_end(token) }
-      var raw = mln_gpu_sync_default()
-      raw.size = UInt32(MemoryLayout<mln_gpu_sync>.size)
-      try checkStatus { diagnostic in mln_acquired_frame_get_producer_sync(
-        access.handle.raw,
-        &raw,
-        diagnostic
-      ) }
-      return try body(GpuSyncView(GpuSync(raw: raw), scope: scope))
-    }
+    ) { raw, scope in try body(GpuSyncView(GpuSync(raw: raw), scope: scope)) }
   }
-}
 
-public extension AcquiredFrameHandle {
   /// Calls `mln_acquired_frame_get_result`.
   func getResult() throws -> RenderFrameResult {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_acquired_frame_get_result"
+    var value0 = mln_render_frame_result()
+    value0.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
+    return try nativeInvoke("mln_acquired_frame_get_result") { raw, _, diagnostic in
+      mln_acquired_frame_get_result(
+        raw,
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_render_frame_result()
-      value0.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
-      try checkStatus { diagnostic in
-        arena.submit { mln_acquired_frame_get_result(
-          handle.raw,
-          &value0,
-          diagnostic
-        ) }
-      }
-      return RenderFrameResult(raw: value0)
-    }
+    } result: { RenderFrameResult(raw: value0) }
   }
 }
 

@@ -10,20 +10,11 @@ public extension Maplibre {
     jniClass bindingArg1: NativePointer,
     context bindingArg2: NativePointer
   ) throws {
-    try mapNativeFailure {
-      try NativeAbi.ensureCompatible()
-      try NativeCallbackGuard.check(owner: nil, operation: "mln_android_init")
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in arena.submit { mln_android_init(
-        bindingArg0.unsafeMutableRawPointer,
-        bindingArg1.unsafeMutableRawPointer,
-        bindingArg2.unsafeMutableRawPointer,
-        diagnostic
-      ) } }
-      return ()
-    }
+    try nativeInvoke("mln_android_init") { _, _, diagnostic in mln_android_init(
+      bindingArg0.unsafeMutableRawPointer,
+      bindingArg1.unsafeMutableRawPointer,
+      bindingArg2.unsafeMutableRawPointer,
+      diagnostic
+    ) }
   }
 }

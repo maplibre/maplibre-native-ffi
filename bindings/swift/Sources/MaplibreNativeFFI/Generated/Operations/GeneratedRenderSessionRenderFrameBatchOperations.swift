@@ -6,63 +6,33 @@ import Foundation
 public extension RenderFrameBatchHandle {
   /// Calls `mln_render_frame_batch_count`.
   func count() throws -> Int {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_frame_batch_count"
+    var value0 = 0
+    return try nativeInvoke("mln_render_frame_batch_count") { raw, _, diagnostic in
+      mln_render_frame_batch_count(
+        raw,
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = 0
-      try checkStatus { diagnostic in
-        arena.submit { mln_render_frame_batch_count(
-          handle.raw,
-          &value0,
-          diagnostic
-        ) }
-      }
-      return value0
-    }
+    } result: { value0 }
   }
-}
 
-public extension RenderFrameBatchHandle {
   /// Calls `mln_render_frame_batch_get`.
   func get(index bindingArg0: Int) throws -> RenderFrameResult {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_render_frame_batch_get"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_render_frame_result()
-      value0.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
-      try checkStatus { diagnostic in arena.submit { mln_render_frame_batch_get(
-        handle.raw,
+    var value0 = mln_render_frame_result()
+    value0.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
+    return try nativeInvoke("mln_render_frame_batch_get") { raw, _, diagnostic in
+      mln_render_frame_batch_get(
+        raw,
         bindingArg0,
         &value0,
         diagnostic
-      ) } }
-      return RenderFrameResult(raw: value0)
-    }
+      )
+    } result: { RenderFrameResult(raw: value0) }
   }
-}
 
-public extension RenderFrameBatchHandle {
   func close() throws {
-    try NativeCallbackGuard.check(
-      owner: self,
-      operation: "mln_render_frame_batch_release"
-    )
-    try mapNativeFailure { try handle.closeOnce { live in
-      mln_render_frame_batch_release(live.raw)
-    } }
+    try nativeClose("mln_render_frame_batch_release") { raw in
+      mln_render_frame_batch_release(raw)
+    }
   }
 }

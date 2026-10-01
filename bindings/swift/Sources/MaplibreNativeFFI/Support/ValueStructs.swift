@@ -201,3 +201,21 @@ func releaseGeneratedCallback(_ pointer: UnsafeMutableRawPointer?) {
   guard let pointer else { return }
   Unmanaged<AnyObject>.fromOpaque(pointer).release()
 }
+
+/// A generated open enum or flag set, which carries its native value as its
+/// raw value so that values this binding does not name survive a round trip.
+protocol NativeOpenValue {
+  associatedtype Native
+  var rawValue: Native { get }
+  init(rawValue: Native)
+}
+
+extension NativeOpenValue {
+  init(raw: Native) {
+    self.init(rawValue: raw)
+  }
+
+  func nativeValue() -> Native {
+    rawValue
+  }
+}

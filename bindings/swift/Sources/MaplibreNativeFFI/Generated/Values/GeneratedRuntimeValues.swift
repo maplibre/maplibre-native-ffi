@@ -3,20 +3,12 @@
 internal import CMaplibreNativeC
 import Foundation
 
-public struct AmbientCacheOperation: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct AmbientCacheOperation: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let resetDatabase: AmbientCacheOperation = .init(rawValue: 1)
@@ -25,20 +17,12 @@ public struct AmbientCacheOperation: RawRepresentable, Equatable, Hashable,
   public static let clear: AmbientCacheOperation = .init(rawValue: 4)
 }
 
-public struct CameraChangeMode: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct CameraChangeMode: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let immediate: CameraChangeMode = .init(rawValue: 0)
@@ -123,39 +107,24 @@ public final class HttpHeaderTransformResponse: @unchecked Sendable {
   }
 }
 
-public struct NetworkStatus: RawRepresentable, Equatable, Hashable, Sendable {
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
-  }
-
-  public static let online: NetworkStatus = .init(rawValue: 1)
-  public static let offline: NetworkStatus = .init(rawValue: 2)
-}
-
-public struct OfflineRegionDefinitionType: RawRepresentable, Equatable,
-  Hashable,
-  Sendable
+public struct NetworkStatus: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
   }
 
-  init(raw: UInt32) {
-    rawValue = raw
-  }
+  public static let online: NetworkStatus = .init(rawValue: 1)
+  public static let offline: NetworkStatus = .init(rawValue: 2)
+}
 
-  func nativeValue() -> UInt32 {
-    rawValue
+public struct OfflineRegionDefinitionType: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
   }
 
   public static let tilePyramid: OfflineRegionDefinitionType =
@@ -163,20 +132,12 @@ public struct OfflineRegionDefinitionType: RawRepresentable, Equatable,
   public static let geometry: OfflineRegionDefinitionType = .init(rawValue: 2)
 }
 
-public struct OfflineRegionDownloadState: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct OfflineRegionDownloadState: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let inactive: OfflineRegionDownloadState = .init(rawValue: 0)
@@ -252,18 +213,13 @@ public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
   }
 }
 
-public struct RenderMode: RawRepresentable, Equatable, Hashable, Sendable {
+public struct RenderMode: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable,
+  Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let partial: RenderMode = .init(rawValue: 0)
@@ -313,20 +269,12 @@ public struct RenderingStats: Equatable, Hashable, Sendable {
   }
 }
 
-public struct ResourceErrorReason: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct ResourceErrorReason: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let none: ResourceErrorReason = .init(rawValue: 0)
@@ -337,18 +285,12 @@ public struct ResourceErrorReason: RawRepresentable, Equatable, Hashable,
   public static let other: ResourceErrorReason = .init(rawValue: 5)
 }
 
-public struct ResourceKind: RawRepresentable, Equatable, Hashable, Sendable {
+public struct ResourceKind: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let unknown: ResourceKind = .init(rawValue: 0)
@@ -361,20 +303,12 @@ public struct ResourceKind: RawRepresentable, Equatable, Hashable, Sendable {
   public static let image: ResourceKind = .init(rawValue: 7)
 }
 
-public struct ResourceLoadingMethod: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct ResourceLoadingMethod: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let all: ResourceLoadingMethod = .init(rawValue: 0)
@@ -382,20 +316,12 @@ public struct ResourceLoadingMethod: RawRepresentable, Equatable, Hashable,
   public static let networkOnly: ResourceLoadingMethod = .init(rawValue: 2)
 }
 
-public struct ResourcePriority: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct ResourcePriority: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let regular: ResourcePriority = .init(rawValue: 0)
@@ -472,20 +398,12 @@ private func invokeResourceProviderCallback(
   }
 }
 
-public struct ResourceProviderDecision: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct ResourceProviderDecision: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let passThrough: ResourceProviderDecision = .init(rawValue: 0)
@@ -686,20 +604,12 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
   }
 }
 
-public struct ResourceResponseStatus: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct ResourceResponseStatus: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let ok: ResourceResponseStatus = .init(rawValue: 0)
@@ -708,20 +618,12 @@ public struct ResourceResponseStatus: RawRepresentable, Equatable, Hashable,
   public static let notModified: ResourceResponseStatus = .init(rawValue: 3)
 }
 
-public struct ResourceStoragePolicy: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct ResourceStoragePolicy: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let permanent: ResourceStoragePolicy = .init(rawValue: 0)
@@ -804,18 +706,12 @@ public final class ResourceTransformResponse: @unchecked Sendable {
   }
 }
 
-public struct ResourceUsage: RawRepresentable, Equatable, Hashable, Sendable {
+public struct ResourceUsage: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let online: ResourceUsage = .init(rawValue: 0)
@@ -972,18 +868,12 @@ public struct RuntimeEventCameraTransitionFinished: Equatable, Hashable,
   }
 }
 
-public struct RuntimeEventMask: OptionSet, Equatable, Hashable, Sendable {
+public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
   public let rawValue: UInt64
   public init(rawValue: UInt64) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt64) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt64 {
-    rawValue
   }
 
   public static let none: RuntimeEventMask = []
@@ -1131,20 +1021,12 @@ public enum RuntimeEventPayload: Equatable, Hashable, Sendable {
   }
 }
 
-public struct RuntimeEventPayloadType: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct RuntimeEventPayloadType: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let none: RuntimeEventPayloadType = .init(rawValue: 0)
@@ -1220,20 +1102,12 @@ public struct RuntimeEventRenderMap: Equatable, Hashable, Sendable {
   }
 }
 
-public struct RuntimeEventSourceType: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct RuntimeEventSourceType: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let runtime: RuntimeEventSourceType = .init(rawValue: 0)
@@ -1268,20 +1142,12 @@ public struct RuntimeEventTileAction: Equatable, Hashable, Sendable {
   }
 }
 
-public struct RuntimeEventType: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let mapCameraWillChange: RuntimeEventType = .init(rawValue: 1)
@@ -1408,18 +1274,12 @@ public struct TileId: Equatable, Hashable, Sendable {
   }
 }
 
-public struct TileOperation: RawRepresentable, Equatable, Hashable, Sendable {
+public struct TileOperation: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let requestedFromCache: TileOperation = .init(rawValue: 0)

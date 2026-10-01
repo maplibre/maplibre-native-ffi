@@ -9,156 +9,74 @@ public extension MapHandle {
     descriptor bindingArg0: MetalSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_metal_surface_attach"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_metal_surface_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_metal_surface_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in try mln_metal_surface_attach(
+      raw,
+      arena.store(bindingArg0.nativeValue()),
+      arena.store(bindingArg1.nativeValue(arena: arena)),
+      &value0,
+      completion,
+      diagnostic
+    ) } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_opengl_surface_attach`.
   func openglSurfaceAttach(
     descriptor bindingArg0: OpenglSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_opengl_surface_attach"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_opengl_surface_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue(arena: arena)),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_opengl_surface_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in try mln_opengl_surface_attach(
+      raw,
+      arena.store(bindingArg0.nativeValue(arena: arena)),
+      arena.store(bindingArg1.nativeValue(arena: arena)),
+      &value0,
+      completion,
+      diagnostic
+    ) } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_vulkan_surface_attach`.
   func vulkanSurfaceAttach(
     descriptor bindingArg0: VulkanSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_vulkan_surface_attach"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_vulkan_surface_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_vulkan_surface_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in try mln_vulkan_surface_attach(
+      raw,
+      arena.store(bindingArg0.nativeValue()),
+      arena.store(bindingArg1.nativeValue(arena: arena)),
+      &value0,
+      completion,
+      diagnostic
+    ) } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_webgpu_surface_attach`.
   func webgpuSurfaceAttach(
     descriptor bindingArg0: WebgpuSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_webgpu_surface_attach"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_webgpu_surface_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_webgpu_surface_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in try mln_webgpu_surface_attach(
+      raw,
+      arena.store(bindingArg0.nativeValue()),
+      arena.store(bindingArg1.nativeValue(arena: arena)),
+      &value0,
+      completion,
+      diagnostic
+    ) } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 }

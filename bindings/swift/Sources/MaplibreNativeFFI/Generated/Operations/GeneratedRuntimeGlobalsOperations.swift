@@ -6,26 +6,17 @@ import Foundation
 public extension HttpHeaderTransformResponse {
   /// Calls `mln_http_header_transform_response_set`.
   func set(name bindingArg0: String, value bindingArg2: String) throws {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_http_header_transform_response_set"
+    try nativeInvoke(owner: self,
+                     "mln_http_header_transform_response_set")
+    { _, arena, diagnostic in
+      try mln_http_header_transform_response_set(
+        nativePointer,
+        arena.view(bindingArg0).data?.assumingMemoryBound(to: CChar.self),
+        NativeInputArena.count(bindingArg0.count),
+        arena.view(bindingArg2).data?.assumingMemoryBound(to: CChar.self),
+        NativeInputArena.count(bindingArg2.count),
+        diagnostic
       )
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in
-        try arena.submit { try mln_http_header_transform_response_set(
-          nativePointer,
-          arena.view(bindingArg0).data?.assumingMemoryBound(to: CChar.self),
-          NativeInputArena.count(bindingArg0.count),
-          arena.view(bindingArg2).data?.assumingMemoryBound(to: CChar.self),
-          NativeInputArena.count(bindingArg2.count),
-          diagnostic
-        ) }
-      }
-      return ()
     }
   }
 }
@@ -33,43 +24,43 @@ public extension HttpHeaderTransformResponse {
 public extension Maplibre {
   /// Calls `mln_network_status_get`.
   static func networkStatusGet() throws -> NetworkStatus {
-    try mapNativeFailure {
-      try NativeAbi.ensureCompatible()
-      try NativeCallbackGuard.check(
-        owner: nil,
-        operation: "mln_network_status_get"
-      )
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: UInt32 = 0
-      try checkStatus { diagnostic in arena.submit { mln_network_status_get(
+    var value0: UInt32 = 0
+    return try nativeInvoke("mln_network_status_get") { _, _, diagnostic in
+      mln_network_status_get(
         &value0,
         diagnostic
-      ) } }
-      return NetworkStatus(rawValue: value0)
-    }
+      )
+    } result: { NetworkStatus(rawValue: value0) }
   }
-}
 
-public extension Maplibre {
   /// Calls `mln_network_status_set`.
   static func networkStatusSet(status bindingArg0: NetworkStatus) throws {
-    try mapNativeFailure {
-      try NativeAbi.ensureCompatible()
-      try NativeCallbackGuard.check(
-        owner: nil,
-        operation: "mln_network_status_set"
-      )
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in arena.submit { mln_network_status_set(
+    try nativeInvoke("mln_network_status_set") { _, _, diagnostic in
+      mln_network_status_set(
         bindingArg0.nativeValue(),
         diagnostic
-      ) } }
-      return ()
+      )
+    }
+  }
+
+  /// Calls `mln_runtime_create`.
+  static func runtimeCreate(options bindingArg0: RuntimeOptions) throws
+    -> RuntimeHandle
+  {
+    var value0: mln_runtime = 0
+    return try nativeInvoke("mln_runtime_create") { _, arena, diagnostic in
+      try mln_runtime_create(
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        &value0,
+        diagnostic
+      )
+    } result: { try RuntimeHandle(adopting: value0) }
+  }
+
+  /// Calls `mln_runtime_options_default`.
+  static func runtimeOptionsDefault() throws -> RuntimeOptions {
+    try nativeDirect("mln_runtime_options_default") { _ in
+      try RuntimeOptions(raw: mln_runtime_options_default())
     }
   }
 }
@@ -77,62 +68,15 @@ public extension Maplibre {
 public extension ResourceTransformResponse {
   /// Calls `mln_resource_transform_response_set_url`.
   func setUrl(url bindingArg0: String) throws {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_resource_transform_response_set_url"
-      )
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in
-        try arena.submit { try mln_resource_transform_response_set_url(
-          nativePointer,
-          arena.view(bindingArg0).data?.assumingMemoryBound(to: CChar.self),
-          NativeInputArena.count(bindingArg0.count),
-          diagnostic
-        ) }
-      }
-      return ()
-    }
-  }
-}
-
-public extension Maplibre {
-  /// Calls `mln_runtime_create`.
-  static func runtimeCreate(options bindingArg0: RuntimeOptions) throws
-    -> RuntimeHandle
-  {
-    try mapNativeFailure {
-      try NativeAbi.ensureCompatible()
-      try NativeCallbackGuard.check(owner: nil, operation: "mln_runtime_create")
-
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_runtime = 0
-      try checkStatus { diagnostic in try arena.submit { try mln_runtime_create(
-        arena.store(bindingArg0.nativeValue(arena: arena)),
-        &value0,
+    try nativeInvoke(owner: self,
+                     "mln_resource_transform_response_set_url")
+    { _, arena, diagnostic in
+      try mln_resource_transform_response_set_url(
+        nativePointer,
+        arena.view(bindingArg0).data?.assumingMemoryBound(to: CChar.self),
+        NativeInputArena.count(bindingArg0.count),
         diagnostic
-      ) } }
-      return try RuntimeHandle(adopting: value0)
+      )
     }
-  }
-}
-
-public extension Maplibre {
-  /// Calls `mln_runtime_options_default`.
-  static func runtimeOptionsDefault() throws -> RuntimeOptions {
-    try NativeAbi.ensureCompatible()
-    try NativeCallbackGuard.check(
-      owner: nil,
-      operation: "mln_runtime_options_default"
-    )
-
-    let arena = NativeInputArena()
-    defer { withExtendedLifetime(arena) {} }
-    let value = mln_runtime_options_default()
-    return try RuntimeOptions(raw: value)
   }
 }

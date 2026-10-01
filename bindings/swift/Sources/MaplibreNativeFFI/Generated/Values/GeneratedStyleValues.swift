@@ -36,20 +36,12 @@ public struct CanonicalTileId: Equatable, Hashable, Sendable {
   }
 }
 
-public struct CustomGeometrySourceOptionField: OptionSet, Equatable, Hashable,
-  Sendable
+public struct CustomGeometrySourceOptionField: OptionSet, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let minZoom: CustomGeometrySourceOptionField =
@@ -188,20 +180,12 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
   do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {}
 }
 
-public struct CustomMvtVectorSourceOptionField: OptionSet, Equatable, Hashable,
-  Sendable
+public struct CustomMvtVectorSourceOptionField: OptionSet, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let minZoom: CustomMvtVectorSourceOptionField =
@@ -287,20 +271,12 @@ private func invokeCustomMvtVectorSourceOptionsCancelTile(
   do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {}
 }
 
-public struct GeojsonSourceOptionField: OptionSet, Equatable, Hashable,
-  Sendable
+public struct GeojsonSourceOptionField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let minZoom: GeojsonSourceOptionField = .init(rawValue: 1)
@@ -526,20 +502,12 @@ public struct ImageStretch: Equatable, Hashable, Sendable {
   }
 }
 
-public struct LocationIndicatorImageKind: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct LocationIndicatorImageKind: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let top: LocationIndicatorImageKind = .init(rawValue: 0)
@@ -681,18 +649,12 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
   }
 }
 
-public struct StyleImageOptionField: OptionSet, Equatable, Hashable, Sendable {
+public struct StyleImageOptionField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let pixelRatio: StyleImageOptionField = .init(rawValue: 1)
@@ -888,20 +850,12 @@ public struct StyleImageStretchesResult: Equatable, Hashable, Sendable {
   }
 }
 
-public struct StyleImageTextFit: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct StyleImageTextFit: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let stretchOrShrink: StyleImageTextFit = .init(rawValue: 0)
@@ -1042,40 +996,25 @@ public struct StyleLayerResult: Equatable, Hashable, Sendable {
   }
 }
 
-public struct StyleLayerVisibility: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct StyleLayerVisibility: RawRepresentable, NativeOpenValue,
+  Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let visible: StyleLayerVisibility = .init(rawValue: 0)
   public static let none: StyleLayerVisibility = .init(rawValue: 1)
 }
 
-public struct StyleRasterDemEncoding: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct StyleRasterDemEncoding: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let mapbox: StyleRasterDemEncoding = .init(rawValue: 0)
@@ -1188,18 +1127,12 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   }
 }
 
-public struct StyleSourceInfoField: OptionSet, Equatable, Hashable, Sendable {
+public struct StyleSourceInfoField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let url: StyleSourceInfoField = .init(rawValue: 1)
@@ -1341,18 +1274,12 @@ public struct StyleSourceTileUrlsResult: Equatable, Hashable, Sendable {
   }
 }
 
-public struct StyleSourceType: RawRepresentable, Equatable, Hashable, Sendable {
+public struct StyleSourceType: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let unknown: StyleSourceType = .init(rawValue: 0)
@@ -1367,38 +1294,24 @@ public struct StyleSourceType: RawRepresentable, Equatable, Hashable, Sendable {
   public static let customMvtVector: StyleSourceType = .init(rawValue: 9)
 }
 
-public struct StyleTileScheme: RawRepresentable, Equatable, Hashable, Sendable {
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
-  }
-
-  public static let xyz: StyleTileScheme = .init(rawValue: 0)
-  public static let tms: StyleTileScheme = .init(rawValue: 1)
-}
-
-public struct StyleTileSourceOptionField: OptionSet, Equatable, Hashable,
-  Sendable
+public struct StyleTileScheme: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
   }
 
-  init(raw: UInt32) {
-    rawValue = raw
-  }
+  public static let xyz: StyleTileScheme = .init(rawValue: 0)
+  public static let tms: StyleTileScheme = .init(rawValue: 1)
+}
 
-  func nativeValue() -> UInt32 {
-    rawValue
+public struct StyleTileSourceOptionField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
   }
 
   public static let minZoom: StyleTileSourceOptionField = .init(rawValue: 1)
@@ -1517,20 +1430,12 @@ public struct StyleTileSourceOptions: Equatable, Hashable, Sendable {
   }
 }
 
-public struct StyleTransitionOptionField: OptionSet, Equatable, Hashable,
-  Sendable
+public struct StyleTransitionOptionField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let duration: StyleTransitionOptionField = .init(rawValue: 1)
@@ -1587,20 +1492,12 @@ public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
   }
 }
 
-public struct StyleVectorTileEncoding: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct StyleVectorTileEncoding: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let mvt: StyleVectorTileEncoding = .init(rawValue: 0)

@@ -4,147 +4,76 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
-  // Calls `mln_metal_borrowed_texture_set_target`.
-
+  /// Calls `mln_metal_borrowed_texture_set_target`.
   func metalBorrowedTextureSetTarget(
     descriptor bindingArg0: MetalBorrowedTextureDescriptor
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_metal_borrowed_texture_set_target"
+    try await nativeUnit("mln_metal_borrowed_texture_set_target") { raw, arena, completion, diagnostic in
+      mln_metal_borrowed_texture_set_target(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_metal_borrowed_texture_set_target(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_opengl_borrowed_texture_set_target`.
-
+  /// Calls `mln_opengl_borrowed_texture_set_target`.
   func openglBorrowedTextureSetTarget(
     descriptor bindingArg0: OpenglBorrowedTextureDescriptor
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_opengl_borrowed_texture_set_target"
+    try await nativeUnit("mln_opengl_borrowed_texture_set_target") { raw, arena, completion, diagnostic in
+      try mln_opengl_borrowed_texture_set_target(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_opengl_borrowed_texture_set_target(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue(arena: arena)),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_texture_read_premultiplied_rgba8`.
-
+  /// Calls `mln_texture_read_premultiplied_rgba8`.
   func textureReadPremultipliedRgba8() async throws -> TextureReadbackResult {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_texture_read_premultiplied_rgba8"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_texture_read_premultiplied_rgba8(
-            handle.raw,
-            completion,
-            diagnostic
-          ) } }) { result in try TextureReadbackResult(
-          raw: NativeCompletion.value(
-            result,
-            as: mln_texture_readback_result.self
-          )
-        ) }
-    }
+    try await nativeStart(
+      "mln_texture_read_premultiplied_rgba8",
+      convert: { result in
+        try TextureReadbackResult(raw: NativeCompletion.value(
+          result,
+          as: mln_texture_readback_result.self
+        ))
+      }
+    ) { raw, _, completion, diagnostic in mln_texture_read_premultiplied_rgba8(
+      raw,
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_vulkan_borrowed_texture_set_target`.
-
+  /// Calls `mln_vulkan_borrowed_texture_set_target`.
   func vulkanBorrowedTextureSetTarget(
     descriptor bindingArg0: VulkanBorrowedTextureDescriptor
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_vulkan_borrowed_texture_set_target"
+    try await nativeUnit("mln_vulkan_borrowed_texture_set_target") { raw, arena, completion, diagnostic in
+      mln_vulkan_borrowed_texture_set_target(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_vulkan_borrowed_texture_set_target(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension RenderSessionHandle {
-  // Calls `mln_webgpu_borrowed_texture_set_target`.
-
+  /// Calls `mln_webgpu_borrowed_texture_set_target`.
   func webgpuBorrowedTextureSetTarget(
     descriptor bindingArg0: WebgpuBorrowedTextureDescriptor
   ) async throws {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_webgpu_borrowed_texture_set_target"
+    try await nativeUnit("mln_webgpu_borrowed_texture_set_target") { raw, arena, completion, diagnostic in
+      mln_webgpu_borrowed_texture_set_target(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startUnit { completion, diagnostic in
-          arena.submit { mln_webgpu_borrowed_texture_set_target(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
 }

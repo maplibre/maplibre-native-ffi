@@ -6,761 +6,418 @@ import Foundation
 public extension MapHandle {
   /// Calls `mln_map_apply_camera_delta`.
   @discardableResult
-
   func applyCameraDelta(delta bindingArg0: CameraDelta) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_apply_camera_delta"
+    try await nativeCommand("mln_map_apply_camera_delta") { raw, arena, completion, diagnostic in
+      mln_map_apply_camera_delta(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_apply_camera_delta(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_camera_for_geometry`.
-
+  /// Calls `mln_map_camera_for_geometry`.
   func cameraForGeometry(
     geometry bindingArg0: Data,
     fitOptions bindingArg1: CameraFitOptions? = nil
   ) async throws -> CameraOptions {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_camera_for_geometry"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_camera_for_geometry(
-            handle.raw,
-            arena.view(bindingArg0),
-            bindingArg1.map { arena.store($0.nativeValue()) },
-            completion,
-            diagnostic
-          ) } }) { result in try CameraOptions(raw: NativeCompletion.value(
-          result,
-          as: mln_camera_options.self
-        )) }
-    }
+    try await nativeStart(
+      "mln_map_camera_for_geometry",
+      convert: { result in try CameraOptions(raw: NativeCompletion.value(
+        result,
+        as: mln_camera_options.self
+      )) }
+    ) { raw, arena, completion, diagnostic in mln_map_camera_for_geometry(
+      raw,
+      arena.view(bindingArg0),
+      bindingArg1.map { arena.store($0.nativeValue()) },
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_camera_for_lat_lng_bounds`.
-
+  /// Calls `mln_map_camera_for_lat_lng_bounds`.
   func cameraForLatLngBounds(
     bounds bindingArg0: LatLngBounds,
     fitOptions bindingArg1: CameraFitOptions? = nil
   ) async throws -> CameraOptions {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_camera_for_lat_lng_bounds"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_camera_for_lat_lng_bounds(
-            handle.raw,
-            bindingArg0.nativeValue(),
-            bindingArg1.map { arena.store($0.nativeValue()) },
-            completion,
-            diagnostic
-          ) } }) { result in try CameraOptions(raw: NativeCompletion.value(
-          result,
-          as: mln_camera_options.self
-        )) }
-    }
+    try await nativeStart(
+      "mln_map_camera_for_lat_lng_bounds",
+      convert: { result in try CameraOptions(raw: NativeCompletion.value(
+        result,
+        as: mln_camera_options.self
+      )) }
+    ) { raw, arena, completion, diagnostic in mln_map_camera_for_lat_lng_bounds(
+      raw,
+      bindingArg0.nativeValue(),
+      bindingArg1.map { arena.store($0.nativeValue()) },
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_camera_for_lat_lngs`.
-
+  /// Calls `mln_map_camera_for_lat_lngs`.
   func cameraForLatLngs(
     coordinates bindingArg0: [LatLng],
     fitOptions bindingArg2: CameraFitOptions? = nil
   ) async throws -> CameraOptions {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_camera_for_lat_lngs"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          try arena.submit { try mln_map_camera_for_lat_lngs(
-            handle.raw,
-            arena.array(bindingArg0.map { $0.nativeValue() }),
-            NativeInputArena.count(bindingArg0.count),
-            bindingArg2.map { arena.store($0.nativeValue()) },
-            completion,
-            diagnostic
-          ) } }) { result in try CameraOptions(raw: NativeCompletion.value(
-          result,
-          as: mln_camera_options.self
-        )) }
-    }
+    try await nativeStart(
+      "mln_map_camera_for_lat_lngs",
+      convert: { result in try CameraOptions(raw: NativeCompletion.value(
+        result,
+        as: mln_camera_options.self
+      )) }
+    ) { raw, arena, completion, diagnostic in try mln_map_camera_for_lat_lngs(
+      raw,
+      arena.array(bindingArg0.map { $0.nativeValue() }),
+      NativeInputArena.count(bindingArg0.count),
+      bindingArg2.map { arena.store($0.nativeValue()) },
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_camera_query`.
-
+  /// Calls `mln_map_camera_query`.
   func cameraQuery() async throws -> CameraQueryResult {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_camera_query"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in arena.submit { mln_map_camera_query(
-          handle.raw,
-          completion,
-          diagnostic
-        ) } }) { result in try CameraQueryResult(raw: NativeCompletion.value(
-          result,
-          as: mln_camera_query_result.self
-        )) }
-    }
+    try await nativeStart(
+      "mln_map_camera_query",
+      convert: { result in try CameraQueryResult(raw: NativeCompletion.value(
+        result,
+        as: mln_camera_query_result.self
+      )) }
+    ) { raw, _, completion, diagnostic in mln_map_camera_query(
+      raw,
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_camera_snapshot_get`.
   func cameraSnapshotGet() throws
     -> (camera: CameraOptions, generation: UInt64)
   {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_camera_snapshot_get"
+    var value0: mln_camera_options = mln_camera_options_default()
+    var value1: UInt64 = 0
+    return try nativeInvoke("mln_map_camera_snapshot_get") { raw, _, diagnostic in
+      mln_map_camera_snapshot_get(
+        raw,
+        &value0,
+        &value1,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_camera_options = mln_camera_options_default()
-      var value1: UInt64 = 0
-      try checkStatus { diagnostic in
-        arena.submit { mln_map_camera_snapshot_get(
-          handle.raw,
-          &value0,
-          &value1,
-          diagnostic
-        ) }
-      }
-      return (CameraOptions(raw: value0), value1)
-    }
+    } result: { (CameraOptions(raw: value0), value1) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_cancel_transitions`.
   @discardableResult
-
   func cancelTransitions() async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_cancel_transitions"
+    try await nativeCommand("mln_map_cancel_transitions") { raw, _, completion, diagnostic in
+      mln_map_cancel_transitions(
+        raw,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_cancel_transitions(
-            handle.raw,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_dump_debug_logs`.
   @discardableResult
-
   func dumpDebugLogs() async throws -> CommandCompletion {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_dump_debug_logs"
+    try await nativeCommand("mln_map_dump_debug_logs") { raw, _, completion, diagnostic in
+      mln_map_dump_debug_logs(
+        raw,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_dump_debug_logs(
-            handle.raw,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_lat_lng_bounds_for_camera`.
-
+  /// Calls `mln_map_lat_lng_bounds_for_camera`.
   func latLngBoundsForCamera(camera bindingArg0: CameraOptions) async throws
     -> LatLngBounds
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_lat_lng_bounds_for_camera"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_lat_lng_bounds_for_camera(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) } }) { result in try LatLngBounds(raw: NativeCompletion.value(
-          result,
-          as: mln_lat_lng_bounds.self
-        )) }
-    }
+    try await nativeStart(
+      "mln_map_lat_lng_bounds_for_camera",
+      convert: { result in try LatLngBounds(raw: NativeCompletion.value(
+        result,
+        as: mln_lat_lng_bounds.self
+      )) }
+    ) { raw, arena, completion, diagnostic in mln_map_lat_lng_bounds_for_camera(
+      raw,
+      arena.store(bindingArg0.nativeValue()),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_lat_lng_bounds_for_camera_unwrapped`.
-
+  /// Calls `mln_map_lat_lng_bounds_for_camera_unwrapped`.
   func latLngBoundsForCameraUnwrapped(
     camera bindingArg0: CameraOptions
   ) async throws
     -> LatLngBounds
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_lat_lng_bounds_for_camera_unwrapped"
+    try await nativeStart(
+      "mln_map_lat_lng_bounds_for_camera_unwrapped",
+      convert: { result in try LatLngBounds(raw: NativeCompletion.value(
+        result,
+        as: mln_lat_lng_bounds.self
+      )) }
+    ) { raw, arena, completion, diagnostic in
+      mln_map_lat_lng_bounds_for_camera_unwrapped(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_lat_lng_bounds_for_camera_unwrapped(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) } }) { result in try LatLngBounds(raw: NativeCompletion.value(
-          result,
-          as: mln_lat_lng_bounds.self
-        )) }
     }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_lat_lng_for_pixel`.
-
+  /// Calls `mln_map_lat_lng_for_pixel`.
   func latLngForPixel(point bindingArg0: ScreenPoint) async throws -> LatLng {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_lat_lng_for_pixel"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_lat_lng_for_pixel(
-            handle.raw,
-            bindingArg0.nativeValue(),
-            completion,
-            diagnostic
-          ) } }) { result in try LatLng(raw: NativeCompletion.value(
-          result,
-          as: mln_lat_lng.self
-        )) }
-    }
+    try await nativeStart(
+      "mln_map_lat_lng_for_pixel",
+      convert: { result in try LatLng(raw: NativeCompletion.value(
+        result,
+        as: mln_lat_lng.self
+      )) }
+    ) { raw, _, completion, diagnostic in mln_map_lat_lng_for_pixel(
+      raw,
+      bindingArg0.nativeValue(),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_lat_lng_for_pixel_unwrapped`.
-
+  /// Calls `mln_map_lat_lng_for_pixel_unwrapped`.
   func latLngForPixelUnwrapped(point bindingArg0: ScreenPoint) async throws
     -> LatLng
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_lat_lng_for_pixel_unwrapped"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_lat_lng_for_pixel_unwrapped(
-            handle.raw,
-            bindingArg0.nativeValue(),
-            completion,
-            diagnostic
-          ) } }) { result in try LatLng(raw: NativeCompletion.value(
-          result,
-          as: mln_lat_lng.self
-        )) }
-    }
+    try await nativeStart(
+      "mln_map_lat_lng_for_pixel_unwrapped",
+      convert: { result in try LatLng(raw: NativeCompletion.value(
+        result,
+        as: mln_lat_lng.self
+      )) }
+    ) { raw, _, completion, diagnostic in mln_map_lat_lng_for_pixel_unwrapped(
+      raw,
+      bindingArg0.nativeValue(),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_lat_lngs_for_pixels`.
-
+  /// Calls `mln_map_lat_lngs_for_pixels`.
   func latLngsForPixels(points bindingArg0: [ScreenPoint]) async throws
     -> [LatLng]
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_lat_lngs_for_pixels"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          try arena.submit { try mln_map_lat_lngs_for_pixels(
-            handle.raw,
-            arena.array(bindingArg0.map { $0.nativeValue() }),
-            NativeInputArena.count(bindingArg0.count),
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.values(
-          result,
-          as: mln_lat_lng.self
-        ).map { LatLng(raw: $0) } }
-    }
+    try await nativeStart(
+      "mln_map_lat_lngs_for_pixels",
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_lat_lng.self
+      ).map { LatLng(raw: $0) } }
+    ) { raw, arena, completion, diagnostic in try mln_map_lat_lngs_for_pixels(
+      raw,
+      arena.array(bindingArg0.map { $0.nativeValue() }),
+      NativeInputArena.count(bindingArg0.count),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_lat_lngs_for_pixels_unwrapped`.
-
+  /// Calls `mln_map_lat_lngs_for_pixels_unwrapped`.
   func latLngsForPixelsUnwrapped(points bindingArg0: [ScreenPoint]) async throws
     -> [LatLng]
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_lat_lngs_for_pixels_unwrapped"
+    try await nativeStart(
+      "mln_map_lat_lngs_for_pixels_unwrapped",
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_lat_lng.self
+      ).map { LatLng(raw: $0) } }
+    ) { raw, arena, completion, diagnostic in
+      try mln_map_lat_lngs_for_pixels_unwrapped(
+        raw,
+        arena.array(bindingArg0.map { $0.nativeValue() }),
+        NativeInputArena.count(bindingArg0.count),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          try arena.submit { try mln_map_lat_lngs_for_pixels_unwrapped(
-            handle.raw,
-            arena.array(bindingArg0.map { $0.nativeValue() }),
-            NativeInputArena.count(bindingArg0.count),
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.values(
-          result,
-          as: mln_lat_lng.self
-        ).map { LatLng(raw: $0) } }
     }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_meters_per_pixel_at_latitude`.
-
+  /// Calls `mln_map_meters_per_pixel_at_latitude`.
   func metersPerPixelAtLatitude(latitude bindingArg0: Double) async throws
     -> Double
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_meters_per_pixel_at_latitude"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_meters_per_pixel_at_latitude(
-            handle.raw,
-            bindingArg0,
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion
-          .value(result, as: Double.self)
-        }
-    }
+    try await nativeStart(
+      "mln_map_meters_per_pixel_at_latitude",
+      convert: { result in try NativeCompletion.value(result, as: Double.self) }
+    ) { raw, _, completion, diagnostic in mln_map_meters_per_pixel_at_latitude(
+      raw,
+      bindingArg0,
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_pixel_for_lat_lng`.
-
+  /// Calls `mln_map_pixel_for_lat_lng`.
   func pixelForLatLng(coordinate bindingArg0: LatLng) async throws
     -> ScreenPoint
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_pixel_for_lat_lng"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          arena.submit { mln_map_pixel_for_lat_lng(
-            handle.raw,
-            bindingArg0.nativeValue(),
-            completion,
-            diagnostic
-          ) } }) { result in try ScreenPoint(raw: NativeCompletion.value(
-          result,
-          as: mln_screen_point.self
-        )) }
-    }
+    try await nativeStart(
+      "mln_map_pixel_for_lat_lng",
+      convert: { result in try ScreenPoint(raw: NativeCompletion.value(
+        result,
+        as: mln_screen_point.self
+      )) }
+    ) { raw, _, completion, diagnostic in mln_map_pixel_for_lat_lng(
+      raw,
+      bindingArg0.nativeValue(),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
-  // Calls `mln_map_pixels_for_lat_lngs`.
-
+  /// Calls `mln_map_pixels_for_lat_lngs`.
   func pixelsForLatLngs(coordinates bindingArg0: [LatLng]) async throws
     -> [ScreenPoint]
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_pixels_for_lat_lngs"
-      )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .start({ completion, diagnostic in
-          try arena.submit { try mln_map_pixels_for_lat_lngs(
-            handle.raw,
-            arena.array(bindingArg0.map { $0.nativeValue() }),
-            NativeInputArena.count(bindingArg0.count),
-            completion,
-            diagnostic
-          ) } }) { result in try NativeCompletion.values(
-          result,
-          as: mln_screen_point.self
-        ).map { ScreenPoint(raw: $0) } }
-    }
+    try await nativeStart(
+      "mln_map_pixels_for_lat_lngs",
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_screen_point.self
+      ).map { ScreenPoint(raw: $0) } }
+    ) { raw, arena, completion, diagnostic in try mln_map_pixels_for_lat_lngs(
+      raw,
+      arena.array(bindingArg0.map { $0.nativeValue() }),
+      NativeInputArena.count(bindingArg0.count),
+      completion,
+      diagnostic
+    ) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_bounds`.
   @discardableResult
-
   func setBounds(options bindingArg0: BoundOptions) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_bounds"
+    try await nativeCommand("mln_map_set_bounds") { raw, arena, completion, diagnostic in
+      mln_map_set_bounds(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_bounds(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_debug_options`.
   @discardableResult
-
   func setDebugOptions(options bindingArg0: MapDebugOption) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_debug_options"
+    try await nativeCommand("mln_map_set_debug_options") { raw, _, completion, diagnostic in
+      mln_map_set_debug_options(
+        raw,
+        bindingArg0.nativeValue(),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_debug_options(
-            handle.raw,
-            bindingArg0.nativeValue(),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_free_camera_options`.
   @discardableResult
-
   func setFreeCameraOptions(options bindingArg0: FreeCameraOptions) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_free_camera_options"
+    try await nativeCommand("mln_map_set_free_camera_options") { raw, arena, completion, diagnostic in
+      mln_map_set_free_camera_options(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_free_camera_options(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_projection_mode`.
   @discardableResult
-
   func setProjectionMode(mode bindingArg0: ProjectionMode) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_projection_mode"
+    try await nativeCommand("mln_map_set_projection_mode") { raw, arena, completion, diagnostic in
+      mln_map_set_projection_mode(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_projection_mode(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_rendering_stats_view_enabled`.
   @discardableResult
-
   func setRenderingStatsViewEnabled(enabled bindingArg0: Bool) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_rendering_stats_view_enabled"
+    try await nativeCommand("mln_map_set_rendering_stats_view_enabled") { raw, _, completion, diagnostic in
+      mln_map_set_rendering_stats_view_enabled(
+        raw,
+        bindingArg0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_rendering_stats_view_enabled(
-            handle.raw,
-            bindingArg0,
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_tile_options`.
   @discardableResult
-
   func setTileOptions(options bindingArg0: MapTileOptions) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_tile_options"
+    try await nativeCommand("mln_map_set_tile_options") { raw, arena, completion, diagnostic in
+      mln_map_set_tile_options(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_tile_options(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_set_viewport_options`.
   @discardableResult
-
   func setViewportOptions(options bindingArg0: MapViewportOptions) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_set_viewport_options"
+    try await nativeCommand("mln_map_set_viewport_options") { raw, arena, completion, diagnostic in
+      mln_map_set_viewport_options(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_set_viewport_options(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_map_update_camera`.
   @discardableResult
-
   func updateCamera(update bindingArg0: CameraUpdate) async throws
     -> CommandCompletion
   {
-    try await awaitNative {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_update_camera"
+    try await nativeCommand("mln_map_update_camera") { raw, arena, completion, diagnostic in
+      mln_map_update_camera(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeCompletion
-        .startCommand { completion, diagnostic in
-          arena.submit { mln_map_update_camera(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            completion,
-            diagnostic
-          ) }
-        }
     }
   }
 }

@@ -9,316 +9,166 @@ public extension MapHandle {
     descriptor bindingArg0: MetalBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_metal_borrowed_texture_attach"
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_metal_borrowed_texture_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in
+      try mln_metal_borrowed_texture_attach(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_metal_borrowed_texture_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_metal_owned_texture_attach`.
   func metalOwnedTextureAttach(
     descriptor bindingArg0: MetalOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_metal_owned_texture_attach"
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_metal_owned_texture_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in
+      try mln_metal_owned_texture_attach(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_metal_owned_texture_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_opengl_borrowed_texture_attach`.
   func openglBorrowedTextureAttach(
     descriptor bindingArg0: OpenglBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_opengl_borrowed_texture_attach"
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_opengl_borrowed_texture_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in
+      try mln_opengl_borrowed_texture_attach(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_opengl_borrowed_texture_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue(arena: arena)),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_opengl_owned_texture_attach`.
   func openglOwnedTextureAttach(
     descriptor bindingArg0: OpenglOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_opengl_owned_texture_attach"
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_opengl_owned_texture_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in
+      try mln_opengl_owned_texture_attach(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_opengl_owned_texture_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue(arena: arena)),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_vulkan_borrowed_texture_attach`.
   func vulkanBorrowedTextureAttach(
     descriptor bindingArg0: VulkanBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_vulkan_borrowed_texture_attach"
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_vulkan_borrowed_texture_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in
+      try mln_vulkan_borrowed_texture_attach(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_vulkan_borrowed_texture_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_vulkan_owned_texture_attach`.
   func vulkanOwnedTextureAttach(
     descriptor bindingArg0: VulkanOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_vulkan_owned_texture_attach"
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_vulkan_owned_texture_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in
+      try mln_vulkan_owned_texture_attach(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_vulkan_owned_texture_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_webgpu_borrowed_texture_attach`.
   func webgpuBorrowedTextureAttach(
     descriptor bindingArg0: WebgpuBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_webgpu_borrowed_texture_attach"
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_webgpu_borrowed_texture_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in
+      try mln_webgpu_borrowed_texture_attach(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_webgpu_borrowed_texture_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
-}
 
-public extension MapHandle {
   /// Calls `mln_webgpu_owned_texture_attach`.
   func webgpuOwnedTextureAttach(
     descriptor bindingArg0: WebgpuOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_webgpu_owned_texture_attach"
+    var value0: mln_render_session = 0
+    return try nativeAttach(
+      "mln_webgpu_owned_texture_attach",
+      as: RenderSessionAttachment.init
+    ) { raw, arena, completion, diagnostic in
+      try mln_webgpu_owned_texture_attach(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg1.nativeValue(arena: arena)),
+        &value0,
+        completion,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_render_session = 0
-      let future = try NativeCompletion
-        .startUnit { completion, diagnostic in
-          try arena.submit { try mln_webgpu_owned_texture_attach(
-            handle.raw,
-            arena.store(bindingArg0.nativeValue()),
-            arena.store(bindingArg1.nativeValue(arena: arena)),
-            &value0,
-            completion,
-            diagnostic
-          ) }
-        }
-      let owner = try RenderSessionHandle(adopting: value0, parent: self)
-      return RenderSessionAttachment(
-        session: owner,
-        completion: Task { [owner] in
-          defer { withExtendedLifetime(owner) {} }
-          try await mapNativeFailure { try await future.value() }
-        }
-      )
-    }
+    } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 }

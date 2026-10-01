@@ -5,238 +5,119 @@ import Foundation
 
 public extension MapProjectionHandle {
   func close() throws {
-    try NativeCallbackGuard.check(
-      owner: self,
-      operation: "mln_map_projection_close"
-    )
-    try mapNativeFailure { try handle.closeOnce { live in
-      try checkStatus { diagnostic in mln_map_projection_close(
-        live.raw,
+    try nativeClose("mln_map_projection_close") { raw, diagnostic in
+      mln_map_projection_close(
+        raw,
         diagnostic
-      ) }
-    } }
+      )
+    }
   }
-}
 
-public extension MapProjectionHandle {
   /// Calls `mln_map_projection_get_camera`.
   func getCamera() throws -> CameraOptions {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_projection_get_camera"
+    var value0: mln_camera_options = mln_camera_options_default()
+    return try nativeInvoke("mln_map_projection_get_camera") { raw, _, diagnostic in
+      mln_map_projection_get_camera(
+        raw,
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: mln_camera_options = mln_camera_options_default()
-      try checkStatus { diagnostic in
-        arena.submit { mln_map_projection_get_camera(
-          handle.raw,
-          &value0,
-          diagnostic
-        ) }
-      }
-      return CameraOptions(raw: value0)
-    }
+    } result: { CameraOptions(raw: value0) }
   }
-}
 
-public extension MapProjectionHandle {
   /// Calls `mln_map_projection_lat_lng_for_pixel`.
   func latLngForPixel(point bindingArg0: ScreenPoint) throws -> LatLng {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_projection_lat_lng_for_pixel"
+    var value0 = mln_lat_lng()
+    return try nativeInvoke("mln_map_projection_lat_lng_for_pixel") { raw, _, diagnostic in
+      mln_map_projection_lat_lng_for_pixel(
+        raw,
+        bindingArg0.nativeValue(),
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_lat_lng()
-      try checkStatus { diagnostic in
-        arena.submit { mln_map_projection_lat_lng_for_pixel(
-          handle.raw,
-          bindingArg0.nativeValue(),
-          &value0,
-          diagnostic
-        ) }
-      }
-      return LatLng(raw: value0)
-    }
+    } result: { LatLng(raw: value0) }
   }
-}
 
-public extension MapProjectionHandle {
   /// Calls `mln_map_projection_lat_lng_for_pixel_unwrapped`.
   func latLngForPixelUnwrapped(point bindingArg0: ScreenPoint) throws
     -> LatLng
   {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_projection_lat_lng_for_pixel_unwrapped"
+    var value0 = mln_lat_lng()
+    return try nativeInvoke("mln_map_projection_lat_lng_for_pixel_unwrapped") { raw, _, diagnostic in
+      mln_map_projection_lat_lng_for_pixel_unwrapped(
+        raw,
+        bindingArg0.nativeValue(),
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_lat_lng()
-      try checkStatus { diagnostic in
-        arena.submit { mln_map_projection_lat_lng_for_pixel_unwrapped(
-          handle.raw,
-          bindingArg0.nativeValue(),
-          &value0,
-          diagnostic
-        ) }
-      }
-      return LatLng(raw: value0)
-    }
+    } result: { LatLng(raw: value0) }
   }
-}
 
-public extension MapProjectionHandle {
   /// Calls `mln_map_projection_meters_per_pixel_at_latitude`.
   func metersPerPixelAtLatitude(latitude bindingArg0: Double) throws -> Double {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_projection_meters_per_pixel_at_latitude"
+    var value0: Double = 0
+    return try nativeInvoke("mln_map_projection_meters_per_pixel_at_latitude") { raw, _, diagnostic in
+      mln_map_projection_meters_per_pixel_at_latitude(
+        raw,
+        bindingArg0,
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0: Double = 0
-      try checkStatus { diagnostic in
-        arena.submit { mln_map_projection_meters_per_pixel_at_latitude(
-          handle.raw,
-          bindingArg0,
-          &value0,
-          diagnostic
-        ) }
-      }
-      return value0
-    }
+    } result: { value0 }
   }
-}
 
-public extension MapProjectionHandle {
   /// Calls `mln_map_projection_pixel_for_lat_lng`.
   func pixelForLatLng(coordinate bindingArg0: LatLng) throws -> ScreenPoint {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_projection_pixel_for_lat_lng"
+    var value0 = mln_screen_point()
+    return try nativeInvoke("mln_map_projection_pixel_for_lat_lng") { raw, _, diagnostic in
+      mln_map_projection_pixel_for_lat_lng(
+        raw,
+        bindingArg0.nativeValue(),
+        &value0,
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      var value0 = mln_screen_point()
-      try checkStatus { diagnostic in
-        arena.submit { mln_map_projection_pixel_for_lat_lng(
-          handle.raw,
-          bindingArg0.nativeValue(),
-          &value0,
-          diagnostic
-        ) }
-      }
-      return ScreenPoint(raw: value0)
-    }
+    } result: { ScreenPoint(raw: value0) }
   }
-}
 
-public extension MapProjectionHandle {
   /// Calls `mln_map_projection_set_camera`.
   func setCamera(camera bindingArg0: CameraOptions) throws {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_projection_set_camera"
+    try nativeInvoke("mln_map_projection_set_camera") { raw, arena, diagnostic in
+      mln_map_projection_set_camera(
+        raw,
+        arena.store(bindingArg0.nativeValue()),
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in
-        arena.submit { mln_map_projection_set_camera(
-          handle.raw,
-          arena.store(bindingArg0.nativeValue()),
-          diagnostic
-        ) }
-      }
-      return ()
     }
   }
-}
 
-public extension MapProjectionHandle {
   /// Calls `mln_map_projection_set_visible_coordinates`.
   func setVisibleCoordinates(
     coordinates bindingArg0: [LatLng],
     padding bindingArg2: EdgeInsets
   ) throws {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_projection_set_visible_coordinates"
+    try nativeInvoke("mln_map_projection_set_visible_coordinates") { raw, arena, diagnostic in
+      try mln_map_projection_set_visible_coordinates(
+        raw,
+        arena.array(bindingArg0.map { $0.nativeValue() }),
+        NativeInputArena.count(bindingArg0.count),
+        bindingArg2.nativeValue(),
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in
-        try arena.submit { try mln_map_projection_set_visible_coordinates(
-          handle.raw,
-          arena.array(bindingArg0.map { $0.nativeValue() }),
-          NativeInputArena.count(bindingArg0.count),
-          bindingArg2.nativeValue(),
-          diagnostic
-        ) }
-      }
-      return ()
     }
   }
-}
 
-public extension MapProjectionHandle {
   /// Calls `mln_map_projection_set_visible_geometry`.
   func setVisibleGeometry(
     geometry bindingArg0: Data,
     padding bindingArg1: EdgeInsets
   ) throws {
-    try mapNativeFailure {
-      try NativeCallbackGuard.check(
-        owner: self,
-        operation: "mln_map_projection_set_visible_geometry"
+    try nativeInvoke("mln_map_projection_set_visible_geometry") { raw, arena, diagnostic in
+      mln_map_projection_set_visible_geometry(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
+        diagnostic
       )
-      let access = try self.handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let handle = access.handle
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-
-      try checkStatus { diagnostic in
-        arena.submit { mln_map_projection_set_visible_geometry(
-          handle.raw,
-          arena.view(bindingArg0),
-          bindingArg1.nativeValue(),
-          diagnostic
-        ) }
-      }
-      return ()
     }
   }
 }

@@ -3,20 +3,12 @@
 internal import CMaplibreNativeC
 import Foundation
 
-public struct CommandDisposition: RawRepresentable, Equatable, Hashable,
-  Sendable
+public struct CommandDisposition: RawRepresentable, NativeOpenValue, Equatable,
+  Hashable, Sendable
 {
   public let rawValue: UInt32
   public init(rawValue: UInt32) {
     self.rawValue = rawValue
-  }
-
-  init(raw: UInt32) {
-    rawValue = raw
-  }
-
-  func nativeValue() -> UInt32 {
-    rawValue
   }
 
   public static let committed: CommandDisposition = .init(rawValue: 0)
