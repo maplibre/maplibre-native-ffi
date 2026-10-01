@@ -3685,11 +3685,7 @@ fn generated_input_mln_rendered_feature_query_options<'py>(
     raw.fields = 0;
     if let Some(field) = generated_present(value, "layer_ids")? {
         raw.layer_ids = {
-            let mut items = Vec::new();
-            for item in field.try_iter()? {
-                let item = item?;
-                items.push(storage.buffer(item, true)?);
-            }
+            let items = generated_items(&field, |item| storage.buffer(item, true))?;
             raw.layer_id_count = generated_length(items.len())?;
             storage.keep_array(items)
         };
@@ -3865,11 +3861,9 @@ fn generated_input_mln_screen_line_string<'py>(
 ) -> PyResult<sys::mln_screen_line_string> {
     let mut raw: sys::mln_screen_line_string = unsafe { std::mem::zeroed() };
     raw.points = {
-        let mut items = Vec::new();
-        for item in value.getattr("points")?.try_iter()? {
-            let item = item?;
-            items.push(generated_input_mln_screen_point(&item, storage)?);
-        }
+        let items = generated_items(&value.getattr("points")?, |item| {
+            generated_input_mln_screen_point(&item, storage)
+        })?;
         raw.point_count = generated_length(items.len())?;
         storage.keep_array(items)
     };
@@ -3900,11 +3894,7 @@ fn generated_input_mln_source_feature_query_options<'py>(
     raw.fields = 0;
     if let Some(field) = generated_present(value, "source_layer_ids")? {
         raw.source_layer_ids = {
-            let mut items = Vec::new();
-            for item in field.try_iter()? {
-                let item = item?;
-                items.push(storage.buffer(item, true)?);
-            }
+            let items = generated_items(&field, |item| storage.buffer(item, true))?;
             raw.source_layer_id_count = generated_length(items.len())?;
             storage.keep_array(items)
         };
@@ -3934,11 +3924,9 @@ fn generated_input_mln_style_image_options<'py>(
     raw.fields = 0;
     if let Some(field) = generated_present(value, "stretch_x")? {
         raw.stretch_x = {
-            let mut items = Vec::new();
-            for item in field.try_iter()? {
-                let item = item?;
-                items.push(generated_input_mln_image_stretch(&item, storage)?);
-            }
+            let items = generated_items(&field, |item| {
+                generated_input_mln_image_stretch(&item, storage)
+            })?;
             raw.stretch_x_count = generated_length(items.len())?;
             storage.keep_array(items)
         };
@@ -3946,11 +3934,9 @@ fn generated_input_mln_style_image_options<'py>(
     }
     if let Some(field) = generated_present(value, "stretch_y")? {
         raw.stretch_y = {
-            let mut items = Vec::new();
-            for item in field.try_iter()? {
-                let item = item?;
-                items.push(generated_input_mln_image_stretch(&item, storage)?);
-            }
+            let items = generated_items(&field, |item| {
+                generated_input_mln_image_stretch(&item, storage)
+            })?;
             raw.stretch_y_count = generated_length(items.len())?;
             storage.keep_array(items)
         };
@@ -4908,10 +4894,7 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py, "mln_map_add_geojson_source_data", self.admission())?;
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let data_handle = data
-            .state()
-            .live_handle()
-            .ok_or_else(|| invalid_state_error("input handle is closed"))?;
+        let data_handle = data.input()?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -4938,14 +4921,9 @@ impl MapHandle {
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let url_value = storage.buffer(url.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = if options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_geojson_source_options(
-                &options.clone(),
-                storage,
-            )?)
-        };
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_geojson_source_options(&options, storage)
+        })?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -4953,9 +4931,7 @@ impl MapHandle {
                     handle,
                     source_id_value,
                     url_value,
-                    options_value
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    generated_pointer(&options_value),
                     completion,
                     diagnostic,
                 )
@@ -5001,11 +4977,9 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py, "mln_map_add_image_source_image", self.admission())?;
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let mut coordinates_values = Vec::new();
-        for item in coordinates.try_iter()? {
-            let item = item?;
-            coordinates_values.push(generated_input_mln_lat_lng(&item, storage)?);
-        }
+        let coordinates_values = generated_items(coordinates, |item| {
+            generated_input_mln_lat_lng(&item, storage)
+        })?;
         let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
         let handle = self.live()?;
@@ -5034,11 +5008,9 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py, "mln_map_add_image_source_url", self.admission())?;
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let mut coordinates_values = Vec::new();
-        for item in coordinates.try_iter()? {
-            let item = item?;
-            coordinates_values.push(generated_input_mln_lat_lng(&item, storage)?);
-        }
+        let coordinates_values = generated_items(coordinates, |item| {
+            generated_input_mln_lat_lng(&item, storage)
+        })?;
         let url_value = storage.buffer(url.clone(), true)?;
         let handle = self.live()?;
         unsafe {
@@ -5093,20 +5065,11 @@ impl MapHandle {
             GeneratedCall::new(py, "mln_map_add_raster_dem_source_tiles", self.admission())?;
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let mut tiles_values = Vec::new();
-        for item in tiles.try_iter()? {
-            let item = item?;
-            tiles_values.push(storage.buffer(item, true)?);
-        }
+        let tiles_values = generated_items(tiles, |item| storage.buffer(item, true))?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = if options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_style_tile_source_options(
-                &options.clone(),
-                storage,
-            )?)
-        };
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_style_tile_source_options(&options, storage)
+        })?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -5115,9 +5078,7 @@ impl MapHandle {
                     source_id_value,
                     tiles_values.as_ptr(),
                     tiles_values.len(),
-                    options_value
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    generated_pointer(&options_value),
                     completion,
                     diagnostic,
                 )
@@ -5138,14 +5099,9 @@ impl MapHandle {
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let url_value = storage.buffer(url.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = if options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_style_tile_source_options(
-                &options.clone(),
-                storage,
-            )?)
-        };
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_style_tile_source_options(&options, storage)
+        })?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -5153,9 +5109,7 @@ impl MapHandle {
                     handle,
                     source_id_value,
                     url_value,
-                    options_value
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    generated_pointer(&options_value),
                     completion,
                     diagnostic,
                 )
@@ -5173,20 +5127,11 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py, "mln_map_add_raster_source_tiles", self.admission())?;
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let mut tiles_values = Vec::new();
-        for item in tiles.try_iter()? {
-            let item = item?;
-            tiles_values.push(storage.buffer(item, true)?);
-        }
+        let tiles_values = generated_items(tiles, |item| storage.buffer(item, true))?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = if options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_style_tile_source_options(
-                &options.clone(),
-                storage,
-            )?)
-        };
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_style_tile_source_options(&options, storage)
+        })?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -5195,9 +5140,7 @@ impl MapHandle {
                     source_id_value,
                     tiles_values.as_ptr(),
                     tiles_values.len(),
-                    options_value
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    generated_pointer(&options_value),
                     completion,
                     diagnostic,
                 )
@@ -5217,14 +5160,9 @@ impl MapHandle {
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let url_value = storage.buffer(url.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = if options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_style_tile_source_options(
-                &options.clone(),
-                storage,
-            )?)
-        };
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_style_tile_source_options(&options, storage)
+        })?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -5232,9 +5170,7 @@ impl MapHandle {
                     handle,
                     source_id_value,
                     url_value,
-                    options_value
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    generated_pointer(&options_value),
                     completion,
                     diagnostic,
                 )
@@ -5301,20 +5237,11 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py, "mln_map_add_vector_source_tiles", self.admission())?;
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let mut tiles_values = Vec::new();
-        for item in tiles.try_iter()? {
-            let item = item?;
-            tiles_values.push(storage.buffer(item, true)?);
-        }
+        let tiles_values = generated_items(tiles, |item| storage.buffer(item, true))?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = if options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_style_tile_source_options(
-                &options.clone(),
-                storage,
-            )?)
-        };
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_style_tile_source_options(&options, storage)
+        })?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -5323,9 +5250,7 @@ impl MapHandle {
                     source_id_value,
                     tiles_values.as_ptr(),
                     tiles_values.len(),
-                    options_value
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    generated_pointer(&options_value),
                     completion,
                     diagnostic,
                 )
@@ -5345,14 +5270,9 @@ impl MapHandle {
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let url_value = storage.buffer(url.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = if options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_style_tile_source_options(
-                &options.clone(),
-                storage,
-            )?)
-        };
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_style_tile_source_options(&options, storage)
+        })?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -5360,9 +5280,7 @@ impl MapHandle {
                     handle,
                     source_id_value,
                     url_value,
-                    options_value
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    generated_pointer(&options_value),
                     completion,
                     diagnostic,
                 )
@@ -5397,14 +5315,9 @@ impl MapHandle {
         let storage = &mut call.storage;
         let geometry_value = storage.buffer(geometry.clone(), false)?;
         let fit_options = fit_options.unwrap_or_else(|| py.None().into_bound(py));
-        let fit_options_value = if fit_options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_camera_fit_options(
-                &fit_options.clone(),
-                storage,
-            )?)
-        };
+        let fit_options_value = generated_maybe(&fit_options, |fit_options| {
+            generated_input_mln_camera_fit_options(&fit_options, storage)
+        })?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_camera_options>(result)?;
@@ -5416,9 +5329,7 @@ impl MapHandle {
                     sys::mln_map_camera_for_geometry(
                         handle,
                         geometry_value,
-                        fit_options_value
-                            .as_ref()
-                            .map_or(std::ptr::null(), |value| value),
+                        generated_pointer(&fit_options_value),
                         completion,
                         diagnostic,
                     )
@@ -5439,14 +5350,9 @@ impl MapHandle {
         let storage = &mut call.storage;
         let bounds_value = generated_input_mln_lat_lng_bounds(&bounds.clone(), storage)?;
         let fit_options = fit_options.unwrap_or_else(|| py.None().into_bound(py));
-        let fit_options_value = if fit_options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_camera_fit_options(
-                &fit_options.clone(),
-                storage,
-            )?)
-        };
+        let fit_options_value = generated_maybe(&fit_options, |fit_options| {
+            generated_input_mln_camera_fit_options(&fit_options, storage)
+        })?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_camera_options>(result)?;
@@ -5458,9 +5364,7 @@ impl MapHandle {
                     sys::mln_map_camera_for_lat_lng_bounds(
                         handle,
                         bounds_value,
-                        fit_options_value
-                            .as_ref()
-                            .map_or(std::ptr::null(), |value| value),
+                        generated_pointer(&fit_options_value),
                         completion,
                         diagnostic,
                     )
@@ -5478,20 +5382,13 @@ impl MapHandle {
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_camera_for_lat_lngs", self.admission())?;
         let storage = &mut call.storage;
-        let mut coordinates_values = Vec::new();
-        for item in coordinates.try_iter()? {
-            let item = item?;
-            coordinates_values.push(generated_input_mln_lat_lng(&item, storage)?);
-        }
+        let coordinates_values = generated_items(coordinates, |item| {
+            generated_input_mln_lat_lng(&item, storage)
+        })?;
         let fit_options = fit_options.unwrap_or_else(|| py.None().into_bound(py));
-        let fit_options_value = if fit_options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_camera_fit_options(
-                &fit_options.clone(),
-                storage,
-            )?)
-        };
+        let fit_options_value = generated_maybe(&fit_options, |fit_options| {
+            generated_input_mln_camera_fit_options(&fit_options, storage)
+        })?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_camera_options>(result)?;
@@ -5504,9 +5401,7 @@ impl MapHandle {
                         handle,
                         coordinates_values.as_ptr(),
                         coordinates_values.len(),
-                        fit_options_value
-                            .as_ref()
-                            .map_or(std::ptr::null(), |value| value),
+                        generated_pointer(&fit_options_value),
                         completion,
                         diagnostic,
                     )
@@ -6315,11 +6210,9 @@ impl MapHandle {
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_lat_lngs_for_pixels", self.admission())?;
         let storage = &mut call.storage;
-        let mut points_values = Vec::new();
-        for item in points.try_iter()? {
-            let item = item?;
-            points_values.push(generated_input_mln_screen_point(&item, storage)?);
-        }
+        let points_values = generated_items(points, |item| {
+            generated_input_mln_screen_point(&item, storage)
+        })?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
@@ -6355,11 +6248,9 @@ impl MapHandle {
             self.admission(),
         )?;
         let storage = &mut call.storage;
-        let mut points_values = Vec::new();
-        for item in points.try_iter()? {
-            let item = item?;
-            points_values.push(generated_input_mln_screen_point(&item, storage)?);
-        }
+        let points_values = generated_items(points, |item| {
+            generated_input_mln_screen_point(&item, storage)
+        })?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
@@ -6536,11 +6427,9 @@ impl MapHandle {
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_pixels_for_lat_lngs", self.admission())?;
         let storage = &mut call.storage;
-        let mut coordinates_values = Vec::new();
-        for item in coordinates.try_iter()? {
-            let item = item?;
-            coordinates_values.push(generated_input_mln_lat_lng(&item, storage)?);
-        }
+        let coordinates_values = generated_items(coordinates, |item| {
+            generated_input_mln_lat_lng(&item, storage)
+        })?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
@@ -6898,10 +6787,7 @@ impl MapHandle {
         let mut call = GeneratedCall::new(py, "mln_map_set_geojson_source_data", self.admission())?;
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let data_handle = data
-            .state()
-            .live_handle()
-            .ok_or_else(|| invalid_state_error("input handle is closed"))?;
+        let data_handle = data.input()?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -7002,11 +6888,9 @@ impl MapHandle {
             GeneratedCall::new(py, "mln_map_set_image_source_coordinates", self.admission())?;
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let mut coordinates_values = Vec::new();
-        for item in coordinates.try_iter()? {
-            let item = item?;
-            coordinates_values.push(generated_input_mln_lat_lng(&item, storage)?);
-        }
+        let coordinates_values = generated_items(coordinates, |item| {
+            generated_input_mln_lat_lng(&item, storage)
+        })?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -7081,20 +6965,14 @@ impl MapHandle {
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
         let filter = filter.unwrap_or_else(|| py.None().into_bound(py));
-        let filter_value = if filter.is_none() {
-            None
-        } else {
-            Some(storage.buffer(filter.clone(), false)?)
-        };
+        let filter_value = generated_maybe(&filter, |filter| storage.buffer(filter, false))?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_set_layer_filter(
                     handle,
                     layer_id_value,
-                    filter_value
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    generated_pointer(&filter_value),
                     completion,
                     diagnostic,
                 )
@@ -7411,14 +7289,9 @@ impl MapHandle {
         let image = image.unwrap_or_else(|| py.None().into_bound(py));
         let image_value = generated_input_mln_premultiplied_rgba8_image(&image.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = if options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_style_image_options(
-                &options.clone(),
-                storage,
-            )?)
-        };
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_style_image_options(&options, storage)
+        })?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
@@ -7426,9 +7299,7 @@ impl MapHandle {
                     handle,
                     image_id_value,
                     &image_value,
-                    options_value
-                        .as_ref()
-                        .map_or(std::ptr::null(), |value| value),
+                    generated_pointer(&options_value),
                     completion,
                     diagnostic,
                 )
@@ -8306,11 +8177,9 @@ impl MapProjectionHandle {
             self.admission(),
         )?;
         let storage = &mut call.storage;
-        let mut coordinates_values = Vec::new();
-        for item in coordinates.try_iter()? {
-            let item = item?;
-            coordinates_values.push(generated_input_mln_lat_lng(&item, storage)?);
-        }
+        let coordinates_values = generated_items(coordinates, |item| {
+            generated_input_mln_lat_lng(&item, storage)
+        })?;
         let padding_value = generated_input_mln_edge_insets(&padding.clone(), storage)?;
         let handle = self.live()?;
         unsafe {
@@ -8690,11 +8559,8 @@ impl RenderSessionHandle {
         let extension_value = storage.buffer(extension.clone(), true)?;
         let extension_field_value = storage.buffer(extension_field.clone(), true)?;
         let arguments = arguments.unwrap_or_else(|| py.None().into_bound(py));
-        let arguments_value = if arguments.is_none() {
-            None
-        } else {
-            Some(storage.buffer(arguments.clone(), false)?)
-        };
+        let arguments_value =
+            generated_maybe(&arguments, |arguments| storage.buffer(arguments, false))?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let value = completion_value::<sys::mln_buffer_view>(result)?;
@@ -8709,9 +8575,7 @@ impl RenderSessionHandle {
                         feature_value,
                         extension_value,
                         extension_field_value,
-                        arguments_value
-                            .as_ref()
-                            .map_or(std::ptr::null(), |value| value),
+                        generated_pointer(&arguments_value),
                         completion,
                         diagnostic,
                     )
@@ -8736,14 +8600,9 @@ impl RenderSessionHandle {
         let geometry_value =
             generated_input_mln_rendered_query_geometry(&geometry.clone(), storage)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = if options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_rendered_feature_query_options(
-                &options.clone(),
-                storage,
-            )?)
-        };
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_rendered_feature_query_options(&options, storage)
+        })?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
@@ -8758,9 +8617,7 @@ impl RenderSessionHandle {
                     sys::mln_render_session_query_rendered_features(
                         handle,
                         &geometry_value,
-                        options_value
-                            .as_ref()
-                            .map_or(std::ptr::null(), |value| value),
+                        generated_pointer(&options_value),
                         completion,
                         diagnostic,
                     )
@@ -8784,14 +8641,9 @@ impl RenderSessionHandle {
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = if options.is_none() {
-            None
-        } else {
-            Some(generated_input_mln_source_feature_query_options(
-                &options.clone(),
-                storage,
-            )?)
-        };
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_source_feature_query_options(&options, storage)
+        })?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
@@ -8806,9 +8658,7 @@ impl RenderSessionHandle {
                     sys::mln_render_session_query_source_features(
                         handle,
                         source_id_value,
-                        options_value
-                            .as_ref()
-                            .map_or(std::ptr::null(), |value| value),
+                        generated_pointer(&options_value),
                         completion,
                         diagnostic,
                     )
@@ -9836,22 +9686,15 @@ fn geojson_source_data_create(
     let storage = &mut call.storage;
     let data_value = storage.buffer(data.clone(), false)?;
     let options = options.unwrap_or_else(|| py.None().into_bound(py));
-    let options_value = if options.is_none() {
-        None
-    } else {
-        Some(generated_input_mln_geojson_source_options(
-            &options.clone(),
-            storage,
-        )?)
-    };
+    let options_value = generated_maybe(&options, |options| {
+        generated_input_mln_geojson_source_options(&options, storage)
+    })?;
     let mut out_data: sys::mln_geojson_source_data = unsafe { std::mem::zeroed() };
     unsafe {
         call.status(|diagnostic| {
             sys::mln_geojson_source_data_create(
                 data_value,
-                options_value
-                    .as_ref()
-                    .map_or(std::ptr::null(), |value| value),
+                generated_pointer(&options_value),
                 &mut out_data,
                 diagnostic,
             )
@@ -10026,11 +9869,9 @@ fn rendered_query_geometry_line_string(
 ) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py, "mln_rendered_query_geometry_line_string", 0)?;
     let storage = &mut call.storage;
-    let mut points_values = Vec::new();
-    for item in points.try_iter()? {
-        let item = item?;
-        points_values.push(generated_input_mln_screen_point(&item, storage)?);
-    }
+    let points_values = generated_items(points, |item| {
+        generated_input_mln_screen_point(&item, storage)
+    })?;
     let result = unsafe {
         call.run(|| {
             sys::mln_rendered_query_geometry_line_string(

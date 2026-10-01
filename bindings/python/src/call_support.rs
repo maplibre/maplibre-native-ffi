@@ -130,6 +130,13 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
             .unwrap_or(0)
     }
 
+    /// The live handle that another owner's call takes as an argument.
+    fn input(&self) -> PyResult<Self::Native> {
+        self.state()
+            .live_handle()
+            .ok_or_else(|| invalid_state_error("input handle is closed"))
+    }
+
     /// The live handle for a call that borrows none of its storage.
     fn live(&self) -> PyResult<Self::Native> {
         self.state()
@@ -338,4 +345,29 @@ fn generated_present<'py>(
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
     let field = value.getattr(name)?;
     Ok((!field.is_none()).then_some(field))
+}
+
+/// Converts each item of a Python iterable.
+fn generated_items<'py, T>(
+    values: &Bound<'py, PyAny>,
+    mut convert: impl FnMut(Bound<'py, PyAny>) -> PyResult<T>,
+) -> PyResult<Vec<T>> {
+    values.try_iter()?.map(|item| convert(item?)).collect()
+}
+
+/// Converts a Python value that may be `None`.
+fn generated_maybe<'py, T>(
+    value: &Bound<'py, PyAny>,
+    convert: impl FnOnce(Bound<'py, PyAny>) -> PyResult<T>,
+) -> PyResult<Option<T>> {
+    if value.is_none() {
+        Ok(None)
+    } else {
+        convert(value.clone()).map(Some)
+    }
+}
+
+/// A pointer to an optional converted value, or null when it is absent.
+fn generated_pointer<T>(value: &Option<T>) -> *const T {
+    value.as_ref().map_or(std::ptr::null(), |value| value)
 }

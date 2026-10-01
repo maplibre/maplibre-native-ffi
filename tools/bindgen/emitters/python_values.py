@@ -458,12 +458,12 @@ class Values:
         if plan.kind == "array" and plan.element:
             inner = self.input(plan.element, "item", scope=scope)
             if plan.ctype.kind == "array":
-                return f'{{ let mut items = Vec::new(); for item in {expr}.try_iter()? {{ let item = item?; items.push({inner}); }} items.try_into().map_err(|_| invalid_argument_error("wrong fixed array length"))? }}'
+                return f'generated_items(&{expr}, |item| {ok(inner)})?.try_into().map_err(|_| invalid_argument_error("wrong fixed array length"))?'
             if plan.length and plan.length.isdigit():
                 check = f'if items.len() != {plan.length} {{ return Err(invalid_argument_error("wrong fixed array length")); }}'
             else:
                 check = f"{scope}.{rust_field(plan.length or 'count')} = generated_length(items.len())?;"
-            body = f"{{ let mut items = Vec::new(); for item in {expr}.try_iter()? {{ let item = item?; items.push({inner}); }} {check} storage.keep_array(items) }}"
+            body = f"{{ let items = generated_items(&{expr}, |item| {ok(inner)})?; {check} storage.keep_array(items) }}"
             if plan.nullable:
                 return f"if {expr}.is_none() {{ std::ptr::null() }} else {{ {body} }}"
             return body

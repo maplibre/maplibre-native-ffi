@@ -230,9 +230,7 @@ def operation(
         if value.kind == "handle" and value.native in OWNERS:
             public = OWNERS[value.native]
             rust = f"&{public}"
-            setup.append(
-                f'        let {local}_handle = {local}.state().live_handle().ok_or_else(|| invalid_state_error("input handle is closed"))?;'
-            )
+            setup.append(f"        let {local}_handle = {local}.input()?;")
             arguments[parameter.name] = f"{local}_handle"
         else:
             values.supported(value, input=True)
@@ -262,11 +260,8 @@ def operation(
                 if value.element is None:
                     raise unsupported(function, "array requires an element plan")
                 converted = values.input(value.element, "item")
-                setup.extend(
-                    [
-                        f"        let mut {local}_values = Vec::new();",
-                        f"        for item in {local}.try_iter()? {{ let item = item?; {local}_values.push({converted}); }}",
-                    ]
+                setup.append(
+                    f"        let {local}_values = generated_items({local}, |item| {ok(converted)})?;"
                 )
                 arguments[parameter.name] = f"{local}_values.as_ptr()"
                 if value.length and value.length.isdigit():
@@ -278,12 +273,11 @@ def operation(
             elif value.kind == "reference" and value.element:
                 converted = values.input(value.element, local + ".clone()")
                 if value.nullable:
+                    converted = values.input(value.element, local)
                     setup.append(
-                        f"        let {local}_value = if {local}.is_none() {{ None }} else {{ Some({converted}) }};"
+                        f"        let {local}_value = generated_maybe(&{local}, |{local}| {ok(converted)})?;"
                     )
-                    arguments[parameter.name] = (
-                        f"{local}_value.as_ref().map_or(std::ptr::null(), |value| value)"
-                    )
+                    arguments[parameter.name] = f"generated_pointer(&{local}_value)"
                 else:
                     mutable = (
                         not value.ctype.pointee.const if value.ctype.pointee else False
