@@ -12,482 +12,271 @@ static mln_map_snapshot read_snapshot(mln_map map) {
   return snapshot;
 }
 
-// One option command and the snapshot fields it must publish. `input` is the
-// value the command submits, and `verify` compares it with the snapshot.
-typedef struct snapshot_row {
-  const char* label;
-  mln_status (*submit)(
-    mln_map map, const void* input, const mln_completion* completion
-  );
-  const void* input;
-  void (*verify)(
-    const char* label, const mln_map_snapshot* snapshot, const void* input
-  );
-} snapshot_row;
-
-static mln_status submit_debug_options(
-  mln_map map, const void* input, const mln_completion* completion
+// Waits for a submitted option command, expects it to commit with a generation
+// past `*previous`, and returns the snapshot, which must carry that
+// generation.
+static mln_map_snapshot settle_commit(
+  mln_map map, mln_test_completion* completion, uint64_t* previous,
+  const char* label
 ) {
-  return mln_map_set_debug_options(
-    map, *(const uint32_t*)input, completion, NULL
-  );
-}
-
-static void verify_debug_options(
-  const char* label, const mln_map_snapshot* snapshot, const void* input
-) {
+  MLN_TEST_OK_MESSAGE(mln_test_completion_finish(completion), label);
   TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-    *(const uint32_t*)input, snapshot->debug_options, label
+    MLN_COMMAND_DISPOSITION_COMMITTED,
+    mln_test_completion_disposition(completion), label
   );
-}
-
-static mln_status submit_rendering_stats(
-  mln_map map, const void* input, const mln_completion* completion
-) {
-  return mln_map_set_rendering_stats_view_enabled(
-    map, *(const bool*)input, completion, NULL
+  const uint64_t committed = mln_test_completion_generation(completion);
+  mln_test_completion_destroy(completion);
+  TEST_ASSERT_GREATER_THAN_UINT64_MESSAGE(*previous, committed, label);
+  *previous = committed;
+  const mln_map_snapshot snapshot = read_snapshot(map);
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT64_MESSAGE(
+    committed, snapshot.generation, label
   );
+  return snapshot;
 }
 
-static void verify_rendering_stats(
-  const char* label, const mln_map_snapshot* snapshot, const void* input
-) {
-  TEST_ASSERT_EQUAL_MESSAGE(
-    *(const bool*)input, snapshot->rendering_stats_view_enabled, label
-  );
-}
-
-static mln_status submit_viewport(
-  mln_map map, const void* input, const mln_completion* completion
-) {
-  return mln_map_set_viewport_options(map, input, completion, NULL);
-}
-
-// Compares the fields the command selected. The snapshot reports every field.
-static void verify_viewport(
-  const char* label, const mln_map_snapshot* snapshot, const void* input
-) {
-  const mln_map_viewport_options* sent = input;
-  const mln_map_viewport_options* got = &snapshot->viewport;
-  if ((sent->fields & MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0U) {
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-      sent->north_orientation, got->north_orientation, label
-    );
-  }
-  if ((sent->fields & MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0U) {
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-      sent->constrain_mode, got->constrain_mode, label
-    );
-  }
-  if ((sent->fields & MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0U) {
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-      sent->viewport_mode, got->viewport_mode, label
-    );
-  }
-  if ((sent->fields & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0U) {
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-      sent->frustum_offset.top, got->frustum_offset.top, label
-    );
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-      sent->frustum_offset.left, got->frustum_offset.left, label
-    );
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-      sent->frustum_offset.bottom, got->frustum_offset.bottom, label
-    );
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-      sent->frustum_offset.right, got->frustum_offset.right, label
-    );
-  }
-}
-
-static mln_status submit_tile(
-  mln_map map, const void* input, const mln_completion* completion
-) {
-  return mln_map_set_tile_options(map, input, completion, NULL);
-}
-
-static void verify_tile(
-  const char* label, const mln_map_snapshot* snapshot, const void* input
-) {
-  const mln_map_tile_options* sent = input;
-  const mln_map_tile_options* got = &snapshot->tile;
-  if ((sent->fields & MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0U) {
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-      sent->prefetch_zoom_delta, got->prefetch_zoom_delta, label
-    );
-  }
-  if ((sent->fields & MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0U) {
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-      sent->lod_min_radius, got->lod_min_radius, label
-    );
-  }
-  if ((sent->fields & MLN_MAP_TILE_OPTION_LOD_SCALE) != 0U) {
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(sent->lod_scale, got->lod_scale, label);
-  }
-  if ((sent->fields & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0U) {
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-      sent->lod_pitch_threshold, got->lod_pitch_threshold, label
-    );
-  }
-  if ((sent->fields & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0U) {
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-      sent->lod_zoom_shift, got->lod_zoom_shift, label
-    );
-  }
-  if ((sent->fields & MLN_MAP_TILE_OPTION_LOD_MODE) != 0U) {
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(sent->lod_mode, got->lod_mode, label);
-  }
-}
-
-static mln_status submit_projection_mode(
-  mln_map map, const void* input, const mln_completion* completion
-) {
-  return mln_map_set_projection_mode(map, input, completion, NULL);
-}
-
-static void verify_projection_mode(
-  const char* label, const mln_map_snapshot* snapshot, const void* input
-) {
-  const mln_projection_mode* sent = input;
-  const mln_projection_mode* got = &snapshot->projection_mode;
-  TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-    sent->fields, got->fields & sent->fields, label
-  );
-  if ((sent->fields & MLN_PROJECTION_MODE_AXONOMETRIC) != 0U) {
-    TEST_ASSERT_EQUAL_MESSAGE(sent->axonometric, got->axonometric, label);
-  }
-  if ((sent->fields & MLN_PROJECTION_MODE_X_SKEW) != 0U) {
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(sent->x_skew, got->x_skew, label);
-  }
-  if ((sent->fields & MLN_PROJECTION_MODE_Y_SKEW) != 0U) {
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(sent->y_skew, got->y_skew, label);
-  }
-}
-
-static mln_status submit_bounds(
-  mln_map map, const void* input, const mln_completion* completion
-) {
-  return mln_map_set_bounds(map, input, completion, NULL);
-}
-
-static void verify_bounds(
-  const char* label, const mln_map_snapshot* snapshot, const void* input
-) {
-  const mln_bound_options* sent = input;
-  const mln_bound_options* got = &snapshot->bounds;
-  TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-    sent->fields, got->fields & sent->fields, label
-  );
-  if ((sent->fields & MLN_BOUND_OPTION_BOUNDS) != 0U) {
-    TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-      1e-9, sent->bounds.southwest.latitude, got->bounds.southwest.latitude,
-      label
-    );
-    TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-      1e-9, sent->bounds.southwest.longitude, got->bounds.southwest.longitude,
-      label
-    );
-    TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-      1e-9, sent->bounds.northeast.latitude, got->bounds.northeast.latitude,
-      label
-    );
-    TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-      1e-9, sent->bounds.northeast.longitude, got->bounds.northeast.longitude,
-      label
-    );
-  }
-  if ((sent->fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0U) {
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(sent->min_zoom, got->min_zoom, label);
-  }
-  if ((sent->fields & MLN_BOUND_OPTION_MAX_ZOOM) != 0U) {
-    TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(sent->max_zoom, got->max_zoom, label);
-  }
-  if ((sent->fields & MLN_BOUND_OPTION_MIN_PITCH) != 0U) {
-    TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-      1e-9, sent->min_pitch, got->min_pitch, label
-    );
-  }
-  if ((sent->fields & MLN_BOUND_OPTION_MAX_PITCH) != 0U) {
-    TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-      1e-9, sent->max_pitch, got->max_pitch, label
-    );
-  }
-}
-
-static mln_status submit_free_camera(
-  mln_map map, const void* input, const mln_completion* completion
-) {
-  return mln_map_set_free_camera_options(map, input, completion, NULL);
-}
-
-// MapLibre renormalizes the altitude of a free-camera position, so only the
-// ground position round-trips.
-static void verify_free_camera_position(
-  const char* label, const mln_map_snapshot* snapshot, const void* input
-) {
-  const mln_free_camera_options* sent = input;
-  const mln_free_camera_options* got = &snapshot->free_camera;
-  TEST_ASSERT_TRUE_MESSAGE(
-    (got->fields & MLN_FREE_CAMERA_OPTION_POSITION) != 0U, label
-  );
-  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-    1e-6, sent->position.x, got->position.x, label
-  );
-  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-    1e-6, sent->position.y, got->position.y, label
-  );
-  TEST_ASSERT_GREATER_THAN_DOUBLE(0.0, got->position.z);
-}
-
-static void verify_free_camera_orientation(
-  const char* label, const mln_map_snapshot* snapshot, const void* input
-) {
-  const mln_free_camera_options* sent = input;
-  const mln_free_camera_options* got = &snapshot->free_camera;
-  TEST_ASSERT_TRUE_MESSAGE(
-    (got->fields & MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0U, label
-  );
-  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-    1e-9, sent->orientation.x, got->orientation.x, label
-  );
-  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-    1e-9, sent->orientation.y, got->orientation.y, label
-  );
-  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-    1e-9, sent->orientation.z, got->orientation.z, label
-  );
-  TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-    1e-9, sent->orientation.w, got->orientation.w, label
-  );
-}
-
-static mln_status submit_event_mask(
-  mln_map map, const void* input, const mln_completion* completion
-) {
-  return mln_map_set_event_mask(map, *(const uint64_t*)input, completion, NULL);
-}
-
-static void verify_event_mask(
-  const char* label, const mln_map_snapshot* snapshot, const void* input
-) {
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    *(const uint64_t*)input, snapshot->event_mask, label
-  );
-}
-
-#define VIEWPORT(field_bit, member, value)    \
-  (&(const mln_map_viewport_options){         \
-    .size = sizeof(mln_map_viewport_options), \
-    .fields = (field_bit),                    \
-    .member = (value),                        \
-  })
-#define TILE(field_bit, member, value)    \
-  (&(const mln_map_tile_options){         \
-    .size = sizeof(mln_map_tile_options), \
-    .fields = (field_bit),                \
-    .member = (value),                    \
-  })
-
-static const uint32_t every_debug_option =
-  MLN_MAP_DEBUG_TILE_BORDERS | MLN_MAP_DEBUG_PARSE_STATUS |
-  MLN_MAP_DEBUG_TIMESTAMPS | MLN_MAP_DEBUG_COLLISION | MLN_MAP_DEBUG_OVERDRAW |
-  MLN_MAP_DEBUG_STENCIL_CLIP | MLN_MAP_DEBUG_DEPTH_BUFFER;
-static const uint32_t no_debug_option = 0;
-static const bool enabled = true;
-static const bool disabled = false;
-static const uint64_t camera_event_mask =
-  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE |
-  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE;
-
-// Each row commits one command on the same map, and every enum value appears
-// in some row, so each mapping to MapLibre and back is exercised. The free
-// camera row precedes the constraints, which would move its position.
-static const snapshot_row snapshot_rows[] = {
-  {"every debug option", submit_debug_options, &every_debug_option,
-   verify_debug_options},
-  {"no debug option", submit_debug_options, &no_debug_option,
-   verify_debug_options},
-  {"rendering stats view on", submit_rendering_stats, &enabled,
-   verify_rendering_stats},
-  {"rendering stats view off", submit_rendering_stats, &disabled,
-   verify_rendering_stats},
-  {"north right", submit_viewport,
-   VIEWPORT(
-     MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION, north_orientation,
-     MLN_NORTH_ORIENTATION_RIGHT
-   ),
-   verify_viewport},
-  {"north down", submit_viewport,
-   VIEWPORT(
-     MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION, north_orientation,
-     MLN_NORTH_ORIENTATION_DOWN
-   ),
-   verify_viewport},
-  {"north left", submit_viewport,
-   VIEWPORT(
-     MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION, north_orientation,
-     MLN_NORTH_ORIENTATION_LEFT
-   ),
-   verify_viewport},
-  {"north up", submit_viewport,
-   VIEWPORT(
-     MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION, north_orientation,
-     MLN_NORTH_ORIENTATION_UP
-   ),
-   verify_viewport},
-  {"constrain none", submit_viewport,
-   VIEWPORT(
-     MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE, constrain_mode,
-     MLN_CONSTRAIN_MODE_NONE
-   ),
-   verify_viewport},
-  {"constrain width and height", submit_viewport,
-   VIEWPORT(
-     MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE, constrain_mode,
-     MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT
-   ),
-   verify_viewport},
-  {"constrain screen", submit_viewport,
-   VIEWPORT(
-     MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE, constrain_mode,
-     MLN_CONSTRAIN_MODE_SCREEN
-   ),
-   verify_viewport},
-  {"constrain height only", submit_viewport,
-   VIEWPORT(
-     MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE, constrain_mode,
-     MLN_CONSTRAIN_MODE_HEIGHT_ONLY
-   ),
-   verify_viewport},
-  {"viewport flipped y", submit_viewport,
-   VIEWPORT(
-     MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE, viewport_mode,
-     MLN_VIEWPORT_MODE_FLIPPED_Y
-   ),
-   verify_viewport},
-  {"viewport default", submit_viewport,
-   VIEWPORT(
-     MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE, viewport_mode,
-     MLN_VIEWPORT_MODE_DEFAULT
-   ),
-   verify_viewport},
-  {"frustum offset", submit_viewport,
-   VIEWPORT(
-     MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET, frustum_offset,
-     ((mln_edge_insets){.top = 1.0, .left = 2.0, .bottom = 3.0, .right = 4.0})
-   ),
-   verify_viewport},
-  {"prefetch zoom delta", submit_tile,
-   TILE(MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA, prefetch_zoom_delta, 3),
-   verify_tile},
-  {"lod min radius", submit_tile,
-   TILE(MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS, lod_min_radius, 2.5), verify_tile},
-  {"lod scale", submit_tile,
-   TILE(MLN_MAP_TILE_OPTION_LOD_SCALE, lod_scale, 1.5), verify_tile},
-  {"lod pitch threshold", submit_tile,
-   TILE(MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD, lod_pitch_threshold, 0.75),
-   verify_tile},
-  {"lod zoom shift", submit_tile,
-   TILE(MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT, lod_zoom_shift, -1.25),
-   verify_tile},
-  {"lod mode distance", submit_tile,
-   TILE(MLN_MAP_TILE_OPTION_LOD_MODE, lod_mode, MLN_TILE_LOD_MODE_DISTANCE),
-   verify_tile},
-  {"lod mode default", submit_tile,
-   TILE(MLN_MAP_TILE_OPTION_LOD_MODE, lod_mode, MLN_TILE_LOD_MODE_DEFAULT),
-   verify_tile},
-  {"axonometric with skew", submit_projection_mode,
-   &(const mln_projection_mode){
-     .size = sizeof(mln_projection_mode),
-     .fields = MLN_PROJECTION_MODE_AXONOMETRIC | MLN_PROJECTION_MODE_X_SKEW |
-               MLN_PROJECTION_MODE_Y_SKEW,
-     .axonometric = true,
-     .x_skew = 0.25,
-     .y_skew = -0.125,
-   },
-   verify_projection_mode},
-  {"perspective", submit_projection_mode,
-   &(const mln_projection_mode){
-     .size = sizeof(mln_projection_mode),
-     .fields = MLN_PROJECTION_MODE_AXONOMETRIC,
-     .axonometric = false,
-   },
-   verify_projection_mode},
-  {"free camera position", submit_free_camera,
-   &(const mln_free_camera_options){
-     .size = sizeof(mln_free_camera_options),
-     .fields = MLN_FREE_CAMERA_OPTION_POSITION,
-     .position = {.x = 0.25, .y = 0.25, .z = 0.5},
-   },
-   verify_free_camera_position},
-  // A quarter turn about the vertical axis.
-  {"free camera orientation", submit_free_camera,
-   &(const mln_free_camera_options){
-     .size = sizeof(mln_free_camera_options),
-     .fields = MLN_FREE_CAMERA_OPTION_ORIENTATION,
-     .orientation =
-       {.x = 0.0, .y = 0.0, .z = 0.7071067811865476, .w = 0.7071067811865476},
-   },
-   verify_free_camera_orientation},
-  {"zoom and pitch limits", submit_bounds,
-   &(const mln_bound_options){
-     .size = sizeof(mln_bound_options),
-     .fields = MLN_BOUND_OPTION_MIN_ZOOM | MLN_BOUND_OPTION_MAX_ZOOM |
-               MLN_BOUND_OPTION_MIN_PITCH | MLN_BOUND_OPTION_MAX_PITCH,
-     .min_zoom = 2.0,
-     .max_zoom = 15.0,
-     .min_pitch = 10.0,
-     .max_pitch = 45.0,
-   },
-   verify_bounds},
-  {"geographic bounds", submit_bounds,
-   &(const mln_bound_options){
-     .size = sizeof(mln_bound_options),
-     .fields = MLN_BOUND_OPTION_BOUNDS,
-     .bounds =
-       {.southwest = {.latitude = -45.0, .longitude = -120.0},
-        .northeast = {.latitude = 45.0, .longitude = 120.0}},
-   },
-   verify_bounds},
-  {"unbounded", submit_bounds,
-   &(const mln_bound_options){
-     .size = sizeof(mln_bound_options),
-     .fields = MLN_BOUND_OPTION_UNBOUNDED,
-   },
-   verify_bounds},
-  {"event mask", submit_event_mask, &camera_event_mask, verify_event_mask},
-};
+// Submits an option command through `expression`, which passes
+// `&completion.descriptor`, and leaves the committed snapshot in `snapshot`.
+#define COMMIT(label, expression)                                    \
+  do {                                                               \
+    mln_test_completion completion = mln_test_completion_default(0); \
+    MLN_TEST_OK_MESSAGE((expression), (label));                      \
+    snapshot = settle_commit(map, &completion, &previous, (label));  \
+  } while (false)
 
 // Every command commits with a generation of its own, and the snapshot at or
-// past that generation carries the committed value.
+// past that generation carries the committed value. Every enum value is
+// committed once, so each mapping to MapLibre and back is exercised. The free
+// camera precedes the constraints, which would move its position.
 static void every_option_command_round_trips_through_the_snapshot(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  uint64_t previous = read_snapshot(map).generation;
+  mln_map_snapshot snapshot = read_snapshot(map);
+  uint64_t previous = snapshot.generation;
 
-  for (size_t index = 0; index < sizeof(snapshot_rows) / sizeof(*snapshot_rows);
-       index += 1) {
-    const snapshot_row* row = &snapshot_rows[index];
-    mln_test_completion completion = mln_test_completion_default(0);
-    MLN_TEST_OK_MESSAGE(
-      row->submit(map, row->input, &completion.descriptor), row->label
+  const uint32_t every_debug_option =
+    MLN_MAP_DEBUG_TILE_BORDERS | MLN_MAP_DEBUG_PARSE_STATUS |
+    MLN_MAP_DEBUG_TIMESTAMPS | MLN_MAP_DEBUG_COLLISION |
+    MLN_MAP_DEBUG_OVERDRAW | MLN_MAP_DEBUG_STENCIL_CLIP |
+    MLN_MAP_DEBUG_DEPTH_BUFFER;
+  for (size_t pass = 0; pass < 2; pass += 1) {
+    const uint32_t debug = pass == 0 ? every_debug_option : 0;
+    COMMIT(
+      "debug options",
+      mln_map_set_debug_options(map, debug, &completion.descriptor, NULL)
     );
-    MLN_TEST_OK_MESSAGE(mln_test_completion_finish(&completion), row->label);
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-      MLN_COMMAND_DISPOSITION_COMMITTED,
-      mln_test_completion_disposition(&completion), row->label
+    TEST_ASSERT_EQUAL_UINT32(debug, snapshot.debug_options);
+    const bool stats = pass == 0;
+    COMMIT(
+      "rendering stats view", mln_map_set_rendering_stats_view_enabled(
+                                map, stats, &completion.descriptor, NULL
+                              )
     );
-    const uint64_t committed = mln_test_completion_generation(&completion);
-    mln_test_completion_destroy(&completion);
-    TEST_ASSERT_GREATER_THAN_UINT64_MESSAGE(previous, committed, row->label);
-    previous = committed;
-
-    const mln_map_snapshot snapshot = read_snapshot(map);
-    TEST_ASSERT_GREATER_OR_EQUAL_UINT64_MESSAGE(
-      committed, snapshot.generation, row->label
-    );
-    row->verify(row->label, &snapshot, row->input);
+    TEST_ASSERT_EQUAL(stats, snapshot.rendering_stats_view_enabled);
   }
+
+  // Each viewport enum field, then the frustum offset.
+  static const struct {
+    const char* label;
+    uint32_t field;
+    uint32_t value;
+  } viewport_rows[] = {
+    {"north right", MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION,
+     MLN_NORTH_ORIENTATION_RIGHT},
+    {"north down", MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION,
+     MLN_NORTH_ORIENTATION_DOWN},
+    {"north left", MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION,
+     MLN_NORTH_ORIENTATION_LEFT},
+    {"north up", MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION,
+     MLN_NORTH_ORIENTATION_UP},
+    {"constrain none", MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE,
+     MLN_CONSTRAIN_MODE_NONE},
+    {"constrain width and height", MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE,
+     MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT},
+    {"constrain screen", MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE,
+     MLN_CONSTRAIN_MODE_SCREEN},
+    {"constrain height only", MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE,
+     MLN_CONSTRAIN_MODE_HEIGHT_ONLY},
+    {"viewport flipped y", MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE,
+     MLN_VIEWPORT_MODE_FLIPPED_Y},
+    {"viewport default", MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE,
+     MLN_VIEWPORT_MODE_DEFAULT},
+  };
+  for (size_t index = 0;
+       index < sizeof(viewport_rows) / sizeof(viewport_rows[0]); index += 1) {
+    mln_map_viewport_options viewport = mln_map_viewport_options_default();
+    viewport.fields = viewport_rows[index].field;
+    viewport.north_orientation = viewport_rows[index].value;
+    viewport.constrain_mode = viewport_rows[index].value;
+    viewport.viewport_mode = viewport_rows[index].value;
+    const char* label = viewport_rows[index].label;
+    COMMIT(
+      label,
+      mln_map_set_viewport_options(map, &viewport, &completion.descriptor, NULL)
+    );
+    const uint32_t field = viewport_rows[index].field;
+    const uint32_t committed =
+      field == MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
+        ? snapshot.viewport.north_orientation
+      : field == MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE
+        ? snapshot.viewport.constrain_mode
+        : snapshot.viewport.viewport_mode;
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
+      viewport_rows[index].value, committed, label
+    );
+  }
+  mln_map_viewport_options viewport = mln_map_viewport_options_default();
+  viewport.fields = MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+  viewport.frustum_offset = (mln_edge_insets){1.0, 2.0, 3.0, 4.0};
+  COMMIT(
+    "frustum offset",
+    mln_map_set_viewport_options(map, &viewport, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_EQUAL_MEMORY(
+    &viewport.frustum_offset, &snapshot.viewport.frustum_offset,
+    sizeof(viewport.frustum_offset)
+  );
+
+  mln_map_tile_options tile = mln_map_tile_options_default();
+  tile.fields =
+    MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA |
+    MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS | MLN_MAP_TILE_OPTION_LOD_SCALE |
+    MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD |
+    MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT | MLN_MAP_TILE_OPTION_LOD_MODE;
+  tile.prefetch_zoom_delta = 3;
+  tile.lod_min_radius = 2.5;
+  tile.lod_scale = 1.5;
+  tile.lod_pitch_threshold = 0.75;
+  tile.lod_zoom_shift = -1.25;
+  tile.lod_mode = MLN_TILE_LOD_MODE_DISTANCE;
+  for (size_t pass = 0; pass < 2; pass += 1) {
+    COMMIT(
+      "tile options",
+      mln_map_set_tile_options(map, &tile, &completion.descriptor, NULL)
+    );
+    TEST_ASSERT_EQUAL_UINT32(
+      tile.prefetch_zoom_delta, snapshot.tile.prefetch_zoom_delta
+    );
+    TEST_ASSERT_EQUAL_DOUBLE(tile.lod_min_radius, snapshot.tile.lod_min_radius);
+    TEST_ASSERT_EQUAL_DOUBLE(tile.lod_scale, snapshot.tile.lod_scale);
+    TEST_ASSERT_EQUAL_DOUBLE(
+      tile.lod_pitch_threshold, snapshot.tile.lod_pitch_threshold
+    );
+    TEST_ASSERT_EQUAL_DOUBLE(tile.lod_zoom_shift, snapshot.tile.lod_zoom_shift);
+    TEST_ASSERT_EQUAL_UINT32(tile.lod_mode, snapshot.tile.lod_mode);
+    // Only the LOD mode changes in the second pass.
+    tile.fields = MLN_MAP_TILE_OPTION_LOD_MODE;
+    tile.lod_mode = MLN_TILE_LOD_MODE_DEFAULT;
+  }
+
+  mln_projection_mode mode = mln_projection_mode_default();
+  mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC | MLN_PROJECTION_MODE_X_SKEW |
+                MLN_PROJECTION_MODE_Y_SKEW;
+  mode.axonometric = true;
+  mode.x_skew = 0.25;
+  mode.y_skew = -0.125;
+  for (size_t pass = 0; pass < 2; pass += 1) {
+    COMMIT(
+      "projection mode",
+      mln_map_set_projection_mode(map, &mode, &completion.descriptor, NULL)
+    );
+    TEST_ASSERT_BITS_HIGH(mode.fields, snapshot.projection_mode.fields);
+    TEST_ASSERT_EQUAL(mode.axonometric, snapshot.projection_mode.axonometric);
+    if (pass == 0) {
+      TEST_ASSERT_EQUAL_DOUBLE(0.25, snapshot.projection_mode.x_skew);
+      TEST_ASSERT_EQUAL_DOUBLE(-0.125, snapshot.projection_mode.y_skew);
+    }
+    // Then perspective.
+    mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC;
+    mode.axonometric = false;
+  }
+
+  // MapLibre renormalizes the altitude of a free-camera position, so only the
+  // ground position round-trips. The orientation is a quarter turn about the
+  // vertical axis.
+  mln_free_camera_options free_camera = mln_free_camera_options_default();
+  free_camera.fields = MLN_FREE_CAMERA_OPTION_POSITION;
+  free_camera.position = (mln_vec3){.x = 0.25, .y = 0.25, .z = 0.5};
+  COMMIT(
+    "free camera position", mln_map_set_free_camera_options(
+                              map, &free_camera, &completion.descriptor, NULL
+                            )
+  );
+  TEST_ASSERT_BITS_HIGH(
+    MLN_FREE_CAMERA_OPTION_POSITION, snapshot.free_camera.fields
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.25, snapshot.free_camera.position.x);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.25, snapshot.free_camera.position.y);
+  TEST_ASSERT_GREATER_THAN_DOUBLE(0.0, snapshot.free_camera.position.z);
+  free_camera.fields = MLN_FREE_CAMERA_OPTION_ORIENTATION;
+  free_camera.orientation =
+    (mln_quaternion){0.0, 0.0, 0.7071067811865476, 0.7071067811865476};
+  COMMIT(
+    "free camera orientation", mln_map_set_free_camera_options(
+                                 map, &free_camera, &completion.descriptor, NULL
+                               )
+  );
+  TEST_ASSERT_BITS_HIGH(
+    MLN_FREE_CAMERA_OPTION_ORIENTATION, snapshot.free_camera.fields
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, snapshot.free_camera.orientation.x);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 0.0, snapshot.free_camera.orientation.y);
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, free_camera.orientation.z, snapshot.free_camera.orientation.z
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, free_camera.orientation.w, snapshot.free_camera.orientation.w
+  );
+
+  mln_bound_options bounds = mln_bound_options_default();
+  bounds.fields = MLN_BOUND_OPTION_MIN_ZOOM | MLN_BOUND_OPTION_MAX_ZOOM |
+                  MLN_BOUND_OPTION_MIN_PITCH | MLN_BOUND_OPTION_MAX_PITCH;
+  bounds.min_zoom = 2.0;
+  bounds.max_zoom = 15.0;
+  bounds.min_pitch = 10.0;
+  bounds.max_pitch = 45.0;
+  COMMIT(
+    "zoom and pitch limits",
+    mln_map_set_bounds(map, &bounds, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_BITS_HIGH(bounds.fields, snapshot.bounds.fields);
+  TEST_ASSERT_EQUAL_DOUBLE(2.0, snapshot.bounds.min_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(15.0, snapshot.bounds.max_zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 10.0, snapshot.bounds.min_pitch);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 45.0, snapshot.bounds.max_pitch);
+  bounds.fields = MLN_BOUND_OPTION_BOUNDS;
+  bounds.bounds = (mln_lat_lng_bounds){{-45.0, -120.0}, {45.0, 120.0}};
+  COMMIT(
+    "geographic bounds",
+    mln_map_set_bounds(map, &bounds, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_BITS_HIGH(MLN_BOUND_OPTION_BOUNDS, snapshot.bounds.fields);
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, -45.0, snapshot.bounds.bounds.southwest.latitude
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, -120.0, snapshot.bounds.bounds.southwest.longitude
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, 45.0, snapshot.bounds.bounds.northeast.latitude
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, 120.0, snapshot.bounds.bounds.northeast.longitude
+  );
+  bounds.fields = MLN_BOUND_OPTION_UNBOUNDED;
+  COMMIT(
+    "unbounded", mln_map_set_bounds(map, &bounds, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_BITS_HIGH(MLN_BOUND_OPTION_UNBOUNDED, snapshot.bounds.fields);
+
+  const uint64_t camera_events =
+    MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE |
+    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE;
+  COMMIT(
+    "event mask",
+    mln_map_set_event_mask(map, camera_events, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT64(camera_events, snapshot.event_mask);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -677,6 +466,13 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
   MLN_TEST_INVALID(mln_map_set_viewport_options(map, NULL, &discard, NULL));
   MLN_TEST_INVALID(mln_map_set_tile_options(map, NULL, &discard, NULL));
   MLN_TEST_INVALID(mln_map_set_projection_mode(map, NULL, &discard, NULL));
+  MLN_TEST_INVALID(
+    mln_map_set_debug_options(MLN_HANDLE_NULL, 0, &discard, NULL)
+  );
+  MLN_TEST_INVALID(mln_map_set_rendering_stats_view_enabled(
+    MLN_HANDLE_NULL, true, &discard, NULL
+  ));
+  MLN_TEST_INVALID(mln_map_dump_debug_logs(MLN_HANDLE_NULL, &discard, NULL));
   MLN_TEST_INVALID(mln_map_set_debug_options(
     map, UINT32_C(1) << 31, &discard, MLN_TEST_DIAGNOSTIC
   ));
@@ -695,17 +491,6 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
-}
-
-static void map_debug_commands_reject_a_null_map(void) {
-  mln_completion completion = mln_test_discard_completion();
-  MLN_TEST_INVALID(
-    mln_map_set_debug_options(MLN_HANDLE_NULL, 0, &completion, NULL)
-  );
-  MLN_TEST_INVALID(mln_map_set_rendering_stats_view_enabled(
-    MLN_HANDLE_NULL, true, &completion, NULL
-  ));
-  MLN_TEST_INVALID(mln_map_dump_debug_logs(MLN_HANDLE_NULL, &completion, NULL));
 }
 
 static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
@@ -925,7 +710,6 @@ MLN_TEST_GROUP {
   RUN_TEST(every_option_command_round_trips_through_the_snapshot);
   RUN_TEST(option_descriptors_reject_what_they_cannot_express);
   RUN_TEST(map_creation_rejects_a_degenerate_extent);
-  RUN_TEST(map_debug_commands_reject_a_null_map);
   RUN_TEST(map_extent_snapshot_tracks_resize_and_fixes_scale_factor);
   RUN_TEST(a_replaced_resize_completes_superseded);
   RUN_TEST(generations_increase_across_submitting_threads);

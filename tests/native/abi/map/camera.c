@@ -185,26 +185,6 @@ static const mln_test_validation_case update_cases[] = {
    MLN_STATUS_INVALID_ARGUMENT, "within [0, 1]"},
 };
 
-static void camera_rejects_invalid_arguments(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  uint64_t generation = 0;
-  mln_camera_options camera = mln_camera_options_default();
-  MLN_TEST_INVALID(mln_map_camera_snapshot_get(map, NULL, &generation, NULL));
-  MLN_TEST_INVALID(mln_map_camera_snapshot_get(map, &camera, NULL, NULL));
-  mln_completion rejected = mln_test_discard_completion();
-  MLN_TEST_INVALID(mln_map_update_camera(map, NULL, &rejected, NULL));
-  MLN_TEST_INVALID(mln_map_camera_query(map, NULL, NULL));
-
-  const mln_camera_update defaults = mln_camera_update_default();
-  mln_test_run_validation_table(
-    update_cases, sizeof(update_cases) / sizeof(*update_cases), &defaults,
-    sizeof(defaults), submit_update_row, &map
-  );
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // The update is copied at submission: editing it afterwards changes nothing.
 // The ordered query and the snapshot both observe the commit, and the query
 // reports the generation that published it.
@@ -660,74 +640,6 @@ static const mln_test_validation_case delta_cases[] = {
    MLN_STATUS_INVALID_ARGUMENT, "size is too small"},
 };
 
-static void camera_deltas_reject_what_they_cannot_express(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  const mln_camera_delta defaults = mln_camera_delta_default();
-  mln_test_run_validation_table(
-    delta_cases, sizeof(delta_cases) / sizeof(*delta_cases), &defaults,
-    sizeof(defaults), submit_delta_row, &map
-  );
-  mln_completion discard = mln_test_discard_completion();
-  MLN_TEST_INVALID(mln_map_apply_camera_delta(map, NULL, &discard, NULL));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void camera_fitting_rejects_invalid_arguments(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_completion operation = mln_test_discard_completion();
-  mln_camera_fit_options fit = mln_camera_fit_options_default();
-  fit.size = sizeof(mln_camera_fit_options) - 1;
-  const mln_lat_lng_bounds bounds = {
-    .southwest = {.latitude = -10.0, .longitude = -10.0},
-    .northeast = {.latitude = 10.0, .longitude = 10.0},
-  };
-  MLN_TEST_INVALID(
-    mln_map_camera_for_lat_lng_bounds(map, bounds, &fit, &operation, NULL)
-  );
-  const mln_lat_lng_bounds inverted = {
-    .southwest = bounds.northeast, .northeast = bounds.southwest
-  };
-  MLN_TEST_INVALID(mln_map_camera_for_lat_lng_bounds(
-    map, inverted, NULL, &operation, MLN_TEST_DIAGNOSTIC
-  ));
-  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "southwest"));
-  fit = mln_camera_fit_options_default();
-  fit.fields = MLN_CAMERA_FIT_OPTION_BEARING;
-  fit.bearing = NAN;
-  MLN_TEST_INVALID(
-    mln_map_camera_for_lat_lng_bounds(map, bounds, &fit, &operation, NULL)
-  );
-  const mln_lat_lng coordinate = {.latitude = 0.0, .longitude = 0.0};
-  MLN_TEST_INVALID(
-    mln_map_camera_for_lat_lngs(map, NULL, 1, NULL, &operation, NULL)
-  );
-  MLN_TEST_INVALID(
-    mln_map_camera_for_lat_lngs(map, &coordinate, 0, NULL, &operation, NULL)
-  );
-  MLN_TEST_INVALID(
-    mln_map_camera_for_lat_lngs(map, &coordinate, 1, NULL, NULL, NULL)
-  );
-  MLN_TEST_INVALID(mln_map_camera_for_geometry(
-    map, (mln_buffer_view){0}, NULL, &operation, NULL
-  ));
-  MLN_TEST_INVALID(
-    mln_map_lat_lng_bounds_for_camera(map, NULL, &operation, NULL)
-  );
-  MLN_TEST_INVALID(
-    mln_map_lat_lng_bounds_for_camera_unwrapped(map, NULL, &operation, NULL)
-  );
-  mln_camera_options undersized = mln_camera_options_default();
-  undersized.size -= 1;
-  MLN_TEST_INVALID(mln_map_lat_lng_bounds_for_camera_unwrapped(
-    map, &undersized, &operation, NULL
-  ));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 static mln_camera_options finish_camera_query(mln_test_completion* query) {
   mln_camera_options camera = mln_camera_options_default();
   MLN_TEST_OK(mln_test_completion_finish_value(query, &camera, sizeof(camera)));
@@ -905,40 +817,6 @@ static void visible_bounds_unwrap_across_the_antimeridian(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void camera_bounds_constraints_reject_invalid_arguments(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_bound_options options = mln_bound_options_default();
-  options.size = sizeof(mln_bound_options) - 1;
-  mln_completion command = mln_test_discard_completion();
-  MLN_TEST_INVALID(mln_map_set_bounds(map, NULL, &command, NULL));
-  MLN_TEST_INVALID(mln_map_set_bounds(map, &options, &command, NULL));
-  options = mln_bound_options_default();
-  options.fields = UINT32_C(1) << 31;
-  MLN_TEST_INVALID(mln_map_set_bounds(map, &options, &command, NULL));
-  options = mln_bound_options_default();
-  options.fields = MLN_BOUND_OPTION_BOUNDS | MLN_BOUND_OPTION_UNBOUNDED;
-  MLN_TEST_INVALID(mln_map_set_bounds(map, &options, &command, NULL));
-  options = mln_bound_options_default();
-  options.fields = MLN_BOUND_OPTION_MIN_ZOOM | MLN_BOUND_OPTION_MAX_ZOOM;
-  options.min_zoom = 10.0;
-  options.max_zoom = 5.0;
-  MLN_TEST_INVALID(
-    mln_map_set_bounds(map, &options, &command, MLN_TEST_DIAGNOSTIC)
-  );
-  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "min_zoom"));
-  options = mln_bound_options_default();
-  options.fields = MLN_BOUND_OPTION_MIN_PITCH | MLN_BOUND_OPTION_MAX_PITCH;
-  options.min_pitch = 40.0;
-  options.max_pitch = 20.0;
-  MLN_TEST_INVALID(
-    mln_map_set_bounds(map, &options, &command, MLN_TEST_DIAGNOSTIC)
-  );
-  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "min_pitch"));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 static double jumped_longitude(mln_map map, double longitude) {
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
@@ -956,150 +834,9 @@ static mln_bound_options read_bounds(mln_runtime runtime, mln_map map) {
   return snapshot.bounds;
 }
 
-// The unbounded state is distinct from world bounds, which the
-// southwest/northeast pair alone cannot express.
-static void camera_bounds_distinguish_unbounded_from_world(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-
-  mln_bound_options snapshot = read_bounds(runtime, map);
-  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
-  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, -160.0, jumped_longitude(map, 200.0));
-
-  mln_bound_options world = mln_bound_options_default();
-  world.fields = MLN_BOUND_OPTION_BOUNDS;
-  world.bounds.southwest.latitude = -90.0;
-  world.bounds.southwest.longitude = -180.0;
-  world.bounds.northeast.latitude = 90.0;
-  world.bounds.northeast.longitude = 180.0;
-  MLN_TEST_AWAIT_OK(
-    mln_map_set_bounds(map, &world, &completion.descriptor, NULL)
-  );
-
-  snapshot = read_bounds(runtime, map);
-  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
-  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 180.0, snapshot.bounds.northeast.longitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 180.0, jumped_longitude(map, 200.0));
-
-  mln_bound_options unbounded = mln_bound_options_default();
-  unbounded.fields = MLN_BOUND_OPTION_UNBOUNDED;
-  MLN_TEST_AWAIT_OK(
-    mln_map_set_bounds(map, &unbounded, &completion.descriptor, NULL)
-  );
-
-  snapshot = read_bounds(runtime, map);
-  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
-  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, -160.0, jumped_longitude(map, 200.0));
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// Zoom and pitch limits clamp a later jump that asks for more.
-static void camera_limits_clamp_later_jumps(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_bound_options limits = mln_bound_options_default();
-  limits.fields = MLN_BOUND_OPTION_MIN_ZOOM | MLN_BOUND_OPTION_MAX_ZOOM |
-                  MLN_BOUND_OPTION_MAX_PITCH;
-  limits.min_zoom = 3.0;
-  limits.max_zoom = 6.0;
-  limits.max_pitch = 20.0;
-  MLN_TEST_AWAIT_OK(
-    mln_map_set_bounds(map, &limits, &completion.descriptor, NULL)
-  );
-
-  mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_ZOOM | MLN_CAMERA_OPTION_PITCH;
-  camera.zoom = 12.0;
-  camera.pitch = 50.0;
-  jump(map, camera);
-  mln_camera_options clamped = query_camera(map).camera;
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 6.0, clamped.zoom);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 20.0, clamped.pitch);
-
-  camera.zoom = 1.0;
-  jump(map, camera);
-  clamped = query_camera(map).camera;
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 3.0, clamped.zoom);
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void free_camera_options_reject_raw_invalid_arguments(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_free_camera_options options = mln_free_camera_options_default();
-  options.size = sizeof(mln_free_camera_options) - 1;
-  mln_completion completion = mln_test_discard_completion();
-  MLN_TEST_INVALID(
-    mln_map_set_free_camera_options(map, NULL, &completion, NULL)
-  );
-  MLN_TEST_INVALID(
-    mln_map_set_free_camera_options(map, &options, &completion, NULL)
-  );
-  options = mln_free_camera_options_default();
-  options.fields = UINT32_C(1) << 31;
-  MLN_TEST_INVALID(
-    mln_map_set_free_camera_options(map, &options, &completion, NULL)
-  );
-  options = mln_free_camera_options_default();
-  options.fields = MLN_FREE_CAMERA_OPTION_POSITION;
-  options.position.z = NAN;
-  MLN_TEST_INVALID(
-    mln_map_set_free_camera_options(map, &options, &completion, NULL)
-  );
-  options = mln_free_camera_options_default();
-  options.fields = MLN_FREE_CAMERA_OPTION_ORIENTATION;
-  options.orientation = (mln_quaternion){0};
-  MLN_TEST_INVALID(mln_map_set_free_camera_options(
-    map, &options, &completion, MLN_TEST_DIAGNOSTIC
-  ));
-  TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "zero length"));
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 static const mln_lat_lng san_francisco = {
   .latitude = 37.7749, .longitude = -122.4194
 };
-
-static void map_coordinate_conversion_rejects_invalid_arguments(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_completion operation = mln_test_discard_completion();
-  MLN_TEST_INVALID(mln_map_pixel_for_lat_lng(map, san_francisco, NULL, NULL));
-  MLN_TEST_INVALID(mln_map_pixel_for_lat_lng(
-    map, (mln_lat_lng){.latitude = 91.0}, &operation, NULL
-  ));
-  MLN_TEST_INVALID(mln_map_lat_lng_for_pixel(
-    map, (mln_screen_point){.x = 0.0, .y = 0.0}, NULL, NULL
-  ));
-  MLN_TEST_INVALID(mln_map_lat_lng_for_pixel(
-    map, (mln_screen_point){.x = NAN, .y = 0.0}, &operation, NULL
-  ));
-  MLN_TEST_INVALID(mln_map_lat_lng_for_pixel_unwrapped(
-    map, (mln_screen_point){.x = 0.0, .y = 0.0}, NULL, NULL
-  ));
-  MLN_TEST_INVALID(mln_map_pixels_for_lat_lngs(map, NULL, 1, &operation, NULL));
-  MLN_TEST_INVALID(mln_map_lat_lngs_for_pixels(map, NULL, 1, &operation, NULL));
-  MLN_TEST_INVALID(
-    mln_map_lat_lngs_for_pixels_unwrapped(map, NULL, 1, &operation, NULL)
-  );
-  MLN_TEST_INVALID(mln_map_meters_per_pixel_at_latitude(map, 0.0, NULL, NULL));
-  MLN_TEST_INVALID(
-    mln_map_meters_per_pixel_at_latitude(map, 91.0, &operation, NULL)
-  );
-  MLN_TEST_INVALID(
-    mln_map_meters_per_pixel_at_latitude(map, NAN, &operation, NULL)
-  );
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
 
 // Each zoom level halves the ground distance a pixel covers, and at one zoom a
 // pixel covers less ground the farther it is from the equator, in proportion
@@ -1130,49 +867,283 @@ static void meters_per_pixel_halves_per_zoom_and_shrinks_toward_the_poles(
   mln_test_destroy_runtime(runtime);
 }
 
-// A free camera orientation replaces the camera's pitch and bearing: the
-// identity quaternion looks straight down with north up.
-static void a_free_camera_orientation_reaches_the_camera(void) {
+// Every camera entry point checks its arguments before it submits: updates,
+// deltas, fits, constraints, free camera options, and conversions.
+static void camera_calls_reject_what_they_cannot_express(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_ZOOM | MLN_CAMERA_OPTION_PITCH |
-                  MLN_CAMERA_OPTION_BEARING;
-  camera.zoom = 4.0;
-  camera.pitch = 30.0;
-  camera.bearing = 20.0;
-  jump(map, camera);
+  {
+    uint64_t generation = 0;
+    mln_camera_options camera = mln_camera_options_default();
+    MLN_TEST_INVALID(mln_map_camera_snapshot_get(map, NULL, &generation, NULL));
+    MLN_TEST_INVALID(mln_map_camera_snapshot_get(map, &camera, NULL, NULL));
+    mln_completion rejected = mln_test_discard_completion();
+    MLN_TEST_INVALID(mln_map_update_camera(map, NULL, &rejected, NULL));
+    MLN_TEST_INVALID(mln_map_camera_query(map, NULL, NULL));
 
-  mln_free_camera_options options = mln_free_camera_options_default();
-  options.fields = MLN_FREE_CAMERA_OPTION_ORIENTATION;
-  options.orientation =
-    (mln_quaternion){.x = 0.0, .y = 0.0, .z = 0.0, .w = 1.0};
-  MLN_TEST_AWAIT_OK(
-    mln_map_set_free_camera_options(map, &options, &completion.descriptor, NULL)
-  );
-  const mln_camera_options applied = query_camera(map).camera;
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, applied.pitch);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, applied.bearing);
+    const mln_camera_update defaults = mln_camera_update_default();
+    mln_test_run_validation_table(
+      update_cases, sizeof(update_cases) / sizeof(*update_cases), &defaults,
+      sizeof(defaults), submit_update_row, &map
+    );
+  }
+  {
+    const mln_camera_delta defaults = mln_camera_delta_default();
+    mln_test_run_validation_table(
+      delta_cases, sizeof(delta_cases) / sizeof(*delta_cases), &defaults,
+      sizeof(defaults), submit_delta_row, &map
+    );
+    mln_completion discard = mln_test_discard_completion();
+    MLN_TEST_INVALID(mln_map_apply_camera_delta(map, NULL, &discard, NULL));
+  }
+  {
+    mln_completion operation = mln_test_discard_completion();
+    mln_camera_fit_options fit = mln_camera_fit_options_default();
+    fit.size = sizeof(mln_camera_fit_options) - 1;
+    const mln_lat_lng_bounds bounds = {
+      .southwest = {.latitude = -10.0, .longitude = -10.0},
+      .northeast = {.latitude = 10.0, .longitude = 10.0},
+    };
+    MLN_TEST_INVALID(
+      mln_map_camera_for_lat_lng_bounds(map, bounds, &fit, &operation, NULL)
+    );
+    const mln_lat_lng_bounds inverted = {
+      .southwest = bounds.northeast, .northeast = bounds.southwest
+    };
+    MLN_TEST_INVALID(mln_map_camera_for_lat_lng_bounds(
+      map, inverted, NULL, &operation, MLN_TEST_DIAGNOSTIC
+    ));
+    TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "southwest"));
+    fit = mln_camera_fit_options_default();
+    fit.fields = MLN_CAMERA_FIT_OPTION_BEARING;
+    fit.bearing = NAN;
+    MLN_TEST_INVALID(
+      mln_map_camera_for_lat_lng_bounds(map, bounds, &fit, &operation, NULL)
+    );
+    const mln_lat_lng coordinate = {.latitude = 0.0, .longitude = 0.0};
+    MLN_TEST_INVALID(
+      mln_map_camera_for_lat_lngs(map, NULL, 1, NULL, &operation, NULL)
+    );
+    MLN_TEST_INVALID(
+      mln_map_camera_for_lat_lngs(map, &coordinate, 0, NULL, &operation, NULL)
+    );
+    MLN_TEST_INVALID(
+      mln_map_camera_for_lat_lngs(map, &coordinate, 1, NULL, NULL, NULL)
+    );
+    MLN_TEST_INVALID(mln_map_camera_for_geometry(
+      map, (mln_buffer_view){0}, NULL, &operation, NULL
+    ));
+    MLN_TEST_INVALID(
+      mln_map_lat_lng_bounds_for_camera(map, NULL, &operation, NULL)
+    );
+    MLN_TEST_INVALID(
+      mln_map_lat_lng_bounds_for_camera_unwrapped(map, NULL, &operation, NULL)
+    );
+    mln_camera_options undersized = mln_camera_options_default();
+    undersized.size -= 1;
+    MLN_TEST_INVALID(mln_map_lat_lng_bounds_for_camera_unwrapped(
+      map, &undersized, &operation, NULL
+    ));
+  }
+  {
+    mln_bound_options options = mln_bound_options_default();
+    options.size = sizeof(mln_bound_options) - 1;
+    mln_completion command = mln_test_discard_completion();
+    MLN_TEST_INVALID(mln_map_set_bounds(map, NULL, &command, NULL));
+    MLN_TEST_INVALID(mln_map_set_bounds(map, &options, &command, NULL));
+    options = mln_bound_options_default();
+    options.fields = UINT32_C(1) << 31;
+    MLN_TEST_INVALID(mln_map_set_bounds(map, &options, &command, NULL));
+    options = mln_bound_options_default();
+    options.fields = MLN_BOUND_OPTION_BOUNDS | MLN_BOUND_OPTION_UNBOUNDED;
+    MLN_TEST_INVALID(mln_map_set_bounds(map, &options, &command, NULL));
+    options = mln_bound_options_default();
+    options.fields = MLN_BOUND_OPTION_MIN_ZOOM | MLN_BOUND_OPTION_MAX_ZOOM;
+    options.min_zoom = 10.0;
+    options.max_zoom = 5.0;
+    MLN_TEST_INVALID(
+      mln_map_set_bounds(map, &options, &command, MLN_TEST_DIAGNOSTIC)
+    );
+    TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "min_zoom"));
+    options = mln_bound_options_default();
+    options.fields = MLN_BOUND_OPTION_MIN_PITCH | MLN_BOUND_OPTION_MAX_PITCH;
+    options.min_pitch = 40.0;
+    options.max_pitch = 20.0;
+    MLN_TEST_INVALID(
+      mln_map_set_bounds(map, &options, &command, MLN_TEST_DIAGNOSTIC)
+    );
+    TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "min_pitch"));
+  }
+  {
+    mln_free_camera_options options = mln_free_camera_options_default();
+    options.size = sizeof(mln_free_camera_options) - 1;
+    mln_completion completion = mln_test_discard_completion();
+    MLN_TEST_INVALID(
+      mln_map_set_free_camera_options(map, NULL, &completion, NULL)
+    );
+    MLN_TEST_INVALID(
+      mln_map_set_free_camera_options(map, &options, &completion, NULL)
+    );
+    options = mln_free_camera_options_default();
+    options.fields = UINT32_C(1) << 31;
+    MLN_TEST_INVALID(
+      mln_map_set_free_camera_options(map, &options, &completion, NULL)
+    );
+    options = mln_free_camera_options_default();
+    options.fields = MLN_FREE_CAMERA_OPTION_POSITION;
+    options.position.z = NAN;
+    MLN_TEST_INVALID(
+      mln_map_set_free_camera_options(map, &options, &completion, NULL)
+    );
+    options = mln_free_camera_options_default();
+    options.fields = MLN_FREE_CAMERA_OPTION_ORIENTATION;
+    options.orientation = (mln_quaternion){0};
+    MLN_TEST_INVALID(mln_map_set_free_camera_options(
+      map, &options, &completion, MLN_TEST_DIAGNOSTIC
+    ));
+    TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "zero length"));
+  }
+  {
+    mln_completion operation = mln_test_discard_completion();
+    MLN_TEST_INVALID(mln_map_pixel_for_lat_lng(map, san_francisco, NULL, NULL));
+    MLN_TEST_INVALID(mln_map_pixel_for_lat_lng(
+      map, (mln_lat_lng){.latitude = 91.0}, &operation, NULL
+    ));
+    MLN_TEST_INVALID(mln_map_lat_lng_for_pixel(
+      map, (mln_screen_point){.x = 0.0, .y = 0.0}, NULL, NULL
+    ));
+    MLN_TEST_INVALID(mln_map_lat_lng_for_pixel(
+      map, (mln_screen_point){.x = NAN, .y = 0.0}, &operation, NULL
+    ));
+    MLN_TEST_INVALID(mln_map_lat_lng_for_pixel_unwrapped(
+      map, (mln_screen_point){.x = 0.0, .y = 0.0}, NULL, NULL
+    ));
+    MLN_TEST_INVALID(
+      mln_map_pixels_for_lat_lngs(map, NULL, 1, &operation, NULL)
+    );
+    MLN_TEST_INVALID(
+      mln_map_lat_lngs_for_pixels(map, NULL, 1, &operation, NULL)
+    );
+    MLN_TEST_INVALID(
+      mln_map_lat_lngs_for_pixels_unwrapped(map, NULL, 1, &operation, NULL)
+    );
+    MLN_TEST_INVALID(
+      mln_map_meters_per_pixel_at_latitude(map, 0.0, NULL, NULL)
+    );
+    MLN_TEST_INVALID(
+      mln_map_meters_per_pixel_at_latitude(map, 91.0, &operation, NULL)
+    );
+    MLN_TEST_INVALID(
+      mln_map_meters_per_pixel_at_latitude(map, NAN, &operation, NULL)
+    );
+  }
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
 
+// Bounds constrain later camera commands: zoom and pitch limits clamp a jump
+// that asks for more, and world bounds stop a jump that unbounded wraps. The
+// unbounded state is distinct from world bounds, which the
+// southwest/northeast pair alone cannot express. A free camera orientation
+// replaces the camera's pitch and bearing.
+static void camera_constraints_and_free_camera_reach_later_commands(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  // The unbounded state is distinct from world bounds, which the
+  // southwest/northeast pair alone cannot express.
+  {
+    mln_bound_options snapshot = read_bounds(runtime, map);
+    TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
+    TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, -160.0, jumped_longitude(map, 200.0));
+
+    mln_bound_options world = mln_bound_options_default();
+    world.fields = MLN_BOUND_OPTION_BOUNDS;
+    world.bounds.southwest.latitude = -90.0;
+    world.bounds.southwest.longitude = -180.0;
+    world.bounds.northeast.latitude = 90.0;
+    world.bounds.northeast.longitude = 180.0;
+    MLN_TEST_AWAIT_OK(
+      mln_map_set_bounds(map, &world, &completion.descriptor, NULL)
+    );
+
+    snapshot = read_bounds(runtime, map);
+    TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
+    TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 180.0, snapshot.bounds.northeast.longitude);
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 180.0, jumped_longitude(map, 200.0));
+
+    mln_bound_options unbounded = mln_bound_options_default();
+    unbounded.fields = MLN_BOUND_OPTION_UNBOUNDED;
+    MLN_TEST_AWAIT_OK(
+      mln_map_set_bounds(map, &unbounded, &completion.descriptor, NULL)
+    );
+
+    snapshot = read_bounds(runtime, map);
+    TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
+    TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, -160.0, jumped_longitude(map, 200.0));
+  }
+  // Zoom and pitch limits clamp a later jump that asks for more.
+  {
+    mln_bound_options limits = mln_bound_options_default();
+    limits.fields = MLN_BOUND_OPTION_MIN_ZOOM | MLN_BOUND_OPTION_MAX_ZOOM |
+                    MLN_BOUND_OPTION_MAX_PITCH;
+    limits.min_zoom = 3.0;
+    limits.max_zoom = 6.0;
+    limits.max_pitch = 20.0;
+    MLN_TEST_AWAIT_OK(
+      mln_map_set_bounds(map, &limits, &completion.descriptor, NULL)
+    );
+
+    mln_camera_options camera = mln_camera_options_default();
+    camera.fields = MLN_CAMERA_OPTION_ZOOM | MLN_CAMERA_OPTION_PITCH;
+    camera.zoom = 12.0;
+    camera.pitch = 50.0;
+    jump(map, camera);
+    mln_camera_options clamped = query_camera(map).camera;
+    TEST_ASSERT_DOUBLE_WITHIN(1e-9, 6.0, clamped.zoom);
+    TEST_ASSERT_DOUBLE_WITHIN(1e-9, 20.0, clamped.pitch);
+
+    camera.zoom = 1.0;
+    jump(map, camera);
+    clamped = query_camera(map).camera;
+    TEST_ASSERT_DOUBLE_WITHIN(1e-9, 3.0, clamped.zoom);
+  }
+  // A free camera orientation replaces the camera's pitch and bearing: the
+  // identity quaternion looks straight down with north up.
+  {
+    mln_camera_options camera = mln_camera_options_default();
+    camera.fields = MLN_CAMERA_OPTION_ZOOM | MLN_CAMERA_OPTION_PITCH |
+                    MLN_CAMERA_OPTION_BEARING;
+    camera.zoom = 4.0;
+    camera.pitch = 30.0;
+    camera.bearing = 20.0;
+    jump(map, camera);
+
+    mln_free_camera_options options = mln_free_camera_options_default();
+    options.fields = MLN_FREE_CAMERA_OPTION_ORIENTATION;
+    options.orientation =
+      (mln_quaternion){.x = 0.0, .y = 0.0, .z = 0.0, .w = 1.0};
+    MLN_TEST_AWAIT_OK(mln_map_set_free_camera_options(
+      map, &options, &completion.descriptor, NULL
+    ));
+    const mln_camera_options applied = query_camera(map).camera;
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, applied.pitch);
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 0.0, applied.bearing);
+  }
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(camera_rejects_invalid_arguments);
+  RUN_TEST(camera_calls_reject_what_they_cannot_express);
   RUN_TEST(camera_snapshot_command_copy_and_disposition_are_ordered);
   RUN_TEST(every_camera_field_round_trips_through_the_snapshot);
   RUN_TEST(relative_camera_commands_compose_in_runtime_order);
   RUN_TEST(every_camera_delta_kind_follows_its_convention);
-  RUN_TEST(camera_deltas_reject_what_they_cannot_express);
-  RUN_TEST(camera_fitting_rejects_invalid_arguments);
   RUN_TEST(camera_fits_round_trip_through_the_visible_bounds);
   RUN_TEST(visible_bounds_unwrap_across_the_antimeridian);
-  RUN_TEST(camera_bounds_constraints_reject_invalid_arguments);
-  RUN_TEST(camera_bounds_distinguish_unbounded_from_world);
-  RUN_TEST(camera_limits_clamp_later_jumps);
-  RUN_TEST(free_camera_options_reject_raw_invalid_arguments);
-  RUN_TEST(map_coordinate_conversion_rejects_invalid_arguments);
+  RUN_TEST(camera_constraints_and_free_camera_reach_later_commands);
   RUN_TEST(meters_per_pixel_halves_per_zoom_and_shrinks_toward_the_poles);
-  RUN_TEST(a_free_camera_orientation_reaches_the_camera);
 }
