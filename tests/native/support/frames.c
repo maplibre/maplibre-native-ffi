@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "frames.h"
 
@@ -105,4 +106,37 @@ mln_acquired_frame mln_test_render_and_acquire(
   MLN_TEST_OK(mln_render_session_acquire_frame(fixture->session, &frame, NULL));
   TEST_ASSERT_NOT_EQUAL(MLN_HANDLE_NULL, frame);
   return frame;
+}
+
+void mln_test_render_release_frame(mln_acquired_frame* frame) {
+  const mln_gpu_sync sync = mln_gpu_sync_default();
+  MLN_TEST_OK(mln_acquired_frame_release(frame, &sync, NULL));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, *frame);
+}
+
+mln_status mln_test_render_read_back(
+  const mln_test_render_fixture* fixture, mln_texture_image_info* out_info,
+  uint8_t* out_pixels, size_t capacity
+) {
+  mln_test_completion readback = mln_test_completion_readback();
+  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+    fixture->session, &readback.descriptor, NULL
+  ));
+  const mln_status status =
+    mln_test_render_fixture_finish_operation(fixture, &readback);
+  if (status == MLN_STATUS_OK) {
+    mln_texture_readback_result result = {0};
+    TEST_ASSERT_TRUE(
+      mln_test_completion_copy_value(&readback, &result, sizeof(result))
+    );
+    TEST_ASSERT_EQUAL_size_t(result.info.byte_length, result.data.size);
+    *out_info = result.info;
+    if (out_pixels != NULL) {
+      const size_t size =
+        result.data.size < capacity ? result.data.size : capacity;
+      memcpy(out_pixels, result.data.data, size);
+    }
+  }
+  mln_test_completion_destroy(&readback);
+  return status;
 }

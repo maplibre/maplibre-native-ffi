@@ -13,9 +13,29 @@ static mln_render_session_snapshot read_snapshot(mln_render_session session) {
   return snapshot;
 }
 
-static void attach_reports_the_selected_native_driver(void) {
+typedef struct foreign_driver_probe {
+  mln_render_session session;
+  atomic_bool done;
+  mln_status status;
+} foreign_driver_probe;
+
+static void service_from_foreign_thread(void* argument) {
+  foreign_driver_probe* probe = argument;
+  size_t serviced = 0;
+  probe->status =
+    mln_render_session_service_driver_work(probe->session, 1, &serviced, NULL);
+  mln_test_flag_set(&probe->done);
+}
+
+// Attach reports the driver the preset selects. The fixture services a caller
+// driver from the case's thread, which fixes that thread as the session's
+// graphics thread; a core worker drives itself. While attached, the session
+// holds its map, which takes no second session and refuses its release, and
+// refuses destroy, which ends only a detached or abandoned session.
+static void an_attached_session_holds_its_map_and_refuses_destroy(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
@@ -34,40 +54,15 @@ static void attach_reports_the_selected_native_driver(void) {
   );
   // A caller driver attaches only when the host services it, so the session
   // is still attaching after submission and has published driver work.
-  if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+  const bool caller =
+    fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
+  if (caller) {
     TEST_ASSERT_TRUE(fixture.observed_attaching);
     TEST_ASSERT_TRUE(fixture.observed_driver_ready);
   }
-  const mln_render_session_snapshot snapshot = read_snapshot(fixture.session);
+  mln_render_session_snapshot snapshot = read_snapshot(fixture.session);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_ATTACHED, snapshot.state);
   TEST_ASSERT_EQUAL_UINT32(capabilities.driver, snapshot.driver);
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-typedef struct foreign_driver_probe {
-  mln_render_session session;
-  atomic_bool done;
-  mln_status status;
-} foreign_driver_probe;
-
-static void service_from_foreign_thread(void* argument) {
-  foreign_driver_probe* probe = argument;
-  size_t serviced = 0;
-  probe->status =
-    mln_render_session_service_driver_work(probe->session, 1, &serviced, NULL);
-  mln_test_flag_set(&probe->done);
-}
-
-// The fixture services a caller driver from the case's thread, which fixes
-// that thread as the session's graphics thread. A core worker drives itself.
-static void driver_service_fixes_and_enforces_graphics_thread_identity(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
   foreign_driver_probe probe = {.session = fixture.session};
   atomic_init(&probe.done, false);
@@ -75,34 +70,147 @@ static void driver_service_fixes_and_enforces_graphics_thread_identity(void) {
     mln_test_thread_start(service_from_foreign_thread, &probe);
   TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.done));
   mln_test_thread_join(thread);
-  TEST_ASSERT_EQUAL_INT(
-    fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
-      ? MLN_STATUS_WRONG_THREAD
-      : MLN_STATUS_INVALID_STATE,
-    probe.status
+  MLN_TEST_STATUS(
+    caller ? MLN_STATUS_WRONG_THREAD : MLN_STATUS_INVALID_STATE, probe.status
   );
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// A map takes a second session only once the first has let it go.
-static void a_map_holds_one_session_at_a_time(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture first = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &first));
 
   mln_test_render_fixture second = {0};
   TEST_ASSERT_FALSE(mln_test_render_fixture_create(map, &second));
   TEST_ASSERT_NOT_NULL(
     strstr(mln_test_last_error(), "map already has an attached render session")
   );
+  mln_completion discard = mln_test_discard_completion();
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_map_release(map, &discard, MLN_TEST_DIAGNOSTIC)
+  );
+  TEST_ASSERT_EQUAL_STRING(
+    "map still has an attached render session", mln_test_last_error()
+  );
+  MLN_TEST_OK(mln_test_map_request_repaint(map));
 
-  mln_test_render_fixture_destroy(&first);
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_destroy(fixture.session, MLN_TEST_DIAGNOSTIC)
+  );
+  TEST_ASSERT_NOT_NULL(strstr(
+    mln_test_last_error(),
+    "must be detached or abandoned before it is destroyed"
+  ));
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state
+  );
+  mln_test_render_request_forced(&fixture, 1);
+  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 1);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED,
+    mln_test_render_batch_result(batch, 0).disposition
+  );
+  mln_render_frame_batch_release(batch);
+
+  // Once the session is gone, the map takes another.
+  mln_test_render_fixture_destroy(&fixture);
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &second));
   mln_test_render_fixture_destroy(&second);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// Detach runs on the driver and frees the map's session slot before the
+// handle is destroyed. A detached session accepts no further work and stays
+// detached for destroy, and a destroyed or null handle names no session.
+static void a_detached_session_frees_its_map_and_refuses_work(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_SESSION_STATE_DETACHED, read_snapshot(fixture.session).state
+  );
+  mln_test_render_fixture other = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &other));
+  mln_test_render_fixture_destroy(&other);
+
+  const mln_render_session detached = fixture.session;
+  const mln_completion discard = mln_test_discard_completion();
+  const mln_frame_demand demand = mln_frame_demand_default();
+  const mln_render_target_extent extent = {
+    .size = sizeof(mln_render_target_extent),
+    .width = 32,
+    .height = 32,
+    .scale_factor = 1.0,
+  };
+  mln_acquired_frame frame = MLN_HANDLE_NULL;
+  mln_render_abandon_result abandoned = {
+    .size = sizeof(mln_render_abandon_result)
+  };
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_request_frame(detached, &demand, NULL)
+  );
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_barrier(detached, &discard, NULL)
+  );
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_resize(detached, &extent, &discard, NULL)
+  );
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_reduce_memory_use(detached, &discard, NULL)
+  );
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_clear_data(detached, &discard, NULL)
+  );
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_dump_debug_logs(detached, &discard, NULL)
+  );
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_acquire_frame(detached, &frame, NULL)
+  );
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_texture_read_premultiplied_rgba8(detached, &discard, NULL)
+  );
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_detach(detached, &discard, NULL)
+  );
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_abandon(detached, &abandoned, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_SESSION_STATE_DETACHED, read_snapshot(detached).state
+  );
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_render_session_snapshot snapshot = {
+    .size = sizeof(mln_render_session_snapshot)
+  };
+  MLN_TEST_INVALID(mln_render_session_get_snapshot(detached, &snapshot, NULL));
+  MLN_TEST_INVALID(
+    mln_render_session_reduce_memory_use(detached, &discard, NULL)
+  );
+  MLN_TEST_INVALID(mln_render_session_destroy(detached, NULL));
+  MLN_TEST_INVALID(
+    mln_render_session_reduce_memory_use(MLN_HANDLE_NULL, &discard, NULL)
+  );
+  MLN_TEST_INVALID(
+    mln_render_session_clear_data(MLN_HANDLE_NULL, &discard, NULL)
+  );
+  MLN_TEST_INVALID(
+    mln_render_session_dump_debug_logs(MLN_HANDLE_NULL, &discard, NULL)
+  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -238,203 +346,6 @@ static void maintenance_commands_run_in_order_with_frames(void) {
   }
 
   mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void normal_detach_runs_on_the_driver_and_retires_map_attachment(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-
-  mln_test_completion detach = mln_test_completion_default(0);
-  MLN_TEST_OK(
-    mln_render_session_detach(fixture.session, &detach.descriptor, NULL)
-  );
-  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &detach));
-  mln_test_completion_destroy(&detach);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_SESSION_STATE_DETACHED, read_snapshot(fixture.session).state
-  );
-
-  // The map's session slot is free again before the handle is destroyed.
-  mln_test_render_fixture other = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &other));
-  mln_test_render_fixture_destroy(&other);
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-typedef struct detached_call {
-  const char* label;
-  mln_status (*call)(mln_render_session session);
-} detached_call;
-
-static mln_status detached_request_frame(mln_render_session session) {
-  const mln_frame_demand demand = mln_frame_demand_default();
-  return mln_render_session_request_frame(session, &demand, NULL);
-}
-
-static mln_status detached_barrier(mln_render_session session) {
-  const mln_completion completion = mln_test_discard_completion();
-  return mln_render_session_barrier(session, &completion, NULL);
-}
-
-static mln_status detached_resize(mln_render_session session) {
-  const mln_render_target_extent extent = {
-    .size = sizeof(mln_render_target_extent),
-    .width = 32,
-    .height = 32,
-    .scale_factor = 1.0,
-  };
-  const mln_completion completion = mln_test_discard_completion();
-  return mln_render_session_resize(session, &extent, &completion, NULL);
-}
-
-static mln_status detached_reduce_memory_use(mln_render_session session) {
-  const mln_completion completion = mln_test_discard_completion();
-  return mln_render_session_reduce_memory_use(session, &completion, NULL);
-}
-
-static mln_status detached_clear_data(mln_render_session session) {
-  const mln_completion completion = mln_test_discard_completion();
-  return mln_render_session_clear_data(session, &completion, NULL);
-}
-
-static mln_status detached_dump_debug_logs(mln_render_session session) {
-  const mln_completion completion = mln_test_discard_completion();
-  return mln_render_session_dump_debug_logs(session, &completion, NULL);
-}
-
-static mln_status detached_acquire_frame(mln_render_session session) {
-  mln_acquired_frame frame = MLN_HANDLE_NULL;
-  return mln_render_session_acquire_frame(session, &frame, NULL);
-}
-
-static mln_status detached_readback(mln_render_session session) {
-  const mln_completion completion = mln_test_discard_completion();
-  return mln_texture_read_premultiplied_rgba8(session, &completion, NULL);
-}
-
-static mln_status detached_detach(mln_render_session session) {
-  const mln_completion completion = mln_test_discard_completion();
-  return mln_render_session_detach(session, &completion, NULL);
-}
-
-static mln_status detached_abandon(mln_render_session session) {
-  mln_render_abandon_result result = {
-    .size = sizeof(mln_render_abandon_result)
-  };
-  return mln_render_session_abandon(session, &result, NULL);
-}
-
-static const detached_call detached_calls[] = {
-  {"request frame", detached_request_frame},
-  {"barrier", detached_barrier},
-  {"resize", detached_resize},
-  {"reduce memory use", detached_reduce_memory_use},
-  {"clear data", detached_clear_data},
-  {"dump debug logs", detached_dump_debug_logs},
-  {"acquire frame", detached_acquire_frame},
-  {"texture readback", detached_readback},
-  {"detach", detached_detach},
-  {"abandon", detached_abandon},
-};
-
-// Once detached, a session accepts no further work and reports its state,
-// and it stays detached for destroy.
-static void a_detached_session_rejects_every_call_that_needs_its_target(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  mln_test_completion detach = mln_test_completion_default(0);
-  MLN_TEST_OK(
-    mln_render_session_detach(fixture.session, &detach.descriptor, NULL)
-  );
-  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &detach));
-  mln_test_completion_destroy(&detach);
-
-  for (size_t row = 0; row < sizeof(detached_calls) / sizeof(detached_calls[0]);
-       row += 1) {
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_INVALID_STATE, detached_calls[row].call(fixture.session),
-      detached_calls[row].label
-    );
-  }
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_SESSION_STATE_DETACHED, read_snapshot(fixture.session).state
-  );
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// Destroy ends a session only after detach or abandon, so an attached one
-// refuses it and keeps rendering.
-static void destroy_refuses_an_attached_session(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_prepare_map(runtime, map);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-
-  MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE,
-    mln_render_session_destroy(fixture.session, MLN_TEST_DIAGNOSTIC)
-  );
-  TEST_ASSERT_NOT_NULL(strstr(
-    mln_test_last_error(),
-    "must be detached or abandoned before it is destroyed"
-  ));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state
-  );
-  mln_test_render_request_forced(&fixture, 1);
-  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 1);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED,
-    mln_test_render_batch_result(batch, 0).disposition
-  );
-  mln_render_frame_batch_release(batch);
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void stale_and_null_sessions_reject_maintenance_commands(void) {
-  mln_completion operation = mln_test_discard_completion();
-  MLN_TEST_INVALID(
-    mln_render_session_reduce_memory_use(MLN_HANDLE_NULL, &operation, NULL)
-  );
-  MLN_TEST_INVALID(
-    mln_render_session_clear_data(MLN_HANDLE_NULL, &operation, NULL)
-  );
-  MLN_TEST_INVALID(
-    mln_render_session_dump_debug_logs(MLN_HANDLE_NULL, &operation, NULL)
-  );
-
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  const mln_render_session stale = fixture.session;
-  mln_test_render_fixture_destroy(&fixture);
-  mln_render_session_snapshot snapshot = {
-    .size = sizeof(mln_render_session_snapshot)
-  };
-  MLN_TEST_INVALID(mln_render_session_get_snapshot(stale, &snapshot, NULL));
-  MLN_TEST_INVALID(
-    mln_render_session_reduce_memory_use(stale, &operation, NULL)
-  );
-  MLN_TEST_INVALID(mln_render_session_destroy(stale, NULL));
-
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -728,14 +639,9 @@ static void parent_first_disposal_retires_a_native_render_attachment(void) {
 }
 
 MLN_TEST_GROUP {
-  RUN_TEST(attach_reports_the_selected_native_driver);
-  RUN_TEST(driver_service_fixes_and_enforces_graphics_thread_identity);
-  RUN_TEST(a_map_holds_one_session_at_a_time);
+  RUN_TEST(an_attached_session_holds_its_map_and_refuses_destroy);
+  RUN_TEST(a_detached_session_frees_its_map_and_refuses_work);
   RUN_TEST(maintenance_commands_run_in_order_with_frames);
-  RUN_TEST(normal_detach_runs_on_the_driver_and_retires_map_attachment);
-  RUN_TEST(a_detached_session_rejects_every_call_that_needs_its_target);
-  RUN_TEST(destroy_refuses_an_attached_session);
-  RUN_TEST(stale_and_null_sessions_reject_maintenance_commands);
   RUN_TEST(abandon_completes_pending_work_and_invalidates_accessors);
   RUN_TEST(abandon_from_a_driver_completion_is_busy);
   RUN_TEST(abandon_from_an_attach_completion_is_busy);

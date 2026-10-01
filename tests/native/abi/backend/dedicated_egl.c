@@ -4,12 +4,10 @@
 #include "support/test_support.h"
 
 static void finish_render_barrier(const mln_test_render_fixture* fixture) {
-  mln_test_completion completion = mln_test_completion_default(0);
-  MLN_TEST_OK(
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, fixture,
     mln_render_session_barrier(fixture->session, &completion.descriptor, NULL)
   );
-  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &completion));
-  mln_test_completion_destroy(&completion);
 }
 
 // The contract a dedicated session offers a host: it creates its own context

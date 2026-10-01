@@ -588,12 +588,10 @@ static void render_one_frame(
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
-  mln_test_completion barrier = mln_test_completion_default(0);
-  MLN_TEST_OK(
-    mln_render_session_barrier(fixture->session, &barrier.descriptor, NULL)
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, fixture,
+    mln_render_session_barrier(fixture->session, &completion.descriptor, NULL)
   );
-  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &barrier));
-  mln_test_completion_destroy(&barrier);
   mln_render_frame_batch frames = MLN_HANDLE_NULL;
   MLN_TEST_OK(
     mln_render_session_drain_frame_results(fixture->session, &frames, NULL)

@@ -163,6 +163,13 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
     }
   }
 
+  // A source query with no options reads every feature the source holds.
+  const mln_test_feature_list source =
+    mln_test_style_query_source_with(&fixture, "points", NULL);
+  MLN_TEST_OK(source.status);
+  TEST_ASSERT_EQUAL_size_t(2, source.count);
+  TEST_ASSERT_EQUAL_UINT(WEST | EAST, named_points(&source));
+
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -268,92 +275,6 @@ static mln_status submit_query(
   return mln_render_session_query_rendered_features(
     session, &call->geometry, &call->rendered, &completion, diagnostic
   );
-}
-
-// Each malformed input is rejected before the query reaches the driver, so
-// no completion runs.
-static void malformed_queries_are_rejected_at_submission(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-
-  static const mln_test_validation_case cases[] = {
-    {"undersized geometry", undersized_geometry, MLN_STATUS_INVALID_ARGUMENT,
-     "too small"},
-    {"unknown geometry type", unknown_geometry_type,
-     MLN_STATUS_INVALID_ARGUMENT, "geometry type is invalid"},
-    {"non-finite point", non_finite_point, MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"line string without points", empty_line_string,
-     MLN_STATUS_INVALID_ARGUMENT, "must contain points"},
-    {"line string with null points", null_line_string_points,
-     MLN_STATUS_INVALID_ARGUMENT, "must not be null"},
-    {"undersized rendered options", undersized_rendered_options,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"unknown rendered option field", unknown_rendered_field,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"layer IDs present but null", null_layer_ids, MLN_STATUS_INVALID_ARGUMENT,
-     NULL},
-    {"layer ID without bytes", layer_id_without_bytes,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"unparsable rendered filter", unparsable_rendered_filter,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"well-formed source query", source_query, MLN_STATUS_OK, NULL},
-    {"empty source ID", empty_source_id, MLN_STATUS_INVALID_ARGUMENT,
-     "must not be empty"},
-    {"source ID without bytes", source_id_without_bytes,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"undersized source options", undersized_source_options,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"unknown source option field", unknown_source_field,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"source layer without bytes", source_layer_without_bytes,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-    {"unparsable source filter", unparsable_source_filter,
-     MLN_STATUS_INVALID_ARGUMENT, NULL},
-  };
-  const query_call defaults = {
-    .geometry =
-      mln_rendered_query_geometry_point((mln_screen_point){.x = 32, .y = 32}),
-    .rendered = mln_rendered_feature_query_options_default(),
-    .source = mln_source_feature_query_options_default(),
-    .source_id = MLN_BUFFER_LITERAL("points"),
-  };
-  mln_test_run_validation_table(
-    cases, sizeof(cases) / sizeof(cases[0]), &defaults, sizeof(defaults),
-    submit_query, &fixture.session
-  );
-  // The accepted source query must finish before the session detaches, which
-  // a barrier orders after it.
-  mln_test_completion barrier = mln_test_completion_default(0);
-  MLN_TEST_OK(
-    mln_render_session_barrier(fixture.session, &barrier.descriptor, NULL)
-  );
-  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &barrier));
-  mln_test_completion_destroy(&barrier);
-
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// A frame of an empty style renders no feature, so a rendered query still
-// completes, with an empty borrowed array.
-static void a_query_of_an_empty_frame_completes_empty(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
-  mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, mln_test_style_render_frame(&fixture)
-  );
-  const mln_test_feature_list list = mln_test_style_query_rendered(&fixture);
-  MLN_TEST_OK(list.status);
-  TEST_ASSERT_EQUAL_size_t(0, list.count);
-  mln_test_render_fixture_destroy(&fixture);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
 }
 
 // One MVT tile with two layers, "points" and "labels", each holding one point
@@ -714,12 +635,63 @@ static mln_status submit_extension(
   );
 }
 
-static void malformed_extension_queries_are_rejected_at_submission(void) {
+// Each malformed input is rejected before the query reaches the driver, so
+// no completion runs. A frame of an empty style renders no feature, so a
+// well-formed rendered query still completes, with an empty borrowed array.
+static void malformed_queries_are_rejected_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+
   static const mln_test_validation_case cases[] = {
+    {"undersized geometry", undersized_geometry, MLN_STATUS_INVALID_ARGUMENT,
+     "too small"},
+    {"unknown geometry type", unknown_geometry_type,
+     MLN_STATUS_INVALID_ARGUMENT, "geometry type is invalid"},
+    {"non-finite point", non_finite_point, MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"line string without points", empty_line_string,
+     MLN_STATUS_INVALID_ARGUMENT, "must contain points"},
+    {"line string with null points", null_line_string_points,
+     MLN_STATUS_INVALID_ARGUMENT, "must not be null"},
+    {"undersized rendered options", undersized_rendered_options,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"unknown rendered option field", unknown_rendered_field,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"layer IDs present but null", null_layer_ids, MLN_STATUS_INVALID_ARGUMENT,
+     NULL},
+    {"layer ID without bytes", layer_id_without_bytes,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"unparsable rendered filter", unparsable_rendered_filter,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"well-formed source query", source_query, MLN_STATUS_OK, NULL},
+    {"empty source ID", empty_source_id, MLN_STATUS_INVALID_ARGUMENT,
+     "must not be empty"},
+    {"source ID without bytes", source_id_without_bytes,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"undersized source options", undersized_source_options,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"unknown source option field", unknown_source_field,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"source layer without bytes", source_layer_without_bytes,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
+    {"unparsable source filter", unparsable_source_filter,
+     MLN_STATUS_INVALID_ARGUMENT, NULL},
+  };
+  const query_call defaults = {
+    .geometry =
+      mln_rendered_query_geometry_point((mln_screen_point){.x = 32, .y = 32}),
+    .rendered = mln_rendered_feature_query_options_default(),
+    .source = mln_source_feature_query_options_default(),
+    .source_id = MLN_BUFFER_LITERAL("points"),
+  };
+  mln_test_run_validation_table(
+    cases, sizeof(cases) / sizeof(cases[0]), &defaults, sizeof(defaults),
+    submit_query, &fixture.session
+  );
+
+  static const mln_test_validation_case extension_cases[] = {
     {"empty source ID", empty_extension_source, MLN_STATUS_INVALID_ARGUMENT,
      "source_id must not be empty"},
     {"empty extension", empty_extension, MLN_STATUS_INVALID_ARGUMENT,
@@ -733,7 +705,7 @@ static void malformed_extension_queries_are_rejected_at_submission(void) {
     {"arguments that are not an object", array_arguments,
      MLN_STATUS_INVALID_ARGUMENT, "must be a JSON object"},
   };
-  const extension_call defaults = {
+  const extension_call extension_defaults = {
     .source_id = MLN_BUFFER_LITERAL("clustered"),
     .feature = MLN_BUFFER_LITERAL(
       "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
@@ -743,9 +715,17 @@ static void malformed_extension_queries_are_rejected_at_submission(void) {
     .field = MLN_BUFFER_LITERAL("children"),
   };
   mln_test_run_validation_table(
-    cases, sizeof(cases) / sizeof(cases[0]), &defaults, sizeof(defaults),
-    submit_extension, &fixture.session
+    extension_cases, sizeof(extension_cases) / sizeof(extension_cases[0]),
+    &extension_defaults, sizeof(extension_defaults), submit_extension,
+    &fixture.session
   );
+
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, mln_test_style_render_frame(&fixture)
+  );
+  const mln_test_feature_list list = mln_test_style_query_rendered(&fixture);
+  MLN_TEST_OK(list.status);
+  TEST_ASSERT_EQUAL_size_t(0, list.count);
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -753,9 +733,7 @@ static void malformed_extension_queries_are_rejected_at_submission(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(rendered_queries_select_by_geometry_layer_and_filter);
-  RUN_TEST(malformed_queries_are_rejected_at_submission);
-  RUN_TEST(a_query_of_an_empty_frame_completes_empty);
   RUN_TEST(source_queries_read_the_named_source_layers);
   RUN_TEST(cluster_extensions_resolve_an_unsigned_cluster_id);
-  RUN_TEST(malformed_extension_queries_are_rejected_at_submission);
+  RUN_TEST(malformed_queries_are_rejected_at_submission);
 }

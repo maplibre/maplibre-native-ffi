@@ -67,6 +67,21 @@ mln_status mln_test_render_fixture_finish_operation(
   const mln_test_render_fixture* fixture, mln_test_completion* completion
 );
 
+// Submits a session operation through `expression`, which passes
+// `&completion.descriptor`, services the fixture until it completes, and
+// expects its terminal status.
+#define MLN_TEST_RENDER_AWAIT(expected_status, fixture, expression)          \
+  do {                                                                       \
+    mln_test_completion completion = mln_test_completion_default(0);         \
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, (expression), #expression); \
+    TEST_ASSERT_EQUAL_INT_MESSAGE(                                           \
+      (expected_status),                                                     \
+      mln_test_render_fixture_finish_operation((fixture), &completion),      \
+      #expression                                                            \
+    );                                                                       \
+    mln_test_completion_destroy(&completion);                                \
+  } while (false)
+
 // Releases the graphics device this thread cached. Every thread must call this
 // before its entry function returns: on browser WebGPU a live GPUDevice pins an
 // Emscripten keepalive and pthread_join on that thread blocks forever. A no-op

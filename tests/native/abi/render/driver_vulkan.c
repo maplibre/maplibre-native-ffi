@@ -42,12 +42,12 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   options.requested_texture_ring_depth = 2;
   mln_render_session session = MLN_HANDLE_NULL;
-  mln_test_completion attach = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_vulkan_owned_texture_attach(
-    map, &descriptor, &options, &session, &attach.descriptor, NULL
-  ));
-  MLN_TEST_INVALID(mln_test_completion_finish(&attach));
-  mln_test_completion_destroy(&attach);
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_vulkan_owned_texture_attach(
+      map, &descriptor, &options, &session, &completion.descriptor, NULL
+    )
+  );
 
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)

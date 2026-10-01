@@ -61,12 +61,10 @@ static void render_to_idle(
     MLN_TEST_OK(
       mln_render_session_request_frame(fixture->session, &demand, NULL)
     );
-    mln_test_completion barrier = mln_test_completion_default(0);
-    MLN_TEST_OK(
-      mln_render_session_barrier(fixture->session, &barrier.descriptor, NULL)
+    MLN_TEST_RENDER_AWAIT(
+      MLN_STATUS_OK, fixture,
+      mln_render_session_barrier(fixture->session, &completion.descriptor, NULL)
     );
-    MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &barrier));
-    mln_test_completion_destroy(&barrier);
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
     MLN_TEST_OK(
       mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
@@ -177,12 +175,12 @@ static void select_then_clear_renderer_data(
   set_selected(map, "{\"selected\":true}");
   render_to_idle(runtime, fixture);
   expect_center_pixel(fixture, green, "the selected point");
-  mln_test_completion cleared = mln_test_completion_default(0);
-  MLN_TEST_OK(
-    mln_render_session_clear_data(fixture->session, &cleared.descriptor, NULL)
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, fixture,
+    mln_render_session_clear_data(
+      fixture->session, &completion.descriptor, NULL
+    )
   );
-  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &cleared));
-  mln_test_completion_destroy(&cleared);
 }
 
 static void add_the_late_source(
@@ -532,14 +530,12 @@ static bool frame_matches(void* context) {
   MLN_TEST_OK(
     mln_render_session_request_frame(seek->fixture->session, &demand, NULL)
   );
-  mln_test_completion barrier = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_render_session_barrier(
-    seek->fixture->session, &barrier.descriptor, NULL
-  ));
-  MLN_TEST_OK(
-    mln_test_render_fixture_finish_operation(seek->fixture, &barrier)
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, seek->fixture,
+    mln_render_session_barrier(
+      seek->fixture->session, &completion.descriptor, NULL
+    )
   );
-  mln_test_completion_destroy(&barrier);
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   MLN_TEST_OK(
     mln_render_session_drain_frame_results(seek->fixture->session, &batch, NULL)

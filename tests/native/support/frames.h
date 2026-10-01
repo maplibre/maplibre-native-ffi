@@ -41,6 +41,19 @@ mln_acquired_frame mln_test_render_and_acquire(
   const mln_test_render_fixture* fixture, uint64_t token
 );
 
+// Releases `*frame` with no consumer synchronization, and expects the release
+// to consume the handle.
+void mln_test_render_release_frame(mln_acquired_frame* frame);
+
+// Reads the fixture's latest frame back. On MLN_STATUS_OK, writes its image
+// info to `out_info` and copies up to `capacity` bytes of its tightly packed
+// pixels into `out_pixels`, which may be null. Otherwise returns the
+// readback's terminal status and writes nothing.
+mln_status mln_test_render_read_back(
+  const mln_test_render_fixture* fixture, mln_texture_image_info* out_info,
+  uint8_t* out_pixels, size_t capacity
+);
+
 #ifdef __cplusplus
 }
 #endif

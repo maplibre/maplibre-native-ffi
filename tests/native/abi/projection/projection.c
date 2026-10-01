@@ -71,12 +71,9 @@ static void creation_observes_earlier_map_camera_commands(void) {
   update.camera.latitude = 12.0;
   update.camera.longitude = 34.0;
   update.camera.zoom = 4.0;
-  mln_test_completion completion = mln_test_completion_default(0);
-  MLN_TEST_OK(
+  MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
-  MLN_TEST_OK(mln_test_completion_finish(&completion));
-  mln_test_completion_destroy(&completion);
 
   // Creation is ordered after the accepted camera command, so the projection
   // copies the committed transform state.

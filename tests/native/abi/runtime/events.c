@@ -366,12 +366,9 @@ static void submit_camera_update(
   update.mode = mode;
   update.camera = camera;
   update.animation = animation;
-  mln_test_completion completion = mln_test_completion_default(0);
-  MLN_TEST_OK(
+  MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
-  MLN_TEST_OK(mln_test_completion_finish(&completion));
-  mln_test_completion_destroy(&completion);
 }
 
 // A transition ends exactly once, whichever way it ends: replaced by a later
