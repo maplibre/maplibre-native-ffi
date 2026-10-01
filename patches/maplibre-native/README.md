@@ -159,10 +159,12 @@ Upstream: not yet filed.
 that `Scheduler::GetCurrent()` creates for a thread with no scheduler. The
 library compiles MapLibre Native without static destructors, so that nothing a
 MapLibre thread reads is destroyed while the process exits, and that option also
-drops thread-local destructors. The run loop is the one piece of MapLibre
-thread-local state that owns resources, so the patch marks it
-`[[clang::always_destroy]]` to free it when its thread ends. Upstream: not
-applicable; it serves this build's compile options.
+drops thread-local destructors. The run loop is the MapLibre thread-local state
+that owns resources, so the patch marks it `[[clang::always_destroy]]` to free
+it when its thread ends. Vendored glslang's per-thread default pool allocator
+also loses its destructor; glslang compiles shaders in pools that `TShader` and
+`TProgram` own, so a thread leaks only what it allocated from the default pool
+outside them. Upstream: not applicable; it serves this build's compile options.
 
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
