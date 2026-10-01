@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
 )
@@ -25,6 +26,10 @@ type renderTarget interface {
 	// DrainFrameResults presents each rendered frame and reports whether one
 	// reached the window.
 	DrainFrameResults() (bool, error)
+	// RetryAt reports when a paced retry is due, or false with none pending.
+	RetryAt() (time.Time, bool)
+	// RetryIfDue forces the pending paced retry once it is due.
+	RetryIfDue() error
 	// Resize keeps the session attached, either resizing the target in place
 	// or handing the session a replacement.
 	Resize(viewport) error
@@ -41,7 +46,13 @@ type callerDriver struct {
 	// released is set once a failed handover detached the session, so Close
 	// only retires the handle.
 	released bool
+	// retryAt is when a paced retry is due, and zero with none pending.
+	retryAt time.Time
 }
+
+// retryDelay is how long a frame that did not reach the window waits to
+// retry, about one display refresh.
+const retryDelay = 16 * time.Millisecond
 
 // attach services the attachment until it completes.
 func (driver *callerDriver) attach(session *maplibre.RenderSessionHandle, completion *maplibre.Future[struct{}], wakes loopWakes) error {
@@ -86,7 +97,8 @@ func (driver *callerDriver) ServiceDriverWork() error {
 
 // DrainFrameResults drains every frame result and presents each rendered
 // frame. A result that asks for another frame, as during a paint transition,
-// requests it, and a frame that missed the window renders again.
+// requests it. A target that was not ready, or a frame that missed the window,
+// consumed its map update, so a paced retry forces the next frame.
 func (driver *callerDriver) DrainFrameResults() (bool, error) {
 	batch, err := driver.session.DrainFrameResults()
 	if errors.Is(err, maplibre.ErrNotReady) {
@@ -106,21 +118,41 @@ func (driver *callerDriver) DrainFrameResults() (bool, error) {
 		if err != nil {
 			return presented, err
 		}
-		if result.Disposition != maplibre.RenderResultRendered {
+		switch result.Disposition {
+		case maplibre.RenderResultRendered:
+			shown, err := driver.present()
+			if err != nil {
+				return presented, err
+			}
+			presented = presented || shown
+			missed = missed || !shown
+		case maplibre.RenderResultTargetNotReady:
+			missed = true
+		default:
 			continue
 		}
-		shown, err := driver.present()
-		if err != nil {
-			return presented, err
-		}
-		presented = presented || shown
-		missed = missed || !shown
 		needsRepaint = needsRepaint || result.NeedsRepaint
 	}
-	if missed || needsRepaint {
-		return presented, driver.RequestFrame(missed)
+	if missed {
+		driver.retryAt = time.Now().Add(retryDelay)
+		return presented, nil
+	}
+	if needsRepaint {
+		return presented, driver.RequestFrame(false)
 	}
 	return presented, nil
+}
+
+func (driver *callerDriver) RetryAt() (time.Time, bool) {
+	return driver.retryAt, !driver.retryAt.IsZero()
+}
+
+func (driver *callerDriver) RetryIfDue() error {
+	if driver.retryAt.IsZero() || time.Now().Before(driver.retryAt) {
+		return nil
+	}
+	driver.retryAt = time.Time{}
+	return driver.RequestFrame(true)
 }
 
 // Resize carries a new logical extent to the map through the attached
@@ -237,12 +269,12 @@ func (target *openGLOwnedTextureTarget) Resize(v viewport) error {
 	return target.callerDriver.Resize(v)
 }
 
-// drawFrame composes the oldest rendered frame. An empty ring keeps the
-// previously composed frame on screen.
+// drawFrame composes the oldest rendered frame. An empty ring leaves the
+// previously composed frame on screen, and nothing new reaches the window.
 func (target *openGLOwnedTextureTarget) drawFrame() (bool, error) {
 	frame, err := target.session.AcquireFrame()
 	if errors.Is(err, maplibre.ErrNotReady) {
-		return true, nil
+		return false, nil
 	}
 	if err != nil {
 		return false, err

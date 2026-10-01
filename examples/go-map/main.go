@@ -148,18 +148,15 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 	// has the thread drain events, service driver work, or drain frame results.
 	input := inputController{}
 	smokeDeadline := time.Now().Add(smokeTimeout)
-	// The session attached after the map took its style and camera, so it
-	// starts with one frame.
-	if err := target.RequestFrame(false); err != nil {
-		return err
-	}
 	for {
 		viewportChanged := false
 		var event sdl.Event
-		if !waitEvent(&event, smoke, smokeDeadline) {
+		deadline, hasDeadline := nextWake(target, smoke, smokeDeadline)
+		ok := waitEvent(&event, deadline, hasDeadline)
+		if smoke && !time.Now().Before(smokeDeadline) {
 			return fmt.Errorf("smoke: no frame rendered within %s", smokeTimeout)
 		}
-		for ok := true; ok; ok = sdl.PollEvent(&event) {
+		for ; ok; ok = sdl.PollEvent(&event) {
 			switch event.Type() {
 			case sdl.EventQuit, sdl.EventWindowCloseRequested:
 				return nil
@@ -198,6 +195,9 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 				return err
 			}
 		}
+		if err := target.RetryIfDue(); err != nil {
+			return err
+		}
 		if wakes.frames.consume() {
 			presented, err := target.DrainFrameResults()
 			if err != nil {
@@ -211,14 +211,24 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 	}
 }
 
-// waitEvent sleeps until the next SDL event. A smoke run stops waiting at its
-// deadline and reports false.
-func waitEvent(event *sdl.Event, smoke bool, deadline time.Time) bool {
-	if !smoke {
+// nextWake reports when the loop must wake without an event: for a paced
+// retry, or at a smoke run's deadline.
+func nextWake(target renderTarget, smoke bool, smokeDeadline time.Time) (time.Time, bool) {
+	retryAt, retry := target.RetryAt()
+	if smoke && (!retry || smokeDeadline.Before(retryAt)) {
+		return smokeDeadline, true
+	}
+	return retryAt, retry
+}
+
+// waitEvent sleeps until the next SDL event, or until a deadline when it has
+// one, and reports whether an event arrived.
+func waitEvent(event *sdl.Event, deadline time.Time, hasDeadline bool) bool {
+	if !hasDeadline {
 		return sdl.WaitEvent(event) == nil
 	}
 	remaining := time.Until(deadline)
-	return remaining > 0 && sdl.WaitEventTimeout(event, int32(remaining.Milliseconds())+1)
+	return sdl.WaitEventTimeout(event, int32(max(remaining.Milliseconds(), 0))+1)
 }
 
 func validateNativeRenderBackend() error {
