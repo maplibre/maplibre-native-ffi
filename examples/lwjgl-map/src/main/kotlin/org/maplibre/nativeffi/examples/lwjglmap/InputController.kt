@@ -28,11 +28,10 @@ import org.lwjgl.glfw.GLFW.glfwSetMouseButtonCallback
 import org.lwjgl.glfw.GLFW.glfwSetScrollCallback
 import org.maplibre.nativeffi.generated.ScreenPoint
 
-/** Decodes GLFW input into camera updates on the GLFW thread. */
+/** Decodes GLFW input into camera commands on the GLFW thread. */
 internal class InputController(
   private val window: Long,
   private val mapState: MapState,
-  private val renderRequest: RenderRequest,
   private val viewport: () -> Viewport,
 ) : AutoCloseable {
   private var leftDown = false
@@ -65,10 +64,7 @@ internal class InputController(
       mapState.adjustPitch(dy * DRAG_PITCH_FACTOR)
     } else if (leftDown) {
       mapState.moveBy(dx, dy)
-    } else {
-      return
     }
-    renderRequest.set()
   }
 
   private fun onMouse(button: Int, action: Int, mods: Int) {
@@ -98,7 +94,6 @@ internal class InputController(
     // GLFW reports OS-adjusted scroll deltas, so natural scrolling needs no correction here.
     val scale = 2.0.pow(yOffset * 0.25)
     mapState.scaleBy(scale, ScreenPoint(cursorX, cursorY))
-    renderRequest.set()
   }
 
   private fun onKey(key: Int, action: Int, mods: Int) {
@@ -129,9 +124,7 @@ internal class InputController(
       GLFW_KEY_RIGHT_BRACKET -> mapState.adjustPitch(KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
       GLFW_KEY_LEFT_BRACKET -> mapState.adjustPitch(-KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
       GLFW_KEY_0 -> mapState.resetOrientation(RESET_ANIMATION_MS)
-      else -> return
     }
-    renderRequest.set()
   }
 
   private fun viewportCenter(): ScreenPoint {

@@ -2,51 +2,134 @@ package org.maplibre.nativeffi.examples.lwjglmap
 
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
+import org.lwjgl.glfw.GLFW.glfwPostEmptyEvent
+import org.lwjgl.glfw.GLFW.glfwWaitEvents
+import org.maplibre.nativeffi.error.MaplibreException
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.RenderDriverKind
-import org.maplibre.nativeffi.generated.RenderFrameResult
-import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
+import org.maplibre.nativeffi.generated.RenderResult
+import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderTargetExtent
 
 /**
- * The render loop explicitly services caller-driver work on its graphics thread. Native code owns
- * the typed work mailbox and completion state.
+ * A render session that the GLFW thread drives. The render loop requests frames, services driver
+ * work after its wake, and drains frame results after theirs. This class serves a native surface,
+ * where the driver presents each frame; texture targets compose each rendered frame into the window
+ * in [present].
  */
-internal interface RenderTarget : AutoCloseable {
-  fun needsMetalAutoreleasePool(): Boolean = false
+internal open class RenderTarget(protected val session: RenderSessionHandle) : AutoCloseable {
+  open fun needsMetalAutoreleasePool(): Boolean = false
+
+  /** Asks for a frame. A forced frame renders even when the map has no newer update. */
+  fun requestFrame(force: Boolean = false) {
+    val flags =
+      if (force) FrameDemandFlag.PRESENT else FrameDemandFlag.IF_NEEDED or FrameDemandFlag.PRESENT
+    session.requestFrame(GeneratedApi.frameDemandDefault().copy(flags = flags))
+  }
+
+  fun serviceDriverWork() {
+    session.serviceDriverWork(0uL)
+  }
 
   /**
-   * Follows a resized host, keeping the session attached so its renderer stays warm. Surface and
-   * owned-texture targets resize in place; a caller-owned texture is reallocated at the new size
-   * and handed to the live session.
+   * Drains every frame result and presents each rendered frame. A result that asks for another
+   * frame, as during a paint transition, requests it, and a frame that missed the window renders
+   * again. Reports whether a frame reached the window.
    */
-  fun resize(viewport: Viewport)
+  fun drainFrameResults(): Boolean {
+    val batch =
+      try {
+        session.drainFrameResults()
+      } catch (error: MaplibreException) {
+        if (error.status == MaplibreStatus.NOT_READY) return false
+        throw error
+      }
+    var presented = false
+    var missed = false
+    var needsRepaint = false
+    batch.use { results ->
+      for (index in 0uL until results.count()) {
+        val result = results.get(index)
+        if (result.disposition != RenderResult.RENDERED) continue
+        if (present()) presented = true else missed = true
+        needsRepaint = needsRepaint || result.needsRepaint
+      }
+    }
+    if (missed) requestFrame(force = true) else if (needsRepaint) requestFrame()
+    return presented
+  }
 
   /**
-   * Renders the latest map update, and reports whether the render loop may rest. It reports false
-   * when no frame reached the screen and when the map asked for another frame while this one
-   * rendered, so the loop demands one more after its idle wait.
+   * Shows the frame the session just rendered, and reports whether it reached the window. A native
+   * surface has already presented it.
    */
-  fun renderUpdate(): Boolean
+  protected open fun present(): Boolean = true
 
-  override fun close()
+  /**
+   * Follows a resized host and keeps the session attached, so its renderer stays warm. The session
+   * resize carries the new extent to the map.
+   */
+  open fun resize(viewport: Viewport) {
+    session.resize(extent(viewport))
+  }
+
+  /**
+   * Hands the session a replacement texture through [handover], and waits for it. Frames that ran
+   * before the handover drew into the outgoing texture, so they are drained and presented while
+   * that texture is still current. A failed handover leaves it unknown which texture the session
+   * holds, so the session is detached before the caller releases either one.
+   */
+  protected fun handOver(handover: () -> Deferred<Unit>) {
+    try {
+      awaitDriverWork(session, handover())
+    } catch (error: RuntimeException) {
+      released = true
+      try {
+        awaitDriverWork(session, session.detach())
+      } catch (cleanupError: RuntimeException) {
+        error.addSuppressed(cleanupError)
+        runCatching { session.abandon() }.onFailure(error::addSuppressed)
+      }
+      throw error
+    }
+    drainFrameResults()
+  }
+
+  /** Set once a failed handover released the session, so [close] only retires the handle. */
+  private var released = false
+
+  /** Detaches through the driver, abandoning the session if that fails, then closes it. */
+  override fun close() {
+    try {
+      if (!released) awaitDriverWork(session, session.detach())
+    } catch (error: RuntimeException) {
+      runCatching { session.abandon() }.onFailure(error::addSuppressed)
+      session.close()
+      throw error
+    }
+    session.close()
+  }
 
   companion object {
-    /** Attaches a render session for the active graphics API and mode, on the calling thread. */
+    /** A session-owned texture ring deep enough to keep compositing while the map renders. */
+    const val OWNED_TEXTURE_RING_DEPTH = 2u
+
+    /** Attaches a render session for the active graphics API and mode, on the GLFW thread. */
     fun attach(
       graphics: GraphicsContext,
       map: MapHandle,
       viewport: Viewport,
       mode: RenderTargetMode,
+      wakes: LoopWakes,
     ): RenderTarget =
       when (graphics) {
-        is MetalContext -> MetalRenderTarget.attach(graphics, map, viewport, mode)
-        is VulkanContext -> VulkanRenderTarget.attach(graphics, map, viewport, mode)
-        is OpenGLContext -> OpenGLRenderTarget.attach(graphics, map, viewport, mode)
+        is MetalContext -> MetalRenderTarget.attach(graphics, map, viewport, mode, wakes)
+        is VulkanContext -> VulkanRenderTarget.attach(graphics, map, viewport, mode, wakes)
+        is OpenGLContext -> OpenGLRenderTarget.attach(graphics, map, viewport, mode, wakes)
         else -> error("Unsupported graphics context: ${graphics.backend()}")
       }
 
@@ -58,53 +141,7 @@ internal interface RenderTarget : AutoCloseable {
       )
 
     /**
-     * Releases a session whose handover failed, before the targets it may hold are released. A
-     * failed handover leaves it unknown which target the session holds. A detach that fails falls
-     * back to abandonment, so the caller may close the session afterwards either way.
-     */
-    fun detachSuppressed(error: RuntimeException, session: RenderSessionHandle) {
-      try {
-        completeDriverOperation(session, session.detach())
-      } catch (cleanupError: Exception) {
-        error.addSuppressed(cleanupError)
-        runCatching { session.abandon() }.onFailure(error::addSuppressed)
-      }
-    }
-
-    val callerDriverOptions: RenderSessionAttachOptions =
-      RenderSessionAttachOptions(driver = RenderDriverKind.CALLER_GRAPHICS_THREAD)
-
-    /** A session-owned texture ring deep enough to keep compositing while the map renders. */
-    val ownedTextureOptions: RenderSessionAttachOptions =
-      RenderSessionAttachOptions(
-        driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
-        requestedTextureRingDepth = 2u,
-      )
-
-    fun finishAttachment(session: RenderSessionHandle, ready: Deferred<Unit>): RenderSessionHandle {
-      try {
-        completeDriverOperation(session, ready)
-        return session
-      } catch (error: Throwable) {
-        runCatching { session.abandon() }
-        runCatching { session.close() }
-        throw error
-      }
-    }
-
-    fun completeDriverOperation(session: RenderSessionHandle, completed: Deferred<*>) {
-      while (!completed.isCompleted) session.serviceDriverWork(0uL)
-      val result = runBlocking { completed.await() }
-      if (result is org.maplibre.nativeffi.runtime.CommandCompletion) {
-        check(result.status == org.maplibre.nativeffi.error.MaplibreStatus.OK) {
-          "Driver operation failed: ${result.status}: ${result.diagnostic}"
-        }
-      }
-    }
-
-    /**
-     * Resizes a map whose session cannot carry the extent itself. A caller-owned texture is sized
-     * by this host, so its handover replaces only the graphics resource.
+     * Resizes a map whose session carries no extent: a texture handover replaces only the texture.
      */
     fun resizeMap(map: MapHandle, viewport: Viewport) {
       map.resize(
@@ -112,47 +149,36 @@ internal interface RenderTarget : AutoCloseable {
       )
     }
 
-    /** Submits one host-paced demand and reports the frame the driver produced for it. */
-    fun renderFrame(session: RenderSessionHandle): RenderFrameResult? {
-      session.requestFrame(
-        GeneratedApi.frameDemandDefault()
-          .copy(
-            flags =
-              FrameDemandFlag(
-                FrameDemandFlag.IF_NEEDED.rawValue or FrameDemandFlag.PRESENT.rawValue
-              )
-          )
-      )
-      session.serviceDriverWork(0uL)
-      val batch =
-        try {
-          session.drainFrameResults()
-        } catch (error: org.maplibre.nativeffi.error.MaplibreException) {
-          if (error.status == org.maplibre.nativeffi.error.MaplibreStatus.NOT_READY) return null
-          throw error
-        }
-      return batch.use { owner ->
-        val count = owner.count()
-        if (count == 0uL) null else owner.get(count - 1uL)
+    /** Services the attachment until it completes, and returns the attached session. */
+    fun attached(attachment: RenderSessionAttachment): RenderSessionHandle {
+      try {
+        awaitDriverWork(attachment.session, attachment.ready)
+        return attachment.session
+      } catch (error: Throwable) {
+        runCatching { attachment.session.abandon() }
+        runCatching { attachment.session.close() }
+        throw error
       }
     }
 
     /**
-     * Closes a session, detaching it first unless a failed handover already released it. Detaching
-     * a released session reports an invalid state, and a close that runs from a `finally` would
-     * replace the handover failure with that.
+     * Services driver work on the GLFW thread until [completion] finishes. Between services the
+     * thread waits for the driver-work wake or for the completion, each of which posts an empty
+     * event. This must not run inside a GLFW callback.
      */
-    fun closeSession(session: RenderSessionHandle, released: Boolean = false) {
-      if (!released) completeDriverOperation(session, session.detach())
-      session.close()
+    fun <T> awaitDriverWork(session: RenderSessionHandle, completion: Deferred<T>): T {
+      completion.invokeOnCompletion { glfwPostEmptyEvent() }
+      while (true) {
+        session.serviceDriverWork(0uL)
+        if (completion.isCompleted) break
+        glfwWaitEvents()
+      }
+      return runBlocking { completion.await() }
     }
 
-    fun closeSuppressed(error: RuntimeException, closeable: AutoCloseable?) {
-      if (closeable == null) {
-        return
-      }
+    fun closeSuppressed(error: Throwable, closeable: AutoCloseable?) {
       try {
-        if (closeable is RenderSessionHandle) closeSession(closeable) else closeable.close()
+        closeable?.close()
       } catch (cleanupError: Exception) {
         error.addSuppressed(cleanupError)
       }
