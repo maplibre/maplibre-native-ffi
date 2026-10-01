@@ -174,11 +174,6 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
         _ = viewport;
     }
 
-    public void PollEvents()
-    {
-        window.PollEvents();
-    }
-
     public void FinishFrame() { }
 
     public void WaitIdle()

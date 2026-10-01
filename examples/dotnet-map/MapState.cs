@@ -4,7 +4,7 @@ using Maplibre.NativeFfi.Runtime;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-/// <summary>Autonomous runtime and any-thread map state.</summary>
+/// <summary>The runtime and its map. Commands go straight to the runtime's own thread.</summary>
 internal sealed class MapState : IDisposable
 {
     private const string StyleUrl = "https://tiles.openfreemap.org/styles/bright";
@@ -24,9 +24,16 @@ internal sealed class MapState : IDisposable
     /// Creates the map with the example's style, or with <paramref name="styleJson" /> in its
     /// place, which the smoke run passes so that it needs no network.
     /// </summary>
-    public static MapState Create(Viewport viewport, byte[]? styleJson = null)
+    /// <remarks>The runtime raises <paramref name="eventWake" /> when it has events to drain.</remarks>
+    public static MapState Create(Viewport viewport, Wake eventWake, byte[]? styleJson = null)
     {
-        var runtime = RuntimeHandle.Create(RuntimeOptions.Default with { CachePath = ":memory:" });
+        var runtime = RuntimeHandle.Create(
+            RuntimeOptions.Default with
+            {
+                CachePath = ":memory:",
+                EventWake = eventWake,
+            }
+        );
         MapHandle? map = null;
         try
         {
@@ -142,7 +149,8 @@ internal sealed class MapState : IDisposable
         Update(new CameraOptions { Bearing = 0, Pitch = 0 }, animation);
     }
 
-    public bool DrainRenderRequests()
+    /// <summary>Drains every runtime event, and reports whether the map published an update to render.</summary>
+    public bool DrainRenderUpdates()
     {
         var requested = false;
         using var batch = runtime.DrainEvents();
@@ -183,23 +191,5 @@ internal sealed class MapState : IDisposable
                 Animation = animation ?? new AnimationOptions(),
             }
         );
-    }
-}
-
-/// <summary>One-bit signal that a frame is worth drawing.</summary>
-internal sealed class RenderRequest
-{
-    private bool requested = true;
-
-    public void Set()
-    {
-        requested = true;
-    }
-
-    public bool Consume()
-    {
-        var current = requested;
-        requested = false;
-        return current;
     }
 }

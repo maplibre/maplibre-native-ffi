@@ -38,4 +38,4 @@
 "PLAT-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ProcessExitTests.cs::AProcessExitsCleanlyWithLiveHandlesAndCallbacks"
 "PLAT-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LeakReportTests.cs::UnreachableHandlesAreReclaimedWithoutLeaks"
 # `mise run //examples/dotnet-map:smoke [preset]` runs this path.
-"EX-01" = "examples/dotnet-map/Shell.cs::RunSmoke"
+"EX-01" = "examples/dotnet-map/Shell.cs::smoke: rendered a frame"

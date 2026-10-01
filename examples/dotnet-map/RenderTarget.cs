@@ -4,100 +4,30 @@ using Maplibre.NativeFfi.Render;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-internal interface IRenderTarget : IDisposable
-{
-    /// <summary>
-    /// Renders the latest map update and reports whether the render loop may rest. It reports
-    /// false when no frame reached the screen and when the map asked for another frame while this
-    /// one rendered, so the loop demands one more.
-    /// </summary>
-    bool Render();
-
-    /// <summary>
-    /// Follows a resized host, keeping the session attached so its renderer stays warm. Surface and
-    /// owned-texture targets resize in place; a caller-owned texture is reallocated at the new size
-    /// and handed to the live session.
-    /// </summary>
-    void Resize(Viewport viewport);
-}
-
-internal static class RenderTargetDriver
+/// <summary>
+/// A render session that the GLFW thread drives. The render loop requests frames, services driver
+/// work after its wake, and drains frame results after theirs. Each mode composes a rendered frame
+/// into the window in <see cref="Present" />.
+/// </summary>
+internal abstract class RenderTarget : IDisposable
 {
     /// <summary>
     /// A session-owned texture ring deep enough to keep compositing while the map renders the next
     /// frame.
     /// </summary>
-    internal const uint OwnedTextureRingDepth = 2;
+    protected const uint OwnedTextureRingDepth = 2;
 
-    /// <summary>
-    /// The presentation context belongs to the render loop, so every session in this example is
-    /// driven by the thread that owns it.
-    /// </summary>
-    internal static readonly RenderSessionAttachOptions CallerDriverOptions = new()
-    {
-        Driver = RenderDriverKind.CallerGraphicsThread,
-    };
+    private readonly GlfwWindow window;
+    private bool released;
 
-    internal static void Wait(RenderSessionHandle session, Task operation)
+    protected RenderTarget(IGraphicsContext graphics, RenderSessionHandle session)
     {
-        while (!operation.IsCompleted)
-        {
-            Service(session);
-            Thread.Yield();
-        }
-        operation.GetAwaiter().GetResult();
-    }
-
-    /// <summary>Submits one host-paced demand and reports the frame the driver produced.</summary>
-    internal static RenderFrameResult? Render(RenderSessionHandle session, bool present)
-    {
-        session.RequestFrame(
-            new FrameDemand(
-                FrameDemandFlag.IfNeeded | (present ? FrameDemandFlag.Present : (FrameDemandFlag)0),
-                0,
-                0,
-                0
-            )
-        );
-        Service(session);
+        Graphics = graphics;
+        Session = session;
+        window = graphics.Window;
         try
         {
-            using var results = session.DrainFrameResults();
-            var count = results.Count();
-            return count == 0 ? null : results.Get(count - 1);
-        }
-        catch (MaplibreException error) when (error.Status == MaplibreStatus.NotReady)
-        {
-            return null;
-        }
-    }
-
-    internal static void Close(RenderSessionHandle session)
-    {
-        try
-        {
-            Wait(session, session.DetachAsync());
-        }
-        catch
-        {
-            try
-            {
-                session.Abandon();
-            }
-            finally
-            {
-                session.Close();
-            }
-            throw;
-        }
-        session.Close();
-    }
-
-    internal static void CompleteAttachment(RenderSessionHandle session)
-    {
-        try
-        {
-            Wait(session, session.Completion);
+            AwaitDriverWork(session.Completion);
         }
         catch
         {
@@ -113,72 +43,215 @@ internal static class RenderTargetDriver
         }
     }
 
-    private static void Service(RenderSessionHandle session) => session.ServiceDriverWork(0);
-}
+    protected IGraphicsContext Graphics { get; }
 
-internal static class RenderTargetFactory
-{
-    public static IRenderTarget Attach(
+    protected RenderSessionHandle Session { get; }
+
+    public static RenderTarget Attach(
         IGraphicsContext graphics,
         MapHandle map,
-        RenderTargetMode mode
+        RenderTargetMode mode,
+        LoopWakes wakes
     )
     {
         if (graphics is OpenGLContext openGl)
         {
             openGl.MakeCurrentForRendering();
         }
+        var viewport = graphics.ReadViewport();
         return mode.Kind switch
         {
             RenderTargetModeKind.OwnedTexture => OwnedTextureRenderTarget.Attach(
                 graphics,
                 map,
-                graphics.ReadViewport()
+                viewport,
+                wakes
             ),
             RenderTargetModeKind.BorrowedTexture => BorrowedTextureRenderTarget.Attach(
                 graphics,
                 map,
-                graphics.ReadViewport()
+                viewport,
+                wakes
             ),
             RenderTargetModeKind.NativeSurface => NativeSurfaceRenderTarget.Attach(
                 graphics,
                 map,
-                graphics.ReadViewport()
+                viewport,
+                wakes
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(mode)),
         };
     }
+
+    /// <summary>Asks for a frame. A forced frame renders even when the map has no newer update.</summary>
+    public void RequestFrame(bool force = false) =>
+        Session.RequestFrame(
+            FrameDemand.Default with
+            {
+                Flags = force
+                    ? FrameDemandFlag.Present
+                    : FrameDemandFlag.IfNeeded | FrameDemandFlag.Present,
+            }
+        );
+
+    public void ServiceDriverWork() => Session.ServiceDriverWork(0);
+
+    /// <summary>
+    /// Drains every frame result and presents each rendered frame. A result that asks for another
+    /// frame, as during a paint transition, requests it, and a frame that missed the window renders
+    /// again.
+    /// </summary>
+    /// <returns>Whether a frame reached the window.</returns>
+    public bool DrainFrameResults()
+    {
+        RenderFrameBatchHandle results;
+        try
+        {
+            results = Session.DrainFrameResults();
+        }
+        catch (MaplibreException error) when (error.Status == MaplibreStatus.NotReady)
+        {
+            return false;
+        }
+
+        var presented = false;
+        var missed = false;
+        var needsRepaint = false;
+        using (results)
+        {
+            var count = results.Count();
+            for (ulong index = 0; index < count; index++)
+            {
+                var result = results.Get(index);
+                if (result.Disposition != RenderResult.Rendered)
+                {
+                    continue;
+                }
+                if (Present())
+                {
+                    presented = true;
+                }
+                else
+                {
+                    missed = true;
+                }
+                needsRepaint |= result.NeedsRepaint;
+            }
+        }
+
+        if (missed || needsRepaint)
+        {
+            RequestFrame(force: missed);
+        }
+        return presented;
+    }
+
+    /// <summary>
+    /// Follows a resized host and keeps the session attached, so its renderer stays warm. The
+    /// session resize carries the new extent to the map.
+    /// </summary>
+    public virtual void Resize(Viewport viewport) =>
+        _ = Session.ResizeAsync(viewport.RenderTargetExtent);
+
+    /// <summary>Detaches through the driver, abandoning the session if that fails, then closes it.</summary>
+    public virtual void Dispose()
+    {
+        try
+        {
+            if (!released)
+            {
+                AwaitDriverWork(Session.DetachAsync());
+            }
+        }
+        catch
+        {
+            try
+            {
+                Session.Abandon();
+            }
+            finally
+            {
+                Session.Close();
+            }
+            throw;
+        }
+        Session.Close();
+    }
+
+    /// <summary>Shows the frame the session just rendered, and reports whether it reached the window.</summary>
+    protected abstract bool Present();
+
+    /// <summary>
+    /// Hands the session a replacement texture through <paramref name="handover" />, and waits for
+    /// it. Frames that ran before the handover drew into the outgoing texture, so they are drained
+    /// and presented while that texture is still current. A failed handover leaves it unknown which
+    /// texture the session holds, so the session is detached before the caller releases either one.
+    /// </summary>
+    protected void HandOver(Func<Task> handover)
+    {
+        try
+        {
+            AwaitDriverWork(handover());
+        }
+        catch
+        {
+            released = true;
+            try
+            {
+                AwaitDriverWork(Session.DetachAsync());
+            }
+            catch
+            {
+                Session.Abandon();
+            }
+            throw;
+        }
+        DrainFrameResults();
+    }
+
+    /// <summary>
+    /// Services driver work on the GLFW thread until <paramref name="operation" /> finishes. Between
+    /// services the thread waits for the driver-work wake or for the operation, each of which posts
+    /// an empty event. This must not run inside a GLFW callback.
+    /// </summary>
+    private void AwaitDriverWork(Task operation)
+    {
+        _ = operation.ContinueWith(
+            _ => window.Glfw.PostEmptyEvent(),
+            TaskContinuationOptions.ExecuteSynchronously
+        );
+        while (true)
+        {
+            Session.ServiceDriverWork(0);
+            if (operation.IsCompleted)
+            {
+                break;
+            }
+            window.WaitEvents();
+        }
+        operation.GetAwaiter().GetResult();
+    }
 }
 
-internal sealed class OwnedTextureRenderTarget : IRenderTarget
+internal sealed class OwnedTextureRenderTarget : RenderTarget
 {
-    private static RenderSessionAttachOptions RingDepthOptions() =>
-        new()
-        {
-            Driver = RenderDriverKind.CallerGraphicsThread,
-            RequestedTextureRingDepth = RenderTargetDriver.OwnedTextureRingDepth,
-        };
-
-    private readonly IGraphicsContext graphics;
     private readonly ITextureCompositor compositor;
-    private readonly RenderSessionHandle session;
 
     private OwnedTextureRenderTarget(
         IGraphicsContext graphics,
         ITextureCompositor compositor,
         RenderSessionHandle session
     )
+        : base(graphics, session)
     {
-        this.graphics = graphics;
         this.compositor = compositor;
-        this.session = session;
-        RenderTargetDriver.CompleteAttachment(session);
     }
 
     public static OwnedTextureRenderTarget Attach(
         IGraphicsContext graphics,
         MapHandle map,
-        Viewport viewport
+        Viewport viewport,
+        LoopWakes wakes
     )
     {
         ITextureCompositor compositor = graphics switch
@@ -192,6 +265,7 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
         };
         try
         {
+            var options = wakes.AttachOptions(OwnedTextureRingDepth);
             var session = graphics switch
             {
                 MetalContext metal => map.MetalOwnedTextureAttach(
@@ -200,7 +274,7 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
                         Extent = viewport.RenderTargetExtent,
                         Context = metal.Descriptor(),
                     },
-                    RingDepthOptions()
+                    options
                 ),
                 VulkanContext vulkan => map.VulkanOwnedTextureAttach(
                     new VulkanOwnedTextureDescriptor
@@ -208,7 +282,7 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
                         Extent = viewport.RenderTargetExtent,
                         Context = vulkan.Descriptor(),
                     },
-                    RingDepthOptions()
+                    options
                 ),
                 OpenGLContext openGl => map.OpenglOwnedTextureAttach(
                     new OpenglOwnedTextureDescriptor
@@ -216,7 +290,7 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
                         Extent = viewport.RenderTargetExtent,
                         Context = openGl.Descriptor(requirePbufferConfig: true),
                     },
-                    RingDepthOptions()
+                    options
                 ),
                 _ => throw new InvalidOperationException(
                     $"Owned textures are not implemented for {graphics.Backend}."
@@ -231,27 +305,22 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
         }
     }
 
-    public bool Render()
+    protected override bool Present()
     {
-        var result = RenderTargetDriver.Render(session, present: false);
-        if (result?.Disposition != RenderResult.Rendered)
-        {
-            return false;
-        }
         // An empty ring keeps the previously composited frame on screen.
         AcquiredFrameHandle frame;
         try
         {
-            frame = session.AcquireFrame();
+            frame = Session.AcquireFrame();
         }
         catch (MaplibreException error) when (error.Status == MaplibreStatus.NotReady)
         {
-            return false;
+            return true;
         }
         using (frame)
         {
             var presented = false;
-            switch (graphics)
+            switch (Graphics)
             {
                 case MetalContext:
                     frame.WithMetalTexture(view => presented = compositor.Draw(view));
@@ -268,23 +337,25 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
                     break;
             }
             if (presented)
-                graphics.FinishFrame();
+            {
+                Graphics.FinishFrame();
+            }
             frame.Release(GpuSync.Default);
-            return presented && !result.Value.NeedsRepaint;
+            return presented;
         }
     }
 
-    public void Resize(Viewport viewport)
+    public override void Resize(Viewport viewport)
     {
-        RenderTargetDriver.Wait(session, session.ResizeAsync(viewport.RenderTargetExtent));
         compositor.Resize(viewport);
+        base.Resize(viewport);
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         try
         {
-            RenderTargetDriver.Close(session);
+            base.Dispose();
         }
         finally
         {
@@ -293,14 +364,11 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
     }
 }
 
-internal sealed class BorrowedTextureRenderTarget : IRenderTarget
+internal sealed class BorrowedTextureRenderTarget : RenderTarget
 {
-    private readonly IGraphicsContext graphics;
     private readonly ITextureCompositor compositor;
-    private readonly RenderSessionHandle session;
     private readonly MapHandle map;
     private IDisposable texture;
-    private bool sessionReleased;
 
     private BorrowedTextureRenderTarget(
         IGraphicsContext graphics,
@@ -309,35 +377,31 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         RenderSessionHandle session,
         MapHandle map
     )
+        : base(graphics, session)
     {
-        this.graphics = graphics;
         this.compositor = compositor;
         this.texture = texture;
-        this.session = session;
         this.map = map;
-        RenderTargetDriver.CompleteAttachment(session);
     }
 
     public static BorrowedTextureRenderTarget Attach(
         IGraphicsContext graphics,
         MapHandle map,
-        Viewport viewport
+        Viewport viewport,
+        LoopWakes wakes
     ) =>
         graphics switch
         {
-            MetalContext metal => AttachMetal(metal, map, viewport),
-            VulkanContext vulkan => AttachVulkan(vulkan, map, viewport),
-            OpenGLContext openGl => AttachOpenGL(openGl, map, viewport),
+            MetalContext metal => AttachMetal(metal, map, viewport, wakes),
+            VulkanContext vulkan => AttachVulkan(vulkan, map, viewport, wakes),
+            OpenGLContext openGl => AttachOpenGL(openGl, map, viewport, wakes),
             _ => throw new InvalidOperationException(
                 $"Borrowed textures are not implemented for {graphics.Backend}."
             ),
         };
 
-    public bool Render()
+    protected override bool Present()
     {
-        var result = RenderTargetDriver.Render(session, present: false);
-        if (result?.Disposition != RenderResult.Rendered)
-            return false;
         var presented = texture switch
         {
             MetalBorrowedTexture metalTexture
@@ -354,100 +418,70 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
             _ => throw new InvalidOperationException("Unsupported borrowed texture compositor."),
         };
         if (presented)
-            graphics.FinishFrame();
-        return presented && !result.Value.NeedsRepaint;
+        {
+            Graphics.FinishFrame();
+        }
+        return presented;
     }
 
-    public void Resize(Viewport viewport)
+    /// <summary>Allocates a texture at the new size and hands it to the live session.</summary>
+    public override void Resize(Viewport viewport)
     {
+        compositor.Resize(viewport);
         IDisposable replacement;
-        Task handover;
-        switch (graphics)
+        Func<Task> handover;
+        switch (Graphics)
         {
             case MetalContext metal:
                 var metalTexture = new MetalBorrowedTexture(metal, viewport);
                 replacement = metalTexture;
-                handover = session.MetalBorrowedTextureSetTargetAsync(
-                    Describe(metalTexture, viewport)
-                );
+                handover = () =>
+                    Session.MetalBorrowedTextureSetTargetAsync(Describe(metalTexture, viewport));
                 break;
             case VulkanContext vulkan:
                 var vulkanImage = new VulkanBorrowedImage(vulkan, viewport);
                 replacement = vulkanImage;
-                handover = session.VulkanBorrowedTextureSetTargetAsync(
-                    Describe(vulkan, vulkanImage, viewport)
-                );
+                handover = () =>
+                    Session.VulkanBorrowedTextureSetTargetAsync(
+                        Describe(vulkan, vulkanImage, viewport)
+                    );
                 break;
             case OpenGLContext openGl:
                 var openGlTexture = new OpenGLBorrowedTexture(openGl, viewport);
                 replacement = openGlTexture;
-                handover = session.OpenglBorrowedTextureSetTargetAsync(
-                    Describe(openGl, openGlTexture, viewport)
-                );
+                handover = () =>
+                    Session.OpenglBorrowedTextureSetTargetAsync(
+                        Describe(openGl, openGlTexture, viewport)
+                    );
                 break;
             default:
                 throw new InvalidOperationException(
-                    $"Borrowed textures are not implemented for {graphics.Backend}."
+                    $"Borrowed textures are not implemented for {Graphics.Backend}."
                 );
         }
 
         try
         {
-            RenderTargetDriver.Wait(session, handover);
+            HandOver(handover);
         }
         catch
         {
-            // A failed handover may or may not have left the session holding the replacement, so
-            // release the session before releasing either texture. Dispose must not release it a
-            // second time, whichever way this path ends.
-            sessionReleased = true;
-            try
-            {
-                RenderTargetDriver.Wait(session, session.DetachAsync());
-            }
-            catch
-            {
-                session.Abandon();
-            }
             replacement.Dispose();
             throw;
         }
-        var outgoing = texture;
+        texture.Dispose();
         texture = replacement;
-        try
-        {
-            compositor.Resize(viewport);
-            // A handover replaces only the graphics resource, so the map still needs the extent.
-            map.ResizeAsync(
-                    new LogicalExtent(
-                        viewport.LogicalWidth,
-                        viewport.LogicalHeight,
-                        viewport.ScaleFactor
-                    )
-                )
-                .GetAwaiter()
-                .GetResult();
-        }
-        finally
-        {
-            outgoing.Dispose();
-        }
+        // A handover replaces only the graphics resource, so the map still needs the extent.
+        _ = map.ResizeAsync(
+            new LogicalExtent(viewport.LogicalWidth, viewport.LogicalHeight, viewport.ScaleFactor)
+        );
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         try
         {
-            // A failed handover already released the session; detaching a released session reports
-            // MLN_STATUS_INVALID_STATE, which would replace the handover failure with its own.
-            if (sessionReleased)
-            {
-                session.Close();
-            }
-            else
-            {
-                RenderTargetDriver.Close(session);
-            }
+            base.Dispose();
         }
         finally
         {
@@ -465,7 +499,8 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
     private static BorrowedTextureRenderTarget AttachMetal(
         MetalContext metal,
         MapHandle map,
-        Viewport viewport
+        Viewport viewport,
+        LoopWakes wakes
     )
     {
         var texture = new MetalBorrowedTexture(metal, viewport);
@@ -476,7 +511,7 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
             {
                 var session = map.MetalBorrowedTextureAttach(
                     Describe(texture, viewport),
-                    RenderTargetDriver.CallerDriverOptions
+                    wakes.AttachOptions()
                 );
                 return new(metal, compositor, texture, session, map);
             }
@@ -496,7 +531,8 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
     private static BorrowedTextureRenderTarget AttachVulkan(
         VulkanContext vulkan,
         MapHandle map,
-        Viewport viewport
+        Viewport viewport,
+        LoopWakes wakes
     )
     {
         var texture = new VulkanBorrowedImage(vulkan, viewport);
@@ -507,7 +543,7 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
             {
                 var session = map.VulkanBorrowedTextureAttach(
                     Describe(vulkan, texture, viewport),
-                    RenderTargetDriver.CallerDriverOptions
+                    wakes.AttachOptions()
                 );
                 return new(vulkan, compositor, texture, session, map);
             }
@@ -527,7 +563,8 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
     private static BorrowedTextureRenderTarget AttachOpenGL(
         OpenGLContext openGl,
         MapHandle map,
-        Viewport viewport
+        Viewport viewport,
+        LoopWakes wakes
     )
     {
         var texture = new OpenGLBorrowedTexture(openGl, viewport);
@@ -538,7 +575,7 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
             {
                 var session = map.OpenglBorrowedTextureAttach(
                     Describe(openGl, texture, viewport),
-                    RenderTargetDriver.CallerDriverOptions
+                    wakes.AttachOptions()
                 );
                 return new(openGl, compositor, texture, session, map);
             }
@@ -610,22 +647,20 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         };
 }
 
-internal sealed class NativeSurfaceRenderTarget : IRenderTarget
+/// <summary>A window surface, where the driver presents each frame it renders.</summary>
+internal sealed class NativeSurfaceRenderTarget : RenderTarget
 {
-    private readonly RenderSessionHandle session;
-
-    private NativeSurfaceRenderTarget(RenderSessionHandle session)
-    {
-        this.session = session;
-        RenderTargetDriver.CompleteAttachment(session);
-    }
+    private NativeSurfaceRenderTarget(IGraphicsContext graphics, RenderSessionHandle session)
+        : base(graphics, session) { }
 
     public static NativeSurfaceRenderTarget Attach(
         IGraphicsContext graphics,
         MapHandle map,
-        Viewport viewport
+        Viewport viewport,
+        LoopWakes wakes
     ) =>
         new(
+            graphics,
             graphics switch
             {
                 MetalContext metal => map.MetalSurfaceAttach(
@@ -635,7 +670,7 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
                         Layer = metal.LayerPointer(),
                         Context = metal.Descriptor(),
                     },
-                    RenderTargetDriver.CallerDriverOptions
+                    wakes.AttachOptions()
                 ),
                 VulkanContext vulkan => map.VulkanSurfaceAttach(
                     new VulkanSurfaceDescriptor
@@ -644,7 +679,7 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
                         Surface = vulkan.SurfaceHandle(),
                         Context = vulkan.Descriptor(),
                     },
-                    RenderTargetDriver.CallerDriverOptions
+                    wakes.AttachOptions()
                 ),
                 OpenGLContext openGl => map.OpenglSurfaceAttach(
                     new OpenglSurfaceDescriptor
@@ -653,7 +688,7 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
                         Surface = openGl.SurfacePointer(),
                         Context = openGl.Descriptor(requirePbufferConfig: false),
                     },
-                    RenderTargetDriver.CallerDriverOptions
+                    wakes.AttachOptions()
                 ),
                 _ => throw new InvalidOperationException(
                     $"Native surfaces are not implemented for {graphics.Backend}."
@@ -661,14 +696,5 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
             }
         );
 
-    public bool Render()
-    {
-        var result = RenderTargetDriver.Render(session, present: true);
-        return result is { Disposition: RenderResult.Rendered, NeedsRepaint: false };
-    }
-
-    public void Resize(Viewport viewport) =>
-        RenderTargetDriver.Wait(session, session.ResizeAsync(viewport.RenderTargetExtent));
-
-    public void Dispose() => RenderTargetDriver.Close(session);
+    protected override bool Present() => true;
 }

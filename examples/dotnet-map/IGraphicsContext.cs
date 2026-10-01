@@ -19,8 +19,6 @@ internal interface IGraphicsContext : IDisposable
 
     void Resize(Viewport viewport);
 
-    void PollEvents();
-
     void FinishFrame();
 }
 

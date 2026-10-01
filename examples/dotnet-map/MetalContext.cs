@@ -257,11 +257,6 @@ internal sealed unsafe class MetalContext : IGraphicsContext
         );
     }
 
-    public void PollEvents()
-    {
-        window.PollEvents();
-    }
-
     public void FinishFrame() { }
 
     public void Dispose()

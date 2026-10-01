@@ -37,20 +37,13 @@ internal static class Program
             Maplibre.LogSetCallback(PrintNativeLog);
             try
             {
-                if (parseResult.Smoke)
-                {
-                    return Shell.RunSmoke(parseResult.Mode.Value, backends) ? 0 : 1;
-                }
-
-                Shell.Run(parseResult.Mode.Value, backends);
+                return Shell.Run(parseResult.Mode.Value, backends, parseResult.Smoke) ? 0 : 1;
             }
             finally
             {
                 Maplibre.LogClearCallback();
                 Maplibre.LogSetAsyncSeverityMask(LogSeverityMask.Default);
             }
-
-            return 0;
         }
         catch (Exception error)
         {

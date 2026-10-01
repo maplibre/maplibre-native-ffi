@@ -105,8 +105,6 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         MakeCurrent();
     }
 
-    public void PollEvents() => window.PollEvents();
-
     public void FinishFrame()
     {
         MakeCurrent();

@@ -36,8 +36,6 @@ internal sealed unsafe class GlfwWindow : IDisposable
 
     public Viewport CurrentViewport { get; private set; }
 
-    public event Action<Viewport>? ViewportChanged;
-
     /// <summary>Opens a window, hidden when <paramref name="visible" /> is false.</summary>
     /// <remarks>
     /// A hidden window on a Linux host with no display uses GLFW's null platform, which creates
@@ -94,9 +92,10 @@ internal sealed unsafe class GlfwWindow : IDisposable
 
     public Viewport ReadViewport() => CurrentViewport;
 
-    public void PollEvents()
+    /// <summary>Sleeps until input arrives or a native wake posts an empty event.</summary>
+    public void WaitEvents()
     {
-        Glfw.PollEvents();
+        Glfw.WaitEvents();
     }
 
     public void WaitEventsTimeout(double timeoutSeconds)
@@ -196,7 +195,9 @@ internal sealed unsafe class GlfwWindow : IDisposable
 
         CurrentViewport = viewport;
         CurrentViewport.Log(label);
-        ViewportChanged?.Invoke(CurrentViewport);
+        // A Cocoa resize arrives as a notification rather than an event, so post one to end the
+        // render loop's wait.
+        Glfw.PostEmptyEvent();
     }
 
     private static bool HasDisplay() =>

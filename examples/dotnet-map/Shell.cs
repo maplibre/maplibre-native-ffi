@@ -3,70 +3,16 @@ using Maplibre.NativeFfi.Render;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-/// <summary>App shell: GLFW/render-session affinity and autonomous map execution.</summary>
+/// <summary>
+/// App shell. GLFW, the graphics context, and the render session stay on the main thread, which
+/// sleeps until input arrives or a native wake posts an empty event. Input becomes map commands, a
+/// map update becomes a frame demand, and each wake has the thread drain events, service driver
+/// work, or drain frame results.
+/// </summary>
 internal static class Shell
 {
     public const int InitialWidth = 960;
     public const int InitialHeight = 640;
-
-    // TODO(map-example-spec): Replace the fixed interval with a display-paced host loop. See Frame loop.
-    private static readonly TimeSpan RenderLoopInterval = TimeSpan.FromMilliseconds(8);
-
-    public static void Run(RenderTargetMode mode, RenderBackendFlag backends)
-    {
-        // GLFW, the graphics context, and the render session remain on the main thread.
-        using var graphics = GraphicsContext.Create(
-            "dotnet-map",
-            InitialWidth,
-            InitialHeight,
-            backends,
-            visible: true
-        );
-        using var state = MapState.Create(graphics.ReadViewport());
-        var renderRequest = new RenderRequest();
-
-        RenderLoop(graphics, mode, state, renderRequest);
-    }
-
-    /// <summary>
-    /// Renders frames in a hidden window until one reaches it with the map at rest, then tears
-    /// down as a closed window would. The style is inline, so the run needs no network.
-    /// </summary>
-    /// <returns>Whether a frame rendered before the deadline.</returns>
-    public static bool RunSmoke(RenderTargetMode mode, RenderBackendFlag backends)
-    {
-        using var graphics = GraphicsContext.Create(
-            "dotnet-map",
-            InitialWidth,
-            InitialHeight,
-            backends,
-            visible: false
-        );
-        using var state = MapState.Create(graphics.ReadViewport(), SmokeStyle);
-        var target = RenderTargetFactory.Attach(graphics, state.Map, mode);
-        try
-        {
-            var elapsed = System.Diagnostics.Stopwatch.StartNew();
-            while (elapsed.Elapsed < SmokeDeadline)
-            {
-                graphics.PollEvents();
-                if (graphics.CanRenderFrame && Render(graphics, target))
-                {
-                    Console.WriteLine($"smoke: rendered a frame with {mode.CliName}");
-                    return true;
-                }
-
-                graphics.Window.WaitEventsTimeout(RenderLoopInterval.TotalSeconds);
-            }
-
-            Console.Error.WriteLine($"smoke: no frame rendered within {SmokeDeadline}");
-            return false;
-        }
-        finally
-        {
-            target.Dispose();
-        }
-    }
 
     private static readonly TimeSpan SmokeDeadline = TimeSpan.FromSeconds(60);
 
@@ -75,67 +21,80 @@ internal static class Shell
             {"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#2a6f97"}}]}
             """u8.ToArray();
 
-    private static void RenderLoop(
-        IGraphicsContext graphics,
-        RenderTargetMode mode,
-        MapState state,
-        RenderRequest renderRequest
-    )
+    /// <summary>
+    /// Runs the example until its window closes. A smoke run instead renders an inline style in a
+    /// hidden window, so it needs no network, and tears down as a closed window would after the
+    /// first frame that reaches the window.
+    /// </summary>
+    /// <returns>False when a smoke run rendered no frame before its deadline.</returns>
+    public static bool Run(RenderTargetMode mode, RenderBackendFlag backends, bool smoke)
     {
+        using var graphics = GraphicsContext.Create(
+            "dotnet-map",
+            InitialWidth,
+            InitialHeight,
+            backends,
+            visible: !smoke
+        );
+        var wakes = new LoopWakes(graphics.Window.Glfw);
+        using var state = MapState.Create(
+            graphics.ReadViewport(),
+            wakes.Events.Wake,
+            smoke ? SmokeStyle : null
+        );
+        // The thread-affine session closes before the map and runtime are released.
+        using var target = RenderTarget.Attach(graphics, state.Map, mode, wakes);
+        Console.WriteLine($"render target: {mode.CliName}");
+        Console.WriteLine($"render target status: {mode.Status}");
+        InputController.PrintControls();
+        using var input = new InputController(graphics.Window, state);
+
         var viewport = graphics.ReadViewport();
-        IRenderTarget? target = null;
-        try
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+        // The session attached after the map took its style and camera, so it starts with one frame.
+        target.RequestFrame();
+        while (!graphics.ShouldClose)
         {
-            target = RenderTargetFactory.Attach(graphics, state.Map, mode);
-            Console.WriteLine($"render target: {mode.CliName}");
-            Console.WriteLine($"render target status: {mode.Status}");
-            InputController.PrintControls();
-            using var input = new InputController(graphics.Window, state, renderRequest);
-
-            while (!graphics.ShouldClose)
+            if (smoke)
             {
-                graphics.PollEvents();
-                if (state.DrainRenderRequests())
+                var remaining = SmokeDeadline - elapsed.Elapsed;
+                if (remaining <= TimeSpan.Zero)
                 {
-                    renderRequest.Set();
+                    Console.Error.WriteLine($"smoke: no frame rendered within {SmokeDeadline}");
+                    return false;
                 }
+                graphics.Window.WaitEventsTimeout(remaining.TotalSeconds);
+            }
+            else
+            {
+                graphics.Window.WaitEvents();
+            }
 
-                var currentViewport = graphics.ReadViewport();
-                if (currentViewport != viewport)
+            using var pool = graphics is MetalContext ? MacObjectiveC.AutoreleasePool() : null;
+            var currentViewport = graphics.ReadViewport();
+            if (currentViewport != viewport)
+            {
+                viewport = currentViewport;
+                if (!viewport.IsEmpty)
                 {
-                    viewport = currentViewport;
-                    if (!viewport.IsEmpty)
-                    {
-                        graphics.Resize(viewport);
-                        // The render target owns the map's extent while a session is attached.
-                        target.Resize(viewport);
-                        renderRequest.Set();
-                    }
+                    graphics.Resize(viewport);
+                    target.Resize(viewport);
                 }
-
-                if (graphics.CanRenderFrame && renderRequest.Consume() && !Render(graphics, target))
-                {
-                    renderRequest.Set();
-                }
-
-                graphics.Window.WaitEventsTimeout(RenderLoopInterval.TotalSeconds);
+            }
+            if (wakes.Events.Consume() && state.DrainRenderUpdates() && graphics.CanRenderFrame)
+            {
+                target.RequestFrame();
+            }
+            if (wakes.DriverWork.Consume())
+            {
+                target.ServiceDriverWork();
+            }
+            if (wakes.Frames.Consume() && target.DrainFrameResults() && smoke)
+            {
+                Console.WriteLine($"smoke: rendered a frame with {mode.CliName}");
+                return true;
             }
         }
-        finally
-        {
-            // The thread-affine session closes before the map and runtime are released.
-            target?.Dispose();
-        }
-    }
-
-    private static bool Render(IGraphicsContext graphics, IRenderTarget target)
-    {
-        if (graphics is not MetalContext)
-        {
-            return target.Render();
-        }
-
-        using var pool = MacObjectiveC.AutoreleasePool();
-        return target.Render();
+        return true;
     }
 }

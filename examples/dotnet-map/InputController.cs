@@ -4,7 +4,7 @@ using Silk.NET.GLFW;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-/// <summary>Decodes host input into any-thread camera submissions.</summary>
+/// <summary>Decodes host input into map camera commands.</summary>
 /// <remarks>GLFW reports pointer positions in the map's logical coordinates already.</remarks>
 internal sealed unsafe class InputController : IDisposable
 {
@@ -19,7 +19,6 @@ internal sealed unsafe class InputController : IDisposable
 
     private readonly GlfwWindow window;
     private readonly MapState state;
-    private readonly RenderRequest renderRequest;
     private readonly GlfwCallbacks.CursorPosCallback cursorCallback;
     private readonly GlfwCallbacks.MouseButtonCallback mouseButtonCallback;
     private readonly GlfwCallbacks.ScrollCallback scrollCallback;
@@ -33,12 +32,11 @@ internal sealed unsafe class InputController : IDisposable
     private double cursorY;
     private bool closed;
 
-    public InputController(GlfwWindow window, MapState state, RenderRequest renderRequest)
+    public InputController(GlfwWindow window, MapState state)
     {
         ArgumentNullException.ThrowIfNull(window);
         this.window = window;
         this.state = state;
-        this.renderRequest = renderRequest;
         cursorCallback = OnCursor;
         mouseButtonCallback = OnMouseButton;
         scrollCallback = OnScroll;
@@ -98,11 +96,6 @@ internal sealed unsafe class InputController : IDisposable
         {
             state.MoveBy(dx, dy);
         }
-        else
-        {
-            return;
-        }
-        renderRequest.Set();
     }
 
     private void OnMouseButton(
@@ -154,7 +147,6 @@ internal sealed unsafe class InputController : IDisposable
         _ = xOffset;
         var scale = Math.Pow(2.0, yOffset * 0.25);
         state.ScaleBy(scale, new ScreenPoint(cursorX, cursorY));
-        renderRequest.Set();
     }
 
     private void OnKey(
@@ -213,9 +205,6 @@ internal sealed unsafe class InputController : IDisposable
             case Keys.Number0:
                 state.ResetOrientation(ResetAnimation);
                 break;
-            default:
-                return;
         }
-        renderRequest.Set();
     }
 }
