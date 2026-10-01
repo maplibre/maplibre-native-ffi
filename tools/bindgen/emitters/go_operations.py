@@ -11,18 +11,7 @@ def element(value):
     return value.element if value.kind == "reference" else value
 
 
-def operation(plan, values):
-    if plan.role == "support":
-        raise ModelError(
-            [f"{plan.name}: support relationship is emitted with its owner or value"]
-        )
-    if plan.direct_registrations:
-        from .go_callbacks import direct_operation
-
-        return direct_operation(plan, values)
-    receiver_name = plan.receiver or plan.scoped_receiver
-    receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
-    handle = element(receiver.value) if receiver else None
+def method_name(plan, receiver, handle):
     method = name(
         plan.function.metadata.get(
             "name",
@@ -30,82 +19,95 @@ def operation(plan, values):
                 (handle.native.removesuffix("_handle") + "_") if handle else "mln_"
             ),
         )
-    )
-    method = method.removeprefix("Mln")
+    ).removeprefix("Mln")
     if handle and handle.handle and plan.name == handle.handle.release:
-        method = "Close"
-    elif receiver and method in {"Close", "IsClosed", "ID"}:
+        return "Close"
+    if receiver and method in {"Close", "IsClosed", "ID"}:
         raise ModelError([f"{plan.name}: {method} is reserved for owner state"])
-    signature, setup, arguments = [], [], {}
-    aliases = []
-    public_names = set()
-    internal_names = {f"input{i}" for i in range(len(plan.inputs))} | {
-        "receiver",
-        "callback",
-        "diagnostic",
-    }
-    count_parameters = {
-        p.value.length
-        for p in plan.inputs
-        if p.value.kind in {"array", "buffer"} and p.value.length
-    }
-    for index, p in enumerate(plan.inputs):
-        if p.name == receiver_name or p.name in count_parameters:
-            continue
-        value = p.value
-        values.require(value, input=True)
-        local = f"input{index}"
-        parts = p.name.split("_")
-        label = parts[0] + "".join(name(part) for part in parts[1:])
-        while label in GO_KEYWORDS or label in internal_names or label in public_names:
-            label += "_"
-        public_names.add(label)
-        signature.append(f"{label} {values.type(value)}")
-        aliases.append(f"{local} := {label}")
-        if value.kind == "handle":
-            setup.append(
-                f'if {local} == nil || {local}.bindingOwner == nil {{ arena.fail("nil input handle") }}; {local}Raw, {local}Done := {local}.bindingAcquire(false); defer {local}Done()'
+    return method
+
+
+def argument(values, value, expr):
+    """A Go expression that converts expr to the native value of a parameter."""
+    if value.kind in {"scalar", "enum"}:
+        return f"{values.c_type(value)}({expr})"
+    if value.kind == "native_pointer":
+        return f"({values.c_type(value)})(C.binding_address(C.uintptr_t({expr})))"
+    if value.kind == "record":
+        return f"native{public(value.native)}({expr}, arena)"
+    if value.kind == "handle":
+        return f"C.{value.native}(arena.lease({expr}.owner()))"
+    if value.kind == "reference":
+        if value.nullable:
+            return f"bindingStoreOptional({expr}, arena, {converter(values, value.element)})"
+        return f"bindingStore({argument(values, value.element, expr)}, arena)"
+    if value.kind == "buffer":
+        if value.length == "nul":
+            return (
+                f"bindingOptionalCString({expr}, arena)"
+                if absent(value)
+                else f"arena.cstring({expr})"
             )
-            arguments[p.name] = f"C.{value.native}({local}Raw)"
-            continue
-        if value.kind == "array":
-            setup.append(f"var {local}Raw *C.{value.element.native}")
-            # Parameter counts belong to the operation rather than a record.
-            converted = values.native(
-                replace(value, length=str(0)), local, local + "Raw"
-            )
-            setup.append(converted)
-            if value.length and value.length.isdigit():
-                setup.append(
-                    f'if len({local}) != {value.length} {{ arena.fail("wrong fixed array length") }}'
-                )
-            elif value.length:
-                count = next(p for p in plan.inputs if p.name == value.length)
-                arguments[value.length] = (
-                    f"bindingCount[C.{count.value.native}](len({local}))"
-                )
-        else:
-            setup.append(f"var {local}Raw {values.c_type(value)}")
-            converted_value = value
-            if (
-                value.kind == "buffer"
-                and value.length
-                and value.length != "nul"
-                and not value.length.isdigit()
-            ):
-                converted_value = replace(value, length="0")
-                count = next(p for p in plan.inputs if p.name == value.length)
-                length = f"len({local})"
-                if absent(value):
-                    length = local + "Length"
-                    setup.append(
-                        f"{length} := 0; if {local} != nil {{ {length} = len(*{local}) }}"
-                    )
-                arguments[value.length] = (
-                    f"bindingCount[C.{count.value.native}]({length})"
-                )
-            setup.append(values.native(converted_value, local, local + "Raw"))
-        arguments[p.name] = local + "Raw"
+        if value.ctype.pointee:
+            if value.nullable:
+                return f"({values.c_type(value)})(bindingNullableBytes({expr}, arena))"
+            if value.optional == "empty":
+                return f"({values.c_type(value)})(bindingOptionalBytes({expr}, arena))"
+            data = f"[]byte({expr})" if value.encoding == "utf8" else expr
+            return f"({values.c_type(value)})(arena.bytes({data}))"
+        if value.nullable:
+            return f"bindingNullableView({expr}, arena)"
+        if value.optional == "empty":
+            return f"bindingOptionalView({expr}, arena)"
+        return f"bindingView({expr}, arena)"
+    if value.kind == "array":
+        if value.ctype.kind == "array":
+            values.fail(value, "fixed array parameters need a conversion")
+        helper = "bindingNullableArray" if value.nullable else "bindingArray"
+        return f"{helper}({expr}, arena, {converter(values, value.element)})"
+    values.fail(value, "missing native input conversion")
+
+
+def converter(values, value):
+    """A function value that converts one binding value and the arena to native."""
+    if value.kind == "record":
+        return f"native{public(value.native)}"
+    if (
+        value.kind == "buffer"
+        and not absent(value)
+        and not value.ctype.pointee
+        and value.length != "nul"
+    ):
+        return f"bindingView[{values.type(value)}]"
+    native = (
+        f"C.{value.native}"
+        if value.kind in {"record", "handle", "union"}
+        else values.c_type(value)
+    )
+    return f"func(item {values.type(value)}, arena *bindingArena) {native} {{ return {argument(values, value, 'item')} }}"
+
+
+def copier(values, value):
+    """A function value that copies one native value to its binding value."""
+    if value.kind == "record":
+        return f"copy{public(value.native)}"
+    if value.kind == "buffer" and not value.ctype.pointee and value.length != "nul":
+        text = "Text" if value.encoding == "utf8" else "Bytes"
+        if value.optional == "empty" and not value.nullable:
+            return f"copyOptionalView{text}"
+        if not absent(value):
+            return f"copyView{text}"
+    return f"func(raw C.{value.native}) {values.type(value)} {{ return {values.copy(value, 'raw')} }}"
+
+
+def operation(plan, values):
+    if plan.role == "support":
+        raise ModelError(
+            [f"{plan.name}: support relationship is emitted with its owner or value"]
+        )
+    receiver_name = plan.receiver or plan.scoped_receiver
+    receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
+    handle = element(receiver.value) if receiver else None
     decision = next(
         (
             c.decision
@@ -114,55 +116,86 @@ def operation(plan, values):
         ),
         None,
     )
-    completing = bool(decision and plan.name == decision.complete)
-    closing_decision = bool(decision and plan.name == decision.handle.release)
-    if receiver:
-        if completing:
-            setup.insert(
-                0,
-                "raw, finishCompletion := receiver.state.reserveCompletion(); accepted := false; defer func() { finishCompletion(accepted); runtime.KeepAlive(receiver) }()",
+    if plan.direct_registrations:
+        from .go_callbacks import direct_operation
+
+        return direct_operation(plan, values)
+    method = method_name(plan, receiver, handle)
+    operation_id = f"C.binding_operation_{plan.name}"
+    if decision and plan.name == decision.handle.release:
+        return f"func (receiver *{values.owner(handle.native)}) Close() error {{ return bindingCloseDecision(receiver.owner(), {operation_id}) }}\n"
+    if plan.view:
+        method = "With" + method.removeprefix("Get")
+    internal = {
+        "arena",
+        "raw",
+        "completion",
+        "diagnostic",
+        "receiver",
+        "result",
+        "future",
+        "item",
+        "adopted",
+        "handle",
+        "callback",
+        "token",
+        "scope",
+    }
+    labels = {}
+    for p in plan.function.parameters:
+        parts = p.name.split("_")
+        label = parts[0] + "".join(name(part) for part in parts[1:])
+        if p.name in {o.name for o in plan.outputs}:
+            label = "out" + name(p.name.removeprefix("out_"))
+        while label in GO_KEYWORDS or label in internal or label in labels.values():
+            label += "_"
+        labels[p.name] = label
+    counts = {
+        p.value.length: p
+        for p in plan.inputs
+        if p.value.kind in {"array", "buffer"}
+        and p.value.length
+        and p.value.length != "nul"
+        and not p.value.length.isdigit()
+    }
+    signature, setup, arguments = [], [], {}
+    for p in plan.inputs:
+        if p.name == receiver_name:
+            continue
+        if p.name in counts:
+            counted = counts[p.name]
+            length = (
+                f"bindingLen({labels[counted.name]})"
+                if counted.value.kind == "buffer" and absent(counted.value)
+                else f"len({labels[counted.name]})"
             )
-        elif plan.scoped_receiver:
-            values.require(handle)
-            setup.insert(0, "receiver.scope.check(); raw := receiver.native")
-        elif plan.consumes:
-            setup.insert(
-                0,
-                "raw, transaction := receiver.state.reserveClose(); defer transaction.finish(); defer runtime.KeepAlive(receiver)",
-            )
-        elif plan.receiver_access == "issued":
-            setup.insert(
-                0, "raw := receiver.state.issued; defer runtime.KeepAlive(receiver)"
-            )
-        else:
-            setup.insert(
-                0,
-                "raw, done := receiver.bindingAcquire("
-                + str(
-                    any(
-                        o.value.lifetime == "owner"
-                        or element(o.value).lifetime == "owner"
-                        for o in plan.outputs
-                    )
-                    or bool(plan.view)
-                ).lower()
-                + "); defer done()",
-            )
-        arguments[receiver.name] = (
-            "raw" if plan.scoped_receiver else f"C.{handle.native}(raw)"
-        )
-        if receiver.value.kind == "reference" and not plan.scoped_receiver:
-            setup.append(f"receiverRaw := C.{handle.native}(raw)")
-            arguments[receiver.name] = "&receiverRaw"
+            arguments[p.name] = f"bindingCount[C.{p.value.native}]({length})"
+            continue
+        value = p.value
+        values.require(value, input=True)
+        signature.append(f"{labels[p.name]} {values.type(value)}")
+        if value.kind == "array" and value.length and value.length.isdigit():
+            values.fail(value, "fixed-length array parameters need a check")
+        arguments[p.name] = argument(values, value, labels[p.name])
+    body_setup = []
+    if plan.scoped_receiver:
+        values.require(handle)
+        arguments[receiver.name] = "receiver.native"
+    elif receiver:
+        arguments[receiver.name] = f"C.{handle.native}(raw)"
+        if receiver.value.kind == "reference":
+            body_setup.append(f"handle := C.{handle.native}(raw)")
+            arguments[receiver.name] = "&handle"
     outputs = []
     for p in plan.outputs:
         value = element(p.value)
         values.require(value)
-        local = "output" + name(p.name)
-        init = (
-            f"C.{value.default}()" if value.default else f"*new({values.c_type(value)})"
+        local = labels[p.name]
+        setup.append(
+            f"{local} := C.{value.default}()"
+            if value.default
+            else f"var {local} {values.c_type(value)}"
         )
-        setup.append(f"{local} := {init}")
         for member in value.fields:
             if member.role == "size":
                 setup.append(
@@ -170,66 +203,80 @@ def operation(plan, values):
                 )
         arguments[p.name] = "&" + local
         outputs.append((p, value, local))
+    owned = {o.parameter: o for o in plan.owned_outputs}
 
-    def parent_of(owned):
-        # An adopted child retains the Go owner passed as its parent input.
-        if owned is None or owned.parent_parameter is None:
+    def parent_of(owner):
+        if owner is None or owner.parent_parameter is None:
             return "nil"
-        if owned.parent_parameter == receiver_name:
+        if owner.parent_parameter == receiver_name:
             return "receiver"
-        return "input" + str(
-            next(
-                index
-                for index, p in enumerate(plan.inputs)
-                if p.name == owned.parent_parameter
-            )
-        )
+        return labels[owner.parent_parameter]
 
-    owned_outputs = {owned.parameter: owned for owned in plan.owned_outputs}
-    output_types = []
-    conversions = []
+    output_types, conversions, adoptions = [], [], []
     for p, value, local in outputs:
         output_types.append(values.type(value))
         if value.kind == "handle":
-            parent = parent_of(owned_outputs.get(p.name))
-            conversions.append(
-                f"adopt{values.owner(value.native)}(uint64({local}), {parent})"
+            adopted = f"adopted{len(adoptions)}" if len(outputs) > 1 else "adopted"
+            adoptions.append(
+                f"{adopted} := adopt{values.owner(value.native)}(uint64({local}), {parent_of(owned.get(p.name))})"
             )
+            conversions.append(adopted)
         else:
             conversions.append(values.copy(value, local, local))
-    completion_type = None
-    converter = None
+    if adoptions and plan.registrations:
+        first = conversions[
+            next(i for i, (_, v, _) in enumerate(outputs) if v.kind == "handle")
+        ]
+        adoptions.append(f"arena.accept({first}.bindingOwner)")
+    if plan.consumes == "always":
+        access = "Consuming"
+    elif plan.consumes:
+        access = "Closing"
+    elif decision and plan.name == decision.complete:
+        access = "Completing"
+    elif plan.receiver_access == "issued":
+        access = "Issued"
+    elif plan.view or any(
+        o.value.lifetime == "owner" or element(o.value).lifetime == "owner"
+        for o in plan.outputs
+    ):
+        access = "Read"
+    else:
+        access = "Live"
+    if plan.scoped_receiver:
+        target = f"receiver.target({operation_id})"
+    elif receiver:
+        target = f"binding{access}(receiver.owner(), {operation_id})"
+    else:
+        target = f"bindingGlobal({operation_id})"
+    result_type = None
     if plan.completion:
         arguments[plan.completion.parameter] = "completion"
         result = plan.result
         if plan.execution == "command":
-            completion_type, converter = "CommandCompletion", "completionCommand"
+            completion_type, convert = "CommandCompletion", "completionCommand"
         elif result is None:
-            completion_type, converter = "struct{}", "completionUnit"
+            completion_type, convert = "struct{}", "completionUnit"
         else:
             values.require(result)
             completion_type = values.type(result)
             if result.kind == "handle":
                 parent = parent_of(plan.completion.result_owner)
-                convert = f"adopt{values.owner(result.native)}(uint64(raw), {parent})"
-                body = f"raw, err := completionValue[C.{result.native}](result); if err != nil {{ return nil, err }}; return {convert}, nil"
+                convert = f"completionOf(func(raw C.{result.native}) {completion_type} {{ return adopt{values.owner(result.native)}(uint64(raw), {parent}) }})"
             elif result.kind == "array":
-                copy = values.copy(result.element, "item")
-                body = (
-                    (
-                        "if result.value == nil { return nil,nil }; "
-                        if result.nullable
-                        else ""
-                    )
-                    + f"items, err := completionSlice[C.{result.element.native}](result); if err != nil {{ return nil, err }}; copied := make({completion_type}, len(items)); for i,item := range items {{ copied[i] = {copy} }}; return copied,nil"
+                if result.stride or result.item_buffer:
+                    values.fail(result, "array result needs a copy adapter")
+                helper = (
+                    "completionNullableListOf"
+                    if result.nullable
+                    else "completionListOf"
                 )
+                convert = f"{helper}({copier(values, result.element)})"
             else:
-                copy = values.copy(replace(result, nullable=False), "raw")
+                content = replace(result, nullable=False)
+                convert = f"completionOf({copier(values, content)})"
                 if result.nullable:
-                    body = f"if result.value == nil {{ return nil,nil }}; raw,err := completionValue[C.{result.native}](result); if err != nil {{ return nil,err }}; copied := {copy}; return &copied,nil"
-                else:
-                    body = f"raw,err := completionValue[C.{result.native}](result); if err != nil {{ var zero {completion_type}; return zero,err }}; return {copy},nil"
-            converter = f"func(result *C.mln_completion_result) ({completion_type},error) {{ {body} }}"
+                    convert = f"completionNullable({convert})"
         output_types.append(f"*Future[{completion_type}]")
         conversions.append("future")
     elif (
@@ -238,93 +285,32 @@ def operation(plan, values):
         and plan.function.return_type.spelling != "mln_status"
     ):
         values.require(plan.result)
-        output_types.append(values.type(plan.result))
-        conversions.append(values.copy(plan.result, "nativeResult"))
-    result_type = output_types[0] if len(output_types) == 1 else "struct{}"
+        result_type = values.type(plan.result)
+    call = native_call(
+        plan.function, *(arguments[p.name] for p in plan.function.parameters)
+    )
     products = ""
     if len(output_types) > 1:
-        result_type = name(plan.name.removeprefix("mln_")) + "Result"
+        returned = name(plan.name.removeprefix("mln_")) + "Result"
         names = [name(p.name.removeprefix("out_")) for p, _, _ in outputs] + (
             ["Completion"] if plan.completion else []
         )
         products = (
-            f"type {result_type} struct {{ "
+            f"type {returned} struct {{ "
             + "; ".join(f"{n} {t}" for n, t in zip(names, output_types, strict=True))
             + " }\n"
         )
         converted = (
-            result_type
+            returned
             + "{"
             + ", ".join(f"{n}: {c}" for n, c in zip(names, conversions, strict=True))
             + "}"
         )
+    elif output_types:
+        returned, converted = output_types[0], conversions[0]
     else:
-        converted = conversions[0] if conversions else "struct{}{}"
-    call = native_call(
-        plan.function, *(arguments[p.name] for p in plan.function.parameters)
-    )
-    invocation = f"bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {{ return int32({call}) }})"
-    if plan.completion:
-        invocation = f"future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {{ return int32({call}) }}, {converter}); if err != nil {{ panic(bindingFailure{{err}}) }}"
-    elif plan.function.return_type.canonical == "void":
-        invocation = call
-    elif plan.function.return_type.spelling != "mln_status":
-        invocation = f"nativeResult := {call}"
-    adoptions = []
-    for index, ((p, value, local), conversion) in enumerate(zip(outputs, conversions)):
-        if value.kind == "handle":
-            adopted = f"adopted{index}"
-            adoptions.append(f"{adopted} := {conversion}")
-            converted = converted.replace(conversion, adopted)
-    if adoptions:
-        invocation += "; " + "; ".join(adoptions)
-    if plan.registrations:
-        owner = (
-            f"adopted{next(i for i, (_, v, _) in enumerate(outputs) if v.kind == 'handle')}.bindingOwner"
-            if adoptions
-            else "receiver.bindingOwner"
-            if receiver
-            else "nil"
-        )
-        invocation += f"; arena.accept({owner})"
-    if completing:
-        invocation += "; accepted = true"
-    if plan.consumes == "always":
-        invocation = "transaction.commit(); " + invocation
-    elif plan.consumes:
-        invocation += "; transaction.commit()"
-    identity = (
-        "uint64(uintptr(unsafe.Pointer(receiver.native)))"
-        if plan.scoped_receiver
-        else "receiver.state.issued"
-        if receiver
-        else "0"
-    )
-    admission = f"bindingAdmission(C.binding_operation_{plan.name}, {identity})"
-    if receiver:
-        guard = (
-            "receiver == nil || receiver.scope == nil"
-            if plan.scoped_receiver
-            else "receiver == nil || receiver.bindingOwner == nil || receiver.state == nil"
-        )
-        admission = (
-            f'if {guard} {{ panic(bindingFailure{{newBindingError(ErrInvalidState, "nil handle")}}) }}; '
-            + admission
-        )
-    setup.insert(0, admission)
-    if closing_decision:
-        body = (
-            admission
-            + "; receiver.state.closeDecision(); runtime.KeepAlive(receiver); return struct{}{}"
-        )
-        return f"func (receiver *{values.owner(handle.native)}) Close() error {{ _, err := bindingCall(func() struct{{}} {{ {body} }}); return err }}\n"
-    if plan.consumes:
-        empty = (
-            f"completedFuture({completion_type}{{}})"
-            if completion_type
-            else f"*new({result_type})"
-        )
-        invocation = f"if raw == 0 {{ return {empty} }}; " + invocation
+        returned = converted = None
+    closure_setup = "".join(line + "\n" for line in body_setup)
     if plan.view:
         if len(outputs) != 1 or plan.completion:
             raise ModelError(
@@ -334,34 +320,71 @@ def operation(plan, values):
         values.views[value.native] = value
         view_type = public(value.native) + "View"
         signature.append(f"callback func({view_type}) error")
-        method = "With" + method.removeprefix("Get")
-        setup.append('if callback == nil { arena.fail("view callback is nil") }')
+        begin = "nil"
+        end = "nil"
         if plan.view.owner.view_begin:
-            begin = native_call(
+            opened = native_call(
                 values.api.source.functions_by_name[plan.view.owner.view_begin],
                 f"C.{handle.native}(raw)",
-                "&token",
+                "token",
             )
-            setup.append(
-                f"var token unsafe.Pointer; bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {{ return int32({begin}) }}); defer C.{plan.view.owner.view_end}(token)"
+            begin = f"func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {{\nreturn int32({opened})\n}}"
+            end = (
+                f"func(token unsafe.Pointer) {{ C.{plan.view.owner.view_end}(token) }}"
             )
-        setup.append("scope := bindingNewScope(); defer scope.alive.Store(false)")
-        invocation += f"; if err := callback({view_type}{{value: {converted}, scope: scope}}); err != nil {{ panic(bindingFailure{{err}}) }}"
-        converted, result_type, output_types = "struct{}{}", "struct{}", []
-    body = f"{'; '.join(aliases)}; arena := &bindingArena{{}}; defer arena.close(); {'; '.join(setup)}; {invocation}; return {converted}"
-    receiver_signature = (
-        f"(receiver *{public(handle.native) + 'Scope' if plan.scoped_receiver else values.owner(handle.native)}) "
-        if receiver
-        else ""
-    )
-    if not output_types:
-        return (
-            products
-            + f"func {receiver_signature}{method}({', '.join(signature)}) error {{ _,err := bindingCall(func() struct{{}} {{ {body} }}); return err }}\n"
+        get = f"func(raw uint64, diagnostic *C.mln_diagnostic) int32 {{\nreturn int32({call})\n}}"
+        wrap = f"func(scope *bindingScope) {view_type} {{ return {view_type}{{value: {conversions[0]}, scope: scope}} }}"
+        body = "".join(line + "\n" for line in setup)
+        body += (
+            f"return bindingWithView({target}, callback, {begin}, {end}, {get}, {wrap})"
         )
+        return f"func (receiver *{values.owner(handle.native)}) {method}({', '.join(signature)}) error {{\n{body}\n}}\n"
+    if plan.completion:
+        start = f"func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {{\n{closure_setup}return int32({call})\n}}"
+        if outputs:
+            result_closure = (
+                f"func(arena *bindingArena, future *Future[{completion_type}]) {returned} {{\n"
+                + "".join(line + "\n" for line in adoptions)
+                + f"return {converted}\n}}"
+            )
+            invocation = f"return bindingStartWith({target}, {start}, {convert}, {result_closure})"
+        else:
+            invocation = f"return bindingStart({target}, {start}, {convert})"
+    elif plan.function.return_type.canonical == "void" or result_type:
+        if outputs:
+            values.fail(
+                plan.result or outputs[0][1], "direct calls cannot have outputs"
+            )
+        if result_type:
+            returned = result_type
+            converted = values.copy(plan.result, call)
+            invocation = f"return bindingDirect({target}, func(arena *bindingArena, raw uint64) {returned} {{\n{closure_setup}return {converted}\n}})"
+        else:
+            invocation = f"_, err := bindingDirect({target}, func(arena *bindingArena, raw uint64) struct{{}} {{\n{closure_setup}{call}\nreturn struct{{}}{{}}\n}})\nreturn err"
+    else:
+        check = f"func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {{\n{closure_setup}return int32({call})\n}}"
+        if outputs:
+            result_closure = (
+                f"func(arena *bindingArena) {returned} {{\n"
+                + "".join(line + "\n" for line in adoptions)
+                + f"return {converted}\n}}"
+            )
+            invocation = f"return bindingGet({target}, {check}, {result_closure})"
+        else:
+            invocation = f"return bindingDo({target}, {check})"
+    receiver_type = (
+        public(handle.native) + "Scope"
+        if plan.scoped_receiver
+        else values.owner(handle.native)
+        if receiver
+        else None
+    )
+    receiver_signature = f"(receiver *{receiver_type}) " if receiver else ""
+    results = f"({returned}, error)" if returned else "error"
+    body = "".join(line + "\n" for line in setup) + invocation
     return (
         products
-        + f"func {receiver_signature}{method}({', '.join(signature)}) ({result_type},error) {{ return bindingCall(func() {result_type} {{ {body} }}) }}\n"
+        + f"func {receiver_signature}{method}({', '.join(signature)}) {results} {{\n{body}\n}}\n"
     )
 
 

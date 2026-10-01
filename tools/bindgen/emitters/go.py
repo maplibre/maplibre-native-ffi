@@ -80,7 +80,8 @@ def lower(api):
             diagnostic="nil",
         )
         owners.append(
-            f"type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,func(raw uint64){{ {dispose} }})}}; return owner }}"
+            f"type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,func(raw uint64){{ {dispose} }})}}; return owner }}\n"
+            f"// owner returns the handle's owner state, or nil for a nil handle.\nfunc (handle *{owner}) owner() *bindingOwner {{ if handle == nil {{ return nil }}; return handle.bindingOwner }}"
         )
         used_support.add(disposer)
     go, header, c = [], [], []

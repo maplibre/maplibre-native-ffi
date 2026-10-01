@@ -74,6 +74,17 @@ type bindingArena struct {
 	pins        runtime.Pinner
 	allocations []unsafe.Pointer
 	callbacks   []*bindingCallbackTicket
+	leases      []func()
+}
+
+// lease holds a handle argument until the arena closes, and returns its raw id.
+func (arena *bindingArena) lease(owner *bindingOwner) uint64 {
+	if owner == nil {
+		arena.fail("nil input handle")
+	}
+	raw, done := owner.bindingAcquire(false)
+	arena.leases = append(arena.leases, done)
+	return raw
 }
 
 func (arena *bindingArena) fail(message string) {
@@ -111,6 +122,9 @@ func (arena *bindingArena) cstring(value string) *C.char {
 }
 
 func (arena *bindingArena) close() {
+	for _, done := range arena.leases {
+		done()
+	}
 	defer arena.pins.Unpin()
 	for _, ticket := range arena.callbacks {
 		ticket.release()

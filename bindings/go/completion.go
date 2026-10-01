@@ -123,12 +123,19 @@ func startCompletion[T any](start func(*C.mln_completion, *C.mln_diagnostic) int
 	handle := cgo.NewHandle(completionReceiver(bridge))
 	cell := bindingHandleCell(handle)
 	completion := C.mln_go_make_completion(cell)
+	// Native never calls a refused completion or its release, and start may
+	// panic while it converts the call's arguments, before native sees it.
+	submitted := false
+	defer func() {
+		if !submitted {
+			handle.Delete()
+			C.binding_handle_free(cell)
+		}
+	}()
 	if err := checkNative(func(diagnostic *C.mln_diagnostic) int32 { return start(&completion, diagnostic) }); err != nil {
-		// Native never calls a refused completion or its release.
-		handle.Delete()
-		C.binding_handle_free(cell)
 		return nil, err
 	}
+	submitted = true
 	return &Future[T]{state: state}, nil
 }
 

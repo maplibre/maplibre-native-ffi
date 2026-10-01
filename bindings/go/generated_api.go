@@ -1761,6 +1761,13 @@ type HttpHeaderTransformResponseScope struct {
 	scope  *bindingScope
 }
 
+func (response *HttpHeaderTransformResponseScope) target(operation uint32) bindingTarget {
+	if response == nil {
+		return bindingScoped(nil, 0, operation)
+	}
+	return bindingScoped(response.scope, uint64(uintptr(unsafe.Pointer(response.native))), operation)
+}
+
 type ImageContent struct {
 	Left   float32
 	Top    float32
@@ -3034,6 +3041,13 @@ func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln
 type ResourceTransformResponseScope struct {
 	native *C.mln_resource_transform_response
 	scope  *bindingScope
+}
+
+func (response *ResourceTransformResponseScope) target(operation uint32) bindingTarget {
+	if response == nil {
+		return bindingScoped(nil, 0, operation)
+	}
+	return bindingScoped(response.scope, uint64(uintptr(unsafe.Pointer(response.native))), operation)
 }
 
 type RuntimeEvent struct {
@@ -4779,11 +4793,27 @@ func adoptAcquiredFrameHandle(raw uint64, parent any) *AcquiredFrameHandle {
 	return owner
 }
 
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *AcquiredFrameHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
 type BufferHandle struct{ *bindingOwner }
 
 func adoptBufferHandle(raw uint64, parent any) *BufferHandle {
 	owner := &BufferHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_buffer_destroy(C.mln_buffer(raw)) })}
 	return owner
+}
+
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *BufferHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
 }
 
 type EventBatchHandle struct{ *bindingOwner }
@@ -4793,11 +4823,27 @@ func adoptEventBatchHandle(raw uint64, parent any) *EventBatchHandle {
 	return owner
 }
 
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *EventBatchHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
 type GeojsonSourceDataHandle struct{ *bindingOwner }
 
 func adoptGeojsonSourceDataHandle(raw uint64, parent any) *GeojsonSourceDataHandle {
 	owner := &GeojsonSourceDataHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(raw)) })}
 	return owner
+}
+
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *GeojsonSourceDataHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
 }
 
 type MapHandle struct{ *bindingOwner }
@@ -4807,11 +4853,27 @@ func adoptMapHandle(raw uint64, parent any) *MapHandle {
 	return owner
 }
 
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *MapHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
 type MapProjectionHandle struct{ *bindingOwner }
 
 func adoptMapProjectionHandle(raw uint64, parent any) *MapProjectionHandle {
 	owner := &MapProjectionHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_map_projection_close(C.mln_map_projection(raw), nil) })}
 	return owner
+}
+
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *MapProjectionHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
 }
 
 type RenderFrameBatchHandle struct{ *bindingOwner }
@@ -4821,11 +4883,27 @@ func adoptRenderFrameBatchHandle(raw uint64, parent any) *RenderFrameBatchHandle
 	return owner
 }
 
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *RenderFrameBatchHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
 type RenderSessionHandle struct{ *bindingOwner }
 
 func adoptRenderSessionHandle(raw uint64, parent any) *RenderSessionHandle {
 	owner := &RenderSessionHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_render_session_dispose(C.mln_render_session(raw), nil) })}
 	return owner
+}
+
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *RenderSessionHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
 }
 
 type ResourceRequestHandle struct{ *bindingOwner }
@@ -4835,6 +4913,14 @@ func adoptResourceRequestHandle(raw uint64, parent any) *ResourceRequestHandle {
 	return owner
 }
 
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *ResourceRequestHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
 type RuntimeHandle struct{ *bindingOwner }
 
 func adoptRuntimeHandle(raw uint64, parent any) *RuntimeHandle {
@@ -4842,258 +4928,97 @@ func adoptRuntimeHandle(raw uint64, parent any) *RuntimeHandle {
 	return owner
 }
 
+// owner returns the handle's owner state, or nil for a nil handle.
+func (handle *RuntimeHandle) owner() *bindingOwner {
+	if handle == nil {
+		return nil
+	}
+	return handle.bindingOwner
+}
+
 func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalOwnedTextureFrameView) error) error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_acquired_frame_get_metal_texture, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(true)
-		defer done()
-		outputOutFrame := *new(C.mln_metal_owned_texture_frame)
-		outputOutFrame.size = C.uint32_t(unsafe.Sizeof(outputOutFrame))
-		if callback == nil {
-			arena.fail("view callback is nil")
-		}
-		var token unsafe.Pointer
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), &token, diagnostic))
-		})
-		defer C.mln_adapter_acquired_frame_view_end(token)
-		scope := bindingNewScope()
-		defer scope.alive.Store(false)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_acquired_frame_get_metal_texture(C.mln_acquired_frame(raw), &outputOutFrame, diagnostic))
-		})
-		if err := callback(MetalOwnedTextureFrameView{value: copyMetalOwnedTextureFrame(outputOutFrame), scope: scope}); err != nil {
-			panic(bindingFailure{err})
-		}
-		return struct{}{}
+	var outFrame C.mln_metal_owned_texture_frame
+	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
+	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_metal_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_adapter_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_get_metal_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
+	}, func(scope *bindingScope) MetalOwnedTextureFrameView {
+		return MetalOwnedTextureFrameView{value: copyMetalOwnedTextureFrame(outFrame), scope: scope}
 	})
-	return err
 }
 
 func (receiver *AcquiredFrameHandle) WithOpenglTexture(callback func(OpenglOwnedTextureFrameView) error) error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_acquired_frame_get_opengl_texture, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(true)
-		defer done()
-		outputOutFrame := *new(C.mln_opengl_owned_texture_frame)
-		outputOutFrame.size = C.uint32_t(unsafe.Sizeof(outputOutFrame))
-		if callback == nil {
-			arena.fail("view callback is nil")
-		}
-		var token unsafe.Pointer
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), &token, diagnostic))
-		})
-		defer C.mln_adapter_acquired_frame_view_end(token)
-		scope := bindingNewScope()
-		defer scope.alive.Store(false)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_acquired_frame_get_opengl_texture(C.mln_acquired_frame(raw), &outputOutFrame, diagnostic))
-		})
-		if err := callback(OpenglOwnedTextureFrameView{value: copyOpenglOwnedTextureFrame(outputOutFrame), scope: scope}); err != nil {
-			panic(bindingFailure{err})
-		}
-		return struct{}{}
+	var outFrame C.mln_opengl_owned_texture_frame
+	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
+	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_opengl_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_adapter_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_get_opengl_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
+	}, func(scope *bindingScope) OpenglOwnedTextureFrameView {
+		return OpenglOwnedTextureFrameView{value: copyOpenglOwnedTextureFrame(outFrame), scope: scope}
 	})
-	return err
 }
 
 func (receiver *AcquiredFrameHandle) WithProducerSync(callback func(GpuSyncView) error) error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_acquired_frame_get_producer_sync, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(true)
-		defer done()
-		outputOutSync := C.mln_gpu_sync_default()
-		outputOutSync.size = C.uint32_t(unsafe.Sizeof(outputOutSync))
-		if callback == nil {
-			arena.fail("view callback is nil")
-		}
-		var token unsafe.Pointer
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), &token, diagnostic))
-		})
-		defer C.mln_adapter_acquired_frame_view_end(token)
-		scope := bindingNewScope()
-		defer scope.alive.Store(false)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_acquired_frame_get_producer_sync(C.mln_acquired_frame(raw), &outputOutSync, diagnostic))
-		})
-		if err := callback(GpuSyncView{value: copyGpuSync(outputOutSync), scope: scope}); err != nil {
-			panic(bindingFailure{err})
-		}
-		return struct{}{}
-	})
-	return err
+	outSync := C.mln_gpu_sync_default()
+	outSync.size = C.uint32_t(unsafe.Sizeof(outSync))
+	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_producer_sync), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_adapter_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_get_producer_sync(C.mln_acquired_frame(raw), &outSync, diagnostic))
+	}, func(scope *bindingScope) GpuSyncView { return GpuSyncView{value: copyGpuSync(outSync), scope: scope} })
 }
 
 func (receiver *AcquiredFrameHandle) GetResult() (RenderFrameResult, error) {
-	return bindingCall(func() RenderFrameResult {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_acquired_frame_get_result, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutResult := *new(C.mln_render_frame_result)
-		outputOutResult.size = C.uint32_t(unsafe.Sizeof(outputOutResult))
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_acquired_frame_get_result(C.mln_acquired_frame(raw), &outputOutResult, diagnostic))
-		})
-		return copyRenderFrameResult(outputOutResult)
+	var outResult C.mln_render_frame_result
+	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_acquired_frame_get_result), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_get_result(C.mln_acquired_frame(raw), &outResult, diagnostic))
+	}, func(arena *bindingArena) RenderFrameResult {
+		return copyRenderFrameResult(outResult)
 	})
 }
 
 func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanOwnedTextureFrameView) error) error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_acquired_frame_get_vulkan_texture, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(true)
-		defer done()
-		outputOutFrame := *new(C.mln_vulkan_owned_texture_frame)
-		outputOutFrame.size = C.uint32_t(unsafe.Sizeof(outputOutFrame))
-		if callback == nil {
-			arena.fail("view callback is nil")
-		}
-		var token unsafe.Pointer
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), &token, diagnostic))
-		})
-		defer C.mln_adapter_acquired_frame_view_end(token)
-		scope := bindingNewScope()
-		defer scope.alive.Store(false)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_acquired_frame_get_vulkan_texture(C.mln_acquired_frame(raw), &outputOutFrame, diagnostic))
-		})
-		if err := callback(VulkanOwnedTextureFrameView{value: copyVulkanOwnedTextureFrame(outputOutFrame), scope: scope}); err != nil {
-			panic(bindingFailure{err})
-		}
-		return struct{}{}
+	var outFrame C.mln_vulkan_owned_texture_frame
+	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
+	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_vulkan_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_adapter_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_get_vulkan_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
+	}, func(scope *bindingScope) VulkanOwnedTextureFrameView {
+		return VulkanOwnedTextureFrameView{value: copyVulkanOwnedTextureFrame(outFrame), scope: scope}
 	})
-	return err
 }
 
 func (receiver *AcquiredFrameHandle) WithWebgpuTexture(callback func(WebgpuOwnedTextureFrameView) error) error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_acquired_frame_get_webgpu_texture, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(true)
-		defer done()
-		outputOutFrame := *new(C.mln_webgpu_owned_texture_frame)
-		outputOutFrame.size = C.uint32_t(unsafe.Sizeof(outputOutFrame))
-		if callback == nil {
-			arena.fail("view callback is nil")
-		}
-		var token unsafe.Pointer
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), &token, diagnostic))
-		})
-		defer C.mln_adapter_acquired_frame_view_end(token)
-		scope := bindingNewScope()
-		defer scope.alive.Store(false)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_acquired_frame_get_webgpu_texture(C.mln_acquired_frame(raw), &outputOutFrame, diagnostic))
-		})
-		if err := callback(WebgpuOwnedTextureFrameView{value: copyWebgpuOwnedTextureFrame(outputOutFrame), scope: scope}); err != nil {
-			panic(bindingFailure{err})
-		}
-		return struct{}{}
+	var outFrame C.mln_webgpu_owned_texture_frame
+	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
+	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_webgpu_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_adapter_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_get_webgpu_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
+	}, func(scope *bindingScope) WebgpuOwnedTextureFrameView {
+		return WebgpuOwnedTextureFrameView{value: copyWebgpuOwnedTextureFrame(outFrame), scope: scope}
 	})
-	return err
 }
 
 func (receiver *AcquiredFrameHandle) Close(consumerCompletion GpuSync) error {
-	_, err := bindingCall(func() struct{} {
-		input1 := consumerCompletion
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_acquired_frame_release, receiver.state.issued)
-		raw, transaction := receiver.state.reserveClose()
-		defer transaction.finish()
-		defer runtime.KeepAlive(receiver)
-		var input1Raw *C.mln_gpu_sync
-		{
-			pointer := (*C.mln_gpu_sync)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeGpuSync(input1, arena)
-			input1Raw = pointer
-		}
-		receiverRaw := C.mln_acquired_frame(raw)
-		if raw == 0 {
-			return *new(struct{})
-		}
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_acquired_frame_release(&receiverRaw, input1Raw, diagnostic))
-		})
-		transaction.commit()
-		return struct{}{}
+	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_acquired_frame_release), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		handle := C.mln_acquired_frame(raw)
+		return int32(C.mln_acquired_frame_release(&handle, bindingStore(nativeGpuSync(consumerCompletion, arena), arena), diagnostic))
 	})
-	return err
 }
 
 func AndroidInit(jniEnv uintptr, jniClass uintptr, context uintptr) error {
-	_, err := bindingCall(func() struct{} {
-		input0 := jniEnv
-		input1 := jniClass
-		input2 := context
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_android_init, 0)
-		var input0Raw unsafe.Pointer
-		input0Raw = unsafe.Pointer(C.binding_address(C.uintptr_t(input0)))
-		var input1Raw unsafe.Pointer
-		input1Raw = unsafe.Pointer(C.binding_address(C.uintptr_t(input1)))
-		var input2Raw unsafe.Pointer
-		input2Raw = unsafe.Pointer(C.binding_address(C.uintptr_t(input2)))
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_android_init(input0Raw, input1Raw, input2Raw, diagnostic))
-		})
-		return struct{}{}
+	return bindingDo(bindingGlobal(C.binding_operation_mln_android_init), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_android_init(unsafe.Pointer(C.binding_address(C.uintptr_t(jniEnv))), unsafe.Pointer(C.binding_address(C.uintptr_t(jniClass))), unsafe.Pointer(C.binding_address(C.uintptr_t(context))), diagnostic))
 	})
-	return err
 }
 
 func (receiver *BufferHandle) Close() error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_buffer_destroy, receiver.state.issued)
-		raw, transaction := receiver.state.reserveClose()
-		defer transaction.finish()
-		defer runtime.KeepAlive(receiver)
-		if raw == 0 {
-			return *new(struct{})
-		}
-		transaction.commit()
+	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_buffer_destroy), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_buffer_destroy(C.mln_buffer(raw))
 		return struct{}{}
 	})
@@ -5101,67 +5026,32 @@ func (receiver *BufferHandle) Close() error {
 }
 
 func (receiver *BufferHandle) Get() ([]byte, error) {
-	return bindingCall(func() []byte {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_buffer_get, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutView := *new(C.mln_buffer_view)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_buffer_get(C.mln_buffer(raw), &outputOutView, diagnostic))
-		})
-		return bindingBytes(outputOutView.data, uint64(outputOutView.size))
+	var outView C.mln_buffer_view
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_buffer_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_buffer_get(C.mln_buffer(raw), &outView, diagnostic))
+	}, func(arena *bindingArena) []byte {
+		return bindingBytes(outView.data, uint64(outView.size))
 	})
 }
 
 func CVersion() (uint32, error) {
-	return bindingCall(func() uint32 {
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_c_version, 0)
-		nativeResult := C.mln_c_version()
-		return uint32(nativeResult)
+	return bindingDirect(bindingGlobal(C.binding_operation_mln_c_version), func(arena *bindingArena, raw uint64) uint32 {
+		return uint32(C.mln_c_version())
 	})
 }
 
 func (receiver *EventBatchHandle) Get() (RuntimeEventBatchView, error) {
-	return bindingCall(func() RuntimeEventBatchView {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_event_batch_get, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutView := *new(C.mln_runtime_event_batch_view)
-		outputOutView.size = C.uint32_t(unsafe.Sizeof(outputOutView))
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_event_batch_get(C.mln_event_batch(raw), &outputOutView, diagnostic))
-		})
-		return copyRuntimeEventBatchView(outputOutView)
+	var outView C.mln_runtime_event_batch_view
+	outView.size = C.uint32_t(unsafe.Sizeof(outView))
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_event_batch_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_event_batch_get(C.mln_event_batch(raw), &outView, diagnostic))
+	}, func(arena *bindingArena) RuntimeEventBatchView {
+		return copyRuntimeEventBatchView(outView)
 	})
 }
 
 func (receiver *EventBatchHandle) Close() error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_event_batch_release, receiver.state.issued)
-		raw, transaction := receiver.state.reserveClose()
-		defer transaction.finish()
-		defer runtime.KeepAlive(receiver)
-		if raw == 0 {
-			return *new(struct{})
-		}
-		transaction.commit()
+	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_event_batch_release), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_event_batch_release(C.mln_event_batch(raw))
 		return struct{}{}
 	})
@@ -5169,44 +5059,17 @@ func (receiver *EventBatchHandle) Close() error {
 }
 
 func GeojsonSourceDataCreate(data []byte, options *GeojsonSourceOptions) (*GeojsonSourceDataHandle, error) {
-	return bindingCall(func() *GeojsonSourceDataHandle {
-		input0 := data
-		input1 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_geojson_source_data_create, 0)
-		var input0Raw C.mln_buffer_view
-		input0Raw = C.mln_buffer_view{data: arena.bytes(input0), size: C.size_t(len(input0))}
-		var input1Raw *C.mln_geojson_source_options
-		if input1 != nil {
-			pointer := (*C.mln_geojson_source_options)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeGeojsonSourceOptions(*input1, arena)
-			input1Raw = pointer
-		}
-		outputOutData := *new(C.mln_geojson_source_data)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_geojson_source_data_create(input0Raw, input1Raw, &outputOutData, diagnostic))
-		})
-		adopted0 := adoptGeojsonSourceDataHandle(uint64(outputOutData), nil)
-		return adopted0
+	var outData C.mln_geojson_source_data
+	return bindingGet(bindingGlobal(C.binding_operation_mln_geojson_source_data_create), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_geojson_source_data_create(bindingView(data, arena), bindingStoreOptional(options, arena, nativeGeojsonSourceOptions), &outData, diagnostic))
+	}, func(arena *bindingArena) *GeojsonSourceDataHandle {
+		adopted := adoptGeojsonSourceDataHandle(uint64(outData), nil)
+		return adopted
 	})
 }
 
 func (receiver *GeojsonSourceDataHandle) Close() error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_geojson_source_data_destroy, receiver.state.issued)
-		raw, transaction := receiver.state.reserveClose()
-		defer transaction.finish()
-		defer runtime.KeepAlive(receiver)
-		if raw == 0 {
-			return *new(struct{})
-		}
-		transaction.commit()
+	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_geojson_source_data_destroy), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(raw))
 		return struct{}{}
 	})
@@ -5214,70 +5077,30 @@ func (receiver *GeojsonSourceDataHandle) Close() error {
 }
 
 func (receiver *HttpHeaderTransformResponseScope) Set(name string, value string) error {
-	_, err := bindingCall(func() struct{} {
-		input1 := name
-		input3 := value
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.scope == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_http_header_transform_response_set, uint64(uintptr(unsafe.Pointer(receiver.native))))
-		receiver.scope.check()
-		raw := receiver.native
-		var input1Raw *C.char
-		input1Raw = (*C.char)(arena.bytes([]byte(input1)))
-		var input3Raw *C.char
-		input3Raw = (*C.char)(arena.bytes([]byte(input3)))
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_http_header_transform_response_set(raw, input1Raw, bindingCount[C.size_t](len(input1)), input3Raw, bindingCount[C.size_t](len(input3)), diagnostic))
-		})
-		return struct{}{}
+	return bindingDo(receiver.target(C.binding_operation_mln_http_header_transform_response_set), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_http_header_transform_response_set(receiver.native, (*C.char)(arena.bytes([]byte(name))), bindingCount[C.size_t](len(name)), (*C.char)(arena.bytes([]byte(value))), bindingCount[C.size_t](len(value)), diagnostic))
 	})
-	return err
 }
 
 func LatLngForProjectedMeters(meters ProjectedMeters) (LatLng, error) {
-	return bindingCall(func() LatLng {
-		input0 := meters
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_lat_lng_for_projected_meters, 0)
-		var input0Raw C.mln_projected_meters
-		input0Raw = nativeProjectedMeters(input0, arena)
-		outputOutCoordinate := *new(C.mln_lat_lng)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_lat_lng_for_projected_meters(input0Raw, &outputOutCoordinate, diagnostic))
-		})
-		return copyLatLng(outputOutCoordinate)
+	var outCoordinate C.mln_lat_lng
+	return bindingGet(bindingGlobal(C.binding_operation_mln_lat_lng_for_projected_meters), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_lat_lng_for_projected_meters(nativeProjectedMeters(meters, arena), &outCoordinate, diagnostic))
+	}, func(arena *bindingArena) LatLng {
+		return copyLatLng(outCoordinate)
 	})
 }
 
 func LogClearCallback() error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_log_clear_callback, 0)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 { return int32(C.mln_log_clear_callback(diagnostic)) })
-		return struct{}{}
+	return bindingDo(bindingGlobal(C.binding_operation_mln_log_clear_callback), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_log_clear_callback(diagnostic))
 	})
-	return err
 }
 
 func LogSetAsyncSeverityMask(mask LogSeverityMask) error {
-	_, err := bindingCall(func() struct{} {
-		input0 := mask
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_log_set_async_severity_mask, 0)
-		var input0Raw C.uint32_t
-		input0Raw = C.uint32_t(input0)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_log_set_async_severity_mask(input0Raw, diagnostic))
-		})
-		return struct{}{}
+	return bindingDo(bindingGlobal(C.binding_operation_mln_log_set_async_severity_mask), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_log_set_async_severity_mask(C.uint32_t(mask), diagnostic))
 	})
-	return err
 }
 
 func LogSetCallback(callback func(LogSeverity, LogEvent, int64, string) uint32) error {
@@ -5305,732 +5128,135 @@ func LogSetCallback(callback func(LogSeverity, LogEvent, int64, string) uint32) 
 }
 
 func (receiver *MapHandle) AddColorReliefLayer(layerId string, sourceId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := sourceId
-		input3 := beforeLayerId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_color_relief_layer, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes([]byte(input2)), size: C.size_t(len(input2))}
-		var input3Raw C.mln_buffer_view
-		if input3 != nil {
-			input3Raw = C.mln_buffer_view{data: arena.bytes([]byte((*input3))), size: C.size_t(len((*input3)))}
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_color_relief_layer(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_color_relief_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_color_relief_layer(C.mln_map(raw), bindingView(layerId, arena), bindingView(sourceId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddCustomGeometrySource(sourceId string, options CustomGeometrySourceOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_custom_geometry_source, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_custom_geometry_source_options
-		{
-			pointer := (*C.mln_custom_geometry_source_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeCustomGeometrySourceOptions(input2, arena)
-			input2Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_custom_geometry_source(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		arena.accept(receiver.bindingOwner)
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_custom_geometry_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_custom_geometry_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomGeometrySourceOptions(options, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddCustomMvtVectorSource(sourceId string, options CustomMvtVectorSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_custom_mvt_vector_source, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_custom_mvt_vector_source_options
-		{
-			pointer := (*C.mln_custom_mvt_vector_source_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeCustomMvtVectorSourceOptions(input2, arena)
-			input2Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_custom_mvt_vector_source(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		arena.accept(receiver.bindingOwner)
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_custom_mvt_vector_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_custom_mvt_vector_source(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativeCustomMvtVectorSourceOptions(options, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := data
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_geojson_source_data, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		if input2 == nil || input2.bindingOwner == nil {
-			arena.fail("nil input handle")
-		}
-		input2Raw, input2Done := input2.bindingAcquire(false)
-		defer input2Done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_geojson_source_data(C.mln_map(raw), input1Raw, C.mln_geojson_source_data(input2Raw), completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_geojson_source_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddGeojsonSourceUrl(sourceId string, url string, options *GeojsonSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := url
-		input3 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_geojson_source_url, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes([]byte(input2)), size: C.size_t(len(input2))}
-		var input3Raw *C.mln_geojson_source_options
-		if input3 != nil {
-			pointer := (*C.mln_geojson_source_options)(arena.allocate(unsafe.Sizeof(*input3Raw)))
-			*pointer = nativeGeojsonSourceOptions(*input3, arena)
-			input3Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_geojson_source_url(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_geojson_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeGeojsonSourceOptions), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddHillshadeLayer(layerId string, sourceId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := sourceId
-		input3 := beforeLayerId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_hillshade_layer, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes([]byte(input2)), size: C.size_t(len(input2))}
-		var input3Raw C.mln_buffer_view
-		if input3 != nil {
-			input3Raw = C.mln_buffer_view{data: arena.bytes([]byte((*input3))), size: C.size_t(len((*input3)))}
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_hillshade_layer(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_hillshade_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_hillshade_layer(C.mln_map(raw), bindingView(layerId, arena), bindingView(sourceId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddImageSourceImage(sourceId string, coordinates []LatLng, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := coordinates
-		input4 := image
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_image_source_image, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_lat_lng
-		{
-			input2Raw = (*C.mln_lat_lng)(arena.array(len(input2), unsafe.Sizeof(*input2Raw)))
-			items := unsafe.Slice(input2Raw, len(input2))
-			for i, item := range input2 {
-				items[i] = nativeLatLng(item, arena)
-			}
-		}
-		var input4Raw *C.mln_premultiplied_rgba8_image
-		{
-			pointer := (*C.mln_premultiplied_rgba8_image)(arena.allocate(unsafe.Sizeof(*input4Raw)))
-			*pointer = nativePremultipliedRgba8Image(input4, arena)
-			input4Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_image_source_image(C.mln_map(raw), input1Raw, input2Raw, bindingCount[C.size_t](len(input2)), input4Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_image_source_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddImageSourceUrl(sourceId string, coordinates []LatLng, url string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := coordinates
-		input4 := url
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_image_source_url, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_lat_lng
-		{
-			input2Raw = (*C.mln_lat_lng)(arena.array(len(input2), unsafe.Sizeof(*input2Raw)))
-			items := unsafe.Slice(input2Raw, len(input2))
-			for i, item := range input2 {
-				items[i] = nativeLatLng(item, arena)
-			}
-		}
-		var input4Raw C.mln_buffer_view
-		input4Raw = C.mln_buffer_view{data: arena.bytes([]byte(input4)), size: C.size_t(len(input4))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_image_source_url(C.mln_map(raw), input1Raw, input2Raw, bindingCount[C.size_t](len(input2)), input4Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_image_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingView(url, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddLocationIndicatorLayer(layerId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := beforeLayerId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_location_indicator_layer, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		if input2 != nil {
-			input2Raw = C.mln_buffer_view{data: arena.bytes([]byte((*input2))), size: C.size_t(len((*input2)))}
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_location_indicator_layer(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_location_indicator_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_location_indicator_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddRasterDemSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := tiles
-		input4 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_raster_dem_source_tiles, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_buffer_view
-		{
-			input2Raw = (*C.mln_buffer_view)(arena.array(len(input2), unsafe.Sizeof(*input2Raw)))
-			items := unsafe.Slice(input2Raw, len(input2))
-			for i, item := range input2 {
-				items[i] = C.mln_buffer_view{data: arena.bytes([]byte(item)), size: C.size_t(len(item))}
-			}
-		}
-		var input4Raw *C.mln_style_tile_source_options
-		if input4 != nil {
-			pointer := (*C.mln_style_tile_source_options)(arena.allocate(unsafe.Sizeof(*input4Raw)))
-			*pointer = nativeStyleTileSourceOptions(*input4, arena)
-			input4Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_raster_dem_source_tiles(C.mln_map(raw), input1Raw, input2Raw, bindingCount[C.size_t](len(input2)), input4Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_dem_source_tiles), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_raster_dem_source_tiles(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(tiles, arena, bindingView[string]), bindingCount[C.size_t](len(tiles)), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddRasterDemSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := url
-		input3 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_raster_dem_source_url, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes([]byte(input2)), size: C.size_t(len(input2))}
-		var input3Raw *C.mln_style_tile_source_options
-		if input3 != nil {
-			pointer := (*C.mln_style_tile_source_options)(arena.allocate(unsafe.Sizeof(*input3Raw)))
-			*pointer = nativeStyleTileSourceOptions(*input3, arena)
-			input3Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_raster_dem_source_url(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_dem_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_raster_dem_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddRasterSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := tiles
-		input4 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_raster_source_tiles, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_buffer_view
-		{
-			input2Raw = (*C.mln_buffer_view)(arena.array(len(input2), unsafe.Sizeof(*input2Raw)))
-			items := unsafe.Slice(input2Raw, len(input2))
-			for i, item := range input2 {
-				items[i] = C.mln_buffer_view{data: arena.bytes([]byte(item)), size: C.size_t(len(item))}
-			}
-		}
-		var input4Raw *C.mln_style_tile_source_options
-		if input4 != nil {
-			pointer := (*C.mln_style_tile_source_options)(arena.allocate(unsafe.Sizeof(*input4Raw)))
-			*pointer = nativeStyleTileSourceOptions(*input4, arena)
-			input4Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_raster_source_tiles(C.mln_map(raw), input1Raw, input2Raw, bindingCount[C.size_t](len(input2)), input4Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_source_tiles), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_raster_source_tiles(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(tiles, arena, bindingView[string]), bindingCount[C.size_t](len(tiles)), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddRasterSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := url
-		input3 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_raster_source_url, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes([]byte(input2)), size: C.size_t(len(input2))}
-		var input3Raw *C.mln_style_tile_source_options
-		if input3 != nil {
-			pointer := (*C.mln_style_tile_source_options)(arena.allocate(unsafe.Sizeof(*input3Raw)))
-			*pointer = nativeStyleTileSourceOptions(*input3, arena)
-			input3Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_raster_source_url(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_raster_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_raster_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddStyleLayerJson(layerJson []byte, beforeLayerId *string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerJson
-		input2 := beforeLayerId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_style_layer_json, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes(input1), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		if input2 != nil {
-			input2Raw = C.mln_buffer_view{data: arena.bytes([]byte((*input2))), size: C.size_t(len((*input2)))}
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_style_layer_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_style_layer_json(C.mln_map(raw), bindingView(layerJson, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddStyleSourceJson(sourceId string, sourceJson []byte) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := sourceJson
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_style_source_json, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes(input2), size: C.size_t(len(input2))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_style_source_json(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_style_source_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_style_source_json(C.mln_map(raw), bindingView(sourceId, arena), bindingView(sourceJson, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddVectorSourceTiles(sourceId string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := tiles
-		input4 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_vector_source_tiles, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_buffer_view
-		{
-			input2Raw = (*C.mln_buffer_view)(arena.array(len(input2), unsafe.Sizeof(*input2Raw)))
-			items := unsafe.Slice(input2Raw, len(input2))
-			for i, item := range input2 {
-				items[i] = C.mln_buffer_view{data: arena.bytes([]byte(item)), size: C.size_t(len(item))}
-			}
-		}
-		var input4Raw *C.mln_style_tile_source_options
-		if input4 != nil {
-			pointer := (*C.mln_style_tile_source_options)(arena.allocate(unsafe.Sizeof(*input4Raw)))
-			*pointer = nativeStyleTileSourceOptions(*input4, arena)
-			input4Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_vector_source_tiles(C.mln_map(raw), input1Raw, input2Raw, bindingCount[C.size_t](len(input2)), input4Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_vector_source_tiles), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_vector_source_tiles(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(tiles, arena, bindingView[string]), bindingCount[C.size_t](len(tiles)), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) AddVectorSourceUrl(sourceId string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := url
-		input3 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_add_vector_source_url, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes([]byte(input2)), size: C.size_t(len(input2))}
-		var input3Raw *C.mln_style_tile_source_options
-		if input3 != nil {
-			pointer := (*C.mln_style_tile_source_options)(arena.allocate(unsafe.Sizeof(*input3Raw)))
-			*pointer = nativeStyleTileSourceOptions(*input3, arena)
-			input3Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_add_vector_source_url(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_add_vector_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_add_vector_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), bindingStoreOptional(options, arena, nativeStyleTileSourceOptions), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := delta
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_apply_camera_delta, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_camera_delta
-		{
-			pointer := (*C.mln_camera_delta)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeCameraDelta(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_apply_camera_delta(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_apply_camera_delta), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_apply_camera_delta(C.mln_map(raw), bindingStore(nativeCameraDelta(delta, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) CameraForGeometry(geometry []byte, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
-	return bindingCall(func() *Future[CameraOptions] {
-		input1 := geometry
-		input2 := fitOptions
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_camera_for_geometry, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes(input1), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_camera_fit_options
-		if input2 != nil {
-			pointer := (*C.mln_camera_fit_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeCameraFitOptions(*input2, arena)
-			input2Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_camera_for_geometry(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (CameraOptions, error) {
-			raw, err := completionValue[C.mln_camera_options](result)
-			if err != nil {
-				var zero CameraOptions
-				return zero, err
-			}
-			return copyCameraOptions(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_camera_for_geometry), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_camera_for_geometry(C.mln_map(raw), bindingView(geometry, arena), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
+	}, completionOf(copyCameraOptions))
 }
 
 func (receiver *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
-	return bindingCall(func() *Future[CameraOptions] {
-		input1 := bounds
-		input2 := fitOptions
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_camera_for_lat_lng_bounds, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_lat_lng_bounds
-		input1Raw = nativeLatLngBounds(input1, arena)
-		var input2Raw *C.mln_camera_fit_options
-		if input2 != nil {
-			pointer := (*C.mln_camera_fit_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeCameraFitOptions(*input2, arena)
-			input2Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_camera_for_lat_lng_bounds(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (CameraOptions, error) {
-			raw, err := completionValue[C.mln_camera_options](result)
-			if err != nil {
-				var zero CameraOptions
-				return zero, err
-			}
-			return copyCameraOptions(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_camera_for_lat_lng_bounds), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_camera_for_lat_lng_bounds(C.mln_map(raw), nativeLatLngBounds(bounds, arena), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
+	}, completionOf(copyCameraOptions))
 }
 
 func (receiver *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFitOptions) (*Future[CameraOptions], error) {
-	return bindingCall(func() *Future[CameraOptions] {
-		input1 := coordinates
-		input3 := fitOptions
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_camera_for_lat_lngs, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_lat_lng
-		{
-			input1Raw = (*C.mln_lat_lng)(arena.array(len(input1), unsafe.Sizeof(*input1Raw)))
-			items := unsafe.Slice(input1Raw, len(input1))
-			for i, item := range input1 {
-				items[i] = nativeLatLng(item, arena)
-			}
-		}
-		var input3Raw *C.mln_camera_fit_options
-		if input3 != nil {
-			pointer := (*C.mln_camera_fit_options)(arena.allocate(unsafe.Sizeof(*input3Raw)))
-			*pointer = nativeCameraFitOptions(*input3, arena)
-			input3Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_camera_for_lat_lngs(C.mln_map(raw), input1Raw, bindingCount[C.size_t](len(input1)), input3Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (CameraOptions, error) {
-			raw, err := completionValue[C.mln_camera_options](result)
-			if err != nil {
-				var zero CameraOptions
-				return zero, err
-			}
-			return copyCameraOptions(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_camera_for_lat_lngs), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_camera_for_lat_lngs(C.mln_map(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), bindingStoreOptional(fitOptions, arena, nativeCameraFitOptions), completion, diagnostic))
+	}, completionOf(copyCameraOptions))
 }
 
 func (receiver *MapHandle) CameraQuery() (*Future[CameraQueryResult], error) {
-	return bindingCall(func() *Future[CameraQueryResult] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_camera_query, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_camera_query(C.mln_map(raw), completion, diagnostic))
-		}, func(result *C.mln_completion_result) (CameraQueryResult, error) {
-			raw, err := completionValue[C.mln_camera_query_result](result)
-			if err != nil {
-				var zero CameraQueryResult
-				return zero, err
-			}
-			return copyCameraQueryResult(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_camera_query), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_camera_query(C.mln_map(raw), completion, diagnostic))
+	}, completionOf(copyCameraQueryResult))
 }
 
 type MapCameraSnapshotGetResult struct {
@@ -6039,2709 +5265,610 @@ type MapCameraSnapshotGetResult struct {
 }
 
 func (receiver *MapHandle) CameraSnapshotGet() (MapCameraSnapshotGetResult, error) {
-	return bindingCall(func() MapCameraSnapshotGetResult {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_camera_snapshot_get, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutCamera := C.mln_camera_options_default()
-		outputOutCamera.size = C.uint32_t(unsafe.Sizeof(outputOutCamera))
-		outputOutGeneration := *new(C.uint64_t)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_camera_snapshot_get(C.mln_map(raw), &outputOutCamera, &outputOutGeneration, diagnostic))
-		})
-		return MapCameraSnapshotGetResult{Camera: copyCameraOptions(outputOutCamera), Generation: uint64(outputOutGeneration)}
+	outCamera := C.mln_camera_options_default()
+	outCamera.size = C.uint32_t(unsafe.Sizeof(outCamera))
+	var outGeneration C.uint64_t
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_camera_snapshot_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_camera_snapshot_get(C.mln_map(raw), &outCamera, &outGeneration, diagnostic))
+	}, func(arena *bindingArena) MapCameraSnapshotGetResult {
+		return MapCameraSnapshotGetResult{Camera: copyCameraOptions(outCamera), Generation: uint64(outGeneration)}
 	})
 }
 
 func (receiver *MapHandle) CancelTransitions() (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_cancel_transitions, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_cancel_transitions(C.mln_map(raw), completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_cancel_transitions), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_cancel_transitions(C.mln_map(raw), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) CopyLayerSourceId(layerId string) (*Future[*string], error) {
-	return bindingCall(func() *Future[*string] {
-		input1 := layerId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_copy_layer_source_id, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_copy_layer_source_id(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*string, error) {
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				var zero *string
-				return zero, err
-			}
-			return func() *string {
-				if raw.size == 0 {
-					return nil
-				}
-				value := bindingString(raw.data, uint64(raw.size))
-				return &value
-			}(), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_layer_source_id), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_copy_layer_source_id(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
+	}, completionOf(copyOptionalViewText))
 }
 
 func (receiver *MapHandle) CopyLayerSourceLayer(layerId string) (*Future[*string], error) {
-	return bindingCall(func() *Future[*string] {
-		input1 := layerId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_copy_layer_source_layer, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_copy_layer_source_layer(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*string, error) {
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				var zero *string
-				return zero, err
-			}
-			return func() *string {
-				if raw.size == 0 {
-					return nil
-				}
-				value := bindingString(raw.data, uint64(raw.size))
-				return &value
-			}(), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_layer_source_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_copy_layer_source_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
+	}, completionOf(copyOptionalViewText))
 }
 
 func (receiver *MapHandle) CopyStyleImagePremultipliedRgba8(imageId string) (*Future[*[]byte], error) {
-	return bindingCall(func() *Future[*[]byte] {
-		input1 := imageId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_copy_style_image_premultiplied_rgba8, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_copy_style_image_premultiplied_rgba8(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*[]byte, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := bindingBytes(raw.data, uint64(raw.size))
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_image_premultiplied_rgba8), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_copy_style_image_premultiplied_rgba8(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyViewBytes)))
 }
 
 func (receiver *MapHandle) CopyStyleImageStretches(imageId string) (*Future[*StyleImageStretchesResult], error) {
-	return bindingCall(func() *Future[*StyleImageStretchesResult] {
-		input1 := imageId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_copy_style_image_stretches, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_copy_style_image_stretches(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*StyleImageStretchesResult, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_style_image_stretches_result](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := copyStyleImageStretchesResult(raw)
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_image_stretches), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_copy_style_image_stretches(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyStyleImageStretchesResult)))
 }
 
 func (receiver *MapHandle) CopyStyleSourceAttribution(sourceId string) (*Future[*string], error) {
-	return bindingCall(func() *Future[*string] {
-		input1 := sourceId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_copy_style_source_attribution, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_copy_style_source_attribution(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*string, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := bindingString(raw.data, uint64(raw.size))
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_source_attribution), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_copy_style_source_attribution(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyViewText)))
 }
 
 func (receiver *MapHandle) CopyStyleSourceUrl(sourceId string) (*Future[*string], error) {
-	return bindingCall(func() *Future[*string] {
-		input1 := sourceId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_copy_style_source_url, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_copy_style_source_url(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*string, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := bindingString(raw.data, uint64(raw.size))
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_copy_style_source_url(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyViewText)))
 }
 
 func (receiver *RuntimeHandle) MapCreate(options MapOptions) (*Future[*MapHandle], error) {
-	return bindingCall(func() *Future[*MapHandle] {
-		input1 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_create, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_map_options
-		{
-			pointer := (*C.mln_map_options)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeMapOptions(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_create(C.mln_runtime(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*MapHandle, error) {
-			raw, err := completionValue[C.mln_map](result)
-			if err != nil {
-				return nil, err
-			}
-			return adoptMapHandle(uint64(raw), receiver), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_create), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_create(C.mln_runtime(raw), bindingStore(nativeMapOptions(options, arena), arena), completion, diagnostic))
+	}, completionOf(func(raw C.mln_map) *MapHandle { return adoptMapHandle(uint64(raw), receiver) }))
 }
 
 func (receiver *MapHandle) DumpDebugLogs() (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_dump_debug_logs, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_dump_debug_logs(C.mln_map(raw), completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_dump_debug_logs), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_dump_debug_logs(C.mln_map(raw), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) GetFeatureState(selector FeatureStateSelector) (*Future[[]byte], error) {
-	return bindingCall(func() *Future[[]byte] {
-		input1 := selector
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_feature_state, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_feature_state_selector
-		{
-			pointer := (*C.mln_feature_state_selector)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeFeatureStateSelector(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_feature_state(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]byte, error) {
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				var zero []byte
-				return zero, err
-			}
-			return bindingBytes(raw.data, uint64(raw.size)), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_feature_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), completion, diagnostic))
+	}, completionOf(copyViewBytes))
 }
 
 func (receiver *MapHandle) GetGlobalState() (*Future[[]byte], error) {
-	return bindingCall(func() *Future[[]byte] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_global_state, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_global_state(C.mln_map(raw), completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]byte, error) {
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				var zero []byte
-				return zero, err
-			}
-			return bindingBytes(raw.data, uint64(raw.size)), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_global_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_global_state(C.mln_map(raw), completion, diagnostic))
+	}, completionOf(copyViewBytes))
 }
 
 func (receiver *MapHandle) GetImageSourceCoordinates(sourceId string) (*Future[[]LatLng], error) {
-	return bindingCall(func() *Future[[]LatLng] {
-		input1 := sourceId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_image_source_coordinates, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_image_source_coordinates(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]LatLng, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			items, err := completionSlice[C.mln_lat_lng](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := make([]LatLng, len(items))
-			for i, item := range items {
-				copied[i] = copyLatLng(item)
-			}
-			return copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_image_source_coordinates), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_image_source_coordinates(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
+	}, completionNullableListOf(copyLatLng))
 }
 
 func (receiver *MapHandle) GetLayerFilter(layerId string) (*Future[*[]byte], error) {
-	return bindingCall(func() *Future[*[]byte] {
-		input1 := layerId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_layer_filter, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_layer_filter(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*[]byte, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := bindingBytes(raw.data, uint64(raw.size))
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_layer_filter), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_layer_filter(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyViewBytes)))
 }
 
 func (receiver *MapHandle) GetLayerProperty(layerId string, propertyName string) (*Future[*[]byte], error) {
-	return bindingCall(func() *Future[*[]byte] {
-		input1 := layerId
-		input2 := propertyName
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_layer_property, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes([]byte(input2)), size: C.size_t(len(input2))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_layer_property(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*[]byte, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := bindingBytes(raw.data, uint64(raw.size))
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_layer_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyViewBytes)))
 }
 
 func (receiver *MapHandle) GetStyleImageInfo(imageId string) (*Future[*StyleImageResult], error) {
-	return bindingCall(func() *Future[*StyleImageResult] {
-		input1 := imageId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_style_image_info, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_style_image_info(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*StyleImageResult, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_style_image_result](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := copyStyleImageResult(raw)
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_image_info), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_image_info(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyStyleImageResult)))
 }
 
 func (receiver *MapHandle) GetStyleLayerInfo(layerId string) (*Future[*StyleLayerResult], error) {
-	return bindingCall(func() *Future[*StyleLayerResult] {
-		input1 := layerId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_style_layer_info, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_style_layer_info(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*StyleLayerResult, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_style_layer_result](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := copyStyleLayerResult(raw)
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer_info), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_layer_info(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyStyleLayerResult)))
 }
 
 func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*[]byte], error) {
-	return bindingCall(func() *Future[*[]byte] {
-		input1 := layerId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_style_layer_json, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_style_layer_json(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*[]byte, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := bindingBytes(raw.data, uint64(raw.size))
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_layer_json(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyViewBytes)))
 }
 
 func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[*[]byte], error) {
-	return bindingCall(func() *Future[*[]byte] {
-		input1 := propertyName
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_style_light_property, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_style_light_property(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*[]byte, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := bindingBytes(raw.data, uint64(raw.size))
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_light_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyViewBytes)))
 }
 
 func (receiver *MapHandle) GetStyleSourceInfo(sourceId string) (*Future[*StyleSourceResult], error) {
-	return bindingCall(func() *Future[*StyleSourceResult] {
-		input1 := sourceId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_style_source_info, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_style_source_info(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*StyleSourceResult, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_style_source_result](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := copyStyleSourceResult(raw)
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_source_info), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_source_info(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyStyleSourceResult)))
 }
 
 func (receiver *MapHandle) GetStyleSourceTileUrls(sourceId string) (*Future[*StyleSourceTileUrlsResult], error) {
-	return bindingCall(func() *Future[*StyleSourceTileUrlsResult] {
-		input1 := sourceId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_style_source_tile_urls, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_style_source_tile_urls(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*StyleSourceTileUrlsResult, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_style_source_tile_urls_result](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := copyStyleSourceTileUrlsResult(raw)
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_source_tile_urls), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_source_tile_urls(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyStyleSourceTileUrlsResult)))
 }
 
 func (receiver *MapHandle) GetStyleTransitionOptions() (*Future[StyleTransitionOptions], error) {
-	return bindingCall(func() *Future[StyleTransitionOptions] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_get_style_transition_options, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_get_style_transition_options(C.mln_map(raw), completion, diagnostic))
-		}, func(result *C.mln_completion_result) (StyleTransitionOptions, error) {
-			raw, err := completionValue[C.mln_style_transition_options](result)
-			if err != nil {
-				var zero StyleTransitionOptions
-				return zero, err
-			}
-			return copyStyleTransitionOptions(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_transition_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_transition_options(C.mln_map(raw), completion, diagnostic))
+	}, completionOf(copyStyleTransitionOptions))
 }
 
 func (receiver *MapHandle) InvalidateCustomGeometrySourceRegion(sourceId string, bounds LatLngBounds) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := bounds
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_invalidate_custom_geometry_source_region, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_lat_lng_bounds
-		input2Raw = nativeLatLngBounds(input2, arena)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_invalidate_custom_geometry_source_region(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_invalidate_custom_geometry_source_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_invalidate_custom_geometry_source_region(C.mln_map(raw), bindingView(sourceId, arena), nativeLatLngBounds(bounds, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) InvalidateCustomGeometrySourceTile(sourceId string, tileId CanonicalTileId) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := tileId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_invalidate_custom_geometry_source_tile, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_canonical_tile_id
-		input2Raw = nativeCanonicalTileId(input2, arena)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_invalidate_custom_geometry_source_tile(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_invalidate_custom_geometry_source_tile), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_invalidate_custom_geometry_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) InvalidateCustomMvtVectorSourceTile(sourceId string, tileId CanonicalTileId) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := tileId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_invalidate_custom_mvt_vector_source_tile, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_canonical_tile_id
-		input2Raw = nativeCanonicalTileId(input2, arena)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_invalidate_custom_mvt_vector_source_tile(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_invalidate_custom_mvt_vector_source_tile), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_invalidate_custom_mvt_vector_source_tile(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) LatLngBoundsForCamera(camera CameraOptions) (*Future[LatLngBounds], error) {
-	return bindingCall(func() *Future[LatLngBounds] {
-		input1 := camera
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_lat_lng_bounds_for_camera, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_camera_options
-		{
-			pointer := (*C.mln_camera_options)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeCameraOptions(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_lat_lng_bounds_for_camera(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (LatLngBounds, error) {
-			raw, err := completionValue[C.mln_lat_lng_bounds](result)
-			if err != nil {
-				var zero LatLngBounds
-				return zero, err
-			}
-			return copyLatLngBounds(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_lat_lng_bounds_for_camera), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_lat_lng_bounds_for_camera(C.mln_map(raw), bindingStore(nativeCameraOptions(camera, arena), arena), completion, diagnostic))
+	}, completionOf(copyLatLngBounds))
 }
 
 func (receiver *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) (*Future[LatLngBounds], error) {
-	return bindingCall(func() *Future[LatLngBounds] {
-		input1 := camera
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_lat_lng_bounds_for_camera_unwrapped, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_camera_options
-		{
-			pointer := (*C.mln_camera_options)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeCameraOptions(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_lat_lng_bounds_for_camera_unwrapped(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (LatLngBounds, error) {
-			raw, err := completionValue[C.mln_lat_lng_bounds](result)
-			if err != nil {
-				var zero LatLngBounds
-				return zero, err
-			}
-			return copyLatLngBounds(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_lat_lng_bounds_for_camera_unwrapped), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_lat_lng_bounds_for_camera_unwrapped(C.mln_map(raw), bindingStore(nativeCameraOptions(camera, arena), arena), completion, diagnostic))
+	}, completionOf(copyLatLngBounds))
 }
 
 func (receiver *MapHandle) LatLngForPixel(point ScreenPoint) (*Future[LatLng], error) {
-	return bindingCall(func() *Future[LatLng] {
-		input1 := point
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_lat_lng_for_pixel, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_screen_point
-		input1Raw = nativeScreenPoint(input1, arena)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_lat_lng_for_pixel(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (LatLng, error) {
-			raw, err := completionValue[C.mln_lat_lng](result)
-			if err != nil {
-				var zero LatLng
-				return zero, err
-			}
-			return copyLatLng(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_lat_lng_for_pixel), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_lat_lng_for_pixel(C.mln_map(raw), nativeScreenPoint(point, arena), completion, diagnostic))
+	}, completionOf(copyLatLng))
 }
 
 func (receiver *MapHandle) LatLngForPixelUnwrapped(point ScreenPoint) (*Future[LatLng], error) {
-	return bindingCall(func() *Future[LatLng] {
-		input1 := point
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_lat_lng_for_pixel_unwrapped, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_screen_point
-		input1Raw = nativeScreenPoint(input1, arena)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_lat_lng_for_pixel_unwrapped(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (LatLng, error) {
-			raw, err := completionValue[C.mln_lat_lng](result)
-			if err != nil {
-				var zero LatLng
-				return zero, err
-			}
-			return copyLatLng(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_lat_lng_for_pixel_unwrapped), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_lat_lng_for_pixel_unwrapped(C.mln_map(raw), nativeScreenPoint(point, arena), completion, diagnostic))
+	}, completionOf(copyLatLng))
 }
 
 func (receiver *MapHandle) LatLngsForPixels(points []ScreenPoint) (*Future[[]LatLng], error) {
-	return bindingCall(func() *Future[[]LatLng] {
-		input1 := points
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_lat_lngs_for_pixels, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_screen_point
-		{
-			input1Raw = (*C.mln_screen_point)(arena.array(len(input1), unsafe.Sizeof(*input1Raw)))
-			items := unsafe.Slice(input1Raw, len(input1))
-			for i, item := range input1 {
-				items[i] = nativeScreenPoint(item, arena)
-			}
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_lat_lngs_for_pixels(C.mln_map(raw), input1Raw, bindingCount[C.size_t](len(input1)), completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]LatLng, error) {
-			items, err := completionSlice[C.mln_lat_lng](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := make([]LatLng, len(items))
-			for i, item := range items {
-				copied[i] = copyLatLng(item)
-			}
-			return copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_lat_lngs_for_pixels), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_lat_lngs_for_pixels(C.mln_map(raw), bindingArray(points, arena, nativeScreenPoint), bindingCount[C.size_t](len(points)), completion, diagnostic))
+	}, completionListOf(copyLatLng))
 }
 
 func (receiver *MapHandle) LatLngsForPixelsUnwrapped(points []ScreenPoint) (*Future[[]LatLng], error) {
-	return bindingCall(func() *Future[[]LatLng] {
-		input1 := points
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_lat_lngs_for_pixels_unwrapped, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_screen_point
-		{
-			input1Raw = (*C.mln_screen_point)(arena.array(len(input1), unsafe.Sizeof(*input1Raw)))
-			items := unsafe.Slice(input1Raw, len(input1))
-			for i, item := range input1 {
-				items[i] = nativeScreenPoint(item, arena)
-			}
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_lat_lngs_for_pixels_unwrapped(C.mln_map(raw), input1Raw, bindingCount[C.size_t](len(input1)), completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]LatLng, error) {
-			items, err := completionSlice[C.mln_lat_lng](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := make([]LatLng, len(items))
-			for i, item := range items {
-				copied[i] = copyLatLng(item)
-			}
-			return copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_lat_lngs_for_pixels_unwrapped), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_lat_lngs_for_pixels_unwrapped(C.mln_map(raw), bindingArray(points, arena, nativeScreenPoint), bindingCount[C.size_t](len(points)), completion, diagnostic))
+	}, completionListOf(copyLatLng))
 }
 
 func (receiver *MapHandle) ListStyleLayerIds() (*Future[[]string], error) {
-	return bindingCall(func() *Future[[]string] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_list_style_layer_ids, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_list_style_layer_ids(C.mln_map(raw), completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]string, error) {
-			items, err := completionSlice[C.mln_buffer_view](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := make([]string, len(items))
-			for i, item := range items {
-				copied[i] = bindingString(item.data, uint64(item.size))
-			}
-			return copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_layer_ids), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_list_style_layer_ids(C.mln_map(raw), completion, diagnostic))
+	}, completionListOf(copyViewText))
 }
 
 func (receiver *MapHandle) ListStyleLayers() (*Future[[]StyleLayerEntry], error) {
-	return bindingCall(func() *Future[[]StyleLayerEntry] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_list_style_layers, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_list_style_layers(C.mln_map(raw), completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]StyleLayerEntry, error) {
-			items, err := completionSlice[C.mln_style_layer_entry](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := make([]StyleLayerEntry, len(items))
-			for i, item := range items {
-				copied[i] = copyStyleLayerEntry(item)
-			}
-			return copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_layers), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_list_style_layers(C.mln_map(raw), completion, diagnostic))
+	}, completionListOf(copyStyleLayerEntry))
 }
 
 func (receiver *MapHandle) ListStyleSourceIds() (*Future[[]string], error) {
-	return bindingCall(func() *Future[[]string] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_list_style_source_ids, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_list_style_source_ids(C.mln_map(raw), completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]string, error) {
-			items, err := completionSlice[C.mln_buffer_view](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := make([]string, len(items))
-			for i, item := range items {
-				copied[i] = bindingString(item.data, uint64(item.size))
-			}
-			return copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_source_ids), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_list_style_source_ids(C.mln_map(raw), completion, diagnostic))
+	}, completionListOf(copyViewText))
 }
 
 func (receiver *MapHandle) LoadedStyleJson() (*Future[[]byte], error) {
-	return bindingCall(func() *Future[[]byte] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_loaded_style_json, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_loaded_style_json(C.mln_map(raw), completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]byte, error) {
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				var zero []byte
-				return zero, err
-			}
-			return bindingBytes(raw.data, uint64(raw.size)), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_loaded_style_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_loaded_style_json(C.mln_map(raw), completion, diagnostic))
+	}, completionOf(copyViewBytes))
 }
 
 func (receiver *MapHandle) MetersPerPixelAtLatitude(latitude float64) (*Future[float64], error) {
-	return bindingCall(func() *Future[float64] {
-		input1 := latitude
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_meters_per_pixel_at_latitude, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.double
-		input1Raw = C.double(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_meters_per_pixel_at_latitude(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (float64, error) {
-			raw, err := completionValue[C.double](result)
-			if err != nil {
-				var zero float64
-				return zero, err
-			}
-			return float64(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_meters_per_pixel_at_latitude), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_meters_per_pixel_at_latitude(C.mln_map(raw), C.double(latitude), completion, diagnostic))
+	}, completionOf(func(raw C.double) float64 { return float64(raw) }))
 }
 
 func (receiver *MapHandle) MoveStyleLayer(layerId string, beforeLayerId *string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := beforeLayerId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_move_style_layer, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		if input2 != nil {
-			input2Raw = C.mln_buffer_view{data: arena.bytes([]byte((*input2))), size: C.size_t(len((*input2)))}
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_move_style_layer(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_move_style_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_move_style_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(beforeLayerId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) PixelForLatLng(coordinate LatLng) (*Future[ScreenPoint], error) {
-	return bindingCall(func() *Future[ScreenPoint] {
-		input1 := coordinate
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_pixel_for_lat_lng, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_lat_lng
-		input1Raw = nativeLatLng(input1, arena)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_pixel_for_lat_lng(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (ScreenPoint, error) {
-			raw, err := completionValue[C.mln_screen_point](result)
-			if err != nil {
-				var zero ScreenPoint
-				return zero, err
-			}
-			return copyScreenPoint(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_pixel_for_lat_lng), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_pixel_for_lat_lng(C.mln_map(raw), nativeLatLng(coordinate, arena), completion, diagnostic))
+	}, completionOf(copyScreenPoint))
 }
 
 func (receiver *MapHandle) PixelsForLatLngs(coordinates []LatLng) (*Future[[]ScreenPoint], error) {
-	return bindingCall(func() *Future[[]ScreenPoint] {
-		input1 := coordinates
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_pixels_for_lat_lngs, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_lat_lng
-		{
-			input1Raw = (*C.mln_lat_lng)(arena.array(len(input1), unsafe.Sizeof(*input1Raw)))
-			items := unsafe.Slice(input1Raw, len(input1))
-			for i, item := range input1 {
-				items[i] = nativeLatLng(item, arena)
-			}
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_pixels_for_lat_lngs(C.mln_map(raw), input1Raw, bindingCount[C.size_t](len(input1)), completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]ScreenPoint, error) {
-			items, err := completionSlice[C.mln_screen_point](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := make([]ScreenPoint, len(items))
-			for i, item := range items {
-				copied[i] = copyScreenPoint(item)
-			}
-			return copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_pixels_for_lat_lngs), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_pixels_for_lat_lngs(C.mln_map(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), completion, diagnostic))
+	}, completionListOf(copyScreenPoint))
 }
 
 func (receiver *MapProjectionHandle) Close() error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_projection_close, receiver.state.issued)
-		raw, transaction := receiver.state.reserveClose()
-		defer transaction.finish()
-		defer runtime.KeepAlive(receiver)
-		if raw == 0 {
-			return *new(struct{})
-		}
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_projection_close(C.mln_map_projection(raw), diagnostic))
-		})
-		transaction.commit()
-		return struct{}{}
+	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_map_projection_close), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_close(C.mln_map_projection(raw), diagnostic))
 	})
-	return err
 }
 
 func (receiver *MapHandle) ProjectionCreate() (*Future[*MapProjectionHandle], error) {
-	return bindingCall(func() *Future[*MapProjectionHandle] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_projection_create, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_projection_create(C.mln_map(raw), completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*MapProjectionHandle, error) {
-			raw, err := completionValue[C.mln_map_projection](result)
-			if err != nil {
-				return nil, err
-			}
-			return adoptMapProjectionHandle(uint64(raw), nil), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_create), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_create(C.mln_map(raw), completion, diagnostic))
+	}, completionOf(func(raw C.mln_map_projection) *MapProjectionHandle { return adoptMapProjectionHandle(uint64(raw), nil) }))
 }
 
 func (receiver *MapProjectionHandle) GetCamera() (CameraOptions, error) {
-	return bindingCall(func() CameraOptions {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_projection_get_camera, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutCamera := C.mln_camera_options_default()
-		outputOutCamera.size = C.uint32_t(unsafe.Sizeof(outputOutCamera))
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_projection_get_camera(C.mln_map_projection(raw), &outputOutCamera, diagnostic))
-		})
-		return copyCameraOptions(outputOutCamera)
+	outCamera := C.mln_camera_options_default()
+	outCamera.size = C.uint32_t(unsafe.Sizeof(outCamera))
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_get_camera), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_get_camera(C.mln_map_projection(raw), &outCamera, diagnostic))
+	}, func(arena *bindingArena) CameraOptions {
+		return copyCameraOptions(outCamera)
 	})
 }
 
 func (receiver *MapProjectionHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
-	return bindingCall(func() LatLng {
-		input1 := point
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_projection_lat_lng_for_pixel, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_screen_point
-		input1Raw = nativeScreenPoint(input1, arena)
-		outputOutCoordinate := *new(C.mln_lat_lng)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_projection_lat_lng_for_pixel(C.mln_map_projection(raw), input1Raw, &outputOutCoordinate, diagnostic))
-		})
-		return copyLatLng(outputOutCoordinate)
+	var outCoordinate C.mln_lat_lng
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_lat_lng_for_pixel), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_lat_lng_for_pixel(C.mln_map_projection(raw), nativeScreenPoint(point, arena), &outCoordinate, diagnostic))
+	}, func(arena *bindingArena) LatLng {
+		return copyLatLng(outCoordinate)
 	})
 }
 
 func (receiver *MapProjectionHandle) LatLngForPixelUnwrapped(point ScreenPoint) (LatLng, error) {
-	return bindingCall(func() LatLng {
-		input1 := point
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_projection_lat_lng_for_pixel_unwrapped, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_screen_point
-		input1Raw = nativeScreenPoint(input1, arena)
-		outputOutCoordinate := *new(C.mln_lat_lng)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_projection_lat_lng_for_pixel_unwrapped(C.mln_map_projection(raw), input1Raw, &outputOutCoordinate, diagnostic))
-		})
-		return copyLatLng(outputOutCoordinate)
+	var outCoordinate C.mln_lat_lng
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_lat_lng_for_pixel_unwrapped), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_lat_lng_for_pixel_unwrapped(C.mln_map_projection(raw), nativeScreenPoint(point, arena), &outCoordinate, diagnostic))
+	}, func(arena *bindingArena) LatLng {
+		return copyLatLng(outCoordinate)
 	})
 }
 
 func (receiver *MapProjectionHandle) MetersPerPixelAtLatitude(latitude float64) (float64, error) {
-	return bindingCall(func() float64 {
-		input1 := latitude
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_projection_meters_per_pixel_at_latitude, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.double
-		input1Raw = C.double(input1)
-		outputOutMetersPerPixel := *new(C.double)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_projection_meters_per_pixel_at_latitude(C.mln_map_projection(raw), input1Raw, &outputOutMetersPerPixel, diagnostic))
-		})
-		return float64(outputOutMetersPerPixel)
+	var outMetersPerPixel C.double
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_meters_per_pixel_at_latitude), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_meters_per_pixel_at_latitude(C.mln_map_projection(raw), C.double(latitude), &outMetersPerPixel, diagnostic))
+	}, func(arena *bindingArena) float64 {
+		return float64(outMetersPerPixel)
 	})
 }
 
 func (receiver *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
-	return bindingCall(func() ScreenPoint {
-		input1 := coordinate
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_projection_pixel_for_lat_lng, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_lat_lng
-		input1Raw = nativeLatLng(input1, arena)
-		outputOutPoint := *new(C.mln_screen_point)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_projection_pixel_for_lat_lng(C.mln_map_projection(raw), input1Raw, &outputOutPoint, diagnostic))
-		})
-		return copyScreenPoint(outputOutPoint)
+	var outPoint C.mln_screen_point
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_pixel_for_lat_lng), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_pixel_for_lat_lng(C.mln_map_projection(raw), nativeLatLng(coordinate, arena), &outPoint, diagnostic))
+	}, func(arena *bindingArena) ScreenPoint {
+		return copyScreenPoint(outPoint)
 	})
 }
 
 func (receiver *MapProjectionHandle) SetCamera(camera CameraOptions) error {
-	_, err := bindingCall(func() struct{} {
-		input1 := camera
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_projection_set_camera, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_camera_options
-		{
-			pointer := (*C.mln_camera_options)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeCameraOptions(input1, arena)
-			input1Raw = pointer
-		}
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_projection_set_camera(C.mln_map_projection(raw), input1Raw, diagnostic))
-		})
-		return struct{}{}
+	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_set_camera), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_set_camera(C.mln_map_projection(raw), bindingStore(nativeCameraOptions(camera, arena), arena), diagnostic))
 	})
-	return err
 }
 
 func (receiver *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLng, padding EdgeInsets) error {
-	_, err := bindingCall(func() struct{} {
-		input1 := coordinates
-		input3 := padding
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_projection_set_visible_coordinates, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_lat_lng
-		{
-			input1Raw = (*C.mln_lat_lng)(arena.array(len(input1), unsafe.Sizeof(*input1Raw)))
-			items := unsafe.Slice(input1Raw, len(input1))
-			for i, item := range input1 {
-				items[i] = nativeLatLng(item, arena)
-			}
-		}
-		var input3Raw C.mln_edge_insets
-		input3Raw = nativeEdgeInsets(input3, arena)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_projection_set_visible_coordinates(C.mln_map_projection(raw), input1Raw, bindingCount[C.size_t](len(input1)), input3Raw, diagnostic))
-		})
-		return struct{}{}
+	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_set_visible_coordinates), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_set_visible_coordinates(C.mln_map_projection(raw), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), nativeEdgeInsets(padding, arena), diagnostic))
 	})
-	return err
 }
 
 func (receiver *MapProjectionHandle) SetVisibleGeometry(geometry []byte, padding EdgeInsets) error {
-	_, err := bindingCall(func() struct{} {
-		input1 := geometry
-		input2 := padding
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_projection_set_visible_geometry, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes(input1), size: C.size_t(len(input1))}
-		var input2Raw C.mln_edge_insets
-		input2Raw = nativeEdgeInsets(input2, arena)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_projection_set_visible_geometry(C.mln_map_projection(raw), input1Raw, input2Raw, diagnostic))
-		})
-		return struct{}{}
+	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_set_visible_geometry), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_set_visible_geometry(C.mln_map_projection(raw), bindingView(geometry, arena), nativeEdgeInsets(padding, arena), diagnostic))
 	})
-	return err
 }
 
 func (receiver *MapHandle) Close() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_release, receiver.state.issued)
-		raw, transaction := receiver.state.reserveClose()
-		defer transaction.finish()
-		defer runtime.KeepAlive(receiver)
-		if raw == 0 {
-			return completedFuture(struct{}{})
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_release(C.mln_map(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		transaction.commit()
-		return future
-	})
+	return bindingStart(bindingClosing(receiver.owner(), C.binding_operation_mln_map_release), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_release(C.mln_map(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *MapHandle) RemoveFeatureState(selector FeatureStateSelector) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := selector
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_remove_feature_state, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_feature_state_selector
-		{
-			pointer := (*C.mln_feature_state_selector)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeFeatureStateSelector(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_remove_feature_state(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_feature_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_remove_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) RemoveStyleImage(imageId string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := imageId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_remove_style_image, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_remove_style_image(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_style_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_remove_style_image(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) RemoveStyleLayer(layerId string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_remove_style_layer, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_remove_style_layer(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_style_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_remove_style_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) RemoveStyleSource(sourceId string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_remove_style_source, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_remove_style_source(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_remove_style_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_remove_style_source(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) RequestRepaint() (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_request_repaint, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_request_repaint(C.mln_map(raw), completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_request_repaint), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_request_repaint(C.mln_map(raw), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) RequestStillImage() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_request_still_image, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_request_still_image(C.mln_map(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_request_still_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_request_still_image(C.mln_map(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *MapHandle) Resize(extent LogicalExtent) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := extent
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_resize, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_logical_extent
-		input1Raw = nativeLogicalExtent(input1, arena)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_resize(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_resize), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_resize(C.mln_map(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetBounds(options BoundOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_bounds, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_bound_options
-		{
-			pointer := (*C.mln_bound_options)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeBoundOptions(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_bounds(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_bounds), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_bounds(C.mln_map(raw), bindingStore(nativeBoundOptions(options, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetCustomGeometrySourceTileData(sourceId string, tileId CanonicalTileId, data []byte) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := tileId
-		input3 := data
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_custom_geometry_source_tile_data, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_canonical_tile_id
-		input2Raw = nativeCanonicalTileId(input2, arena)
-		var input3Raw C.mln_buffer_view
-		input3Raw = C.mln_buffer_view{data: arena.bytes(input3), size: C.size_t(len(input3))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_custom_geometry_source_tile_data(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_custom_geometry_source_tile_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_custom_geometry_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetCustomMvtVectorSourceTileData(sourceId string, tileId CanonicalTileId, data []byte) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := tileId
-		input3 := data
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_custom_mvt_vector_source_tile_data, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_canonical_tile_id
-		input2Raw = nativeCanonicalTileId(input2, arena)
-		var input3Raw C.mln_buffer_view
-		input3Raw = C.mln_buffer_view{data: arena.bytes(input3), size: C.size_t(len(input3))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_custom_mvt_vector_source_tile_data(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_custom_mvt_vector_source_tile_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_custom_mvt_vector_source_tile_data(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(data, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetCustomMvtVectorSourceTileError(sourceId string, tileId CanonicalTileId, message string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := tileId
-		input3 := message
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_custom_mvt_vector_source_tile_error, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_canonical_tile_id
-		input2Raw = nativeCanonicalTileId(input2, arena)
-		var input3Raw C.mln_buffer_view
-		input3Raw = C.mln_buffer_view{data: arena.bytes([]byte(input3)), size: C.size_t(len(input3))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_custom_mvt_vector_source_tile_error(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_custom_mvt_vector_source_tile_error), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_custom_mvt_vector_source_tile_error(C.mln_map(raw), bindingView(sourceId, arena), nativeCanonicalTileId(tileId, arena), bindingView(message, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetDebugOptions(options MapDebugOption) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_debug_options, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.uint32_t
-		input1Raw = C.uint32_t(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_debug_options(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_debug_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_debug_options(C.mln_map(raw), C.uint32_t(options), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetEventMask(mask RuntimeEventMask) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := mask
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_event_mask, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.uint64_t
-		input1Raw = C.uint64_t(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_event_mask(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_event_mask), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_event_mask(C.mln_map(raw), C.uint64_t(mask), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetFeatureState(selector FeatureStateSelector, state []byte) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := selector
-		input2 := state
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_feature_state, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_feature_state_selector
-		{
-			pointer := (*C.mln_feature_state_selector)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeFeatureStateSelector(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes(input2), size: C.size_t(len(input2))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_feature_state(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_feature_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_feature_state(C.mln_map(raw), bindingStore(nativeFeatureStateSelector(selector, arena), arena), bindingView(state, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_free_camera_options, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_free_camera_options
-		{
-			pointer := (*C.mln_free_camera_options)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeFreeCameraOptions(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_free_camera_options(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_free_camera_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_free_camera_options(C.mln_map(raw), bindingStore(nativeFreeCameraOptions(options, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetGeojsonSourceData(sourceId string, data *GeojsonSourceDataHandle) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := data
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_geojson_source_data, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		if input2 == nil || input2.bindingOwner == nil {
-			arena.fail("nil input handle")
-		}
-		input2Raw, input2Done := input2.bindingAcquire(false)
-		defer input2Done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_geojson_source_data(C.mln_map(raw), input1Raw, C.mln_geojson_source_data(input2Raw), completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_geojson_source_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_geojson_source_data(C.mln_map(raw), bindingView(sourceId, arena), C.mln_geojson_source_data(arena.lease(data.owner())), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetGeojsonSourceSynchronousTiling(sourceId string, enabled bool) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := enabled
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_geojson_source_synchronous_tiling, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.bool
-		input2Raw = C.bool(input2)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_geojson_source_synchronous_tiling(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_geojson_source_synchronous_tiling), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_geojson_source_synchronous_tiling(C.mln_map(raw), bindingView(sourceId, arena), C.bool(enabled), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetGeojsonSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := url
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_geojson_source_url, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes([]byte(input2)), size: C.size_t(len(input2))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_geojson_source_url(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_geojson_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_geojson_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value []byte) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := propertyName
-		input2 := value
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_global_state_property, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes(input2), size: C.size_t(len(input2))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_global_state_property(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_global_state_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_global_state_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetImageSourceCoordinates(sourceId string, coordinates []LatLng) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := coordinates
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_image_source_coordinates, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_lat_lng
-		{
-			input2Raw = (*C.mln_lat_lng)(arena.array(len(input2), unsafe.Sizeof(*input2Raw)))
-			items := unsafe.Slice(input2Raw, len(input2))
-			for i, item := range input2 {
-				items[i] = nativeLatLng(item, arena)
-			}
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_image_source_coordinates(C.mln_map(raw), input1Raw, input2Raw, bindingCount[C.size_t](len(input2)), completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_image_source_coordinates), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_image_source_coordinates(C.mln_map(raw), bindingView(sourceId, arena), bindingArray(coordinates, arena, nativeLatLng), bindingCount[C.size_t](len(coordinates)), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetImageSourceImage(sourceId string, image PremultipliedRgba8Image) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := image
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_image_source_image, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_premultiplied_rgba8_image
-		{
-			pointer := (*C.mln_premultiplied_rgba8_image)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativePremultipliedRgba8Image(input2, arena)
-			input2Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_image_source_image(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_image_source_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_image_source_image(C.mln_map(raw), bindingView(sourceId, arena), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetImageSourceUrl(sourceId string, url string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := url
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_image_source_url, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes([]byte(input2)), size: C.size_t(len(input2))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_image_source_url(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_image_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_image_source_url(C.mln_map(raw), bindingView(sourceId, arena), bindingView(url, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetLayerFilter(layerId string, filter *[]byte) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := filter
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_layer_filter, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_buffer_view
-		if input2 != nil {
-			pointer := (*C.mln_buffer_view)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = C.mln_buffer_view{data: arena.bytes(*input2), size: C.size_t(len(*input2))}
-			input2Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_layer_filter(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_filter), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_layer_filter(C.mln_map(raw), bindingView(layerId, arena), bindingStoreOptional(filter, arena, bindingView[[]byte]), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetLayerMaxZoom(layerId string, maxZoom float64) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := maxZoom
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_layer_max_zoom, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.double
-		input2Raw = C.double(input2)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_layer_max_zoom(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_max_zoom), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_layer_max_zoom(C.mln_map(raw), bindingView(layerId, arena), C.double(maxZoom), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetLayerMinZoom(layerId string, minZoom float64) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := minZoom
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_layer_min_zoom, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.double
-		input2Raw = C.double(input2)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_layer_min_zoom(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_min_zoom), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_layer_min_zoom(C.mln_map(raw), bindingView(layerId, arena), C.double(minZoom), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetLayerProperty(layerId string, propertyName string, value []byte) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := propertyName
-		input3 := value
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_layer_property, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes([]byte(input2)), size: C.size_t(len(input2))}
-		var input3Raw C.mln_buffer_view
-		input3Raw = C.mln_buffer_view{data: arena.bytes(input3), size: C.size_t(len(input3))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_layer_property(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetLayerSourceId(layerId string, sourceId string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := sourceId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_layer_source_id, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes([]byte(input2)), size: C.size_t(len(input2))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_layer_source_id(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_source_id), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_layer_source_id(C.mln_map(raw), bindingView(layerId, arena), bindingView(sourceId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetLayerSourceLayer(layerId string, sourceLayer *string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := sourceLayer
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_layer_source_layer, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		if input2 != nil {
-			input2Raw = C.mln_buffer_view{data: arena.bytes([]byte((*input2))), size: C.size_t(len((*input2)))}
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_layer_source_layer(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_source_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_layer_source_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(sourceLayer, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetLayerVisibility(layerId string, visibility StyleLayerVisibility) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := visibility
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_layer_visibility, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.uint32_t
-		input2Raw = C.uint32_t(input2)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_layer_visibility(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_visibility), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_layer_visibility(C.mln_map(raw), bindingView(layerId, arena), C.uint32_t(visibility), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetLocationIndicatorAccuracyRadius(layerId string, radius float64) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := radius
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_location_indicator_accuracy_radius, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.double
-		input2Raw = C.double(input2)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_location_indicator_accuracy_radius(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_location_indicator_accuracy_radius), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_location_indicator_accuracy_radius(C.mln_map(raw), bindingView(layerId, arena), C.double(radius), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetLocationIndicatorBearing(layerId string, bearing float64) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := bearing
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_location_indicator_bearing, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.double
-		input2Raw = C.double(input2)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_location_indicator_bearing(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_location_indicator_bearing), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_location_indicator_bearing(C.mln_map(raw), bindingView(layerId, arena), C.double(bearing), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetLocationIndicatorImageName(layerId string, imageKind LocationIndicatorImageKind, imageId string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := imageKind
-		input3 := imageId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_location_indicator_image_name, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.uint32_t
-		input2Raw = C.uint32_t(input2)
-		var input3Raw C.mln_buffer_view
-		input3Raw = C.mln_buffer_view{data: arena.bytes([]byte(input3)), size: C.size_t(len(input3))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_location_indicator_image_name(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_location_indicator_image_name), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_location_indicator_image_name(C.mln_map(raw), bindingView(layerId, arena), C.uint32_t(imageKind), bindingView(imageId, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetLocationIndicatorLocation(layerId string, coordinate LatLng, altitude float64) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := layerId
-		input2 := coordinate
-		input3 := altitude
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_location_indicator_location, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_lat_lng
-		input2Raw = nativeLatLng(input2, arena)
-		var input3Raw C.double
-		input3Raw = C.double(input3)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_location_indicator_location(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_location_indicator_location), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_location_indicator_location(C.mln_map(raw), bindingView(layerId, arena), nativeLatLng(coordinate, arena), C.double(altitude), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetProjectionMode(mode ProjectionMode) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := mode
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_projection_mode, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_projection_mode
-		{
-			pointer := (*C.mln_projection_mode)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeProjectionMode(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_projection_mode(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_projection_mode), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_projection_mode(C.mln_map(raw), bindingStore(nativeProjectionMode(mode, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetRenderingStatsViewEnabled(enabled bool) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := enabled
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_rendering_stats_view_enabled, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.bool
-		input1Raw = C.bool(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_rendering_stats_view_enabled(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_rendering_stats_view_enabled), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_rendering_stats_view_enabled(C.mln_map(raw), C.bool(enabled), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetStyleImage(imageId string, image PremultipliedRgba8Image, options *StyleImageOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := imageId
-		input2 := image
-		input3 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_style_image, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_premultiplied_rgba8_image
-		{
-			pointer := (*C.mln_premultiplied_rgba8_image)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativePremultipliedRgba8Image(input2, arena)
-			input2Raw = pointer
-		}
-		var input3Raw *C.mln_style_image_options
-		if input3 != nil {
-			pointer := (*C.mln_style_image_options)(arena.allocate(unsafe.Sizeof(*input3Raw)))
-			*pointer = nativeStyleImageOptions(*input3, arena)
-			input3Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_style_image(C.mln_map(raw), input1Raw, input2Raw, input3Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_image(C.mln_map(raw), bindingView(imageId, arena), bindingStore(nativePremultipliedRgba8Image(image, arena), arena), bindingStoreOptional(options, arena, nativeStyleImageOptions), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetStyleJson(json []byte) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := json
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_style_json, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes(input1), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_style_json(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_json(C.mln_map(raw), bindingView(json, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetStyleLightJson(lightJson []byte) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := lightJson
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_style_light_json, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes(input1), size: C.size_t(len(input1))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_style_light_json(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_light_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_light_json(C.mln_map(raw), bindingView(lightJson, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value []byte) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := propertyName
-		input2 := value
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_style_light_property, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes(input2), size: C.size_t(len(input2))}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_style_light_property(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_light_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_light_property(C.mln_map(raw), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetStyleSourceVolatile(sourceId string, isVolatile bool) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := sourceId
-		input2 := isVolatile
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_style_source_volatile, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.bool
-		input2Raw = C.bool(input2)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_style_source_volatile(C.mln_map(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_source_volatile), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_source_volatile(C.mln_map(raw), bindingView(sourceId, arena), C.bool(isVolatile), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetStyleTransitionOptions(options StyleTransitionOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_style_transition_options, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_style_transition_options
-		{
-			pointer := (*C.mln_style_transition_options)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeStyleTransitionOptions(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_style_transition_options(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_transition_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_transition_options(C.mln_map(raw), bindingStore(nativeStyleTransitionOptions(options, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetStyleUrl(url string) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := url
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_style_url, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.char
-		input1Raw = arena.cstring(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_style_url(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_url(C.mln_map(raw), arena.cstring(url), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetTileOptions(options MapTileOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_tile_options, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_map_tile_options
-		{
-			pointer := (*C.mln_map_tile_options)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeMapTileOptions(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_tile_options(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_tile_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_tile_options(C.mln_map(raw), bindingStore(nativeMapTileOptions(options, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SetViewportOptions(options MapViewportOptions) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_set_viewport_options, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_map_viewport_options
-		{
-			pointer := (*C.mln_map_viewport_options)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeMapViewportOptions(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_set_viewport_options(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_viewport_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_viewport_options(C.mln_map(raw), bindingStore(nativeMapViewportOptions(options, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *MapHandle) SnapshotGet() (MapSnapshot, error) {
-	return bindingCall(func() MapSnapshot {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_snapshot_get, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutSnapshot := *new(C.mln_map_snapshot)
-		outputOutSnapshot.size = C.uint32_t(unsafe.Sizeof(outputOutSnapshot))
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_snapshot_get(C.mln_map(raw), &outputOutSnapshot, diagnostic))
-		})
-		return copyMapSnapshot(outputOutSnapshot)
+	var outSnapshot C.mln_map_snapshot
+	outSnapshot.size = C.uint32_t(unsafe.Sizeof(outSnapshot))
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_snapshot_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_snapshot_get(C.mln_map(raw), &outSnapshot, diagnostic))
+	}, func(arena *bindingArena) MapSnapshot {
+		return copyMapSnapshot(outSnapshot)
 	})
 }
 
 func (receiver *MapHandle) StyleUrl() (*Future[string], error) {
-	return bindingCall(func() *Future[string] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_style_url, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_style_url(C.mln_map(raw), completion, diagnostic))
-		}, func(result *C.mln_completion_result) (string, error) {
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				var zero string
-				return zero, err
-			}
-			return bindingString(raw.data, uint64(raw.size)), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_style_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_style_url(C.mln_map(raw), completion, diagnostic))
+	}, completionOf(copyViewText))
 }
 
 func (receiver *MapHandle) UpdateCamera(update CameraUpdate) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := update
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_map_update_camera, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_camera_update
-		{
-			pointer := (*C.mln_camera_update)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeCameraUpdate(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_update_camera(C.mln_map(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_update_camera), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_update_camera(C.mln_map(raw), bindingStore(nativeCameraUpdate(update, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 type MetalBorrowedTextureAttachResult struct {
@@ -8750,67 +5877,20 @@ type MetalBorrowedTextureAttachResult struct {
 }
 
 func (receiver *MapHandle) MetalBorrowedTextureAttach(descriptor MetalBorrowedTextureDescriptor, options RenderSessionAttachOptions) (MetalBorrowedTextureAttachResult, error) {
-	return bindingCall(func() MetalBorrowedTextureAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_metal_borrowed_texture_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_metal_borrowed_texture_descriptor
-		{
-			pointer := (*C.mln_metal_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeMetalBorrowedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_metal_borrowed_texture_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return MetalBorrowedTextureAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_metal_borrowed_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_metal_borrowed_texture_attach(C.mln_map(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MetalBorrowedTextureAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MetalBorrowedTextureAttachResult{Session: adopted, Completion: future}
 	})
 }
 
 func (receiver *RenderSessionHandle) MetalBorrowedTextureSetTarget(descriptor MetalBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := descriptor
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_metal_borrowed_texture_set_target, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_metal_borrowed_texture_descriptor
-		{
-			pointer := (*C.mln_metal_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeMetalBorrowedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_metal_borrowed_texture_set_target(C.mln_render_session(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_metal_borrowed_texture_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_metal_borrowed_texture_set_target(C.mln_render_session(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 type MetalOwnedTextureAttachResult struct {
@@ -8819,39 +5899,13 @@ type MetalOwnedTextureAttachResult struct {
 }
 
 func (receiver *MapHandle) MetalOwnedTextureAttach(descriptor MetalOwnedTextureDescriptor, options RenderSessionAttachOptions) (MetalOwnedTextureAttachResult, error) {
-	return bindingCall(func() MetalOwnedTextureAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_metal_owned_texture_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_metal_owned_texture_descriptor
-		{
-			pointer := (*C.mln_metal_owned_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeMetalOwnedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_metal_owned_texture_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return MetalOwnedTextureAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_metal_owned_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_metal_owned_texture_attach(C.mln_map(raw), bindingStore(nativeMetalOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MetalOwnedTextureAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MetalOwnedTextureAttachResult{Session: adopted, Completion: future}
 	})
 }
 
@@ -8861,96 +5915,35 @@ type MetalSurfaceAttachResult struct {
 }
 
 func (receiver *MapHandle) MetalSurfaceAttach(descriptor MetalSurfaceDescriptor, options RenderSessionAttachOptions) (MetalSurfaceAttachResult, error) {
-	return bindingCall(func() MetalSurfaceAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_metal_surface_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_metal_surface_descriptor
-		{
-			pointer := (*C.mln_metal_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeMetalSurfaceDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_metal_surface_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return MetalSurfaceAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_metal_surface_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_metal_surface_attach(C.mln_map(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MetalSurfaceAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MetalSurfaceAttachResult{Session: adopted, Completion: future}
 	})
 }
 
 func (receiver *RenderSessionHandle) MetalSurfaceSetTarget(descriptor MetalSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := descriptor
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_metal_surface_set_target, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_metal_surface_descriptor
-		{
-			pointer := (*C.mln_metal_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeMetalSurfaceDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_metal_surface_set_target(C.mln_render_session(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_metal_surface_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_metal_surface_set_target(C.mln_render_session(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 func NetworkStatusGet() (NetworkStatus, error) {
-	return bindingCall(func() NetworkStatus {
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_network_status_get, 0)
-		outputOutStatus := *new(C.uint32_t)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_network_status_get(&outputOutStatus, diagnostic))
-		})
-		return NetworkStatus(outputOutStatus)
+	var outStatus C.uint32_t
+	return bindingGet(bindingGlobal(C.binding_operation_mln_network_status_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_network_status_get(&outStatus, diagnostic))
+	}, func(arena *bindingArena) NetworkStatus {
+		return NetworkStatus(outStatus)
 	})
 }
 
 func NetworkStatusSet(status NetworkStatus) error {
-	_, err := bindingCall(func() struct{} {
-		input0 := status
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_network_status_set, 0)
-		var input0Raw C.uint32_t
-		input0Raw = C.uint32_t(input0)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_network_status_set(input0Raw, diagnostic))
-		})
-		return struct{}{}
+	return bindingDo(bindingGlobal(C.binding_operation_mln_network_status_set), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_network_status_set(C.uint32_t(status), diagnostic))
 	})
-	return err
 }
 
 type OpenglBorrowedTextureAttachResult struct {
@@ -8959,67 +5952,20 @@ type OpenglBorrowedTextureAttachResult struct {
 }
 
 func (receiver *MapHandle) OpenglBorrowedTextureAttach(descriptor OpenglBorrowedTextureDescriptor, options RenderSessionAttachOptions) (OpenglBorrowedTextureAttachResult, error) {
-	return bindingCall(func() OpenglBorrowedTextureAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_opengl_borrowed_texture_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_opengl_borrowed_texture_descriptor
-		{
-			pointer := (*C.mln_opengl_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeOpenglBorrowedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_opengl_borrowed_texture_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return OpenglBorrowedTextureAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_opengl_borrowed_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_opengl_borrowed_texture_attach(C.mln_map(raw), bindingStore(nativeOpenglBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) OpenglBorrowedTextureAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return OpenglBorrowedTextureAttachResult{Session: adopted, Completion: future}
 	})
 }
 
 func (receiver *RenderSessionHandle) OpenglBorrowedTextureSetTarget(descriptor OpenglBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := descriptor
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_opengl_borrowed_texture_set_target, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_opengl_borrowed_texture_descriptor
-		{
-			pointer := (*C.mln_opengl_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeOpenglBorrowedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_opengl_borrowed_texture_set_target(C.mln_render_session(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_opengl_borrowed_texture_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_opengl_borrowed_texture_set_target(C.mln_render_session(raw), bindingStore(nativeOpenglBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 type OpenglOwnedTextureAttachResult struct {
@@ -9028,49 +5974,19 @@ type OpenglOwnedTextureAttachResult struct {
 }
 
 func (receiver *MapHandle) OpenglOwnedTextureAttach(descriptor OpenglOwnedTextureDescriptor, options RenderSessionAttachOptions) (OpenglOwnedTextureAttachResult, error) {
-	return bindingCall(func() OpenglOwnedTextureAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_opengl_owned_texture_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_opengl_owned_texture_descriptor
-		{
-			pointer := (*C.mln_opengl_owned_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeOpenglOwnedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_opengl_owned_texture_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return OpenglOwnedTextureAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_opengl_owned_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_opengl_owned_texture_attach(C.mln_map(raw), bindingStore(nativeOpenglOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) OpenglOwnedTextureAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return OpenglOwnedTextureAttachResult{Session: adopted, Completion: future}
 	})
 }
 
 func OpenglSupportedContextProviderMask() (OpenglContextProviderFlag, error) {
-	return bindingCall(func() OpenglContextProviderFlag {
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_opengl_supported_context_provider_mask, 0)
-		nativeResult := C.mln_opengl_supported_context_provider_mask()
-		return OpenglContextProviderFlag(nativeResult)
+	return bindingDirect(bindingGlobal(C.binding_operation_mln_opengl_supported_context_provider_mask), func(arena *bindingArena, raw uint64) OpenglContextProviderFlag {
+		return OpenglContextProviderFlag(C.mln_opengl_supported_context_provider_mask())
 	})
 }
 
@@ -9080,150 +5996,58 @@ type OpenglSurfaceAttachResult struct {
 }
 
 func (receiver *MapHandle) OpenglSurfaceAttach(descriptor OpenglSurfaceDescriptor, options RenderSessionAttachOptions) (OpenglSurfaceAttachResult, error) {
-	return bindingCall(func() OpenglSurfaceAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_opengl_surface_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_opengl_surface_descriptor
-		{
-			pointer := (*C.mln_opengl_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeOpenglSurfaceDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_opengl_surface_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return OpenglSurfaceAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_opengl_surface_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_opengl_surface_attach(C.mln_map(raw), bindingStore(nativeOpenglSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) OpenglSurfaceAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return OpenglSurfaceAttachResult{Session: adopted, Completion: future}
 	})
 }
 
 func (receiver *RenderSessionHandle) OpenglSurfaceSetTarget(descriptor OpenglSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := descriptor
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_opengl_surface_set_target, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_opengl_surface_descriptor
-		{
-			pointer := (*C.mln_opengl_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeOpenglSurfaceDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_opengl_surface_set_target(C.mln_render_session(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_opengl_surface_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_opengl_surface_set_target(C.mln_render_session(raw), bindingStore(nativeOpenglSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 func PluginGetRegisterFunctionV1() (uintptr, error) {
-	return bindingCall(func() uintptr {
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_plugin_get_register_function_v1, 0)
-		nativeResult := C.mln_plugin_get_register_function_v1()
-		return uintptr(unsafe.Pointer(nativeResult))
+	return bindingDirect(bindingGlobal(C.binding_operation_mln_plugin_get_register_function_v1), func(arena *bindingArena, raw uint64) uintptr {
+		return uintptr(unsafe.Pointer(C.mln_plugin_get_register_function_v1()))
 	})
 }
 
 func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {
-	return bindingCall(func() ProjectedMeters {
-		input0 := coordinate
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_projected_meters_for_lat_lng, 0)
-		var input0Raw C.mln_lat_lng
-		input0Raw = nativeLatLng(input0, arena)
-		outputOutMeters := *new(C.mln_projected_meters)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_projected_meters_for_lat_lng(input0Raw, &outputOutMeters, diagnostic))
-		})
-		return copyProjectedMeters(outputOutMeters)
+	var outMeters C.mln_projected_meters
+	return bindingGet(bindingGlobal(C.binding_operation_mln_projected_meters_for_lat_lng), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_projected_meters_for_lat_lng(nativeLatLng(coordinate, arena), &outMeters, diagnostic))
+	}, func(arena *bindingArena) ProjectedMeters {
+		return copyProjectedMeters(outMeters)
 	})
 }
 
 func (receiver *RenderFrameBatchHandle) Count() (uint, error) {
-	return bindingCall(func() uint {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_frame_batch_count, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutCount := *new(C.size_t)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_frame_batch_count(C.mln_render_frame_batch(raw), &outputOutCount, diagnostic))
-		})
-		return uint(outputOutCount)
+	var outCount C.size_t
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_frame_batch_count), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_frame_batch_count(C.mln_render_frame_batch(raw), &outCount, diagnostic))
+	}, func(arena *bindingArena) uint {
+		return uint(outCount)
 	})
 }
 
 func (receiver *RenderFrameBatchHandle) Get(index uint) (RenderFrameResult, error) {
-	return bindingCall(func() RenderFrameResult {
-		input1 := index
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_frame_batch_get, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.size_t
-		input1Raw = C.size_t(input1)
-		outputOutResult := *new(C.mln_render_frame_result)
-		outputOutResult.size = C.uint32_t(unsafe.Sizeof(outputOutResult))
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_frame_batch_get(C.mln_render_frame_batch(raw), input1Raw, &outputOutResult, diagnostic))
-		})
-		return copyRenderFrameResult(outputOutResult)
+	var outResult C.mln_render_frame_result
+	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_frame_batch_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_frame_batch_get(C.mln_render_frame_batch(raw), C.size_t(index), &outResult, diagnostic))
+	}, func(arena *bindingArena) RenderFrameResult {
+		return copyRenderFrameResult(outResult)
 	})
 }
 
 func (receiver *RenderFrameBatchHandle) Close() error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_frame_batch_release, receiver.state.issued)
-		raw, transaction := receiver.state.reserveClose()
-		defer transaction.finish()
-		defer runtime.KeepAlive(receiver)
-		if raw == 0 {
-			return *new(struct{})
-		}
-		transaction.commit()
+	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_render_frame_batch_release), func(arena *bindingArena, raw uint64) struct{} {
 		C.mln_render_frame_batch_release(C.mln_render_frame_batch(raw))
 		return struct{}{}
 	})
@@ -9231,442 +6055,137 @@ func (receiver *RenderFrameBatchHandle) Close() error {
 }
 
 func (receiver *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
-	return bindingCall(func() RenderAbandonResult {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_abandon, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutResult := *new(C.mln_render_abandon_result)
-		outputOutResult.size = C.uint32_t(unsafe.Sizeof(outputOutResult))
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_abandon(C.mln_render_session(raw), &outputOutResult, diagnostic))
-		})
-		return copyRenderAbandonResult(outputOutResult)
+	var outResult C.mln_render_abandon_result
+	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_abandon), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_abandon(C.mln_render_session(raw), &outResult, diagnostic))
+	}, func(arena *bindingArena) RenderAbandonResult {
+		return copyRenderAbandonResult(outResult)
 	})
 }
 
 func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error) {
-	return bindingCall(func() *AcquiredFrameHandle {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_acquire_frame, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutFrame := *new(C.mln_acquired_frame)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_acquire_frame(C.mln_render_session(raw), &outputOutFrame, diagnostic))
-		})
-		adopted0 := adoptAcquiredFrameHandle(uint64(outputOutFrame), receiver)
-		return adopted0
+	var outFrame C.mln_acquired_frame
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_acquire_frame), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_acquire_frame(C.mln_render_session(raw), &outFrame, diagnostic))
+	}, func(arena *bindingArena) *AcquiredFrameHandle {
+		adopted := adoptAcquiredFrameHandle(uint64(outFrame), receiver)
+		return adopted
 	})
 }
 
 func (receiver *RenderSessionHandle) Barrier() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_barrier, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_barrier(C.mln_render_session(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_barrier), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_barrier(C.mln_render_session(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_clear_data, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_clear_data(C.mln_render_session(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_clear_data), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_clear_data(C.mln_render_session(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RenderSessionHandle) Close() error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_destroy, receiver.state.issued)
-		raw, transaction := receiver.state.reserveClose()
-		defer transaction.finish()
-		defer runtime.KeepAlive(receiver)
-		if raw == 0 {
-			return *new(struct{})
-		}
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_destroy(C.mln_render_session(raw), diagnostic))
-		})
-		transaction.commit()
-		return struct{}{}
+	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_render_session_destroy), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_destroy(C.mln_render_session(raw), diagnostic))
 	})
-	return err
 }
 
 func (receiver *RenderSessionHandle) Detach() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_detach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_detach(C.mln_render_session(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_detach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_detach(C.mln_render_session(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RenderSessionHandle) DrainFrameResults() (*RenderFrameBatchHandle, error) {
-	return bindingCall(func() *RenderFrameBatchHandle {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_drain_frame_results, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutBatch := *new(C.mln_render_frame_batch)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_drain_frame_results(C.mln_render_session(raw), &outputOutBatch, diagnostic))
-		})
-		adopted0 := adoptRenderFrameBatchHandle(uint64(outputOutBatch), nil)
-		return adopted0
+	var outBatch C.mln_render_frame_batch
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_drain_frame_results), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_drain_frame_results(C.mln_render_session(raw), &outBatch, diagnostic))
+	}, func(arena *bindingArena) *RenderFrameBatchHandle {
+		adopted := adoptRenderFrameBatchHandle(uint64(outBatch), nil)
+		return adopted
 	})
 }
 
 func (receiver *RenderSessionHandle) DumpDebugLogs() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_dump_debug_logs, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_dump_debug_logs(C.mln_render_session(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_dump_debug_logs), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_dump_debug_logs(C.mln_render_session(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RenderSessionHandle) GetCapabilities() (RenderSessionCapabilities, error) {
-	return bindingCall(func() RenderSessionCapabilities {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_get_capabilities, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutCapabilities := *new(C.mln_render_session_capabilities)
-		outputOutCapabilities.size = C.uint32_t(unsafe.Sizeof(outputOutCapabilities))
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_get_capabilities(C.mln_render_session(raw), &outputOutCapabilities, diagnostic))
-		})
-		return copyRenderSessionCapabilities(outputOutCapabilities)
+	var outCapabilities C.mln_render_session_capabilities
+	outCapabilities.size = C.uint32_t(unsafe.Sizeof(outCapabilities))
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_get_capabilities), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_get_capabilities(C.mln_render_session(raw), &outCapabilities, diagnostic))
+	}, func(arena *bindingArena) RenderSessionCapabilities {
+		return copyRenderSessionCapabilities(outCapabilities)
 	})
 }
 
 func (receiver *RenderSessionHandle) GetSnapshot() (RenderSessionSnapshot, error) {
-	return bindingCall(func() RenderSessionSnapshot {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_get_snapshot, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutSnapshot := *new(C.mln_render_session_snapshot)
-		outputOutSnapshot.size = C.uint32_t(unsafe.Sizeof(outputOutSnapshot))
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_get_snapshot(C.mln_render_session(raw), &outputOutSnapshot, diagnostic))
-		})
-		return copyRenderSessionSnapshot(outputOutSnapshot)
+	var outSnapshot C.mln_render_session_snapshot
+	outSnapshot.size = C.uint32_t(unsafe.Sizeof(outSnapshot))
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_get_snapshot), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_get_snapshot(C.mln_render_session(raw), &outSnapshot, diagnostic))
+	}, func(arena *bindingArena) RenderSessionSnapshot {
+		return copyRenderSessionSnapshot(outSnapshot)
 	})
 }
 
 func (receiver *RenderSessionHandle) ProjectionCreate() (*MapProjectionHandle, error) {
-	return bindingCall(func() *MapProjectionHandle {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_projection_create, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutProjection := *new(C.mln_map_projection)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_projection_create(C.mln_render_session(raw), &outputOutProjection, diagnostic))
-		})
-		adopted0 := adoptMapProjectionHandle(uint64(outputOutProjection), nil)
-		return adopted0
+	var outProjection C.mln_map_projection
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_projection_create), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_projection_create(C.mln_render_session(raw), &outProjection, diagnostic))
+	}, func(arena *bindingArena) *MapProjectionHandle {
+		adopted := adoptMapProjectionHandle(uint64(outProjection), nil)
+		return adopted
 	})
 }
 
 func (receiver *RenderSessionHandle) QueryFeatureExtensions(sourceId string, feature []byte, extension string, extensionField string, arguments *[]byte) (*Future[[]byte], error) {
-	return bindingCall(func() *Future[[]byte] {
-		input1 := sourceId
-		input2 := feature
-		input3 := extension
-		input4 := extensionField
-		input5 := arguments
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_query_feature_extensions, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw C.mln_buffer_view
-		input2Raw = C.mln_buffer_view{data: arena.bytes(input2), size: C.size_t(len(input2))}
-		var input3Raw C.mln_buffer_view
-		input3Raw = C.mln_buffer_view{data: arena.bytes([]byte(input3)), size: C.size_t(len(input3))}
-		var input4Raw C.mln_buffer_view
-		input4Raw = C.mln_buffer_view{data: arena.bytes([]byte(input4)), size: C.size_t(len(input4))}
-		var input5Raw *C.mln_buffer_view
-		if input5 != nil {
-			pointer := (*C.mln_buffer_view)(arena.allocate(unsafe.Sizeof(*input5Raw)))
-			*pointer = C.mln_buffer_view{data: arena.bytes(*input5), size: C.size_t(len(*input5))}
-			input5Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_query_feature_extensions(C.mln_render_session(raw), input1Raw, input2Raw, input3Raw, input4Raw, input5Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]byte, error) {
-			raw, err := completionValue[C.mln_buffer_view](result)
-			if err != nil {
-				var zero []byte
-				return zero, err
-			}
-			return bindingBytes(raw.data, uint64(raw.size)), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_query_feature_extensions), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_query_feature_extensions(C.mln_render_session(raw), bindingView(sourceId, arena), bindingView(feature, arena), bindingView(extension, arena), bindingView(extensionField, arena), bindingStoreOptional(arguments, arena, bindingView[[]byte]), completion, diagnostic))
+	}, completionOf(copyViewBytes))
 }
 
 func (receiver *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
-	return bindingCall(func() *Future[[]QueriedFeature] {
-		input1 := geometry
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_query_rendered_features, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_rendered_query_geometry
-		{
-			pointer := (*C.mln_rendered_query_geometry)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeRenderedQueryGeometry(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_rendered_feature_query_options
-		if input2 != nil {
-			pointer := (*C.mln_rendered_feature_query_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderedFeatureQueryOptions(*input2, arena)
-			input2Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_query_rendered_features(C.mln_render_session(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]QueriedFeature, error) {
-			items, err := completionSlice[C.mln_queried_feature](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := make([]QueriedFeature, len(items))
-			for i, item := range items {
-				copied[i] = copyQueriedFeature(item)
-			}
-			return copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_query_rendered_features), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_query_rendered_features(C.mln_render_session(raw), bindingStore(nativeRenderedQueryGeometry(geometry, arena), arena), bindingStoreOptional(options, arena, nativeRenderedFeatureQueryOptions), completion, diagnostic))
+	}, completionListOf(copyQueriedFeature))
 }
 
 func (receiver *RenderSessionHandle) QuerySourceFeatures(sourceId string, options *SourceFeatureQueryOptions) (*Future[[]QueriedFeature], error) {
-	return bindingCall(func() *Future[[]QueriedFeature] {
-		input1 := sourceId
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_query_source_features, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_buffer_view
-		input1Raw = C.mln_buffer_view{data: arena.bytes([]byte(input1)), size: C.size_t(len(input1))}
-		var input2Raw *C.mln_source_feature_query_options
-		if input2 != nil {
-			pointer := (*C.mln_source_feature_query_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeSourceFeatureQueryOptions(*input2, arena)
-			input2Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_query_source_features(C.mln_render_session(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]QueriedFeature, error) {
-			items, err := completionSlice[C.mln_queried_feature](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := make([]QueriedFeature, len(items))
-			for i, item := range items {
-				copied[i] = copyQueriedFeature(item)
-			}
-			return copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_query_source_features), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_query_source_features(C.mln_render_session(raw), bindingView(sourceId, arena), bindingStoreOptional(options, arena, nativeSourceFeatureQueryOptions), completion, diagnostic))
+	}, completionListOf(copyQueriedFeature))
 }
 
 func (receiver *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_reduce_memory_use, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_reduce_memory_use(C.mln_render_session(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_reduce_memory_use), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_reduce_memory_use(C.mln_render_session(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RenderSessionHandle) RequestFrame(demand FrameDemand) error {
-	_, err := bindingCall(func() struct{} {
-		input1 := demand
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_request_frame, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_frame_demand
-		{
-			pointer := (*C.mln_frame_demand)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeFrameDemand(input1, arena)
-			input1Raw = pointer
-		}
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_request_frame(C.mln_render_session(raw), input1Raw, diagnostic))
-		})
-		return struct{}{}
+	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_request_frame), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_request_frame(C.mln_render_session(raw), bindingStore(nativeFrameDemand(demand, arena), arena), diagnostic))
 	})
-	return err
 }
 
 func (receiver *RenderSessionHandle) Resize(extent RenderTargetExtent) (*Future[CommandCompletion], error) {
-	return bindingCall(func() *Future[CommandCompletion] {
-		input1 := extent
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_resize, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_render_target_extent
-		{
-			pointer := (*C.mln_render_target_extent)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeRenderTargetExtent(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_resize(C.mln_render_session(raw), input1Raw, completion, diagnostic))
-		}, completionCommand)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_resize), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_resize(C.mln_render_session(raw), bindingStore(nativeRenderTargetExtent(extent, arena), arena), completion, diagnostic))
+	}, completionCommand)
 }
 
 func (receiver *RenderSessionHandle) ServiceDriverWork(maxWork uint) (uint, error) {
-	return bindingCall(func() uint {
-		input1 := maxWork
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_render_session_service_driver_work, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.size_t
-		input1Raw = C.size_t(input1)
-		outputOutServiced := *new(C.size_t)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_session_service_driver_work(C.mln_render_session(raw), input1Raw, &outputOutServiced, diagnostic))
-		})
-		return uint(outputOutServiced)
+	var outServiced C.size_t
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_service_driver_work), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_service_driver_work(C.mln_render_session(raw), C.size_t(maxWork), &outServiced, diagnostic))
+	}, func(arena *bindingArena) uint {
+		return uint(outServiced)
 	})
 }
 
@@ -9676,127 +6195,50 @@ type RenderTargetExtentPhysicalSizeResult struct {
 }
 
 func RenderTargetExtentPhysicalSize(extent RenderTargetExtent) (RenderTargetExtentPhysicalSizeResult, error) {
-	return bindingCall(func() RenderTargetExtentPhysicalSizeResult {
-		input0 := extent
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_render_target_extent_physical_size, 0)
-		var input0Raw *C.mln_render_target_extent
-		{
-			pointer := (*C.mln_render_target_extent)(arena.allocate(unsafe.Sizeof(*input0Raw)))
-			*pointer = nativeRenderTargetExtent(input0, arena)
-			input0Raw = pointer
-		}
-		outputOutWidth := *new(C.uint32_t)
-		outputOutHeight := *new(C.uint32_t)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_render_target_extent_physical_size(input0Raw, &outputOutWidth, &outputOutHeight, diagnostic))
-		})
-		return RenderTargetExtentPhysicalSizeResult{Width: uint32(outputOutWidth), Height: uint32(outputOutHeight)}
+	var outWidth C.uint32_t
+	var outHeight C.uint32_t
+	return bindingGet(bindingGlobal(C.binding_operation_mln_render_target_extent_physical_size), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_target_extent_physical_size(bindingStore(nativeRenderTargetExtent(extent, arena), arena), &outWidth, &outHeight, diagnostic))
+	}, func(arena *bindingArena) RenderTargetExtentPhysicalSizeResult {
+		return RenderTargetExtentPhysicalSizeResult{Width: uint32(outWidth), Height: uint32(outHeight)}
 	})
 }
 
 func RenderedQueryGeometryBox(box ScreenBox) (RenderedQueryGeometry, error) {
-	return bindingCall(func() RenderedQueryGeometry {
-		input0 := box
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_rendered_query_geometry_box, 0)
-		var input0Raw C.mln_screen_box
-		input0Raw = nativeScreenBox(input0, arena)
-		nativeResult := C.mln_rendered_query_geometry_box(input0Raw)
-		return copyRenderedQueryGeometry(nativeResult)
+	return bindingDirect(bindingGlobal(C.binding_operation_mln_rendered_query_geometry_box), func(arena *bindingArena, raw uint64) RenderedQueryGeometry {
+		return copyRenderedQueryGeometry(C.mln_rendered_query_geometry_box(nativeScreenBox(box, arena)))
 	})
 }
 
 func RenderedQueryGeometryLineString(points []ScreenPoint) (RenderedQueryGeometry, error) {
-	return bindingCall(func() RenderedQueryGeometry {
-		input0 := points
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_rendered_query_geometry_line_string, 0)
-		var input0Raw *C.mln_screen_point
-		{
-			input0Raw = (*C.mln_screen_point)(arena.array(len(input0), unsafe.Sizeof(*input0Raw)))
-			items := unsafe.Slice(input0Raw, len(input0))
-			for i, item := range input0 {
-				items[i] = nativeScreenPoint(item, arena)
-			}
-		}
-		nativeResult := C.mln_rendered_query_geometry_line_string(input0Raw, bindingCount[C.size_t](len(input0)))
-		return copyRenderedQueryGeometry(nativeResult)
+	return bindingDirect(bindingGlobal(C.binding_operation_mln_rendered_query_geometry_line_string), func(arena *bindingArena, raw uint64) RenderedQueryGeometry {
+		return copyRenderedQueryGeometry(C.mln_rendered_query_geometry_line_string(bindingArray(points, arena, nativeScreenPoint), bindingCount[C.size_t](len(points))))
 	})
 }
 
 func RenderedQueryGeometryPoint(point ScreenPoint) (RenderedQueryGeometry, error) {
-	return bindingCall(func() RenderedQueryGeometry {
-		input0 := point
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_rendered_query_geometry_point, 0)
-		var input0Raw C.mln_screen_point
-		input0Raw = nativeScreenPoint(input0, arena)
-		nativeResult := C.mln_rendered_query_geometry_point(input0Raw)
-		return copyRenderedQueryGeometry(nativeResult)
+	return bindingDirect(bindingGlobal(C.binding_operation_mln_rendered_query_geometry_point), func(arena *bindingArena, raw uint64) RenderedQueryGeometry {
+		return copyRenderedQueryGeometry(C.mln_rendered_query_geometry_point(nativeScreenPoint(point, arena)))
 	})
 }
 
 func (receiver *ResourceRequestHandle) Cancelled() (bool, error) {
-	return bindingCall(func() bool {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_resource_request_cancelled, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutCancelled := *new(C.bool)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_resource_request_cancelled(C.mln_resource_request_handle(raw), &outputOutCancelled, diagnostic))
-		})
-		return bool(outputOutCancelled)
+	var outCancelled C.bool
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_resource_request_cancelled), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_resource_request_cancelled(C.mln_resource_request_handle(raw), &outCancelled, diagnostic))
+	}, func(arena *bindingArena) bool {
+		return bool(outCancelled)
 	})
 }
 
 func (receiver *ResourceRequestHandle) Complete(response ResourceResponse) error {
-	_, err := bindingCall(func() struct{} {
-		input1 := response
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_resource_request_complete, receiver.state.issued)
-		raw, finishCompletion := receiver.state.reserveCompletion()
-		accepted := false
-		defer func() { finishCompletion(accepted); runtime.KeepAlive(receiver) }()
-		var input1Raw *C.mln_resource_response
-		{
-			pointer := (*C.mln_resource_response)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeResourceResponse(input1, arena)
-			input1Raw = pointer
-		}
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_resource_request_complete(C.mln_resource_request_handle(raw), input1Raw, diagnostic))
-		})
-		accepted = true
-		return struct{}{}
+	return bindingDo(bindingCompleting(receiver.owner(), C.binding_operation_mln_resource_request_complete), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_resource_request_complete(C.mln_resource_request_handle(raw), bindingStore(nativeResourceResponse(response, arena), arena), diagnostic))
 	})
-	return err
 }
 
 func (receiver *ResourceRequestHandle) Close() error {
-	_, err := bindingCall(func() struct{} {
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_resource_request_release, receiver.state.issued)
-		receiver.state.closeDecision()
-		runtime.KeepAlive(receiver)
-		return struct{}{}
-	})
-	return err
+	return bindingCloseDecision(receiver.owner(), C.binding_operation_mln_resource_request_release)
 }
 
 func (receiver *ResourceRequestHandle) SetCancelCallback(callback func()) (bool, error) {
@@ -9831,688 +6273,183 @@ func (receiver *ResourceRequestHandle) SetCancelCallback(callback func()) (bool,
 }
 
 func (receiver *ResourceRequestHandle) WaitUntilRetired() error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_resource_request_wait_until_retired, receiver.state.issued)
-		raw := receiver.state.issued
-		defer runtime.KeepAlive(receiver)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_resource_request_wait_until_retired(C.mln_resource_request_handle(raw), diagnostic))
-		})
-		return struct{}{}
+	return bindingDo(bindingIssued(receiver.owner(), C.binding_operation_mln_resource_request_wait_until_retired), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_resource_request_wait_until_retired(C.mln_resource_request_handle(raw), diagnostic))
 	})
-	return err
 }
 
 func (receiver *ResourceTransformResponseScope) SetUrl(url string) error {
-	_, err := bindingCall(func() struct{} {
-		input1 := url
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.scope == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_resource_transform_response_set_url, uint64(uintptr(unsafe.Pointer(receiver.native))))
-		receiver.scope.check()
-		raw := receiver.native
-		var input1Raw *C.char
-		input1Raw = (*C.char)(arena.bytes([]byte(input1)))
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_resource_transform_response_set_url(raw, input1Raw, bindingCount[C.size_t](len(input1)), diagnostic))
-		})
-		return struct{}{}
+	return bindingDo(receiver.target(C.binding_operation_mln_resource_transform_response_set_url), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_resource_transform_response_set_url(receiver.native, (*C.char)(arena.bytes([]byte(url))), bindingCount[C.size_t](len(url)), diagnostic))
 	})
-	return err
 }
 
 func (receiver *RuntimeHandle) Barrier() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_barrier, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_barrier(C.mln_runtime(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_barrier), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_barrier(C.mln_runtime(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) ClearHttpHeaderTransform() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_clear_http_header_transform, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_clear_http_header_transform(C.mln_runtime(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_clear_http_header_transform), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_clear_http_header_transform(C.mln_runtime(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) ClearResourceProvider() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_clear_resource_provider, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_clear_resource_provider(C.mln_runtime(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_clear_resource_provider), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_clear_resource_provider(C.mln_runtime(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) ClearResourceTransform() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_clear_resource_transform, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_clear_resource_transform(C.mln_runtime(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_clear_resource_transform), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_clear_resource_transform(C.mln_runtime(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func RuntimeCreate(options RuntimeOptions) (*RuntimeHandle, error) {
-	return bindingCall(func() *RuntimeHandle {
-		input0 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_runtime_create, 0)
-		var input0Raw *C.mln_runtime_options
-		{
-			pointer := (*C.mln_runtime_options)(arena.allocate(unsafe.Sizeof(*input0Raw)))
-			*pointer = nativeRuntimeOptions(input0, arena)
-			input0Raw = pointer
-		}
-		outputOutRuntime := *new(C.mln_runtime)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_create(input0Raw, &outputOutRuntime, diagnostic))
-		})
-		adopted0 := adoptRuntimeHandle(uint64(outputOutRuntime), nil)
-		arena.accept(adopted0.bindingOwner)
-		return adopted0
+	var outRuntime C.mln_runtime
+	return bindingGet(bindingGlobal(C.binding_operation_mln_runtime_create), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_create(bindingStore(nativeRuntimeOptions(options, arena), arena), &outRuntime, diagnostic))
+	}, func(arena *bindingArena) *RuntimeHandle {
+		adopted := adoptRuntimeHandle(uint64(outRuntime), nil)
+		arena.accept(adopted.bindingOwner)
+		return adopted
 	})
 }
 
 func (receiver *RuntimeHandle) DrainEvents() (*EventBatchHandle, error) {
-	return bindingCall(func() *EventBatchHandle {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_drain_events, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutBatch := *new(C.mln_event_batch)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_drain_events(C.mln_runtime(raw), &outputOutBatch, diagnostic))
-		})
-		adopted0 := adoptEventBatchHandle(uint64(outputOutBatch), nil)
-		return adopted0
+	var outBatch C.mln_event_batch
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_drain_events), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_drain_events(C.mln_runtime(raw), &outBatch, diagnostic))
+	}, func(arena *bindingArena) *EventBatchHandle {
+		adopted := adoptEventBatchHandle(uint64(outBatch), nil)
+		return adopted
 	})
 }
 
 func (receiver *RuntimeHandle) GetEventMask() (RuntimeEventMask, error) {
-	return bindingCall(func() RuntimeEventMask {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_get_event_mask, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		outputOutMask := *new(C.uint64_t)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_get_event_mask(C.mln_runtime(raw), &outputOutMask, diagnostic))
-		})
-		return RuntimeEventMask(outputOutMask)
+	var outMask C.uint64_t
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_get_event_mask), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_get_event_mask(C.mln_runtime(raw), &outMask, diagnostic))
+	}, func(arena *bindingArena) RuntimeEventMask {
+		return RuntimeEventMask(outMask)
 	})
 }
 
 func (receiver *RuntimeHandle) OfflineRegionCreate(definition OfflineRegionDefinition, metadata []byte) (*Future[OfflineRegionInfo], error) {
-	return bindingCall(func() *Future[OfflineRegionInfo] {
-		input1 := definition
-		input2 := metadata
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_offline_region_create, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_offline_region_definition
-		{
-			pointer := (*C.mln_offline_region_definition)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeOfflineRegionDefinition(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.uint8_t
-		input2Raw = (*C.uint8_t)(arena.bytes(input2))
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_offline_region_create(C.mln_runtime(raw), input1Raw, input2Raw, bindingCount[C.size_t](len(input2)), completion, diagnostic))
-		}, func(result *C.mln_completion_result) (OfflineRegionInfo, error) {
-			raw, err := completionValue[C.mln_offline_region_info](result)
-			if err != nil {
-				var zero OfflineRegionInfo
-				return zero, err
-			}
-			return copyOfflineRegionInfo(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_create), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_offline_region_create(C.mln_runtime(raw), bindingStore(nativeOfflineRegionDefinition(definition, arena), arena), (*C.uint8_t)(arena.bytes(metadata)), bindingCount[C.size_t](len(metadata)), completion, diagnostic))
+	}, completionOf(copyOfflineRegionInfo))
 }
 
 func (receiver *RuntimeHandle) OfflineRegionDelete(regionId int64) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := regionId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_offline_region_delete, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_offline_region_id
-		input1Raw = C.mln_offline_region_id(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_offline_region_delete(C.mln_runtime(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_delete), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_offline_region_delete(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) OfflineRegionGet(regionId int64) (*Future[*OfflineRegionInfo], error) {
-	return bindingCall(func() *Future[*OfflineRegionInfo] {
-		input1 := regionId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_offline_region_get, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_offline_region_id
-		input1Raw = C.mln_offline_region_id(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_offline_region_get(C.mln_runtime(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (*OfflineRegionInfo, error) {
-			if result.value == nil {
-				return nil, nil
-			}
-			raw, err := completionValue[C.mln_offline_region_info](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := copyOfflineRegionInfo(raw)
-			return &copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_get), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_offline_region_get(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
+	}, completionNullable(completionOf(copyOfflineRegionInfo)))
 }
 
 func (receiver *RuntimeHandle) OfflineRegionGetStatus(regionId int64) (*Future[OfflineRegionStatus], error) {
-	return bindingCall(func() *Future[OfflineRegionStatus] {
-		input1 := regionId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_offline_region_get_status, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_offline_region_id
-		input1Raw = C.mln_offline_region_id(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_offline_region_get_status(C.mln_runtime(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) (OfflineRegionStatus, error) {
-			raw, err := completionValue[C.mln_offline_region_status](result)
-			if err != nil {
-				var zero OfflineRegionStatus
-				return zero, err
-			}
-			return copyOfflineRegionStatus(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_get_status), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_offline_region_get_status(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
+	}, completionOf(copyOfflineRegionStatus))
 }
 
 func (receiver *RuntimeHandle) OfflineRegionInvalidate(regionId int64) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := regionId
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_offline_region_invalidate, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_offline_region_id
-		input1Raw = C.mln_offline_region_id(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_offline_region_invalidate(C.mln_runtime(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_invalidate), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_offline_region_invalidate(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) OfflineRegionSetDownloadState(regionId int64, state OfflineRegionDownloadState) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := regionId
-		input2 := state
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_offline_region_set_download_state, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_offline_region_id
-		input1Raw = C.mln_offline_region_id(input1)
-		var input2Raw C.uint32_t
-		input2Raw = C.uint32_t(input2)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_offline_region_set_download_state(C.mln_runtime(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_set_download_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_offline_region_set_download_state(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.uint32_t(state), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) OfflineRegionSetObserved(regionId int64, observed bool) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := regionId
-		input2 := observed
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_offline_region_set_observed, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_offline_region_id
-		input1Raw = C.mln_offline_region_id(input1)
-		var input2Raw C.bool
-		input2Raw = C.bool(input2)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_offline_region_set_observed(C.mln_runtime(raw), input1Raw, input2Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_set_observed), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_offline_region_set_observed(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.bool(observed), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) OfflineRegionUpdateMetadata(regionId int64, metadata []byte) (*Future[OfflineRegionInfo], error) {
-	return bindingCall(func() *Future[OfflineRegionInfo] {
-		input1 := regionId
-		input2 := metadata
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_offline_region_update_metadata, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.mln_offline_region_id
-		input1Raw = C.mln_offline_region_id(input1)
-		var input2Raw *C.uint8_t
-		input2Raw = (*C.uint8_t)(arena.bytes(input2))
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_offline_region_update_metadata(C.mln_runtime(raw), input1Raw, input2Raw, bindingCount[C.size_t](len(input2)), completion, diagnostic))
-		}, func(result *C.mln_completion_result) (OfflineRegionInfo, error) {
-			raw, err := completionValue[C.mln_offline_region_info](result)
-			if err != nil {
-				var zero OfflineRegionInfo
-				return zero, err
-			}
-			return copyOfflineRegionInfo(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_update_metadata), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_offline_region_update_metadata(C.mln_runtime(raw), C.mln_offline_region_id(regionId), (*C.uint8_t)(arena.bytes(metadata)), bindingCount[C.size_t](len(metadata)), completion, diagnostic))
+	}, completionOf(copyOfflineRegionInfo))
 }
 
 func (receiver *RuntimeHandle) OfflineRegionsList() (*Future[[]OfflineRegionInfo], error) {
-	return bindingCall(func() *Future[[]OfflineRegionInfo] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_offline_regions_list, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_offline_regions_list(C.mln_runtime(raw), completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]OfflineRegionInfo, error) {
-			items, err := completionSlice[C.mln_offline_region_info](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := make([]OfflineRegionInfo, len(items))
-			for i, item := range items {
-				copied[i] = copyOfflineRegionInfo(item)
-			}
-			return copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_regions_list), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_offline_regions_list(C.mln_runtime(raw), completion, diagnostic))
+	}, completionListOf(copyOfflineRegionInfo))
 }
 
 func (receiver *RuntimeHandle) OfflineRegionsMergeDatabase(sideDatabasePath string) (*Future[[]OfflineRegionInfo], error) {
-	return bindingCall(func() *Future[[]OfflineRegionInfo] {
-		input1 := sideDatabasePath
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_offline_regions_merge_database, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.char
-		input1Raw = arena.cstring(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_offline_regions_merge_database(C.mln_runtime(raw), input1Raw, completion, diagnostic))
-		}, func(result *C.mln_completion_result) ([]OfflineRegionInfo, error) {
-			items, err := completionSlice[C.mln_offline_region_info](result)
-			if err != nil {
-				return nil, err
-			}
-			copied := make([]OfflineRegionInfo, len(items))
-			for i, item := range items {
-				copied[i] = copyOfflineRegionInfo(item)
-			}
-			return copied, nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_regions_merge_database), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_offline_regions_merge_database(C.mln_runtime(raw), arena.cstring(sideDatabasePath), completion, diagnostic))
+	}, completionListOf(copyOfflineRegionInfo))
 }
 
 func (receiver *RuntimeHandle) Close() (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_release, receiver.state.issued)
-		raw, transaction := receiver.state.reserveClose()
-		defer transaction.finish()
-		defer runtime.KeepAlive(receiver)
-		if raw == 0 {
-			return completedFuture(struct{}{})
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_release(C.mln_runtime(raw), completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		transaction.commit()
-		return future
-	})
+	return bindingStart(bindingClosing(receiver.owner(), C.binding_operation_mln_runtime_release), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_release(C.mln_runtime(raw), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) RunAmbientCacheOperation(operation AmbientCacheOperation) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := operation
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_run_ambient_cache_operation, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.uint32_t
-		input1Raw = C.uint32_t(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_run_ambient_cache_operation(C.mln_runtime(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_run_ambient_cache_operation), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_run_ambient_cache_operation(C.mln_runtime(raw), C.uint32_t(operation), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) SetEventMask(mask RuntimeEventMask) error {
-	_, err := bindingCall(func() struct{} {
-		input1 := mask
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_set_event_mask, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.uint64_t
-		input1Raw = C.uint64_t(input1)
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_set_event_mask(C.mln_runtime(raw), input1Raw, diagnostic))
-		})
-		return struct{}{}
+	return bindingDo(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_event_mask), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_event_mask(C.mln_runtime(raw), C.uint64_t(mask), diagnostic))
 	})
-	return err
 }
 
 func (receiver *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransform) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := transform
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_set_http_header_transform, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_http_header_transform
-		{
-			pointer := (*C.mln_http_header_transform)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeHttpHeaderTransform(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_set_http_header_transform(C.mln_runtime(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		arena.accept(receiver.bindingOwner)
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_http_header_transform), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_http_header_transform(C.mln_runtime(raw), bindingStore(nativeHttpHeaderTransform(transform, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) SetMaximumAmbientCacheSize(size uint64) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := size
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_set_maximum_ambient_cache_size, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw C.uint64_t
-		input1Raw = C.uint64_t(input1)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_set_maximum_ambient_cache_size(C.mln_runtime(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_maximum_ambient_cache_size), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_maximum_ambient_cache_size(C.mln_runtime(raw), C.uint64_t(size), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) SetResourceProvider(provider ResourceProvider) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := provider
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_set_resource_provider, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_resource_provider
-		{
-			pointer := (*C.mln_resource_provider)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeResourceProvider(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_set_resource_provider(C.mln_runtime(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		arena.accept(receiver.bindingOwner)
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_resource_provider), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_resource_provider(C.mln_runtime(raw), bindingStore(nativeResourceProvider(provider, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 func (receiver *RuntimeHandle) SetResourceTransform(transform ResourceTransform) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := transform
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_runtime_set_resource_transform, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_resource_transform
-		{
-			pointer := (*C.mln_resource_transform)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeResourceTransform(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_runtime_set_resource_transform(C.mln_runtime(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		arena.accept(receiver.bindingOwner)
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_resource_transform), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_resource_transform(C.mln_runtime(raw), bindingStore(nativeResourceTransform(transform, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 func SupportedRenderBackendMask() (RenderBackendFlag, error) {
-	return bindingCall(func() RenderBackendFlag {
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_supported_render_backend_mask, 0)
-		nativeResult := C.mln_supported_render_backend_mask()
-		return RenderBackendFlag(nativeResult)
+	return bindingDirect(bindingGlobal(C.binding_operation_mln_supported_render_backend_mask), func(arena *bindingArena, raw uint64) RenderBackendFlag {
+		return RenderBackendFlag(C.mln_supported_render_backend_mask())
 	})
 }
 
 func (receiver *RenderSessionHandle) TextureReadPremultipliedRgba8() (*Future[TextureReadbackResult], error) {
-	return bindingCall(func() *Future[TextureReadbackResult] {
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_texture_read_premultiplied_rgba8, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_texture_read_premultiplied_rgba8(C.mln_render_session(raw), completion, diagnostic))
-		}, func(result *C.mln_completion_result) (TextureReadbackResult, error) {
-			raw, err := completionValue[C.mln_texture_readback_result](result)
-			if err != nil {
-				var zero TextureReadbackResult
-				return zero, err
-			}
-			return copyTextureReadbackResult(raw), nil
-		})
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_texture_read_premultiplied_rgba8), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_texture_read_premultiplied_rgba8(C.mln_render_session(raw), completion, diagnostic))
+	}, completionOf(copyTextureReadbackResult))
 }
 
 type VulkanBorrowedTextureAttachResult struct {
@@ -10521,67 +6458,20 @@ type VulkanBorrowedTextureAttachResult struct {
 }
 
 func (receiver *MapHandle) VulkanBorrowedTextureAttach(descriptor VulkanBorrowedTextureDescriptor, options RenderSessionAttachOptions) (VulkanBorrowedTextureAttachResult, error) {
-	return bindingCall(func() VulkanBorrowedTextureAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_vulkan_borrowed_texture_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_vulkan_borrowed_texture_descriptor
-		{
-			pointer := (*C.mln_vulkan_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeVulkanBorrowedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_vulkan_borrowed_texture_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return VulkanBorrowedTextureAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_vulkan_borrowed_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_vulkan_borrowed_texture_attach(C.mln_map(raw), bindingStore(nativeVulkanBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) VulkanBorrowedTextureAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return VulkanBorrowedTextureAttachResult{Session: adopted, Completion: future}
 	})
 }
 
 func (receiver *RenderSessionHandle) VulkanBorrowedTextureSetTarget(descriptor VulkanBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := descriptor
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_vulkan_borrowed_texture_set_target, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_vulkan_borrowed_texture_descriptor
-		{
-			pointer := (*C.mln_vulkan_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeVulkanBorrowedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_vulkan_borrowed_texture_set_target(C.mln_render_session(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_vulkan_borrowed_texture_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_vulkan_borrowed_texture_set_target(C.mln_render_session(raw), bindingStore(nativeVulkanBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 type VulkanOwnedTextureAttachResult struct {
@@ -10590,39 +6480,13 @@ type VulkanOwnedTextureAttachResult struct {
 }
 
 func (receiver *MapHandle) VulkanOwnedTextureAttach(descriptor VulkanOwnedTextureDescriptor, options RenderSessionAttachOptions) (VulkanOwnedTextureAttachResult, error) {
-	return bindingCall(func() VulkanOwnedTextureAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_vulkan_owned_texture_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_vulkan_owned_texture_descriptor
-		{
-			pointer := (*C.mln_vulkan_owned_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeVulkanOwnedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_vulkan_owned_texture_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return VulkanOwnedTextureAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_vulkan_owned_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_vulkan_owned_texture_attach(C.mln_map(raw), bindingStore(nativeVulkanOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) VulkanOwnedTextureAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return VulkanOwnedTextureAttachResult{Session: adopted, Completion: future}
 	})
 }
 
@@ -10632,67 +6496,20 @@ type VulkanSurfaceAttachResult struct {
 }
 
 func (receiver *MapHandle) VulkanSurfaceAttach(descriptor VulkanSurfaceDescriptor, options RenderSessionAttachOptions) (VulkanSurfaceAttachResult, error) {
-	return bindingCall(func() VulkanSurfaceAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_vulkan_surface_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_vulkan_surface_descriptor
-		{
-			pointer := (*C.mln_vulkan_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeVulkanSurfaceDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_vulkan_surface_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return VulkanSurfaceAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_vulkan_surface_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_vulkan_surface_attach(C.mln_map(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) VulkanSurfaceAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return VulkanSurfaceAttachResult{Session: adopted, Completion: future}
 	})
 }
 
 func (receiver *RenderSessionHandle) VulkanSurfaceSetTarget(descriptor VulkanSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := descriptor
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_vulkan_surface_set_target, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_vulkan_surface_descriptor
-		{
-			pointer := (*C.mln_vulkan_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeVulkanSurfaceDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_vulkan_surface_set_target(C.mln_render_session(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_vulkan_surface_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_vulkan_surface_set_target(C.mln_render_session(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 type WebgpuBorrowedTextureAttachResult struct {
@@ -10701,67 +6518,20 @@ type WebgpuBorrowedTextureAttachResult struct {
 }
 
 func (receiver *MapHandle) WebgpuBorrowedTextureAttach(descriptor WebgpuBorrowedTextureDescriptor, options RenderSessionAttachOptions) (WebgpuBorrowedTextureAttachResult, error) {
-	return bindingCall(func() WebgpuBorrowedTextureAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_webgpu_borrowed_texture_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_webgpu_borrowed_texture_descriptor
-		{
-			pointer := (*C.mln_webgpu_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeWebgpuBorrowedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_webgpu_borrowed_texture_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return WebgpuBorrowedTextureAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_webgpu_borrowed_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_webgpu_borrowed_texture_attach(C.mln_map(raw), bindingStore(nativeWebgpuBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) WebgpuBorrowedTextureAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return WebgpuBorrowedTextureAttachResult{Session: adopted, Completion: future}
 	})
 }
 
 func (receiver *RenderSessionHandle) WebgpuBorrowedTextureSetTarget(descriptor WebgpuBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := descriptor
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_webgpu_borrowed_texture_set_target, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_webgpu_borrowed_texture_descriptor
-		{
-			pointer := (*C.mln_webgpu_borrowed_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeWebgpuBorrowedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_webgpu_borrowed_texture_set_target(C.mln_render_session(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_webgpu_borrowed_texture_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_webgpu_borrowed_texture_set_target(C.mln_render_session(raw), bindingStore(nativeWebgpuBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 type WebgpuOwnedTextureAttachResult struct {
@@ -10770,39 +6540,13 @@ type WebgpuOwnedTextureAttachResult struct {
 }
 
 func (receiver *MapHandle) WebgpuOwnedTextureAttach(descriptor WebgpuOwnedTextureDescriptor, options RenderSessionAttachOptions) (WebgpuOwnedTextureAttachResult, error) {
-	return bindingCall(func() WebgpuOwnedTextureAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_webgpu_owned_texture_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_webgpu_owned_texture_descriptor
-		{
-			pointer := (*C.mln_webgpu_owned_texture_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeWebgpuOwnedTextureDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_webgpu_owned_texture_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return WebgpuOwnedTextureAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_webgpu_owned_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_webgpu_owned_texture_attach(C.mln_map(raw), bindingStore(nativeWebgpuOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) WebgpuOwnedTextureAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return WebgpuOwnedTextureAttachResult{Session: adopted, Completion: future}
 	})
 }
 
@@ -10812,67 +6556,20 @@ type WebgpuSurfaceAttachResult struct {
 }
 
 func (receiver *MapHandle) WebgpuSurfaceAttach(descriptor WebgpuSurfaceDescriptor, options RenderSessionAttachOptions) (WebgpuSurfaceAttachResult, error) {
-	return bindingCall(func() WebgpuSurfaceAttachResult {
-		input1 := descriptor
-		input2 := options
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_webgpu_surface_attach, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_webgpu_surface_descriptor
-		{
-			pointer := (*C.mln_webgpu_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeWebgpuSurfaceDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		var input2Raw *C.mln_render_session_attach_options
-		{
-			pointer := (*C.mln_render_session_attach_options)(arena.allocate(unsafe.Sizeof(*input2Raw)))
-			*pointer = nativeRenderSessionAttachOptions(input2, arena)
-			input2Raw = pointer
-		}
-		outputOutSession := *new(C.mln_render_session)
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_webgpu_surface_attach(C.mln_map(raw), input1Raw, input2Raw, &outputOutSession, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		adopted0 := adoptRenderSessionHandle(uint64(outputOutSession), receiver)
-		arena.accept(adopted0.bindingOwner)
-		return WebgpuSurfaceAttachResult{Session: adopted0, Completion: future}
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_webgpu_surface_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_webgpu_surface_attach(C.mln_map(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) WebgpuSurfaceAttachResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return WebgpuSurfaceAttachResult{Session: adopted, Completion: future}
 	})
 }
 
 func (receiver *RenderSessionHandle) WebgpuSurfaceSetTarget(descriptor WebgpuSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingCall(func() *Future[struct{}] {
-		input1 := descriptor
-		arena := &bindingArena{}
-		defer arena.close()
-		if receiver == nil || receiver.bindingOwner == nil || receiver.state == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
-		}
-		bindingAdmission(C.binding_operation_mln_webgpu_surface_set_target, receiver.state.issued)
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var input1Raw *C.mln_webgpu_surface_descriptor
-		{
-			pointer := (*C.mln_webgpu_surface_descriptor)(arena.allocate(unsafe.Sizeof(*input1Raw)))
-			*pointer = nativeWebgpuSurfaceDescriptor(input1, arena)
-			input1Raw = pointer
-		}
-		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_webgpu_surface_set_target(C.mln_render_session(raw), input1Raw, completion, diagnostic))
-		}, completionUnit)
-		if err != nil {
-			panic(bindingFailure{err})
-		}
-		return future
-	})
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_webgpu_surface_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_webgpu_surface_set_target(C.mln_render_session(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 //export mlnGo_mln_log_set_callback_registration_callback

@@ -432,7 +432,8 @@ class Values:
             typename = public(native)
             if value.response:
                 chunks.append(
-                    f"type {typename}Scope struct {{ native *C.{native}; scope *bindingScope }}"
+                    f"type {typename}Scope struct {{ native *C.{native}; scope *bindingScope }}\n"
+                    f"func (response *{typename}Scope) target(operation uint32) bindingTarget {{ if response == nil {{ return bindingScoped(nil, 0, operation) }}; return bindingScoped(response.scope, uint64(uintptr(unsafe.Pointer(response.native))), operation) }}"
                 )
                 continue
             from .go_callbacks import plain, registration_input, signature
