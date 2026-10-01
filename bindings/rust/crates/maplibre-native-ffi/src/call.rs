@@ -1,5 +1,5 @@
-//! One native call: its admission, its temporary input storage, and the
-//! submission or status check that ends it.
+//! One native call: its admission, its temporary input storage, and the C call
+//! that it makes.
 //!
 //! A generated operation admits a call through its owner or [`Call::global`],
 //! converts each argument through the call, and makes the C call with the
