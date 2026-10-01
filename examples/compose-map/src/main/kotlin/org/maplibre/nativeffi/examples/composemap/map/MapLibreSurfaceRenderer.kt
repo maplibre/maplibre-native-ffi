@@ -12,6 +12,7 @@ import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderer
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceSession
 import org.maplibre.nativeffi.examples.composemap.surface.ProducerBackend
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
+import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RenderResult
@@ -40,8 +41,14 @@ internal class MapLibreSurfaceRenderer(
   private val closed = AtomicBoolean(false)
   private val mapStateLock = Any()
 
-  /** Set when the next draw should demand a frame: a map update, a repaint, or a new target. */
-  private val frameWanted = AtomicBoolean(true)
+  /** Set when the next draw should demand a frame: a map update or a repaint. */
+  private val frameWanted = AtomicBoolean(false)
+
+  /**
+   * Set when the next draw should render even with no newer map update: for a new target, or to
+   * retry a target that was not ready, which consumed the update.
+   */
+  private val frameForced = AtomicBoolean(false)
 
   /** Set by the runtime's event wake until the next draw drains the events. */
   private val eventsPending = AtomicBoolean(false)
@@ -104,7 +111,11 @@ internal class MapLibreSurfaceRenderer(
     val session = ensureAttachedRenderSession(map, frame).session
     servicing.set(true)
     try {
-      if (frameWanted.getAndSet(false)) session.requestFrame(GeneratedApi.frameDemandDefault())
+      val forced = frameForced.getAndSet(false)
+      if (frameWanted.getAndSet(false) || forced) {
+        val demand = GeneratedApi.frameDemandDefault()
+        session.requestFrame(if (forced) demand.copy(flags = FrameDemandFlag(0u)) else demand)
+      }
       session.serviceDriverWork(0uL)
     } finally {
       servicing.set(false)
@@ -122,8 +133,11 @@ internal class MapLibreSurfaceRenderer(
     batch.use { results ->
       for (index in 0uL until results.count()) {
         val result = results.get(index)
-        if (result.disposition != RenderResult.RENDERED) continue
-        rendered = true
+        when (result.disposition) {
+          RenderResult.RENDERED -> rendered = true
+          // The next Compose frame retries the frame.
+          RenderResult.TARGET_NOT_READY -> requestRender(force = true)
+        }
         // The result carries the map's own follow-up demand, so an ongoing transition needs no
         // runtime event round trip.
         if (result.needsRepaint) requestRender()
@@ -160,9 +174,12 @@ internal class MapLibreSurfaceRenderer(
     }
   }
 
-  /** Asks Compose for a draw that demands a frame. */
-  fun requestRender() {
-    frameWanted.set(true)
+  /**
+   * Asks Compose for a draw that demands a frame. A forced frame renders even when the map has no
+   * newer update.
+   */
+  fun requestRender(force: Boolean = false) {
+    (if (force) frameForced else frameWanted).set(true)
     surfaceSession?.requestFrame()
   }
 
@@ -264,7 +281,8 @@ internal class MapLibreSurfaceRenderer(
         }
         val retargeted = existing.copy(targetKey = borrowed.targetKey)
         renderSession = retargeted
-        frameWanted.set(true)
+        // Handing over a texture publishes no map update, so the new texture needs a forced frame.
+        frameForced.set(true)
         return retargeted
       }
     }
@@ -281,7 +299,7 @@ internal class MapLibreSurfaceRenderer(
     val attached =
       AttachedRenderSession(borrowed.sessionKey, borrowed.targetKey, attachment.session)
     renderSession = attached
-    frameWanted.set(true)
+    frameForced.set(true)
     return attached
   }
 
@@ -308,6 +326,8 @@ internal class MapLibreSurfaceRenderer(
    * driver-work wake or the completion arrives.
    */
   private fun awaitDriverWork(session: RenderSessionHandle, completion: Deferred<Unit>) {
+    // Permits from wakes that draws already serviced would only spin the loop.
+    driverWork.drainPermits()
     completion.invokeOnCompletion { driverWork.release() }
     servicing.set(true)
     try {
