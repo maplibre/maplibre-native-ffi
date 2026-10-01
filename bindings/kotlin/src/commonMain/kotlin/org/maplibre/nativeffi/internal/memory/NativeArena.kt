@@ -12,15 +12,17 @@ internal open class NativeArena : AutoCloseable {
   private var cursor = 0L
   private var limit = 0L
 
+  fun allocate(size: Int, alignment: Int = 8): Long = allocate(size.toLong(), alignment)
+
   /** Allocates [size] zeroed bytes aligned to [alignment], which must be a power of two. */
-  fun allocate(size: Int, alignment: Int = 8): Long {
+  fun allocate(size: Long, alignment: Int = 8): Long {
     require(size >= 0)
     val start = (cursor + alignment - 1) and (alignment - 1).toLong().inv()
     if (cursor != 0L && start + size <= limit) {
       cursor = start + size
       return start
     }
-    if (size > BLOCK_SIZE / 4) return block(maxOf(size.toLong(), 1L))
+    if (size > BLOCK_SIZE / 4) return block(maxOf(size, 1L))
     val block = block(BLOCK_SIZE)
     cursor = block + size
     limit = block + BLOCK_SIZE
@@ -58,7 +60,8 @@ internal open class NativeArena : AutoCloseable {
 
   /** Writes [items] as a C array of [size]-byte elements and returns its address. */
   inline fun <T> array(items: List<T>, size: Int, alignment: Int, write: (Long, T) -> Unit): Long {
-    val result = allocate(maxOf(items.size, 1) * size, alignment)
+    // Two Int factors cannot overflow a Long product.
+    val result = allocate(maxOf(items.size, 1).toLong() * size, alignment)
     items.forEachIndexed { index, item -> write(result + index.toLong() * size, item) }
     return result
   }

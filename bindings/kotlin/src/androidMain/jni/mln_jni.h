@@ -14,14 +14,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// Addresses travel zero-extended, as Memory.kt reads them, so a 32-bit address
+// at or above 2^31 is the same Long whichever side produced it.
+
 // A pointer argument from its Kotlin Long carrier.
-#define MLN_JNI_POINTER(type, value) ((type)(intptr_t)(value))
+#define MLN_JNI_POINTER(type, value) ((type)(uintptr_t)(value))
 
 // A record that C takes by value, from the address of the caller's copy.
-#define MLN_JNI_RECORD(type, value) (*(const type*)(intptr_t)(value))
+#define MLN_JNI_RECORD(type, value) (*(const type*)(uintptr_t)(value))
 
 // A pointer as its Kotlin Long carrier.
-#define MLN_JNI_ADDRESS(value) ((jlong)(intptr_t)(value))
+#define MLN_JNI_ADDRESS(value) ((jlong)(uintptr_t)(value))
 
 // One static method of org.maplibre.nativeffi.internal.c.Upcalls, which an
 // upcall stub calls. JNI_OnLoad resolves its method ID.
