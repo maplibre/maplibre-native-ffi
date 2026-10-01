@@ -8,6 +8,28 @@ namespace Maplibre.NativeFfi.Internal.Pointer;
 internal unsafe delegate mln_status StatusDestroy<T>(T handle, mln_diagnostic* diagnostic)
     where T : unmanaged, IMlnHandle;
 
+/// <summary>A binding object that owns one native handle.</summary>
+internal interface INativeOwner
+{
+    /// <summary>The roots of callbacks registered through this owner.</summary>
+    NativeCallbackOwner CallbackOwner { get; }
+}
+
+/// <summary>A binding object that owns one native handle of type <typeparamref name="T"/>.</summary>
+internal interface INativeOwner<T> : INativeOwner
+    where T : unmanaged, IMlnHandle
+{
+    NativeHandleState<T> State { get; }
+
+    NativeCallbackOwner INativeOwner.CallbackOwner => State.CallbackOwner;
+}
+
+/// <summary>A handle state that a call scope borrows for the duration of one call.</summary>
+internal interface INativeReader
+{
+    void EndRead();
+}
+
 /// <summary>
 /// Close-once ownership for one native handle.
 /// </summary>
@@ -15,7 +37,7 @@ internal unsafe delegate mln_status StatusDestroy<T>(T handle, mln_diagnostic* d
 /// The C API issues generational handles and rejects a released one, so this
 /// tracks ownership rather than identity. The null handle means closed.
 /// </remarks>
-internal sealed unsafe class NativeHandleState<T>
+internal sealed unsafe class NativeHandleState<T> : INativeReader
     where T : unmanaged, IMlnHandle
 {
     private readonly object gate = new();
@@ -181,7 +203,33 @@ internal sealed unsafe class NativeHandleState<T>
         return handle;
     }
 
-    internal ReadScope Borrow()
+    internal ReadScope Borrow() => new(this, BeginRead());
+
+    /// <summary>Enters <paramref name="operation"/> and borrows the handle for its native call.</summary>
+    internal ReadScope Read(object owner, string operation)
+    {
+        NativeCallbackGuard.EnsureAllowed(owner, operation);
+        return Borrow();
+    }
+
+    /// <summary>
+    /// Constructs the owner of a handle that native code just transferred, and
+    /// disposes the handle if construction fails.
+    /// </summary>
+    internal static TOwner Adopt<TOwner>(T handle, Func<TOwner> create, StatusDestroy<T> dispose)
+    {
+        try
+        {
+            return create();
+        }
+        catch
+        {
+            dispose(handle, null);
+            throw;
+        }
+    }
+
+    internal T BeginRead()
     {
         lock (gate)
         {
@@ -190,7 +238,15 @@ internal sealed unsafe class NativeHandleState<T>
             {
                 readers++;
             }
-            return new ReadScope(this, live);
+            return live;
+        }
+    }
+
+    public void EndRead()
+    {
+        lock (gate)
+        {
+            readers--;
         }
     }
 
@@ -211,10 +267,7 @@ internal sealed unsafe class NativeHandleState<T>
             if (retained is null)
                 return;
             owner = null;
-            lock (retained.gate)
-            {
-                retained.readers--;
-            }
+            retained.EndRead();
         }
     }
 

@@ -1,186 +1,105 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Memory;
-using Maplibre.NativeFfi.Internal.Pointer;
-using Maplibre.NativeFfi.Internal.Status;
-using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Logging;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Query;
-using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
-using Maplibre.NativeFfi.Style;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-
 namespace Maplibre.NativeFfi.Runtime;
 
-public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
+public sealed unsafe partial class RuntimeHandle
+    : IDisposable,
+        IAsyncDisposable,
+        INativeOwner<MlnRuntime>
 {
     private readonly NativeHandleState<MlnRuntime> state;
     private volatile Task teardown = Task.CompletedTask;
-    private readonly ulong nativeId;
-    public ulong Id => nativeId;
 
     internal RuntimeHandle(MlnRuntime handle)
     {
-        nativeId = handle.Value;
-        state = new NativeHandleState<MlnRuntime>(
-            handle,
-            StartRelease,
-            nameof(RuntimeHandle),
-            static (live, diagnostic) => NativeMethods.mln_runtime_dispose(live, diagnostic)
-        );
+        state = new(handle, StartRelease, nameof(RuntimeHandle), Abandon);
     }
 
-    internal static RuntimeHandle Adopt(MlnRuntime handle)
-    {
-        RuntimeHandle? owner = null;
-        try
-        {
-            owner = new RuntimeHandle(handle);
-            return owner;
-        }
-        catch
-        {
-            if (owner is null)
-                NativeMethods.mln_runtime_dispose(handle, null);
-            else
-                owner.state.Retire();
-            throw;
-        }
-    }
+    internal static RuntimeHandle Adopt(MlnRuntime handle) =>
+        NativeHandleState<MlnRuntime>.Adopt(handle, () => new RuntimeHandle(handle), Abandon);
 
+    private static mln_status Abandon(MlnRuntime live, mln_diagnostic* diagnostic) =>
+        NativeMethods.mln_runtime_dispose(live, diagnostic);
+
+    NativeHandleState<MlnRuntime> INativeOwner<MlnRuntime>.State => state;
     internal MlnRuntime Handle => state.Handle;
+    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;
 
-    internal NativeHandleState<MlnRuntime>.ReadScope Borrow() => state.Borrow();
-
-    internal global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackOwner CallbackOwner =>
-        state.CallbackOwner;
+    // Runtime events report their source by this identity.
+    public ulong Id => state.IssuedHandle.Value;
     public bool IsClosed => state.IsClosed;
 
     public void Dispose()
     {
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_dispose"
-        );
+        NativeCallbackGuard.EnsureAllowed(this, "mln_runtime_dispose");
         state.Retire();
     }
 
     public Task<MapHandle> MapCreateAsync(MapOptions options)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_map_create"
-        );
-        return NativeCompletion.Submit(
+        using var scope = new NativeCallScope(this, "mln_map_create");
+        return scope.Query<MlnMap, MapHandle>(
             (completion, diagnostic) =>
-            {
-                var nativeOptions = NativeMapOptions(options);
-                return NativeMethods.mln_map_create(Handle, &nativeOptions, completion, diagnostic);
-            },
-            result => MapHandle.Adopt(this, NativeCompletion.Value<MlnMap>(result))
+                NativeMethods.mln_map_create(
+                    Handle,
+                    scope.Value(NativeMapOptions(options)),
+                    completion,
+                    diagnostic
+                ),
+            handle => MapHandle.Adopt(this, handle)
         );
     }
 
     public Task BarrierAsync(CancellationToken cancellationToken = default)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_barrier"
+        using var scope = new NativeCallScope(this, "mln_runtime_barrier");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_barrier(Handle, completion, diagnostic),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_barrier(Handle, completion, diagnostic),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task ClearHttpHeaderTransformAsync(CancellationToken cancellationToken = default)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_clear_http_header_transform"
+        using var scope = new NativeCallScope(this, "mln_runtime_clear_http_header_transform");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_clear_http_header_transform(
+                    Handle,
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_clear_http_header_transform(
-                        Handle,
-                        completion,
-                        diagnostic
-                    ),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task ClearResourceProviderAsync(CancellationToken cancellationToken = default)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_clear_resource_provider"
+        using var scope = new NativeCallScope(this, "mln_runtime_clear_resource_provider");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_clear_resource_provider(Handle, completion, diagnostic),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_clear_resource_provider(
-                        Handle,
-                        completion,
-                        diagnostic
-                    ),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task ClearResourceTransformAsync(CancellationToken cancellationToken = default)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_clear_resource_transform"
+        using var scope = new NativeCallScope(this, "mln_runtime_clear_resource_transform");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_clear_resource_transform(Handle, completion, diagnostic),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_clear_resource_transform(
-                        Handle,
-                        completion,
-                        diagnostic
-                    ),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public static RuntimeHandle Create(RuntimeOptions options)
     {
-        using var scope = new NativeCallScope();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            null,
-            "mln_runtime_create"
-        );
-        global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
+        using var scope = new NativeCallScope(null, "mln_runtime_create");
         var nativeOptions = NativeRuntimeOptions(options, scope);
         MlnRuntime outRuntime = default;
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_runtime_create(
-                &nativeOptions,
-                &outRuntime,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        Check(NativeMethods.mln_runtime_create(&nativeOptions, &outRuntime, Diagnostic));
         var owner = RuntimeHandle.Adopt(outRuntime);
         scope.Accept(owner.CallbackOwner);
         return owner;
@@ -188,42 +107,17 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
 
     public EventBatchHandle DrainEvents()
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_drain_events"
-        );
+        using var call = Enter(this, "mln_runtime_drain_events");
         MlnEventBatch outBatch = default;
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_runtime_drain_events(
-                Handle,
-                &outBatch,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        Check(NativeMethods.mln_runtime_drain_events(Handle, &outBatch, Diagnostic));
         return EventBatchHandle.Adopt(outBatch);
     }
 
     public RuntimeEventMask GetEventMask()
     {
-        using var read = state.Borrow();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_get_event_mask"
-        );
+        using var read = state.Read(this, "mln_runtime_get_event_mask");
         ulong outMask = default;
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_runtime_get_event_mask(
-                read.Handle,
-                &outMask,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        Check(NativeMethods.mln_runtime_get_event_mask(read.Handle, &outMask, Diagnostic));
         return (RuntimeEventMask)outMask;
     }
 
@@ -233,30 +127,21 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_offline_region_create"
-        );
+        using var scope = new NativeCallScope(this, "mln_runtime_offline_region_create");
         var bufferMetadata = scope.Buffer(metadata);
-        var operation = NativeCompletion.Submit(
+        return scope.Query<mln_offline_region_info, OfflineRegionInfo>(
             (completion, diagnostic) =>
-            {
-                var nativeDefinition = NativeOfflineRegionDefinition(definition, scope);
-                return NativeMethods.mln_runtime_offline_region_create(
+                NativeMethods.mln_runtime_offline_region_create(
                     Handle,
-                    &nativeDefinition,
+                    scope.Value(NativeOfflineRegionDefinition(definition, scope)),
                     (byte*)bufferMetadata.data,
                     checked((nuint)bufferMetadata.size),
                     completion,
                     diagnostic
-                );
-            },
-            result => CopyOfflineRegionInfo(NativeCompletion.Value<mln_offline_region_info>(result))
+                ),
+            CopyOfflineRegionInfo,
+            cancellationToken
         );
-        scope.Accept();
-        return operation.WaitAsync(cancellationToken);
     }
 
     public Task OfflineRegionDeleteAsync(
@@ -264,23 +149,17 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_offline_region_delete"
+        using var scope = new NativeCallScope(this, "mln_runtime_offline_region_delete");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_offline_region_delete(
+                    Handle,
+                    regionId,
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_offline_region_delete(
-                        Handle,
-                        regionId,
-                        completion,
-                        diagnostic
-                    ),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task<OfflineRegionInfo?> OfflineRegionGetAsync(
@@ -288,28 +167,18 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_offline_region_get"
+        using var scope = new NativeCallScope(this, "mln_runtime_offline_region_get");
+        return scope.QueryOptionalValue<mln_offline_region_info, OfflineRegionInfo>(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_offline_region_get(
+                    Handle,
+                    regionId,
+                    completion,
+                    diagnostic
+                ),
+            CopyOfflineRegionInfo,
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_offline_region_get(
-                        Handle,
-                        regionId,
-                        completion,
-                        diagnostic
-                    ),
-                result =>
-                    result->value_count == 0
-                        ? (OfflineRegionInfo?)null
-                        : CopyOfflineRegionInfo(
-                            NativeCompletion.Value<mln_offline_region_info>(result)
-                        )
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task<OfflineRegionStatus> OfflineRegionGetStatusAsync(
@@ -317,26 +186,18 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_offline_region_get_status"
+        using var scope = new NativeCallScope(this, "mln_runtime_offline_region_get_status");
+        return scope.Query<mln_offline_region_status, OfflineRegionStatus>(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_offline_region_get_status(
+                    Handle,
+                    regionId,
+                    completion,
+                    diagnostic
+                ),
+            CopyOfflineRegionStatus,
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_offline_region_get_status(
-                        Handle,
-                        regionId,
-                        completion,
-                        diagnostic
-                    ),
-                result =>
-                    CopyOfflineRegionStatus(
-                        NativeCompletion.Value<mln_offline_region_status>(result)
-                    )
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task OfflineRegionInvalidateAsync(
@@ -344,23 +205,17 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_offline_region_invalidate"
+        using var scope = new NativeCallScope(this, "mln_runtime_offline_region_invalidate");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_offline_region_invalidate(
+                    Handle,
+                    regionId,
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_offline_region_invalidate(
-                        Handle,
-                        regionId,
-                        completion,
-                        diagnostic
-                    ),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task OfflineRegionSetDownloadStateAsync(
@@ -369,24 +224,21 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
+        using var scope = new NativeCallScope(
             this,
             "mln_runtime_offline_region_set_download_state"
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_offline_region_set_download_state(
-                        Handle,
-                        regionId,
-                        (uint)state,
-                        completion,
-                        diagnostic
-                    ),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_offline_region_set_download_state(
+                    Handle,
+                    regionId,
+                    (uint)state,
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
     }
 
     public Task OfflineRegionSetObservedAsync(
@@ -395,24 +247,18 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_offline_region_set_observed"
+        using var scope = new NativeCallScope(this, "mln_runtime_offline_region_set_observed");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_offline_region_set_observed(
+                    Handle,
+                    regionId,
+                    (byte)(observed ? 1 : 0),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_offline_region_set_observed(
-                        Handle,
-                        regionId,
-                        (byte)(observed ? 1 : 0),
-                        completion,
-                        diagnostic
-                    ),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task<OfflineRegionInfo> OfflineRegionUpdateMetadataAsync(
@@ -421,14 +267,9 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_offline_region_update_metadata"
-        );
+        using var scope = new NativeCallScope(this, "mln_runtime_offline_region_update_metadata");
         var bufferMetadata = scope.Buffer(metadata);
-        var operation = NativeCompletion.Submit(
+        return scope.Query<mln_offline_region_info, OfflineRegionInfo>(
             (completion, diagnostic) =>
                 NativeMethods.mln_runtime_offline_region_update_metadata(
                     Handle,
@@ -438,35 +279,22 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
                     completion,
                     diagnostic
                 ),
-            result => CopyOfflineRegionInfo(NativeCompletion.Value<mln_offline_region_info>(result))
+            CopyOfflineRegionInfo,
+            cancellationToken
         );
-        scope.Accept();
-        return operation.WaitAsync(cancellationToken);
     }
 
     public Task<OfflineRegionInfo[]> OfflineRegionsListAsync(
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_offline_regions_list"
+        using var scope = new NativeCallScope(this, "mln_runtime_offline_regions_list");
+        return scope.QueryArray<mln_offline_region_info, OfflineRegionInfo>(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_offline_regions_list(Handle, completion, diagnostic),
+            CopyOfflineRegionInfo,
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_offline_regions_list(Handle, completion, diagnostic),
-                result =>
-                {
-                    var values = NativeCompletion.Values<mln_offline_region_info>(result);
-                    var copied = new OfflineRegionInfo[values.Length];
-                    for (var index = 0; index < values.Length; index++)
-                        copied[index] = CopyOfflineRegionInfo(values[index]);
-                    return copied;
-                }
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task<OfflineRegionInfo[]> OfflineRegionsMergeDatabaseAsync(
@@ -474,45 +302,25 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_offline_regions_merge_database"
+        using var scope = new NativeCallScope(this, "mln_runtime_offline_regions_merge_database");
+        return scope.QueryArray<mln_offline_region_info, OfflineRegionInfo>(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_offline_regions_merge_database(
+                    Handle,
+                    scope.CStringArgument(sideDatabasePath),
+                    completion,
+                    diagnostic
+                ),
+            CopyOfflineRegionInfo,
+            cancellationToken
         );
-        ArgumentNullException.ThrowIfNull(sideDatabasePath);
-        using var nativeSideDatabasePath = NativeUtf8String.FromNullableString(
-            sideDatabasePath,
-            nameof(sideDatabasePath)
-        );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_offline_regions_merge_database(
-                        Handle,
-                        nativeSideDatabasePath.Pointer,
-                        completion,
-                        diagnostic
-                    ),
-                result =>
-                {
-                    var values = NativeCompletion.Values<mln_offline_region_info>(result);
-                    var copied = new OfflineRegionInfo[values.Length];
-                    for (var index = 0; index < values.Length; index++)
-                        copied[index] = CopyOfflineRegionInfo(values[index]);
-                    return copied;
-                }
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public void Close() => CloseAsync().GetAwaiter().GetResult();
 
     public Task CloseAsync()
     {
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_release"
-        );
+        NativeCallbackGuard.EnsureAllowed(this, "mln_runtime_release");
         state.Close();
         return teardown;
     }
@@ -533,41 +341,23 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_run_ambient_cache_operation"
+        using var scope = new NativeCallScope(this, "mln_runtime_run_ambient_cache_operation");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_run_ambient_cache_operation(
+                    Handle,
+                    (uint)operation,
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_run_ambient_cache_operation(
-                        Handle,
-                        (uint)operation,
-                        completion,
-                        diagnostic
-                    ),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public void SetEventMask(RuntimeEventMask mask)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_set_event_mask"
-        );
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_runtime_set_event_mask(
-                Handle,
-                (ulong)mask,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        using var call = Enter(this, "mln_runtime_set_event_mask");
+        Check(NativeMethods.mln_runtime_set_event_mask(Handle, (ulong)mask, Diagnostic));
     }
 
     public Task SetHttpHeaderTransformAsync(
@@ -575,27 +365,17 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_set_http_header_transform"
-        );
-        var operation = NativeCompletion.Submit(
+        using var scope = new NativeCallScope(this, "mln_runtime_set_http_header_transform");
+        return scope.Run(
             (completion, diagnostic) =>
-            {
-                var nativeTransform = NativeHttpHeaderTransform(transform, scope);
-                return NativeMethods.mln_runtime_set_http_header_transform(
+                NativeMethods.mln_runtime_set_http_header_transform(
                     Handle,
-                    &nativeTransform,
+                    scope.Value(NativeHttpHeaderTransform(transform, scope)),
                     completion,
                     diagnostic
-                );
-            },
-            result => true
+                ),
+            cancellationToken
         );
-        scope.Accept(this.CallbackOwner);
-        return operation.WaitAsync(cancellationToken);
     }
 
     public Task SetMaximumAmbientCacheSizeAsync(
@@ -603,23 +383,17 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_set_maximum_ambient_cache_size"
+        using var scope = new NativeCallScope(this, "mln_runtime_set_maximum_ambient_cache_size");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_runtime_set_maximum_ambient_cache_size(
+                    Handle,
+                    size,
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_runtime_set_maximum_ambient_cache_size(
-                        Handle,
-                        size,
-                        completion,
-                        diagnostic
-                    ),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task SetResourceProviderAsync(
@@ -627,27 +401,17 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_set_resource_provider"
-        );
-        var operation = NativeCompletion.Submit(
+        using var scope = new NativeCallScope(this, "mln_runtime_set_resource_provider");
+        return scope.Run(
             (completion, diagnostic) =>
-            {
-                var nativeProvider = NativeResourceProvider(provider, scope);
-                return NativeMethods.mln_runtime_set_resource_provider(
+                NativeMethods.mln_runtime_set_resource_provider(
                     Handle,
-                    &nativeProvider,
+                    scope.Value(NativeResourceProvider(provider, scope)),
                     completion,
                     diagnostic
-                );
-            },
-            result => true
+                ),
+            cancellationToken
         );
-        scope.Accept(this.CallbackOwner);
-        return operation.WaitAsync(cancellationToken);
     }
 
     public Task SetResourceTransformAsync(
@@ -655,26 +419,16 @@ public sealed unsafe partial class RuntimeHandle : IDisposable, IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_runtime_set_resource_transform"
-        );
-        var operation = NativeCompletion.Submit(
+        using var scope = new NativeCallScope(this, "mln_runtime_set_resource_transform");
+        return scope.Run(
             (completion, diagnostic) =>
-            {
-                var nativeTransform = NativeResourceTransform(transform, scope);
-                return NativeMethods.mln_runtime_set_resource_transform(
+                NativeMethods.mln_runtime_set_resource_transform(
                     Handle,
-                    &nativeTransform,
+                    scope.Value(NativeResourceTransform(transform, scope)),
                     completion,
                     diagnostic
-                );
-            },
-            result => true
+                ),
+            cancellationToken
         );
-        scope.Accept(this.CallbackOwner);
-        return operation.WaitAsync(cancellationToken);
     }
 }

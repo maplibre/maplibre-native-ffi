@@ -1,13 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Logging;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Query;
-using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
-
 namespace Maplibre.NativeFfi.Style;
 
 public sealed record StyleTileSourceOptions
@@ -24,13 +16,9 @@ public sealed record StyleTileSourceOptions
     {
         get
         {
-            global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-                null,
-                "mln_style_tile_source_options_default"
-            );
-            global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
-            return global::Maplibre.NativeFfi.Internal.Struct.GeneratedValues.CopyStyleTileSourceOptions(
-                global::Maplibre.NativeFfi.Internal.C.NativeMethods.mln_style_tile_source_options_default()
+            using var call = Enter(null, "mln_style_tile_source_options_default");
+            return CopyStyleTileSourceOptions(
+                NativeMethods.mln_style_tile_source_options_default()
             );
         }
     }

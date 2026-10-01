@@ -8,6 +8,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Base/Maplibre.Operations.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Base/RenderBackendFlag.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Base/Status.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/GlobalUsings.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Internal/C/NativeMethods.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Internal/C/NativeTypes.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Internal/Struct/GeneratedValues.g.cs",

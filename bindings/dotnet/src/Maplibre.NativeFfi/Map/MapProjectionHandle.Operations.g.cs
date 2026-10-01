@@ -1,249 +1,152 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Memory;
-using Maplibre.NativeFfi.Internal.Pointer;
-using Maplibre.NativeFfi.Internal.Status;
-using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Logging;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Query;
-using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
-using Maplibre.NativeFfi.Style;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-
 namespace Maplibre.NativeFfi.Map;
 
-public sealed unsafe partial class MapProjectionHandle : IDisposable
+public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwner<MlnMapProjection>
 {
     private readonly NativeHandleState<MlnMapProjection> state;
-    private readonly ulong nativeId;
-    public ulong Id => nativeId;
 
     internal MapProjectionHandle(MlnMapProjection handle)
     {
-        nativeId = handle.Value;
-        state = new NativeHandleState<MlnMapProjection>(
+        state = new(
             handle,
             static (live, diagnostic) => NativeMethods.mln_map_projection_close(live, diagnostic),
             nameof(MapProjectionHandle),
-            static (live, diagnostic) => NativeMethods.mln_map_projection_close(live, diagnostic)
+            Abandon
         );
     }
 
-    internal static MapProjectionHandle Adopt(MlnMapProjection handle)
-    {
-        MapProjectionHandle? owner = null;
-        try
-        {
-            owner = new MapProjectionHandle(handle);
-            return owner;
-        }
-        catch
-        {
-            if (owner is null)
-                NativeMethods.mln_map_projection_close(handle, null);
-            else
-                owner.state.Retire();
-            throw;
-        }
-    }
+    internal static MapProjectionHandle Adopt(MlnMapProjection handle) =>
+        NativeHandleState<MlnMapProjection>.Adopt(
+            handle,
+            () => new MapProjectionHandle(handle),
+            Abandon
+        );
 
+    private static mln_status Abandon(MlnMapProjection live, mln_diagnostic* diagnostic) =>
+        NativeMethods.mln_map_projection_close(live, diagnostic);
+
+    NativeHandleState<MlnMapProjection> INativeOwner<MlnMapProjection>.State => state;
     internal MlnMapProjection Handle => state.Handle;
+    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;
 
-    internal NativeHandleState<MlnMapProjection>.ReadScope Borrow() => state.Borrow();
-
-    internal global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackOwner CallbackOwner =>
-        state.CallbackOwner;
+    // Runtime events report their source by this identity.
+    public ulong Id => state.IssuedHandle.Value;
     public bool IsClosed => state.IsClosed;
 
     public void Dispose()
     {
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_map_projection_close"
-        );
+        NativeCallbackGuard.EnsureAllowed(this, "mln_map_projection_close");
         state.Retire();
     }
 
     public void Close()
     {
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_map_projection_close"
-        );
+        NativeCallbackGuard.EnsureAllowed(this, "mln_map_projection_close");
         state.Close();
     }
 
     public CameraOptions GetCamera()
     {
-        using var read = state.Borrow();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_map_projection_get_camera"
-        );
+        using var read = state.Read(this, "mln_map_projection_get_camera");
         var outCamera = new mln_camera_options { size = (uint)sizeof(mln_camera_options) };
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_map_projection_get_camera(
-                read.Handle,
-                &outCamera,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        Check(NativeMethods.mln_map_projection_get_camera(read.Handle, &outCamera, Diagnostic));
         return CopyCameraOptions(outCamera);
     }
 
     public LatLng LatLngForPixel(ScreenPoint point)
     {
-        using var read = state.Borrow();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_map_projection_lat_lng_for_pixel"
-        );
+        using var read = state.Read(this, "mln_map_projection_lat_lng_for_pixel");
         var outCoordinate = default(mln_lat_lng);
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
+        Check(
             NativeMethods.mln_map_projection_lat_lng_for_pixel(
                 read.Handle,
                 NativeScreenPoint(point),
                 &outCoordinate,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
+                Diagnostic
+            )
         );
         return CopyLatLng(outCoordinate);
     }
 
     public LatLng LatLngForPixelUnwrapped(ScreenPoint point)
     {
-        using var read = state.Borrow();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_map_projection_lat_lng_for_pixel_unwrapped"
-        );
+        using var read = state.Read(this, "mln_map_projection_lat_lng_for_pixel_unwrapped");
         var outCoordinate = default(mln_lat_lng);
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
+        Check(
             NativeMethods.mln_map_projection_lat_lng_for_pixel_unwrapped(
                 read.Handle,
                 NativeScreenPoint(point),
                 &outCoordinate,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
+                Diagnostic
+            )
         );
         return CopyLatLng(outCoordinate);
     }
 
     public double MetersPerPixelAtLatitude(double latitude)
     {
-        using var read = state.Borrow();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_map_projection_meters_per_pixel_at_latitude"
-        );
+        using var read = state.Read(this, "mln_map_projection_meters_per_pixel_at_latitude");
         double outMetersPerPixel = default;
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
+        Check(
             NativeMethods.mln_map_projection_meters_per_pixel_at_latitude(
                 read.Handle,
                 latitude,
                 &outMetersPerPixel,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
+                Diagnostic
+            )
         );
         return outMetersPerPixel;
     }
 
     public ScreenPoint PixelForLatLng(LatLng coordinate)
     {
-        using var read = state.Borrow();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_map_projection_pixel_for_lat_lng"
-        );
+        using var read = state.Read(this, "mln_map_projection_pixel_for_lat_lng");
         var outPoint = default(mln_screen_point);
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
+        Check(
             NativeMethods.mln_map_projection_pixel_for_lat_lng(
                 read.Handle,
                 NativeLatLng(coordinate),
                 &outPoint,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
+                Diagnostic
+            )
         );
         return CopyScreenPoint(outPoint);
     }
 
     public void SetCamera(CameraOptions camera)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_map_projection_set_camera"
-        );
+        using var call = Enter(this, "mln_map_projection_set_camera");
         var nativeCamera = NativeCameraOptions(camera);
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_map_projection_set_camera(
-                Handle,
-                &nativeCamera,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        Check(NativeMethods.mln_map_projection_set_camera(Handle, &nativeCamera, Diagnostic));
     }
 
     public void SetVisibleCoordinates(LatLng[] coordinates, EdgeInsets padding)
     {
-        using var scope = new NativeCallScope();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_map_projection_set_visible_coordinates"
-        );
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
+        using var scope = new NativeCallScope(this, "mln_map_projection_set_visible_coordinates");
+        Check(
             NativeMethods.mln_map_projection_set_visible_coordinates(
                 Handle,
                 scope.Array<mln_lat_lng, LatLng>(coordinates, item => NativeLatLng(item)),
                 checked((nuint)coordinates.Length),
                 NativeEdgeInsets(padding),
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
+                Diagnostic
+            )
         );
         scope.Accept();
     }
 
     public void SetVisibleGeometry(byte[] geometry, EdgeInsets padding)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_map_projection_set_visible_geometry"
-        );
-        using var nativeGeometry = NativeStringView.From(geometry, nameof(geometry));
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
+        using var scope = new NativeCallScope(this, "mln_map_projection_set_visible_geometry");
+        Check(
             NativeMethods.mln_map_projection_set_visible_geometry(
                 Handle,
-                nativeGeometry.Value,
+                scope.Buffer(geometry),
                 NativeEdgeInsets(padding),
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
+                Diagnostic
+            )
         );
+        scope.Accept();
     }
 }

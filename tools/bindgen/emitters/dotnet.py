@@ -158,14 +158,12 @@ def public_type(name: str) -> str:
     return pascal(name.removeprefix("mln_"))
 
 
-def string_copy(value: str, optional: bool) -> str:
-    copied = f"RuntimeStructs.CopyUtf8((sbyte*){value}.data, {value}.size)"
-    return f"{value}.size == 0 ? null : {copied}" if optional else copied
-
-
-# Status checks read the message from this stack buffer, which the module skips
-# zeroing because native writes it before returning.
-DIAGNOSTIC_LOCAL = "        mln_diagnostic diagnostic;"
+# Generated sources take their imports from GlobalUsings.g.cs. The compiler
+# treats a .g.cs file as generated code, which disables nullable annotations
+# unless the file enables them.
+HEADER = (
+    "// Generated from the C headers by tools/bindgen. Do not edit.\n#nullable enable\n"
+)
 
 
 def native_call(function: Function, arguments: str, diagnostic: str) -> str:
@@ -176,23 +174,17 @@ def native_call(function: Function, arguments: str, diagnostic: str) -> str:
 
 
 def checked_call(function: Function, arguments: str) -> str:
-    """Checks a synchronous call against the DIAGNOSTIC_LOCAL it reports into."""
+    """Checks a synchronous call against the calling thread's diagnostic."""
     if not function.diagnostic:
         raise Unsupported(f"{function.name} returns a status without a diagnostic")
-    call = native_call(function, arguments, "NativeDiagnostic.Prepare(&diagnostic)")
-    return f"NativeStatus.Check({call}, &diagnostic);"
+    return f"Check({native_call(function, arguments, 'Diagnostic')});"
 
 
-def submit_callback(
-    function: Function, arguments: str, call_locals: list[str] | None = None
-) -> str:
-    """Wraps a completion-taking call as a NativeCompletion submission."""
-    call = native_call(function, arguments, "diagnostic")
-    if call_locals:
-        return (
-            f"(completion, diagnostic) => {{ {' '.join(call_locals)} return {call}; }}"
-        )
-    return f"(completion, diagnostic) => {call}"
+def submission(function: Function, arguments: str) -> str:
+    """A completion-taking C call as the submission that NativeCallScope runs."""
+    return (
+        f"(completion, diagnostic) => {native_call(function, arguments, 'diagnostic')}"
+    )
 
 
 def operation_name(function: Function, receiver: str) -> str:
@@ -201,6 +193,80 @@ def operation_name(function: Function, receiver: str) -> str:
     if suffix.startswith("list_"):
         suffix = suffix.removeprefix("list_")
     return pascal(suffix.removeprefix("mln_"))
+
+
+def method(signature: str, body: list[str]) -> str:
+    return (
+        f"    {signature}\n    {{\n"
+        + "".join(f"        {line}\n" for line in body)
+        + "    }\n"
+    )
+
+
+def completion_query(
+    plan: OperationPlan, values: Values, records: set[str], api
+) -> tuple[str, str, str]:
+    """The result type, submission helper, and copy of a completion's value."""
+    function = plan.function
+    native = function.metadata.get("result")
+    shape = function.metadata.get("shape", "value")
+    nullable = function.metadata.get("nullable") == "true"
+    if native == "void" and shape == "none":
+        return "Task", "Run", ""
+    if (
+        plan.result is not None
+        and "view"
+        in {
+            plan.result.buffer_form,
+            plan.result.element and plan.result.element.buffer_form,
+        }
+    ) and function.metadata.get("encoding") in {"utf8", "json", "bytes"}:
+        encoding = function.metadata["encoding"]
+        public = "string" if encoding == "utf8" else "byte[]"
+        optional = function.metadata.get("optional") == "empty"
+        copy = (
+            ("CopyOptionalUtf8View" if optional else "CopyUtf8View")
+            if encoding == "utf8"
+            else "CopyBufferView"
+        )
+        copy = f"ValueStructs.{copy}"
+        if shape == "array":
+            return f"{public}[]", f"QueryArray<mln_buffer_view, {public}>", copy
+        if shape == "value":
+            if nullable or optional:
+                return f"{public}?", f"QueryOptional<mln_buffer_view, {public}>", copy
+            return public, f"Query<mln_buffer_view, {public}>", copy
+        raise Unsupported(f"buffer result shape {shape!r} needs a conversion rule")
+    if native in PRIMITIVES and shape == "value":
+        if nullable:
+            raise Unsupported("nullable scalar completion needs a presence conversion")
+        scalar = PRIMITIVES[native]
+        return scalar, f"Query<{scalar}, {scalar}>", "static value => value"
+    if native in api.records_by_name and shape in {"array", "value"}:
+        # Validate the whole record before emitting the operation.
+        record = values.record(native)
+        values.decoder(record)
+        records.add(native)
+        public = public_type(native)
+        copy = (
+            f"static value => Copy{public}(value)"
+            if native in values.item_buffers
+            else f"Copy{public}"
+        )
+        if shape == "array":
+            helper = "QueryOptionalArray" if nullable else "QueryArray"
+            return (
+                f"{public}[]{'?' if nullable else ''}",
+                f"{helper}<{native}, {public}>",
+                copy,
+            )
+        if not nullable:
+            return public, f"Query<{native}, {public}>", copy
+        helper = (
+            "QueryOptional" if values.declares_class(record) else "QueryOptionalValue"
+        )
+        return f"{public}?", f"{helper}<{native}, {public}>", copy
+    raise Unsupported(f"result {native!r} with shape {shape!r} needs a conversion rule")
 
 
 def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[str]]:
@@ -235,6 +301,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
     if receiver and receiver not in owners and not plan.scoped_receiver:
         raise Unsupported(f"receiver {receiver} requires its generated owner")
     static = receiver_parameter is None
+    owner_expression = "null" if static else "this"
     factory = (
         plan.owned_outputs[0].handle.native
         if static and len(plan.owned_outputs) == 1
@@ -251,6 +318,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         if factory
         else "Maplibre"
     )
+    guard = f'NativeCallbackGuard.EnsureAllowed(this, "{function.name}");'
     handle_plan = bound.handles.get(receiver)
     if (
         plan.consumes
@@ -258,7 +326,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         and function.name == handle_plan.release
         and handle_plan.release_inputs
     ):
-        declarations, locals_, arguments = [], [], ["&live"]
+        declarations, arguments = [], ["&live"]
         for parameter in plan.inputs:
             if parameter.name == plan.receiver:
                 continue
@@ -267,20 +335,20 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             name = camel(parameter.name)
             declarations.append(f"{values.public_type(value)} {name}")
             if value.kind == "reference" and value.element:
-                locals_.append(
-                    f"var native{pascal(name)} = {values.encode(value.element, name)};"
-                )
-                arguments.append(f"&native{pascal(name)}")
+                # The release runs synchronously, so its scope outlives the call.
+                arguments.append(f"scope.Value({values.encode(value.element, name)})")
             else:
                 arguments.append(values.encode(value, name))
         call = native_call(function, ", ".join(arguments), "diagnostic")
         return (
             owner_class,
-            (
-                f"    public void Release({', '.join(declarations)})\n    {{\n"
-                f'        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(this, "{function.name}");\n'
-                f"        state.Release((live, diagnostic) => {{ {' '.join(locals_)} return {call}; }});\n"
-                "    }\n"
+            method(
+                f"public void Release({', '.join(declarations)})",
+                [
+                    guard,
+                    "using var scope = new NativeCallScope();",
+                    f"state.Release((live, diagnostic) => {call});",
+                ],
             ),
             set(values.plans),
         )
@@ -295,11 +363,18 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             owners[receiver],
             (
                 "    public void Close() => CloseAsync().GetAwaiter().GetResult();\n\n"
-                f'    public Task CloseAsync()\n    {{\n        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(this, "{function.name}");\n        state.Close();\n        return teardown;\n    }}\n\n'
-                "    public ValueTask DisposeAsync() => new(CloseAsync());\n\n"
-                f"    private mln_status StartRelease({native_type} handle, mln_diagnostic* _)\n    {{\n"
-                f"        teardown = NativeCompletion.SubmitUnit({submit_callback(function, 'handle, completion')});\n"
-                "        return mln_status.MLN_STATUS_OK;\n    }\n"
+                + method(
+                    "public Task CloseAsync()",
+                    [guard, "state.Close();", "return teardown;"],
+                )
+                + "\n    public ValueTask DisposeAsync() => new(CloseAsync());\n\n"
+                + method(
+                    f"private mln_status StartRelease({native_type} handle, mln_diagnostic* _)",
+                    [
+                        f"teardown = NativeCompletion.SubmitUnit({submission(function, 'handle, completion')});",
+                        "return mln_status.MLN_STATUS_OK;",
+                    ],
+                )
             ),
             set(),
         )
@@ -315,20 +390,14 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         "render_driver",
     }:
         raise Unsupported(f"execution {execution!r} requires another runtime skeleton")
+    asynchronous = plan.completion is not None
     records: set[str] = {receiver} if plan.scoped_receiver else set()
     args = ["Pointer" if plan.scoped_receiver else "Handle"] if receiver else []
     if plan.receiver_access == "issued":
         args[0] = "state.IssuedHandle"
     parameters = []
-    prologue = (
-        [
-            "        global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();"
-        ]
-        if static
-        else []
-    )
+    prologue: list[str] = []
     outputs = []
-    call_locals = []
     scoped = False
     immediate_owners = []
     counts = {
@@ -356,29 +425,25 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             continue
         if parameter.name in direct_contexts:
             registration = direct_contexts[parameter.name]
-            args.append("root" + pascal(registration.callback))
+            callback = camel(registration.callback)
+            callback_value = input_plans[registration.callback]
+            # A callback restricted to its registration owner carries that owner.
+            descriptor = (
+                f"new NativeOwnedCallback({callback}, this)"
+                if values.owned_direct_callback(callback_value)
+                else callback
+            )
+            args.append(f"{callback} is null ? null : scope.Register({descriptor})")
             continue
         if parameter.name in direct_releases:
-            args.append(
-                "&global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackRoot.Release"
-            )
+            args.append("&NativeCallbackRoot.Release")
             continue
         if parameter.name in direct:
-            registration = direct[parameter.name]
             callback_value = input_plans[parameter.name]
             values.supported(callback_value)
             name = camel(parameter.name)
             parameters.append(f"{values.public_type(callback_value)} {name}")
             scoped = True
-            # A callback restricted to its registration owner carries that owner.
-            descriptor = (
-                f"new global::Maplibre.NativeFfi.Internal.Callback.NativeOwnedCallback({name}, this)"
-                if values.owned_direct_callback(callback_value)
-                else name
-            )
-            prologue.append(
-                f"        var root{pascal(parameter.name)} = {name} is null ? null : scope.Register({descriptor});"
-            )
             args.append(
                 f"{name} is null ? null : &Invoke{public_type(callback_value.native)}"
             )
@@ -402,6 +467,13 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             continue
         ctype = type_name(parameter.type)
         pointee = parameter.type.pointee
+        is_output = parameter.metadata.get("direction") == "out"
+        if (
+            asynchronous
+            and is_output
+            and parameter.name not in {owner.parameter for owner in plan.owned_outputs}
+        ):
+            raise Unsupported("asynchronous output requires a completion value")
         if plan.completion and parameter.name == plan.completion.parameter:
             args.append("completion")
         elif parameter.name in {owner.parameter for owner in plan.owned_outputs}:
@@ -413,8 +485,11 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             if owner.handle.native not in owners:
                 raise Unsupported("owned output requires its generated owner")
             native = raw_handle(owner.handle.native)
-            prologue.append(f"        {native} {name} = default;")
-            args.append(f"&native{pascal(name)}" if plan.completion else f"&{name}")
+            if asynchronous:
+                args.append("output")
+            else:
+                prologue.append(f"{native} {name} = default;")
+                args.append(f"&{name}")
             immediate_owners.append((owner, name, native))
         elif (
             parameter.name in input_plans
@@ -432,9 +507,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             parameters.append(f"{public} {name}")
             scoped = True
             encoder = "Utf8" if value_plan.encoding == "utf8" else "Buffer"
-            prologue.append(
-                f"        var buffer{pascal(name)} = scope.{encoder}({name});"
-            )
+            prologue.append(f"var buffer{pascal(name)} = scope.{encoder}({name});")
             args.append(
                 f"({values.raw_type(value_plan.element) + '*' if value_plan.element else values.raw_type(value_plan)})buffer{pascal(name)}.data"
             )
@@ -446,12 +519,8 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             args.append(f"(void*){name}.Address")
         elif ctype in owners:
             parameters.append(f"{owners[ctype]} {name}")
-            prologue.append(f"        ArgumentNullException.ThrowIfNull({name});")
-            prologue.append(f"        using var use{pascal(name)} = {name}.Borrow();")
-            prologue.append(
-                f"        var handle{pascal(name)} = use{pascal(name)}.Handle;"
-            )
-            args.append(f"handle{pascal(name)}")
+            scoped = True
+            args.append(f"scope.Use({name})")
         elif ctype in PRIMITIVES:
             enum = parameter.metadata.get("enum")
             if enum:
@@ -513,27 +582,18 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             "json",
             "utf8",
         }:
-            public = (
-                "byte[]"
-                if parameter.metadata["encoding"] in {"bytes", "json"}
-                else "string"
-            )
-            parameters.append(f"{public} {name}")
-            prologue.append(
-                f"        using var native{pascal(name)} = NativeStringView.From({name}, nameof({name}));"
-            )
-            args.append(f"native{pascal(name)}.Value")
+            utf8 = parameter.metadata["encoding"] == "utf8"
+            parameters.append(f"{'string' if utf8 else 'byte[]'} {name}")
+            scoped = True
+            args.append(f"scope.{'Utf8' if utf8 else 'Buffer'}({name})")
         elif (
             pointee
             and type_name(pointee) == "char"
             and parameter.metadata.get("encoding") == "utf8"
         ):
             parameters.append(f"string {name}")
-            prologue.append(f"        ArgumentNullException.ThrowIfNull({name});")
-            prologue.append(
-                f"        using var native{pascal(name)} = NativeUtf8String.FromNullableString({name}, nameof({name}));"
-            )
-            args.append(f"native{pascal(name)}.Pointer")
+            scoped = True
+            args.append(f"scope.CStringArgument({name})")
         elif (
             parameter.name in input_plans
             and input_plans[parameter.name].kind == "array"
@@ -545,9 +605,9 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             parameters.append(f"{values.public_type(value_plan)} {name}")
             scoped = True
             if value_plan.length and value_plan.length.isdecimal():
-                prologue.append(f"        ArgumentNullException.ThrowIfNull({name});")
+                prologue.append(f"ArgumentNullException.ThrowIfNull({name});")
                 prologue.append(
-                    f'        if ({name}.Length != {value_plan.length}) throw new ArgumentException("Expected {value_plan.length} elements.", nameof({name}));'
+                    f'if ({name}.Length != {value_plan.length}) throw new ArgumentException("Expected {value_plan.length} elements.", nameof({name}));'
                 )
             args.append(values.encode(value_plan, name))
         elif (
@@ -562,6 +622,11 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             parameters.append(f"{values.public_type(value_plan)} {name}")
             element = value_plan.element
             assert element is not None
+            if asynchronous:
+                # A submission closure cannot address a stack local.
+                scoped = True
+                args.append(values.encode(value_plan, name))
+                continue
             scoped |= values.needs_scope(element)
             source = name + (
                 ".Value"
@@ -572,23 +637,15 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             if value_plan.nullable:
                 expression = f"{name} is null ? default({values.raw_type(element)}) : {expression}"
             local = f"native{pascal(name)}"
-            declaration = f"var {local} = {expression};"
-            if execution in {"immediate", "snapshot", "event_batch", "render_driver"}:
-                prologue.append(f"        {declaration}")
-            else:
-                call_locals.append(declaration)
+            prologue.append(f"var {local} = {expression};")
             args.append(
                 f"{name} is null ? null : &{local}"
                 if value_plan.nullable
                 else f"&{local}"
             )
-        elif (
-            pointee
-            and parameter.metadata.get("direction") == "out"
-            and type_name(pointee) in PRIMITIVES
-        ):
+        elif pointee and is_output and type_name(pointee) in PRIMITIVES:
             native = PRIMITIVES[type_name(pointee)]
-            prologue.append(f"        {native} {name} = default;")
+            prologue.append(f"{native} {name} = default;")
             args.append(f"&{name}")
             output_plan = next(
                 item.value.element
@@ -602,11 +659,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 outputs.append(
                     ("ulong", f"(ulong){name}") if native == "nuint" else (native, name)
                 )
-        elif (
-            pointee
-            and parameter.metadata.get("direction") == "out"
-            and type_name(pointee) in api.records_by_name
-        ):
+        elif pointee and is_output and type_name(pointee) in api.records_by_name:
             record = type_name(pointee)
             output_plan = next(
                 item.value.element
@@ -623,7 +676,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 initial = f"new {record} {{ size = (uint)sizeof({record}) }}"
             else:
                 initial = f"default({record})"
-            prologue.append(f"        var {name} = {initial};")
+            prologue.append(f"var {name} = {initial};")
             args.append(f"&{name}")
             copied = values.copy(output_plan, name)
             output_type = values.public_type(output_plan)
@@ -637,65 +690,64 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             raise Unsupported(
                 f"parameter {parameter.name}: {parameter.type.spelling} needs a conversion rule"
             )
-    prologue.insert(
-        0,
-        f'        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed({"null" if static else "this"}, "{function.name}");',
-    )
-    if handle_plan:
-        prologue.insert(0, "        using var retained = this.state.Retain();")
-    if scoped:
-        prologue.insert(0, "        using var scope = new NativeCallScope();")
-    if (
-        handle_plan
-        and execution in {"immediate", "snapshot", "event_batch", "render_driver"}
-        and outputs
-        and function.name != handle_plan.release
-    ):
-        prologue.insert(0, "        using var read = state.Borrow();")
-        args[0] = "read.Handle"
     decision_completion = any(
         callback.decision and callback.decision.complete == function.name
         for callback in bound.callbacks.values()
     )
+    reads = bool(
+        handle_plan
+        and not asynchronous
+        and outputs
+        and function.name != handle_plan.release
+    )
+    # Entering checks the callback guard, keeps the receiver reachable, and, for
+    # an owner-less operation, loads the native library.
+    if reads:
+        entry = [f'using var read = state.Read(this, "{function.name}");']
+        if scoped:
+            entry.append("using var scope = new NativeCallScope();")
+        args[0] = "read.Handle"
+    elif scoped or asynchronous:
+        entry = [
+            f'using var scope = new NativeCallScope({owner_expression}, "{function.name}");'
+        ]
+    else:
+        entry = [f'using var call = Enter({owner_expression}, "{function.name}");']
     if decision_completion:
-        prologue.append("        using var claim = state.BeginClaim();")
-    call = f"NativeMethods.{function.name}({', '.join(args)})"
-    callback = submit_callback(function, ", ".join(args), call_locals)
+        entry.append("using var claim = state.BeginClaim();")
+    prologue = entry + prologue
+    arguments = ", ".join(args)
     name = operation_name(function, factory or receiver)
+    modifiers = "public static" if static else "public"
     if plan.view:
         assert handle_plan and handle_plan.view_begin and handle_plan.view_end
         if len(outputs) != 1:
             raise Unsupported("borrowed view requires one output descriptor")
         output_type, copied = outputs[0]
         parameters.append(f"Action<{output_type}> callback")
-        prologue.append("        ArgumentNullException.ThrowIfNull(callback);")
-        prologue.append("        var viewScope = new NativeViewScope();")
-        prologue.append("        void* token = null;")
-        prologue.append(DIAGNOSTIC_LOCAL)
-        prologue.append(
-            "        "
-            + checked_call(
-                api.functions_by_name[handle_plan.view_begin], "read.Handle, &token"
-            )
-        )
         body = prologue + [
-            "        try",
-            "        {",
-            f"            {checked_call(function, ', '.join(args))}",
-            f"            callback({copied});",
-            "        }",
-            "        finally",
-            "        {",
-            "            viewScope.Expire();",
-            f"            NativeMethods.{handle_plan.view_end}(token);",
-            "        }",
+            "ArgumentNullException.ThrowIfNull(callback);",
+            "var viewScope = new NativeViewScope();",
+            "void* token = null;",
+            checked_call(
+                api.functions_by_name[handle_plan.view_begin], "read.Handle, &token"
+            ),
+            "try",
+            "{",
+            f"    {checked_call(function, arguments)}",
+            f"    callback({copied});",
+            "}",
+            "finally",
+            "{",
+            "    viewScope.Expire();",
+            f"    NativeMethods.{handle_plan.view_end}(token);",
+            "}",
         ]
         return (
             owner_class,
-            (
-                f"    public void With{name.removeprefix('Get')}({', '.join(parameters)})\n    {{\n"
-                + "\n".join(body)
-                + "\n    }\n"
+            method(
+                f"public void With{name.removeprefix('Get')}({', '.join(parameters)})",
+                body,
             ),
             records | values.plans.keys(),
         )
@@ -711,30 +763,26 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         )
         if owner.parent_parameter and not parent:
             raise Unsupported("owned output parent requires another input owner")
-        if plan.completion:
-            pre = f"{native} native{pascal(local)} = default; "
-            call = native_call(function, ", ".join(args), "diagnostic")
-            callback = f"(completion, diagnostic) => {{ {pre}{' '.join(call_locals)} var status = {call}; if (status == mln_status.MLN_STATUS_OK) {local} = native{pascal(local)}; return status; }}"
+        if asynchronous:
             body = prologue + [
-                f"        var attachment = NativeCompletion.SubmitUnit({callback});"
+                f"return scope.Attach<{native}, {result_type}>(",
+                f"    (output, completion, diagnostic) => {native_call(function, arguments, 'diagnostic')},",
+                f"    (handle, attachment) => {result_type}.Adopt({parent}handle, attachment)",
+                ");",
             ]
-            constructor = f"{result_type}.Adopt({parent}{local}, attachment)"
         else:
-            body = prologue + [
-                DIAGNOSTIC_LOCAL,
-                f"        {checked_call(function, ', '.join(args))}",
-            ]
+            body = prologue + [checked_call(function, arguments)]
             constructor = f"{result_type}.Adopt({parent}{local})"
-        if scoped:
-            body += [
-                f"        var owner = {constructor};",
-                "        scope.Accept(owner.CallbackOwner);"
-                if plan.registrations
-                else "        scope.Accept();",
-                "        return owner;",
-            ]
-        else:
-            body.append(f"        return {constructor};")
+            if plan.registrations:
+                body += [
+                    f"var owner = {constructor};",
+                    "scope.Accept(owner.CallbackOwner);",
+                    "return owner;",
+                ]
+            else:
+                if scoped:
+                    body.append("scope.Accept();")
+                body.append(f"return {constructor};")
     elif execution == "lifecycle" and plan.result and plan.result.ownership == "owned":
         owner = plan.completion.result_owner if plan.completion else None
         if owner is None or owner.handle.native not in owners:
@@ -749,20 +797,13 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             raise Unsupported("owned completion parent requires another input owner")
         result_type = f"Task<{owners[result]}>"
         name += "Async"
-        native_type = raw_handle(result)
-        expression = f"NativeCompletion.Submit({callback}, result => {owners[result]}.Adopt({parent}NativeCompletion.Value<{native_type}>(result)))"
-        body = prologue + (
-            [
-                f"        var operation = {expression};",
-                "        scope.Accept(this.CallbackOwner);"
-                if handle_plan and plan.registrations
-                else "        scope.Accept();",
-                "        return operation;",
-            ]
-            if scoped
-            else [f"        return {expression};"]
-        )
-    elif execution in {"immediate", "snapshot", "event_batch", "render_driver"}:
+        body = prologue + [
+            f"return scope.Query<{raw_handle(result)}, {owners[result]}>(",
+            f"    {submission(function, arguments)},",
+            f"    handle => {owners[result]}.Adopt({parent}handle)",
+            ");",
+        ]
+    elif not asynchronous:
         definition = api.typedefs_by_name.get(receiver)
         if (
             definition
@@ -771,7 +812,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         ):
             return (
                 owners[receiver],
-                f'    public void Close() {{ global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(this, "{function.name}"); state.Close(); }}\n',
+                f"    public void Close() {{ {guard} state.Close(); }}\n",
                 records | values.plans.keys(),
             )
         if type_name(function.return_type) not in {"mln_status", "void"}:
@@ -781,17 +822,17 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 raise Unsupported("direct return cannot report a diagnostic")
             values.supported(plan.result)
             result_type = values.public_type(plan.result)
-            copied = values.copy(plan.result, "returned")
             body = prologue + [
-                f"        var returned = {call};",
-                f"        return {copied};",
+                f"var returned = NativeMethods.{function.name}({arguments});",
+                f"return {values.copy(plan.result, 'returned')};",
             ]
-            code = (
-                f"    public {'static ' if static else ''}{result_type} {name}({', '.join(parameters)})\n    {{\n"
-                + "\n".join(body)
-                + "\n    }\n"
+            return (
+                owner_class,
+                method(
+                    f"{modifiers} {result_type} {name}({', '.join(parameters)})", body
+                ),
+                records | values.plans.keys(),
             )
-            return owner_class, code, records | values.plans.keys()
         if outputs:
             result_type = (
                 outputs[0][0]
@@ -810,13 +851,10 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             )
         else:
             result_type, result = "void", None
-        body = prologue + [
-            DIAGNOSTIC_LOCAL,
-            f"        {checked_call(function, ', '.join(args))}",
-        ]
+        body = prologue + [checked_call(function, arguments)]
         if scoped:
             accept = (
-                "scope.Accept(this.CallbackOwner);"
+                "scope.Accept(CallbackOwner);"
                 if handle_plan and (plan.registrations or plan.direct_registrations)
                 else "scope.Accept();"
             )
@@ -831,11 +869,11 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             )
             if rejected:
                 accept = f"if (!{camel(rejected)}) {accept}"
-            body.append("        " + accept)
+            body.append(accept)
         if decision_completion:
-            body.append("        claim.Accept();")
+            body.append("claim.Accept();")
         if result is not None:
-            body.append(f"        return {result};")
+            body.append(f"return {result};")
     else:
         parameters.append("CancellationToken cancellationToken = default")
         name += "Async"
@@ -848,118 +886,20 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                     "command carries a typed payload that needs its own conversion"
                 )
             result_type = "Task<CommandCompletion>"
-            expression = f"NativeCompletion.SubmitCommand({callback})"
+            call = (
+                f"scope.Command({submission(function, arguments)}, cancellationToken);"
+            )
         else:
-            native = function.metadata.get("result")
-            shape = function.metadata.get("shape", "value")
-            if native == "void" and shape == "none":
-                result_type = "Task"
-                converter = "result => true"
-            elif (
-                plan.result is not None
-                and "view"
-                in {
-                    plan.result.buffer_form,
-                    plan.result.element and plan.result.element.buffer_form,
-                }
-            ) and function.metadata.get("encoding") in {
-                "utf8",
-                "json",
-                "bytes",
-            }:
-                encoding = function.metadata["encoding"]
-                value_type = "string" if encoding == "utf8" else "byte[]"
-                value = "NativeCompletion.Value<mln_buffer_view>(result)"
-                optional = function.metadata.get("optional") == "empty"
-                nullable = function.metadata.get("nullable") == "true" or optional
-                copy = (
-                    string_copy("value", optional)
-                    if encoding == "utf8"
-                    else "ValueStructs.CopyBufferView(value)"
-                )
-                if shape == "array":
-                    result_type = f"Task<{value_type}[]>"
-                    converter = (
-                        "result =>\n        {\n"
-                        "            var values = NativeCompletion.Values<mln_buffer_view>(result);\n"
-                        f"            var copied = new {value_type}[values.Length];\n"
-                        "            for (var index = 0; index < values.Length; index++)\n"
-                        "            {\n                var value = values[index];\n"
-                        f"                copied[index] = {copy};\n            }}\n"
-                        "            return copied;\n        }"
-                    )
-                elif shape == "value":
-                    result_type = f"Task<{value_type}{'?' if nullable else ''}>"
-                    missing = (
-                        "if (result->value_count == 0) return null; "
-                        if nullable
-                        else ""
-                    )
-                    converter = (
-                        f"result => {{ {missing}var value = {value}; return {copy}; }}"
-                    )
-                else:
-                    raise Unsupported(
-                        f"buffer result shape {shape!r} needs a conversion rule"
-                    )
-            elif native in PRIMITIVES and shape == "value":
-                if function.metadata.get("nullable") == "true":
-                    raise Unsupported(
-                        "nullable scalar completion needs a presence conversion"
-                    )
-                result_type = f"Task<{PRIMITIVES[native]}>"
-                converter = (
-                    f"result => NativeCompletion.Value<{PRIMITIVES[native]}>(result)"
-                )
-            elif native in api.records_by_name and shape == "array":
-                nullable = function.metadata.get("nullable") == "true"
-                # Validate the whole record before emitting the operation.
-                values.decoder(values.record(native))
-                records.add(native)
-                result_type = f"Task<{public_type(native)}[]{'?' if nullable else ''}>"
-                converter = (
-                    "result =>\n        {\n"
-                    + (
-                        "            if (result->value == null) return null;\n"
-                        if nullable
-                        else ""
-                    )
-                    + f"            var values = NativeCompletion.Values<{native}>(result);\n"
-                    f"            var copied = new {public_type(native)}[values.Length];\n"
-                    "            for (var index = 0; index < values.Length; index++)\n"
-                    f"                copied[index] = Copy{public_type(native)}(values[index]);\n"
-                    "            return copied;\n        }"
-                )
-            elif native in api.records_by_name and shape == "value":
-                nullable = function.metadata.get("nullable") == "true"
-                values.decoder(values.record(native))
-                records.add(native)
-                result_type = f"Task<{public_type(native)}{'?' if nullable else ''}>"
-                copied = f"Copy{public_type(native)}(NativeCompletion.Value<{native}>(result))"
-                if nullable:
-                    copied = f"result->value_count == 0 ? ({public_type(native)}?)null : {copied}"
-                converter = f"result => {copied}"
-            else:
-                raise Unsupported(
-                    f"result {native!r} with shape {shape!r} needs a conversion rule"
-                )
-            expression = f"NativeCompletion.Submit({callback}, {converter})"
-        body = prologue + (
-            [
-                f"        var operation = {expression};",
-                "        scope.Accept(this.CallbackOwner);"
-                if handle_plan and plan.registrations
-                else "        scope.Accept();",
-                "        return operation.WaitAsync(cancellationToken);",
-            ]
-            if scoped
-            else [f"        return {expression}.WaitAsync(cancellationToken);"]
-        )
-    code = (
-        f"    public {'static ' if static else ''}{result_type} {name}({', '.join(parameters)})\n"
-        "    {\n" + "\n".join(body) + "\n    }\n"
+            value_type, helper, copy = completion_query(plan, values, records, api)
+            result_type = value_type if value_type == "Task" else f"Task<{value_type}>"
+            copy = f", {copy}" if copy else ""
+            call = f"scope.{helper}({submission(function, arguments)}{copy}, cancellationToken);"
+        body = prologue + [f"return {call}"]
+    return (
+        owner_class,
+        method(f"{modifiers} {result_type} {name}({', '.join(parameters)})", body),
+        records | values.plans.keys(),
     )
-    return owner_class, code, records | values.plans.keys()
 
 
 def emit(api: Api | BoundApi) -> Emission:
@@ -988,11 +928,11 @@ def emit(api: Api | BoundApi) -> Emission:
                 raise Unsupported("support operation requires its generated owner")
             if function.name in conflicts:
                 raise Unsupported("public method name collides after conversion")
-            owner, method, used_records = emit_operation(plan, bound)
+            owner, emitted, used_records = emit_operation(plan, bound)
         except Unsupported as error:
             unsupported[function.name] = f"{function.location}: {error}"
             continue
-        methods[owner].append(method)
+        methods[owner].append(emitted)
         records[owner].update(used_records)
         supported.append(function.name)
     files = {}
@@ -1052,42 +992,54 @@ def emit(api: Api | BoundApi) -> Emission:
         extra_argument = ", completion" if immediate_completion else ""
         # A pending decision is only ever borrowed through BorrowDecision.
         adopt_extra = ", Task completion" if immediate_completion else ""
+        cleanup = handle.dispose or handle.release
+        cleanup_function = api.functions_by_name[cleanup]
+        # Abandon disposes a handle that no owner can close any more.
+        abandon = (
+            f"=> {native_call(cleanup_function, 'live', 'diagnostic')};"
+            if type_name(cleanup_function.return_type) == "mln_status"
+            else f"{{ NativeMethods.{cleanup}(live); return mln_status.MLN_STATUS_OK; }}"
+        )
         destroy = (
             "StartRelease"
             if asynchronous_release
             else f"static (live, diagnostic) => {native_call(release.function, 'live', 'diagnostic')}"
         )
-        cleanup = handle.dispose or handle.release
-        cleanup_function = api.functions_by_name[cleanup]
-        dispose = (
-            f"static (live, diagnostic) => {native_call(cleanup_function, 'live', 'diagnostic')}"
-            if type_name(cleanup_function.return_type) == "mln_status"
-            else f"static (live, _) => {{ NativeMethods.{cleanup}(live); return mln_status.MLN_STATUS_OK; }}"
-        )
         if handle.release_inputs or (
             not asynchronous_release
             and type_name(release.function.return_type) == "void"
         ):
-            destroy = dispose
-        declarations = f"    private readonly NativeHandleState<{native_type}> state;\n"
+            destroy = "Abandon"
+        fields = [f"private readonly NativeHandleState<{native_type}> state;"]
         if asynchronous_release:
-            declarations += "    private volatile Task teardown = Task.CompletedTask;\n"
-        # Runtime events report their source by this identity.
-        declarations += (
-            "    private readonly ulong nativeId;\n    public ulong Id => nativeId;\n"
-        )
+            fields.append("private volatile Task teardown = Task.CompletedTask;")
         if immediate_completion:
-            declarations += "    public Task Completion { get; }\n"
-        declarations += (
-            f"\n    internal {owner}({parent}{native_type} handle{extra})\n    {{\n"
-        )
-        declarations += "        nativeId = handle.Value;\n"
+            fields.append("public Task Completion { get; }")
+        constructor = []
         if immediate_completion:
-            declarations += "        Completion = completion.ContinueWith(static (finished, retained) => { GC.KeepAlive(retained); return finished; }, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();\n"
-        declarations += f"        state = new NativeHandleState<{native_type}>(handle, {destroy}, nameof({owner}), {dispose}{', pendingDecision' if decision_owner else ''}{', retainedParent: parent' if handle.parent else ''});\n    }}\n"
-        declarations += f"\n    internal static {owner} Adopt({parent}{native_type} handle{adopt_extra})\n    {{\n        {owner}? owner = null;\n        try\n        {{\n            owner = new {owner}({argument}handle{extra_argument});\n            return owner;\n        }}\n        catch\n        {{\n            if (owner is null) {native_call(cleanup_function, 'handle', 'null')};\n            else owner.state.Retire();\n            throw;\n        }}\n    }}\n"
-        declarations += f"\n    internal {native_type} Handle => state.Handle;\n    internal NativeHandleState<{native_type}>.ReadScope Borrow() => state.Borrow();\n    internal global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackOwner CallbackOwner => state.CallbackOwner;\n    public bool IsClosed => state.IsClosed;\n"
-        declarations += f'    public void Dispose() {{ global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(this, "{cleanup}"); state.Retire(); }}\n'
+            constructor.append(
+                "Completion = completion.ContinueWith(static (finished, retained) => { GC.KeepAlive(retained); return finished; }, this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();"
+            )
+        constructor.append(
+            f"state = new(handle, {destroy}, nameof({owner}), Abandon{', pendingDecision' if decision_owner else ''}{', retainedParent: parent' if handle.parent else ''});"
+        )
+        declarations = (
+            "".join(f"    {field}\n" for field in fields)
+            + "\n"
+            + method(
+                f"internal {owner}({parent}{native_type} handle{extra})", constructor
+            )
+            + f"\n    internal static {owner} Adopt({parent}{native_type} handle{adopt_extra}) =>\n"
+            f"        NativeHandleState<{native_type}>.Adopt(handle, () => new {owner}({argument}handle{extra_argument}), Abandon);\n"
+            f"\n    private static mln_status Abandon({native_type} live, mln_diagnostic* diagnostic) {abandon}\n"
+            f"\n    NativeHandleState<{native_type}> INativeOwner<{native_type}>.State => state;\n"
+            f"    internal {native_type} Handle => state.Handle;\n"
+            "    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;\n"
+            "    // Runtime events report their source by this identity.\n"
+            "    public ulong Id => state.IssuedHandle.Value;\n"
+            "    public bool IsClosed => state.IsClosed;\n"
+            f'    public void Dispose() {{ NativeCallbackGuard.EnsureAllowed(this, "{cleanup}"); state.Retire(); }}\n'
+        )
         if decision_owner:
             declarations += f"    internal static {owner} BorrowDecision({native_type} handle) => new(handle, true);\n    internal bool FinishDecision(bool accepted) => state.FinishDecision(accepted);\n"
         methods[owner].insert(0, declarations)
@@ -1129,9 +1081,19 @@ def emit(api: Api | BoundApi) -> Emission:
         for item in (*api.records, *api.enums)
         if item.name in used_records or item.name in enum_names
     }
-    extra_imports = "".join(
-        f"using Maplibre.NativeFfi.{namespace};\n"
-        for namespace in sorted(namespaces - {"Map", "Runtime", "Style"})
+    # Every generated file shares one set of imports.
+    files["GlobalUsings.g.cs"] = (
+        "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+        + "".join(
+            f"global using Maplibre.NativeFfi.{namespace};\n"
+            for namespace in sorted(namespaces | {"Map", "Runtime", "Style"})
+        )
+        + "".join(
+            f"global using Maplibre.NativeFfi.Internal.{namespace};\n"
+            for namespace in ("C", "Callback", "Memory", "Pointer", "Struct")
+        )
+        + "global using static Maplibre.NativeFfi.Internal.NativeCall;\n"
+        "global using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;\n"
     )
     values = Values(bound)
     for owner, body in sorted(methods.items()):
@@ -1153,24 +1115,22 @@ def emit(api: Api | BoundApi) -> Emission:
                 "Maplibre": "Base",
             }.get(owner, "Map")
         )
+        handle_types = {
+            owners[native]: raw_handle(native) for native in created_handles
+        }
         interfaces = [
-            *(["IDisposable"] if owner in {owners[n] for n in created_handles} else []),
+            *(["IDisposable"] if owner in handle_types else []),
             *(["IAsyncDisposable"] if owner in async_disposable else []),
+            *(
+                [f"INativeOwner<{handle_types[owner]}>"]
+                if owner in handle_types
+                else []
+            ),
         ]
         bases = f" : {', '.join(interfaces)}" if interfaces else ""
         files[f"{namespace}/{owner}.Operations.g.cs"] = (
-            "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-            "#nullable enable\n"
-            "using Maplibre.NativeFfi.Internal.C;\n"
-            "using Maplibre.NativeFfi.Internal.Memory;\n"
-            "using Maplibre.NativeFfi.Internal.Pointer;\n"
-            "using Maplibre.NativeFfi.Internal.Status;\n"
-            "using Maplibre.NativeFfi.Internal.Struct;\n"
-            "using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;\n"
-            "using Maplibre.NativeFfi.Runtime;\n"
-            "using Maplibre.NativeFfi.Map;\n"
-            "using Maplibre.NativeFfi.Style;\n" + extra_imports + "\n"
-            f"namespace Maplibre.NativeFfi{'.' + namespace if owner != 'Maplibre' else ''};\n\n"
+            HEADER
+            + f"namespace Maplibre.NativeFfi{'.' + namespace if owner != 'Maplibre' else ''};\n\n"
             f"public {'static' if owner == 'Maplibre' else 'sealed'} unsafe partial class {owner}{bases}\n{{\n"
             + "\n".join(body)
             + "}\n"
@@ -1204,12 +1164,8 @@ def emit(api: Api | BoundApi) -> Emission:
         for _, value in sorted(direct_callbacks.items())
     )
     files["Internal/Struct/GeneratedValues.g.cs"] = (
-        "// Generated from the C headers by tools/bindgen. Do not edit.\n#nullable enable\n"
-        "using Maplibre.NativeFfi.Internal.C;\nusing Maplibre.NativeFfi.Internal.Memory;\nusing Maplibre.NativeFfi.Internal.Callback;\nusing System.Runtime.CompilerServices;\nusing System.Runtime.InteropServices;\n"
-        + "".join(
-            f"using Maplibre.NativeFfi.{namespace};\n"
-            for namespace in sorted(namespaces)
-        )
+        HEADER
+        + "using System.Runtime.CompilerServices;\nusing System.Runtime.InteropServices;\n\n"
         + "namespace Maplibre.NativeFfi.Internal.Struct;\n\ninternal static unsafe class GeneratedValues\n{\n"
         + "\n".join(converters)
         + "}\n"
@@ -1223,24 +1179,16 @@ def emit(api: Api | BoundApi) -> Emission:
             default = (
                 f"    public static {public_type(name)} Default\n    {{\n"
                 "        get\n        {\n"
-                f'            global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(null, "{plan.default}");\n'
-                "            global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();\n"
-                f"            return global::Maplibre.NativeFfi.Internal.Struct.GeneratedValues.Copy{public_type(name)}(global::Maplibre.NativeFfi.Internal.C.NativeMethods.{plan.default}());\n"
+                f'            using var call = Enter(null, "{plan.default}");\n'
+                f"            return Copy{public_type(name)}(NativeMethods.{plan.default}());\n"
                 "        }\n    }\n"
             )
             if declaration.rstrip().endswith(";"):
                 declaration = declaration.rstrip()[:-1] + "\n{\n" + default + "}\n"
             else:
                 declaration = declaration.rstrip()[:-1] + default + "}\n"
-        # A nested value can be declared in a different domain header.
-        imports = "".join(
-            f"using Maplibre.NativeFfi.{item};\n"
-            for item in sorted(namespaces - {namespace})
-        )
         files[f"{namespace}/{public_type(name)}.g.cs"] = (
-            "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-            "#nullable enable\nusing Maplibre.NativeFfi.Internal.C;\n" + imports + "\n"
-            f"namespace Maplibre.NativeFfi.{namespace};\n\n" + declaration
+            HEADER + f"namespace Maplibre.NativeFfi.{namespace};\n\n" + declaration
         )
     # The completion runtime reads results through the completion record's
     # callbacks, so the enums those results carry, such as a command
@@ -1305,16 +1253,11 @@ def emit(api: Api | BoundApi) -> Emission:
         name = public_type(native)
         namespace = namespace_for(api.records_by_name[native].location.path)
         properties = "".join(
-            f"    public {values.member_type(value, member, fields)} {member} {{ get {{ scope.EnsureActive(); return value.{member}; }} }}\n"
+            f"    public {values.member_type(value, member, fields)} {member} => scope.Active(value).{member};\n"
             for member, fields in values.members(value)
         )
         files[f"{namespace}/{name}View.g.cs"] = (
-            "// Generated from the C headers by tools/bindgen. Do not edit.\n#nullable enable\n"
-            "using Maplibre.NativeFfi.Internal.Pointer;\n"
-            + "".join(
-                f"using Maplibre.NativeFfi.{item};\n"
-                for item in sorted(namespaces - {namespace})
-            )
+            HEADER
             + f"namespace Maplibre.NativeFfi.{namespace};\n\npublic sealed class {name}View\n{{\n"
             f"    private readonly {name} value;\n    private readonly NativeViewScope scope;\n"
             f"    internal {name}View({name} value, NativeViewScope scope) {{ this.value = value; this.scope = scope; }}\n"

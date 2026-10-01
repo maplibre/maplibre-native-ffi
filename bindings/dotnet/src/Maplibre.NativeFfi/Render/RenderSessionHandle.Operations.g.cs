@@ -1,31 +1,14 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Memory;
-using Maplibre.NativeFfi.Internal.Pointer;
-using Maplibre.NativeFfi.Internal.Status;
-using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Logging;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Query;
-using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
-using Maplibre.NativeFfi.Style;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-
 namespace Maplibre.NativeFfi.Render;
 
-public sealed unsafe partial class RenderSessionHandle : IDisposable
+public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwner<MlnRenderSession>
 {
     private readonly NativeHandleState<MlnRenderSession> state;
-    private readonly ulong nativeId;
-    public ulong Id => nativeId;
     public Task Completion { get; }
 
     internal RenderSessionHandle(MapHandle parent, MlnRenderSession handle, Task completion)
     {
-        nativeId = handle.Value;
         Completion = completion
             .ContinueWith(
                 static (finished, retained) =>
@@ -39,11 +22,11 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
                 TaskScheduler.Default
             )
             .Unwrap();
-        state = new NativeHandleState<MlnRenderSession>(
+        state = new(
             handle,
             static (live, diagnostic) => NativeMethods.mln_render_session_destroy(live, diagnostic),
             nameof(RenderSessionHandle),
-            static (live, diagnostic) => NativeMethods.mln_render_session_dispose(live, diagnostic),
+            Abandon,
             retainedParent: parent
         );
     }
@@ -52,38 +35,27 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         MapHandle parent,
         MlnRenderSession handle,
         Task completion
-    )
-    {
-        RenderSessionHandle? owner = null;
-        try
-        {
-            owner = new RenderSessionHandle(parent, handle, completion);
-            return owner;
-        }
-        catch
-        {
-            if (owner is null)
-                NativeMethods.mln_render_session_dispose(handle, null);
-            else
-                owner.state.Retire();
-            throw;
-        }
-    }
+    ) =>
+        NativeHandleState<MlnRenderSession>.Adopt(
+            handle,
+            () => new RenderSessionHandle(parent, handle, completion),
+            Abandon
+        );
 
+    private static mln_status Abandon(MlnRenderSession live, mln_diagnostic* diagnostic) =>
+        NativeMethods.mln_render_session_dispose(live, diagnostic);
+
+    NativeHandleState<MlnRenderSession> INativeOwner<MlnRenderSession>.State => state;
     internal MlnRenderSession Handle => state.Handle;
+    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;
 
-    internal NativeHandleState<MlnRenderSession>.ReadScope Borrow() => state.Borrow();
-
-    internal global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackOwner CallbackOwner =>
-        state.CallbackOwner;
+    // Runtime events report their source by this identity.
+    public ulong Id => state.IssuedHandle.Value;
     public bool IsClosed => state.IsClosed;
 
     public void Dispose()
     {
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_dispose"
-        );
+        NativeCallbackGuard.EnsureAllowed(this, "mln_render_session_dispose");
         state.Retire();
     }
 
@@ -92,26 +64,17 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_metal_borrowed_texture_set_target"
+        using var scope = new NativeCallScope(this, "mln_metal_borrowed_texture_set_target");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_metal_borrowed_texture_set_target(
+                    Handle,
+                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor)),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                {
-                    var nativeDescriptor = NativeMetalBorrowedTextureDescriptor(descriptor);
-                    return NativeMethods.mln_metal_borrowed_texture_set_target(
-                        Handle,
-                        &nativeDescriptor,
-                        completion,
-                        diagnostic
-                    );
-                },
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task MetalSurfaceSetTargetAsync(
@@ -119,26 +82,17 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_metal_surface_set_target"
+        using var scope = new NativeCallScope(this, "mln_metal_surface_set_target");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_metal_surface_set_target(
+                    Handle,
+                    scope.Value(NativeMetalSurfaceDescriptor(descriptor)),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                {
-                    var nativeDescriptor = NativeMetalSurfaceDescriptor(descriptor);
-                    return NativeMethods.mln_metal_surface_set_target(
-                        Handle,
-                        &nativeDescriptor,
-                        completion,
-                        diagnostic
-                    );
-                },
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task OpenglBorrowedTextureSetTargetAsync(
@@ -146,27 +100,17 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_opengl_borrowed_texture_set_target"
-        );
-        var operation = NativeCompletion.Submit(
+        using var scope = new NativeCallScope(this, "mln_opengl_borrowed_texture_set_target");
+        return scope.Run(
             (completion, diagnostic) =>
-            {
-                var nativeDescriptor = NativeOpenglBorrowedTextureDescriptor(descriptor, scope);
-                return NativeMethods.mln_opengl_borrowed_texture_set_target(
+                NativeMethods.mln_opengl_borrowed_texture_set_target(
                     Handle,
-                    &nativeDescriptor,
+                    scope.Value(NativeOpenglBorrowedTextureDescriptor(descriptor, scope)),
                     completion,
                     diagnostic
-                );
-            },
-            result => true
+                ),
+            cancellationToken
         );
-        scope.Accept();
-        return operation.WaitAsync(cancellationToken);
     }
 
     public Task OpenglSurfaceSetTargetAsync(
@@ -174,234 +118,126 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_opengl_surface_set_target"
-        );
-        var operation = NativeCompletion.Submit(
+        using var scope = new NativeCallScope(this, "mln_opengl_surface_set_target");
+        return scope.Run(
             (completion, diagnostic) =>
-            {
-                var nativeDescriptor = NativeOpenglSurfaceDescriptor(descriptor, scope);
-                return NativeMethods.mln_opengl_surface_set_target(
+                NativeMethods.mln_opengl_surface_set_target(
                     Handle,
-                    &nativeDescriptor,
+                    scope.Value(NativeOpenglSurfaceDescriptor(descriptor, scope)),
                     completion,
                     diagnostic
-                );
-            },
-            result => true
+                ),
+            cancellationToken
         );
-        scope.Accept();
-        return operation.WaitAsync(cancellationToken);
     }
 
     public RenderAbandonResult Abandon()
     {
-        using var read = state.Borrow();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_abandon"
-        );
+        using var read = state.Read(this, "mln_render_session_abandon");
         var outResult = new mln_render_abandon_result
         {
             size = (uint)sizeof(mln_render_abandon_result),
         };
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_abandon(
-                read.Handle,
-                &outResult,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        Check(NativeMethods.mln_render_session_abandon(read.Handle, &outResult, Diagnostic));
         return CopyRenderAbandonResult(outResult);
     }
 
     public AcquiredFrameHandle AcquireFrame()
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_acquire_frame"
-        );
+        using var call = Enter(this, "mln_render_session_acquire_frame");
         MlnAcquiredFrame outFrame = default;
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_acquire_frame(
-                Handle,
-                &outFrame,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        Check(NativeMethods.mln_render_session_acquire_frame(Handle, &outFrame, Diagnostic));
         return AcquiredFrameHandle.Adopt(this, outFrame);
     }
 
     public Task BarrierAsync(CancellationToken cancellationToken = default)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_barrier"
+        using var scope = new NativeCallScope(this, "mln_render_session_barrier");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_render_session_barrier(Handle, completion, diagnostic),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_render_session_barrier(Handle, completion, diagnostic),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task ClearDataAsync(CancellationToken cancellationToken = default)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_clear_data"
+        using var scope = new NativeCallScope(this, "mln_render_session_clear_data");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_render_session_clear_data(Handle, completion, diagnostic),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_render_session_clear_data(Handle, completion, diagnostic),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public void Close()
     {
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_destroy"
-        );
+        NativeCallbackGuard.EnsureAllowed(this, "mln_render_session_destroy");
         state.Close();
     }
 
     public Task DetachAsync(CancellationToken cancellationToken = default)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_detach"
+        using var scope = new NativeCallScope(this, "mln_render_session_detach");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_render_session_detach(Handle, completion, diagnostic),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_render_session_detach(Handle, completion, diagnostic),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public RenderFrameBatchHandle DrainFrameResults()
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_drain_frame_results"
-        );
+        using var call = Enter(this, "mln_render_session_drain_frame_results");
         MlnRenderFrameBatch outBatch = default;
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_drain_frame_results(
-                Handle,
-                &outBatch,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        Check(NativeMethods.mln_render_session_drain_frame_results(Handle, &outBatch, Diagnostic));
         return RenderFrameBatchHandle.Adopt(outBatch);
     }
 
     public Task DumpDebugLogsAsync(CancellationToken cancellationToken = default)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_dump_debug_logs"
+        using var scope = new NativeCallScope(this, "mln_render_session_dump_debug_logs");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_render_session_dump_debug_logs(Handle, completion, diagnostic),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_render_session_dump_debug_logs(
-                        Handle,
-                        completion,
-                        diagnostic
-                    ),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public RenderSessionCapabilities GetCapabilities()
     {
-        using var read = state.Borrow();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_get_capabilities"
-        );
+        using var read = state.Read(this, "mln_render_session_get_capabilities");
         var outCapabilities = new mln_render_session_capabilities
         {
             size = (uint)sizeof(mln_render_session_capabilities),
         };
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
+        Check(
             NativeMethods.mln_render_session_get_capabilities(
                 read.Handle,
                 &outCapabilities,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
+                Diagnostic
+            )
         );
         return CopyRenderSessionCapabilities(outCapabilities);
     }
 
     public RenderSessionSnapshot GetSnapshot()
     {
-        using var read = state.Borrow();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_get_snapshot"
-        );
+        using var read = state.Read(this, "mln_render_session_get_snapshot");
         var outSnapshot = new mln_render_session_snapshot
         {
             size = (uint)sizeof(mln_render_session_snapshot),
         };
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_get_snapshot(
-                read.Handle,
-                &outSnapshot,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        Check(NativeMethods.mln_render_session_get_snapshot(read.Handle, &outSnapshot, Diagnostic));
         return CopyRenderSessionSnapshot(outSnapshot);
     }
 
     public MapProjectionHandle ProjectionCreate()
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_projection_create"
-        );
+        using var call = Enter(this, "mln_render_session_projection_create");
         MlnMapProjection outProjection = default;
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_projection_create(
-                Handle,
-                &outProjection,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
+        Check(
+            NativeMethods.mln_render_session_projection_create(Handle, &outProjection, Diagnostic)
         );
         return MapProjectionHandle.Adopt(outProjection);
     }
@@ -415,44 +251,22 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_query_feature_extensions"
-        );
-        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        using var nativeFeature = NativeStringView.From(feature, nameof(feature));
-        using var nativeExtension = NativeStringView.From(extension, nameof(extension));
-        using var nativeExtensionField = NativeStringView.From(
-            extensionField,
-            nameof(extensionField)
-        );
-        var operation = NativeCompletion.Submit(
+        using var scope = new NativeCallScope(this, "mln_render_session_query_feature_extensions");
+        return scope.Query<mln_buffer_view, byte[]>(
             (completion, diagnostic) =>
-            {
-                var nativeArguments = arguments is null
-                    ? default(mln_buffer_view)
-                    : scope.Buffer(arguments);
-                return NativeMethods.mln_render_session_query_feature_extensions(
+                NativeMethods.mln_render_session_query_feature_extensions(
                     Handle,
-                    nativeSourceId.Value,
-                    nativeFeature.Value,
-                    nativeExtension.Value,
-                    nativeExtensionField.Value,
-                    arguments is null ? null : &nativeArguments,
+                    scope.Utf8(sourceId),
+                    scope.Buffer(feature),
+                    scope.Utf8(extension),
+                    scope.Utf8(extensionField),
+                    arguments is null ? null : scope.Value(scope.Buffer(arguments)),
                     completion,
                     diagnostic
-                );
-            },
-            result =>
-            {
-                var value = NativeCompletion.Value<mln_buffer_view>(result);
-                return ValueStructs.CopyBufferView(value);
-            }
+                ),
+            ValueStructs.CopyBufferView,
+            cancellationToken
         );
-        scope.Accept();
-        return operation.WaitAsync(cancellationToken);
     }
 
     public Task<QueriedFeature[]> QueryRenderedFeaturesAsync(
@@ -461,38 +275,21 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_query_rendered_features"
-        );
-        var operation = NativeCompletion.Submit(
+        using var scope = new NativeCallScope(this, "mln_render_session_query_rendered_features");
+        return scope.QueryArray<mln_queried_feature, QueriedFeature>(
             (completion, diagnostic) =>
-            {
-                var nativeGeometry = NativeRenderedQueryGeometry(geometry, scope);
-                var nativeOptions = options is null
-                    ? default(mln_rendered_feature_query_options)
-                    : NativeRenderedFeatureQueryOptions(options, scope);
-                return NativeMethods.mln_render_session_query_rendered_features(
+                NativeMethods.mln_render_session_query_rendered_features(
                     Handle,
-                    &nativeGeometry,
-                    options is null ? null : &nativeOptions,
+                    scope.Value(NativeRenderedQueryGeometry(geometry, scope)),
+                    options is null
+                        ? null
+                        : scope.Value(NativeRenderedFeatureQueryOptions(options, scope)),
                     completion,
                     diagnostic
-                );
-            },
-            result =>
-            {
-                var values = NativeCompletion.Values<mln_queried_feature>(result);
-                var copied = new QueriedFeature[values.Length];
-                for (var index = 0; index < values.Length; index++)
-                    copied[index] = CopyQueriedFeature(values[index]);
-                return copied;
-            }
+                ),
+            CopyQueriedFeature,
+            cancellationToken
         );
-        scope.Accept();
-        return operation.WaitAsync(cancellationToken);
     }
 
     public Task<QueriedFeature[]> QuerySourceFeaturesAsync(
@@ -501,77 +298,38 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_query_source_features"
-        );
-        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var operation = NativeCompletion.Submit(
+        using var scope = new NativeCallScope(this, "mln_render_session_query_source_features");
+        return scope.QueryArray<mln_queried_feature, QueriedFeature>(
             (completion, diagnostic) =>
-            {
-                var nativeOptions = options is null
-                    ? default(mln_source_feature_query_options)
-                    : NativeSourceFeatureQueryOptions(options, scope);
-                return NativeMethods.mln_render_session_query_source_features(
+                NativeMethods.mln_render_session_query_source_features(
                     Handle,
-                    nativeSourceId.Value,
-                    options is null ? null : &nativeOptions,
+                    scope.Utf8(sourceId),
+                    options is null
+                        ? null
+                        : scope.Value(NativeSourceFeatureQueryOptions(options, scope)),
                     completion,
                     diagnostic
-                );
-            },
-            result =>
-            {
-                var values = NativeCompletion.Values<mln_queried_feature>(result);
-                var copied = new QueriedFeature[values.Length];
-                for (var index = 0; index < values.Length; index++)
-                    copied[index] = CopyQueriedFeature(values[index]);
-                return copied;
-            }
+                ),
+            CopyQueriedFeature,
+            cancellationToken
         );
-        scope.Accept();
-        return operation.WaitAsync(cancellationToken);
     }
 
     public Task ReduceMemoryUseAsync(CancellationToken cancellationToken = default)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_reduce_memory_use"
+        using var scope = new NativeCallScope(this, "mln_render_session_reduce_memory_use");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_render_session_reduce_memory_use(Handle, completion, diagnostic),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_render_session_reduce_memory_use(
-                        Handle,
-                        completion,
-                        diagnostic
-                    ),
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public void RequestFrame(FrameDemand demand)
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_request_frame"
-        );
+        using var call = Enter(this, "mln_render_session_request_frame");
         var nativeDemand = NativeFrameDemand(demand);
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_request_frame(
-                Handle,
-                &nativeDemand,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        Check(NativeMethods.mln_render_session_request_frame(Handle, &nativeDemand, Diagnostic));
     }
 
     public Task<CommandCompletion> ResizeAsync(
@@ -579,45 +337,30 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_resize"
+        using var scope = new NativeCallScope(this, "mln_render_session_resize");
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_render_session_resize(
+                    Handle,
+                    scope.Value(NativeRenderTargetExtent(extent)),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .SubmitCommand(
-                (completion, diagnostic) =>
-                {
-                    var nativeExtent = NativeRenderTargetExtent(extent);
-                    return NativeMethods.mln_render_session_resize(
-                        Handle,
-                        &nativeExtent,
-                        completion,
-                        diagnostic
-                    );
-                }
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public ulong ServiceDriverWork(ulong maxWork)
     {
-        using var read = state.Borrow();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_render_session_service_driver_work"
-        );
+        using var read = state.Read(this, "mln_render_session_service_driver_work");
         nuint outServiced = default;
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
+        Check(
             NativeMethods.mln_render_session_service_driver_work(
                 read.Handle,
                 checked((nuint)maxWork),
                 &outServiced,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
+                Diagnostic
+            )
         );
         return (ulong)outServiced;
     }
@@ -626,25 +369,13 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_texture_read_premultiplied_rgba8"
+        using var scope = new NativeCallScope(this, "mln_texture_read_premultiplied_rgba8");
+        return scope.Query<mln_texture_readback_result, TextureReadbackResult>(
+            (completion, diagnostic) =>
+                NativeMethods.mln_texture_read_premultiplied_rgba8(Handle, completion, diagnostic),
+            CopyTextureReadbackResult,
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                    NativeMethods.mln_texture_read_premultiplied_rgba8(
-                        Handle,
-                        completion,
-                        diagnostic
-                    ),
-                result =>
-                    CopyTextureReadbackResult(
-                        NativeCompletion.Value<mln_texture_readback_result>(result)
-                    )
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task VulkanBorrowedTextureSetTargetAsync(
@@ -652,26 +383,17 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_vulkan_borrowed_texture_set_target"
+        using var scope = new NativeCallScope(this, "mln_vulkan_borrowed_texture_set_target");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_vulkan_borrowed_texture_set_target(
+                    Handle,
+                    scope.Value(NativeVulkanBorrowedTextureDescriptor(descriptor)),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                {
-                    var nativeDescriptor = NativeVulkanBorrowedTextureDescriptor(descriptor);
-                    return NativeMethods.mln_vulkan_borrowed_texture_set_target(
-                        Handle,
-                        &nativeDescriptor,
-                        completion,
-                        diagnostic
-                    );
-                },
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task VulkanSurfaceSetTargetAsync(
@@ -679,26 +401,17 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_vulkan_surface_set_target"
+        using var scope = new NativeCallScope(this, "mln_vulkan_surface_set_target");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_vulkan_surface_set_target(
+                    Handle,
+                    scope.Value(NativeVulkanSurfaceDescriptor(descriptor)),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                {
-                    var nativeDescriptor = NativeVulkanSurfaceDescriptor(descriptor);
-                    return NativeMethods.mln_vulkan_surface_set_target(
-                        Handle,
-                        &nativeDescriptor,
-                        completion,
-                        diagnostic
-                    );
-                },
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task WebgpuBorrowedTextureSetTargetAsync(
@@ -706,26 +419,17 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_webgpu_borrowed_texture_set_target"
+        using var scope = new NativeCallScope(this, "mln_webgpu_borrowed_texture_set_target");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_webgpu_borrowed_texture_set_target(
+                    Handle,
+                    scope.Value(NativeWebgpuBorrowedTextureDescriptor(descriptor)),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                {
-                    var nativeDescriptor = NativeWebgpuBorrowedTextureDescriptor(descriptor);
-                    return NativeMethods.mln_webgpu_borrowed_texture_set_target(
-                        Handle,
-                        &nativeDescriptor,
-                        completion,
-                        diagnostic
-                    );
-                },
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 
     public Task WebgpuSurfaceSetTargetAsync(
@@ -733,25 +437,16 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_webgpu_surface_set_target"
+        using var scope = new NativeCallScope(this, "mln_webgpu_surface_set_target");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_webgpu_surface_set_target(
+                    Handle,
+                    scope.Value(NativeWebgpuSurfaceDescriptor(descriptor)),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
         );
-        return NativeCompletion
-            .Submit(
-                (completion, diagnostic) =>
-                {
-                    var nativeDescriptor = NativeWebgpuSurfaceDescriptor(descriptor);
-                    return NativeMethods.mln_webgpu_surface_set_target(
-                        Handle,
-                        &nativeDescriptor,
-                        completion,
-                        diagnostic
-                    );
-                },
-                result => true
-            )
-            .WaitAsync(cancellationToken);
     }
 }

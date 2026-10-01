@@ -13,5 +13,12 @@ internal sealed class NativeViewScope
             );
     }
 
+    /// <summary>Returns <paramref name="value"/> once the view is known to be active.</summary>
+    internal T Active<T>(T value)
+    {
+        EnsureActive();
+        return value;
+    }
+
     internal void Expire() => active = false;
 }

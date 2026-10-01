@@ -1,13 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Logging;
-using Maplibre.NativeFfi.Query;
-using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
-using Maplibre.NativeFfi.Style;
-
 namespace Maplibre.NativeFfi.Map;
 
 public sealed record BoundOptions
@@ -22,14 +14,8 @@ public sealed record BoundOptions
     {
         get
         {
-            global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-                null,
-                "mln_bound_options_default"
-            );
-            global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
-            return global::Maplibre.NativeFfi.Internal.Struct.GeneratedValues.CopyBoundOptions(
-                global::Maplibre.NativeFfi.Internal.C.NativeMethods.mln_bound_options_default()
-            );
+            using var call = Enter(null, "mln_bound_options_default");
+            return CopyBoundOptions(NativeMethods.mln_bound_options_default());
         }
     }
 }

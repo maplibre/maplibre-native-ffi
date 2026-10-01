@@ -1,13 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Logging;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Query;
-using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
-
 namespace Maplibre.NativeFfi.Style;
 
 public readonly record struct PremultipliedRgba8Image
@@ -67,13 +59,9 @@ public readonly record struct PremultipliedRgba8Image
     {
         get
         {
-            global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-                null,
-                "mln_premultiplied_rgba8_image_default"
-            );
-            global::Maplibre.NativeFfi.Internal.Loader.NativeLibraryLoader.EnsureLoaded();
-            return global::Maplibre.NativeFfi.Internal.Struct.GeneratedValues.CopyPremultipliedRgba8Image(
-                global::Maplibre.NativeFfi.Internal.C.NativeMethods.mln_premultiplied_rgba8_image_default()
+            using var call = Enter(null, "mln_premultiplied_rgba8_image_default");
+            return CopyPremultipliedRgba8Image(
+                NativeMethods.mln_premultiplied_rgba8_image_default()
             );
         }
     }

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Maplibre.NativeFfi.Internal.C;
@@ -5,18 +6,29 @@ using Maplibre.NativeFfi.Internal.Callback;
 
 namespace Maplibre.NativeFfi.Internal.Memory;
 
-internal sealed unsafe class NativeCallScope : IDisposable
+/// <summary>
+/// The native storage and callback registrations of one native call, released
+/// when the call returns.
+/// </summary>
+/// <remarks>
+/// A registration becomes permanent only after <see cref="Accept"/>. The
+/// operation half of this class, in NativeCallScope.Operation.cs, enters
+/// generated operations and submits their completions.
+/// </remarks>
+internal sealed unsafe partial class NativeCallScope : IDisposable
 {
-    private readonly List<nint> allocations = [];
-    private readonly List<NativeCallbackRoot> registrations = [];
+    private List<nint>? allocations;
+    private List<NativeCallbackRoot>? registrations;
     private bool accepted;
+
+    internal NativeCallScope() { }
 
     internal void* Register(object descriptor)
     {
         var root = new NativeCallbackRoot(descriptor);
         try
         {
-            registrations.Add(root);
+            (registrations ??= []).Add(root);
         }
         catch
         {
@@ -29,6 +41,8 @@ internal sealed unsafe class NativeCallScope : IDisposable
     internal void Accept(NativeCallbackOwner? owner = null)
     {
         accepted = true;
+        if (registrations is null)
+            return;
         foreach (var root in registrations)
             root.Retain(owner ?? NativeCallbackOwner.Global);
     }
@@ -40,7 +54,7 @@ internal sealed unsafe class NativeCallScope : IDisposable
         var pointer = (T*)NativeMemory.Alloc((nuint)count, (nuint)sizeof(T));
         try
         {
-            allocations.Add((nint)pointer);
+            (allocations ??= []).Add((nint)pointer);
         }
         catch
         {
@@ -49,6 +63,10 @@ internal sealed unsafe class NativeCallScope : IDisposable
         }
         return pointer;
     }
+
+    /// <summary>Zeroed storage for one value that native code writes during the call.</summary>
+    internal T* Out<T>()
+        where T : unmanaged => Value(default(T));
 
     internal T* Value<T>(T value)
         where T : unmanaged
@@ -71,6 +89,11 @@ internal sealed unsafe class NativeCallScope : IDisposable
         ArgumentNullException.ThrowIfNull(text);
         if (text.Contains('\0'))
             throw new ArgumentException("String contains a null character.", nameof(text));
+        return Terminated(text);
+    }
+
+    private sbyte* Terminated(string text)
+    {
         var count = Encoding.UTF8.GetByteCount(text);
         var pointer = Allocate<byte>(checked(count + 1));
         Encoding.UTF8.GetBytes(text, new Span<byte>(pointer, count));
@@ -83,17 +106,23 @@ internal sealed unsafe class NativeCallScope : IDisposable
             ? throw new InvalidOperationException("Native string pointer is null.")
             : Marshal.PtrToStringUTF8((nint)pointer)!;
 
-    internal mln_buffer_view Buffer(byte[] bytes)
+    internal mln_buffer_view Buffer(
+        byte[] bytes,
+        [CallerArgumentExpression(nameof(bytes))] string? name = null
+    )
     {
-        ArgumentNullException.ThrowIfNull(bytes);
+        ArgumentNullException.ThrowIfNull(bytes, name);
         var pointer = Allocate<byte>(bytes.Length);
         bytes.CopyTo(new Span<byte>(pointer, bytes.Length));
         return new mln_buffer_view { data = pointer, size = (nuint)bytes.Length };
     }
 
-    internal mln_buffer_view Utf8(string text)
+    internal mln_buffer_view Utf8(
+        string text,
+        [CallerArgumentExpression(nameof(text))] string? name = null
+    )
     {
-        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(text, name);
         var count = Encoding.UTF8.GetByteCount(text);
         var pointer = Allocate<byte>(count);
         Encoding.UTF8.GetBytes(text, new Span<byte>(pointer, count));
@@ -149,12 +178,16 @@ internal sealed unsafe class NativeCallScope : IDisposable
 
     public void Dispose()
     {
-        if (!accepted)
+        EndOperation();
+        if (!accepted && registrations is not null)
             foreach (var root in registrations)
                 root.Dispose();
-        registrations.Clear();
-        foreach (var pointer in allocations)
-            NativeMemory.Free((void*)pointer);
-        allocations.Clear();
+        registrations = null;
+        if (allocations is not null)
+            foreach (var pointer in allocations)
+                NativeMemory.Free((void*)pointer);
+        allocations = null;
     }
+
+    partial void EndOperation();
 }

@@ -1,108 +1,50 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Memory;
-using Maplibre.NativeFfi.Internal.Pointer;
-using Maplibre.NativeFfi.Internal.Status;
-using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Logging;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Query;
-using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
-using Maplibre.NativeFfi.Style;
-using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
-
 namespace Maplibre.NativeFfi.Base;
 
-public sealed unsafe partial class BufferHandle : IDisposable
+public sealed unsafe partial class BufferHandle : IDisposable, INativeOwner<MlnBuffer>
 {
     private readonly NativeHandleState<MlnBuffer> state;
-    private readonly ulong nativeId;
-    public ulong Id => nativeId;
 
     internal BufferHandle(MlnBuffer handle)
     {
-        nativeId = handle.Value;
-        state = new NativeHandleState<MlnBuffer>(
-            handle,
-            static (live, _) =>
-            {
-                NativeMethods.mln_buffer_destroy(live);
-                return mln_status.MLN_STATUS_OK;
-            },
-            nameof(BufferHandle),
-            static (live, _) =>
-            {
-                NativeMethods.mln_buffer_destroy(live);
-                return mln_status.MLN_STATUS_OK;
-            }
-        );
+        state = new(handle, Abandon, nameof(BufferHandle), Abandon);
     }
 
-    internal static BufferHandle Adopt(MlnBuffer handle)
+    internal static BufferHandle Adopt(MlnBuffer handle) =>
+        NativeHandleState<MlnBuffer>.Adopt(handle, () => new BufferHandle(handle), Abandon);
+
+    private static mln_status Abandon(MlnBuffer live, mln_diagnostic* diagnostic)
     {
-        BufferHandle? owner = null;
-        try
-        {
-            owner = new BufferHandle(handle);
-            return owner;
-        }
-        catch
-        {
-            if (owner is null)
-                NativeMethods.mln_buffer_destroy(handle);
-            else
-                owner.state.Retire();
-            throw;
-        }
+        NativeMethods.mln_buffer_destroy(live);
+        return mln_status.MLN_STATUS_OK;
     }
 
+    NativeHandleState<MlnBuffer> INativeOwner<MlnBuffer>.State => state;
     internal MlnBuffer Handle => state.Handle;
+    internal NativeCallbackOwner CallbackOwner => state.CallbackOwner;
 
-    internal NativeHandleState<MlnBuffer>.ReadScope Borrow() => state.Borrow();
-
-    internal global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackOwner CallbackOwner =>
-        state.CallbackOwner;
+    // Runtime events report their source by this identity.
+    public ulong Id => state.IssuedHandle.Value;
     public bool IsClosed => state.IsClosed;
 
     public void Dispose()
     {
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_buffer_destroy"
-        );
+        NativeCallbackGuard.EnsureAllowed(this, "mln_buffer_destroy");
         state.Retire();
     }
 
     public void Close()
     {
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_buffer_destroy"
-        );
+        NativeCallbackGuard.EnsureAllowed(this, "mln_buffer_destroy");
         state.Close();
     }
 
     public byte[] Get()
     {
-        using var read = state.Borrow();
-        using var retained = this.state.Retain();
-        global::Maplibre.NativeFfi.Internal.Callback.NativeCallbackGuard.EnsureAllowed(
-            this,
-            "mln_buffer_get"
-        );
+        using var read = state.Read(this, "mln_buffer_get");
         var outView = new mln_buffer_view { size = (uint)sizeof(mln_buffer_view) };
-        mln_diagnostic diagnostic;
-        NativeStatus.Check(
-            NativeMethods.mln_buffer_get(
-                read.Handle,
-                &outView,
-                NativeDiagnostic.Prepare(&diagnostic)
-            ),
-            &diagnostic
-        );
+        Check(NativeMethods.mln_buffer_get(read.Handle, &outView, Diagnostic));
         return ValueStructs.CopyBufferView(outView);
     }
 }

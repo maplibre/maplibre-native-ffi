@@ -7,6 +7,7 @@
 /dotnet/src/Maplibre.NativeFfi/Base/Maplibre.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/RenderBackendFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Base/Status.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/GlobalUsings.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeMethods.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeTypes.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/Struct/GeneratedValues.g.cs linguist-generated=true
