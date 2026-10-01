@@ -31,14 +31,10 @@ void read_center_pixel(
   const mln_test_render_fixture& fixture, std::uint8_t (&out_rgba)[4]
 ) {
   auto readback = mln_test_completion_readback();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
-                     fixture.session, &readback.descriptor, nullptr
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &readback)
-  );
+  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+    fixture.session, &readback.descriptor, nullptr
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &readback));
   auto image = mln_texture_readback_result{};
   TEST_ASSERT_TRUE(
     mln_test_completion_copy_value(&readback, &image, sizeof(image))
@@ -59,14 +55,11 @@ void render_forced_frame(const mln_test_render_fixture& fixture) {
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   auto frame = mln_acquired_frame{MLN_HANDLE_NULL};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_acquire_frame(fixture.session, &frame, nullptr)
   );
   const auto cpu_complete = mln_gpu_sync_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(&frame, &cpu_complete, nullptr)
-  );
+  MLN_TEST_OK(mln_acquired_frame_release(&frame, &cpu_complete, nullptr));
 }
 
 // A still image completes only with a frame that rendered the map as its
@@ -87,9 +80,7 @@ void a_frame_of_an_older_update_does_not_complete_a_still_image() {
   );
   auto fixture = mln_test_render_fixture{};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_still_image(&fixture, map)
-  );
+  MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
   // A static map publishes no update for the new style until a still image
   // requests one, so the session's latest update still shows red.
   mln_test_load_style_and_wait(
@@ -111,9 +102,7 @@ void a_frame_of_an_older_update_does_not_complete_a_still_image() {
     mln_test_gate_wait_entered(parked.get()), "the runtime worker never parked"
   );
   auto still = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_request_still_image(map, &still.descriptor, nullptr)
-  );
+  MLN_TEST_OK(mln_map_request_still_image(map, &still.descriptor, nullptr));
   render_forced_frame(fixture);
   mln_test_gate_release(parked.get());
 
@@ -121,9 +110,7 @@ void a_frame_of_an_older_update_does_not_complete_a_still_image() {
   TEST_ASSERT_TRUE(points.wait_for_hits(SyncPoint::StillImageFrameHeldBack, 1));
   TEST_ASSERT_FALSE(mln_test_completion_poll(&still));
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_pending_still_image(&fixture, &still)
-  );
+  MLN_TEST_OK(mln_test_render_pending_still_image(&fixture, &still));
   mln_test_completion_destroy(&still);
   std::uint8_t rgba[4] = {};
   read_center_pixel(fixture, rgba);

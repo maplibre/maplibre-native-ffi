@@ -19,16 +19,11 @@ using mln::native_tests::SyncPointScope;
 
 auto create_projection(mln_map map) -> mln_map_projection {
   auto completion = mln_test_completion_default(sizeof(mln_map_projection));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_projection_create(map, &completion.descriptor, nullptr)
-  );
+  MLN_TEST_OK(mln_map_projection_create(map, &completion.descriptor, nullptr));
   auto projection = mln_map_projection{MLN_HANDLE_NULL};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_completion_finish_value(
-                     &completion, &projection, sizeof(projection)
-                   )
-  );
+  MLN_TEST_OK(mln_test_completion_finish_value(
+    &completion, &projection, sizeof(projection)
+  ));
   return projection;
 }
 
@@ -36,8 +31,7 @@ constexpr auto origin = mln_lat_lng{.latitude = 0.0, .longitude = 0.0};
 
 auto convert(mln_map_projection projection) -> mln_screen_point {
   auto point = mln_screen_point{};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_map_projection_pixel_for_lat_lng(projection, origin, &point, nullptr)
   );
   return point;
@@ -86,15 +80,12 @@ void close_waits_for_a_running_conversion() {
 
   TEST_ASSERT_TRUE_MESSAGE(running, "the conversion never ran");
   TEST_ASSERT_TRUE_MESSAGE(waited, "the close did not wait for the conversion");
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, close_status.load());
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK, conversion.status.load(), conversion.diagnostic.message
-  );
+  MLN_TEST_OK(close_status.load());
+  MLN_TEST_OK_MESSAGE(conversion.status.load(), conversion.diagnostic.message);
   TEST_ASSERT_EQUAL_DOUBLE(expected.x, conversion.point.x);
   TEST_ASSERT_EQUAL_DOUBLE(expected.y, conversion.point.y);
   auto point = mln_screen_point{};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_map_projection_pixel_for_lat_lng(projection, origin, &point, nullptr)
   );
 
@@ -119,9 +110,9 @@ void a_conversion_that_leased_before_close_reports_a_stale_handle() {
   conversion.thread.join();
 
   TEST_ASSERT_TRUE_MESSAGE(leased, "the conversion never leased the handle");
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, close_status);
+  MLN_TEST_OK(close_status);
   TEST_ASSERT_EQUAL_INT(0, close_waits);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, conversion.status.load());
+  MLN_TEST_INVALID(conversion.status.load());
   TEST_ASSERT_NOT_NULL_MESSAGE(
     std::strstr(conversion.diagnostic.message, "stale"),
     conversion.diagnostic.message

@@ -47,38 +47,27 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   options.requested_texture_ring_depth = 2;
   mln_render_session session = MLN_HANDLE_NULL;
   mln_test_completion attach = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_vulkan_owned_texture_attach(
-      map, &descriptor, &options, &session, &attach.descriptor, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_finish(&attach)
-  );
+  MLN_TEST_OK(mln_vulkan_owned_texture_attach(
+    map, &descriptor, &options, &session, &attach.descriptor, NULL
+  ));
+  MLN_TEST_INVALID(mln_test_completion_finish(&attach));
   mln_test_completion_destroy(&attach);
 
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_get_snapshot(session, &snapshot, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_get_snapshot(session, &snapshot, NULL));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_SESSION_STATE_TARGET_LOST, snapshot.state
   );
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE, mln_render_session_destroy(session, NULL)
   );
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_abandon(session, &abandoned, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_destroy(session, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_abandon(session, &abandoned, NULL));
+  MLN_TEST_OK(mln_render_session_destroy(session, NULL));
 
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));

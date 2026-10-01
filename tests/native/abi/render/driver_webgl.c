@@ -18,8 +18,7 @@ static void transferred_offscreen_canvas_runs_on_core_worker(void) {
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
   );
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_DRIVER_CORE_WORKER, snapshot.driver);

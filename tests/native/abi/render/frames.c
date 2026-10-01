@@ -14,24 +14,19 @@
 static void texture_readback_is_an_ordered_owned_operation_result(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 260);
 
   mln_test_completion readback = mln_test_completion_readback();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
-                     fixture.session, &readback.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &readback)
-  );
+  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+    fixture.session, &readback.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &readback));
   mln_texture_readback_result result = {0};
   TEST_ASSERT_TRUE(
     mln_test_completion_copy_value(&readback, &result, sizeof(result))
@@ -48,9 +43,7 @@ static void texture_readback_is_an_ordered_owned_operation_result(void) {
   mln_test_completion_destroy(&readback);
 
   const mln_gpu_sync sync = mln_gpu_sync_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(&frame, &sync, NULL)
-  );
+  MLN_TEST_OK(mln_acquired_frame_release(&frame, &sync, NULL));
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -70,21 +63,17 @@ static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_abandon(fixture.session, &abandoned, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_abandon(fixture.session, &abandoned, NULL));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, abandoned.disposition
   );
   TEST_ASSERT_GREATER_THAN_UINT32(0, abandoned.quarantined_resource_count);
   mln_render_frame_result invalid = {.size = sizeof(mln_render_frame_result)};
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_TARGET_LOST, mln_acquired_frame_get_result(frame, &invalid, NULL)
   );
   const mln_gpu_sync sync = mln_gpu_sync_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(&frame, &sync, NULL)
-  );
+  MLN_TEST_OK(mln_acquired_frame_release(&frame, &sync, NULL));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
 
   mln_test_render_fixture_destroy(&fixture);
@@ -105,9 +94,7 @@ static mln_render_frame_result render_one(
   mln_acquired_frame frame = MLN_HANDLE_NULL;
   while (mln_render_session_acquire_frame(fixture->session, &frame, NULL) ==
          MLN_STATUS_OK) {
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_acquired_frame_release(&frame, NULL, NULL)
-    );
+    MLN_TEST_OK(mln_acquired_frame_release(&frame, NULL, NULL));
     frame = MLN_HANDLE_NULL;
   }
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
@@ -123,8 +110,7 @@ static void ease_zoom(mln_map map, double zoom) {
   // below until the jump ends it.
   update.animation.fields = MLN_ANIMATION_OPTION_DURATION;
   update.animation.duration_ms = 3600000;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
+  MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
 }
@@ -134,8 +120,7 @@ static void jump_zoom(mln_map map, double zoom) {
   update.mode = MLN_CAMERA_UPDATE_MODE_JUMP;
   update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
   update.camera.zoom = zoom;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
+  MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
 }
@@ -159,12 +144,9 @@ static mln_render_frame_result render_and_settle(
   TEST_ASSERT_TRUE(mln_test_await_event(
     runtime, MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED, map, &event, NULL, 0
   ));
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_event_mask(
-      map, MLN_RUNTIME_EVENT_MASK_ALL, &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_event_mask(
+    map, MLN_RUNTIME_EVENT_MASK_ALL, &completion.descriptor, NULL
+  ));
   return result;
 }
 
@@ -176,11 +158,10 @@ static mln_render_frame_result render_and_settle(
 static void a_camera_transition_publishes_an_update_after_every_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(instant_style_json))
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 

@@ -49,7 +49,7 @@ void destroy_fixture(Fixture& fixture) {
 // Holds a core worker inside the blocker. A caller driver runs nothing until
 // the case services it, which holds its queue just the same.
 void block_driver(const Fixture& fixture, DriverBlocker& blocker) {
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, blocker.submit(fixture.render.session));
+  MLN_TEST_OK(blocker.submit(fixture.render.session));
   if (fixture.render.driver == MLN_RENDER_DRIVER_CORE_WORKER) {
     TEST_ASSERT_TRUE(mln_test_gate_wait_entered(blocker.gate.get()));
   }
@@ -89,21 +89,19 @@ void demand_coalescing_preserves_boundaries_and_generations() {
   auto separate = newest;
   separate.token = 103;
   separate.coalescing_boundary = 8;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, request_frame(fixture, first));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, request_frame(fixture, newest));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, request_frame(fixture, separate));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, blocker.finish(fixture.render));
+  MLN_TEST_OK(request_frame(fixture, first));
+  MLN_TEST_OK(request_frame(fixture, newest));
+  MLN_TEST_OK(request_frame(fixture, separate));
+  MLN_TEST_OK(blocker.finish(fixture.render));
 
   auto unknown = mln_frame_demand_default();
   unknown.flags = 1U << 8U;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, request_frame(fixture, unknown)
-  );
+  MLN_TEST_INVALID(request_frame(fixture, unknown));
 
   const auto batch = wait_for_results(fixture, 3);
   auto later = separate;
   later.token = 104;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, request_frame(fixture, later));
+  MLN_TEST_OK(request_frame(fixture, later));
   const auto second_batch = wait_for_results(fixture, 1);
   TEST_ASSERT_EQUAL_UINT64(104, batch_result(second_batch, 0).token);
   mln_render_frame_batch_release(second_batch);
@@ -141,13 +139,13 @@ void a_demand_misses_a_deadline_that_passes_while_the_driver_is_busy() {
   missed.token = 105;
   missed.coalescing_boundary = 1;
   missed.timeout_ns = std::chrono::nanoseconds{std::chrono::hours{1}}.count();
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, request_frame(fixture, missed));
+  MLN_TEST_OK(request_frame(fixture, missed));
   mln::testing::advance_render_clock(std::chrono::hours{2});
   auto in_time = missed;
   in_time.token = 106;
   in_time.coalescing_boundary = 2;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, request_frame(fixture, in_time));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, blocker.finish(fixture.render));
+  MLN_TEST_OK(request_frame(fixture, in_time));
+  MLN_TEST_OK(blocker.finish(fixture.render));
 
   const auto batch = wait_for_results(fixture, 2);
   const auto first = batch_result(batch, 0);
@@ -178,25 +176,20 @@ void a_parked_demand_misses_a_deadline_that_passes_while_the_ring_is_full() {
   parked.token = 113;
   parked.coalescing_boundary = 113;
   parked.timeout_ns = std::chrono::nanoseconds{std::chrono::hours{1}}.count();
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, request_frame(fixture, parked));
+  MLN_TEST_OK(request_frame(fixture, parked));
   // The fence runs after the driver parked the demand.
   auto fence = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_reduce_memory_use(
-                     fixture.render.session, &fence.descriptor, nullptr
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(mln_render_session_reduce_memory_use(
+    fixture.render.session, &fence.descriptor, nullptr
+  ));
+  MLN_TEST_OK(
     mln_test_render_fixture_finish_operation(&fixture.render, &fence)
   );
   mln_test_completion_destroy(&fence);
   mln::testing::advance_render_clock(std::chrono::hours{2});
 
   const auto cpu_complete = mln_gpu_sync_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(&first, &cpu_complete, nullptr)
-  );
+  MLN_TEST_OK(mln_acquired_frame_release(&first, &cpu_complete, nullptr));
   const auto batch = wait_for_results(fixture, 1);
   const auto result = batch_result(batch, 0);
   TEST_ASSERT_EQUAL_UINT64(113, result.token);
@@ -204,9 +197,7 @@ void a_parked_demand_misses_a_deadline_that_passes_while_the_ring_is_full() {
     MLN_RENDER_RESULT_DEADLINE_MISSED, result.disposition
   );
   mln_render_frame_batch_release(batch);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(&second, &cpu_complete, nullptr)
-  );
+  MLN_TEST_OK(mln_acquired_frame_release(&second, &cpu_complete, nullptr));
   destroy_fixture(fixture);
 }
 
@@ -218,7 +209,7 @@ void request_frame_and_hold_the_call(const Fixture& fixture, uint64_t token) {
   auto demand = mln_frame_demand_default();
   demand.flags = 0;
   demand.token = token;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, request_frame(fixture, demand));
+  MLN_TEST_OK(request_frame(fixture, demand));
 }
 
 struct PublishedFrame {
@@ -308,8 +299,7 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
       "the held call to publish its frame"
     ));
     auto published_count = std::size_t{0};
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
+    MLN_TEST_OK(
       mln_render_frame_batch_count(published.batch, &published_count, nullptr)
     );
     TEST_ASSERT_EQUAL_size_t(1, published_count);
@@ -322,7 +312,7 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
     mln_test_pulse();
     mln_test_thread_join(thread);
     TEST_ASSERT_TRUE(release.abandon_waited);
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, release.abandon_status);
+    MLN_TEST_OK(release.abandon_status);
     TEST_ASSERT_EQUAL_UINT32(
       MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, result.disposition
     );
@@ -332,19 +322,16 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
     release.exits_before_the_call = points.hits(SyncPoint::RenderDriverExited);
     auto* thread = mln_test_thread_start(abandon_inside_the_call, &release);
     auto serviced = std::size_t{0};
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_session_service_driver_work(
-                       fixture.render.session, 0, &serviced, nullptr
-                     )
-    );
+    MLN_TEST_OK(mln_render_session_service_driver_work(
+      fixture.render.session, 0, &serviced, nullptr
+    ));
     mln_test_thread_join(thread);
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_BUSY, release.abandon_status);
+    MLN_TEST_STATUS(MLN_STATUS_BUSY, release.abandon_status);
     TEST_ASSERT_EQUAL_INT(0, points.hits(SyncPoint::RenderAbandonWaits));
   }
   auto snapshot =
     mln_render_session_snapshot{.size = sizeof(mln_render_session_snapshot)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_get_snapshot(fixture.render.session, &snapshot, nullptr)
   );
   TEST_ASSERT_EQUAL_UINT32(

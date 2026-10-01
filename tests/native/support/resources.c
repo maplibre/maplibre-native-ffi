@@ -10,6 +10,7 @@
 #include "resources.h"
 
 #include "env.h"
+#include "status.h"
 #include "unity.h"
 #include "wait.h"
 
@@ -266,9 +267,7 @@ void mln_test_provider_install(
     .callback = scripted_provider,
     .user_data = provider,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_resource_provider(runtime, &descriptor)
-  );
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &descriptor));
 }
 
 const mln_test_provider_request* mln_test_provider_request_at(

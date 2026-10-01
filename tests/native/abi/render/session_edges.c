@@ -13,13 +13,10 @@
 
 static void detach_fixture(mln_test_render_fixture* fixture) {
   mln_test_completion detach = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_detach(fixture->session, &detach.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(fixture, &detach)
-  );
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &detach));
   mln_test_completion_destroy(&detach);
 }
 
@@ -32,14 +29,14 @@ static void a_map_release_waits_for_its_session_to_detach(void) {
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
   mln_completion discard = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
     mln_map_release(map, &discard, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_EQUAL_STRING(
     "map still has an attached render session", mln_test_last_error()
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_request_repaint(map));
+  MLN_TEST_OK(mln_test_map_request_repaint(map));
 
   detach_fixture(&fixture);
   mln_test_render_fixture_destroy(&fixture);
@@ -55,12 +52,10 @@ static void a_readback_before_any_frame_fails_at_completion(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_test_completion readback = mln_test_completion_readback();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
-                     fixture.session, &readback.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+    fixture.session, &readback.descriptor, NULL
+  ));
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
     mln_test_render_fixture_finish_operation(&fixture, &readback)
   );
@@ -75,14 +70,10 @@ static void a_readback_before_any_frame_fails_at_completion(void) {
     MLN_RENDER_RESULT_RENDERED, mln_test_style_render_frame(&fixture)
   );
   readback = mln_test_completion_readback();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
-                     fixture.session, &readback.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &readback)
-  );
+  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+    fixture.session, &readback.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &readback));
   mln_test_completion_destroy(&readback);
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);

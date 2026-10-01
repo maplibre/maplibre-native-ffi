@@ -19,11 +19,9 @@ static mln_acquired_frame render_and_acquire(
     MLN_RENDER_RESULT_RENDERED, mln_test_style_render_frame(fixture)
   );
   mln_acquired_frame frame = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_acquire_frame(
-                     fixture->session, &frame, MLN_TEST_DIAGNOSTIC
-                   )
-  );
+  MLN_TEST_OK(mln_render_session_acquire_frame(
+    fixture->session, &frame, MLN_TEST_DIAGNOSTIC
+  ));
   return frame;
 }
 
@@ -32,10 +30,8 @@ static void attach(
 ) {
   *runtime = mln_test_create_runtime();
   *map = mln_test_create_map(*runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_json(*map, mln_test_empty_style_json)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(*runtime));
+  MLN_TEST_OK(mln_test_map_set_style_json(*map, mln_test_empty_style_json));
+  MLN_TEST_OK(mln_test_runtime_barrier(*runtime));
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(*map, fixture));
 }
 
@@ -56,8 +52,7 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
   attach(&runtime, &map, &fixture);
   mln_acquired_frame frame = render_and_acquire(&fixture);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_adapter_acquired_frame_view_begin(frame, NULL, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_NOT_NULL_MESSAGE(
@@ -66,8 +61,7 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
   );
   void* scopes[2] = {NULL, NULL};
   for (size_t index = 0; index < 2; index += 1) {
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
+    MLN_TEST_OK(
       mln_adapter_acquired_frame_view_begin(frame, &scopes[index], NULL)
     );
     TEST_ASSERT_NOT_NULL(scopes[index]);
@@ -75,7 +69,7 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
   mln_gpu_sync sync = mln_gpu_sync_default();
   for (size_t index = 0; index < 2; index += 1) {
     const mln_acquired_frame held = frame;
-    TEST_ASSERT_EQUAL_INT(
+    MLN_TEST_STATUS(
       MLN_STATUS_BUSY, mln_acquired_frame_release(&frame, &sync, NULL)
     );
     TEST_ASSERT_EQUAL_UINT64(held, frame);
@@ -84,13 +78,10 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
   mln_adapter_acquired_frame_view_end(NULL);
 
   const mln_acquired_frame released = frame;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(&frame, &sync, NULL)
-  );
+  MLN_TEST_OK(mln_acquired_frame_release(&frame, &sync, NULL));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
   void* stale = NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_adapter_acquired_frame_view_begin(released, &stale, NULL)
   );
   TEST_ASSERT_NULL(stale);
@@ -120,18 +111,12 @@ static void disposing_a_frame_abandons_its_session_after_open_views(void) {
   mln_acquired_frame kept = render_and_acquire(&fixture);
   const mln_acquired_frame disposed = render_and_acquire(&fixture);
   void* scope = NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_acquired_frame_view_begin(kept, &scope, NULL)
-  );
+  MLN_TEST_OK(mln_adapter_acquired_frame_view_begin(kept, &scope, NULL));
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_dispose(disposed, MLN_TEST_DIAGNOSTIC)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_acquired_frame_dispose(disposed, NULL)
-  );
+  MLN_TEST_OK(mln_acquired_frame_dispose(disposed, MLN_TEST_DIAGNOSTIC));
+  MLN_TEST_INVALID(mln_acquired_frame_dispose(disposed, NULL));
   void* rejected = NULL;
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_TARGET_LOST,
     mln_adapter_acquired_frame_view_begin(kept, &rejected, MLN_TEST_DIAGNOSTIC)
   );
@@ -140,7 +125,7 @@ static void disposing_a_frame_abandons_its_session_after_open_views(void) {
   );
   TEST_ASSERT_NULL(rejected);
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_TARGET_LOST, mln_acquired_frame_get_result(kept, &result, NULL)
   );
 
@@ -150,9 +135,7 @@ static void disposing_a_frame_abandons_its_session_after_open_views(void) {
     "the disposed frame's session to be abandoned"
   ));
   mln_gpu_sync sync = mln_gpu_sync_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(&kept, &sync, NULL)
-  );
+  MLN_TEST_OK(mln_acquired_frame_release(&kept, &sync, NULL));
 
   detach(runtime, map, &fixture);
 }

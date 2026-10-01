@@ -54,12 +54,10 @@ static void style_image_stretches_are_borrowed_by_the_completion(void) {
   options.stretch_x_count = 1;
   options.stretch_y = &stretch_y;
   options.stretch_y_count = 1;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_image(
-                     map, MLN_BUFFER_LITERAL("probe-stretches"), &image,
-                     &options, &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
+    map, MLN_BUFFER_LITERAL("probe-stretches"), &image, &options,
+    &completion.descriptor, NULL
+  ));
 
   stretch_probe probe = {.status = MLN_STATUS_INVALID_STATE};
   atomic_init(&probe.done, false);
@@ -68,15 +66,12 @@ static void style_image_stretches_are_borrowed_by_the_completion(void) {
     .callback = copy_stretches,
     .user_data = &probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_copy_style_image_stretches(
-      map, MLN_BUFFER_LITERAL("probe-stretches"), &completion, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_map_copy_style_image_stretches(
+    map, MLN_BUFFER_LITERAL("probe-stretches"), &completion, NULL
+  ));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_TRUE(atomic_load(&probe.done));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.status);
+  MLN_TEST_OK(probe.status);
   TEST_ASSERT_EQUAL_size_t(1, probe.x_count);
   TEST_ASSERT_EQUAL_size_t(1, probe.y_count);
   TEST_ASSERT_EQUAL_MEMORY(&stretch_x, &probe.x, sizeof(stretch_x));
@@ -92,15 +87,12 @@ static void style_image_stretches_are_borrowed_by_the_completion(void) {
     .callback = copy_stretches,
     .user_data = &missing,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_copy_style_image_stretches(
-      map, MLN_BUFFER_LITERAL("missing"), &missing_completion, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_map_copy_style_image_stretches(
+    map, MLN_BUFFER_LITERAL("missing"), &missing_completion, NULL
+  ));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_TRUE(atomic_load(&missing.done));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, missing.status);
+  MLN_TEST_OK(missing.status);
   TEST_ASSERT_EQUAL_size_t(0, missing.value_count);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -109,12 +101,10 @@ static void style_image_stretches_are_borrowed_by_the_completion(void) {
 static mln_style_image_info read_image_info(mln_map map, const char* id) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_style_image_result));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_style_image_info(
-                     map, mln_test_view_of(id), &completion.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  MLN_TEST_OK(mln_map_get_style_image_info(
+    map, mln_test_view_of(id), &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_completion_finish(&completion));
   TEST_ASSERT_EQUAL_size_t(1, mln_test_completion_value_count(&completion));
   mln_style_image_result result = {0};
   TEST_ASSERT_TRUE(
@@ -128,11 +118,9 @@ static mln_status copy_pixels(
   mln_map map, const char* id, uint8_t* out, size_t capacity, bool* found
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_copy_style_image_premultiplied_rgba8(
-                     map, mln_test_view_of(id), &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_map_copy_style_image_premultiplied_rgba8(
+    map, mln_test_view_of(id), &completion.descriptor, NULL
+  ));
   const mln_status status = mln_test_completion_finish(&completion);
   *found = mln_test_completion_value_count(&completion) == 1;
   if (*found) {
@@ -178,12 +166,10 @@ static void style_images_copy_their_metadata_and_packed_pixels(void) {
   };
   options.text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
   options.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_image(
-                     map, MLN_BUFFER_LITERAL("marker"), &image, &options,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
+    map, MLN_BUFFER_LITERAL("marker"), &image, &options, &completion.descriptor,
+    NULL
+  ));
 
   mln_style_image_info expected = mln_style_image_info_default();
   expected.width = 2;
@@ -217,28 +203,22 @@ static void style_images_copy_their_metadata_and_packed_pixels(void) {
 
   uint8_t copied[16] = {0};
   bool found = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, copy_pixels(map, "marker", copied, sizeof(copied), &found)
-  );
+  MLN_TEST_OK(copy_pixels(map, "marker", copied, sizeof(copied), &found));
   TEST_ASSERT_TRUE(found);
   TEST_ASSERT_EQUAL_MEMORY(packed, copied, sizeof(packed));
 
   // Replacing an image replaces its metadata too, back to the defaults.
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_image(
-                     map, MLN_BUFFER_LITERAL("marker"), &image, NULL,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
+    map, MLN_BUFFER_LITERAL("marker"), &image, NULL, &completion.descriptor,
+    NULL
+  ));
   const mln_style_image_info replaced = read_image_info(map, "marker");
   const mln_style_image_info defaults = mln_style_image_info_default();
   TEST_ASSERT_EQUAL_FLOAT(defaults.pixel_ratio, replaced.pixel_ratio);
   TEST_ASSERT_EQUAL(defaults.sdf, replaced.sdf);
   TEST_ASSERT_EQUAL(defaults.has_content, replaced.has_content);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, copy_pixels(map, "missing", copied, sizeof(copied), &found)
-  );
+  MLN_TEST_OK(copy_pixels(map, "missing", copied, sizeof(copied), &found));
   TEST_ASSERT_FALSE(found);
 
   mln_test_destroy_map(map);
@@ -301,12 +281,10 @@ static void style_images_read_back_only_the_text_fit_the_host_names(void) {
   mln_style_image_options options = mln_style_image_options_default();
   options.fields = MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
   options.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_image(
-                     map, MLN_BUFFER_LITERAL("label"), &image, &options,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
+    map, MLN_BUFFER_LITERAL("label"), &image, &options, &completion.descriptor,
+    NULL
+  ));
   const mln_style_image_info info = read_image_info(map, "label");
   TEST_ASSERT_FALSE(info.has_text_fit_width);
   TEST_ASSERT_TRUE(info.has_text_fit_height);

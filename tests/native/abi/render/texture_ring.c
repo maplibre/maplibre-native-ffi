@@ -9,9 +9,7 @@
 
 static void release_frame(mln_acquired_frame* frame) {
   const mln_gpu_sync sync = mln_gpu_sync_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(frame, &sync, NULL)
-  );
+  MLN_TEST_OK(mln_acquired_frame_release(frame, &sync, NULL));
 }
 
 static void render_and_release(
@@ -42,27 +40,19 @@ static void a_resize_retires_every_old_size_slot(void) {
     .scale_factor = 1.0,
   };
   mln_test_completion resize = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_resize(
-                     fixture.session, &resized, &resize.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &resize)
-  );
+  MLN_TEST_OK(mln_render_session_resize(
+    fixture.session, &resized, &resize.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &resize));
   mln_test_completion_destroy(&resize);
   render_and_release(&fixture, 303);
   render_and_release(&fixture, 304);
 
   mln_test_completion readback = mln_test_completion_readback();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
-                     fixture.session, &readback.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &readback)
-  );
+  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+    fixture.session, &readback.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &readback));
   mln_texture_readback_result result = {0};
   TEST_ASSERT_TRUE(
     mln_test_completion_copy_value(&readback, &result, sizeof(result))

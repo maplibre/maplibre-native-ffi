@@ -32,11 +32,9 @@ constexpr char empty_style_json[] = R"({"version":8,"sources":{},"layers":[]})";
 auto prepare(const char* json, const mln_geojson_source_options* options)
   -> mln_geojson_source_data {
   auto data = mln_geojson_source_data{MLN_HANDLE_NULL};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_geojson_source_data_create(
-                     mln_test_view_of(json), options, &data, MLN_TEST_DIAGNOSTIC
-                   )
-  );
+  MLN_TEST_OK(mln_geojson_source_data_create(
+    mln_test_view_of(json), options, &data, MLN_TEST_DIAGNOSTIC
+  ));
   return data;
 }
 
@@ -57,29 +55,20 @@ void add_drawn_source(
   mln_test_load_style_and_wait(
     runtime, map, MLN_BUFFER_LITERAL(empty_style_json)
   );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, nullptr
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_layer_json(
-      map,
-      MLN_BUFFER_LITERAL(R"({"id":"dots","type":"circle","source":"points"})"),
-      MLN_BUFFER_LITERAL(""), &completion.descriptor, nullptr
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
+    map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, nullptr
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+    map,
+    MLN_BUFFER_LITERAL(R"({"id":"dots","type":"circle","source":"points"})"),
+    MLN_BUFFER_LITERAL(""), &completion.descriptor, nullptr
+  ));
 }
 
 void set_data(mln_map map, mln_geojson_source_data data) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, nullptr
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_geojson_source_data(
+    map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, nullptr
+  ));
 }
 
 // Holds when the source holds exactly one feature, named `name`.
@@ -169,12 +158,9 @@ void the_synchronous_tiling_override_slices_without_the_datas_worker() {
     "the first data's tiles"
   ));
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_geojson_source_synchronous_tiling(
-      map, MLN_BUFFER_LITERAL("points"), true, &completion.descriptor, nullptr
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_geojson_source_synchronous_tiling(
+    map, MLN_BUFFER_LITERAL("points"), true, &completion.descriptor, nullptr
+  ));
   sync.hold(SyncPoint::GeoJsonTileSlice);
   const auto second = prepare(POINT_COLLECTION("second"), nullptr);
   set_data(map, second);

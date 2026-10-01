@@ -14,14 +14,11 @@ static void an_accepted_cache_operation_completes_after_the_runtime_releases(
   // Nothing has opened the database yet, so the operation opens it on the
   // worker, after the release below retired the handle.
   mln_test_completion cleared = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_runtime_run_ambient_cache_operation(
-      runtime, MLN_AMBIENT_CACHE_OPERATION_CLEAR, &cleared.descriptor, NULL
-    )
-  );
+  MLN_TEST_OK(mln_runtime_run_ambient_cache_operation(
+    runtime, MLN_AMBIENT_CACHE_OPERATION_CLEAR, &cleared.descriptor, NULL
+  ));
   mln_test_destroy_runtime(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&cleared));
+  MLN_TEST_OK(mln_test_completion_finish(&cleared));
   mln_test_completion_destroy(&cleared);
 }
 

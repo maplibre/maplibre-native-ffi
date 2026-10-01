@@ -44,13 +44,10 @@ static void destroying_an_arena_releases_what_it_adopted(void) {
   TEST_ASSERT_NOT_NULL(context);
   TEST_ASSERT_EQUAL_INT(0, *context);
   *context = 42;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_adapter_arena_adopt_release(arena, read_arena_context, context, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_arena_adopt_handle(arena, map, NULL)
-  );
+  MLN_TEST_OK(mln_adapter_arena_adopt_handle(arena, map, NULL));
   TEST_ASSERT_EQUAL_UINT(0, arena_release.calls);
   TEST_ASSERT_TRUE(mln_test_adapter_map_is_live(map));
 
@@ -67,27 +64,22 @@ static void a_failed_arena_adoption_releases_at_once(void) {
   mln_map map = mln_test_adapter_create_map(runtime);
   release_probe probe = {0};
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_arena_adopt_release(
-      NULL, count_release, &probe, MLN_TEST_DIAGNOSTIC
-    )
-  );
+  MLN_TEST_INVALID(mln_adapter_arena_adopt_release(
+    NULL, count_release, &probe, MLN_TEST_DIAGNOSTIC
+  ));
   TEST_ASSERT_NOT_NULL_MESSAGE(
     strstr(mln_test_last_error(), "arena must not be null"),
     mln_test_last_error()
   );
   TEST_ASSERT_EQUAL_UINT(1, probe.calls);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_adapter_arena_adopt_release(NULL, NULL, &probe, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_NOT_NULL_MESSAGE(
     strstr(mln_test_last_error(), "release must not be null"),
     mln_test_last_error()
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_adapter_arena_adopt_handle(NULL, map, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_NOT_NULL_MESSAGE(

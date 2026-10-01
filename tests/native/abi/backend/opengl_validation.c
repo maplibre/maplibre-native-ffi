@@ -320,7 +320,7 @@ static void only_the_builds_providers_attach(void) {
       map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
     );
     call.descriptor.opengl_owned = owned_descriptor(providers[index].platform);
-    TEST_ASSERT_EQUAL_INT(
+    MLN_TEST_STATUS(
       MLN_STATUS_UNSUPPORTED,
       submit_owned_attach(NULL, &call, MLN_TEST_DIAGNOSTIC)
     );

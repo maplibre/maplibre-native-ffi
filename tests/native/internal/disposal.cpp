@@ -18,6 +18,7 @@
 #include "render/render_session_common.hpp"
 #include "runtime/runtime.hpp"
 #include "support/harness.h"
+#include "support/status.h"
 #include "support/wait.h"
 #include "unity.h"
 
@@ -75,9 +76,7 @@ auto create_runtime(std::atomic_uint* wake_releases = nullptr) -> mln_runtime {
     };
   }
   auto runtime = mln_runtime{MLN_HANDLE_NULL};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, nullptr)
-  );
+  MLN_TEST_OK(mln_runtime_create(&options, &runtime, nullptr));
   return runtime;
 }
 
@@ -86,11 +85,9 @@ auto create_map(mln_runtime runtime) -> mln_map {
   const auto completion = descriptor(result);
   auto options = mln_map_options_default();
   options.map_mode = MLN_MAP_MODE_STATIC;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_create(runtime, &options, &completion, nullptr)
-  );
+  MLN_TEST_OK(mln_map_create(runtime, &options, &completion, nullptr));
   TEST_ASSERT_TRUE(released(result));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, result.status.load());
+  MLN_TEST_OK(result.status.load());
   return result.handle;
 }
 
@@ -125,8 +122,7 @@ void runtime_barriers_observe_retired_command_captures() {
   auto result = Result{};
   auto completion = std::make_shared<mln::core::Completion>(descriptor(result));
   auto capture = std::shared_ptr<Capture>(new Capture{probe});
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln::core::submit_runtime_command(
       live,
       [runtime, completion, capture = std::move(capture), &probe](uint64_t) {
@@ -155,7 +151,7 @@ void runtime_barriers_observe_retired_command_captures() {
   TEST_ASSERT_TRUE(
     await([&] { return probe.barrier_released.load(); }, "the barrier")
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.nested_status.load());
+  MLN_TEST_OK(probe.nested_status.load());
   TEST_ASSERT_TRUE_MESSAGE(
     probe.observed_retirement.load(),
     "the runtime barrier completed before the command's captures retired"
@@ -164,9 +160,7 @@ void runtime_barriers_observe_retired_command_captures() {
   live.reset();
   auto closed = Result{};
   const auto close = descriptor(closed);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_release(runtime, &close, nullptr)
-  );
+  MLN_TEST_OK(mln_runtime_release(runtime, &close, nullptr));
   TEST_ASSERT_TRUE(released(closed));
 }
 
@@ -213,11 +207,9 @@ void unclaimed_creation_disposes_on_the_callback_thread() {
     ++static_cast<UnclaimedCreation*>(context)->result.releases;
     mln_test_pulse();
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_create(runtime, nullptr, &completion, nullptr)
-  );
+  MLN_TEST_OK(mln_map_create(runtime, nullptr, &completion, nullptr));
   TEST_ASSERT_TRUE(released(creation.result));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, creation.result.status.load());
+  MLN_TEST_OK(creation.result.status.load());
   TEST_ASSERT_NULL_MESSAGE(
     creation.checks.failure(), creation.checks.failure()
   );
@@ -239,7 +231,7 @@ void disposal_drains_queued_work_and_map_cleanup() {
   auto runtime_weak = std::weak_ptr{live};
   auto rejected = Result{};
   const auto rejected_completion = descriptor(rejected);
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
     mln_runtime_release(runtime, &rejected_completion, nullptr)
   );
@@ -251,13 +243,10 @@ void disposal_drains_queued_work_and_map_cleanup() {
   auto still = Result{};
   const auto resize_completion = descriptor(resize);
   const auto still_completion = descriptor(still);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_map_resize(map, {300, 200, 1.0}, &resize_completion, nullptr)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_request_still_image(map, &still_completion, nullptr)
-  );
+  MLN_TEST_OK(mln_map_request_still_image(map, &still_completion, nullptr));
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     return mln_runtime_dispose(runtime, nullptr);
   });
@@ -278,9 +267,9 @@ void disposal_drains_queued_work_and_map_cleanup() {
   sync_points.release(SyncPoint::MapPoolShutdown);
   TEST_ASSERT_TRUE(expired(runtime_weak));
   TEST_ASSERT_EQUAL_UINT(1, resize.releases.load());
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, resize.status.load());
+  MLN_TEST_OK(resize.status.load());
   TEST_ASSERT_EQUAL_UINT(1, still.releases.load());
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_CANCELLED, still.status.load());
+  MLN_TEST_STATUS(MLN_STATUS_CANCELLED, still.status.load());
 }
 
 void failed_creation_releases_parent_reservation() {
@@ -293,7 +282,7 @@ void failed_creation_releases_parent_reservation() {
     const auto faults = AllocationFaults{};
     status = mln_map_create(runtime, nullptr, &completion, nullptr);
   }
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_NATIVE_ERROR, status);
+  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, status);
   TEST_ASSERT_EQUAL_UINT(0, result.releases.load());
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     return mln_runtime_dispose(runtime, nullptr);
@@ -322,12 +311,10 @@ void disposed_parent_allows_observed_child_release() {
   });
   auto result = Result{};
   const auto completion = descriptor(result);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_release(map, &completion, nullptr)
-  );
+  MLN_TEST_OK(mln_map_release(map, &completion, nullptr));
   TEST_ASSERT_TRUE(expired(weak));
   TEST_ASSERT_TRUE(released(result));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, result.status.load());
+  MLN_TEST_OK(result.status.load());
 }
 
 void disposal_waits_for_pending_child_creation() {
@@ -338,9 +325,7 @@ void disposal_waits_for_pending_child_creation() {
   park_worker(*live, worker);
   auto result = Result{};
   const auto completion = descriptor(result);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_create(runtime, nullptr, &completion, nullptr)
-  );
+  MLN_TEST_OK(mln_map_create(runtime, nullptr, &completion, nullptr));
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     return mln_runtime_dispose(runtime, nullptr);
   });
@@ -353,7 +338,7 @@ void disposal_waits_for_pending_child_creation() {
   mln_test_pulse();
   TEST_ASSERT_TRUE(expired(weak));
   TEST_ASSERT_TRUE(released(result));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, result.status.load());
+  MLN_TEST_INVALID(result.status.load());
 }
 
 // An operation that stays pending after its run-loop task returns, the way an
@@ -391,8 +376,7 @@ void a_pending_operation_keeps_only_its_runtime_alive() {
   const auto completion = descriptor(result);
   auto operation = std::shared_ptr<mln::core::OperationObject>{};
   auto entered = std::atomic_bool{false};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     submit_pending_operation(pending_runtime, completion, entered, operation)
   );
   TEST_ASSERT_TRUE(await([&] { return entered.load(); }, "the operation"));
@@ -410,7 +394,7 @@ void a_pending_operation_keeps_only_its_runtime_alive() {
   operation.reset();
   TEST_ASSERT_TRUE(expired(pending_weak));
   TEST_ASSERT_EQUAL_UINT(1, result.releases.load());
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, result.status.load());
+  MLN_TEST_OK(result.status.load());
 }
 
 void disposal_retires_an_attached_graph_after_driver_quiescence() {
@@ -428,31 +412,31 @@ void disposal_retires_an_attached_graph_after_driver_quiescence() {
   auto attach = Result{};
   const auto completion = descriptor(attach);
   auto handle = mln_render_session{MLN_HANDLE_NULL};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln::core::start_attach_render_session(
-                     session, mln::core::RenderSessionKind::Surface, &options,
-                     capabilities, &handle, &completion
-                   )
+  MLN_TEST_OK(
+    mln::core::start_attach_render_session(
+      session, mln::core::RenderSessionKind::Surface, &options, capabilities,
+      &handle, &completion
+    )
   );
   TEST_ASSERT_TRUE(released(attach));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, attach.status.load());
+  MLN_TEST_OK(attach.status.load());
   auto weak = std::weak_ptr{session};
   auto driver = WorkerGate{};
   auto blocked = Result{};
   const auto blocked_completion = descriptor(blocked);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln::core::enqueue_driver_operation(
-                     handle,
-                     [&driver](mln_render_session_object&) {
-                       driver.entered = true;
-                       mln_test_pulse();
-                       static_cast<void>(
-                         await([&] { return driver.release.load(); }, "release")
-                       );
-                       return MLN_STATUS_OK;
-                     },
-                     &blocked_completion
-                   )
+  MLN_TEST_OK(
+    mln::core::enqueue_driver_operation(
+      handle,
+      [&driver](mln_render_session_object&) {
+        driver.entered = true;
+        mln_test_pulse();
+        static_cast<void>(
+          await([&] { return driver.release.load(); }, "release")
+        );
+        return MLN_STATUS_OK;
+      },
+      &blocked_completion
+    )
   );
   TEST_ASSERT_TRUE(await([&] { return driver.entered.load(); }, "the driver"));
   auto* runtime_token = mln_adapter_owner_token_create(runtime);
@@ -488,7 +472,7 @@ void disposal_retires_an_attached_graph_after_driver_quiescence() {
     "the graph to retire"
   ));
   TEST_ASSERT_EQUAL_UINT(1, blocked.releases.load());
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, blocked.status.load());
+  MLN_TEST_OK(blocked.status.load());
 }
 
 void abandoned_frame_preserves_its_session_owner_without_synthesizing_gpu_sync() {
@@ -501,10 +485,7 @@ void abandoned_frame_preserves_its_session_owner_without_synthesizing_gpu_sync()
   session->state = MLN_RENDER_SESSION_STATE_ATTACHED;
   session->attached = true;
   session->acquired_frame_count = 1;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln::core::map_attach_render_target_session(map, session.get())
-  );
+  MLN_TEST_OK(mln::core::map_attach_render_target_session(map, session.get()));
   auto frame = std::make_shared<mln_acquired_frame_object>();
   frame->session = session;
   const auto handle =
@@ -547,10 +528,7 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
   session->state = MLN_RENDER_SESSION_STATE_ATTACHED;
   session->attached = true;
   session->acquired_frame_count = 2;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln::core::map_attach_render_target_session(map, session.get())
-  );
+  MLN_TEST_OK(mln::core::map_attach_render_target_session(map, session.get()));
   auto frame = std::make_shared<mln_acquired_frame_object>();
   frame->session = session;
   auto frame_id =
@@ -574,11 +552,11 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
   });
   auto result =
     mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_BUSY, mln_render_session_abandon(session->self, &result, nullptr)
   );
   auto sync = mln_gpu_sync_default();
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_BUSY, mln_acquired_frame_release(&frame_id, &sync, nullptr)
   );
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
@@ -591,7 +569,7 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
     return mln_acquired_frame_dispose(sibling_id, nullptr);
   });
   void* rejected = nullptr;
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_TARGET_LOST,
     mln_adapter_acquired_frame_view_begin(frame_id, &rejected, nullptr)
   );
@@ -608,9 +586,7 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
     mln_adapter_acquired_frame_view_end(scope);
     return MLN_STATUS_OK;
   });
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(&frame_id, &sync, nullptr)
-  );
+  MLN_TEST_OK(mln_acquired_frame_release(&frame_id, &sync, nullptr));
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     return mln_render_session_destroy(session->self, nullptr);
   });

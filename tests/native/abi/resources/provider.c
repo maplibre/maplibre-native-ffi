@@ -80,13 +80,8 @@ static void resource_provider_registration_validates_its_descriptor(void) {
     provider_cases, sizeof(provider_cases) / sizeof(provider_cases[0]),
     &provider, sizeof(provider), submit_provider, &runtime
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_set_resource_provider(runtime, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_test_clear_resource_provider(MLN_HANDLE_NULL)
-  );
+  MLN_TEST_INVALID(mln_test_set_resource_provider(runtime, NULL));
+  MLN_TEST_INVALID(mln_test_clear_resource_provider(MLN_HANDLE_NULL));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -101,29 +96,19 @@ static void resource_provider_registration_releases_owned_state(void) {
   };
 
   mln_completion rejected = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_set_resource_provider(
-                                   MLN_HANDLE_NULL, &provider, &rejected, NULL
-                                 )
-  );
+  MLN_TEST_INVALID(mln_runtime_set_resource_provider(
+    MLN_HANDLE_NULL, &provider, &rejected, NULL
+  ));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&release_count));
 
   mln_runtime runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_resource_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&release_count));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_resource_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&release_count));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_clear_resource_provider(runtime)
-  );
+  MLN_TEST_OK(mln_test_clear_resource_provider(runtime));
   TEST_ASSERT_EQUAL_INT(2, atomic_load(&release_count));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_resource_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_test_destroy_runtime(runtime);
   TEST_ASSERT_EQUAL_INT(3, atomic_load(&release_count));
 }
@@ -133,22 +118,16 @@ static void custom_provider_request_handles_reject_raw_null_handles(void) {
   const mln_resource_response response =
     mln_test_text_response(inline_style_json);
   bool cancelled = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_resource_request_cancelled(MLN_HANDLE_NULL, &cancelled, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_resource_request_complete(MLN_HANDLE_NULL, &response, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_resource_request_set_cancel_callback(
-      MLN_HANDLE_NULL, ignore_cancel, NULL, NULL, &cancelled, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(mln_resource_request_set_cancel_callback(
+    MLN_HANDLE_NULL, ignore_cancel, NULL, NULL, &cancelled, NULL
+  ));
+  MLN_TEST_INVALID(
     mln_resource_request_wait_until_retired(MLN_HANDLE_NULL, NULL)
   );
 }
@@ -203,20 +182,16 @@ static void resource_provider_command_copies_cross_thread_descriptor(void) {
     mln_test_thread_start(submit_provider_from_thread, &submission);
   TEST_ASSERT_NOT_NULL(thread);
   mln_test_thread_join(thread);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, submission.status);
+  MLN_TEST_OK(submission.status);
 
   // The accepted command owns the descriptor shape, not this binding storage.
   submission.provider.callback = NULL;
   submission.provider.user_data = NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_completion_finish(&submission.completion)
-  );
+  MLN_TEST_OK(mln_test_completion_finish(&submission.completion));
   mln_test_completion_destroy(&submission.completion);
 
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, "custom://copied.json")
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://copied.json"));
   char message[512];
   TEST_ASSERT_TRUE(
     mln_test_await_loading_failure(runtime, map, message, sizeof(message))
@@ -259,12 +234,9 @@ static mln_map start_claimed_request(
     .callback = claim_and_drop_resource_provider,
     .user_data = probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_resource_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_url(map, "custom://dropped-request-style.json")
   );
   TEST_ASSERT_TRUE(mln_test_await(
@@ -315,23 +287,16 @@ static void a_released_request_does_not_hold_its_runtime_open(void) {
   mln_runtime runtime = MLN_HANDLE_NULL;
   mln_runtime_options options = mln_runtime_options_default();
   options.event_wake = mln_test_pulse_wake();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC)
-  );
+  MLN_TEST_OK(mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC));
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
     .callback = claim_and_drop_resource_provider,
     .user_data = &probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_resource_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_create_status(runtime, NULL, &map)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
+  MLN_TEST_OK(
     mln_test_map_set_style_url(map, "custom://dropped-request-style.json")
   );
   TEST_ASSERT_TRUE(mln_test_await(
@@ -342,9 +307,7 @@ static void a_released_request_does_not_hold_its_runtime_open(void) {
   mln_test_gate gate;
   mln_test_gate_init(&gate);
   const mln_completion hold = mln_test_gate_completion(&gate);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_debug_options(map, 0, &hold, NULL)
-  );
+  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &hold, NULL));
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
   );
@@ -360,18 +323,10 @@ static void a_released_request_does_not_hold_its_runtime_open(void) {
   );
   mln_test_gate_release(&gate);
 
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK, map_status, mln_test_last_error()
-  );
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK, runtime_status, mln_test_last_error()
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_completion_finish(&map_release)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_completion_finish(&runtime_release)
-  );
+  MLN_TEST_OK_MESSAGE(map_status, mln_test_last_error());
+  MLN_TEST_OK_MESSAGE(runtime_status, mln_test_last_error());
+  MLN_TEST_OK(mln_test_completion_finish(&map_release));
+  MLN_TEST_OK(mln_test_completion_finish(&runtime_release));
   mln_test_completion_destroy(&map_release);
   mln_test_completion_destroy(&runtime_release);
 }
@@ -388,17 +343,13 @@ static void a_held_request_does_not_hold_its_runtime_open(void) {
 
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
   mln_resource_request_release(handle);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_wait_until_retired(handle, NULL)
-  );
+  MLN_TEST_OK(mln_resource_request_wait_until_retired(handle, NULL));
 }
 
 static void unsupported_style_url_scheme_names_scheme_and_url(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, unsupported_scheme_style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, unsupported_scheme_style_url));
   char message[512];
   TEST_ASSERT_TRUE(
     mln_test_await_loading_failure(runtime, map, message, sizeof(message))
@@ -413,8 +364,7 @@ static void unsupported_style_url_scheme_names_scheme_and_url(void) {
 static void unsupported_style_url_diagnostic_redacts_credentials(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_url(map, credentialed_unsupported_scheme_style_url)
   );
   char message[512];
@@ -436,13 +386,9 @@ static void unsupported_style_url_names_declining_provider(void) {
     .size = sizeof(mln_resource_provider),
     .callback = pass_through_provider,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_resource_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, unsupported_scheme_style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, unsupported_scheme_style_url));
   char message[512];
   TEST_ASSERT_TRUE(
     mln_test_await_loading_failure(runtime, map, message, sizeof(message))
@@ -488,16 +434,12 @@ static void resource_provider_defers_inline_release_until_callback_returns(
     .callback = inline_release_resource_provider,
     .user_data = &state,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_resource_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, "custom://inline-style.json")
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://inline-style.json"));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
   TEST_ASSERT_TRUE(atomic_load(&state.callback_finished));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&state.completion_status));
+  MLN_TEST_OK(atomic_load(&state.completion_status));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -561,16 +503,12 @@ static mln_map start_cancel_probe_request(
     .callback = cancel_probe_resource_provider,
     .user_data = probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_resource_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_set_resource_provider(runtime, &provider));
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, "custom://cancel-style.json")
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://cancel-style.json"));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->provider_entered));
   if (!atomic_load(&probe->skip_register)) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe->register_status));
+    MLN_TEST_OK(atomic_load(&probe->register_status));
     TEST_ASSERT_FALSE(atomic_load(&probe->register_reported_cancelled));
   }
   return map;
@@ -593,19 +531,17 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   TEST_ASSERT_FALSE(atomic_load(&probe.released_before_cancel));
 
   bool cancelled = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled, NULL)
-  );
+  MLN_TEST_OK(mln_resource_request_cancelled(handle, &cancelled, NULL));
   TEST_ASSERT_TRUE(cancelled);
   const mln_resource_response response =
     mln_test_text_response(inline_style_json);
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
     mln_resource_request_complete(handle, &response, NULL)
   );
 
   cancelled = false;
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
     mln_resource_request_set_cancel_callback(
       handle, count_cancel, &probe, NULL, &cancelled, NULL
@@ -615,12 +551,9 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
 
   mln_resource_request_release(handle);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_resource_request_set_cancel_callback(
-      handle, count_cancel, &probe, NULL, &cancelled, NULL
-    )
-  );
+  MLN_TEST_INVALID(mln_resource_request_set_cancel_callback(
+    handle, count_cancel, &probe, NULL, &cancelled, NULL
+  ));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
@@ -656,16 +589,13 @@ static void late_cancel_callback_registration_reports_cancelled(void) {
     request_reports_cancelled, &poll, mln_test_deadline_default(),
     "the request to report cancelled"
   ));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, poll.status);
+  MLN_TEST_OK(poll.status);
   TEST_ASSERT_TRUE(poll.cancelled);
 
   bool cancelled = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_resource_request_set_cancel_callback(
-      handle, count_cancel, &probe, count_cancel_release, &cancelled, NULL
-    )
-  );
+  MLN_TEST_OK(mln_resource_request_set_cancel_callback(
+    handle, count_cancel, &probe, count_cancel_release, &cancelled, NULL
+  ));
   TEST_ASSERT_TRUE(cancelled);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
 
@@ -687,16 +617,11 @@ static void cancel_callback_may_release_the_request(void) {
   mln_test_destroy_map(map);
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&probe.cancel_count, 1));
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_wait_until_retired(handle, NULL)
-  );
+  MLN_TEST_OK(mln_resource_request_wait_until_retired(handle, NULL));
   bool cancelled = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_resource_request_set_cancel_callback(
-      handle, count_cancel, &probe, NULL, &cancelled, NULL
-    )
-  );
+  MLN_TEST_INVALID(mln_resource_request_set_cancel_callback(
+    handle, count_cancel, &probe, NULL, &cancelled, NULL
+  ));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
   mln_test_destroy_runtime(runtime);
 }
@@ -719,9 +644,7 @@ static void a_request_names_its_alias_and_its_resolved_url(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_provider_install(runtime, provider);
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, alias_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, alias_url));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
 
   const mln_test_provider_request* request =
@@ -758,9 +681,7 @@ static void a_pmtiles_request_carries_its_byte_range(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_provider_install(runtime, provider);
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, style_url));
   TEST_ASSERT_TRUE(
     mln_test_provider_wait_for_requests(provider, archive_url, 1)
   );
@@ -859,7 +780,7 @@ static void a_tile_answer_decides_whether_the_map_renders(void) {
       mln_test_provider_requests(provider, tile_url) >= 1, row->label
     );
     if (row->renders) {
-      TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, still, row->label);
+      MLN_TEST_OK_MESSAGE(still, row->label);
     } else {
       TEST_ASSERT_NOT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, still, row->label);
       TEST_ASSERT_NOT_EQUAL_INT_MESSAGE(
@@ -899,9 +820,7 @@ static void a_style_error_reaches_the_loading_failure(void) {
   mln_test_provider_install(runtime, provider);
   for (size_t index = 0; index < 2; index += 1) {
     mln_map map = mln_test_create_map(runtime);
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_test_map_set_style_url(map, resources[index].url)
-    );
+    MLN_TEST_OK(mln_test_map_set_style_url(map, resources[index].url));
     char message[512];
     TEST_ASSERT_TRUE(
       mln_test_await_loading_failure(runtime, map, message, sizeof(message))
@@ -919,7 +838,7 @@ static void a_style_error_reaches_the_loading_failure(void) {
 // next load has read the cache.
 static mln_map load_style(mln_runtime runtime, const char* url) {
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
   return map;
 }
@@ -1013,9 +932,7 @@ static void a_usable_cached_style_loads_before_the_provider_answers(void) {
   mln_map first = load_style(runtime, cached_style_url);
 
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, cached_style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, cached_style_url));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
   TEST_ASSERT_TRUE(
     mln_test_provider_wait_for_requests(provider, cached_style_url, 2)
@@ -1027,8 +944,7 @@ static void a_usable_cached_style_loads_before_the_provider_answers(void) {
     .size = sizeof(mln_resource_response),
     .status = MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_resource_request_complete(revalidation->handle, &not_modified, NULL)
   );
   mln_resource_request_release(revalidation->handle);

@@ -22,8 +22,7 @@ static mln_map_projection create_session_projection(
   const mln_test_render_fixture* fixture
 ) {
   mln_map_projection projection = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK,
+  MLN_TEST_OK_MESSAGE(
     mln_render_session_projection_create(
       fixture->session, &projection, MLN_TEST_DIAGNOSTIC
     ),
@@ -35,7 +34,7 @@ static mln_map_projection create_session_projection(
 
 static void expect_no_projection(const mln_test_render_fixture* fixture) {
   mln_map_projection projection = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
     mln_render_session_projection_create(fixture->session, &projection, NULL)
   );
@@ -46,13 +45,10 @@ static mln_screen_point pixel_of(
   mln_map_projection projection, double latitude, double longitude
 ) {
   mln_screen_point point = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_projection_pixel_for_lat_lng(
-      projection, (mln_lat_lng){.latitude = latitude, .longitude = longitude},
-      &point, NULL
-    )
-  );
+  MLN_TEST_OK(mln_map_projection_pixel_for_lat_lng(
+    projection, (mln_lat_lng){.latitude = latitude, .longitude = longitude},
+    &point, NULL
+  ));
   return point;
 }
 
@@ -66,8 +62,7 @@ static void jump_to(
   update.camera.latitude = latitude;
   update.camera.longitude = longitude;
   update.camera.zoom = zoom;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
+  MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
 }
@@ -76,9 +71,7 @@ static void expect_center(
   mln_map_projection projection, double latitude, double longitude, double zoom
 ) {
   mln_camera_options camera = {.size = sizeof(mln_camera_options)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_get_camera(projection, &camera, NULL)
-  );
+  MLN_TEST_OK(mln_map_projection_get_camera(projection, &camera, NULL));
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, latitude, camera.latitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, longitude, camera.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, zoom, camera.zoom);
@@ -105,8 +98,8 @@ static void a_session_projection_copies_the_last_rendered_frame(void) {
   // The earlier copy kept its own transform.
   expect_center(before, 0.0, 0.0, 0.0);
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(before, NULL));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(after, NULL));
+  MLN_TEST_OK(mln_map_projection_close(before, NULL));
+  MLN_TEST_OK(mln_map_projection_close(after, NULL));
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -130,9 +123,7 @@ static void a_session_projection_outlives_its_session(void) {
   const mln_screen_point center = pixel_of(projection, 0.0, 0.0);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 32.0, center.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 32.0, center.y);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_close(projection, NULL)
-  );
+  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
 }
 
 // A resize retires the rendered transform, since it no longer matches the
@@ -152,14 +143,10 @@ static void a_resize_or_detach_withholds_the_projection(void) {
     .scale_factor = 1.0,
   };
   mln_test_completion resize = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_resize(
-                     fixture.session, &extent, &resize.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &resize)
-  );
+  MLN_TEST_OK(mln_render_session_resize(
+    fixture.session, &extent, &resize.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &resize));
   mln_test_completion_destroy(&resize);
   expect_no_projection(&fixture);
 
@@ -168,18 +155,13 @@ static void a_resize_or_detach_withholds_the_projection(void) {
   const mln_screen_point center = pixel_of(projection, 0.0, 0.0);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 16.0, center.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 8.0, center.y);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_close(projection, NULL)
-  );
+  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
 
   mln_test_completion detach = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_detach(fixture.session, &detach.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &detach)
-  );
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &detach));
   mln_test_completion_destroy(&detach);
   expect_no_projection(&fixture);
 
@@ -214,9 +196,7 @@ static mln_status submit_projection(
     call->session, call->null_output ? NULL : &projection, diagnostic
   );
   if (status == MLN_STATUS_OK) {
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_map_projection_close(projection, NULL)
-    );
+    MLN_TEST_OK(mln_map_projection_close(projection, NULL));
   }
   return status;
 }

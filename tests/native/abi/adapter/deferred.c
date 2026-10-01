@@ -64,11 +64,9 @@ static void deferred_listener(
 
 static void* deferred_context(uint32_t callback, deferred_probe* probe) {
   void* context = NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_deferred_callback_create(
-                     callback, deferred_listener, probe, &context, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_deferred_callback_create(
+    callback, deferred_listener, probe, &context, NULL
+  ));
   TEST_ASSERT_NOT_NULL(context);
   return context;
 }
@@ -96,24 +94,16 @@ static void deferred_callbacks_reject_raw_invalid_arguments(void) {
   deferred_probe probe = {0};
   void* context = NULL;
   TEST_ASSERT_NULL(mln_adapter_deferred_callback_function(0));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_adapter_deferred_callback_create(
-                                   0, deferred_listener, &probe, &context, NULL
-                                 )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_deferred_callback_create(
-      MLN_ADAPTER_DEFERRED_LOG_CALLBACK, NULL, &probe, &context, NULL
-    )
-  );
+  MLN_TEST_INVALID(mln_adapter_deferred_callback_create(
+    0, deferred_listener, &probe, &context, NULL
+  ));
+  MLN_TEST_INVALID(mln_adapter_deferred_callback_create(
+    MLN_ADAPTER_DEFERRED_LOG_CALLBACK, NULL, &probe, &context, NULL
+  ));
   context = &probe;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_adapter_deferred_callback_create(
-                                   MLN_ADAPTER_DEFERRED_LOG_CALLBACK,
-                                   deferred_listener, &probe, &context, NULL
-                                 )
-  );
+  MLN_TEST_INVALID(mln_adapter_deferred_callback_create(
+    MLN_ADAPTER_DEFERRED_LOG_CALLBACK, deferred_listener, &probe, &context, NULL
+  ));
   TEST_ASSERT_EQUAL_PTR(&probe, context);
   TEST_ASSERT_EQUAL_size_t(0, atomic_load(&probe.releases));
 }
@@ -211,13 +201,9 @@ static void routed_deferred_provider_delivers_a_request_the_host_completes(
     .user_data = (void*)&routed,
   };
   mln_runtime runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_adapter_set_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_adapter_set_provider(runtime, &provider));
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, style_url));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.delivered));
 
   mln_adapter_deferred_call_record* record = atomic_load(&probe.kept);
@@ -238,17 +224,13 @@ static void routed_deferred_provider_delivers_a_request_the_host_completes(
     .bytes = inline_style_json,
     .byte_count = sizeof(inline_style_json) - 1,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_complete(handle, &response, NULL)
-  );
+  MLN_TEST_OK(mln_resource_request_complete(handle, &response, NULL));
   mln_resource_request_release(handle);
   TEST_ASSERT_TRUE(wait_for_map_event(
     runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED, map, NULL, 0
   ));
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_adapter_clear_provider(runtime)
-  );
+  MLN_TEST_OK(mln_test_adapter_clear_provider(runtime));
   mln_adapter_deferred_callback_release(context);
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.records));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.releases));
@@ -271,13 +253,9 @@ static void unadopted_deferred_request_fails_and_releases_once(void) {
     .release_user_data = mln_adapter_deferred_callback_release,
   };
   mln_runtime runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_adapter_set_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_adapter_set_provider(runtime, &provider));
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, style_url));
   char message[256] = {0};
   TEST_ASSERT_TRUE(wait_for_map_event(
     runtime, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, map, message, sizeof(message)
@@ -285,9 +263,7 @@ static void unadopted_deferred_request_fails_and_releases_once(void) {
   TEST_ASSERT_NOT_NULL(strstr(message, "released without a response"));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.records));
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_adapter_clear_provider(runtime)
-  );
+  MLN_TEST_OK(mln_test_adapter_clear_provider(runtime));
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.releases));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

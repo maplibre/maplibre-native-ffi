@@ -15,11 +15,10 @@ static bool source_exists(mln_map map, const char* id) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_style_source_result));
   const mln_buffer_view view = mln_test_view_of(id);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_map_get_style_source_info(map, view, &completion.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  MLN_TEST_OK(mln_test_completion_finish(&completion));
   const bool found = mln_test_completion_value_count(&completion) == 1;
   mln_test_completion_destroy(&completion);
   return found;
@@ -29,11 +28,10 @@ static bool image_exists(mln_map map, const char* id) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_style_image_result));
   const mln_buffer_view view = mln_test_view_of(id);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_map_get_style_image_info(map, view, &completion.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  MLN_TEST_OK(mln_test_completion_finish(&completion));
   const bool found = mln_test_completion_value_count(&completion) == 1;
   mln_test_completion_destroy(&completion);
   return found;
@@ -45,12 +43,10 @@ static void style_command_deep_copies_and_ordered_read_observes_it(void) {
   char id[] = "owned-source";
   char json[sizeof(MLN_TEST_EMPTY_GEOJSON_SOURCE)];
   memcpy(json, MLN_TEST_EMPTY_GEOJSON_SOURCE, sizeof(json));
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_style_source_json(
-                     map, mln_test_view_of(id), mln_test_view_of(json),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, mln_test_view_of(id), mln_test_view_of(json), &completion.descriptor,
+    NULL
+  ));
   memset(id, 'x', strlen(id));
   memset(json, ' ', strlen(json));
   TEST_ASSERT_TRUE(source_exists(map, "owned-source"));
@@ -64,18 +60,14 @@ static void duplicate_id_is_an_async_failed_terminal_event(void) {
   const mln_buffer_view id = MLN_BUFFER_LITERAL("duplicate");
   const mln_buffer_view json =
     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
+  MLN_TEST_AWAIT_OK(
     mln_map_add_style_source_json(map, id, json, &completion.descriptor, NULL)
   );
   mln_test_completion duplicate = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_map_add_style_source_json(map, id, json, &duplicate.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_finish(&duplicate)
-  );
+  MLN_TEST_INVALID(mln_test_completion_finish(&duplicate));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_COMMAND_DISPOSITION_FAILED, mln_test_completion_disposition(&duplicate)
   );
@@ -87,19 +79,14 @@ static void duplicate_id_is_an_async_failed_terminal_event(void) {
 static void remove_commands_commit_and_report_missing_ids(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_style_source_json(
-                     map, MLN_BUFFER_LITERAL("doomed-source"),
-                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
-                     &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_remove_style_source(
-      map, MLN_BUFFER_LITERAL("doomed-source"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, MLN_BUFFER_LITERAL("doomed-source"),
+    MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
+    NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_source(
+    map, MLN_BUFFER_LITERAL("doomed-source"), &completion.descriptor, NULL
+  ));
   TEST_ASSERT_FALSE(source_exists(map, "doomed-source"));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "doomed-source",
@@ -115,18 +102,13 @@ static void remove_commands_commit_and_report_missing_ids(void) {
   image.stride = 4;
   image.pixels = pixel;
   image.byte_length = sizeof(pixel);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_image(
-                     map, MLN_BUFFER_LITERAL("doomed-image"), &image, NULL,
-                     &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_remove_style_image(
-      map, MLN_BUFFER_LITERAL("doomed-image"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
+    map, MLN_BUFFER_LITERAL("doomed-image"), &image, NULL,
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_image(
+    map, MLN_BUFFER_LITERAL("doomed-image"), &completion.descriptor, NULL
+  ));
   TEST_ASSERT_FALSE(image_exists(map, "doomed-image"));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, "doomed-image",
@@ -325,9 +307,7 @@ static void missing_style_ids_report_not_found(void) {
   for (size_t index = 0; index < sizeof(cases) / sizeof(cases[0]); index += 1) {
     const missing_id_case* row = &cases[index];
     mln_test_completion completion = mln_test_completion_default(0);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK, row->submit(map, &completion.descriptor), row->label
-    );
+    MLN_TEST_OK_MESSAGE(row->submit(map, &completion.descriptor), row->label);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_NOT_FOUND, mln_test_completion_finish(&completion), row->label
     );
@@ -353,16 +333,11 @@ static void global_state_checks_views_and_completion(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_completion discard = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_global_state(map, NULL, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_global_state_property(
-      map, (mln_buffer_view){.data = NULL, .size = 1},
-      MLN_BUFFER_LITERAL("true"), &discard, NULL
-    )
-  );
+  MLN_TEST_INVALID(mln_map_get_global_state(map, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_set_global_state_property(
+    map, (mln_buffer_view){.data = NULL, .size = 1}, MLN_BUFFER_LITERAL("true"),
+    &discard, NULL
+  ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_STATE, "style JSON has not loaded",
     mln_map_set_global_state_property(
@@ -377,24 +352,17 @@ static void global_state_checks_views_and_completion(void) {
 // Reads the style's global state as JSON.
 static void read_global_state(mln_map map, char* out, size_t capacity) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_global_state(map, &completion.descriptor, NULL)
-  );
+  MLN_TEST_OK(mln_map_get_global_state(map, &completion.descriptor, NULL));
   bool found = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_style_finish_text(&completion, out, capacity, &found)
-  );
+  MLN_TEST_OK(mln_test_style_finish_text(&completion, out, capacity, &found));
   TEST_ASSERT_TRUE(found);
 }
 
 static void set_global_state(mln_map map, const char* value) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_global_state_property(
-                     map, MLN_BUFFER_LITERAL("theme"), mln_test_view_of(value),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_global_state_property(
+    map, MLN_BUFFER_LITERAL("theme"), mln_test_view_of(value),
+    &completion.descriptor, NULL
+  ));
 }
 
 // Global state starts from the defaults the style declares. A set property
@@ -452,14 +420,9 @@ static void global_state_reads_back_defaults_and_set_properties(void) {
 
 static void read_loaded_style_json(mln_map map, char* out, size_t capacity) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_loaded_style_json(map, &completion.descriptor, NULL)
-  );
+  MLN_TEST_OK(mln_map_loaded_style_json(map, &completion.descriptor, NULL));
   bool found = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_style_finish_text(&completion, out, capacity, &found)
-  );
+  MLN_TEST_OK(mln_test_style_finish_text(&completion, out, capacity, &found));
   TEST_ASSERT_TRUE(found);
 }
 
@@ -476,13 +439,11 @@ static void the_loaded_style_document_reads_back_as_loaded(void) {
   static const char named_style[] =
     "{\"version\":8,\"name\":\"loaded\",\"sources\":{},\"layers\":[]}";
   mln_test_load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(named_style));
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_style_source_json(
-                     map, MLN_BUFFER_LITERAL("added-later"),
-                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, MLN_BUFFER_LITERAL("added-later"),
+    MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
+    NULL
+  ));
   read_loaded_style_json(map, document, sizeof(document));
   TEST_ASSERT_EQUAL_STRING(named_style, document);
   mln_test_destroy_map(map);
@@ -493,13 +454,11 @@ static void the_loaded_style_document_reads_back_as_loaded(void) {
 static mln_style_transition_options read_transition_options(mln_map map) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_style_transition_options));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_map_get_style_transition_options(map, &completion.descriptor, NULL)
   );
   mln_style_transition_options value = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_completion_finish_value(&completion, &value, sizeof(value))
   );
   return value;
@@ -553,11 +512,9 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
     MLN_STYLE_TRANSITION_OPTION_DURATION | MLN_STYLE_TRANSITION_OPTION_DELAY;
   applied.duration_ms = 250.0;
   applied.delay_ms = 75.0;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_transition_options(
-                     map, &applied, &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_transition_options(
+    map, &applied, &completion.descriptor, NULL
+  ));
   mln_style_transition_options read = read_transition_options(map);
   TEST_ASSERT_EQUAL_DOUBLE(250.0, read.duration_ms);
   TEST_ASSERT_EQUAL_DOUBLE(75.0, read.delay_ms);
@@ -568,11 +525,9 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
     mln_style_transition_options_default();
   placement.fields = MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
   placement.enable_placement_transitions = false;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_transition_options(
-                     map, &placement, &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_transition_options(
+    map, &placement, &completion.descriptor, NULL
+  ));
   const mln_style_transition_options placement_read =
     read_transition_options(map);
   TEST_ASSERT_BITS_HIGH(
@@ -580,11 +535,9 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
     placement_read.fields
   );
   TEST_ASSERT_FALSE(placement_read.enable_placement_transitions);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_transition_options(
-                     map, &applied, &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_transition_options(
+    map, &applied, &completion.descriptor, NULL
+  ));
 
   // A null or undersized struct never reaches the map worker.
   MLN_TEST_EXPECT_COMMAND_REJECTED(
@@ -641,14 +594,10 @@ static void style_transition_options_reject_unsafe_raw_input(void) {
 // Reads one light property as JSON, or reports it undefined with "".
 static void read_light_property(mln_map map, const char* name, char* out) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_style_light_property(
-                     map, mln_test_view_of(name), &completion.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_style_finish_text(&completion, out, 64, NULL)
-  );
+  MLN_TEST_OK(mln_map_get_style_light_property(
+    map, mln_test_view_of(name), &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_style_finish_text(&completion, out, 64, NULL));
 }
 
 // The light has no ID to miss, so every bad input is an INVALID_ARGUMENT, and
@@ -658,25 +607,20 @@ static void the_style_light_round_trips_through_json(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_style_light_json(
-      map, MLN_BUFFER_LITERAL("{\"anchor\":\"viewport\",\"intensity\":0.5}"),
-      &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_light_json(
+    map, MLN_BUFFER_LITERAL("{\"anchor\":\"viewport\",\"intensity\":0.5}"),
+    &completion.descriptor, NULL
+  ));
   char value[64];
   read_light_property(map, "anchor", value);
   TEST_ASSERT_EQUAL_STRING("\"viewport\"", value);
   read_light_property(map, "intensity", value);
   TEST_ASSERT_EQUAL_STRING("0.5", value);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_light_property(
-                     map, MLN_BUFFER_LITERAL("intensity"),
-                     MLN_BUFFER_LITERAL("0.75"), &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_light_property(
+    map, MLN_BUFFER_LITERAL("intensity"), MLN_BUFFER_LITERAL("0.75"),
+    &completion.descriptor, NULL
+  ));
   read_light_property(map, "intensity", value);
   TEST_ASSERT_EQUAL_STRING("0.75", value);
 

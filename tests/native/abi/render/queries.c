@@ -161,7 +161,7 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
     options.filter = row->filter == NULL ? NULL : &filter;
     const mln_test_feature_list list =
       mln_test_style_query_rendered_with(&fixture, &row->geometry, &options);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, list.status, row->label);
+    MLN_TEST_OK_MESSAGE(list.status, row->label);
     TEST_ASSERT_EQUAL_size_t_MESSAGE(row->count, list.count, row->label);
     TEST_ASSERT_EQUAL_UINT_MESSAGE(
       row->points, named_points(&list), row->label
@@ -336,13 +336,10 @@ static void malformed_queries_are_rejected_at_submission(void) {
   // The accepted source query must finish before the session detaches, which
   // a barrier orders after it.
   mln_test_completion barrier = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_barrier(fixture.session, &barrier.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &barrier)
-  );
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &barrier));
   mln_test_completion_destroy(&barrier);
 
   mln_test_render_fixture_destroy(&fixture);
@@ -362,7 +359,7 @@ static void a_query_of_an_empty_frame_completes_empty(void) {
     MLN_RENDER_RESULT_RENDERED, mln_test_style_render_frame(&fixture)
   );
   const mln_test_feature_list list = mln_test_style_query_rendered(&fixture);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, list.status);
+  MLN_TEST_OK(list.status);
   TEST_ASSERT_EQUAL_size_t(0, list.count);
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -443,38 +440,29 @@ static void source_queries_read_the_named_source_layers(void) {
   options.fetch_tile = count_fetch;
   options.cancel_tile = ignore_cancel;
   options.user_data = &fetches;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL("tiles"), &options, &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_layer_json(
-      map,
-      MLN_BUFFER_LITERAL(
-        "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"tiles\","
-        "\"source-layer\":\"points\"}"
-      ),
-      (mln_buffer_view){0}, &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_custom_mvt_vector_source(
+    map, MLN_BUFFER_LITERAL("tiles"), &options, &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+    map,
+    MLN_BUFFER_LITERAL(
+      "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"tiles\","
+      "\"source-layer\":\"points\"}"
+    ),
+    (mln_buffer_view){0}, &completion.descriptor, NULL
+  ));
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   fetch_wait fetched = {.fetches = &fetches};
   TEST_ASSERT_TRUE(mln_test_style_render_until(
     &fixture, root_fetched, &fetched, "the root tile fetch"
   ));
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_custom_mvt_vector_source_tile_data(
-      map, MLN_BUFFER_LITERAL("tiles"),
-      (mln_canonical_tile_id){.z = 0, .x = 0, .y = 0},
-      mln_test_buffer_view(two_layer_tile, sizeof(two_layer_tile)),
-      &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_custom_mvt_vector_source_tile_data(
+    map, MLN_BUFFER_LITERAL("tiles"),
+    (mln_canonical_tile_id){.z = 0, .x = 0, .y = 0},
+    mln_test_buffer_view(two_layer_tile, sizeof(two_layer_tile)),
+    &completion.descriptor, NULL
+  ));
   source_count loaded = {.fixture = &fixture};
   TEST_ASSERT_TRUE(mln_test_style_render_until(
     &fixture, both_layers_loaded, &loaded, "both source layers"
@@ -512,7 +500,7 @@ static void source_queries_read_the_named_source_layers(void) {
     query.filter = row->filter == NULL ? NULL : &filter;
     const mln_test_feature_list list =
       mln_test_style_query_source_with(&fixture, "tiles", &query);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, list.status, row->label);
+    MLN_TEST_OK_MESSAGE(list.status, row->label);
     TEST_ASSERT_EQUAL_size_t_MESSAGE(row->count, list.count, row->label);
     for (size_t hit = 0; hit < list.count; hit += 1) {
       TEST_ASSERT_EQUAL_STRING_MESSAGE(
@@ -558,15 +546,12 @@ static mln_status query_extension(
   const mln_buffer_view argument_view =
     arguments == NULL ? (mln_buffer_view){0} : mln_test_view_of(arguments);
   mln_test_completion completion = mln_test_completion_buffer_view();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_query_feature_extensions(
-      fixture->session, MLN_BUFFER_LITERAL("clustered"),
-      mln_test_view_of(feature), MLN_BUFFER_LITERAL("supercluster"),
-      mln_test_view_of(field), arguments == NULL ? NULL : &argument_view,
-      &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
+  MLN_TEST_OK(mln_render_session_query_feature_extensions(
+    fixture->session, MLN_BUFFER_LITERAL("clustered"),
+    mln_test_view_of(feature), MLN_BUFFER_LITERAL("supercluster"),
+    mln_test_view_of(field), arguments == NULL ? NULL : &argument_view,
+    &completion.descriptor, MLN_TEST_DIAGNOSTIC
+  ));
   (void)mln_test_render_fixture_finish_operation(fixture, &completion);
   bool found = false;
   const mln_status status =
@@ -631,8 +616,7 @@ static void cluster_extensions_resolve_an_unsigned_cluster_id(void) {
   };
   for (size_t index = 0; index < sizeof(rows) / sizeof(rows[0]); index += 1) {
     const extension_row* row = &rows[index];
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK,
+    MLN_TEST_OK_MESSAGE(
       query_extension(
         &fixture, cluster, row->field, row->arguments, result, sizeof(result)
       ),
@@ -682,8 +666,7 @@ static void cluster_extensions_resolve_an_unsigned_cluster_id(void) {
       "\"cluster_id\":%s}}",
       written
     );
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
+    MLN_TEST_OK(
       query_extension(&fixture, feature, "leaves", NULL, result, sizeof(result))
     );
     if (expected[index] == NULL) {

@@ -154,16 +154,12 @@ static void offline_region_creation_validates_its_definition(void) {
     &defaults, sizeof(defaults), submit_region, &runtime
   );
   mln_completion completion = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_runtime_offline_region_create(runtime, NULL, NULL, 0, &completion, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_offline_region_create(
-      runtime, &defaults, NULL, 3, &completion, NULL
-    )
-  );
+  MLN_TEST_INVALID(mln_runtime_offline_region_create(
+    runtime, &defaults, NULL, 3, &completion, NULL
+  ));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -269,9 +265,7 @@ static region_probe* new_region_probe(mln_completion* out_completion) {
 static region_probe* finish_region_probe(
   mln_status submission, region_probe* probe
 ) {
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK, submission, mln_test_last_error()
-  );
+  MLN_TEST_OK_MESSAGE(submission, mln_test_last_error());
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->done));
   TEST_ASSERT_FALSE_MESSAGE(probe->overflowed, "a region did not fit its copy");
   return probe;
@@ -385,11 +379,9 @@ static mln_status get_region_status(
     .callback = copy_status,
     .user_data = probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_offline_region_get_status(
-                     runtime, id, &completion, MLN_TEST_DIAGNOSTIC
-                   )
-  );
+  MLN_TEST_OK(mln_runtime_offline_region_get_status(
+    runtime, id, &completion, MLN_TEST_DIAGNOSTIC
+  ));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->done));
   const mln_status status = probe->status;
   *out_status = probe->value;
@@ -407,7 +399,7 @@ static void an_offline_region_lives_from_creation_to_deletion(void) {
 
   const mln_offline_region_definition pyramid = tile_definition();
   region_probe* created = create_region(runtime, &pyramid, metadata, 3);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, created->status);
+  MLN_TEST_OK(created->status);
   TEST_ASSERT_EQUAL_size_t(1, created->count);
   const mln_offline_region_id id = created->regions[0].id;
   expect_tile_region(&created->regions[0], metadata, 3);
@@ -415,7 +407,7 @@ static void an_offline_region_lives_from_creation_to_deletion(void) {
 
   const mln_offline_region_definition geometry = geometry_definition();
   region_probe* shaped = create_region(runtime, &geometry, NULL, 0);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, shaped->status);
+  MLN_TEST_OK(shaped->status);
   const region_copy shaped_region = shaped->regions[0];
   free(shaped);
   TEST_ASSERT_NOT_EQUAL_INT64(id, shaped_region.id);
@@ -428,14 +420,14 @@ static void an_offline_region_lives_from_creation_to_deletion(void) {
   TEST_ASSERT_EQUAL_size_t(0, shaped_region.metadata_size);
 
   region_probe* listed = list_regions(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, listed->status);
+  MLN_TEST_OK(listed->status);
   TEST_ASSERT_EQUAL_size_t(2, listed->count);
   expect_tile_region(find_region(listed, id), metadata, 3);
   TEST_ASSERT_NOT_NULL(find_region(listed, shaped_region.id));
   free(listed);
 
   region_probe* fetched = get_region(runtime, id);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, fetched->status);
+  MLN_TEST_OK(fetched->status);
   TEST_ASSERT_EQUAL_size_t(1, fetched->count);
   expect_tile_region(&fetched->regions[0], metadata, 3);
   free(fetched);
@@ -449,7 +441,7 @@ static void an_offline_region_lives_from_creation_to_deletion(void) {
     ),
     updated
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, updated->status);
+  MLN_TEST_OK(updated->status);
   expect_tile_region(&updated->regions[0], updated_metadata, 2);
   free(updated);
   fetched = get_region(runtime, id);
@@ -457,27 +449,26 @@ static void an_offline_region_lives_from_creation_to_deletion(void) {
   free(fetched);
 
   mln_offline_region_status status = {0};
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, get_region_status(runtime, id, &status));
+  MLN_TEST_OK(get_region_status(runtime, id, &status));
   TEST_ASSERT_EQUAL_UINT32(sizeof(mln_offline_region_status), status.size);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE, status.download_state
   );
   TEST_ASSERT_FALSE(status.complete);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
+  MLN_TEST_AWAIT_OK(
     mln_runtime_offline_region_delete(runtime, id, &completion.descriptor, NULL)
   );
 
   fetched = get_region(runtime, id);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, fetched->status);
+  MLN_TEST_OK(fetched->status);
   TEST_ASSERT_EQUAL_size_t(0, fetched->count);
   free(fetched);
   listed = list_regions(runtime);
   TEST_ASSERT_EQUAL_size_t(1, listed->count);
   TEST_ASSERT_EQUAL_INT64(shaped_region.id, listed->regions[0].id);
   free(listed);
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_NOT_FOUND, get_region_status(runtime, id, &status)
   );
   mln_test_destroy_runtime(runtime);
@@ -558,7 +549,7 @@ static void offline_operations_report_a_missing_region(void) {
   mln_runtime runtime = mln_test_create_runtime();
 
   region_probe* fetched = get_region(runtime, missing);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, fetched->status);
+  MLN_TEST_OK(fetched->status);
   TEST_ASSERT_EQUAL_size_t(0, fetched->count);
   free(fetched);
 
@@ -569,9 +560,7 @@ static void offline_operations_report_a_missing_region(void) {
     const mln_status submission = missing_region_operations[index].operation(
       runtime, missing, &completion.descriptor
     );
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK, submission, missing_region_operations[index].label
-    );
+    MLN_TEST_OK_MESSAGE(submission, missing_region_operations[index].label);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_NOT_FOUND, mln_test_completion_finish(&completion),
       missing_region_operations[index].label
@@ -580,16 +569,12 @@ static void offline_operations_report_a_missing_region(void) {
   }
 
   mln_completion completion = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_offline_region_set_download_state(
-                                   runtime, missing, 999, &completion, NULL
-                                 )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_offline_region_update_metadata(
-                                   runtime, missing, NULL, 3, &completion, NULL
-                                 )
-  );
+  MLN_TEST_INVALID(mln_runtime_offline_region_set_download_state(
+    runtime, missing, 999, &completion, NULL
+  ));
+  MLN_TEST_INVALID(mln_runtime_offline_region_update_metadata(
+    runtime, missing, NULL, 3, &completion, NULL
+  ));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -602,8 +587,7 @@ static void offline_database_merge_rejects_what_names_no_database_file(void) {
   };
   mln_runtime runtime = mln_test_create_runtime();
   mln_completion completion = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_runtime_offline_regions_merge_database(runtime, NULL, &completion, NULL)
   );
   for (size_t index = 0;
@@ -643,11 +627,9 @@ static void offline_database_merge_reports_a_corrupt_side_database(void) {
   mln_test_completion merge = mln_test_completion_default(0);
   // The file opens read-only, so acceptance succeeds and the schema failure
   // reaches the completion instead.
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_offline_regions_merge_database(
-                     runtime, fixture_path, &merge.descriptor, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_runtime_offline_regions_merge_database(
+    runtime, fixture_path, &merge.descriptor, NULL
+  ));
   TEST_ASSERT_TRUE(mln_test_completion_wait(&merge, -1));
   TEST_ASSERT_NOT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&merge));
   TEST_ASSERT_GREATER_THAN_size_t(
@@ -711,7 +693,7 @@ static mln_offline_region_id write_side_database(
   const mln_offline_region_definition definition = tile_definition();
   region_probe* created =
     create_region(side, &definition, metadata, metadata_size);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, created->status);
+  MLN_TEST_OK(created->status);
   const mln_offline_region_id id = created->regions[0].id;
   free(created);
   // The release completes once the runtime has closed its database.
@@ -734,7 +716,7 @@ static void offline_database_merge_copies_regions_from_a_read_only_file(void) {
 
   mln_runtime runtime = mln_test_create_runtime();
   region_probe* merged = merge_database(runtime, side_path);
-  TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, merged->status, side_path);
+  MLN_TEST_OK_MESSAGE(merged->status, side_path);
   TEST_ASSERT_EQUAL_size_t(1, merged->count);
   const mln_offline_region_id merged_id = merged->regions[0].id;
   expect_tile_region(&merged->regions[0], metadata, sizeof(metadata));
@@ -810,17 +792,13 @@ static void a_download_completes_from_provider_served_resources(void) {
   region_probe* created = create_region(runtime, &definition, NULL, 0);
   const mln_offline_region_id id = created->regions[0].id;
   free(created);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_observed(
-                     runtime, id, true, &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_download_state(
-                     runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_observed(
+    runtime, id, true, &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_download_state(
+    runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &completion.descriptor,
+    NULL
+  ));
   download_watch watch = {.region = id};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_await_event_matching(
@@ -843,24 +821,20 @@ static void a_download_completes_from_provider_served_resources(void) {
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_USAGE_OFFLINE, style_request->usage);
 
   mln_offline_region_status status = {0};
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, get_region_status(runtime, id, &status));
+  MLN_TEST_OK(get_region_status(runtime, id, &status));
   TEST_ASSERT_TRUE(status.complete);
   TEST_ASSERT_EQUAL_UINT64(1, status.completed_tile_count);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_download_state(
-                     runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_download_state(
+    runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE, &completion.descriptor,
+    NULL
+  ));
 
   // A map reads the downloaded style as a usable cached copy, and only asks
   // the provider to revalidate it. Once the region is invalidated, the copy
   // has expired, so the map asks for the style again and offers that copy.
   mln_map before = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(before, offline_style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(before, offline_style_url));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, before));
   // The style loads from the cached copy before the revalidation reaches the
   // provider.
@@ -877,15 +851,11 @@ static void a_download_completes_from_provider_served_resources(void) {
   mln_test_destroy_map(before);
   mln_resource_request_release(revalidation->handle);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_invalidate(
-                     runtime, id, &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_invalidate(
+    runtime, id, &completion.descriptor, NULL
+  ));
   mln_map after = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(after, offline_style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(after, offline_style_url));
   TEST_ASSERT_TRUE(
     mln_test_provider_wait_for_requests(provider, offline_style_url, 3)
   );
@@ -903,9 +873,7 @@ static void a_download_completes_from_provider_served_resources(void) {
     .bytes = (const uint8_t*)offline_style_json,
     .byte_count = sizeof(offline_style_json) - 1,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_complete(refetch->handle, &style, NULL)
-  );
+  MLN_TEST_OK(mln_resource_request_complete(refetch->handle, &style, NULL));
   mln_resource_request_release(refetch->handle);
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, after));
 
@@ -964,17 +932,13 @@ static void a_failed_download_request_reports_its_reason(void) {
   region_probe* created = create_region(runtime, &definition, NULL, 0);
   const mln_offline_region_id id = created->regions[0].id;
   free(created);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_observed(
-                     runtime, id, true, &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_download_state(
-                     runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_observed(
+    runtime, id, true, &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_download_state(
+    runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &completion.descriptor,
+    NULL
+  ));
   response_error_watch watch = {.region = id};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_await_event_matching(
@@ -987,12 +951,10 @@ static void a_failed_download_request_reports_its_reason(void) {
     strstr(watch.message, "the tile host is unreachable"), watch.message
   );
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_download_state(
-                     runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_download_state(
+    runtime, id, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE, &completion.descriptor,
+    NULL
+  ));
   mln_test_destroy_runtime(runtime);
   mln_test_provider_destroy(provider);
 }
@@ -1062,13 +1024,13 @@ static void offline_submission_never_waits_for_the_runtime_worker(void) {
     // The completion will never run, so release the waiting thread by hand.
     mln_test_flag_set(&probe.entered);
   }
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, accepted);
+  MLN_TEST_OK(accepted);
   mln_test_thread_join(thread);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe.offline_status));
+  MLN_TEST_OK(atomic_load(&probe.offline_status));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.finished));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe.reentrant_status));
+  MLN_TEST_OK(atomic_load(&probe.reentrant_status));
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&list));
+  MLN_TEST_OK(mln_test_completion_finish(&list));
   mln_test_completion_destroy(&list);
   mln_test_destroy_runtime(runtime);
 }
@@ -1087,17 +1049,13 @@ static void an_offline_operation_accepted_before_release_still_completes(void) {
   mln_runtime_options options = mln_runtime_options_default();
   options.event_wake = mln_test_pulse_wake();
   options.cache_path = cache_path;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC)
-  );
+  MLN_TEST_OK(mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC));
   // A resource configuration completion runs on the runtime worker, so the
   // offline operation and the release queue behind it.
   mln_test_gate gate;
   mln_test_gate_init(&gate);
   const mln_completion hold = mln_test_gate_completion(&gate);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_clear_resource_provider(runtime, &hold, NULL)
-  );
+  MLN_TEST_OK(mln_runtime_clear_resource_provider(runtime, &hold, NULL));
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
   );
@@ -1114,22 +1072,20 @@ static void an_offline_operation_accepted_before_release_still_completes(void) {
     mln_runtime_release(runtime, &release.descriptor, MLN_TEST_DIAGNOSTIC);
   mln_test_gate_release(&gate);
 
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK, release_status, mln_test_last_error()
-  );
+  MLN_TEST_OK_MESSAGE(release_status, mln_test_last_error());
   (void)finish_region_probe(create_status, probe);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe->status);
+  MLN_TEST_OK(probe->status);
   const mln_offline_region_id created_id = probe->regions[0].id;
   free(probe);
   // The release completes once the runtime has closed its database.
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&release));
+  MLN_TEST_OK(mln_test_completion_finish(&release));
   mln_test_completion_destroy(&release);
 
   mln_runtime_options reopen = mln_runtime_options_default();
   reopen.cache_path = cache_path;
   mln_runtime reopened = mln_test_create_runtime_with_options(reopen);
   region_probe* listed = list_regions(reopened);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, listed->status);
+  MLN_TEST_OK(listed->status);
   TEST_ASSERT_EQUAL_size_t(1, listed->count);
   expect_tile_region(
     find_region(listed, created_id), metadata, sizeof(metadata)

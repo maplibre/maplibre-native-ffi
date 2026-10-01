@@ -12,6 +12,7 @@
 
 #include "env.h"
 #include "render.h"
+#include "status.h"
 #include "unity.h"
 #include "wait.h"
 
@@ -73,13 +74,10 @@ uint32_t mln_test_style_render_frame(const mln_test_render_fixture* fixture) {
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = 0;
   demand.token = wait.token;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_request_frame(
-                     fixture->session, &demand, MLN_TEST_DIAGNOSTIC
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(mln_render_session_request_frame(
+    fixture->session, &demand, MLN_TEST_DIAGNOSTIC
+  ));
+  MLN_TEST_OK_MESSAGE(
     mln_test_render_step_until(
       fixture, frame_arrived, &wait, mln_test_deadline_default(),
       "a frame result"
@@ -166,8 +164,7 @@ static feature_probe* new_feature_probe(mln_completion* out_completion) {
 static mln_test_feature_list finish_feature_probe(
   const mln_test_render_fixture* fixture, feature_probe* probe
 ) {
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK,
+  MLN_TEST_OK_MESSAGE(
     mln_test_render_step_until(
       fixture, probe_done, probe, mln_test_deadline_default(), "a feature query"
     ),
@@ -203,7 +200,7 @@ mln_test_feature_list mln_test_style_query_rendered_with(
   );
   if (status != MLN_STATUS_OK) {
     free(probe);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, status, mln_test_last_error());
+    MLN_TEST_OK_MESSAGE(status, mln_test_last_error());
   }
   return finish_feature_probe(fixture, probe);
 }
@@ -238,7 +235,7 @@ mln_test_feature_list mln_test_style_query_source_with(
   );
   if (status != MLN_STATUS_OK) {
     free(probe);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, status, mln_test_last_error());
+    MLN_TEST_OK_MESSAGE(status, mln_test_last_error());
   }
   return finish_feature_probe(fixture, probe);
 }
@@ -319,7 +316,7 @@ void mln_test_style_serve(
     mln_test_completion_destroy(&completion);
     TEST_FAIL_MESSAGE(mln_test_last_error());
   }
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&completion));
+  MLN_TEST_OK(mln_test_completion_settle(&completion));
 }
 
 typedef struct list_probe {
@@ -376,9 +373,7 @@ static mln_test_style_list run_list_query(
     .callback = copy_list,
     .user_data = probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, query(map, &completion, MLN_TEST_DIAGNOSTIC)
-  );
+  MLN_TEST_OK(query(map, &completion, MLN_TEST_DIAGNOSTIC));
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_wait_for_flag(&probe->done), "the list query never completed"
   );

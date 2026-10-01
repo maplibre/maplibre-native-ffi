@@ -15,14 +15,10 @@
 #if !defined(__EMSCRIPTEN__)
 static void finish_render_barrier(const mln_test_render_fixture* fixture) {
   mln_test_completion completion = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_barrier(fixture->session, &completion.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_render_fixture_finish_operation(fixture, &completion)
-  );
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &completion));
   mln_test_completion_destroy(&completion);
 }
 
@@ -32,28 +28,25 @@ static uint32_t render_red_frame(
   mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture,
   uint32_t flags
 ) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = flags;
   demand.token = 7;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
   finish_render_barrier(fixture);
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
   );
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
   const mln_status status = mln_render_frame_batch_get(batch, 0, &result, NULL);
   mln_render_frame_batch_release(batch);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, status);
+  MLN_TEST_OK(status);
   TEST_ASSERT_EQUAL_UINT64(demand.token, result.token);
   return result.disposition;
 }
@@ -131,7 +124,7 @@ static void host_targets_refuse_readback_and_a_borrowed_texture_resize(void) {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED, render_red_frame(runtime, map, &fixture, 0)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
+  MLN_TEST_STATUS(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
   const mln_render_target_extent smaller = {
     .size = sizeof(mln_render_target_extent),
     .width = MLN_TEST_HOST_TARGET_SIZE / 2,
@@ -139,7 +132,7 @@ static void host_targets_refuse_readback_and_a_borrowed_texture_resize(void) {
     .scale_factor = 1.0,
   };
   mln_test_completion resize = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_UNSUPPORTED,
     mln_render_session_resize(
       fixture.session, &smaller, &resize.descriptor, MLN_TEST_DIAGNOSTIC
@@ -155,7 +148,7 @@ static void host_targets_refuse_readback_and_a_borrowed_texture_resize(void) {
     MLN_RENDER_RESULT_RENDERED,
     render_red_frame(runtime, map, &fixture, MLN_FRAME_DEMAND_PRESENT)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
+  MLN_TEST_STATUS(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
   mln_test_render_fixture_destroy(&fixture);
 
   mln_test_destroy_map(map);

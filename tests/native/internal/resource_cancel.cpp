@@ -78,28 +78,22 @@ void cancel_callback_skips_a_completed_request() {
     .callback = complete_inline_provider,
     .user_data = &probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln::native_tests::set_resource_provider(runtime, provider)
-  );
+  MLN_TEST_OK(mln::native_tests::set_resource_provider(runtime, provider));
   auto map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, "custom://cancel-style.json")
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://cancel-style.json"));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.provider_entered));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.register_status.load());
+  MLN_TEST_OK(probe.register_status.load());
   const auto handle = probe.handle.load();
 
   // Let the response reach the style before the map goes away.
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_test_destroy_map(map);
   TEST_ASSERT_TRUE(
     sync_points.wait_for_hits(SyncPoint::ResourceRequestCancelled, 1)
   );
   TEST_ASSERT_EQUAL_INT(0, probe.cancel_count.load());
   auto cancelled = true;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_resource_request_cancelled(handle, &cancelled, nullptr)
-  );
+  MLN_TEST_OK(mln_resource_request_cancelled(handle, &cancelled, nullptr));
   TEST_ASSERT_FALSE(cancelled);
   TEST_ASSERT_EQUAL_INT(0, probe.release_count.load());
 
@@ -179,16 +173,11 @@ void run_release_waits_for_in_flight_cancel_callback(BlockingCancel& probe) {
     .callback = blocking_cancel_provider,
     .user_data = &probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln::native_tests::set_resource_provider(runtime, provider)
-  );
+  MLN_TEST_OK(mln::native_tests::set_resource_provider(runtime, provider));
   auto map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_map_set_style_url(map, "custom://blocking-cancel.json")
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://blocking-cancel.json"));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.provider_entered));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.register_status.load());
+  MLN_TEST_OK(probe.register_status.load());
   TEST_ASSERT_FALSE(probe.register_reported_cancelled.load());
 
   mln_test_destroy_map(map);
@@ -196,9 +185,7 @@ void run_release_waits_for_in_flight_cancel_callback(BlockingCancel& probe) {
   mln_test_flag_set(&probe.release_started);
   const auto handle = probe.handle.load();
   if (probe.waiter_drains_instead_of_releasing) {
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_resource_request_wait_until_retired(handle, nullptr)
-    );
+    MLN_TEST_OK(mln_resource_request_wait_until_retired(handle, nullptr));
   } else {
     mln_resource_request_release(handle);
   }
@@ -210,21 +197,13 @@ void run_release_waits_for_in_flight_cancel_callback(BlockingCancel& probe) {
   );
   TEST_ASSERT_TRUE(callback_returned_before_release);
   if (probe.self_release) {
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_INVALID_ARGUMENT, probe.status_after_self_release.load()
-    );
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_INVALID_ARGUMENT,
-      probe.complete_status_after_self_release.load()
-    );
+    MLN_TEST_INVALID(probe.status_after_self_release.load());
+    MLN_TEST_INVALID(probe.complete_status_after_self_release.load());
   } else {
     mln_resource_request_release(handle);
   }
   auto cancelled = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_resource_request_cancelled(handle, &cancelled, nullptr)
-  );
+  MLN_TEST_INVALID(mln_resource_request_cancelled(handle, &cancelled, nullptr));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -327,24 +306,20 @@ void run_drain_waits_for_an_unrun_registrations_release(
     .callback = blocking_registration_provider,
     .user_data = &probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln::native_tests::set_resource_provider(runtime, provider)
-  );
+  MLN_TEST_OK(mln::native_tests::set_resource_provider(runtime, provider));
   auto map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_url(map, "custom://blocking-registration.json")
   );
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.provider_entered));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.register_status.load());
+  MLN_TEST_OK(probe.register_status.load());
 
   auto* releaser =
     probe.release_during_decision
       ? probe.releaser
       : mln_test_thread_start(release_request_on_this_thread, &probe);
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe.release_entered));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_resource_request_wait_until_retired(probe.handle.load(), nullptr)
   );
   const auto release_returned_before_drain = probe.release_returned.load();

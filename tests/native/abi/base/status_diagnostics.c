@@ -15,16 +15,11 @@ static void a_failed_call_writes_its_diagnostic_and_a_successful_call_clears_it(
 ) {
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_buffer_view view = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_buffer_get(MLN_HANDLE_NULL, &view, &diagnostic)
-  );
+  MLN_TEST_INVALID(mln_buffer_get(MLN_HANDLE_NULL, &view, &diagnostic));
   TEST_ASSERT_GREATER_THAN_size_t(0, strlen(diagnostic.message));
 
   uint32_t network_status = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_network_status_get(&network_status, &diagnostic)
-  );
+  MLN_TEST_OK(mln_network_status_get(&network_status, &diagnostic));
   TEST_ASSERT_EQUAL_size_t(0, strlen(diagnostic.message));
 }
 
@@ -33,10 +28,7 @@ static void a_diagnostic_is_written_within_its_declared_size(void) {
   memset(&diagnostic, 'x', sizeof(diagnostic));
   diagnostic.size = (uint32_t)(offsetof(mln_diagnostic, message) + 4);
   mln_buffer_view view = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_buffer_get(MLN_HANDLE_NULL, &view, &diagnostic)
-  );
+  MLN_TEST_INVALID(mln_buffer_get(MLN_HANDLE_NULL, &view, &diagnostic));
   TEST_ASSERT_EQUAL_size_t(3, strlen(diagnostic.message));
   TEST_ASSERT_EQUAL_INT('x', diagnostic.message[4]);
 }
@@ -92,14 +84,11 @@ static void a_value_that_names_no_buffer_is_rejected_without_effect(void) {
   }
 
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_buffer_get(MLN_HANDLE_NULL, NULL, &diagnostic)
-  );
+  MLN_TEST_INVALID(mln_buffer_get(MLN_HANDLE_NULL, NULL, &diagnostic));
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "out_view"));
 
   // Destroying the runtime's value as a buffer left the runtime live.
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -112,12 +101,10 @@ static void a_native_exception_becomes_native_error_with_its_text(void) {
   mln_test_drain_all(runtime);
 
   mln_test_completion completion = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(
-                     map, MLN_BUFFER_LITERAL("{"), &completion.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_OK(mln_map_set_style_json(
+    map, MLN_BUFFER_LITERAL("{"), &completion.descriptor, NULL
+  ));
+  MLN_TEST_STATUS(
     MLN_STATUS_NATIVE_ERROR, mln_test_completion_finish(&completion)
   );
   TEST_ASSERT_EQUAL_UINT32(

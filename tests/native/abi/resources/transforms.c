@@ -94,16 +94,9 @@ static void resource_transform_registration_validates_its_descriptor(void) {
     sizeof(resource_transform_cases) / sizeof(resource_transform_cases[0]),
     &transform, sizeof(transform), submit_resource_transform, &runtime
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_set_resource_transform(runtime, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_test_clear_resource_transform(MLN_HANDLE_NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_clear_resource_transform(runtime)
-  );
+  MLN_TEST_INVALID(mln_test_set_resource_transform(runtime, NULL));
+  MLN_TEST_INVALID(mln_test_clear_resource_transform(MLN_HANDLE_NULL));
+  MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -113,18 +106,14 @@ static void a_replacement_url_needs_a_transform_invocation(void) {
   mln_resource_transform_response response = {
     .size = sizeof(mln_resource_transform_response),
   };
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE, mln_resource_transform_response_set_url(
                                 &response, "http://127.0.0.1/", 17, NULL
                               )
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_resource_transform_response_set_url(NULL, "x", 1, NULL)
-  );
+  MLN_TEST_INVALID(mln_resource_transform_response_set_url(NULL, "x", 1, NULL));
   response.size = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_resource_transform_response_set_url(&response, "x", 1, NULL)
   );
 }
@@ -179,14 +168,8 @@ static void header_transform_registration_validates_its_descriptor(void) {
     sizeof(header_transform_cases) / sizeof(header_transform_cases[0]),
     &transform, sizeof(transform), submit_header_transform, &runtime
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_test_set_http_header_transform(runtime, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_test_clear_http_header_transform(MLN_HANDLE_NULL)
-  );
+  MLN_TEST_INVALID(mln_test_set_http_header_transform(runtime, NULL));
+  MLN_TEST_INVALID(mln_test_clear_http_header_transform(MLN_HANDLE_NULL));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -216,7 +199,7 @@ static void a_header_needs_a_transform_invocation_and_a_valid_field(void) {
   mln_http_header_transform_response response = {
     .size = sizeof(mln_http_header_transform_response),
   };
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE, mln_http_header_transform_response_set(
                                 &response, "X-Test", 6, "value", 5, NULL
                               )
@@ -273,7 +256,7 @@ static void load_from_server(
   char url[256];
   mln_test_http_server_url(server, path, url, sizeof(url));
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
   if (expect_loaded) {
     TEST_ASSERT_TRUE_MESSAGE(mln_test_await_style_loaded(runtime, map), path);
   } else {
@@ -307,9 +290,7 @@ static void a_resource_transform_rewrites_until_cleared(void) {
     .callback = rewrite_a_to_b,
     .user_data = &probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_resource_transform(runtime, &transform)
-  );
+  MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
 
   load_from_server(runtime, server, "/a/first.json", true);
   TEST_ASSERT_EQUAL_INT(
@@ -321,9 +302,7 @@ static void a_resource_transform_rewrites_until_cleared(void) {
   const int calls = atomic_load(&probe.calls);
   TEST_ASSERT_GREATER_OR_EQUAL_INT(1, calls);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_clear_resource_transform(runtime)
-  );
+  MLN_TEST_OK(mln_test_clear_resource_transform(runtime));
   load_from_server(runtime, server, "/a/second.json", true);
   TEST_ASSERT_EQUAL_INT(
     1, mln_test_http_server_requests(server, "/a/second.json")
@@ -389,19 +368,14 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
     .callback = record_image_resource_kind,
     .user_data = &probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_resource_transform(runtime, &transform)
-  );
+  MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
 #if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   const mln_http_header_transform header_transform = {
     .size = sizeof(mln_http_header_transform),
     .callback = record_image_header_kind,
     .user_data = &probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_set_http_header_transform(runtime, &header_transform)
-  );
+  MLN_TEST_OK(mln_test_set_http_header_transform(runtime, &header_transform));
 #endif
 
   char overlay_url[256];
@@ -417,12 +391,9 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
   );
   TEST_ASSERT_TRUE(written > 0 && (size_t)written < sizeof(style));
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_map_set_style_json(
-      map, (mln_buffer_view){.data = style, .size = (size_t)written}
-    )
-  );
+  MLN_TEST_OK(mln_test_map_set_style_json(
+    map, (mln_buffer_view){.data = style, .size = (size_t)written}
+  ));
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_wait_for_flag(&probe.resource_seen),
     "the resource transform never saw the image request"
@@ -485,9 +456,7 @@ static void install_token_transform(
     .callback = add_token,
     .user_data = probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_set_http_header_transform(runtime, &transform)
-  );
+  MLN_TEST_OK(mln_test_set_http_header_transform(runtime, &transform));
 }
 
 static bool request_carried_token(
@@ -522,9 +491,7 @@ static void a_header_transform_adds_headers_until_cleared(void) {
   );
   const int calls = atomic_load(&probe.calls);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_clear_http_header_transform(runtime)
-  );
+  MLN_TEST_OK(mln_test_clear_http_header_transform(runtime));
   load_from_server(runtime, server, "/after-clear.json", true);
   TEST_ASSERT_EQUAL_INT(
     1, mln_test_http_server_requests(server, "/after-clear.json")
@@ -559,7 +526,7 @@ static void a_header_transform_skips_requests_that_are_not_http(void) {
   token_transform probe;
   install_token_transform(runtime, &probe);
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
   TEST_ASSERT_TRUE_MESSAGE(mln_test_await_style_loaded(runtime, map), url);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.calls));
   mln_test_destroy_map(map);

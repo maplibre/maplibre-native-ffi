@@ -30,20 +30,16 @@ static mln_feature_state_selector selector_for(
 static void set_state(
   mln_map map, mln_feature_state_selector selector, const char* state
 ) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_feature_state(
-                     map, &selector, mln_test_view_of(state),
-                     &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_feature_state(
+    map, &selector, mln_test_view_of(state), &completion.descriptor,
+    MLN_TEST_DIAGNOSTIC
+  ));
 }
 
 static void remove_state(mln_map map, mln_feature_state_selector selector) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_remove_feature_state(
-                     map, &selector, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_remove_feature_state(
+    map, &selector, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+  ));
 }
 
 // The state object the map store holds for one feature, as JSON.
@@ -51,16 +47,11 @@ static void read_state(
   mln_map map, mln_feature_state_selector selector, char* out, size_t capacity
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_feature_state(
-                     map, &selector, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                   )
-  );
+  MLN_TEST_OK(mln_map_get_feature_state(
+    map, &selector, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+  ));
   bool found = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_style_finish_text(&completion, out, capacity, &found)
-  );
+  MLN_TEST_OK(mln_test_style_finish_text(&completion, out, capacity, &found));
   TEST_ASSERT_TRUE(found);
 }
 

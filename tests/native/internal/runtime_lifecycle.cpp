@@ -21,24 +21,16 @@ void runtime_release_waits_for_retired_map_cleanup() {
   sync_points.hold(SyncPoint::MapPoolShutdown);
   const auto options = mln_runtime_options_default();
   auto runtime = mln_runtime{MLN_HANDLE_NULL};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, nullptr)
-  );
+  MLN_TEST_OK(mln_runtime_create(&options, &runtime, nullptr));
   auto create_map = mln_test_completion_default(sizeof(mln_map));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_map_create(runtime, nullptr, &create_map.descriptor, nullptr)
   );
   auto map = mln_map{MLN_HANDLE_NULL};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_completion_finish_value(&create_map, &map, sizeof(map))
-  );
+  MLN_TEST_OK(mln_test_completion_finish_value(&create_map, &map, sizeof(map)));
 
   auto map_close = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_release(map, &map_close.descriptor, nullptr)
-  );
+  MLN_TEST_OK(mln_map_release(map, &map_close.descriptor, nullptr));
   const auto cleanup_parked =
     sync_points.wait_for_hits(SyncPoint::MapPoolShutdown, 1);
   const auto map_closed = mln_test_completion_wait(&map_close, -1);
@@ -54,7 +46,7 @@ void runtime_release_waits_for_retired_map_cleanup() {
 
   TEST_ASSERT_TRUE(cleanup_parked);
   TEST_ASSERT_TRUE(map_closed);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, runtime_accepted);
+  MLN_TEST_OK(runtime_accepted);
   TEST_ASSERT_TRUE_MESSAGE(
     runtime_waited,
     "the runtime release never waited for a map's parked cleanup"
@@ -63,8 +55,8 @@ void runtime_release_waits_for_retired_map_cleanup() {
     runtime_closed_early,
     "the runtime release completed while a map's cleanup was parked"
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, map_status);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, runtime_status);
+  MLN_TEST_OK(map_status);
+  MLN_TEST_OK(runtime_status);
 }
 
 }  // namespace

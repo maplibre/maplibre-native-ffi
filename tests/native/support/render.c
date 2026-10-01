@@ -8,6 +8,7 @@
 
 #include "env.h"
 #include "render_backend.h"
+#include "status.h"
 #include "unity.h"
 #include "wait.h"
 
@@ -256,10 +257,7 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
       fixture->session, &detach.descriptor, MLN_TEST_DIAGNOSTIC
     );
     if (detach_status == MLN_STATUS_OK) {
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK,
-        mln_test_render_fixture_finish_operation(fixture, &detach)
-      );
+      MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &detach));
     } else {
       detach.descriptor.release_user_data(detach.descriptor.user_data);
       TEST_ASSERT_TRUE(
@@ -269,8 +267,7 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
     }
     mln_test_completion_destroy(&detach);
     if (detach_status != MLN_STATUS_INVALID_ARGUMENT) {
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK,
+      MLN_TEST_OK(
         mln_render_session_destroy(fixture->session, MLN_TEST_DIAGNOSTIC)
       );
     }

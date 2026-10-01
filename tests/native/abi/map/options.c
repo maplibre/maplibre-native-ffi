@@ -15,9 +15,7 @@
 
 static mln_map_snapshot read_snapshot(mln_map map) {
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_snapshot_get(map, &snapshot, NULL)
-  );
+  MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
   return snapshot;
 }
 
@@ -478,13 +476,10 @@ static void every_option_command_round_trips_through_the_snapshot(void) {
        index += 1) {
     const snapshot_row* row = &snapshot_rows[index];
     mln_test_completion completion = mln_test_completion_default(0);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK, row->submit(map, row->input, &completion.descriptor),
-      row->label
+    MLN_TEST_OK_MESSAGE(
+      row->submit(map, row->input, &completion.descriptor), row->label
     );
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK, mln_test_completion_finish(&completion), row->label
-    );
+    MLN_TEST_OK_MESSAGE(mln_test_completion_finish(&completion), row->label);
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(
       MLN_COMMAND_DISPOSITION_COMMITTED,
       mln_test_completion_disposition(&completion), row->label
@@ -686,30 +681,18 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
   );
 
   mln_completion discard = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_viewport_options(map, NULL, &discard, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_tile_options(map, NULL, &discard, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_projection_mode(map, NULL, &discard, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_debug_options(
-      map, UINT32_C(1) << 31, &discard, MLN_TEST_DIAGNOSTIC
-    )
-  );
+  MLN_TEST_INVALID(mln_map_set_viewport_options(map, NULL, &discard, NULL));
+  MLN_TEST_INVALID(mln_map_set_tile_options(map, NULL, &discard, NULL));
+  MLN_TEST_INVALID(mln_map_set_projection_mode(map, NULL, &discard, NULL));
+  MLN_TEST_INVALID(mln_map_set_debug_options(
+    map, UINT32_C(1) << 31, &discard, MLN_TEST_DIAGNOSTIC
+  ));
   TEST_ASSERT_EQUAL_STRING(
     "debug options contain unknown bits", mln_test_last_error()
   );
 
   // A rejected command publishes nothing, so the snapshot keeps the defaults.
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   const mln_map_snapshot snapshot = read_snapshot(map);
   TEST_ASSERT_EQUAL_UINT32(0, snapshot.debug_options);
   TEST_ASSERT_EQUAL_UINT32(
@@ -723,19 +706,13 @@ static void option_descriptors_reject_what_they_cannot_express(void) {
 
 static void map_debug_commands_reject_a_null_map(void) {
   mln_completion completion = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_map_set_debug_options(MLN_HANDLE_NULL, 0, &completion, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_rendering_stats_view_enabled(
-                                   MLN_HANDLE_NULL, true, &completion, NULL
-                                 )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_dump_debug_logs(MLN_HANDLE_NULL, &completion, NULL)
-  );
+  MLN_TEST_INVALID(mln_map_set_rendering_stats_view_enabled(
+    MLN_HANDLE_NULL, true, &completion, NULL
+  ));
+  MLN_TEST_INVALID(mln_map_dump_debug_logs(MLN_HANDLE_NULL, &completion, NULL));
 }
 
 static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
@@ -751,14 +728,11 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.logical_extent.scale_factor);
   const uint64_t initial_generation = snapshot.generation;
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_resize(
-      map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.1},
-      &completion.descriptor, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_AWAIT_OK(mln_map_resize(
+    map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.1},
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   snapshot = read_snapshot(map);
   TEST_ASSERT_GREATER_THAN_UINT64(initial_generation, snapshot.generation);
   TEST_ASSERT_EQUAL_UINT32(96, snapshot.logical_extent.width);
@@ -768,40 +742,26 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   // The renderer fixes its pixel ratio at creation, so a resize may change
   // only the width and height.
   mln_completion rejected = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_resize(
-      map,
-      (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 2.25},
-      &rejected, MLN_TEST_DIAGNOSTIC
-    )
-  );
+  MLN_TEST_INVALID(mln_map_resize(
+    map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 2.25},
+    &rejected, MLN_TEST_DIAGNOSTIC
+  ));
   TEST_ASSERT_EQUAL_STRING(
     "scale factor is fixed at map creation", mln_test_last_error()
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_resize(
-      map, (mln_logical_extent){.width = 0, .height = 48, .scale_factor = 1.1},
-      &rejected, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_INVALID(mln_map_resize(
+    map, (mln_logical_extent){.width = 0, .height = 48, .scale_factor = 1.1},
+    &rejected, NULL
+  ));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   snapshot = read_snapshot(map);
   TEST_ASSERT_EQUAL_UINT32(96, snapshot.logical_extent.width);
   TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.logical_extent.scale_factor);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_snapshot_get(MLN_HANDLE_NULL, &snapshot, NULL)
-  );
+  MLN_TEST_INVALID(mln_map_snapshot_get(MLN_HANDLE_NULL, &snapshot, NULL));
   mln_map_snapshot undersized = {.size = sizeof(mln_map_snapshot) - 1};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_snapshot_get(map, &undersized, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_snapshot_get(map, NULL, NULL)
-  );
+  MLN_TEST_INVALID(mln_map_snapshot_get(map, &undersized, NULL));
+  MLN_TEST_INVALID(mln_map_snapshot_get(map, NULL, NULL));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -818,32 +778,24 @@ static void a_replaced_resize_completes_superseded(void) {
   mln_test_gate gate;
   mln_test_gate_init(&gate);
   const mln_completion hold = mln_test_gate_completion(&gate);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_debug_options(map, 0, &hold, NULL)
-  );
+  MLN_TEST_OK(mln_map_set_debug_options(map, 0, &hold, NULL));
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
   );
 
   mln_test_completion replaced = mln_test_completion_default(0);
   mln_test_completion newest = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_resize(
-      map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
-      &replaced.descriptor, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_resize(
-      map, (mln_logical_extent){.width = 64, .height = 32, .scale_factor = 1.0},
-      &newest.descriptor, NULL
-    )
-  );
+  MLN_TEST_OK(mln_map_resize(
+    map, (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
+    &replaced.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_map_resize(
+    map, (mln_logical_extent){.width = 64, .height = 32, .scale_factor = 1.0},
+    &newest.descriptor, NULL
+  ));
   mln_test_gate_release(&gate);
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&replaced));
+  MLN_TEST_OK(mln_test_completion_finish(&replaced));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_COMMAND_DISPOSITION_SUPERSEDED,
     mln_test_completion_disposition(&replaced)
@@ -851,7 +803,7 @@ static void a_replaced_resize_completes_superseded(void) {
   TEST_ASSERT_EQUAL_UINT64(0, mln_test_completion_generation(&replaced));
   mln_test_completion_destroy(&replaced);
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&newest));
+  MLN_TEST_OK(mln_test_completion_finish(&newest));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&newest)
   );
@@ -932,7 +884,7 @@ static void generations_increase_across_submitting_threads(void) {
   for (size_t thread = 0; thread < submitting_threads; thread += 1) {
     const submitter* state = &submitters[thread];
     for (size_t index = 0; index < commands_per_thread; index += 1) {
-      TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, state->statuses[index]);
+      MLN_TEST_OK(state->statuses[index]);
       TEST_ASSERT_EQUAL_UINT32(
         MLN_COMMAND_DISPOSITION_COMMITTED, state->dispositions[index]
       );
@@ -967,17 +919,11 @@ static void map_creation_rejects_a_degenerate_extent(void) {
   mln_map_options options = mln_map_options_default();
   options.initial_extent.width = 0;
   mln_map map = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_test_map_create_status(runtime, &options, &map)
-  );
+  MLN_TEST_INVALID(mln_test_map_create_status(runtime, &options, &map));
   TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "initial extent"));
   options = mln_map_options_default();
   options.initial_extent.scale_factor = INFINITY;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_test_map_create_status(runtime, &options, &map)
-  );
+  MLN_TEST_INVALID(mln_test_map_create_status(runtime, &options, &map));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   mln_test_destroy_runtime(runtime);
 }

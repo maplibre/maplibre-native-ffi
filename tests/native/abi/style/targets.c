@@ -23,13 +23,11 @@ static void fetch_nothing(void* user_data, mln_canonical_tile_id tile_id) {
 }
 
 static void add_json_source(mln_map map, const char* id) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_style_source_json(
-                     map, mln_test_view_of(id),
-                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, mln_test_view_of(id),
+    MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
+    NULL
+  ));
 }
 
 static void source_commands_fail_on_a_taken_missing_or_wrong_target(void) {
@@ -74,13 +72,10 @@ static void source_commands_fail_on_a_taken_missing_or_wrong_target(void) {
   );
 
   mln_geojson_source_data data = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
-      NULL, &data, MLN_TEST_DIAGNOSTIC
-    )
-  );
+  MLN_TEST_OK(mln_geojson_source_data_create(
+    MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
+    NULL, &data, MLN_TEST_DIAGNOSTIC
+  ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "source_id must not be empty",
     mln_map_add_geojson_source_data(
@@ -101,12 +96,9 @@ static void custom_tile_data_needs_a_real_tile_and_source(void) {
   mln_custom_geometry_source_options options =
     mln_custom_geometry_source_options_default();
   options.fetch_tile = fetch_nothing;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_custom_geometry_source(
-                     map, MLN_BUFFER_LITERAL("geometry"), &options,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_custom_geometry_source(
+    map, MLN_BUFFER_LITERAL("geometry"), &options, &completion.descriptor, NULL
+  ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "within zoom bounds",
     mln_map_set_custom_geometry_source_tile_data(

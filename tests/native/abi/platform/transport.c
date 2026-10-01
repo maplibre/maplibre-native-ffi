@@ -98,7 +98,7 @@ static void a_percent_encoded_file_url_loads_its_file(void) {
 
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
   TEST_ASSERT_TRUE_MESSAGE(mln_test_await_style_loaded(runtime, map), url);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -145,7 +145,7 @@ static void a_local_pmtiles_archive_renders(void) {
   char url[4096];
   file_url(path, url, sizeof(url));
   mln_runtime runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, render_pmtiles(runtime, url));
+  MLN_TEST_OK(render_pmtiles(runtime, url));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -223,7 +223,7 @@ static void the_http_transport_follows_each_status(void) {
     char url[256];
     mln_test_http_server_url(server, row->path, url, sizeof(url));
     mln_map map = mln_test_create_map(runtime);
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+    MLN_TEST_OK(mln_test_map_set_style_url(map, url));
     if (row->outcome == STYLE_LOADS) {
       TEST_ASSERT_TRUE_MESSAGE(
         mln_test_await_style_loaded(runtime, map), row->label
@@ -259,7 +259,7 @@ static void a_refused_connection_fails_the_load(void) {
 
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
   char message[512];
   TEST_ASSERT_TRUE(
     mln_test_await_loading_failure(runtime, map, message, sizeof(message))
@@ -285,7 +285,7 @@ static void a_not_modified_response_revalidates_the_cached_style(void) {
   // The default cache is in memory and lives only while something holds it,
   // so the first map stays until the second has loaded.
   mln_map first = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(first, url));
+  MLN_TEST_OK(mln_test_map_set_style_url(first, url));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, first));
   char validator[64];
   TEST_ASSERT_FALSE(mln_test_http_server_request_header(
@@ -294,7 +294,7 @@ static void a_not_modified_response_revalidates_the_cached_style(void) {
   ));
 
   mln_map second = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(second, url));
+  MLN_TEST_OK(mln_test_map_set_style_url(second, url));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, second));
   TEST_ASSERT_TRUE(mln_test_http_server_request_header(
     server, "/revalidated.json", 1, "If-None-Match", validator,
@@ -323,7 +323,7 @@ static void a_remote_pmtiles_archive_is_read_in_ranges(void) {
   char url[256];
   mln_test_http_server_url(server, "/archive.pmtiles", url, sizeof(url));
   mln_runtime runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, render_pmtiles(runtime, url));
+  MLN_TEST_OK(render_pmtiles(runtime, url));
 
   const int requests =
     mln_test_http_server_requests(server, "/archive.pmtiles");
@@ -357,15 +357,13 @@ static void a_request_in_flight_does_not_hold_its_map_open(void) {
   mln_runtime runtime = mln_test_create_runtime();
   // The case waits for the map's release itself, so it creates it untracked.
   mln_map map = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_create_status(runtime, NULL, &map)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
   TEST_ASSERT_TRUE(
     mln_test_http_server_wait_for_requests(server, "/held.json", 1)
   );
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_close(map));
+  MLN_TEST_OK(mln_test_map_close(map));
   mln_test_http_server_release_held(server);
   mln_test_destroy_runtime(runtime);
   mln_test_http_server_stop(server);
@@ -386,7 +384,7 @@ static void an_unclassified_transport_error_fails_the_style(void) {
   mln_test_http_server_url(server, "/loop.json", url, sizeof(url));
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
   char message[512];
   TEST_ASSERT_TRUE(
     mln_test_await_loading_failure(runtime, map, message, sizeof(message))

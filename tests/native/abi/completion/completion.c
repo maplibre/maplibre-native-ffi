@@ -45,13 +45,11 @@ static void an_accepted_completion_runs_and_releases_exactly_once(void) {
   mln_completion completion = probed_completion(&probe);
 
   const mln_map_options options = mln_map_options_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_create(runtime, &options, &completion, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_map_create(runtime, &options, &completion, NULL));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.calls));
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.releases));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe.status));
+  MLN_TEST_OK(atomic_load(&probe.status));
 
   const mln_map map = (mln_map)atomic_load(&probe.value);
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
@@ -64,8 +62,7 @@ static void a_rejected_submission_leaves_callback_state_with_the_caller(void) {
   mln_completion completion = probed_completion(&probe);
   const mln_map_options options = mln_map_options_default();
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_map_create(MLN_HANDLE_NULL, &options, &completion, NULL)
   );
   TEST_ASSERT_EQUAL_UINT32(0, atomic_load(&probe.calls));
@@ -87,14 +84,10 @@ static void runtime_events_wake_the_receiver_directly(void) {
   mln_runtime_options options = mln_runtime_options_default();
   options.event_wake = event_wake;
   mln_runtime runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, NULL)
-  );
+  MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_json(map, mln_test_empty_style_json)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_GREATER_THAN_UINT32(0, atomic_load(&wakes));
   TEST_ASSERT_GREATER_THAN_size_t(0, mln_test_drain_all(runtime));
   mln_test_destroy_map(map);

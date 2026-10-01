@@ -100,11 +100,9 @@ static void render_recorded_tile(
     .callback = serve_recorded_tile,
     .user_data = &out->tile,
   };
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_set_resource_provider(
-                     out->runtime, &provider, &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_runtime_set_resource_provider(
+    out->runtime, &provider, &completion.descriptor, NULL
+  ));
 
   mln_map_options options = mln_map_options_default();
   options.initial_extent =
@@ -116,9 +114,7 @@ static void render_recorded_tile(
     out->runtime, out->map, MLN_BUFFER_LITERAL(mlt_style_json)
   );
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(out->map, &out->fixture));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_still_image(&out->fixture, out->map)
-  );
+  MLN_TEST_OK(mln_test_render_still_image(&out->fixture, out->map));
 }
 
 static void destroy_mlt_map(mlt_map* map) {
@@ -136,16 +132,11 @@ static size_t count_admin_features(const mlt_map* map) {
   options.source_layer_ids = source_layers;
   options.source_layer_id_count = 1;
   mln_test_completion query = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_query_source_features(
-                     map->fixture.session, MLN_BUFFER_LITERAL("mlt-source"),
-                     &options, &query.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_render_fixture_finish_operation(&map->fixture, &query)
-  );
+  MLN_TEST_OK(mln_render_session_query_source_features(
+    map->fixture.session, MLN_BUFFER_LITERAL("mlt-source"), &options,
+    &query.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&map->fixture, &query));
   const size_t count = mln_test_completion_value_count(&query);
   mln_test_completion_destroy(&query);
   return count;
@@ -167,10 +158,7 @@ static void a_plain_tile_decodes_when_the_option_is_off(void) {
 
 static void a_fast_pfor_tile_logs_a_parse_warning_when_the_option_is_off(void) {
   atomic_store(&mlt_parse_warning_logged, false);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_log_set_callback(record_mlt_parse_warning, NULL, NULL, NULL)
-  );
+  MLN_TEST_OK(mln_log_set_callback(record_mlt_parse_warning, NULL, NULL, NULL));
   mlt_map map = {0};
   render_recorded_tile(&map, "map/issue12432/0-0-0-fastpfor.mlt", false);
   // MapLibre may deliver a warning from its logging thread after the tile
@@ -180,7 +168,7 @@ static void a_fast_pfor_tile_logs_a_parse_warning_when_the_option_is_off(void) {
     "the map logged no MLT parse warning"
   );
   destroy_mlt_map(&map);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
+  MLN_TEST_OK(mln_log_clear_callback(NULL));
 }
 
 MLN_TEST_GROUP {

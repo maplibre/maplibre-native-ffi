@@ -12,22 +12,18 @@
 #include "unity.h"
 
 static void add_source(mln_map map, const char* id) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_style_source_json(
-                     map, mln_test_view_of(id),
-                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, mln_test_view_of(id),
+    MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
+    NULL
+  ));
 }
 
 static void add_layer(mln_map map, const char* json, const char* before) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_style_layer_json(
-                     map, mln_test_view_of(json), mln_test_view_of(before),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+    map, mln_test_view_of(json), mln_test_view_of(before),
+    &completion.descriptor, NULL
+  ));
 }
 
 static const mln_buffer_view fixture_tiles[] = {
@@ -35,12 +31,10 @@ static const mln_buffer_view fixture_tiles[] = {
 };
 
 static void add_dem_source(mln_map map, const char* id) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_raster_dem_source_tiles(
-                     map, mln_test_view_of(id), fixture_tiles, 1, NULL,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_raster_dem_source_tiles(
+    map, mln_test_view_of(id), fixture_tiles, 1, NULL, &completion.descriptor,
+    NULL
+  ));
 }
 
 // Deep-copies one layer result, whose views die with the callback.
@@ -97,13 +91,12 @@ static layer_probe take_layer_result(
     .callback = copy_layer_result,
     .user_data = &probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_map_get_style_layer_info(map, mln_test_view_of(id), &completion, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_TRUE(atomic_load(&probe.done));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.status);
+  MLN_TEST_OK(probe.status);
   return probe;
 }
 
@@ -130,37 +123,26 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
   TEST_ASSERT_EQUAL_DOUBLE(-INFINITY, probe.info.min_zoom);
   TEST_ASSERT_EQUAL_DOUBLE(INFINITY, probe.info.max_zoom);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_min_zoom(
-      map, MLN_BUFFER_LITERAL("info-layer"), 3.0, &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_max_zoom(
-      map, MLN_BUFFER_LITERAL("info-layer"), 12.0, &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_visibility(
-      map, MLN_BUFFER_LITERAL("info-layer"), MLN_STYLE_LAYER_VISIBILITY_NONE,
-      &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_min_zoom(
+    map, MLN_BUFFER_LITERAL("info-layer"), 3.0, &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_max_zoom(
+    map, MLN_BUFFER_LITERAL("info-layer"), 12.0, &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_visibility(
+    map, MLN_BUFFER_LITERAL("info-layer"), MLN_STYLE_LAYER_VISIBILITY_NONE,
+    &completion.descriptor, NULL
+  ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "visibility is invalid",
     mln_map_set_layer_visibility(
       map, MLN_BUFFER_LITERAL("info-layer"), 7, &completion.descriptor, NULL
     )
   );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_layer_source_layer(
-                     map, MLN_BUFFER_LITERAL("info-layer"),
-                     MLN_BUFFER_LITERAL("roads"), &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_source_layer(
+    map, MLN_BUFFER_LITERAL("info-layer"), MLN_BUFFER_LITERAL("roads"),
+    &completion.descriptor, NULL
+  ));
   probe = take_layer_result(runtime, map, "info-layer");
   TEST_ASSERT_TRUE(probe.found);
   TEST_ASSERT_EQUAL_DOUBLE(3.0, probe.info.min_zoom);
@@ -179,12 +161,10 @@ static mln_status read_layer_property(
   mln_map map, const char* layer, const char* name, char* out, size_t capacity
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_layer_property(
-                     map, mln_test_view_of(layer), mln_test_view_of(name),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_map_get_layer_property(
+    map, mln_test_view_of(layer), mln_test_view_of(name),
+    &completion.descriptor, NULL
+  ));
   return mln_test_style_finish_text(&completion, out, capacity, NULL);
 }
 
@@ -192,11 +172,9 @@ static mln_status read_layer_filter(
   mln_map map, const char* layer, char* out, size_t capacity
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_layer_filter(
-                     map, mln_test_view_of(layer), &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_map_get_layer_filter(
+    map, mln_test_view_of(layer), &completion.descriptor, NULL
+  ));
   return mln_test_style_finish_text(&completion, out, capacity, NULL);
 }
 
@@ -222,21 +200,15 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
   );
 
   EXPECT_LAYER_PROPERTY("", map, "dots", "circle-radius");
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_property(
-      map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-radius"),
-      MLN_BUFFER_LITERAL("4"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-radius"),
+    MLN_BUFFER_LITERAL("4"), &completion.descriptor, NULL
+  ));
   EXPECT_LAYER_PROPERTY("4.0", map, "dots", "circle-radius");
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_property(
-      map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-color"),
-      MLN_BUFFER_LITERAL("\"#ff0000\""), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-color"),
+    MLN_BUFFER_LITERAL("\"#ff0000\""), &completion.descriptor, NULL
+  ));
   EXPECT_LAYER_PROPERTY(
     "[\"rgba\",255.0,0.0,0.0,1.0]", map, "dots", "circle-color"
   );
@@ -267,21 +239,14 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
   EXPECT_LAYER_PROPERTY("", map, "dots", "fill-color");
 
   char filter[256];
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, read_layer_filter(map, "dots", filter, sizeof(filter))
-  );
+  MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
   TEST_ASSERT_EQUAL_STRING("", filter);
   const mln_buffer_view kind_filter =
     MLN_BUFFER_LITERAL("[\"==\",[\"get\",\"kind\"],\"park\"]");
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_layer_filter(
-                     map, MLN_BUFFER_LITERAL("dots"), &kind_filter,
-                     &completion.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, read_layer_filter(map, "dots", filter, sizeof(filter))
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_filter(
+    map, MLN_BUFFER_LITERAL("dots"), &kind_filter, &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
   TEST_ASSERT_EQUAL_STRING("[\"==\",[\"get\",\"kind\"],\"park\"]", filter);
   const mln_buffer_view bad_filter =
     MLN_BUFFER_LITERAL("[\"no-such-operator\",1]");
@@ -291,20 +256,13 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
       map, MLN_BUFFER_LITERAL("dots"), &bad_filter, &completion.descriptor, NULL
     )
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, read_layer_filter(map, "dots", filter, sizeof(filter))
-  );
+  MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
   TEST_ASSERT_EQUAL_STRING("[\"==\",[\"get\",\"kind\"],\"park\"]", filter);
   // A null filter clears it.
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_filter(
-      map, MLN_BUFFER_LITERAL("dots"), NULL, &completion.descriptor, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, read_layer_filter(map, "dots", filter, sizeof(filter))
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_filter(
+    map, MLN_BUFFER_LITERAL("dots"), NULL, &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
   TEST_ASSERT_EQUAL_STRING("", filter);
 
   mln_test_destroy_map(map);
@@ -315,11 +273,9 @@ static mln_status read_layer_json(
   mln_map map, const char* layer, char* out, size_t capacity, bool* found
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_style_layer_json(
-                     map, mln_test_view_of(layer), &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_map_get_style_layer_json(
+    map, mln_test_view_of(layer), &completion.descriptor, NULL
+  ));
   return mln_test_style_finish_text(&completion, out, capacity, found);
 }
 
@@ -334,18 +290,13 @@ static void layer_json_serializes_the_current_layer(void) {
     "\"background-color\":\"#ff0000\"}}",
     ""
   );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_min_zoom(
-      map, MLN_BUFFER_LITERAL("paper"), 2.0, &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_min_zoom(
+    map, MLN_BUFFER_LITERAL("paper"), 2.0, &completion.descriptor, NULL
+  ));
 
   char json[512];
   bool found = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, read_layer_json(map, "paper", json, sizeof(json), &found)
-  );
+  MLN_TEST_OK(read_layer_json(map, "paper", json, sizeof(json), &found));
   TEST_ASSERT_TRUE(found);
   TEST_ASSERT_NOT_NULL(strstr(json, "\"id\":\"paper\""));
   TEST_ASSERT_NOT_NULL(strstr(json, "\"type\":\"background\""));
@@ -354,22 +305,15 @@ static void layer_json_serializes_the_current_layer(void) {
   );
   TEST_ASSERT_NOT_NULL(strstr(json, "\"minzoom\":2.0"));
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_remove_style_layer(
-      map, MLN_BUFFER_LITERAL("paper"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_layer(
+    map, MLN_BUFFER_LITERAL("paper"), &completion.descriptor, NULL
+  ));
   add_layer(map, json, "");
   char again[512];
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, read_layer_json(map, "paper", again, sizeof(again), &found)
-  );
+  MLN_TEST_OK(read_layer_json(map, "paper", again, sizeof(again), &found));
   TEST_ASSERT_EQUAL_STRING(json, again);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, read_layer_json(map, "missing", json, sizeof(json), &found)
-  );
+  MLN_TEST_OK(read_layer_json(map, "missing", json, sizeof(json), &found));
   TEST_ASSERT_FALSE(found);
 
   mln_test_destroy_map(map);
@@ -377,12 +321,10 @@ static void layer_json_serializes_the_current_layer(void) {
 }
 
 static void move_layer(mln_map map, const char* layer, const char* before) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_move_style_layer(
-                     map, mln_test_view_of(layer), mln_test_view_of(before),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_move_style_layer(
+    map, mln_test_view_of(layer), mln_test_view_of(before),
+    &completion.descriptor, NULL
+  ));
 }
 
 // Both listings report the layer stack bottom to top, as moves leave it.
@@ -390,12 +332,10 @@ static void layers_list_in_style_order_after_moves(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   add_source(map, "points");
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_vector_source_tiles(
-                     map, MLN_BUFFER_LITERAL("tiles"), fixture_tiles, 1, NULL,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_vector_source_tiles(
+    map, MLN_BUFFER_LITERAL("tiles"), fixture_tiles, 1, NULL,
+    &completion.descriptor, NULL
+  ));
   add_layer(map, "{\"id\":\"paper\",\"type\":\"background\"}", "");
   add_layer(
     map, "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"points\"}", ""
@@ -413,14 +353,14 @@ static void layers_list_in_style_order_after_moves(void) {
   move_layer(map, "dots", "dots");
 
   const mln_test_style_list ids = mln_test_style_list_layer_ids(map);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, ids.status);
+  MLN_TEST_OK(ids.status);
   TEST_ASSERT_EQUAL_size_t(3, ids.count);
   TEST_ASSERT_EQUAL_STRING("roads", ids.entries[0].id);
   TEST_ASSERT_EQUAL_STRING("dots", ids.entries[1].id);
   TEST_ASSERT_EQUAL_STRING("paper", ids.entries[2].id);
 
   const mln_test_style_list layers = mln_test_style_list_layers(map);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, layers.status);
+  MLN_TEST_OK(layers.status);
   TEST_ASSERT_EQUAL_size_t(3, layers.count);
   TEST_ASSERT_EQUAL_STRING("roads", layers.entries[0].id);
   TEST_ASSERT_EQUAL_STRING("line", layers.entries[0].type);
@@ -444,8 +384,7 @@ static mln_status copy_layer_text(
   mln_map map, const char* layer, bool source_layer, char* out
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     source_layer ? mln_map_copy_layer_source_layer(
                      map, mln_test_view_of(layer), &completion.descriptor, NULL
                    )
@@ -468,41 +407,26 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
   add_layer(map, "{\"id\":\"paper\",\"type\":\"background\"}", "");
 
   char text[64];
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_source_id(
-      map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("not-yet-added"),
-      &completion.descriptor, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, copy_layer_text(map, "dots", false, text)
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_source_id(
+    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("not-yet-added"),
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(copy_layer_text(map, "dots", false, text));
   TEST_ASSERT_EQUAL_STRING("not-yet-added", text);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, copy_layer_text(map, "dots", true, text)
-  );
+  MLN_TEST_OK(copy_layer_text(map, "dots", true, text));
   TEST_ASSERT_EQUAL_STRING("", text);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_layer_source_layer(
-                     map, MLN_BUFFER_LITERAL("dots"),
-                     MLN_BUFFER_LITERAL("pois"), &completion.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, copy_layer_text(map, "dots", true, text)
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_source_layer(
+    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("pois"),
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(copy_layer_text(map, "dots", true, text));
   TEST_ASSERT_EQUAL_STRING("pois", text);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_layer_source_layer(
-                     map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL(""),
-                     &completion.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, copy_layer_text(map, "dots", true, text)
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_source_layer(
+    map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL(""),
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(copy_layer_text(map, "dots", true, text));
   TEST_ASSERT_EQUAL_STRING("", text);
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
@@ -526,9 +450,7 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
       &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, copy_layer_text(map, "paper", false, text)
-  );
+  MLN_TEST_OK(copy_layer_text(map, "paper", false, text));
   TEST_ASSERT_EQUAL_STRING("", text);
 
   mln_test_destroy_map(map);
@@ -561,11 +483,11 @@ static void terrain_layers_require_a_raster_dem_source(void) {
   for (size_t index = 0; index < 2; index += 1) {
     const mln_buffer_view layer = mln_test_view_of(adders[index].layer);
     // Each goes under the paper, before the layer the loop added last.
-    MLN_TEST_AWAIT_COMMAND(
-      MLN_STATUS_OK, adders[index].add(
-                       map, layer, MLN_BUFFER_LITERAL("dem"),
-                       MLN_BUFFER_LITERAL("paper"), &completion.descriptor, NULL
-                     )
+    MLN_TEST_AWAIT_OK(
+      adders[index].add(
+        map, layer, MLN_BUFFER_LITERAL("dem"), MLN_BUFFER_LITERAL("paper"),
+        &completion.descriptor, NULL
+      )
     );
     layer_probe probe = take_layer_result(runtime, map, adders[index].layer);
     TEST_ASSERT_EQUAL_STRING(adders[index].type, probe.type);
@@ -600,21 +522,16 @@ static void terrain_layers_require_a_raster_dem_source(void) {
   TEST_ASSERT_EQUAL_STRING("paper", ids.entries[2].id);
 
   // The color ramp is an ordinary property of the color-relief layer.
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_property(
-      map, MLN_BUFFER_LITERAL("relief"),
-      MLN_BUFFER_LITERAL("color-relief-color"),
-      MLN_BUFFER_LITERAL(
-        "[\"interpolate\",[\"linear\"],[\"elevation\"],0,\"#000000\",1000,"
-        "\"#ffffff\"]"
-      ),
-      &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+    map, MLN_BUFFER_LITERAL("relief"), MLN_BUFFER_LITERAL("color-relief-color"),
+    MLN_BUFFER_LITERAL(
+      "[\"interpolate\",[\"linear\"],[\"elevation\"],0,\"#000000\",1000,"
+      "\"#ffffff\"]"
+    ),
+    &completion.descriptor, NULL
+  ));
   char ramp[256];
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     read_layer_property(map, "relief", "color-relief-color", ramp, sizeof(ramp))
   );
   TEST_ASSERT_NOT_NULL(strstr(ramp, "\"elevation\""));
@@ -679,12 +596,10 @@ static void location_indicator_setters_write_its_properties(void) {
   add_layer(
     map, "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"points\"}", ""
   );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_location_indicator_layer(
-                     map, MLN_BUFFER_LITERAL("puck"), MLN_BUFFER_LITERAL(""),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_location_indicator_layer(
+    map, MLN_BUFFER_LITERAL("puck"), MLN_BUFFER_LITERAL(""),
+    &completion.descriptor, NULL
+  ));
 
   static const struct {
     const char* label;
@@ -705,33 +620,28 @@ static void location_indicator_setters_write_its_properties(void) {
   for (size_t index = 0; index < sizeof(setters) / sizeof(setters[0]);
        index += 1) {
     mln_test_completion completion = mln_test_completion_default(0);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK,
+    MLN_TEST_OK_MESSAGE(
       setters[index].set(
         map, MLN_BUFFER_LITERAL("puck"), &completion.descriptor
       ),
       setters[index].label
     );
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK, mln_test_completion_settle(&completion),
-      setters[index].label
+    MLN_TEST_OK_MESSAGE(
+      mln_test_completion_settle(&completion), setters[index].label
     );
     char value[128];
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      read_layer_property(
-        map, "puck", setters[index].property, value, sizeof(value)
-      )
-    );
+    MLN_TEST_OK(read_layer_property(
+      map, "puck", setters[index].property, value, sizeof(value)
+    ));
     TEST_ASSERT_NOT_NULL_MESSAGE(
       strstr(value, setters[index].expected), setters[index].label
     );
 
     completion = mln_test_completion_default(0);
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, setters[index].set(
-                       map, MLN_BUFFER_LITERAL("dots"), &completion.descriptor
-                     )
+    MLN_TEST_OK(
+      setters[index].set(
+        map, MLN_BUFFER_LITERAL("dots"), &completion.descriptor
+      )
     );
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_finish(&completion),

@@ -48,8 +48,7 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
 
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(square_style_json))
   );
   mln_test_render_fixture fixture = {0};
@@ -64,39 +63,28 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
   while (!square_rendered && !mln_test_deadline_passed(deadline)) {
     mln_frame_demand demand = mln_frame_demand_default();
     demand.flags = 0;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
+    MLN_TEST_OK(
       mln_render_session_request_frame(fixture.session, &demand, NULL)
     );
     mln_test_completion barrier = mln_test_completion_default(0);
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
+    MLN_TEST_OK(
       mln_render_session_barrier(fixture.session, &barrier.descriptor, NULL)
     );
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_test_render_fixture_finish_operation(&fixture, &barrier)
-    );
+    MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &barrier));
     mln_test_completion_destroy(&barrier);
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
+    MLN_TEST_OK(
       mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
     );
     mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_frame_batch_get(batch, 0, &result, NULL)
-    );
+    MLN_TEST_OK(mln_render_frame_batch_get(batch, 0, &result, NULL));
     mln_render_frame_batch_release(batch);
     if (result.disposition == MLN_RENDER_RESULT_RENDERED) {
       mln_test_completion readback = mln_test_completion_readback();
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
-                         fixture.session, &readback.descriptor, NULL
-                       )
-      );
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK,
+      MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+        fixture.session, &readback.descriptor, NULL
+      ));
+      MLN_TEST_OK(
         mln_test_render_fixture_finish_operation(&fixture, &readback)
       );
       mln_texture_readback_result image = {0};

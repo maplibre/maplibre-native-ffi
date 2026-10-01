@@ -429,8 +429,7 @@ static void submit_camera(
   update.animation.fields = animation_fields;
   update.animation.duration_ms = duration_ms;
   update.animation.transition_id = transition_id;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
+  MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
 }
@@ -593,22 +592,17 @@ static void render_one_frame(
   const mln_test_render_fixture* fixture, mln_runtime runtime, event_log* log
 ) {
   mln_frame_demand demand = mln_frame_demand_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
   mln_test_completion barrier = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_barrier(fixture->session, &barrier.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(fixture, &barrier)
-  );
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &barrier));
   mln_test_completion_destroy(&barrier);
   mln_render_frame_batch frames = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_drain_frame_results(fixture->session, &frames, NULL)
   );
   mln_render_frame_batch_release(frames);
@@ -646,12 +640,9 @@ static void rendering_a_style_to_idle_reports_its_lifecycle(void) {
   event_log* log = &scenario_log;
   log_reset(log);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_style_json(
-      map, MLN_BUFFER_LITERAL(render_style_json), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_json(
+    map, MLN_BUFFER_LITERAL(render_style_json), &completion.descriptor, NULL
+  ));
   render_until_logged(&fixture, runtime, log, MLN_RUNTIME_EVENT_MAP_IDLE, map);
 
   submit_camera(
@@ -750,12 +741,9 @@ static mln_status render_still_image(
     .user_data = &probe,
     .release_user_data = release_still_image_probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_request_still_image(
-      map, event_at_completion == 0 ? &still.descriptor : &probed, NULL
-    )
-  );
+  MLN_TEST_OK(mln_map_request_still_image(
+    map, event_at_completion == 0 ? &still.descriptor : &probed, NULL
+  ));
   const mln_test_deadline deadline = mln_test_deadline_default();
   mln_test_watchdog_note("rendering until a still image completes");
   while (!mln_test_completion_poll(&still)) {
@@ -793,13 +781,10 @@ static void a_still_image_reports_that_it_finished(void) {
   event_log* log = &scenario_log;
   log_reset(log);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, render_still_image(
-                     &fixture, runtime, map,
-                     MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED, NULL, 0
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(render_still_image(
+    &fixture, runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED, NULL, 0
+  ));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   log_drain(runtime, log);
   check_scenario_rows(SCENARIO_STILL_IMAGE, log, &context);
 
@@ -842,11 +827,9 @@ static void deny_requests(mln_runtime runtime) {
     .size = sizeof(mln_resource_provider),
     .callback = deny_every_request,
   };
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_set_resource_provider(
-                     runtime, &provider, &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_runtime_set_resource_provider(
+    runtime, &provider, &completion.descriptor, NULL
+  ));
 }
 
 // A style that fails to parse reports the parser's exception with code 0. A
@@ -869,21 +852,19 @@ static void failed_loads_report_their_text(void) {
       map, MLN_BUFFER_LITERAL("{"), &completion.descriptor, NULL
     )
   );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_json(
-                     map, MLN_BUFFER_LITERAL(remote_source_style_json),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_json(
+    map, MLN_BUFFER_LITERAL(remote_source_style_json), &completion.descriptor,
+    NULL
+  ));
   char still_diagnostic[MLN_DIAGNOSTIC_MESSAGE_CAPACITY] = "";
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_NATIVE_ERROR,
     render_still_image(
       &fixture, runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED,
       still_diagnostic, sizeof(still_diagnostic)
     )
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   log_drain(runtime, log);
   check_scenario_rows(SCENARIO_STILL_IMAGE_FAILURE, log, &context);
   const recorded_event* failed =
@@ -922,43 +903,32 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
   };
   mln_test_completion create =
     mln_test_completion_default(sizeof(mln_offline_region_info));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_offline_region_create(
-                     runtime, &definition, NULL, 0, &create.descriptor, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_runtime_offline_region_create(
+    runtime, &definition, NULL, 0, &create.descriptor, NULL
+  ));
   mln_offline_region_info info = {.size = sizeof(info)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_completion_finish_value(&create, &info, sizeof(info))
-  );
+  MLN_TEST_OK(mln_test_completion_finish_value(&create, &info, sizeof(info)));
   scenario_context context = {.runtime = runtime, .region_id = info.id};
   mln_test_drain_all(runtime);
   log_reset(&scenario_log);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_observed(
-                     runtime, info.id, true, &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_download_state(
-                     runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_observed(
+    runtime, info.id, true, &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_download_state(
+    runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
+    &completion.descriptor, NULL
+  ));
   TEST_ASSERT_TRUE(mln_test_await(
     offline_error_logged, &context, mln_test_deadline_default(),
     "an offline response error"
   ));
   log_drain(runtime, &scenario_log);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_runtime_offline_region_set_download_state(
-                     runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
-                     &completion.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_download_state(
+    runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   log_drain(runtime, &scenario_log);
   check_scenario_rows(SCENARIO_OFFLINE, &scenario_log, &context);
 
@@ -970,19 +940,14 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
 static void a_map_created_with_an_empty_mask_queues_nothing(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_static_map(runtime, MLN_RUNTIME_EVENT_MASK_NONE);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_style_json(
-      map, mln_test_background_style_json, &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_json(
+    map, mln_test_background_style_json, &completion.descriptor, NULL
+  ));
   submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 2.0, 0, 0.0, 0);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, render_still_image(&fixture, runtime, map, 0, NULL, 0)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(render_still_image(&fixture, runtime, map, 0, NULL, 0));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
 
   event_log* log = &scenario_log;
   log_reset(log);

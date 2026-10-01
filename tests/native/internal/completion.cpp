@@ -11,6 +11,7 @@
 
 #include "maplibre_native_c.h"
 #include "support/harness.h"
+#include "support/status.h"
 #include "unity.h"
 
 namespace {
@@ -71,7 +72,7 @@ void inline_resolution_waits_for_acceptance() {
   TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
   TEST_ASSERT_EQUAL_UINT(1, probe.releases.load());
   TEST_ASSERT_EQUAL_INT(2, probe.phase.load());
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.status.load());
+  MLN_TEST_OK(probe.status.load());
 }
 
 // A rejected completion leaves the user data with the caller and delivers
@@ -98,7 +99,7 @@ void abandonment_reports_cancelled() {
   }
   TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());
   TEST_ASSERT_EQUAL_UINT(1, probe.releases.load());
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_CANCELLED, probe.status.load());
+  MLN_TEST_STATUS(MLN_STATUS_CANCELLED, probe.status.load());
 }
 
 // Acceptance and resolution racing on two threads still deliver once, with the

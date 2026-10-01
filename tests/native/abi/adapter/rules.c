@@ -61,30 +61,18 @@ static void http_header_routes_match_exact_glob_kind_and_order(void) {
     },
   };
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    header_route_status(
-      rules, 2, MLN_RESOURCE_KIND_TILE, "https://tiles.localhost/exact"
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    header_route_status(
-      rules, 2, MLN_RESOURCE_KIND_STYLE, "https://tiles.localhost/exact"
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    header_route_status(
-      rules, 2, MLN_RESOURCE_KIND_TILE, "https://elsewhere.localhost/"
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    header_route_status(
-      NULL, 1, MLN_RESOURCE_KIND_TILE, "https://tiles.localhost/"
-    )
-  );
+  MLN_TEST_INVALID(header_route_status(
+    rules, 2, MLN_RESOURCE_KIND_TILE, "https://tiles.localhost/exact"
+  ));
+  MLN_TEST_OK(header_route_status(
+    rules, 2, MLN_RESOURCE_KIND_STYLE, "https://tiles.localhost/exact"
+  ));
+  MLN_TEST_OK(header_route_status(
+    rules, 2, MLN_RESOURCE_KIND_TILE, "https://elsewhere.localhost/"
+  ));
+  MLN_TEST_INVALID(header_route_status(
+    NULL, 1, MLN_RESOURCE_KIND_TILE, "https://tiles.localhost/"
+  ));
 }
 
 static void http_header_validation_uses_the_native_policy(void) {
@@ -226,22 +214,16 @@ static void rewrite_rules_replace_the_url_of_the_first_matching_rule(void) {
     .callback = rewrite_cases_transform,
     .user_data = &probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, set_transform_committed(runtime, &transform)
-  );
+  MLN_TEST_OK(set_transform_committed(runtime, &transform));
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, style_url));
   TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.finished));
 
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, probe.kind);
   TEST_ASSERT_EQUAL_STRING(style_url, probe.url);
   for (size_t index = 0; index < rewrite_case_count; ++index) {
     const rewrite_case* row = &rewrite_cases[index];
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK, probe.statuses[index], row->url
-    );
+    MLN_TEST_OK_MESSAGE(probe.statuses[index], row->url);
     TEST_ASSERT_EQUAL_MESSAGE(
       row->replacement != NULL, probe.replaced[index], row->url
     );
@@ -260,24 +242,17 @@ static void rewrite_rules_accept_raw_null_arguments(void) {
   mln_resource_transform_response response = {
     .size = sizeof(mln_resource_transform_response),
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_resource_transform_rewrite_callback(
-                     NULL, MLN_RESOURCE_KIND_STYLE,
-                     "custom://adapter-rewrite/style.json", &response
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_adapter_resource_transform_rewrite_callback(
-      (void*)&rewrite_table, MLN_RESOURCE_KIND_STYLE, NULL, &response
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_resource_transform_rewrite_callback(
-                     (void*)&rewrite_table, MLN_RESOURCE_KIND_STYLE,
-                     "custom://adapter-rewrite/style.json", NULL
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_resource_transform_rewrite_callback(
+    NULL, MLN_RESOURCE_KIND_STYLE, "custom://adapter-rewrite/style.json",
+    &response
+  ));
+  MLN_TEST_OK(mln_adapter_resource_transform_rewrite_callback(
+    (void*)&rewrite_table, MLN_RESOURCE_KIND_STYLE, NULL, &response
+  ));
+  MLN_TEST_OK(mln_adapter_resource_transform_rewrite_callback(
+    (void*)&rewrite_table, MLN_RESOURCE_KIND_STYLE,
+    "custom://adapter-rewrite/style.json", NULL
+  ));
   TEST_ASSERT_NULL(response.url);
 }
 
@@ -326,21 +301,17 @@ static void provider_rules_answer_the_first_matching_request_inline(void) {
     .user_data = (void*)&table,
   };
   mln_runtime runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_adapter_set_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_adapter_set_provider(runtime, &provider));
   mln_map map = mln_test_create_map(runtime);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_url(map, "custom://adapter-rules/style.json")
   );
   TEST_ASSERT_TRUE(wait_for_map_event(
     runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED, map, NULL, 0
   ));
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_url(map, "custom://adapter-rules/nested/style.json")
   );
   char message[512] = {0};
@@ -349,9 +320,7 @@ static void provider_rules_answer_the_first_matching_request_inline(void) {
   ));
   TEST_ASSERT_NOT_NULL(strstr(message, "declined"));
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_adapter_clear_provider(runtime)
-  );
+  MLN_TEST_OK(mln_test_adapter_clear_provider(runtime));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

@@ -5,6 +5,7 @@
 
 #include "env.h"
 #include "render.h"
+#include "status.h"
 #include "tables.h"
 #include "wait.h"
 

@@ -160,16 +160,11 @@ static void* assert_pointer_message(
 static void dart_wakes_post_zero_per_wake_and_one_on_release(void) {
   reset_posts(true);
   mln_wake wake = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_dart_wake_create(NULL, 17, &wake, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(mln_adapter_dart_wake_create(NULL, 17, &wake, NULL));
+  MLN_TEST_INVALID(
     mln_adapter_dart_wake_create(fake_post_address(), 0, &wake, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_adapter_dart_wake_create(fake_post_address(), 17, &wake, NULL)
   );
   wake.callback(wake.user_data);
@@ -186,18 +181,14 @@ static mln_adapter_completion_record* post_map_record(
   mln_runtime runtime, dart_finalizer* out_finalizer, mln_map* out_map
 ) {
   mln_completion completion = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_dart_completion_create(
-                     MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map),
-                     fake_post_address(), 23, 31, &completion, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_create(runtime, NULL, &completion, NULL)
-  );
+  MLN_TEST_OK(mln_adapter_dart_completion_create(
+    MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), fake_post_address(), 23,
+    31, &completion, NULL
+  ));
+  MLN_TEST_OK(mln_map_create(runtime, NULL, &completion, NULL));
   mln_adapter_completion_record* record =
     assert_pointer_message(0, 23, 31, out_finalizer);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, record->result.status);
+  MLN_TEST_OK(record->result.status);
   TEST_ASSERT_EQUAL_size_t(1, record->result.value_count);
   *out_map = *(const mln_map*)record->result.value;
   TEST_ASSERT_TRUE(mln_test_adapter_map_is_live(*out_map));
@@ -239,26 +230,18 @@ static void an_undelivered_dart_completion_disposes_its_result(void) {
 static void a_rejected_dart_completion_posts_nothing(void) {
   reset_posts(true);
   mln_completion completion = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_dart_completion_create(
-      MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), NULL, 23, 31,
-      &completion, MLN_TEST_DIAGNOSTIC
-    )
-  );
+  MLN_TEST_INVALID(mln_adapter_dart_completion_create(
+    MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), NULL, 23, 31, &completion,
+    MLN_TEST_DIAGNOSTIC
+  ));
   TEST_ASSERT_NOT_NULL_MESSAGE(
     strstr(mln_test_last_error(), "Dart receive port"), mln_test_last_error()
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_dart_completion_create(
-                     MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map),
-                     fake_post_address(), 23, 31, &completion, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_create(MLN_HANDLE_NULL, NULL, &completion, NULL)
-  );
+  MLN_TEST_OK(mln_adapter_dart_completion_create(
+    MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), fake_post_address(), 23,
+    31, &completion, NULL
+  ));
+  MLN_TEST_INVALID(mln_map_create(MLN_HANDLE_NULL, NULL, &completion, NULL));
   mln_adapter_completion_reject(&completion);
   TEST_ASSERT_EQUAL_size_t(0, atomic_load(&posted_count));
 }
@@ -284,11 +267,9 @@ static mln_resource_provider_callback deferred_provider_callback(void) {
 
 static void* dart_deferred_context(uint32_t callback, int64_t port) {
   void* context = NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_dart_deferred_callback_create(
-                     callback, fake_post_address(), port, &context, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_dart_deferred_callback_create(
+    callback, fake_post_address(), port, &context, NULL
+  ));
   TEST_ASSERT_NOT_NULL(context);
   return context;
 }
@@ -298,12 +279,9 @@ static void* dart_deferred_context(uint32_t callback, int64_t port) {
 static void dart_deferred_callbacks_post_the_callback_and_record(void) {
   reset_posts(true);
   void* context = NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_dart_deferred_callback_create(
-      MLN_ADAPTER_DEFERRED_LOG_CALLBACK, fake_post_address(), 0, &context, NULL
-    )
-  );
+  MLN_TEST_INVALID(mln_adapter_dart_deferred_callback_create(
+    MLN_ADAPTER_DEFERRED_LOG_CALLBACK, fake_post_address(), 0, &context, NULL
+  ));
   TEST_ASSERT_NULL(context);
   context = dart_deferred_context(MLN_ADAPTER_DEFERRED_LOG_CALLBACK, 29);
   char message[] = "deferred";
@@ -352,12 +330,9 @@ static void an_undelivered_dart_provider_record_fails_its_request(void) {
     .release_user_data = mln_adapter_deferred_callback_release,
   };
   mln_runtime runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_adapter_set_provider(runtime, &provider)
-  );
+  MLN_TEST_OK(mln_test_adapter_set_provider(runtime, &provider));
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_url(map, "custom://dart-provider-style.json")
   );
   dart_finalizer finalizer = NULL;
@@ -373,9 +348,7 @@ static void an_undelivered_dart_provider_record_fails_its_request(void) {
   TEST_ASSERT_NOT_NULL(strstr(message, "released without a response"));
 
   // Clearing the provider releases the context, which posts 0 last.
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_adapter_clear_provider(runtime)
-  );
+  MLN_TEST_OK(mln_test_adapter_clear_provider(runtime));
   TEST_ASSERT_EQUAL_size_t(2, atomic_load(&posted_count));
   assert_integer_message(1, 37, 0);
   mln_test_destroy_map(map);
@@ -428,11 +401,9 @@ static void count_registration_release(void* context) {
 static void* arena_with_counted_release(void) {
   void* arena = mln_adapter_arena_create();
   TEST_ASSERT_NOT_NULL(arena);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_arena_adopt_release(
-                     arena, count_registration_release, NULL, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_arena_adopt_release(
+    arena, count_registration_release, NULL, NULL
+  ));
   return arena;
 }
 
@@ -445,12 +416,10 @@ static void dart_release_registrations_post_their_identifier_once(void) {
   static int context;
 
   uint64_t first = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_dart_release_register(
-                     fake_post_address(), 17, &context,
-                     arena_with_counted_release(), &first, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_dart_release_register(
+    fake_post_address(), 17, &context, arena_with_counted_release(), &first,
+    NULL
+  ));
   TEST_ASSERT_NOT_EQUAL_UINT64(0, first);
   TEST_ASSERT_EQUAL_UINT(0, registration_releases);
   mln_adapter_dart_release(&context);
@@ -460,23 +429,18 @@ static void dart_release_registrations_post_their_identifier_once(void) {
   TEST_ASSERT_EQUAL_UINT(1, registration_releases);
 
   uint64_t second = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_dart_release_register(
-                     fake_post_address(), 17, &context, NULL, &second, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_dart_release_register(
+    fake_post_address(), 17, &context, NULL, &second, NULL
+  ));
   TEST_ASSERT_NOT_EQUAL_UINT64(first, second);
 
   // A context holds one registration at a time. The rejected registration
   // still consumes its arena.
   uint64_t duplicate = 1;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_adapter_dart_release_register(
-      fake_post_address(), 17, &context, arena_with_counted_release(),
-      &duplicate, NULL
-    )
-  );
+  MLN_TEST_INVALID(mln_adapter_dart_release_register(
+    fake_post_address(), 17, &context, arena_with_counted_release(), &duplicate,
+    NULL
+  ));
   TEST_ASSERT_EQUAL_UINT64(0, duplicate);
   TEST_ASSERT_EQUAL_UINT(2, registration_releases);
 

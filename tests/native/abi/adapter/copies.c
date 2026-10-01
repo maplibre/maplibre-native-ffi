@@ -51,9 +51,7 @@ static void every_copy_kind_copies_its_result_into_storage_of_its_own(void) {
       copy_result(entry->kind, entry->element_size, &result, &delivery);
 
     TEST_ASSERT_NOT_NULL_MESSAGE(record, entry->type);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK, record->result.status, entry->type
-    );
+    MLN_TEST_OK_MESSAGE(record->result.status, entry->type);
     TEST_ASSERT_EQUAL_UINT64_MESSAGE(5, record->result.generation, entry->type);
     TEST_ASSERT_TRUE_MESSAGE(
       mln_adapter_copy_case_view(record->result.diagnostic, result.diagnostic),
@@ -122,7 +120,7 @@ static void a_failed_result_copies_its_diagnostic_and_no_value(void) {
     MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), &result, &delivery
   );
   TEST_ASSERT_NOT_NULL(record);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_NATIVE_ERROR, record->result.status);
+  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, record->result.status);
   TEST_ASSERT_TRUE(
     mln_adapter_copy_case_view(record->result.diagnostic, result.diagnostic)
   );

@@ -24,14 +24,10 @@ static void read_center_pixel(
   const mln_test_render_fixture* fixture, uint8_t out_rgba[4]
 ) {
   mln_test_completion readback = mln_test_completion_readback();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
-                     fixture->session, &readback.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(fixture, &readback)
-  );
+  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+    fixture->session, &readback.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &readback));
   mln_texture_readback_result image = {0};
   TEST_ASSERT_TRUE(
     mln_test_completion_copy_value(&readback, &image, sizeof(image))
@@ -55,9 +51,7 @@ static void a_still_image_renders_the_current_style(uint32_t map_mode) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_still_image(&fixture, map)
-  );
+  MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
   uint8_t rgba[4] = {0};
   read_center_pixel(&fixture, rgba);
   TEST_ASSERT_EQUAL_UINT8(255, rgba[0]);
@@ -71,9 +65,7 @@ static void a_still_image_renders_the_current_style(uint32_t map_mode) {
   mln_test_load_style_and_wait(
     runtime, map, MLN_BUFFER_LITERAL(green_background_style_json)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_still_image(&fixture, map)
-  );
+  MLN_TEST_OK(mln_test_render_still_image(&fixture, map));
   read_center_pixel(&fixture, rgba);
   TEST_ASSERT_EQUAL_UINT8(0, rgba[0]);
   TEST_ASSERT_EQUAL_UINT8(255, rgba[1]);
@@ -99,7 +91,7 @@ static void a_continuous_map_refuses_a_still_image(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = create_map_in_mode(runtime, MLN_MAP_MODE_CONTINUOUS);
   mln_test_completion refused = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
     mln_map_request_still_image(map, &refused.descriptor, MLN_TEST_DIAGNOSTIC)
   );
@@ -120,22 +112,16 @@ static void map_close_cancels_the_pending_still_image(void) {
 
   // Without a render session the first request stays pending.
   mln_test_completion pending = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_request_still_image(map, &pending.descriptor, NULL)
-  );
+  MLN_TEST_OK(mln_map_request_still_image(map, &pending.descriptor, NULL));
   mln_test_completion duplicate = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_request_still_image(map, &duplicate.descriptor, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_OK(mln_map_request_still_image(map, &duplicate.descriptor, NULL));
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE, mln_test_completion_finish(&duplicate)
   );
   mln_test_completion_destroy(&duplicate);
 
   mln_test_destroy_map(map);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_CANCELLED, mln_test_completion_finish(&pending)
-  );
+  MLN_TEST_STATUS(MLN_STATUS_CANCELLED, mln_test_completion_finish(&pending));
   mln_test_completion_destroy(&pending);
   mln_test_destroy_runtime(runtime);
 }

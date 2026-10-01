@@ -50,7 +50,7 @@ static bool update_or_idle_arrived(void* context) {
 static void render_to_idle(
   mln_runtime runtime, const mln_test_render_fixture* fixture
 ) {
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   idle_probe probe = {.runtime = runtime, .fixture = fixture};
   const mln_test_deadline deadline = mln_test_deadline_default();
   for (;;) {
@@ -65,22 +65,17 @@ static void render_to_idle(
       return;
     }
     mln_frame_demand demand = mln_frame_demand_default();
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
+    MLN_TEST_OK(
       mln_render_session_request_frame(fixture->session, &demand, NULL)
     );
     mln_test_completion barrier = mln_test_completion_default(0);
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
+    MLN_TEST_OK(
       mln_render_session_barrier(fixture->session, &barrier.descriptor, NULL)
     );
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_test_render_fixture_finish_operation(fixture, &barrier)
-    );
+    MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &barrier));
     mln_test_completion_destroy(&barrier);
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
+    MLN_TEST_OK(
       mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
     );
     mln_render_frame_batch_release(batch);
@@ -92,14 +87,10 @@ static void read_center_pixel(
   const mln_test_render_fixture* fixture, uint8_t out[4]
 ) {
   mln_test_completion readback = mln_test_completion_readback();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
-                     fixture->session, &readback.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(fixture, &readback)
-  );
+  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+    fixture->session, &readback.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &readback));
   mln_texture_readback_result result = {0};
   TEST_ASSERT_TRUE(
     mln_test_completion_copy_value(&readback, &result, sizeof(result))
@@ -127,13 +118,10 @@ static void expect_center_pixel(
 }
 
 static void set_property(mln_map map, const char* property, const char* value) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_property(
-      map, MLN_BUFFER_LITERAL("background"), mln_test_view_of(property),
-      mln_test_view_of(value), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+    map, MLN_BUFFER_LITERAL("background"), mln_test_view_of(property),
+    mln_test_view_of(value), &completion.descriptor, NULL
+  ));
 }
 
 static const mln_feature_state_selector point_one = {
@@ -144,12 +132,9 @@ static const mln_feature_state_selector point_one = {
 };
 
 static void set_selected(mln_map map, const char* state) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_feature_state(
-      map, &point_one, mln_test_view_of(state), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_feature_state(
+    map, &point_one, mln_test_view_of(state), &completion.descriptor, NULL
+  ));
 }
 
 static const uint8_t red[4] = {255, 0, 0, 255};
@@ -168,12 +153,10 @@ static void add_swatch(mln_map map) {
   image.stride = 8;
   image.pixels = red_swatch;
   image.byte_length = sizeof(red_swatch);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_image(
-                     map, MLN_BUFFER_LITERAL("swatch"), &image, NULL,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
+    map, MLN_BUFFER_LITERAL("swatch"), &image, NULL, &completion.descriptor,
+    NULL
+  ));
 }
 
 // A value written under a long delay, whose delay is cleared before any frame
@@ -202,13 +185,10 @@ static void select_then_clear_renderer_data(
   render_to_idle(runtime, fixture);
   expect_center_pixel(fixture, green, "the selected point");
   mln_test_completion cleared = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_clear_data(fixture->session, &cleared.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(fixture, &cleared)
-  );
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &cleared));
   mln_test_completion_destroy(&cleared);
 }
 
@@ -218,21 +198,16 @@ static void add_the_late_source(
   (void)runtime;
   (void)fixture;
   mln_geojson_source_data data = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_geojson_source_data_create(
-                     MLN_BUFFER_LITERAL(
-                       "{\"type\":\"Feature\",\"properties\":{},\"geometry\":"
-                       "{\"type\":\"Point\",\"coordinates\":[0,0]}}"
-                     ),
-                     NULL, &data, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("late"), data, &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_OK(mln_geojson_source_data_create(
+    MLN_BUFFER_LITERAL(
+      "{\"type\":\"Feature\",\"properties\":{},\"geometry\":"
+      "{\"type\":\"Point\",\"coordinates\":[0,0]}}"
+    ),
+    NULL, &data, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
+    map, MLN_BUFFER_LITERAL("late"), data, &completion.descriptor, NULL
+  ));
   mln_geojson_source_data_destroy(data);
 }
 
@@ -241,12 +216,9 @@ static void remove_the_swatch(
 ) {
   (void)runtime;
   (void)fixture;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_remove_style_image(
-      map, MLN_BUFFER_LITERAL("swatch"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_image(
+    map, MLN_BUFFER_LITERAL("swatch"), &completion.descriptor, NULL
+  ));
 }
 
 // A layer paints from global state, so a new value repaints it.
@@ -255,13 +227,10 @@ static void set_the_global_color(
 ) {
   (void)runtime;
   (void)fixture;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_global_state_property(
-      map, MLN_BUFFER_LITERAL("color"), MLN_BUFFER_LITERAL("\"#0000ff\""),
-      &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_global_state_property(
+    map, MLN_BUFFER_LITERAL("color"), MLN_BUFFER_LITERAL("\"#0000ff\""),
+    &completion.descriptor, NULL
+  ));
 }
 
 typedef struct pixel_row {
@@ -322,8 +291,7 @@ static void each_mutation_reaches_the_pixels_of_an_update_driven_host(void) {
     TEST_ASSERT_TRUE_MESSAGE(
       mln_test_render_fixture_create(map, &fixture), row->label
     );
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK,
+    MLN_TEST_OK_MESSAGE(
       mln_test_map_set_style_json(map, mln_test_view_of(row->style)), row->label
     );
     if (row->prepare != NULL) {
@@ -343,7 +311,7 @@ static void each_mutation_reaches_the_pixels_of_an_update_driven_host(void) {
 // How many render updates the map published for the commands before the
 // barrier.
 static size_t take_updates(mln_runtime runtime) {
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   return mln_test_drain_counting(
     runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
   );
@@ -355,21 +323,15 @@ typedef struct update_state {
 } update_state;
 
 static void add_empty_geojson(mln_map map, update_state* state) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("geo"), state->data, &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
+    map, MLN_BUFFER_LITERAL("geo"), state->data, &completion.descriptor, NULL
+  ));
 }
 static void remove_geojson(mln_map map, update_state* state) {
   (void)state;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_remove_style_source(
-      map, MLN_BUFFER_LITERAL("geo"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_source(
+    map, MLN_BUFFER_LITERAL("geo"), &completion.descriptor, NULL
+  ));
 }
 static const uint8_t white_pixel[4] = {255, 255, 255, 255};
 static mln_premultiplied_rgba8_image white_image(void) {
@@ -390,35 +352,26 @@ static void add_image_source(mln_map map, update_state* state) {
     {.latitude = -1, .longitude = -1},
   };
   const mln_premultiplied_rgba8_image image = white_image();
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_image_source_image(
-                     map, MLN_BUFFER_LITERAL("image"), corners, 4, &image,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_image_source_image(
+    map, MLN_BUFFER_LITERAL("image"), corners, 4, &image,
+    &completion.descriptor, NULL
+  ));
 }
 static void add_icon(mln_map map, update_state* state) {
   (void)state;
   const mln_premultiplied_rgba8_image image = white_image();
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_image(
-                     map, MLN_BUFFER_LITERAL("icon"), &image, NULL,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_image(
+    map, MLN_BUFFER_LITERAL("icon"), &image, NULL, &completion.descriptor, NULL
+  ));
 }
 static void remove_icon(mln_map map, update_state* state) {
   (void)state;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_remove_style_image(
-      map, MLN_BUFFER_LITERAL("icon"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_image(
+    map, MLN_BUFFER_LITERAL("icon"), &completion.descriptor, NULL
+  ));
 }
 static void set_tile_options(mln_map map, const mln_map_tile_options* options) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
+  MLN_TEST_AWAIT_OK(
     mln_map_set_tile_options(map, options, &completion.descriptor, NULL)
   );
 }
@@ -469,11 +422,9 @@ static void set_style_transition(mln_map map, update_state* state) {
   mln_style_transition_options options = mln_style_transition_options_default();
   options.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
   options.duration_ms = 123.0;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_transition_options(
-                     map, &options, &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_transition_options(
+    map, &options, &completion.descriptor, NULL
+  ));
 }
 static void select_point(mln_map map, update_state* state) {
   (void)state;
@@ -485,8 +436,7 @@ static void merge_no_state(mln_map map, update_state* state) {
 }
 static void remove_point_state(mln_map map, update_state* state) {
   (void)state;
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
+  MLN_TEST_AWAIT_OK(
     mln_map_remove_feature_state(map, &point_one, &completion.descriptor, NULL)
   );
 }
@@ -538,30 +488,22 @@ static const update_row update_rows[] = {
 static void each_mutation_publishes_a_render_update_only_when_it_changes(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_map_set_style_json(
-      map, MLN_BUFFER_LITERAL(
-             "{\"version\":8,\"sources\":{\"point\":{\"type\":\"geojson\","
-             "\"data\":{\"type\":\"Feature\",\"id\":1,\"properties\":{},"
-             "\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]}}}},"
-             "\"layers\":[{\"id\":\"background\",\"type\":\"background\"}]}"
-           )
-    )
-  );
+  MLN_TEST_OK(mln_test_map_set_style_json(
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"sources\":{\"point\":{\"type\":\"geojson\","
+           "\"data\":{\"type\":\"Feature\",\"id\":1,\"properties\":{},"
+           "\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]}}}},"
+           "\"layers\":[{\"id\":\"background\",\"type\":\"background\"}]}"
+         )
+  ));
   (void)take_updates(runtime);
   update_state state = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
-      NULL, &state.data, NULL
-    )
-  );
+  MLN_TEST_OK(mln_geojson_source_data_create(
+    MLN_BUFFER_LITERAL("{\"type\":\"FeatureCollection\",\"features\":[]}"),
+    NULL, &state.data, NULL
+  ));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_snapshot_get(map, &snapshot, NULL)
-  );
+  MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
   state.initial_tile = snapshot.tile;
 
   for (size_t index = 0; index < sizeof(update_rows) / sizeof(update_rows[0]);
@@ -594,36 +536,27 @@ static bool frame_matches(void* context) {
   const frame_seek* seek = context;
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = seek->flags;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_request_frame(seek->fixture->session, &demand, NULL)
   );
   mln_test_completion barrier = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_barrier(
-                     seek->fixture->session, &barrier.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(mln_render_session_barrier(
+    seek->fixture->session, &barrier.descriptor, NULL
+  ));
+  MLN_TEST_OK(
     mln_test_render_fixture_finish_operation(seek->fixture, &barrier)
   );
   mln_test_completion_destroy(&barrier);
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_drain_frame_results(seek->fixture->session, &batch, NULL)
   );
   size_t count = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_frame_batch_count(batch, &count, NULL)
-  );
+  MLN_TEST_OK(mln_render_frame_batch_count(batch, &count, NULL));
   bool matched = false;
   for (size_t index = 0; index < count; index += 1) {
     mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_frame_batch_get(batch, index, &result, NULL)
-    );
+    MLN_TEST_OK(mln_render_frame_batch_get(batch, index, &result, NULL));
     matched |= result.disposition == seek->disposition &&
                (result.disposition != MLN_RENDER_RESULT_RENDERED ||
                 result.needs_repaint == seek->needs_repaint);
@@ -648,8 +581,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
 
@@ -673,21 +605,15 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
     "an if-needed demand never found the map settled"
   );
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_property(
-      map, MLN_BUFFER_LITERAL("bg"),
-      MLN_BUFFER_LITERAL("background-color-transition"),
-      MLN_BUFFER_LITERAL("{\"duration\":60000}"), &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_property(
-      map, MLN_BUFFER_LITERAL("bg"), MLN_BUFFER_LITERAL("background-color"),
-      MLN_BUFFER_LITERAL("\"#0000ff\""), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+    map, MLN_BUFFER_LITERAL("bg"),
+    MLN_BUFFER_LITERAL("background-color-transition"),
+    MLN_BUFFER_LITERAL("{\"duration\":60000}"), &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+    map, MLN_BUFFER_LITERAL("bg"), MLN_BUFFER_LITERAL("background-color"),
+    MLN_BUFFER_LITERAL("\"#0000ff\""), &completion.descriptor, NULL
+  ));
   demand_until(
     (frame_seek){
       .fixture = &fixture,

@@ -45,7 +45,7 @@ static void an_asset_style_resolves_under_the_runtime_asset_path(void) {
   options.asset_path = directory;
   mln_runtime runtime = mln_test_create_runtime_with_options(options);
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
   TEST_ASSERT_TRUE_MESSAGE(mln_test_await_style_loaded(runtime, map), url);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

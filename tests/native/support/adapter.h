@@ -13,6 +13,7 @@
 #include "env.h"
 #include "maplibre_native_c.h"
 #include "maplibre_native_c/callback_adapter.h"
+#include "status.h"
 #include "unity.h"
 #include "wait.h"
 
@@ -40,12 +41,10 @@ static inline mln_completion mln_test_adapter_completion(
   uint32_t copy_kind, size_t element_size, mln_test_adapter_delivery* delivery
 ) {
   mln_completion completion = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_completion_create(
-                     copy_kind, element_size, mln_test_adapter_keep_record,
-                     delivery, &completion, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_completion_create(
+    copy_kind, element_size, mln_test_adapter_keep_record, delivery,
+    &completion, NULL
+  ));
   return completion;
 }
 
@@ -86,14 +85,9 @@ static inline mln_status mln_test_adapter_clear_provider(mln_runtime runtime) {
 // disposed it, before destroying the runtime.
 static inline mln_map mln_test_adapter_create_map(mln_runtime runtime) {
   mln_test_completion completion = mln_test_completion_default(sizeof(mln_map));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_create(runtime, NULL, &completion.descriptor, NULL)
-  );
+  MLN_TEST_OK(mln_map_create(runtime, NULL, &completion.descriptor, NULL));
   mln_map map = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_completion_finish_value(&completion, &map, sizeof(map))
-  );
+  MLN_TEST_OK(mln_test_completion_finish_value(&completion, &map, sizeof(map)));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   return map;
 }

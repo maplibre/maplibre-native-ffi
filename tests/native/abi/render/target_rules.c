@@ -22,7 +22,7 @@ static void a_frame_release_the_backend_cannot_wait_on_keeps_the_frame(void) {
 
   mln_gpu_sync unknown = mln_gpu_sync_default();
   unknown.kind = 999;
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_UNSUPPORTED,
     mln_acquired_frame_release(&frame, &unknown, MLN_TEST_DIAGNOSTIC)
   );
@@ -30,15 +30,11 @@ static void a_frame_release_the_backend_cannot_wait_on_keeps_the_frame(void) {
   // The host still owns the frame and its accessors still answer.
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_get_result(frame, &result, NULL)
-  );
+  MLN_TEST_OK(mln_acquired_frame_get_result(frame, &result, NULL));
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
 
   const mln_gpu_sync sync = mln_gpu_sync_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(&frame, &sync, NULL)
-  );
+  MLN_TEST_OK(mln_acquired_frame_release(&frame, &sync, NULL));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
 
   mln_test_render_fixture_destroy(&fixture);
@@ -56,7 +52,7 @@ static void a_borrowed_texture_has_no_frames_to_acquire(void) {
   );
 
   mln_acquired_frame frame = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_UNSUPPORTED, mln_render_session_acquire_frame(
                               fixture.session, &frame, MLN_TEST_DIAGNOSTIC
                             )

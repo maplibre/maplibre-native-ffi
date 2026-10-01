@@ -13,6 +13,7 @@
 #include "env.h"
 
 #include "render.h"
+#include "status.h"
 #include "unity.h"
 #include "wait.h"
 
@@ -117,9 +118,7 @@ mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options) {
   mln_runtime runtime = MLN_HANDLE_NULL;
   // Event waits block on this wake rather than polling the queue.
   options.event_wake = mln_test_pulse_wake();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC)
-  );
+  MLN_TEST_OK(mln_runtime_create(&options, &runtime, MLN_TEST_DIAGNOSTIC));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
   tracked_runtime = runtime;
   return runtime;
@@ -228,14 +227,11 @@ mln_map mln_test_create_map_with_options(
   mln_map map = MLN_HANDLE_NULL;
   mln_test_completion completion = mln_test_completion_default(sizeof(map));
   reserve_map_slot();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_create(
-      runtime, options, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
+  MLN_TEST_OK(mln_map_create(
+    runtime, options, &completion.descriptor, MLN_TEST_DIAGNOSTIC
+  ));
   TEST_ASSERT_TRUE(mln_test_completion_wait(&completion, -1));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&completion));
+  MLN_TEST_OK(mln_test_completion_status(&completion));
   TEST_ASSERT_TRUE(
     mln_test_completion_copy_value(&completion, &map, sizeof(map))
   );
@@ -254,7 +250,7 @@ mln_map mln_test_create_map(mln_runtime runtime) {
 
 void mln_test_destroy_runtime(mln_runtime runtime) {
   mln_test_release_drained_batch();
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_close(runtime));
+  MLN_TEST_OK(mln_test_runtime_close(runtime));
   if (tracked_runtime == runtime) {
     tracked_runtime = MLN_HANDLE_NULL;
   }
@@ -281,9 +277,7 @@ mln_status mln_test_runtime_barrier(mln_runtime runtime) {
 void mln_test_destroy_map(mln_map map) {
   mln_test_release_drained_batch();
   const mln_completion release = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_release(map, &release, MLN_TEST_DIAGNOSTIC)
-  );
+  MLN_TEST_OK(mln_map_release(map, &release, MLN_TEST_DIAGNOSTIC));
   untrack_map(map);
 }
 
@@ -656,16 +650,15 @@ void mln_test_load_style_and_wait(
   mln_runtime runtime, mln_map map, mln_buffer_view json
 ) {
   mln_test_completion applied = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_map_set_style_json(map, json, &applied.descriptor, MLN_TEST_DIAGNOSTIC)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&applied));
+  MLN_TEST_OK(mln_test_completion_settle(&applied));
   // MapLibre parses an inline document and notifies its observer inside the
   // command, so the events the load produces are queued once it commits. The
   // barrier only orders this thread behind the runtime worker's own follow-up
   // work.
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
 }
 
 bool mln_test_reclaim_thread_resources(void) {

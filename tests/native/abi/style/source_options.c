@@ -99,12 +99,9 @@ static const geojson_option_case geojson_option_cases[] = {
 static void geojson_data_validates_every_option_field(void) {
   mln_geojson_source_options options = every_geojson_option();
   mln_geojson_source_data data = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(point_collection), &options, &data, MLN_TEST_DIAGNOSTIC
-    )
-  );
+  MLN_TEST_OK(mln_geojson_source_data_create(
+    MLN_BUFFER_LITERAL(point_collection), &options, &data, MLN_TEST_DIAGNOSTIC
+  ));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, data);
   mln_geojson_source_data_destroy(data);
 
@@ -142,27 +139,19 @@ static void geojson_sources_take_and_validate_their_options(void) {
 
   mln_geojson_source_options options = every_geojson_option();
   mln_geojson_source_data data = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(point_collection), &options, &data, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("prepared"), data, &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_OK(mln_geojson_source_data_create(
+    MLN_BUFFER_LITERAL(point_collection), &options, &data, MLN_TEST_DIAGNOSTIC
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
+    map, MLN_BUFFER_LITERAL("prepared"), data, &completion.descriptor, NULL
+  ));
   mln_geojson_source_data_destroy(data);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_geojson_source_url(
-                     map, MLN_BUFFER_LITERAL("points"),
-                     MLN_BUFFER_LITERAL("fixture://points.geojson"), &options,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_url(
+    map, MLN_BUFFER_LITERAL("points"),
+    MLN_BUFFER_LITERAL("fixture://points.geojson"), &options,
+    &completion.descriptor, NULL
+  ));
 
   inverted_zoom_range(&options);
   MLN_TEST_EXPECT_COMMAND_REJECTED(
@@ -274,12 +263,9 @@ static void custom_sources_validate_every_option_field(void) {
   mln_test_load_style_and_wait(runtime, map, mln_test_empty_style_json);
 
   mln_custom_geometry_source_options geometry = every_geometry_option();
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_custom_geometry_source(
-                     map, MLN_BUFFER_LITERAL("geometry"), &geometry,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_custom_geometry_source(
+    map, MLN_BUFFER_LITERAL("geometry"), &geometry, &completion.descriptor, NULL
+  ));
   for (size_t index = 0;
        index < sizeof(geometry_option_cases) / sizeof(geometry_option_cases[0]);
        index += 1) {
@@ -305,12 +291,9 @@ static void custom_sources_validate_every_option_field(void) {
   }
 
   mln_custom_mvt_vector_source_options mvt = every_mvt_option();
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_custom_mvt_vector_source(
-      map, MLN_BUFFER_LITERAL("mvt"), &mvt, &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_custom_mvt_vector_source(
+    map, MLN_BUFFER_LITERAL("mvt"), &mvt, &completion.descriptor, NULL
+  ));
   mvt.max_zoom = 4.5;
   MLN_TEST_EXPECT_COMMAND_REJECTED(
     "max_zoom must be an integer within [0, 32]",

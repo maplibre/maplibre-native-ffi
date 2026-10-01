@@ -118,19 +118,14 @@ static mln_acquired_frame render_and_acquire(
     MLN_RENDER_RESULT_RENDERED, mln_test_style_render_frame(fixture)
   );
   mln_acquired_frame frame = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_acquire_frame(fixture->session, &frame, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_acquire_frame(fixture->session, &frame, NULL));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
   return frame;
 }
 
 static void release_frame(mln_acquired_frame* frame) {
   const mln_gpu_sync sync = mln_gpu_sync_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(frame, &sync, NULL)
-  );
+  MLN_TEST_OK(mln_acquired_frame_release(frame, &sync, NULL));
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, *frame);
 }
 
@@ -181,8 +176,7 @@ static void only_the_sessions_backend_describes_its_frame_texture(void) {
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
   );
 
@@ -205,7 +199,7 @@ static void only_the_sessions_backend_describes_its_frame_texture(void) {
       );
       continue;
     }
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, status, accessor->name);
+    MLN_TEST_OK_MESSAGE(status, accessor->name);
     if (accessor->call == get_result) {
       TEST_ASSERT_EQUAL_UINT32(
         MLN_RENDER_RESULT_RENDERED, record.result.disposition
@@ -228,7 +222,7 @@ static void only_the_sessions_backend_describes_its_frame_texture(void) {
   frame_record record;
   memset(&record, 0, sizeof(record));
   record.size = preset->record_size;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, preset->call(frame, &record, NULL));
+  MLN_TEST_OK(preset->call(frame, &record, NULL));
   TEST_ASSERT_NOT_EQUAL_UINT64(
     first_frame_id, expect_preset_texture(&record, snapshot.generation)
   );
@@ -324,23 +318,15 @@ static void accessors_reject_a_broken_frame_or_output(void) {
   // only when it succeeds.
   const mln_gpu_sync sync = mln_gpu_sync_default();
   mln_acquired_frame null_handle = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_acquired_frame_release(&null_handle, &sync, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_acquired_frame_release(NULL, &sync, NULL)
-  );
+  MLN_TEST_INVALID(mln_acquired_frame_release(&null_handle, &sync, NULL));
+  MLN_TEST_INVALID(mln_acquired_frame_release(NULL, &sync, NULL));
   mln_acquired_frame stale_copy = stale;
   TEST_ASSERT_NOT_EQUAL_INT(
     MLN_STATUS_OK, mln_acquired_frame_release(&stale_copy, &sync, NULL)
   );
   mln_gpu_sync undersized = sync;
   undersized.size = sizeof(mln_gpu_sync) - 1;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_acquired_frame_release(&frame, &undersized, NULL)
-  );
+  MLN_TEST_INVALID(mln_acquired_frame_release(&frame, &undersized, NULL));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
   release_frame(&frame);
 
@@ -422,16 +408,13 @@ static void physical_sizes_round_up_and_reject_overflow(void) {
   uint32_t width = 0;
   uint32_t height = 0;
   const mln_render_target_extent extent = EXTENT(1, 1, 1.0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_render_target_extent_physical_size(NULL, &width, &height, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_render_target_extent_physical_size(&extent, NULL, &height, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_render_target_extent_physical_size(&extent, &width, NULL, NULL)
   );
 }

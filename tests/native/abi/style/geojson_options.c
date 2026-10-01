@@ -77,29 +77,20 @@ static void render_points(
     MLN_BUFFER_LITERAL("{\"version\":8,\"sources\":{},\"layers\":[]}")
   );
   mln_geojson_source_data data = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_geojson_source_data_create(
-      MLN_BUFFER_LITERAL(nearby_points), options, &data, MLN_TEST_DIAGNOSTIC
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(
-      map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_OK(mln_geojson_source_data_create(
+    MLN_BUFFER_LITERAL(nearby_points), options, &data, MLN_TEST_DIAGNOSTIC
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_data(
+    map, MLN_BUFFER_LITERAL("points"), data, &completion.descriptor, NULL
+  ));
   mln_geojson_source_data_destroy(data);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_layer_json(
-      map,
-      MLN_BUFFER_LITERAL(
-        "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"points\"}"
-      ),
-      MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+    map,
+    MLN_BUFFER_LITERAL(
+      "{\"id\":\"dots\",\"type\":\"circle\",\"source\":\"points\"}"
+    ),
+    MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
+  ));
 
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));

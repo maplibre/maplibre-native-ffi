@@ -15,6 +15,7 @@
 #include "maplibre_native_c/callback_adapter.h"
 #include "runtime/runtime.hpp"
 #include "support/harness.h"
+#include "support/status.h"
 #include "support/wait.h"
 #include "unity.h"
 
@@ -38,9 +39,7 @@ auto create_runtime(std::atomic_uint& wake_releases) -> mln_runtime {
     mln_test_pulse();
   };
   auto runtime = mln_runtime{MLN_HANDLE_NULL};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, nullptr)
-  );
+  MLN_TEST_OK(mln_runtime_create(&options, &runtime, nullptr));
   return runtime;
 }
 
@@ -96,15 +95,11 @@ void undelivered_dart_completion_disposes_its_owned_result() {
   const auto runtime = create_runtime(releases);
   auto weak = std::weak_ptr{mln::core::lease_runtime(runtime)};
   auto completion = mln_completion{};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_dart_completion_create(
-                     MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map),
-                     reinterpret_cast<void*>(post), 23, 31, &completion, nullptr
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_create(runtime, nullptr, &completion, nullptr)
-  );
+  MLN_TEST_OK(mln_adapter_dart_completion_create(
+    MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map),
+    reinterpret_cast<void*>(post), 23, 31, &completion, nullptr
+  ));
+  MLN_TEST_OK(mln_map_create(runtime, nullptr, &completion, nullptr));
   TEST_ASSERT_TRUE(
     await([&] { return deliveries.load() == 1; }, "the completion post")
   );
@@ -233,12 +228,10 @@ void dart_deferred_callbacks_post_records_before_retirement() {
     return false;
   };
   void* context = nullptr;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_dart_deferred_callback_create(
-                     MLN_ADAPTER_DEFERRED_LOG_CALLBACK,
-                     reinterpret_cast<void*>(post), 29, &context, nullptr
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_dart_deferred_callback_create(
+    MLN_ADAPTER_DEFERRED_LOG_CALLBACK, reinterpret_cast<void*>(post), 29,
+    &context, nullptr
+  ));
   auto* address =
     mln_adapter_deferred_callback_function(MLN_ADAPTER_DEFERRED_LOG_CALLBACK);
   const auto callback = reinterpret_cast<mln_log_callback>(address);
@@ -273,11 +266,9 @@ void dart_ports_release_after_the_host_closes() {
     return false;  // A closed isolate port rejects delivery.
   };
   auto wake = mln_wake{};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_dart_wake_create(
-                     reinterpret_cast<void*>(post), 17, &wake, nullptr
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_dart_wake_create(
+    reinterpret_cast<void*>(post), 17, &wake, nullptr
+  ));
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     wake.callback(wake.user_data);
     wake.release_user_data(wake.user_data);
@@ -309,23 +300,16 @@ void dart_ports_release_after_the_host_closes() {
 
   auto runtime_releases = std::atomic_uint{};
   const auto runtime = create_runtime(runtime_releases);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_arena_adopt_handle(arena, runtime, nullptr)
-  );
+  MLN_TEST_OK(mln_adapter_arena_adopt_handle(arena, runtime, nullptr));
   static auto context_releases = unsigned{};
   context_releases = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_arena_adopt_release(
-                     arena, [](void*) { ++context_releases; }, nullptr, nullptr
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_arena_adopt_release(
+    arena, [](void*) { ++context_releases; }, nullptr, nullptr
+  ));
   auto registration = std::uint64_t{};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_adapter_dart_release_register(
-      reinterpret_cast<void*>(post), 17, context, arena, &registration, nullptr
-    )
-  );
+  MLN_TEST_OK(mln_adapter_dart_release_register(
+    reinterpret_cast<void*>(post), 17, context, arena, &registration, nullptr
+  ));
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     mln_adapter_dart_release(context);
     mln_adapter_dart_release(context);
@@ -346,12 +330,10 @@ void dart_ports_release_after_the_host_closes() {
   // registration, which must get a notification ID of its own.
   arena = mln_adapter_arena_create();
   auto second_registration = std::uint64_t{};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_dart_release_register(
-                     reinterpret_cast<void*>(post), 17, context, arena,
-                     &second_registration, nullptr
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_dart_release_register(
+    reinterpret_cast<void*>(post), 17, context, arena, &second_registration,
+    nullptr
+  ));
   TEST_ASSERT_NOT_EQUAL_UINT64(registration, second_registration);
   mln_adapter_dart_release(context);
   TEST_ASSERT_NULL_MESSAGE(checks.failure(), checks.failure());

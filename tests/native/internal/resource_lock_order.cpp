@@ -123,9 +123,7 @@ void runtime_teardown_leaves_other_runtimes_responsive() {
     .user_data = &probe,
     .release_user_data = mark_transform_released,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln::native_tests::set_resource_transform(runtime, transform)
-  );
+  MLN_TEST_OK(mln::native_tests::set_resource_transform(runtime, transform));
   TEST_ASSERT_TRUE(
     mln::native_tests::start_offline_download(runtime, offline_style_url)
   );
@@ -144,7 +142,7 @@ void runtime_teardown_leaves_other_runtimes_responsive() {
     probe.observed_call.load(),
     "a call on an unrelated runtime stalled behind runtime teardown"
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, other.status.load());
+  MLN_TEST_OK(other.status.load());
 }
 
 // Parks the file source thread just before it looks up the resource
@@ -203,9 +201,7 @@ void resource_transform_lookup_leaves_other_runtimes_responsive() {
     .callback = lookup_provider,
     .user_data = &provider_probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln::native_tests::set_resource_provider(runtime, provider)
-  );
+  MLN_TEST_OK(mln::native_tests::set_resource_provider(runtime, provider));
   auto transform_probe =
     BlockingTransform{.only_url = lookup_blocking_style_url, .other = &other};
   const auto transform = mln_resource_transform{
@@ -213,23 +209,18 @@ void resource_transform_lookup_leaves_other_runtimes_responsive() {
     .callback = blocking_transform,
     .user_data = &transform_probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln::native_tests::set_resource_transform(runtime, transform)
-  );
+  MLN_TEST_OK(mln::native_tests::set_resource_transform(runtime, transform));
 
   // The first map's style request parks a transform callback inside the
   // shared lock.
   auto blocking_map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_url(blocking_map, lookup_blocking_style_url)
   );
   TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &transform_probe.entered));
   // The second map's parks a file source thread one step ahead of the lookup.
   auto probe_map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(probe_map, lookup_probe_style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(probe_map, lookup_probe_style_url));
   TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &provider_probe.entered));
 
   // Clearing waits for the parked transform callback, so it is the pending
@@ -237,9 +228,7 @@ void resource_transform_lookup_leaves_other_runtimes_responsive() {
   provider_probe.writer_hits =
     sync_points.hits(SyncPoint::ResourceTransformExclusive) + 1;
   mln_test_flag_set(&provider_probe.writer_pending);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln::native_tests::clear_resource_transform(runtime)
-  );
+  MLN_TEST_OK(mln::native_tests::clear_resource_transform(runtime));
   mln_test_thread_join(other_thread);
 
   TEST_ASSERT_TRUE_MESSAGE(
@@ -250,7 +239,7 @@ void resource_transform_lookup_leaves_other_runtimes_responsive() {
     transform_probe.observed_call.load(),
     "a call on an unrelated runtime stalled behind a transform lookup"
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, other.status.load());
+  MLN_TEST_OK(other.status.load());
   mln_test_destroy_map(probe_map);
   mln_test_destroy_map(blocking_map);
   mln_test_destroy_runtime(runtime);
@@ -313,17 +302,13 @@ void clearing_resource_provider_waits_for_in_flight_callback() {
   auto sync_points = SyncPointScope{};
   auto runtime = mln_test_create_runtime();
   auto probe = ParkedProvider{.sync_points = &sync_points};
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, install_parked_provider(runtime, probe));
+  MLN_TEST_OK(install_parked_provider(runtime, probe));
   auto map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, offline_style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, offline_style_url));
   TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.entered));
 
   start_writer(sync_points, probe);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln::native_tests::clear_resource_provider(runtime)
-  );
+  MLN_TEST_OK(mln::native_tests::clear_resource_provider(runtime));
   TEST_ASSERT_TRUE_MESSAGE(
     probe.writer_waited.load(),
     "the clear never waited for the running provider callback"
@@ -342,7 +327,7 @@ void runtime_teardown_waits_for_in_flight_provider_callback() {
   auto sync_points = SyncPointScope{};
   auto runtime = mln_test_create_runtime();
   auto probe = ParkedProvider{.sync_points = &sync_points};
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, install_parked_provider(runtime, probe));
+  MLN_TEST_OK(install_parked_provider(runtime, probe));
   TEST_ASSERT_TRUE(
     mln::native_tests::start_offline_download(runtime, offline_style_url)
   );

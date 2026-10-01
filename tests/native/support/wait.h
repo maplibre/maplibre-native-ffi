@@ -85,15 +85,18 @@ typedef struct mln_test_completion {
 // Submits a command through `expression` and asserts its terminal status. The
 // macro declares the `completion` the expression must pass, so an expression
 // that names anything else does not compile.
-#define MLN_TEST_AWAIT_COMMAND(expected_status, expression)          \
-  do {                                                               \
-    mln_test_completion completion = mln_test_completion_default(0); \
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, (expression));              \
-    TEST_ASSERT_EQUAL_INT(                                           \
-      (expected_status), mln_test_completion_finish(&completion)     \
-    );                                                               \
-    mln_test_completion_destroy(&completion);                        \
+#define MLN_TEST_AWAIT_COMMAND(expected_status, expression)                   \
+  do {                                                                        \
+    mln_test_completion completion = mln_test_completion_default(0);          \
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, (expression), #expression);  \
+    TEST_ASSERT_EQUAL_INT_MESSAGE(                                            \
+      (expected_status), mln_test_completion_finish(&completion), #expression \
+    );                                                                        \
+    mln_test_completion_destroy(&completion);                                 \
   } while (false)
+// The same, expecting the command to succeed.
+#define MLN_TEST_AWAIT_OK(...) \
+  MLN_TEST_AWAIT_COMMAND(MLN_STATUS_OK, (__VA_ARGS__))
 
 mln_test_completion mln_test_completion_default(size_t value_size);
 mln_test_completion mln_test_completion_buffer_view(void);

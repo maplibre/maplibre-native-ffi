@@ -23,8 +23,7 @@ static mln_camera_options test_camera(void) {
 }
 
 static void update_camera(mln_map map, const mln_camera_update* update) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
+  MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, update, &completion.descriptor, NULL)
   );
 }
@@ -48,11 +47,9 @@ static mln_camera_update ease_to_zoom(
 static mln_map_snapshot read_settled_snapshot(
   mln_runtime runtime, mln_map map
 ) {
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_snapshot_get(map, &snapshot, NULL)
-  );
+  MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
   return snapshot;
 }
 
@@ -63,12 +60,9 @@ static mln_map_snapshot read_settled_snapshot(
 static mln_camera_options query_camera(mln_map map) {
   mln_test_completion query =
     mln_test_completion_default(sizeof(mln_camera_query_result));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_camera_query(map, &query.descriptor, NULL)
-  );
+  MLN_TEST_OK(mln_map_camera_query(map, &query.descriptor, NULL));
   mln_camera_query_result result = {.size = sizeof(mln_camera_query_result)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_completion_finish_value(&query, &result, sizeof(result))
   );
   return result.camera;
@@ -166,12 +160,10 @@ static void a_rendered_ease_completes_at_its_target(void) {
   transition_wait wait = {
     .runtime = runtime, .fixture = &fixture, .transition_id = 31
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_step_until(
-                     &fixture, transition_finished, &wait,
-                     mln_test_deadline_default(), "a transition-finished event"
-                   )
-  );
+  MLN_TEST_OK(mln_test_render_step_until(
+    &fixture, transition_finished, &wait, mln_test_deadline_default(),
+    "a transition-finished event"
+  ));
   TEST_ASSERT_FALSE(wait.failed);
   TEST_ASSERT_EQUAL_size_t(1, wait.finished);
   TEST_ASSERT_EQUAL_DOUBLE(5.0, query_camera(map).zoom);
@@ -181,17 +173,12 @@ static void a_rendered_ease_completes_at_its_target(void) {
   TEST_ASSERT_FALSE(wait.demand_pending);
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_request_frame(fixture.session, &demand, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_step_until(
-                     &fixture, settled_result, (void*)&fixture,
-                     mln_test_deadline_default(), "a fence frame"
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
+  MLN_TEST_OK(mln_test_render_step_until(
+    &fixture, settled_result, (void*)&fixture, mln_test_deadline_default(),
+    "a fence frame"
+  ));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_EQUAL_size_t(0, drain_finished(runtime, 31));
 
   mln_test_render_fixture_destroy(&fixture);
@@ -211,12 +198,12 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
 
   const mln_camera_update eased = ease_to_zoom(18.0, 60000.0, 41);
   update_camera(map, &eased);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_cancel_transitions(map, &completion.descriptor, NULL)
+  MLN_TEST_AWAIT_OK(
+    mln_map_cancel_transitions(map, &completion.descriptor, NULL)
   );
   // The cancelled transition reports its end, leaves the camera where it
   // stopped, short of the eased target, and the camera stays there.
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_EQUAL_size_t(1, drain_finished(runtime, 41));
   const double settled = read_settled_snapshot(runtime, map).camera.zoom;
   TEST_ASSERT_TRUE(settled < 18.0);
@@ -225,21 +212,18 @@ static void cancel_transitions_commits_and_leaves_the_camera(void) {
   );
 
   // Cancelling with nothing running commits and changes nothing.
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_cancel_transitions(map, &completion.descriptor, NULL)
+  MLN_TEST_AWAIT_OK(
+    mln_map_cancel_transitions(map, &completion.descriptor, NULL)
   );
   TEST_ASSERT_EQUAL_DOUBLE(
     settled, read_settled_snapshot(runtime, map).camera.zoom
   );
 
   mln_completion rejected = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_map_cancel_transitions(MLN_HANDLE_NULL, &rejected, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_cancel_transitions(map, NULL, NULL)
-  );
+  MLN_TEST_INVALID(mln_map_cancel_transitions(map, NULL, NULL));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -277,7 +261,7 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
   gesture.camera.bearing = 20.0;
   gesture.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
   update_camera(map, &gesture);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_EQUAL_size_t(0, drain_finished(runtime, 51));
 
   gesture.gesture_phase = MLN_GESTURE_PHASE_CANCEL;
@@ -287,10 +271,7 @@ static void gesture_phase_publishes_the_snapshot_flag(void) {
 
   update.gesture_phase = MLN_GESTURE_PHASE_CANCEL + 1;
   mln_completion rejected = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_update_camera(map, &update, &rejected, NULL)
-  );
+  MLN_TEST_INVALID(mln_map_update_camera(map, &update, &rejected, NULL));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

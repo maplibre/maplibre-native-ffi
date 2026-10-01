@@ -7,14 +7,10 @@
 
 static void finish_render_barrier(const mln_test_render_fixture* fixture) {
   mln_test_completion completion = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_barrier(fixture->session, &completion.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_render_fixture_finish_operation(fixture, &completion)
-  );
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &completion));
   mln_test_completion_destroy(&completion);
 }
 
@@ -28,27 +24,20 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   // Attaching with no share context is the behavior under test.
   TEST_ASSERT_TRUE(mln_test_dedicated_egl_surface_create(map, &fixture));
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = MLN_FRAME_DEMAND_PRESENT;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_request_frame(fixture.session, &demand, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   finish_render_barrier(&fixture);
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
   );
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_frame_batch_get(batch, 0, &result, NULL)
-  );
+  MLN_TEST_OK(mln_render_frame_batch_get(batch, 0, &result, NULL));
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_TRUE(mln_test_egl_context_is_current());
@@ -71,8 +60,7 @@ static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
   mln_render_session_capabilities capabilities = {
     .size = sizeof(mln_render_session_capabilities)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
   );
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_DRIVER_CORE_WORKER, capabilities.driver);
@@ -81,53 +69,42 @@ static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
     MLN_RENDER_SESSION_CAPABILITY_READBACK, capabilities.flags
   );
   size_t serviced = 0;
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
     mln_render_session_service_driver_work(fixture.session, 0, &serviced, NULL)
   );
   mln_acquired_frame frame = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_UNSUPPORTED,
     mln_render_session_acquire_frame(fixture.session, &frame, NULL)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_map_set_style_json(map, mln_test_red_background_style_json)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = 0;
   demand.token = 41;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_request_frame(fixture.session, &demand, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_request_frame(fixture.session, &demand, NULL));
   finish_render_barrier(&fixture);
 
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
   );
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_frame_batch_get(batch, 0, &result, NULL)
-  );
+  MLN_TEST_OK(mln_render_frame_batch_get(batch, 0, &result, NULL));
   TEST_ASSERT_EQUAL_UINT64(demand.token, result.token);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   mln_render_frame_batch_release(batch);
 
   mln_test_completion readback = mln_test_completion_readback();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
-                     fixture.session, &readback.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &readback)
-  );
+  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+    fixture.session, &readback.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &readback));
   mln_texture_readback_result readback_result = {0};
   TEST_ASSERT_TRUE(mln_test_completion_copy_value(
     &readback, &readback_result, sizeof(readback_result)

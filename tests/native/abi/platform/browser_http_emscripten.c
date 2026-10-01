@@ -88,7 +88,7 @@ static void style_loads_over_http_from_the_runner_origin(void) {
 
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
 
   char failure[512];
   const bool loaded =
@@ -104,14 +104,11 @@ static void style_loads_over_http_from_the_runner_origin(void) {
   // layer.
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_style_layer_result));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_get_style_layer_info(
-      map, mln_test_buffer_view(fixture_layer_id, strlen(fixture_layer_id)),
-      &completion.descriptor, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  MLN_TEST_OK(mln_map_get_style_layer_info(
+    map, mln_test_buffer_view(fixture_layer_id, strlen(fixture_layer_id)),
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_completion_finish(&completion));
   const bool found = mln_test_completion_value_count(&completion) == 1;
   mln_test_completion_destroy(&completion);
 

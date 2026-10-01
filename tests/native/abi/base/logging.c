@@ -67,26 +67,20 @@ static void count_log_callback_release(void* user_data) { ++*(int*)user_data; }
 LOG_STATE_CASE(log_callback_releases_owned_user_data) {
   int first_releases = 0;
   int second_releases = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_log_set_callback(
-      ignore_log_record, &first_releases, count_log_callback_release, NULL
-    )
-  );
+  MLN_TEST_OK(mln_log_set_callback(
+    ignore_log_record, &first_releases, count_log_callback_release, NULL
+  ));
   TEST_ASSERT_EQUAL_INT(0, first_releases);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_log_set_callback(
-      ignore_log_record, &second_releases, count_log_callback_release, NULL
-    )
-  );
+  MLN_TEST_OK(mln_log_set_callback(
+    ignore_log_record, &second_releases, count_log_callback_release, NULL
+  ));
   TEST_ASSERT_EQUAL_INT(1, first_releases);
   TEST_ASSERT_EQUAL_INT(0, second_releases);
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
+  MLN_TEST_OK(mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_INT(1, second_releases);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
+  MLN_TEST_OK(mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_INT(1, second_releases);
 }
 
@@ -95,21 +89,16 @@ LOG_STATE_CASE(log_callback_releases_owned_user_data) {
 LOG_STATE_CASE(a_null_callback_clears_and_releases_the_user_data_it_passes) {
   int installed_releases = 0;
   int passed_releases = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_log_set_callback(
-      ignore_log_record, &installed_releases, count_log_callback_release, NULL
-    )
-  );
+  MLN_TEST_OK(mln_log_set_callback(
+    ignore_log_record, &installed_releases, count_log_callback_release, NULL
+  ));
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_log_set_callback(
-                     NULL, &passed_releases, count_log_callback_release, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_log_set_callback(
+    NULL, &passed_releases, count_log_callback_release, NULL
+  ));
   TEST_ASSERT_EQUAL_INT(1, installed_releases);
   TEST_ASSERT_EQUAL_INT(1, passed_releases);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
+  MLN_TEST_OK(mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_INT(1, installed_releases);
   TEST_ASSERT_EQUAL_INT(1, passed_releases);
 }
@@ -132,28 +121,23 @@ LOG_STATE_CASE(a_deferred_log_registration_releases_its_context_once) {
   static atomic_int releases;
   atomic_store(&releases, 0);
   void* context = NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_adapter_deferred_callback_create(
-                     MLN_ADAPTER_DEFERRED_LOG_CALLBACK, count_deferred_release,
-                     &releases, &context, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_adapter_deferred_callback_create(
+    MLN_ADAPTER_DEFERRED_LOG_CALLBACK, count_deferred_release, &releases,
+    &context, NULL
+  ));
   void* address =
     mln_adapter_deferred_callback_function(MLN_ADAPTER_DEFERRED_LOG_CALLBACK);
   TEST_ASSERT_NOT_NULL(address);
   mln_log_callback callback = NULL;
   memcpy(&callback, &address, sizeof(callback));
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_log_set_callback(
-      callback, context, mln_adapter_deferred_callback_release, NULL
-    )
-  );
+  MLN_TEST_OK(mln_log_set_callback(
+    callback, context, mln_adapter_deferred_callback_release, NULL
+  ));
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&releases));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
+  MLN_TEST_OK(mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&releases));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
+  MLN_TEST_OK(mln_log_clear_callback(NULL));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&releases));
 }
 
@@ -270,26 +254,20 @@ static void dump_debug_logs(dump_probe* probe) {
   atomic_init(&probe->unexpected, 0);
   atomic_init(&probe->count_at_completion, -1);
   atomic_init(&probe->completed, false);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_log_set_callback(record_dump, probe, NULL, NULL)
-  );
+  MLN_TEST_OK(mln_log_set_callback(record_dump, probe, NULL, NULL));
 
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_json(map, mln_test_empty_style_json)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
   const mln_completion completion = {
     .size = sizeof(mln_completion),
     .callback = record_dump_completion,
     .user_data = probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_dump_debug_logs(map, &completion, NULL)
-  );
+  MLN_TEST_OK(mln_map_dump_debug_logs(map, &completion, NULL));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->completed));
   TEST_ASSERT_TRUE(mln_test_wait_for_count(&probe->count, DUMP_RECORD_COUNT));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback(NULL));
+  MLN_TEST_OK(mln_log_clear_callback(NULL));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -312,8 +290,7 @@ static void dump_debug_logs(dump_probe* probe) {
 // that runs the command, before the command completes. Consuming a record or
 // passing it on changes nothing about the next one.
 LOG_STATE_CASE(a_synchronous_record_arrives_on_the_logging_thread) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_ERROR, NULL)
   );
   static dump_probe probe;
@@ -329,8 +306,7 @@ LOG_STATE_CASE(a_synchronous_record_arrives_on_the_logging_thread) {
 // With info records asynchronous, MapLibre hands the dump to its log thread,
 // which delivers every record in order and none on the thread that logged it.
 LOG_STATE_CASE(an_asynchronous_record_arrives_on_the_log_thread) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_INFO, NULL)
   );
   static dump_probe probe;
@@ -346,15 +322,10 @@ LOG_STATE_CASE(an_asynchronous_record_arrives_on_the_log_thread) {
 // A rejected mask leaves the previous one in effect: here every severity
 // stays synchronous.
 LOG_STATE_CASE(a_rejected_async_mask_leaves_the_previous_one) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_log_set_async_severity_mask(0, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_log_set_async_severity_mask(
-      MLN_LOG_SEVERITY_MASK_ALL | (UINT32_C(1) << 31U), NULL
-    )
-  );
+  MLN_TEST_OK(mln_log_set_async_severity_mask(0, NULL));
+  MLN_TEST_INVALID(mln_log_set_async_severity_mask(
+    MLN_LOG_SEVERITY_MASK_ALL | (UINT32_C(1) << 31U), NULL
+  ));
   static dump_probe probe;
   dump_debug_logs(&probe);
   TEST_ASSERT_EQUAL_INT(
@@ -405,9 +376,7 @@ static void stop_capturing_stderr(
 // MapLibre's platform logger. record_dump consumes the style URL record and
 // passes on the two separators.
 LOG_STATE_CASE(only_records_the_callback_passes_on_reach_the_platform_logger) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_log_set_async_severity_mask(0, NULL)
-  );
+  MLN_TEST_OK(mln_log_set_async_severity_mask(0, NULL));
   stderr_capture capture;
   start_capturing_stderr(&capture);
   // stderr must come back even when the dump fails, or a full pipe would

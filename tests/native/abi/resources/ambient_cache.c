@@ -21,34 +21,22 @@ static void ambient_cache_calls_validate_their_arguments(void) {
   for (size_t index = 0;
        index < sizeof(unknown_operations) / sizeof(unknown_operations[0]);
        index += 1) {
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_INVALID_ARGUMENT,
-      mln_runtime_run_ambient_cache_operation(
-        runtime, unknown_operations[index], &completion, NULL
-      )
-    );
+    MLN_TEST_INVALID(mln_runtime_run_ambient_cache_operation(
+      runtime, unknown_operations[index], &completion, NULL
+    ));
   }
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_run_ambient_cache_operation(
-      MLN_HANDLE_NULL, MLN_AMBIENT_CACHE_OPERATION_CLEAR, &completion, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_run_ambient_cache_operation(
-      runtime, MLN_AMBIENT_CACHE_OPERATION_CLEAR, NULL, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(mln_runtime_run_ambient_cache_operation(
+    MLN_HANDLE_NULL, MLN_AMBIENT_CACHE_OPERATION_CLEAR, &completion, NULL
+  ));
+  MLN_TEST_INVALID(mln_runtime_run_ambient_cache_operation(
+    runtime, MLN_AMBIENT_CACHE_OPERATION_CLEAR, NULL, NULL
+  ));
+  MLN_TEST_INVALID(
     mln_runtime_set_maximum_ambient_cache_size(runtime, 1024, NULL, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_set_maximum_ambient_cache_size(
-                                   MLN_HANDLE_NULL, 1024, &completion, NULL
-                                 )
-  );
+  MLN_TEST_INVALID(mln_runtime_set_maximum_ambient_cache_size(
+    MLN_HANDLE_NULL, 1024, &completion, NULL
+  ));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -96,9 +84,7 @@ static const cache_case cache_cases[] = {
 // map until the next load has read the cache.
 static mln_map load_style(mln_runtime runtime) {
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_url(map, cached_style_url)
-  );
+  MLN_TEST_OK(mln_test_map_set_style_url(map, cached_style_url));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
   return map;
 }
@@ -109,31 +95,25 @@ static void apply_change(mln_runtime runtime, const cache_case* row) {
       return;
     case CHANGE_OPERATION: {
       mln_test_completion completion = mln_test_completion_default(0);
-      TEST_ASSERT_EQUAL_INT_MESSAGE(
-        MLN_STATUS_OK,
+      MLN_TEST_OK_MESSAGE(
         mln_runtime_run_ambient_cache_operation(
           runtime, row->operation, &completion.descriptor, NULL
         ),
         row->label
       );
-      TEST_ASSERT_EQUAL_INT_MESSAGE(
-        MLN_STATUS_OK, mln_test_completion_finish(&completion), row->label
-      );
+      MLN_TEST_OK_MESSAGE(mln_test_completion_finish(&completion), row->label);
       mln_test_completion_destroy(&completion);
       return;
     }
     case CHANGE_BUDGET: {
       mln_test_completion completion = mln_test_completion_default(0);
-      TEST_ASSERT_EQUAL_INT_MESSAGE(
-        MLN_STATUS_OK,
+      MLN_TEST_OK_MESSAGE(
         mln_runtime_set_maximum_ambient_cache_size(
           runtime, row->budget, &completion.descriptor, NULL
         ),
         row->label
       );
-      TEST_ASSERT_EQUAL_INT_MESSAGE(
-        MLN_STATUS_OK, mln_test_completion_finish(&completion), row->label
-      );
+      MLN_TEST_OK_MESSAGE(mln_test_completion_finish(&completion), row->label);
       mln_test_completion_destroy(&completion);
       return;
     }

@@ -17,9 +17,7 @@ static mln_render_session_snapshot read_snapshot(mln_render_session session) {
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_get_snapshot(session, &snapshot, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_get_snapshot(session, &snapshot, NULL));
   return snapshot;
 }
 
@@ -32,8 +30,7 @@ static void attach_reports_the_selected_native_driver(void) {
   mln_render_session_capabilities capabilities = {
     .size = sizeof(mln_render_session_capabilities)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
   );
   TEST_ASSERT_EQUAL_UINT32(fixture.driver, capabilities.driver);
@@ -225,14 +222,12 @@ static void maintenance_commands_run_in_order_with_frames(void) {
       .release_user_data = maintenance_released,
     };
     mln_test_render_request_forced(&fixture, 10 * row + 1);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK, command->submit(fixture.session, &completion, NULL),
-      command->label
+    MLN_TEST_OK_MESSAGE(
+      command->submit(fixture.session, &completion, NULL), command->label
     );
     mln_test_render_request_forced(&fixture, 10 * row + 2);
     probe_wait wait = {.fixture = &fixture, .probe = &probe};
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK,
+    MLN_TEST_OK_MESSAGE(
       mln_test_render_step_until(
         &fixture, maintenance_settled, &wait, mln_test_deadline_default(),
         "a maintenance command between two frames"
@@ -240,7 +235,7 @@ static void maintenance_commands_run_in_order_with_frames(void) {
       command->label
     );
     TEST_ASSERT_FALSE_MESSAGE(probe.drain_failed, command->label);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MLN_STATUS_OK, probe.status, command->label);
+    MLN_TEST_OK_MESSAGE(probe.status, command->label);
     TEST_ASSERT_EQUAL_size_t_MESSAGE(2, probe.token_count, command->label);
     TEST_ASSERT_EQUAL_UINT64_MESSAGE(
       10 * row + 1, probe.tokens[0], command->label
@@ -262,13 +257,10 @@ static void normal_detach_runs_on_the_driver_and_retires_map_attachment(void) {
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
   mln_test_completion detach = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_detach(fixture.session, &detach.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &detach)
-  );
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &detach));
   mln_test_completion_destroy(&detach);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_SESSION_STATE_DETACHED, read_snapshot(fixture.session).state
@@ -369,13 +361,10 @@ static void a_detached_session_rejects_every_call_that_needs_its_target(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_test_completion detach = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_detach(fixture.session, &detach.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &detach)
-  );
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &detach));
   mln_test_completion_destroy(&detach);
 
   for (size_t row = 0; row < sizeof(detached_calls) / sizeof(detached_calls[0]);
@@ -403,7 +392,7 @@ static void destroy_refuses_an_attached_session(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
     mln_render_session_destroy(fixture.session, MLN_TEST_DIAGNOSTIC)
   );
@@ -429,16 +418,13 @@ static void destroy_refuses_an_attached_session(void) {
 
 static void stale_and_null_sessions_reject_maintenance_commands(void) {
   mln_completion operation = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_render_session_reduce_memory_use(MLN_HANDLE_NULL, &operation, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_render_session_clear_data(MLN_HANDLE_NULL, &operation, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_render_session_dump_debug_logs(MLN_HANDLE_NULL, &operation, NULL)
   );
 
@@ -451,17 +437,11 @@ static void stale_and_null_sessions_reject_maintenance_commands(void) {
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_render_session_get_snapshot(stale, &snapshot, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(mln_render_session_get_snapshot(stale, &snapshot, NULL));
+  MLN_TEST_INVALID(
     mln_render_session_reduce_memory_use(stale, &operation, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_render_session_destroy(stale, NULL)
-  );
+  MLN_TEST_INVALID(mln_render_session_destroy(stale, NULL));
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -479,17 +459,13 @@ static void abandon_completes_pending_work_and_invalidates_accessors(void) {
   // is still queued at abandon. A core worker may already have run it, and
   // with no frame rendered yet it has no renderer to act on.
   mln_test_completion pending = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_reduce_memory_use(
-                     fixture.session, &pending.descriptor, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_render_session_reduce_memory_use(
+    fixture.session, &pending.descriptor, NULL
+  ));
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_abandon(fixture.session, &abandoned, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_abandon(fixture.session, &abandoned, NULL));
   TEST_ASSERT_TRUE(
     abandoned.disposition == MLN_RENDER_ABANDON_DISPOSITION_CLEAN ||
     abandoned.disposition == MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED
@@ -497,7 +473,7 @@ static void abandon_completes_pending_work_and_invalidates_accessors(void) {
   // Abandon settles every accepted command before it returns.
   TEST_ASSERT_TRUE(mln_test_completion_poll(&pending));
   if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
-    TEST_ASSERT_EQUAL_INT(
+    MLN_TEST_STATUS(
       MLN_STATUS_TARGET_LOST, mln_test_completion_status(&pending)
     );
   }
@@ -507,7 +483,7 @@ static void abandon_completes_pending_work_and_invalidates_accessors(void) {
     MLN_RENDER_SESSION_STATE_ABANDONED, read_snapshot(fixture.session).state
   );
   mln_acquired_frame frame = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
+  MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
     mln_render_session_acquire_frame(fixture.session, &frame, NULL)
   );
@@ -575,21 +551,17 @@ static void abandon_from_a_driver_completion_is_busy(void) {
       .user_data = &probe,
       .release_user_data = maintenance_released,
     };
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK, command->submit(fixture.session, &completion, NULL),
-      command->label
+    MLN_TEST_OK_MESSAGE(
+      command->submit(fixture.session, &completion, NULL), command->label
     );
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK,
+    MLN_TEST_OK_MESSAGE(
       mln_test_render_step_until(
         &fixture, reentrant_abandon_settled, &probe,
         mln_test_deadline_default(), "a command whose completion abandons"
       ),
       command->label
     );
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK, probe.completion_status, command->label
-    );
+    MLN_TEST_OK_MESSAGE(probe.completion_status, command->label);
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_BUSY, probe.abandon_status, command->label
     );
@@ -659,24 +631,21 @@ static void abandon_from_an_attach_completion_is_busy(void) {
     .release_user_data = maintenance_released,
   };
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_render_fixture_start_attach(map, &options, &completion, &fixture)
   );
   probe.session = fixture.session;
   mln_test_flag_set(&probe.published);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_step_until(
-                     &fixture, attach_abandon_settled, &probe,
-                     mln_test_deadline_default(), "an attach that abandons"
-                   )
-  );
+  MLN_TEST_OK(mln_test_render_step_until(
+    &fixture, attach_abandon_settled, &probe, mln_test_deadline_default(),
+    "an attach that abandons"
+  ));
   TEST_ASSERT_TRUE_MESSAGE(
     probe.saw_session, "the attach completed inside the attach call"
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.completion_status);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_BUSY, probe.abandon_status);
+  MLN_TEST_OK(probe.completion_status);
+  MLN_TEST_STATUS(MLN_STATUS_BUSY, probe.abandon_status);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_SESSION_STATE_ATTACHED, read_snapshot(fixture.session).state
   );
@@ -710,19 +679,15 @@ static void a_session_disposed_while_attaching_frees_the_map(void) {
   };
   mln_test_completion attach = mln_test_completion_default(0);
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_start_attach(
-                     map, &options, &attach.descriptor, &fixture
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_dispose(fixture.session, NULL)
-  );
+  MLN_TEST_OK(mln_test_render_fixture_start_attach(
+    map, &options, &attach.descriptor, &fixture
+  ));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL));
 
   TEST_ASSERT_TRUE(mln_test_completion_wait(&attach, -1));
   const mln_status attach_status = mln_test_completion_status(&attach);
   if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_TARGET_LOST, attach_status);
+    MLN_TEST_STATUS(MLN_STATUS_TARGET_LOST, attach_status);
   } else {
     TEST_ASSERT_TRUE(
       attach_status == MLN_STATUS_OK || attach_status == MLN_STATUS_TARGET_LOST
@@ -753,24 +718,17 @@ static void parent_first_disposal_retires_a_native_render_attachment(void) {
   options.event_wake.user_data = &retired;
   options.event_wake.release_user_data = retirement_release;
   mln_runtime runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create(&options, &runtime, NULL)
-  );
+  MLN_TEST_OK(mln_runtime_create(&options, &runtime, NULL));
   mln_map map = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_create_status(runtime, NULL, &map)
-  );
+  MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_dispose(runtime, NULL));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_dispose(map, NULL));
+  MLN_TEST_OK(mln_runtime_dispose(runtime, NULL));
+  MLN_TEST_OK(mln_map_dispose(map, NULL));
   TEST_ASSERT_FALSE(atomic_load(&retired));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_dispose(fixture.session, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL));
   mln_render_session_snapshot snapshot = {.size = sizeof(snapshot)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+  MLN_TEST_INVALID(
     mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
   );
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&retired));

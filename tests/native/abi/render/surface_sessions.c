@@ -60,8 +60,7 @@ static mln_render_session_snapshot read_snapshot(
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_get_snapshot(fixture->session, &snapshot, NULL)
   );
   return snapshot;
@@ -79,15 +78,10 @@ static void a_surface_session_resizes_its_surface(void) {
     .scale_factor = 1.0,
   };
   mln_test_completion resize = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_resize(
-                     map.fixture.session, &extent, &resize.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_test_render_fixture_finish_operation(&map.fixture, &resize)
-  );
+  MLN_TEST_OK(mln_render_session_resize(
+    map.fixture.session, &extent, &resize.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&map.fixture, &resize));
   mln_test_completion_destroy(&resize);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED, render_without_presenting(&map.fixture, 2)
@@ -129,16 +123,14 @@ static void a_surface_replacement_can_change_the_scale_factor(void) {
   descriptor.context.device = context.metal_device;
   descriptor.layer = info.metal_layer;
   mln_test_completion completion = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK,
+  MLN_TEST_OK_MESSAGE(
     mln_metal_surface_set_target(
       map.fixture.session, &descriptor, &completion.descriptor,
       MLN_TEST_DIAGNOSTIC
     ),
     mln_test_last_error()
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_test_render_fixture_finish_operation(&map.fixture, &completion)
   );
   mln_test_completion_destroy(&completion);

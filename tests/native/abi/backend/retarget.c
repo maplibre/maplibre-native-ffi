@@ -109,21 +109,15 @@ static void finish(
 // Repaints the red style's background blue, with no transition, so the next
 // frame shows the change.
 static void paint_background_blue(mln_map map) {
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_property(
-      map, MLN_BUFFER_LITERAL("bg"),
-      MLN_BUFFER_LITERAL("background-color-transition"),
-      MLN_BUFFER_LITERAL("{\"duration\":0}"), &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_layer_property(
-      map, MLN_BUFFER_LITERAL("bg"), MLN_BUFFER_LITERAL("background-color"),
-      MLN_BUFFER_LITERAL("\"#0000ff\""), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+    map, MLN_BUFFER_LITERAL("bg"),
+    MLN_BUFFER_LITERAL("background-color-transition"),
+    MLN_BUFFER_LITERAL("{\"duration\":0}"), &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+    map, MLN_BUFFER_LITERAL("bg"), MLN_BUFFER_LITERAL("background-color"),
+    MLN_BUFFER_LITERAL("\"#0000ff\""), &completion.descriptor, NULL
+  ));
 }
 
 // Renders one frame and, once the session is idle, returns its disposition.
@@ -134,31 +128,24 @@ static uint32_t render_frame(
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = flags;
   demand.token = next_token++;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
   mln_test_completion barrier = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_barrier(fixture->session, &barrier.descriptor, NULL)
   );
   finish(fixture, &barrier, MLN_STATUS_OK, "the render barrier");
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
   );
   size_t count = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_frame_batch_count(batch, &count, NULL)
-  );
+  MLN_TEST_OK(mln_render_frame_batch_count(batch, &count, NULL));
   uint32_t disposition = UINT32_MAX;
   for (size_t index = 0; index < count; index += 1) {
     mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_frame_batch_get(batch, index, &result, NULL)
-    );
+    MLN_TEST_OK(mln_render_frame_batch_get(batch, index, &result, NULL));
     if (result.token == demand.token) {
       disposition = result.disposition;
     }
@@ -198,14 +185,10 @@ static void expect_owned_color(
   const char* what
 ) {
   mln_test_completion readback = mln_test_completion_readback();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_texture_read_premultiplied_rgba8(
-                     fixture->session, &readback.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(fixture, &readback)
-  );
+  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+    fixture->session, &readback.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &readback));
   mln_texture_readback_result result = {0};
   TEST_ASSERT_TRUE(
     mln_test_completion_copy_value(&readback, &result, sizeof(result))
@@ -269,8 +252,7 @@ static void a_borrowed_texture_retarget_renders_into_the_new_texture(void) {
     mln_test_render_fixture_new_texture(fixture);
   TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());
   mln_test_completion completion = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK,
+  MLN_TEST_OK_MESSAGE(
     mln_test_render_fixture_set_texture(
       fixture, mln_test_render_fixture_graphics(fixture), replacement,
       &completion.descriptor
@@ -281,7 +263,7 @@ static void a_borrowed_texture_retarget_renders_into_the_new_texture(void) {
 
   // The frame after the swap lands in the replacement alone.
   paint_background_blue(map.map);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(map.runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(map.runtime));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
   );
@@ -303,8 +285,7 @@ static void a_surface_retarget_presents_through_the_new_surface(void) {
   TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());
   unconfigure_surface(replacement);
   mln_test_completion completion = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT_MESSAGE(
-    MLN_STATUS_OK,
+  MLN_TEST_OK_MESSAGE(
     mln_test_render_fixture_set_surface(
       fixture, mln_test_render_fixture_graphics(fixture), replacement,
       &completion.descriptor
@@ -469,7 +450,7 @@ static void expect_old_target_rendering(
 ) {
   const mln_test_render_fixture* fixture = &map->fixture;
   paint_background_blue(map->map);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(map->runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(map->runtime));
   const uint32_t flags =
     row->session == TARGET_SURFACE ? MLN_FRAME_DEMAND_PRESENT : 0;
   TEST_ASSERT_EQUAL_UINT32_MESSAGE(

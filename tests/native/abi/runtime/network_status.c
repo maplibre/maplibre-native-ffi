@@ -31,27 +31,21 @@ static void restoring_network_status(void (*body)(void)) {
 
 static uint32_t current_network_status(void) {
   uint32_t status = 0;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_network_status_get(&status, NULL));
+  MLN_TEST_OK(mln_network_status_get(&status, NULL));
   return status;
 }
 
 NETWORK_STATUS_CASE(the_network_status_round_trips) {
   TEST_ASSERT_EQUAL_UINT32(MLN_NETWORK_STATUS_ONLINE, current_network_status());
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_network_status_set(MLN_NETWORK_STATUS_OFFLINE, NULL)
-  );
+  MLN_TEST_OK(mln_network_status_set(MLN_NETWORK_STATUS_OFFLINE, NULL));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_NETWORK_STATUS_OFFLINE, current_network_status()
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_network_status_set(MLN_NETWORK_STATUS_OFFLINE, NULL)
-  );
+  MLN_TEST_OK(mln_network_status_set(MLN_NETWORK_STATUS_OFFLINE, NULL));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_NETWORK_STATUS_OFFLINE, current_network_status()
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_network_status_set(MLN_NETWORK_STATUS_ONLINE, NULL)
-  );
+  MLN_TEST_OK(mln_network_status_set(MLN_NETWORK_STATUS_ONLINE, NULL));
   TEST_ASSERT_EQUAL_UINT32(MLN_NETWORK_STATUS_ONLINE, current_network_status());
 }
 
@@ -59,15 +53,12 @@ static const uint32_t unknown_statuses[] = {0, 3, UINT32_MAX};
 
 // A value that names no status is rejected and leaves the status as it was.
 NETWORK_STATUS_CASE(the_network_status_rejects_a_value_that_names_no_status) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_network_status_set(MLN_NETWORK_STATUS_OFFLINE, NULL)
-  );
+  MLN_TEST_OK(mln_network_status_set(MLN_NETWORK_STATUS_OFFLINE, NULL));
   for (size_t index = 0;
        index < sizeof(unknown_statuses) / sizeof(*unknown_statuses);
        index += 1) {
     mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_INVALID_ARGUMENT,
+    MLN_TEST_INVALID(
       mln_network_status_set(unknown_statuses[index], &diagnostic)
     );
     TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "network status"));
@@ -77,9 +68,7 @@ NETWORK_STATUS_CASE(the_network_status_rejects_a_value_that_names_no_status) {
   }
 
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_network_status_get(NULL, &diagnostic)
-  );
+  MLN_TEST_INVALID(mln_network_status_get(NULL, &diagnostic));
   TEST_ASSERT_NOT_NULL(strstr(diagnostic.message, "out_status"));
 }
 
@@ -93,7 +82,7 @@ static void load_style_with_cache(const char* url, const char* cache_path) {
   options.cache_path = cache_path;
   mln_runtime runtime = mln_test_create_runtime_with_options(options);
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
+  MLN_TEST_OK(mln_test_map_set_style_url(map, url));
   TEST_ASSERT_TRUE(mln_test_await_style_loaded(runtime, map));
   mln_test_destroy_map(map);
   // The release completes once the runtime has closed its database.
@@ -120,9 +109,7 @@ NETWORK_STATUS_CASE(a_cached_style_reloads_from_the_database_while_offline) {
   );
   mln_test_http_server_stop(server);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_network_status_set(MLN_NETWORK_STATUS_OFFLINE, NULL)
-  );
+  MLN_TEST_OK(mln_network_status_set(MLN_NETWORK_STATUS_OFFLINE, NULL));
   load_style_with_cache(url, cache_path);
   (void)remove(cache_path);
 }

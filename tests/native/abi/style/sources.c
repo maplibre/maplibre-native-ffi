@@ -26,12 +26,10 @@ static bool read_source(
 ) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_style_source_result));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_style_source_info(
-                     map, mln_test_view_of(id), &completion.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  MLN_TEST_OK(mln_map_get_style_source_info(
+    map, mln_test_view_of(id), &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_completion_finish(&completion));
   const bool found = mln_test_completion_value_count(&completion) == 1;
   *out = (mln_style_source_result){0};
   if (found) {
@@ -243,17 +241,14 @@ static void tile_sources_report_their_effective_options(void) {
       row->mutate(&options);
     }
     mln_test_completion completion = mln_test_completion_default(0);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK,
+    MLN_TEST_OK_MESSAGE(
       add_tile_source(
         map, row->kind, id, row->from_url,
         row->mutate == NULL ? NULL : &options, &completion.descriptor, NULL
       ),
       row->label
     );
-    TEST_ASSERT_EQUAL_INT_MESSAGE(
-      MLN_STATUS_OK, mln_test_completion_settle(&completion), row->label
-    );
+    MLN_TEST_OK_MESSAGE(mln_test_completion_settle(&completion), row->label);
 
     mln_style_source_result result;
     TEST_ASSERT_TRUE_MESSAGE(read_source(map, id, &result), row->label);
@@ -438,17 +433,14 @@ static void read_source_text(
 ) {
   const mln_buffer_view view = mln_test_view_of(id);
   mln_test_completion completion = mln_test_completion_buffer_view();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     attribution
       ? mln_map_copy_style_source_attribution(
           map, view, &completion.descriptor, NULL
         )
       : mln_map_copy_style_source_url(map, view, &completion.descriptor, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_style_finish_text(&completion, out, 64, found)
-  );
+  MLN_TEST_OK(mln_test_style_finish_text(&completion, out, 64, found));
 }
 
 // A URL source reports the URL it was added with, or last set to, and an
@@ -459,41 +451,30 @@ static void sources_copy_their_url_and_attribution(void) {
   mln_map map = mln_test_create_map(runtime);
   serve_nothing(runtime);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, add_tile_source(
-                     map, TILE_SOURCE_RASTER, "remote", true, NULL,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(add_tile_source(
+    map, TILE_SOURCE_RASTER, "remote", true, NULL, &completion.descriptor, NULL
+  ));
   mln_style_tile_source_options attributed =
     mln_style_tile_source_options_default();
   attributed.fields = MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
   char attribution[] = "Fixture tiles";
   attributed.attribution = mln_test_view_of(attribution);
   mln_test_completion add = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, add_tile_source(
-                     map, TILE_SOURCE_VECTOR, "inline", false, &attributed,
-                     &add.descriptor, NULL
-                   )
-  );
+  MLN_TEST_OK(add_tile_source(
+    map, TILE_SOURCE_VECTOR, "inline", false, &attributed, &add.descriptor, NULL
+  ));
   // The command copied the attribution before it returned.
   memset(attribution, 'x', strlen(attribution));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_settle(&add));
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_geojson_source_url(
-                     map, MLN_BUFFER_LITERAL("geojson"),
-                     MLN_BUFFER_LITERAL("fixture://first.geojson"), NULL,
-                     &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_geojson_source_url(
-                     map, MLN_BUFFER_LITERAL("geojson"),
-                     MLN_BUFFER_LITERAL("fixture://second.geojson"),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_OK(mln_test_completion_settle(&add));
+  MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_url(
+    map, MLN_BUFFER_LITERAL("geojson"),
+    MLN_BUFFER_LITERAL("fixture://first.geojson"), NULL, &completion.descriptor,
+    NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_geojson_source_url(
+    map, MLN_BUFFER_LITERAL("geojson"),
+    MLN_BUFFER_LITERAL("fixture://second.geojson"), &completion.descriptor, NULL
+  ));
 
   char text[64];
   bool found = false;
@@ -540,21 +521,16 @@ static void source_ids_list_in_style_order(void) {
       "\"features\":[]}}},\"layers\":[]}"
     )
   );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_style_source_json(
-                     map, MLN_BUFFER_LITERAL("third"),
-                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
-                     &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_remove_style_source(
-      map, MLN_BUFFER_LITERAL("first"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, MLN_BUFFER_LITERAL("third"),
+    MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
+    NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_source(
+    map, MLN_BUFFER_LITERAL("first"), &completion.descriptor, NULL
+  ));
   const mln_test_style_list list = mln_test_style_list_source_ids(map);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, list.status);
+  MLN_TEST_OK(list.status);
   TEST_ASSERT_EQUAL_size_t(2, list.count);
   TEST_ASSERT_EQUAL_STRING("second", list.entries[0].id);
   TEST_ASSERT_EQUAL_STRING("third", list.entries[1].id);
@@ -607,13 +583,12 @@ static void read_tile_urls(
     .callback = copy_tile_urls,
     .user_data = probe,
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_map_get_style_source_tile_urls(map, source_id, &completion, NULL)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_TRUE(atomic_load(&probe->done));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe->status);
+  MLN_TEST_OK(probe->status);
 }
 
 // A found source completes with one result even when it holds no inline tile
@@ -626,18 +601,13 @@ static void style_source_tile_urls_distinguish_empty_from_missing(void) {
     MLN_BUFFER_LITERAL("fixture://a/{z}/{x}/{y}.mvt"),
     MLN_BUFFER_LITERAL("fixture://b/{z}/{x}/{y}.mvt"),
   };
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_vector_source_tiles(
-                     map, MLN_BUFFER_LITERAL("inline"), tiles, 2, NULL,
-                     &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, add_tile_source(
-                     map, TILE_SOURCE_VECTOR, "remote", true, NULL,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_vector_source_tiles(
+    map, MLN_BUFFER_LITERAL("inline"), tiles, 2, NULL, &completion.descriptor,
+    NULL
+  ));
+  MLN_TEST_AWAIT_OK(add_tile_source(
+    map, TILE_SOURCE_VECTOR, "remote", true, NULL, &completion.descriptor, NULL
+  ));
 
   tile_urls_probe probe;
   read_tile_urls(runtime, map, MLN_BUFFER_LITERAL("inline"), &probe);
@@ -661,12 +631,9 @@ static void style_source_volatility_round_trips(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   const mln_buffer_view source_id = MLN_BUFFER_LITERAL("volatile-vector");
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_vector_source_tiles(
-      map, source_id, fixture_tiles, 1, NULL, &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_vector_source_tiles(
+    map, source_id, fixture_tiles, 1, NULL, &completion.descriptor, NULL
+  ));
   mln_style_source_result result;
   TEST_ASSERT_TRUE(read_source(map, "volatile-vector", &result));
   TEST_ASSERT_FALSE(result.info.is_volatile);
@@ -674,12 +641,10 @@ static void style_source_volatility_round_trips(void) {
   // The committed toggle publishes a snapshot generation, so volatility is an
   // ordered command rather than a synchronous write.
   mln_test_completion enable = mln_test_completion_default(0);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_source_volatile(
-                     map, source_id, true, &enable.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&enable));
+  MLN_TEST_OK(mln_map_set_style_source_volatile(
+    map, source_id, true, &enable.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_completion_finish(&enable));
   TEST_ASSERT_EQUAL_UINT32(
     MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&enable)
   );
@@ -688,11 +653,9 @@ static void style_source_volatility_round_trips(void) {
   TEST_ASSERT_TRUE(read_source(map, "volatile-vector", &result));
   TEST_ASSERT_TRUE(result.info.is_volatile);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_style_source_volatile(
-                     map, source_id, false, &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_style_source_volatile(
+    map, source_id, false, &completion.descriptor, NULL
+  ));
   TEST_ASSERT_TRUE(read_source(map, "volatile-vector", &result));
   TEST_ASSERT_FALSE(result.info.is_volatile);
 
@@ -703,23 +666,18 @@ static void style_source_volatility_round_trips(void) {
 static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_style_source_json(
-                     map, MLN_BUFFER_LITERAL("in-use"),
-                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
-                     &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_style_layer_json(
-      map,
-      MLN_BUFFER_LITERAL(
-        "{\"id\":\"user\",\"type\":\"circle\",\"source\":\"in-use\"}"
-      ),
-      MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, MLN_BUFFER_LITERAL("in-use"),
+    MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
+    NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_style_layer_json(
+    map,
+    MLN_BUFFER_LITERAL(
+      "{\"id\":\"user\",\"type\":\"circle\",\"source\":\"in-use\"}"
+    ),
+    MLN_BUFFER_LITERAL(""), &completion.descriptor, NULL
+  ));
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_STATE, "used by a layer",
@@ -729,18 +687,12 @@ static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   );
   TEST_ASSERT_TRUE(source_exists(map, "in-use"));
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_remove_style_layer(
-      map, MLN_BUFFER_LITERAL("user"), &completion.descriptor, NULL
-    )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_remove_style_source(
-      map, MLN_BUFFER_LITERAL("in-use"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_layer(
+    map, MLN_BUFFER_LITERAL("user"), &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_remove_style_source(
+    map, MLN_BUFFER_LITERAL("in-use"), &completion.descriptor, NULL
+  ));
   TEST_ASSERT_FALSE(source_exists(map, "in-use"));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -751,12 +703,10 @@ static void read_image_source_coordinates(
 ) {
   mln_test_completion completion =
     mln_test_completion_default(4 * sizeof(mln_lat_lng));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_image_source_coordinates(
-                     map, mln_test_view_of(id), &completion.descriptor, NULL
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  MLN_TEST_OK(mln_map_get_image_source_coordinates(
+    map, mln_test_view_of(id), &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_completion_finish(&completion));
   TEST_ASSERT_EQUAL_size_t(4, mln_test_completion_value_count(&completion));
   TEST_ASSERT_TRUE(
     mln_test_completion_copy_value(&completion, out, 4 * sizeof(mln_lat_lng))
@@ -786,19 +736,14 @@ static void image_sources_hold_corners_and_pixels(void) {
   image.pixels = pixels;
   image.byte_length = sizeof(pixels);
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_image_source_image(
-                     map, MLN_BUFFER_LITERAL("inline-image"), corners, 4,
-                     &image, &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_image_source_url(
-      map, MLN_BUFFER_LITERAL("remote-image"), corners, 4,
-      MLN_BUFFER_LITERAL("fixture://image.png"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_image_source_image(
+    map, MLN_BUFFER_LITERAL("inline-image"), corners, 4, &image,
+    &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_add_image_source_url(
+    map, MLN_BUFFER_LITERAL("remote-image"), corners, 4,
+    MLN_BUFFER_LITERAL("fixture://image.png"), &completion.descriptor, NULL
+  ));
   mln_style_source_result result;
   TEST_ASSERT_TRUE(read_source(map, "inline-image", &result));
   TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_IMAGE, result.info.type);
@@ -813,38 +758,28 @@ static void image_sources_hold_corners_and_pixels(void) {
     {.latitude = 4.0, .longitude = 7.0},
     {.latitude = 4.0, .longitude = 6.0},
   };
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_image_source_coordinates(
-                     map, MLN_BUFFER_LITERAL("inline-image"), moved, 4,
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_image_source_coordinates(
+    map, MLN_BUFFER_LITERAL("inline-image"), moved, 4, &completion.descriptor,
+    NULL
+  ));
   read_image_source_coordinates(map, "inline-image", read);
   TEST_ASSERT_EQUAL_MEMORY(moved, read, sizeof(moved));
   // A URL source takes inline pixels, and an inline one takes a URL.
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_set_image_source_image(
-                     map, MLN_BUFFER_LITERAL("remote-image"), &image,
-                     &completion.descriptor, NULL
-                   )
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_set_image_source_url(
-      map, MLN_BUFFER_LITERAL("inline-image"),
-      MLN_BUFFER_LITERAL("fixture://image.png"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_set_image_source_image(
+    map, MLN_BUFFER_LITERAL("remote-image"), &image, &completion.descriptor,
+    NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_image_source_url(
+    map, MLN_BUFFER_LITERAL("inline-image"),
+    MLN_BUFFER_LITERAL("fixture://image.png"), &completion.descriptor, NULL
+  ));
 
   // Coordinates come in fours, and pixels must cover the image, before the
   // call returns.
   mln_completion discard = mln_test_discard_completion();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_image_source_coordinates(
-      map, MLN_BUFFER_LITERAL("inline-image"), moved, 3, &discard, NULL
-    )
-  );
+  MLN_TEST_INVALID(mln_map_set_image_source_coordinates(
+    map, MLN_BUFFER_LITERAL("inline-image"), moved, 3, &discard, NULL
+  ));
   MLN_TEST_EXPECT_COMMAND_REJECTED(
     "must be 4", mln_map_add_image_source_url(
                    map, MLN_BUFFER_LITERAL("one-corner"), moved, 1,
@@ -854,20 +789,15 @@ static void image_sources_hold_corners_and_pixels(void) {
   );
   mln_premultiplied_rgba8_image short_image = image;
   short_image.byte_length = 15;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_image_source_image(
-      map, MLN_BUFFER_LITERAL("inline-image"), &short_image, &discard, NULL
-    )
-  );
+  MLN_TEST_INVALID(mln_map_set_image_source_image(
+    map, MLN_BUFFER_LITERAL("inline-image"), &short_image, &discard, NULL
+  ));
 
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK, mln_map_add_style_source_json(
-                     map, MLN_BUFFER_LITERAL("geojson"),
-                     MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE),
-                     &completion.descriptor, NULL
-                   )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_style_source_json(
+    map, MLN_BUFFER_LITERAL("geojson"),
+    MLN_BUFFER_LITERAL(MLN_TEST_EMPTY_GEOJSON_SOURCE), &completion.descriptor,
+    NULL
+  ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "not an image source",
     mln_map_set_image_source_coordinates(
@@ -895,13 +825,10 @@ static void image_sources_hold_corners_and_pixels(void) {
   // A missing source has no coordinates to report, which is not a failure.
   mln_test_completion missing =
     mln_test_completion_default(4 * sizeof(mln_lat_lng));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_get_image_source_coordinates(
-      map, MLN_BUFFER_LITERAL("missing"), &missing.descriptor, NULL
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&missing));
+  MLN_TEST_OK(mln_map_get_image_source_coordinates(
+    map, MLN_BUFFER_LITERAL("missing"), &missing.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_completion_finish(&missing));
   TEST_ASSERT_EQUAL_size_t(0, mln_test_completion_value_count(&missing));
   mln_test_completion_destroy(&missing);
 
@@ -922,13 +849,10 @@ static void an_image_source_requests_its_url_as_an_image(void) {
     {.latitude = 0.0, .longitude = 3.0},
     {.latitude = 0.0, .longitude = 2.0},
   };
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_OK,
-    mln_map_add_image_source_url(
-      map, MLN_BUFFER_LITERAL("remote-image"), corners, 4,
-      MLN_BUFFER_LITERAL("fixture://image.png"), &completion.descriptor, NULL
-    )
-  );
+  MLN_TEST_AWAIT_OK(mln_map_add_image_source_url(
+    map, MLN_BUFFER_LITERAL("remote-image"), corners, 4,
+    MLN_BUFFER_LITERAL("fixture://image.png"), &completion.descriptor, NULL
+  ));
   TEST_ASSERT_TRUE(
     mln_test_provider_wait_for_requests(provider, "fixture://image.png", 1)
   );

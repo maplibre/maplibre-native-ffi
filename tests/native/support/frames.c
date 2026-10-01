@@ -7,14 +7,13 @@
 #include "frames.h"
 
 #include "env.h"
+#include "status.h"
 #include "unity.h"
 #include "wait.h"
 
 void mln_test_render_prepare_map(mln_runtime runtime, mln_map map) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_map_set_style_json(map, mln_test_empty_style_json)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  MLN_TEST_OK(mln_test_map_set_style_json(map, mln_test_empty_style_json));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
 }
 
 void mln_test_render_request_forced(
@@ -24,8 +23,7 @@ void mln_test_render_request_forced(
   demand.flags = 0;
   demand.token = token;
   demand.coalescing_boundary = token;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
+  MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
   );
 }
@@ -78,12 +76,9 @@ mln_render_frame_batch mln_test_render_wait_for_results(
   results_wait wait = {
     .fixture = fixture, .minimum = minimum, .batch = MLN_HANDLE_NULL
   };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_step_until(
-                     fixture, results_ready, &wait, mln_test_deadline_default(),
-                     "frame results"
-                   )
-  );
+  MLN_TEST_OK(mln_test_render_step_until(
+    fixture, results_ready, &wait, mln_test_deadline_default(), "frame results"
+  ));
   TEST_ASSERT_FALSE(wait.failed);
   return wait.batch;
 }
@@ -92,9 +87,7 @@ mln_render_frame_result mln_test_render_batch_result(
   mln_render_frame_batch batch, size_t index
 ) {
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_frame_batch_get(batch, index, &result, NULL)
-  );
+  MLN_TEST_OK(mln_render_frame_batch_get(batch, index, &result, NULL));
   return result;
 }
 
@@ -109,10 +102,7 @@ mln_acquired_frame mln_test_render_and_acquire(
   TEST_ASSERT_EQUAL_UINT64(token, result.token);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   mln_acquired_frame frame = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_acquire_frame(fixture->session, &frame, NULL)
-  );
+  MLN_TEST_OK(mln_render_session_acquire_frame(fixture->session, &frame, NULL));
   TEST_ASSERT_NOT_EQUAL(MLN_HANDLE_NULL, frame);
   return frame;
 }
