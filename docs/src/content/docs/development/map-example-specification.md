@@ -209,17 +209,17 @@ Where the host toolkit fixes display-refresh and window callbacks, that thread
 is the render loop thread. Where a graphics API context is thread-current, the
 render loop thread is the only thread that makes it current.
 
-| Example       | Render loop thread                                            |
-| ------------- | ------------------------------------------------------------- |
-| `c-map`       | process main thread (SDL window, graphics context)            |
-| `zig-map`     | process main thread (SDL window, graphics context)            |
-| `go-map`      | process main thread (SDL window, graphics context)            |
-| `rust-map`    | winit event-loop thread                                       |
-| `lwjgl-map`   | GLFW main thread                                              |
-| `dotnet-map`  | GLFW main thread                                              |
-| `swift-map`   | main run loop (AppKit timer on macOS, `CADisplayLink` on iOS) |
-| `android-map` | UI thread (`Choreographer`)                                   |
-| `compose-map` | native surface bridge's producer thread                       |
+| Example       | Render loop thread                                 |
+| ------------- | -------------------------------------------------- |
+| `c-map`       | process main thread (SDL window, graphics context) |
+| `zig-map`     | process main thread (SDL window, graphics context) |
+| `go-map`      | process main thread (SDL window, graphics context) |
+| `rust-map`    | winit event-loop thread                            |
+| `lwjgl-map`   | GLFW main thread                                   |
+| `dotnet-map`  | GLFW main thread                                   |
+| `swift-map`   | main actor (AppKit on macOS, UIKit on iOS)         |
+| `android-map` | UI thread (`Choreographer`)                        |
+| `compose-map` | native surface bridge's producer thread            |
 
 ##### Attaching the render session
 
@@ -329,22 +329,30 @@ changing map state.
 
 ### Frame loop
 
-The host display source submits frame demand. Map updates wake the selected
-driver directly; runtime events are observations and are not a render-progress
-mechanism.
+The selected driver renders. The core coalesces frame demands and replaces a
+pending resize with a later one, so the render loop keeps no frame schedule of
+its own. It submits frame demand when the map reports a render update, when a
+rendered result asks for another frame, and for a paced retry. Runtime events
+tell the loop when to demand a frame, and frame results report what rendered.
 
-#### Render loop iteration
+#### Render loop events
 
-1. Handle window, input, and resize events. Submit any-thread map and session
-   work directly.
-2. Service caller-driver work on the graphics thread, when its wake fires or
-   from an independent polling cadence, including while presentation is paused.
-3. Drain the complete frame-result queue after its wake or on the host cadence.
-4. Drain the complete runtime-event queue after its wake or on the host cadence.
-5. For a rendered owned-texture result, acquire one frame, wait for producer
-   synchronization, and submit the compositor pass.
-6. Present and release an acquired frame with consumer-completion
+A render loop that receives wakes sleeps until a window, input, or wake event
+arrives, and then handles that event:
+
+1. A window or input event submits any-thread map and session work directly.
+2. A driver-work wake services caller-driver work on the graphics thread,
+   including while presentation is paused.
+3. A runtime-event wake drains the complete runtime-event queue. A map render
+   update demands a frame.
+4. A frame-result wake drains the complete frame-result queue. For a rendered
+   owned-texture result, the loop acquires the newest frame, waits for producer
+   synchronization, and submits the compositor pass.
+5. The loop presents, then releases an acquired frame with consumer-completion
    synchronization.
+
+A binding that exposes only polling runs the same steps from an existing host
+cadence.
 
 ```mermaid
 sequenceDiagram
@@ -366,15 +374,19 @@ sequenceDiagram
 
 #### Cadence and results
 
-- The render loop MUST submit demand from the host display or invalidation
-  source while visible.
+- The render loop MUST submit demand from the map's render updates, or from the
+  host display source, while visible. A demand that carries the render-if-needed
+  flag reports no update when nothing changed, so a display source MAY demand
+  every refresh.
 - Each demand MUST carry a unique host token.
 - A positive timeout starts when native code accepts the demand. Deadline missed
   is terminal and does not enter an immediate retry loop.
 - Rendered, no update, size pending, target not ready, superseded, and deadline
   missed MUST remain distinct outcomes.
 - No update and size pending wait for a newer map update. Target not ready waits
-  for target readiness or a paced retry.
+  for target readiness or a paced retry. A rendered frame that cannot reach the
+  window, such as one with no drawable, also takes a paced retry, which renders
+  without the render-if-needed flag because its update was consumed.
 - Frame-result wake state is level-triggered. Each drain transfers every queued
   result into an independently owned batch.
 - The frame result's map-update, extent, and frame generations determine what
@@ -497,7 +509,9 @@ table:
 
 - Create an exportable texture sized to the viewport.
 - Attach with the borrowed-texture descriptor referencing host-owned handles.
-- After a rendered result, sample that texture through the compositor path.
+- After a rendered result, sample the newest texture whose attachment or
+  replacement has completed through the compositor path. The session renders
+  into the outgoing texture until a replacement completes.
 - On resize, allocate a replacement and start the backend target-replacement
   future, then submit a map resize with the same extent. Retain both allocations
   until the replacement's outcome is known.
@@ -528,9 +542,10 @@ that pass.
 ### Resize mechanics
 
 - Recompute the viewport on host size or scale changes.
-- Start one absolute session resize future with the new logical extent. Resize
-  assigns a new extent generation and updates the map viewport through the
-  selected driver.
+- Start one absolute session resize future with the new logical extent on each
+  host size change. A later resize supersedes an earlier one that has not
+  applied, so the host needs no resize pacing. Resize assigns a new extent
+  generation and updates the map viewport through the selected driver.
 - Resize API-level and compositor resources for owned textures and surfaces.
 - For a borrowed texture, allocate a matching host texture and start target
   replacement instead of resizing the fixed allocation. Submit a map resize with
@@ -756,8 +771,8 @@ when the drag ends, and hold it for the whole drag when a second button goes
 down and up during one. Keyboard interactions are discrete commands and leave
 the state clear.
 
-Input handlers return whether the camera changed so the next display callback
-submits frame demand.
+Input handlers submit camera commands. The map reports the resulting render
+update, which drives the next frame demand.
 
 ### Resize triggers
 
@@ -782,10 +797,10 @@ Mobile examples keep runtime and map state alive across brief disappear and
 background transitions. They tear down only on view destruction or app
 termination.
 
-Track view visibility and app foreground separately. Run the display-paced
-render loop only while the view is visible and the app is in the foreground. The
-runtime's native scheduler keeps running across these transitions, so loading
-continues while the view is off screen.
+Track view visibility and app foreground separately. Submit frame demand only
+while the view is visible and the app is in the foreground. The runtime's native
+scheduler keeps running across these transitions, so loading continues while the
+view is off screen.
 
 When the host toolkit supplies a fresh presentation surface for the same
 graphics context, start target replacement and keep the outgoing surface alive
@@ -797,13 +812,13 @@ driver before destroying it. Abandon instead when the graphics thread can no
 longer service detach. Keep runtime and map handles alive, and attach again once
 a context and surface exist.
 
-| Transition                       | Behavior                                                                                                                        |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| View will appear                 | Mark the view visible. In the foreground, resume display-paced demand, refresh the viewport, and replace or attach the surface. |
-| View did disappear               | Mark the view hidden. Pause demand but continue servicing caller-driver work. Replace the surface when it disappears.           |
-| App foreground                   | Mark the app foreground. If visible, resume display-paced demand and refresh the viewport.                                      |
-| App background                   | Mark the app background. Pause demand but continue servicing caller-driver work.                                                |
-| View destroyed / app termination | Run [Shared shutdown](#shutdown).                                                                                               |
+| Transition                       | Behavior                                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| View will appear                 | Mark the view visible. In the foreground, resume demand, refresh the viewport, and replace or attach the surface.     |
+| View did disappear               | Mark the view hidden. Pause demand but continue servicing caller-driver work. Replace the surface when it disappears. |
+| App foreground                   | Mark the app foreground. If visible, resume demand and refresh the viewport.                                          |
+| App background                   | Mark the app background. Pause demand but continue servicing caller-driver work.                                      |
+| View destroyed / app termination | Run [Shared shutdown](#shutdown).                                                                                     |
 
 ### Entry and shell
 
@@ -845,8 +860,8 @@ concurrently share one state, so a gesture ending while another is still live
 leaves it set, and the last one to end clears it. Double-tap is a discrete
 animated command and leaves the state clear.
 
-Input handlers return whether the camera changed so the next display callback
-submits frame demand.
+Input handlers submit camera commands. The map reports the resulting render
+update, which drives the next frame demand.
 
 ### Resize triggers
 
