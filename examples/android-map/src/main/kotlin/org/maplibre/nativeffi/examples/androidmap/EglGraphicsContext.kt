@@ -71,7 +71,7 @@ private constructor(
     return true
   }
 
-  override fun releaseSurface(): Boolean {
+  override fun releaseSurface(handOver: () -> Unit): Boolean {
     if (!hasSurface) {
       return true
     }
@@ -79,8 +79,14 @@ private constructor(
       // Nowhere for a session to park, so this context cannot outlive the window.
       return false
     }
-    EGL14.eglDestroySurface(display, windowSurface)
+    // The session moves to the parking surface before the window surface goes.
+    val outgoing = windowSurface
     windowSurface = EGL14.EGL_NO_SURFACE
+    try {
+      handOver()
+    } finally {
+      EGL14.eglDestroySurface(display, outgoing)
+    }
     return true
   }
 

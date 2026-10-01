@@ -47,8 +47,11 @@ private constructor(private val session: RenderSessionHandle, private val driver
     session.serviceDriverWork(0uL)
   }
 
-  /** What one frame-result drain saw. */
-  data class Drained(val rendered: Boolean, val needsRepaint: Boolean)
+  /**
+   * What one frame-result drain saw. A target that was not ready consumed its map update, so the
+   * view retries with a forced frame.
+   */
+  data class Drained(val rendered: Boolean, val needsRepaint: Boolean, val targetNotReady: Boolean)
 
   /** Drains every frame result. */
   fun drainFrameResults(): Drained {
@@ -56,55 +59,61 @@ private constructor(private val session: RenderSessionHandle, private val driver
       try {
         session.drainFrameResults()
       } catch (error: MaplibreException) {
-        if (error.status == MaplibreStatus.NOT_READY) return Drained(false, false)
+        if (error.status == MaplibreStatus.NOT_READY) return Drained(false, false, false)
         throw error
       }
     return batch.use { results ->
       var rendered = false
       var needsRepaint = false
+      var targetNotReady = false
       for (index in 0uL until results.count()) {
         val result = results.get(index)
-        if (result.disposition == RenderResult.RENDERED) {
-          rendered = true
-          needsRepaint = needsRepaint || result.needsRepaint
+        when (result.disposition) {
+          RenderResult.RENDERED -> rendered = true
+          RenderResult.TARGET_NOT_READY -> targetNotReady = true
+          else -> continue
         }
+        needsRepaint = needsRepaint || result.needsRepaint
       }
-      Drained(rendered, needsRepaint)
+      Drained(rendered, needsRepaint, targetNotReady)
     }
   }
 
   /**
    * Points the session at the surface the graphics context presents through now, and at the
    * viewport. A session resize carries the map's extent itself. An EGL surface handover replaces
-   * only the graphics resource, so that path submits the map resize alongside it. The outgoing
-   * surface stays valid until the handover runs, so nothing waits for it here; a failed handover
-   * reaches [onFailure].
+   * only the graphics resource, so that path submits the map resize alongside it. The returned
+   * handover or resize completes through driver work; a caller whose outgoing surface is about to
+   * go passes it to [awaitDriverWork], and a failure otherwise reaches [onFailure].
    */
   fun follow(
     map: MapHandle,
     graphics: GraphicsContext,
     viewport: Viewport,
     onFailure: (Throwable) -> Unit,
-  ) {
+  ): Deferred<*> {
     this.viewport = viewport
-    when (graphics) {
-      is EglGraphicsContext -> {
-        session
-          .openglSurfaceSetTarget(
-            OpenglSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
+    val completion =
+      when (graphics) {
+        is EglGraphicsContext -> {
+          val handover =
+            session.openglSurfaceSetTarget(
+              OpenglSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
+            )
+          map.resize(
+            LogicalExtent(
+              viewport.logicalWidth.toUInt(),
+              viewport.logicalHeight.toUInt(),
+              viewport.scaleFactor,
+            )
           )
-          .invokeOnCompletion { error -> if (error != null) onFailure(error) }
-        map.resize(
-          LogicalExtent(
-            viewport.logicalWidth.toUInt(),
-            viewport.logicalHeight.toUInt(),
-            viewport.scaleFactor,
-          )
-        )
+          handover
+        }
+        is VulkanGraphicsContext -> session.resize(viewport.extent)
+        else -> error("Unsupported graphics context: ${graphics::class.java.name}")
       }
-      is VulkanGraphicsContext -> session.resize(viewport.extent)
-      else -> error("Unsupported graphics context: ${graphics::class.java.name}")
-    }
+    completion.invokeOnCompletion { error -> if (error != null) onFailure(error) }
+    return completion
   }
 
   /**
@@ -123,9 +132,12 @@ private constructor(private val session: RenderSessionHandle, private val driver
 
   /**
    * Services driver work until [completion] finishes, sleeping until the session's driver-work wake
-   * or the completion arrives. Only teardown waits like this; everything else follows the wakes.
+   * or the completion arrives. Only teardown and a surface loss wait like this; everything else
+   * follows the wakes.
    */
-  private fun awaitDriverWork(completion: Deferred<*>) {
+  fun awaitDriverWork(completion: Deferred<*>) {
+    // Permits from wakes the UI thread already serviced would only spin the loop.
+    driverWork.drainPermits()
     completion.invokeOnCompletion { driverWork.release() }
     while (true) {
       session.serviceDriverWork(0uL)

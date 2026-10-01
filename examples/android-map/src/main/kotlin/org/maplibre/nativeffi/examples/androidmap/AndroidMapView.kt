@@ -9,6 +9,7 @@ import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.generated.Wake
 
 /**
@@ -130,9 +131,10 @@ internal class AndroidMapView(
       finishPendingDrawing()
       onRendered()
     }
-    // The result carries the map's own follow-up demand, so an ongoing transition needs no runtime
-    // event round trip.
-    if (drained.needsRepaint) scheduleFrame()
+    // A target that was not ready consumed the map update, so the next Choreographer frame forces
+    // a retry. The result otherwise carries the map's own follow-up demand, so an ongoing
+    // transition needs no runtime event round trip.
+    if (drained.targetNotReady) requestRedraw() else if (drained.needsRepaint) scheduleFrame()
   }
 
   private fun surfaceAvailable(holder: SurfaceHolder) {
@@ -164,15 +166,24 @@ internal class AndroidMapView(
     requestRedraw()
   }
 
+  /**
+   * Parks a live session off the outgoing surface before this callback returns, since the surface
+   * is gone after that. A session still attaching against it closes instead.
+   */
   private fun surfaceLost() {
-    // Work queued against the outgoing surface runs while that surface is still valid.
-    guarded { renderTarget?.serviceDriverWork() }
-    if (graphics?.releaseSurface() == true) {
-      // The context outlived the surface, so the session parks on it until a surface returns.
-      followSurface("surface released")
-    } else {
-      detachSurface()
-    }
+    val target = renderTarget
+    val parked =
+      target?.attached != false &&
+        try {
+          graphics?.releaseSurface {
+            // The context outlived the surface, so the session parks on it until a surface returns.
+            followSurface("surface released")?.let { target?.awaitDriverWork(it) }
+          } == true
+        } catch (error: RuntimeException) {
+          Log.w(TAG, "parking the render session failed; closing it", error)
+          false
+        }
+    if (!parked) detachSurface()
     finishPendingDrawing()
   }
 
@@ -209,22 +220,25 @@ internal class AndroidMapView(
 
   /**
    * Points the live session at the surface its graphics context presents through now, and at the
-   * current viewport. A session still attaching takes both once it attaches.
+   * current viewport, and returns the handover. A session still attaching takes both once it
+   * attaches.
    */
-  private fun followSurface(change: String) {
-    val currentGraphics = graphics ?: return
-    val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return
-    val target = renderTarget?.takeIf { it.attached } ?: return
-    val state = mapState ?: return
-    target.follow(state.map, currentGraphics, currentViewport) { error ->
-      // A failed handover may leave the session naming a destroyed surface, so close it; the next
-      // surface attaches a new one.
-      handler.post {
-        Log.w(TAG, "$change: handing the surface over failed; the session is closed", error)
-        if (renderTarget === target) detachSurface()
+  private fun followSurface(change: String): Deferred<*>? {
+    val currentGraphics = graphics ?: return null
+    val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return null
+    val target = renderTarget?.takeIf { it.attached } ?: return null
+    val state = mapState ?: return null
+    val handover =
+      target.follow(state.map, currentGraphics, currentViewport) { error ->
+        // A failed handover may leave the session naming a destroyed surface, so close it; the next
+        // surface attaches a new one.
+        handler.post {
+          Log.w(TAG, "$change: handing the surface over failed; the session is closed", error)
+          if (renderTarget === target) detachSurface()
+        }
       }
-    }
     Log.i(TAG, "$change: the live session follows it and keeps its renderer")
+    return handover
   }
 
   /** Runs one piece of UI-thread render work, rebuilding the context once if it throws. */

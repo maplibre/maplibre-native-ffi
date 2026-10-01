@@ -42,7 +42,7 @@ internal class VulkanGraphicsContext private constructor(private var handle: Lon
    * outgoing one to still be valid, so the session and this context close together and attach again
    * against the next window, accepting a cold renderer.
    */
-  override fun releaseSurface(): Boolean = false
+  override fun releaseSurface(handOver: () -> Unit): Boolean = false
 
   override fun close() {
     if (handle == 0L) {
