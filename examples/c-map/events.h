@@ -35,6 +35,12 @@ mln_wake app_event_wake(app_event_code code);
 /// Pushes an app event with code after delay_ms.
 void app_event_push_after(app_event_code code, Uint32 delay_ms);
 
+/// Startup and shutdown block on a session's lifecycle completion outside the
+/// SDL loop. Every driver wake and every awaited completion also signals this
+/// wait, so it services driver work only when there is some.
+void app_events_clear_driver_wait(void);
+void app_events_wait_driver(void);
+
 /// One submission's completion that the submitting thread blocks on, for
 /// startup and shutdown steps that cannot continue without it.
 typedef struct awaited_completion {

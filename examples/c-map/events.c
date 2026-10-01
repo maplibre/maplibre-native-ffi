@@ -3,11 +3,27 @@
 #include "events.h"
 
 static Uint32 app_event_type;
+/// Lives for the whole process, because a wake can arrive from a native thread
+/// at any time.
+static SDL_Semaphore* driver_wait;
 
 app_error app_events_init(void) {
   app_event_type = SDL_RegisterEvents(1);
-  return app_event_type == 0 ? APP_ERROR_EVENT_DRAIN_FAILED : APP_OK;
+  driver_wait = SDL_CreateSemaphore(0);
+  if (driver_wait == nullptr) {
+    fprintf(stderr, "SDL_CreateSemaphore failed: %s\n", SDL_GetError());
+  }
+  return app_event_type == 0 || driver_wait == nullptr
+           ? APP_ERROR_EVENT_DRAIN_FAILED
+           : APP_OK;
 }
+
+void app_events_clear_driver_wait(void) {
+  while (SDL_TryWaitSemaphore(driver_wait)) {
+  }
+}
+
+void app_events_wait_driver(void) { SDL_WaitSemaphore(driver_wait); }
 
 bool app_event_code_of(const SDL_Event* event, app_event_code* out_code) {
   if (event->type != app_event_type) return false;
@@ -25,7 +41,9 @@ static void push_app_event(app_event_code code) {
 }
 
 static void wake_render_loop(void* user_data) {
-  push_app_event((app_event_code)(intptr_t)user_data);
+  const app_event_code code = (app_event_code)(intptr_t)user_data;
+  push_app_event(code);
+  if (code == APP_EVENT_DRIVER_WORK) SDL_SignalSemaphore(driver_wait);
 }
 
 mln_wake app_event_wake(app_event_code code) {
@@ -68,6 +86,7 @@ static void store_completion(
 static void signal_completion(void* user_data) {
   awaited_completion* completion = user_data;
   SDL_SignalSemaphore(completion->signal);
+  SDL_SignalSemaphore(driver_wait);
 }
 
 app_error awaited_completion_init(

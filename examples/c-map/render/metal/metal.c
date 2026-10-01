@@ -360,8 +360,7 @@ struct render_target {
     } owned;
     struct {
       metal_compositor compositor;
-      /// The texture the session renders into as far as completed
-      /// replacements show.
+      /// The texture the compositor samples.
       id texture;
       texture_replacements replacements;
     } borrowed;
@@ -587,20 +586,25 @@ app_error render_target_resize(
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }
 
-app_error render_target_service(render_target* target) {
-  MAP_TRY(render_session_service(&target->session));
-  if (target->mode != RENDER_TARGET_MODE_BORROWED_TEXTURE) {
-    return APP_OK;
-  }
+/// Switches the compositor to each replacement a rendered frame has drawn
+/// into, releasing the texture it retires.
+static app_error show_replacements(render_target* target) {
   while (true) {
     id replacement = nullptr;
-    MAP_TRY(texture_replacements_take_completed(
-      &target->as.borrowed.replacements, (void**)&replacement
+    MAP_TRY(texture_replacements_take_shown(
+      &target->as.borrowed.replacements, &target->session, (void**)&replacement
     ));
     if (replacement == nullptr) return APP_OK;
     release_object(&target->as.borrowed.texture);
     target->as.borrowed.texture = replacement;
   }
+}
+
+app_error render_target_service(render_target* target) {
+  MAP_TRY(render_session_service(&target->session));
+  return target->mode == RENDER_TARGET_MODE_BORROWED_TEXTURE
+           ? show_replacements(target)
+           : APP_OK;
 }
 
 static app_error present_owned(render_target* target, bool* out_presented) {
@@ -637,6 +641,7 @@ app_error render_target_present(
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
       return present_owned(target, out_presented);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
+      MAP_TRY(show_replacements(target));
       return metal_compositor_draw_texture(
         &target->as.borrowed.compositor, target->as.borrowed.texture,
         out_presented

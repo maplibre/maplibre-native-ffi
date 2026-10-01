@@ -40,13 +40,14 @@ app_error render_session_service(render_session* session) {
 }
 
 /// Services driver work until a lifecycle submission completes, abandoning the
-/// session when the driver cannot be serviced. Startup and shutdown block here.
-/// The driver's wake goes to the SDL loop rather than to this wait, so the wait
-/// paces the service calls instead.
+/// session when the driver cannot be serviced. Startup and shutdown block here,
+/// between driver wakes.
 static mln_status service_until_complete(
   render_session* session, awaited_completion* completion
 ) {
-  do {
+  while (true) {
+    // A wake that arrives after the clear ends the next wait at once.
+    app_events_clear_driver_wait();
     if (render_session_service(session) != APP_OK) {
       // Abandonment completes the pending submission with target loss.
       mln_render_abandon_result result = {.size = sizeof(result)};
@@ -54,7 +55,9 @@ static mln_status service_until_complete(
       awaited_completion_wait(completion, -1);
       break;
     }
-  } while (!awaited_completion_wait(completion, 1));
+    if (awaited_completion_wait(completion, 0)) break;
+    app_events_wait_driver();
+  }
   return completion->status;
 }
 
@@ -155,6 +158,9 @@ app_error render_session_drain_results(
       case MLN_RENDER_RESULT_RENDERED:
         out_results->rendered = true;
         out_results->needs_repaint = result.needs_repaint;
+        if (result.token > session->rendered_token) {
+          session->rendered_token = result.token;
+        }
         break;
       case MLN_RENDER_RESULT_TARGET_NOT_READY:
         out_results->target_not_ready = true;
@@ -272,6 +278,9 @@ struct texture_replacement {
   void* texture;
   atomic_bool completed;
   mln_status status;
+  /// The demand whose rendered frame shows the replacement, once its
+  /// set_target has completed.
+  uint64_t shown_token;
 };
 
 static void complete_replacement(
@@ -321,8 +330,9 @@ static void* take_oldest(texture_replacements* replacements) {
   return texture;
 }
 
-app_error texture_replacements_take_completed(
-  texture_replacements* replacements, void** out_texture
+app_error texture_replacements_take_shown(
+  texture_replacements* replacements, render_session* session,
+  void** out_texture
 ) {
   *out_texture = nullptr;
   texture_replacement* oldest = replacements->oldest;
@@ -340,6 +350,11 @@ app_error texture_replacements_take_completed(
       NULL
     );
   }
+  if (oldest->shown_token == 0) {
+    MAP_TRY(render_session_request_frame(session, true));
+    oldest->shown_token = session->next_frame_token;
+  }
+  if (session->rendered_token < oldest->shown_token) return APP_OK;
   *out_texture = take_oldest(replacements);
   return APP_OK;
 }

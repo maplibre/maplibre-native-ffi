@@ -336,8 +336,7 @@ struct render_target {
     } owned;
     struct {
       vulkan_compositor compositor;
-      /// The image the session renders into as far as completed replacements
-      /// show.
+      /// The image the compositor samples.
       borrowed_image image;
       texture_replacements replacements;
     } borrowed;
@@ -579,16 +578,14 @@ app_error render_target_resize(
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }
 
-app_error render_target_service(render_target* target) {
-  MAP_TRY(render_session_service(&target->session));
-  if (target->mode != RENDER_TARGET_MODE_BORROWED_TEXTURE) {
-    return APP_OK;
-  }
+/// Switches the compositor to each replacement a rendered frame has drawn
+/// into, destroying the image it retires.
+static app_error show_replacements(render_target* target) {
   vulkan_compositor* compositor = &target->as.borrowed.compositor;
   while (true) {
     void* replacement = nullptr;
-    MAP_TRY(texture_replacements_take_completed(
-      &target->as.borrowed.replacements, &replacement
+    MAP_TRY(texture_replacements_take_shown(
+      &target->as.borrowed.replacements, &target->session, &replacement
     ));
     if (replacement == nullptr) return APP_OK;
     // The compositor waits for its own sampling, but the session's last
@@ -600,6 +597,13 @@ app_error render_target_service(render_target* target) {
     target->as.borrowed.image = *(borrowed_image*)replacement;
     free(replacement);
   }
+}
+
+app_error render_target_service(render_target* target) {
+  MAP_TRY(render_session_service(&target->session));
+  return target->mode == RENDER_TARGET_MODE_BORROWED_TEXTURE
+           ? show_replacements(target)
+           : APP_OK;
 }
 
 /// Samples image_view into the window and waits for the sampling pass, so the
@@ -655,6 +659,7 @@ app_error render_target_present(
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
       return present_owned(target, out_presented);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
+      MAP_TRY(show_replacements(target));
       return present_image_view(
         &target->as.borrowed.compositor, target->as.borrowed.image.view,
         out_presented

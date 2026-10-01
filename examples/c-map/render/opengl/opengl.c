@@ -462,8 +462,7 @@ struct render_target {
     } owned;
     struct {
       opengl_compositor compositor;
-      /// The texture the session renders into as far as completed
-      /// replacements show.
+      /// The texture the compositor samples.
       GLuint texture;
       texture_replacements replacements;
     } borrowed;
@@ -740,16 +739,14 @@ app_error render_target_resize(
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }
 
-app_error render_target_service(render_target* target) {
-  MAP_TRY(render_session_service(&target->session));
-  if (target->mode != RENDER_TARGET_MODE_BORROWED_TEXTURE) {
-    return APP_OK;
-  }
+/// Switches the compositor to each replacement a rendered frame has drawn
+/// into, destroying the texture it retires.
+static app_error show_replacements(render_target* target) {
   opengl_compositor* compositor = &target->as.borrowed.compositor;
   while (true) {
     void* replacement = nullptr;
-    MAP_TRY(texture_replacements_take_completed(
-      &target->as.borrowed.replacements, &replacement
+    MAP_TRY(texture_replacements_take_shown(
+      &target->as.borrowed.replacements, &target->session, &replacement
     ));
     if (replacement == nullptr) return APP_OK;
     borrowed_texture_destroy(
@@ -757,6 +754,13 @@ app_error render_target_service(render_target* target) {
     );
     target->as.borrowed.texture = (GLuint)(uintptr_t)replacement;
   }
+}
+
+app_error render_target_service(render_target* target) {
+  MAP_TRY(render_session_service(&target->session));
+  return target->mode == RENDER_TARGET_MODE_BORROWED_TEXTURE
+           ? show_replacements(target)
+           : APP_OK;
 }
 
 static app_error present_owned(
@@ -794,6 +798,7 @@ app_error render_target_present(
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
       return present_owned(target, current_viewport, out_presented);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
+      MAP_TRY(show_replacements(target));
       return opengl_compositor_draw_texture(
         &target->as.borrowed.compositor, target->as.borrowed.texture,
         current_viewport

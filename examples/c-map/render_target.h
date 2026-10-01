@@ -18,6 +18,8 @@ typedef struct render_session {
   /// Whether demands ask the driver to present, as a surface target does.
   bool presents;
   uint64_t next_frame_token;
+  /// The newest demand token with a rendered result.
+  uint64_t rendered_token;
 } render_session;
 
 /// What one drain of the frame-result queue found.
@@ -111,10 +113,13 @@ void texture_replacements_queue(
   mln_status status
 );
 
-/// Takes the oldest replacement whose set_target completed, writing its
-/// texture, or null when none has. A failed replacement reports its error.
-[[nodiscard]] app_error texture_replacements_take_completed(
-  texture_replacements* replacements, void** out_texture
+/// Takes the oldest replacement that a rendered frame has drawn into, writing
+/// its texture, or null when none has. A completed replacement holds no frame
+/// yet, so the first call that finds it demands one. A failed replacement
+/// reports its error.
+[[nodiscard]] app_error texture_replacements_take_shown(
+  texture_replacements* replacements, render_session* session,
+  void** out_texture
 );
 
 /// Takes the oldest replacement whatever its state, for teardown after the

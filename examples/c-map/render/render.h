@@ -58,12 +58,13 @@ render_session* render_target_session(render_target* target);
   render_target* target, viewport current_viewport
 );
 
-/// Services caller-driver work, then releases what completed target
-/// replacements retired.
+/// Services caller-driver work, then shows any replacement texture a rendered
+/// frame has drawn into.
 [[nodiscard]] app_error render_target_service(render_target* target);
 
 /// Shows the newest rendered frame: the texture modes sample it into the
-/// window, and a surface target already presented it. Reports false when no
+/// window, switching to a replacement texture once a frame has rendered into
+/// it, and a surface target already presented it. Reports false when no
 /// frame reached the window.
 [[nodiscard]] app_error render_target_present(
   render_target* target, viewport current_viewport, bool* out_presented
