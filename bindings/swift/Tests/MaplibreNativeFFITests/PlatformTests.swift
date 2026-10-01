@@ -5,11 +5,10 @@ import Testing
 // Exit tests run their body in a child process, which the simulator and Mac
 // Catalyst runners cannot spawn.
 #if os(macOS) || os(Linux)
-  /// A process exits cleanly once it has waited for its runtime's teardown,
-  /// with its log callback still installed, its resource provider never
-  /// cleared, and its map closed with a style request in flight. The C API
-  /// names that wait as the point after which a host may exit.
-  @Test func exitingAfterRuntimeTeardownIsClean() async {
+  /// A process exits cleanly with its runtime and map live, its resource
+  /// provider and log callback installed, and a style request in flight. The C
+  /// API lets a host exit at any point, so nothing is closed first.
+  @Test func exitingWithLiveHandlesAndCallbacksIsClean() async {
     await #expect(processExitsWith: .success) {
       try Maplibre.logSetCallback { _, _, _, _ in 1 }
       let runtime = try MapFixture.makeRuntime()
@@ -20,9 +19,9 @@ import Testing
         initialExtent: LogicalExtent(width: 8, height: 8, scaleFactor: 1)
       ))
       try await map.setStyleUrl(url: "custom://exit.json")
-      try await map.close()
-      try await runtime.close()
-      exit(0)
+      // Keeps both handles referenced through the exit, so that neither one's
+      // deinit retires it first.
+      withExtendedLifetime((runtime, map)) { exit(0) }
     }
   }
 #endif

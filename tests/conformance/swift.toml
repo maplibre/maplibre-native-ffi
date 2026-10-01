@@ -37,7 +37,7 @@
 "REND-01" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::anOwnedTextureSessionRendersPixelsTheBindingReadsBack"
 "REND-02" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::aCallerDrivenSessionIsServicedOnAHostThread"
 "PLAT-01" = { na = "The binding has no loader, package step, or build hook of its own: SwiftPM links the library through pkg-config and an rpath, so every test that runs has loaded it the way a consumer does" }
-"PLAT-02" = "bindings/swift/Tests/MaplibreNativeFFITests/PlatformTests.swift::exitingAfterRuntimeTeardownIsClean"
+"PLAT-02" = "bindings/swift/Tests/MaplibreNativeFFITests/PlatformTests.swift::exitingWithLiveHandlesAndCallbacksIsClean"
 "PLAT-03" = { na = "Swift reclaims objects by reference counting and has no collector: deinit disposes an abandoned handle (LIFE-04, COMP-03), and a callback that captures its own receiver is a cycle the language leaves alive" }
 # `mise run //examples/swift-map:smoke` renders one frame in each render-target
 # mode through this path. The iOS target, swift-map-ios, is a UIKit app with
