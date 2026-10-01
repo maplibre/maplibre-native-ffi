@@ -1,6 +1,7 @@
 #include "wake/wake.hpp"
 
 #include "diagnostics/diagnostics.hpp"
+#include "execution/process_exit.hpp"
 
 namespace mln::core {
 
@@ -17,7 +18,9 @@ Wake::~Wake() {
     accepted = accepted_;
     descriptor_ = {};
   }
-  if (accepted && descriptor.release_user_data != nullptr) {
+  if (
+    accepted && descriptor.release_user_data != nullptr && !process_exiting()
+  ) {
     try {
       descriptor.release_user_data(descriptor.user_data);
     } catch (...) {
@@ -42,7 +45,12 @@ auto Wake::notify() noexcept -> void {
   auto* user_data = static_cast<void*>(nullptr);
   {
     const auto lock = std::scoped_lock{mutex_};
-    if (!accepted_ || closing_ || descriptor_.callback == nullptr) return;
+    if (
+      !accepted_ || closing_ || descriptor_.callback == nullptr ||
+      process_exiting()
+    ) {
+      return;
+    }
     ++in_flight_;
     callback = descriptor_.callback;
     user_data = descriptor_.user_data;

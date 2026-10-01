@@ -3,6 +3,7 @@
 #include "completion/completion.hpp"
 
 #include "diagnostics/diagnostics.hpp"
+#include "execution/process_exit.hpp"
 
 namespace mln::core {
 
@@ -22,6 +23,7 @@ auto invoke_completion(
     .value = value,
     .value_count = value_count,
   };
+  if (process_exiting()) return;
   try {
     descriptor.callback(descriptor.user_data, &result);
   } catch (...) {
@@ -115,7 +117,7 @@ auto Completion::release() noexcept -> void {
   const auto release_user_data = descriptor_.release_user_data;
   const auto user_data = descriptor_.user_data;
   descriptor_ = {};
-  if (release_user_data != nullptr) {
+  if (release_user_data != nullptr && !process_exiting()) {
     try {
       release_user_data(user_data);
     } catch (...) {

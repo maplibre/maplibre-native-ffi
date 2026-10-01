@@ -40,6 +40,7 @@
 
 #include "completion/completion.hpp"
 #include "diagnostics/diagnostics.hpp"
+#include "execution/process_exit.hpp"
 #include "geojson/geojson.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
@@ -1087,6 +1088,7 @@ auto create_runtime(
   if (options_status != MLN_STATUS_OK) {
     return options_status;
   }
+  watch_process_exit();
   const auto event_wake = std::make_shared<Wake>(options->event_wake);
 
   static_cast<void>(runtime_disposal_lane());
@@ -2911,7 +2913,7 @@ auto invoke_resource_transform(
   mln::testing::hit(mln::testing::SyncPoint::ResourceTransformLookup);
   const std::shared_lock transform_lock(state->mutex);
   const auto registration = state->registration;
-  if (registration == nullptr) {
+  if (registration == nullptr || process_exiting()) {
     return MLN_STATUS_OK;
   }
 
@@ -2946,7 +2948,7 @@ auto invoke_http_header_transform(
 
   const std::shared_lock transform_lock(state->mutex);
   const auto registration = state->registration;
-  if (registration == nullptr) {
+  if (registration == nullptr || process_exiting()) {
     return {};
   }
 

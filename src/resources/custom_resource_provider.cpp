@@ -22,6 +22,7 @@
 #include "resources/custom_resource_provider.hpp"
 
 #include "diagnostics/diagnostics.hpp"
+#include "execution/process_exit.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 #include "testing/sync_point.hpp"
@@ -263,13 +264,15 @@ void run_cancel_callback(ResourceRequestObject& object) noexcept {
     object.cancel_callback_running = true;
     object.cancel_callback_thread = std::this_thread::get_id();
   }
-  try {
-    callback(user_data);
-  } catch (...) {
-    // Host callbacks must not unwind through MapLibre's cancel path.
+  if (!process_exiting()) {
+    try {
+      callback(user_data);
+    } catch (...) {
+      // Host callbacks must not unwind through MapLibre's cancel path.
+    }
   }
   // The callback runs at most once, so its context retires as it returns.
-  if (release != nullptr) {
+  if (release != nullptr && !process_exiting()) {
     try {
       release(user_data);
     } catch (...) {
@@ -344,7 +347,7 @@ void retire_request(mln_resource_request_handle handle) noexcept {
   object->state_changed.notify_all();
   if (release != nullptr) {
     try {
-      release(user_data);
+      if (!process_exiting()) release(user_data);
     } catch (...) {
       // Host callbacks must not unwind through the release path.
     }
@@ -414,6 +417,35 @@ struct CustomProviderInvocation {
   void* user_data = nullptr;
 };
 
+// Answers a request that the provider did not answer with an error, and
+// retires it.
+auto fail_request(
+  mln_resource_request_handle handle, const char* message
+) noexcept -> void {
+  const auto response = mln_resource_response{
+    .size = sizeof(mln_resource_response),
+    .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
+    .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
+    .bytes = nullptr,
+    .byte_count = 0,
+    .error_message = message,
+    .must_revalidate = false,
+    .has_modified = false,
+    .modified_unix_ms = 0,
+    .has_expires = false,
+    .expires_unix_ms = 0,
+    .etag = nullptr,
+    .has_retry_after = false,
+    .retry_after_unix_ms = 0,
+  };
+  try {
+    static_cast<void>(complete_resource_request(handle, &response));
+  } catch (...) {
+    // The request retires whether or not the response landed.
+  }
+  retire_request(handle);
+}
+
 auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
   -> bool {
   try {
@@ -426,6 +458,10 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
     }
     if (was_cancelled) {
       retire_request(invocation.handle);
+      return true;
+    }
+    if (process_exiting()) {
+      fail_request(invocation.handle, "the process is exiting");
       return true;
     }
     const auto request =
@@ -451,55 +487,15 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
       return false;
     }
     if (decision != MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
-      auto response = mln_resource_response{
-        .size = sizeof(mln_resource_response),
-        .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-        .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
-        .bytes = nullptr,
-        .byte_count = 0,
-        .error_message = "resource provider returned an unknown decision",
-        .must_revalidate = false,
-        .has_modified = false,
-        .modified_unix_ms = 0,
-        .has_expires = false,
-        .expires_unix_ms = 0,
-        .etag = nullptr,
-        .has_retry_after = false,
-        .retry_after_unix_ms = 0,
-      };
-      static_cast<void>(
-        complete_resource_request(invocation.handle, &response)
+      fail_request(
+        invocation.handle, "resource provider returned an unknown decision"
       );
-      retire_request(invocation.handle);
       return true;
     }
     // A handled request stays reachable by id until the host releases it.
     return true;
   } catch (...) {
-    auto response = mln_resource_response{
-      .size = sizeof(mln_resource_response),
-      .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-      .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
-      .bytes = nullptr,
-      .byte_count = 0,
-      .error_message = "resource provider threw an exception",
-      .must_revalidate = false,
-      .has_modified = false,
-      .modified_unix_ms = 0,
-      .has_expires = false,
-      .expires_unix_ms = 0,
-      .etag = nullptr,
-      .has_retry_after = false,
-      .retry_after_unix_ms = 0,
-    };
-    try {
-      static_cast<void>(
-        complete_resource_request(invocation.handle, &response)
-      );
-    } catch (...) {
-      static_cast<void>(response);
-    }
-    retire_request(invocation.handle);
+    fail_request(invocation.handle, "resource provider threw an exception");
     return true;
   }
 }

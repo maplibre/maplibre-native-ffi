@@ -13,6 +13,7 @@
 #include "bytes/buffer.hpp"
 #include "c_api/boundary.hpp"
 #include "diagnostics/diagnostics.hpp"
+#include "execution/process_exit.hpp"
 #include "geojson/geojson_source_data.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
@@ -139,7 +140,7 @@ struct OwnedCallbackSourceOptions {
   ~OwnedCallbackSourceOptions() {
     if (
       ownership.load(std::memory_order_acquire) == Ownership::accepted &&
-      value.release_user_data != nullptr
+      value.release_user_data != nullptr && !mln::core::process_exiting()
     ) {
       try {
         value.release_user_data(value.user_data);

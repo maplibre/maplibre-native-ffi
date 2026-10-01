@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "execution/control_state.hpp"
+#include "execution/process_exit.hpp"
 #include "execution/runtime_executor.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
@@ -107,7 +108,12 @@ class RuntimeCallbackContext {
     -> RuntimeCallbackContext& = delete;
 
   ~RuntimeCallbackContext() noexcept {
-    if (!owned_.load(std::memory_order_acquire) || release_ == nullptr) return;
+    if (
+      !owned_.load(std::memory_order_acquire) || release_ == nullptr ||
+      process_exiting()
+    ) {
+      return;
+    }
     try {
       release_(user_data_);
     } catch (...) {

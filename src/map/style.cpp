@@ -83,6 +83,7 @@
 
 #include "bytes/buffer.hpp"
 #include "diagnostics/diagnostics.hpp"
+#include "execution/process_exit.hpp"
 #include "geojson/geojson.hpp"
 #include "geojson/geojson_source_data.hpp"
 #include "handles/handle_table.hpp"
@@ -743,6 +744,7 @@ auto to_native_tile_function(
     return nullptr;
   }
   return [callback, user_data](const mln::CanonicalTileID& tile_id) -> void {
+    if (mln::core::process_exiting()) return;
     try {
       callback(user_data, to_c_canonical_tile_id(tile_id));
     } catch (const std::exception& exception) {

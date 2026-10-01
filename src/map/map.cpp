@@ -87,6 +87,7 @@
 #include "bytes/buffer.hpp"
 #include "completion/completion.hpp"
 #include "diagnostics/diagnostics.hpp"
+#include "execution/process_exit.hpp"
 #include "geojson/geojson.hpp"
 #include "handles/handle_table.hpp"
 #include "map/map_internal.hpp"
@@ -236,6 +237,7 @@ class CallbackSourceRegistry final {
   };
 
   static auto invoke(const Entry& entry) noexcept -> void {
+    if (mln::core::process_exiting()) return;
     try {
       entry.release(entry.user_data);
     } catch (const std::exception& exception) {
