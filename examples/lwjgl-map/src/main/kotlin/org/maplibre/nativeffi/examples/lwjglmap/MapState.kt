@@ -1,8 +1,6 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
 import kotlinx.coroutines.runBlocking
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.AnimationOptions
 import org.maplibre.nativeffi.generated.CameraDelta
 import org.maplibre.nativeffi.generated.CameraDeltaKind
@@ -81,18 +79,10 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
     AnimationOptions(durationMs = durationMs)
 
   /** Drains every runtime event, and reports whether the map published an update to render. */
-  fun drainRenderUpdates(): Boolean {
-    val batch =
-      try {
-        runtime.drainEvents()
-      } catch (error: MaplibreException) {
-        if (error.status == MaplibreStatus.NOT_READY) return false
-        throw error
-      }
-    return batch.use { owner ->
+  fun drainRenderUpdates(): Boolean =
+    runtime.drainEvents().use { owner ->
       owner.get().events.any { event -> event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE }
     }
-  }
 
   override fun close() {
     runBlocking {
