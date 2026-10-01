@@ -16,7 +16,8 @@ const KEYBOARD_PITCH: f64 = 5.0;
 const KEYBOARD_ANIMATION_MS: f64 = 160.0;
 const RESET_ANIMATION_MS: f64 = 220.0;
 
-/// Decodes host input and updates the map in logical map coordinates.
+/// Decodes host input into camera commands in logical map coordinates. The map
+/// reports the resulting render update, which drives the next frame demand.
 #[derive(Default)]
 pub struct Controller {
     left_down: bool,
@@ -41,13 +42,12 @@ impl Controller {
         println!("  0: reset pitch and bearing");
     }
 
-    /// Reports whether the event changed the camera.
     pub fn handle(
         &mut self,
         event: &WindowEvent,
         viewport: Viewport,
         map: &mut MapState,
-    ) -> Result<bool, Box<dyn Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         match event {
             WindowEvent::CursorMoved { position, .. } => self.cursor(
                 position.x / viewport.scale_factor,
@@ -61,13 +61,13 @@ impl Controller {
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = modifiers.state();
-                Ok(false)
+                Ok(())
             }
-            _ => Ok(false),
+            _ => Ok(()),
         }
     }
 
-    fn cursor(&mut self, x: f64, y: f64, map: &mut MapState) -> Result<bool, Box<dyn Error>> {
+    fn cursor(&mut self, x: f64, y: f64, map: &mut MapState) -> Result<(), Box<dyn Error>> {
         let dx = x - self.last_x;
         let dy = y - self.last_y;
         self.last_x = x;
@@ -82,13 +82,10 @@ impl Controller {
             if dy != 0.0 {
                 map.adjust_pitch(dy * DRAG_PITCH_FACTOR, None)?;
             }
-            Ok(dx != 0.0 || dy != 0.0)
         } else if self.left_down && (dx != 0.0 || dy != 0.0) {
             map.move_by(dx, dy, None)?;
-            Ok(true)
-        } else {
-            Ok(false)
         }
+        Ok(())
     }
 
     fn mouse(
@@ -96,12 +93,12 @@ impl Controller {
         button: MouseButton,
         state: ElementState,
         map: &mut MapState,
-    ) -> Result<bool, Box<dyn Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let was_dragging = self.dragging();
         match button {
             MouseButton::Left => self.left_down = state == ElementState::Pressed,
             MouseButton::Right => self.right_down = state == ElementState::Pressed,
-            _ => return Ok(false),
+            _ => return Ok(()),
         }
         if self.dragging() != was_dragging {
             if self.dragging() {
@@ -109,7 +106,7 @@ impl Controller {
             }
             map.set_gesture_in_progress(self.dragging())?;
         }
-        Ok(false)
+        Ok(())
     }
 
     fn dragging(&self) -> bool {
@@ -121,20 +118,20 @@ impl Controller {
         viewport: Viewport,
         delta: MouseScrollDelta,
         map: &mut MapState,
-    ) -> Result<bool, Box<dyn Error>> {
+    ) -> Result<(), Box<dyn Error>> {
         let lines = match delta {
             MouseScrollDelta::LineDelta(_, y) => f64::from(y),
             MouseScrollDelta::PixelDelta(position) => position.y / viewport.scale_factor / 120.0,
         };
         if lines == 0.0 {
-            return Ok(false);
+            return Ok(());
         }
         map.scale_by(
             2.0_f64.powf(lines * 0.25),
             ScreenPoint::new(self.cursor_x, self.cursor_y),
             None,
         )?;
-        Ok(true)
+        Ok(())
     }
 }
 
@@ -143,12 +140,12 @@ fn keyboard(
     physical_key: PhysicalKey,
     state: ElementState,
     map: &mut MapState,
-) -> Result<bool, Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>> {
     if state != ElementState::Pressed {
-        return Ok(false);
+        return Ok(());
     }
     let PhysicalKey::Code(code) = physical_key else {
-        return Ok(false);
+        return Ok(());
     };
     let center = ScreenPoint::new(
         f64::from(viewport.logical_width) / 2.0,
@@ -178,7 +175,7 @@ fn keyboard(
         KeyCode::BracketRight => map.adjust_pitch(KEYBOARD_PITCH, Some(KEYBOARD_ANIMATION_MS))?,
         KeyCode::BracketLeft => map.adjust_pitch(-KEYBOARD_PITCH, Some(KEYBOARD_ANIMATION_MS))?,
         KeyCode::Digit0 | KeyCode::Numpad0 => map.reset_orientation(RESET_ANIMATION_MS)?,
-        _ => return Ok(false),
+        _ => {}
     }
-    Ok(true)
+    Ok(())
 }

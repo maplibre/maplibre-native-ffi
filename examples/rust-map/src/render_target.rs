@@ -12,13 +12,15 @@ pub use opengl_target::RenderTarget;
 #[cfg(maplibre_render_backend = "vulkan")]
 pub use vulkan_target::RenderTarget;
 
+use std::collections::VecDeque;
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    AcquiredFrameHandle, Error, ErrorKind, FrameDemand, NativeFuture, RenderResult,
-    RenderSessionHandle, RenderTargetExtent,
+    AcquiredFrameHandle, Error, ErrorKind, FrameDemand, FrameDemandFlag, GpuSync, NativeFuture,
+    RenderResult, RenderSessionAttachOptions, RenderSessionHandle, RenderTargetExtent,
 };
 
+use crate::shell::{AppEvent, Wakes};
 use crate::viewport::Viewport;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -57,12 +59,15 @@ impl Mode {
     }
 }
 
-/// One frame demand's outcome: whether the session rendered the demand, and
-/// whether the map asked for another frame while it rendered this one.
+/// What one drain of the frame-result queue found.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct FrameOutcome {
+pub struct FrameResults {
+    /// A demand rendered a frame.
     pub rendered: bool,
+    /// The map asked for another frame while it rendered one.
     pub needs_repaint: bool,
+    /// The target could not produce a frame, so the loop retries later.
+    pub target_not_ready: bool,
 }
 
 pub fn extent(viewport: Viewport) -> RenderTargetExtent {
@@ -73,36 +78,127 @@ pub fn extent(viewport: Viewport) -> RenderTargetExtent {
     )
 }
 
+/// Caller-driver attach options whose wakes post frame-result and driver-work
+/// events to the winit loop.
+pub fn attach_options(wakes: &Wakes, mode: Mode) -> RenderSessionAttachOptions {
+    RenderSessionAttachOptions {
+        driver: maplibre_native_ffi::RenderDriverKind::CallerGraphicsThread,
+        requested_texture_ring_depth: if mode == Mode::OwnedTexture { 2 } else { 0 },
+        frame_wake: wakes.wake(AppEvent::FrameResults),
+        driver_work_wake: wakes.wake(AppEvent::DriverWork),
+    }
+}
+
 /// A caller-graphics-thread render session plus the monotonic demand tokens
 /// that tie each frame result back to the demand that produced it.
-///
-/// Every ordered session submission runs on the graphics thread that attached,
-/// so this type also owns the loop that services driver work while one is
-/// outstanding.
-pub struct FrameDriver {
+pub struct Session {
     session: RenderSessionHandle,
+    presents: bool,
     next_token: u64,
 }
 
-impl FrameDriver {
+impl Session {
     /// Services driver work until the attachment resolves.
     pub fn new(
         attachment: (RenderSessionHandle, NativeFuture<()>),
+        presents: bool,
     ) -> maplibre_native_ffi::Result<Self> {
-        let driver = Self {
+        let session = Self {
             session: attachment.0,
+            presents,
             next_token: 0,
         };
-        driver.drive(&attachment.1)?;
-        Ok(driver)
+        session.service_until(&attachment.1)?;
+        Ok(session)
     }
 
-    pub fn session(&self) -> &RenderSessionHandle {
+    pub fn handle(&self) -> &RenderSessionHandle {
         &self.session
     }
 
-    /// Services driver work until one ordered submission resolves.
-    pub fn drive<T>(&self, operation: &NativeFuture<T>) -> maplibre_native_ffi::Result<T> {
+    /// Services every queued caller-driver item on the graphics thread.
+    pub fn service(&self) -> maplibre_native_ffi::Result<()> {
+        self.session.service_driver_work(0)?;
+        Ok(())
+    }
+
+    /// Demands a frame. A forced demand renders even without a newer map
+    /// update, which a retry after an undrawn frame needs.
+    pub fn request_frame(&mut self, force: bool) -> maplibre_native_ffi::Result<()> {
+        self.next_token += 1;
+        let mut flags = FrameDemandFlag::empty();
+        flags.set(FrameDemandFlag::IF_NEEDED, !force);
+        flags.set(FrameDemandFlag::PRESENT, self.presents);
+        self.session.request_frame(&FrameDemand {
+            flags,
+            token: self.next_token,
+            ..FrameDemand::default()
+        })
+    }
+
+    /// Drains every queued frame result.
+    pub fn drain_results(&self) -> maplibre_native_ffi::Result<FrameResults> {
+        let batch = match self.session.drain_frame_results() {
+            Ok(batch) => batch,
+            Err(error) if error.kind() == ErrorKind::NotReady => return Ok(FrameResults::default()),
+            Err(error) => return Err(error),
+        };
+        let mut results = FrameResults::default();
+        for index in 0..batch.count()? {
+            let result = batch.get(index)?;
+            // No update and size pending wait for the map's next update,
+            // superseded demands have a newer one behind them, and no demand
+            // carries a timeout.
+            match result.disposition {
+                RenderResult::Rendered => {
+                    results.rendered = true;
+                    results.needs_repaint = result.needs_repaint;
+                }
+                RenderResult::TargetNotReady => results.target_not_ready = true,
+                _ => {}
+            }
+        }
+        Ok(results)
+    }
+
+    /// Starts the session resize that carries the new logical extent to the
+    /// map. A later resize supersedes this one, so a live resize needs no
+    /// pacing.
+    pub fn resize(&self, viewport: Viewport) -> maplibre_native_ffi::Result<()> {
+        self.session.resize(&extent(viewport))?;
+        Ok(())
+    }
+
+    /// Acquires the newest rendered frame, releasing any older one unsampled.
+    /// Reports `None` while the ring holds none.
+    pub fn acquire_newest(&self) -> maplibre_native_ffi::Result<Option<AcquiredFrameHandle>> {
+        let mut newest = None;
+        loop {
+            match self.session.acquire_frame() {
+                Ok(frame) => {
+                    if let Some(older) = newest.replace(frame) {
+                        AcquiredFrameHandle::release(&older, &GpuSync::default())?;
+                    }
+                }
+                Err(error) if error.kind() == ErrorKind::NotReady => return Ok(newest),
+                Err(error) => return Err(error),
+            }
+        }
+    }
+
+    /// Detaches on the graphics thread, then destroys the session.
+    pub fn close(self) -> Result<(), Box<dyn StdError>> {
+        let operation = self.session.detach()?;
+        self.service_until(&operation)?;
+        self.session
+            .destroy()
+            .map_err(|error| Box::new(error) as Box<dyn StdError>)
+    }
+
+    /// Services driver work until a lifecycle submission resolves. Startup and
+    /// shutdown block here. The driver's wake goes to the winit loop rather
+    /// than to this wait, so the loop yields between service calls instead.
+    fn service_until<T>(&self, operation: &NativeFuture<T>) -> maplibre_native_ffi::Result<T> {
         while !operation.is_ready() {
             if self.session.service_driver_work(0)? == 0 {
                 std::thread::yield_now();
@@ -110,67 +206,51 @@ impl FrameDriver {
         }
         operation.take()
     }
+}
 
-    /// Carries a new logical extent to the map through the attached session,
-    /// which is the only extent authority while it stays attached.
-    pub fn resize(&self, viewport: Viewport) -> maplibre_native_ffi::Result<()> {
-        let operation = self.session.resize(&extent(viewport))?;
-        let receipt = self.drive(&operation)?;
-        if receipt.raw_status == maplibre_native_ffi::Status::Ok.to_native() {
-            Ok(())
-        } else {
-            Err(Error::from_status_and_diagnostic(
-                receipt.raw_status,
-                receipt.diagnostic,
-            ))
+/// The caller-owned textures a borrowed-texture target hands over on resize,
+/// oldest first. The session renders into a texture until its replacement
+/// completes, so each outgoing texture stays alive until then.
+pub struct Replacements<T> {
+    entries: VecDeque<(NativeFuture<()>, T)>,
+}
+
+impl<T> Default for Replacements<T> {
+    fn default() -> Self {
+        Self {
+            entries: VecDeque::new(),
         }
     }
+}
 
-    /// Submits one demand, services driver work, and reports the outcome of
-    /// the result carrying this demand's token.
-    pub fn render_frame(&mut self, present: bool) -> maplibre_native_ffi::Result<FrameOutcome> {
-        self.next_token += 1;
-        let token = self.next_token;
-        self.session.request_frame(&FrameDemand {
-            flags: if present {
-                maplibre_native_ffi::FrameDemandFlag::PRESENT
-            } else {
-                maplibre_native_ffi::FrameDemandFlag::empty()
-            },
-            token,
-            ..FrameDemand::default()
-        })?;
-        self.session.service_driver_work(0)?;
-        let batch = self.session.drain_frame_results()?;
-        let results = (0..batch.count()?)
-            .map(|index| batch.get(index))
-            .collect::<maplibre_native_ffi::Result<Vec<_>>>()?;
-        Ok(results
-            .into_iter()
-            .find(|result| result.token == token)
-            .map(|result| FrameOutcome {
-                rendered: result.disposition == RenderResult::Rendered,
-                needs_repaint: result.needs_repaint,
-            })
-            .unwrap_or_default())
+impl<T> Replacements<T> {
+    /// Queues the texture a set_target call handed over, with that call's
+    /// completion.
+    pub fn push(&mut self, completion: NativeFuture<()>, texture: T) {
+        self.entries.push_back((completion, texture));
     }
 
-    /// Leases the rendered frame, reporting `None` while the ring holds none.
-    pub fn acquire_frame(&self) -> maplibre_native_ffi::Result<Option<AcquiredFrameHandle>> {
-        match self.session.acquire_frame() {
-            Ok(frame) => Ok(Some(frame)),
-            Err(error) if error.kind() == ErrorKind::NotReady => Ok(None),
-            Err(error) => Err(error),
+    /// Takes the oldest replacement whose set_target completed, or `None` when
+    /// none has. A failed replacement reports its error: the session may still
+    /// render into it or the texture before it, so neither is released before
+    /// the session detaches.
+    pub fn take_completed(&mut self) -> maplibre_native_ffi::Result<Option<T>> {
+        let Some((completion, _)) = self.entries.front() else {
+            return Ok(None);
+        };
+        if !completion.is_ready() {
+            return Ok(None);
         }
+        let (completion, texture) = self.entries.pop_front().expect("front entry exists");
+        completion.take()?;
+        Ok(Some(texture))
     }
 
-    /// Detaches on the graphics thread, then destroys the session.
-    pub fn close(self) -> Result<(), Box<dyn StdError>> {
-        let operation = self.session.detach()?;
-        self.drive(&operation)?;
-        self.session
-            .destroy()
-            .map_err(|error| Box::new(error) as Box<dyn StdError>)
+    /// Takes every replacement whatever its state, for teardown after the
+    /// session detached. Only OpenGL textures need an explicit close.
+    #[cfg(maplibre_render_backend = "opengl")]
+    pub fn take_all(&mut self) -> impl Iterator<Item = T> + '_ {
+        self.entries.drain(..).map(|(_, texture)| texture)
     }
 }
 

@@ -1,30 +1,35 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    GpuSync, MapHandle, OpenglBorrowedTextureDescriptor, OpenglOwnedTextureDescriptor,
-    OpenglSurfaceDescriptor, RenderSessionAttachOptions,
+    GpuSync, MapHandle, OpenglBorrowedTextureDescriptor, OpenglContextDescriptor,
+    OpenglOwnedTextureDescriptor, OpenglSurfaceDescriptor,
 };
 
 use crate::graphics::GraphicsContext;
 use crate::map_state::MapState;
-use crate::opengl::{OpenGLBorrowedTexture, OpenGLTextureCompositor};
+use crate::opengl::{OpenGLBorrowedTexture, OpenGLContext, OpenGLTextureCompositor};
 use crate::render_target::{
-    FrameDriver, FrameOutcome, Mode, compositor_error, extent, require_cpu_complete_producer,
+    Mode, Replacements, Session, attach_options, compositor_error, extent,
+    require_cpu_complete_producer,
 };
+use crate::shell::Wakes;
 use crate::viewport::Viewport;
 
 pub enum RenderTarget {
     OwnedTexture {
-        driver: FrameDriver,
+        session: Session,
         compositor: Box<OpenGLTextureCompositor>,
     },
     BorrowedTexture {
-        driver: FrameDriver,
+        session: Session,
         compositor: Box<OpenGLTextureCompositor>,
+        /// The texture the session renders into as far as completed
+        /// replacements show.
         texture: Box<OpenGLBorrowedTexture>,
+        replacements: Replacements<OpenGLBorrowedTexture>,
     },
     Surface {
-        driver: FrameDriver,
+        session: Session,
     },
 }
 
@@ -34,55 +39,42 @@ impl RenderTarget {
         map: &MapHandle,
         graphics: &GraphicsContext,
         viewport: Viewport,
+        wakes: &Wakes,
     ) -> maplibre_native_ffi::Result<Self> {
         let gl = graphics.opengl();
         let context = gl.descriptor().map_err(|error| {
             compositor_error(format!("OpenGL context descriptor failed: {error}"))
         })?;
-        let options = RenderSessionAttachOptions {
-            driver: maplibre_native_ffi::RenderDriverKind::CallerGraphicsThread,
-            requested_texture_ring_depth: if mode == Mode::OwnedTexture { 2 } else { 0 },
-            ..Default::default()
-        };
+        let options = attach_options(wakes, mode);
         match mode {
             Mode::OwnedTexture => {
                 let descriptor = OpenglOwnedTextureDescriptor {
                     extent: extent(viewport),
                     context,
                 };
-                let driver = FrameDriver::new(unsafe {
-                    map.opengl_owned_texture_attach(&descriptor, &(options))
-                }?)?;
-                let compositor = OpenGLTextureCompositor::new(gl, viewport).map_err(|error| {
-                    compositor_error(format!("OpenGL compositor creation failed: {error}"))
-                })?;
+                let session = Session::new(
+                    unsafe { map.opengl_owned_texture_attach(&descriptor, &options) }?,
+                    false,
+                )?;
                 Ok(Self::OwnedTexture {
-                    driver,
-                    compositor: Box::new(compositor),
+                    session,
+                    compositor: Box::new(compositor(gl, viewport)?),
                 })
             }
             Mode::BorrowedTexture => {
                 let texture = OpenGLBorrowedTexture::new(gl, viewport).map_err(|error| {
                     compositor_error(format!("OpenGL texture creation failed: {error}"))
                 })?;
-                let descriptor = OpenglBorrowedTextureDescriptor {
-                    extent: extent(viewport),
-                    physical_width: viewport.physical_width,
-                    physical_height: viewport.physical_height,
-                    context,
-                    texture: texture.texture(),
-                    target: texture.target(),
-                };
-                let driver = FrameDriver::new(unsafe {
-                    map.opengl_borrowed_texture_attach(&descriptor, &(options))
-                }?)?;
-                let compositor = OpenGLTextureCompositor::new(gl, viewport).map_err(|error| {
-                    compositor_error(format!("OpenGL compositor creation failed: {error}"))
-                })?;
+                let descriptor = borrowed_descriptor(context, &texture, viewport);
+                let session = Session::new(
+                    unsafe { map.opengl_borrowed_texture_attach(&descriptor, &options) }?,
+                    false,
+                )?;
                 Ok(Self::BorrowedTexture {
-                    driver,
-                    compositor: Box::new(compositor),
+                    session,
+                    compositor: Box::new(compositor(gl, viewport)?),
                     texture: Box::new(texture),
+                    replacements: Replacements::default(),
                 })
             }
             Mode::NativeSurface => {
@@ -95,14 +87,24 @@ impl RenderTarget {
                     surface,
                 };
                 Ok(Self::Surface {
-                    driver: FrameDriver::new(unsafe {
-                        map.opengl_surface_attach(&descriptor, &(options))
-                    }?)?,
+                    session: Session::new(
+                        unsafe { map.opengl_surface_attach(&descriptor, &options) }?,
+                        true,
+                    )?,
                 })
             }
         }
     }
 
+    pub fn session_mut(&mut self) -> &mut Session {
+        match self {
+            Self::OwnedTexture { session, .. }
+            | Self::BorrowedTexture { session, .. }
+            | Self::Surface { session } => session,
+        }
+    }
+
+    /// Starts the session resize or target replacement a new viewport needs.
     pub fn resize(
         &mut self,
         graphics: &GraphicsContext,
@@ -110,102 +112,141 @@ impl RenderTarget {
         viewport: Viewport,
     ) -> Result<(), Box<dyn StdError>> {
         match self {
-            Self::OwnedTexture { driver, compositor } => {
+            Self::OwnedTexture {
+                session,
+                compositor,
+            } => {
                 compositor.resize(viewport);
-                driver.resize(viewport)?;
+                session.resize(viewport)?;
                 Ok(())
             }
             Self::BorrowedTexture {
-                driver,
+                session,
                 compositor,
-                texture,
+                replacements,
+                ..
             } => {
                 let gl = graphics.opengl();
                 let replacement = OpenGLBorrowedTexture::new(gl, viewport).map_err(|error| {
                     compositor_error(format!("OpenGL texture creation failed: {error}"))
                 })?;
-                let descriptor = OpenglBorrowedTextureDescriptor {
-                    extent: extent(viewport),
-                    physical_width: viewport.physical_width,
-                    physical_height: viewport.physical_height,
-                    context: gl
-                        .descriptor()
-                        .map_err(|error| compositor_error(error.to_string()))?,
-                    texture: replacement.texture(),
-                    target: replacement.target(),
-                };
-                let operation = unsafe {
-                    driver
-                        .session()
+                let context = gl
+                    .descriptor()
+                    .map_err(|error| compositor_error(error.to_string()))?;
+                let descriptor = borrowed_descriptor(context, &replacement, viewport);
+                let completion = unsafe {
+                    session
+                        .handle()
                         .opengl_borrowed_texture_set_target(&descriptor)
                 }?;
-                driver.drive(&operation)?;
+                replacements.push(completion, replacement);
                 compositor.resize(viewport);
-                let outgoing = std::mem::replace(&mut **texture, replacement);
-                outgoing.close(Some(gl));
                 // Target replacement changes only the graphics resource, so
                 // the map takes the new extent directly.
                 map.resize(viewport)
             }
-            Self::Surface { driver } => {
-                driver.resize(viewport)?;
+            Self::Surface { session } => {
+                session.resize(viewport)?;
                 Ok(())
             }
         }
     }
 
-    pub fn render_update(
-        &mut self,
-        graphics: &GraphicsContext,
-    ) -> maplibre_native_ffi::Result<FrameOutcome> {
-        let present = matches!(self, Self::Surface { .. });
-        let driver = match self {
-            Self::OwnedTexture { driver, .. }
-            | Self::BorrowedTexture { driver, .. }
-            | Self::Surface { driver } => driver,
-        };
-        let mut outcome = driver.render_frame(present)?;
-        if !outcome.rendered {
-            return Ok(outcome);
+    /// Services caller-driver work, then releases what completed target
+    /// replacements retired.
+    pub fn service(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
+        self.session_mut().service()?;
+        if let Self::BorrowedTexture {
+            texture,
+            replacements,
+            ..
+        } = self
+        {
+            while let Some(replacement) = replacements.take_completed()? {
+                std::mem::replace(&mut **texture, replacement).close(Some(graphics.opengl()));
+            }
         }
+        Ok(())
+    }
+
+    /// Shows the newest rendered frame, reporting false when no frame reached
+    /// the window.
+    pub fn present(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<bool> {
         match self {
-            Self::OwnedTexture { driver, compositor } => {
-                let Some(frame) = driver.acquire_frame()? else {
-                    outcome.rendered = false;
-                    return Ok(outcome);
+            Self::OwnedTexture {
+                session,
+                compositor,
+            } => {
+                // Without a new frame, the window keeps the one it already
+                // shows.
+                let Some(frame) = session.acquire_newest()? else {
+                    return Ok(true);
                 };
                 require_cpu_complete_producer(&frame)?;
-                compositor.draw_frame(graphics.opengl(), &frame)?;
+                let drawn = compositor.draw_frame(graphics.opengl(), &frame);
                 frame.release(&GpuSync::default())?;
+                drawn?;
             }
             Self::BorrowedTexture {
                 compositor,
                 texture,
                 ..
             } => compositor.draw_texture(graphics.opengl(), texture.texture())?,
+            // The driver already presented the frame.
             Self::Surface { .. } => {}
         }
-        Ok(outcome)
+        Ok(true)
     }
 
     pub fn close(self, graphics: &GraphicsContext) -> Result<(), Box<dyn StdError>> {
+        let gl = Some(graphics.opengl());
         match self {
-            Self::OwnedTexture { driver, compositor } => {
-                driver.close()?;
-                compositor.close(Some(graphics.opengl()));
+            Self::OwnedTexture {
+                session,
+                compositor,
+            } => {
+                session.close()?;
+                compositor.close(gl);
                 Ok(())
             }
             Self::BorrowedTexture {
-                driver,
+                session,
                 compositor,
                 texture,
+                mut replacements,
             } => {
-                driver.close()?;
-                compositor.close(Some(graphics.opengl()));
-                texture.close(Some(graphics.opengl()));
+                session.close()?;
+                for replacement in replacements.take_all() {
+                    replacement.close(gl);
+                }
+                compositor.close(gl);
+                texture.close(gl);
                 Ok(())
             }
-            Self::Surface { driver } => driver.close(),
+            Self::Surface { session } => session.close(),
         }
+    }
+}
+
+fn compositor(
+    gl: &OpenGLContext,
+    viewport: Viewport,
+) -> maplibre_native_ffi::Result<OpenGLTextureCompositor> {
+    OpenGLTextureCompositor::new(gl, viewport)
+        .map_err(|error| compositor_error(format!("OpenGL compositor creation failed: {error}")))
+}
+
+fn borrowed_descriptor(
+    context: OpenglContextDescriptor,
+    texture: &OpenGLBorrowedTexture,
+    viewport: Viewport,
+) -> OpenglBorrowedTextureDescriptor {
+    OpenglBorrowedTextureDescriptor {
+        extent: extent(viewport),
+        physical_width: viewport.physical_width,
+        physical_height: viewport.physical_height,
+        context,
+        texture: texture.texture(),
+        target: texture.target(),
     }
 }

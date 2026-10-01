@@ -1,4 +1,5 @@
-//! Autonomous runtime and any-thread map state.
+//! The runtime and map, driven by the native scheduler thread the runtime
+//! owns.
 
 use std::error::Error;
 use std::time::Duration;
@@ -9,6 +10,7 @@ use maplibre_native_ffi::{
     RuntimeEventType, RuntimeHandle, RuntimeOptions, ScreenPoint,
 };
 
+use crate::shell::{AppEvent, Wakes};
 use crate::viewport::Viewport;
 
 const STYLE_URL: &str = "https://tiles.openfreemap.org/styles/bright";
@@ -21,9 +23,12 @@ pub struct MapState {
 }
 
 impl MapState {
-    pub fn new(viewport: Viewport) -> Result<Self, Box<dyn Error>> {
+    /// Creates the runtime, whose event wake posts runtime-event drains to the
+    /// event loop, and the map.
+    pub fn new(viewport: Viewport, wakes: &Wakes) -> Result<Self, Box<dyn Error>> {
         let runtime_options = RuntimeOptions {
             cache_path: Some(":memory:".into()),
+            event_wake: wakes.wake(AppEvent::RuntimeEvents),
             ..Default::default()
         };
         let runtime = maplibre_native_ffi::runtime_create(&runtime_options)
@@ -170,6 +175,8 @@ impl MapState {
         Ok(())
     }
 
+    /// Drains every queued runtime event and reports whether the map published
+    /// a render update.
     pub fn drain_events(&self) -> maplibre_native_ffi::Result<bool> {
         let source = self.map.id();
         Ok(self

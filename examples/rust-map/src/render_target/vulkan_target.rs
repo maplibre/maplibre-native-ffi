@@ -1,31 +1,36 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    GpuSync, MapHandle, RenderSessionAttachOptions, VulkanBorrowedTextureDescriptor,
-    VulkanContextDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
+    GpuSync, MapHandle, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor,
+    VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
 };
 
 use crate::graphics::GraphicsContext;
 use crate::map_state::MapState;
 use crate::render_target::{
-    FrameDriver, FrameOutcome, Mode, compositor_error, extent, require_cpu_complete_producer,
+    Mode, Replacements, Session, attach_options, compositor_error, extent,
+    require_cpu_complete_producer,
 };
+use crate::shell::Wakes;
 use crate::viewport::Viewport;
 use crate::vulkan::{BorrowedImage, VulkanContext};
 use crate::vulkan_texture_compositor::VulkanTextureCompositor;
 
 pub enum RenderTarget {
     OwnedTexture {
-        driver: FrameDriver,
+        session: Session,
         compositor: Box<VulkanTextureCompositor>,
     },
     BorrowedTexture {
-        driver: FrameDriver,
+        session: Session,
         compositor: Box<VulkanTextureCompositor>,
+        /// The image the session renders into as far as completed replacements
+        /// show.
         image: Box<BorrowedImage>,
+        replacements: Replacements<BorrowedImage>,
     },
     Surface {
-        driver: FrameDriver,
+        session: Session,
     },
 }
 
@@ -35,31 +40,26 @@ impl RenderTarget {
         map: &MapHandle,
         graphics: &GraphicsContext,
         viewport: Viewport,
+        wakes: &Wakes,
     ) -> maplibre_native_ffi::Result<Self> {
         let vk = graphics.vulkan();
         // The window thread submits and presents on the same VkQueue this
         // descriptor hands over, so the session shares that thread rather than
         // driving the queue from a core worker.
-        let options = RenderSessionAttachOptions {
-            driver: maplibre_native_ffi::RenderDriverKind::CallerGraphicsThread,
-            requested_texture_ring_depth: if mode == Mode::OwnedTexture { 2 } else { 0 },
-            ..Default::default()
-        };
+        let options = attach_options(wakes, mode);
         match mode {
             Mode::OwnedTexture => {
                 let descriptor = VulkanOwnedTextureDescriptor {
                     extent: extent(viewport),
                     context: context_descriptor(vk),
                 };
-                let driver = FrameDriver::new(unsafe {
-                    map.vulkan_owned_texture_attach(&descriptor, &(options))
-                }?)?;
-                let compositor = VulkanTextureCompositor::new(vk, viewport).map_err(|error| {
-                    compositor_error(format!("Vulkan compositor creation failed: {error:?}"))
-                })?;
+                let session = Session::new(
+                    unsafe { map.vulkan_owned_texture_attach(&descriptor, &options) }?,
+                    false,
+                )?;
                 Ok(Self::OwnedTexture {
-                    driver,
-                    compositor: Box::new(compositor),
+                    session,
+                    compositor: Box::new(compositor(vk, viewport)?),
                 })
             }
             Mode::BorrowedTexture => {
@@ -67,16 +67,15 @@ impl RenderTarget {
                     compositor_error(format!("Vulkan image creation failed: {error:?}"))
                 })?;
                 let descriptor = borrowed_descriptor(vk, viewport, &image);
-                let driver = FrameDriver::new(unsafe {
-                    map.vulkan_borrowed_texture_attach(&descriptor, &(options))
-                }?)?;
-                let compositor = VulkanTextureCompositor::new(vk, viewport).map_err(|error| {
-                    compositor_error(format!("Vulkan compositor creation failed: {error:?}"))
-                })?;
+                let session = Session::new(
+                    unsafe { map.vulkan_borrowed_texture_attach(&descriptor, &options) }?,
+                    false,
+                )?;
                 Ok(Self::BorrowedTexture {
-                    driver,
-                    compositor: Box::new(compositor),
+                    session,
+                    compositor: Box::new(compositor(vk, viewport)?),
                     image: Box::new(image),
+                    replacements: Replacements::default(),
                 })
             }
             Mode::NativeSurface => {
@@ -86,14 +85,24 @@ impl RenderTarget {
                     surface: vk.surface_handle(),
                 };
                 Ok(Self::Surface {
-                    driver: FrameDriver::new(unsafe {
-                        map.vulkan_surface_attach(&descriptor, &(options))
-                    }?)?,
+                    session: Session::new(
+                        unsafe { map.vulkan_surface_attach(&descriptor, &options) }?,
+                        true,
+                    )?,
                 })
             }
         }
     }
 
+    pub fn session_mut(&mut self) -> &mut Session {
+        match self {
+            Self::OwnedTexture { session, .. }
+            | Self::BorrowedTexture { session, .. }
+            | Self::Surface { session } => session,
+        }
+    }
+
+    /// Starts the session resize or target replacement a new viewport needs.
     pub fn resize(
         &mut self,
         graphics: &GraphicsContext,
@@ -101,30 +110,33 @@ impl RenderTarget {
         viewport: Viewport,
     ) -> Result<(), Box<dyn StdError>> {
         match self {
-            Self::OwnedTexture { driver, compositor } => {
+            Self::OwnedTexture {
+                session,
+                compositor,
+            } => {
                 compositor.resize(viewport).map_err(|error| {
                     compositor_error(format!("Vulkan resize failed: {error:?}"))
                 })?;
-                driver.resize(viewport)?;
+                session.resize(viewport)?;
                 Ok(())
             }
             Self::BorrowedTexture {
-                driver,
+                session,
                 compositor,
-                image,
+                replacements,
+                ..
             } => {
                 let replacement =
                     BorrowedImage::new(graphics.vulkan(), viewport).map_err(|error| {
                         compositor_error(format!("Vulkan image creation failed: {error:?}"))
                     })?;
                 let descriptor = borrowed_descriptor(graphics.vulkan(), viewport, &replacement);
-                let operation = unsafe {
-                    driver
-                        .session()
+                let completion = unsafe {
+                    session
+                        .handle()
                         .vulkan_borrowed_texture_set_target(&descriptor)
                 }?;
-                driver.drive(&operation)?;
-                **image = replacement;
+                replacements.push(completion, replacement);
                 compositor.resize(viewport).map_err(|error| {
                     compositor_error(format!("Vulkan resize failed: {error:?}"))
                 })?;
@@ -132,75 +144,101 @@ impl RenderTarget {
                 // the map takes the new extent directly.
                 map.resize(viewport)
             }
-            Self::Surface { driver } => {
-                driver.resize(viewport)?;
+            Self::Surface { session } => {
+                session.resize(viewport)?;
                 Ok(())
             }
         }
     }
 
-    pub fn render_update(
-        &mut self,
-        _graphics: &GraphicsContext,
-    ) -> maplibre_native_ffi::Result<FrameOutcome> {
-        let present = matches!(self, Self::Surface { .. });
-        let driver = match self {
-            Self::OwnedTexture { driver, .. }
-            | Self::BorrowedTexture { driver, .. }
-            | Self::Surface { driver } => driver,
-        };
-        let mut outcome = driver.render_frame(present)?;
-        if !outcome.rendered {
-            return Ok(outcome);
+    /// Services caller-driver work, then releases what completed target
+    /// replacements retired.
+    pub fn service(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
+        self.session_mut().service()?;
+        if let Self::BorrowedTexture {
+            image,
+            replacements,
+            ..
+        } = self
+        {
+            while let Some(replacement) = replacements.take_completed()? {
+                // The compositor waits for its own sampling, but the session's
+                // last render into the outgoing image may still be in flight.
+                graphics.vulkan().wait_idle().map_err(|error| {
+                    compositor_error(format!("Vulkan device wait failed: {error:?}"))
+                })?;
+                **image = replacement;
+            }
         }
-        match self {
-            Self::OwnedTexture { driver, compositor } => {
-                let Some(frame) = driver.acquire_frame()? else {
-                    outcome.rendered = false;
-                    return Ok(outcome);
+        Ok(())
+    }
+
+    /// Shows the newest rendered frame, reporting false when no frame reached
+    /// the window. The compositor's sampling finishes before this returns, so
+    /// the session may render into the sampled image again.
+    pub fn present(&mut self, _graphics: &GraphicsContext) -> maplibre_native_ffi::Result<bool> {
+        let presented = match self {
+            Self::OwnedTexture {
+                session,
+                compositor,
+            } => {
+                // Without a new frame, the window keeps the one it already
+                // shows.
+                let Some(frame) = session.acquire_newest()? else {
+                    return Ok(true);
                 };
                 require_cpu_complete_producer(&frame)?;
-                outcome.rendered = compositor.draw(&frame)?;
-                compositor.wait_idle().map_err(|error| {
+                let presented = compositor.draw(&frame);
+                let waited = compositor.wait_idle();
+                frame.release(&GpuSync::default())?;
+                waited.map_err(|error| {
                     compositor_error(format!("Vulkan consumer wait failed: {error:?}"))
                 })?;
-                frame.release(&GpuSync::default())?;
+                presented?
             }
             Self::BorrowedTexture {
                 compositor, image, ..
             } => {
-                outcome.rendered = compositor
+                let presented = compositor
                     .draw_image_view(image.view())
                     .map_err(|error| compositor_error(format!("Vulkan draw failed: {error:?}")))?;
+                compositor.wait_idle().map_err(|error| {
+                    compositor_error(format!("Vulkan consumer wait failed: {error:?}"))
+                })?;
+                presented
             }
-            Self::Surface { .. } => {}
-        }
-        Ok(outcome)
+            // The driver already presented the frame.
+            Self::Surface { .. } => true,
+        };
+        Ok(presented)
     }
 
     pub fn close(self, _graphics: &GraphicsContext) -> Result<(), Box<dyn StdError>> {
         match self {
             Self::OwnedTexture {
-                driver,
+                session,
                 mut compositor,
+            }
+            | Self::BorrowedTexture {
+                session,
+                mut compositor,
+                ..
             } => {
-                driver.close()?;
+                session.close()?;
                 compositor.close()?;
                 Ok(())
             }
-            Self::BorrowedTexture {
-                driver,
-                mut compositor,
-                image,
-            } => {
-                driver.close()?;
-                compositor.close()?;
-                drop(image);
-                Ok(())
-            }
-            Self::Surface { driver } => driver.close(),
+            Self::Surface { session } => session.close(),
         }
     }
+}
+
+fn compositor(
+    vk: &VulkanContext,
+    viewport: Viewport,
+) -> maplibre_native_ffi::Result<VulkanTextureCompositor> {
+    VulkanTextureCompositor::new(vk, viewport)
+        .map_err(|error| compositor_error(format!("Vulkan compositor creation failed: {error:?}")))
 }
 
 fn borrowed_descriptor(

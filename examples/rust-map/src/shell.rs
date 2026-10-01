@@ -1,9 +1,13 @@
+//! The winit event loop. Native wakes reach it as user events, and the app
+//! does the work they schedule on this thread.
+
 use std::error::Error;
 use std::time::{Duration, Instant};
 
+use maplibre_native_ffi::Wake;
 use winit::application::ApplicationHandler;
 use winit::event::{StartCause, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::{Window, WindowAttributes, WindowId};
 
 use crate::app::App;
@@ -15,12 +19,46 @@ const INITIAL_HEIGHT: u32 = 640;
 /// How long a smoke test waits for its first rendered frame before it fails.
 const SMOKE_DEADLINE: Duration = Duration::from_secs(60);
 
+/// The work a native wake asks the event loop to do.
+#[derive(Clone, Copy, Debug)]
+pub enum AppEvent {
+    /// The runtime event queue has events to drain.
+    RuntimeEvents,
+    /// The render session has frame results to drain.
+    FrameResults,
+    /// The render session has caller-driver work to service.
+    DriverWork,
+}
+
+/// Builds wakes that post an [`AppEvent`] to the event loop from any native
+/// thread.
+#[derive(Clone)]
+pub struct Wakes(EventLoopProxy<AppEvent>);
+
+impl Wakes {
+    pub fn wake(&self, event: AppEvent) -> Wake {
+        let proxy = self.0.clone();
+        // The send fails only once the loop has exited, when nothing is left
+        // to wake.
+        Wake::new(move || {
+            let _ = proxy.send_event(event);
+        })
+    }
+}
+
 pub fn run(
     mode: Mode,
     backends: maplibre_native_ffi::RenderBackendFlag,
 ) -> Result<(), Box<dyn Error>> {
-    let event_loop = EventLoop::new()?;
-    let mut shell = Shell::new(mode, backends);
+    let event_loop = EventLoop::<AppEvent>::with_user_event().build()?;
+    let mut shell = Shell {
+        mode,
+        backends,
+        wakes: Wakes(event_loop.create_proxy()),
+        app: None,
+        error: None,
+        smoke_deadline: crate::smoke_test().then(|| Instant::now() + SMOKE_DEADLINE),
+    };
     let run_result = event_loop.run_app(&mut shell);
     if let Some(error) = shell.error {
         return Err(error);
@@ -31,39 +69,35 @@ pub fn run(
 struct Shell {
     mode: Mode,
     backends: maplibre_native_ffi::RenderBackendFlag,
+    wakes: Wakes,
     app: Option<App>,
     error: Option<Box<dyn Error>>,
     smoke_deadline: Option<Instant>,
 }
 
 impl Shell {
-    fn new(mode: Mode, backends: maplibre_native_ffi::RenderBackendFlag) -> Self {
-        Self {
-            mode,
-            backends,
-            app: None,
-            error: None,
-            smoke_deadline: crate::smoke_test().then(|| Instant::now() + SMOKE_DEADLINE),
-        }
-    }
-
     fn startup(&mut self, event_loop: &ActiveEventLoop) -> Result<(), Box<dyn Error>> {
         let (window, graphics) =
             GraphicsContext::create_window(event_loop, window_attributes(), self.backends)?;
-        let app = App::new(window, graphics, self.mode)?;
+        let app = App::new(window, graphics, self.mode, &self.wakes)?;
         app.print_status();
         self.app = Some(app);
         Ok(())
     }
+
+    fn exit(&mut self, event_loop: &ActiveEventLoop) {
+        if let Some(app) = self.app.as_mut() {
+            app.close_or_abort();
+        }
+        event_loop.exit();
+    }
 }
 
-impl ApplicationHandler for Shell {
-    fn new_events(&mut self, event_loop: &ActiveEventLoop, _cause: StartCause) {
-        // TODO(map-example-spec): Replace fixed timer with a display-paced host
-        // loop.
-        event_loop.set_control_flow(ControlFlow::WaitUntil(
-            Instant::now() + Duration::from_millis(16),
-        ));
+impl ApplicationHandler<AppEvent> for Shell {
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, cause: StartCause) {
+        if let (StartCause::ResumeTimeReached { .. }, Some(app)) = (cause, self.app.as_mut()) {
+            app.retry_if_due(Instant::now());
+        }
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -73,6 +107,12 @@ impl ApplicationHandler for Shell {
         if let Err(error) = self.startup(event_loop) {
             self.error = Some(error);
             event_loop.exit();
+        }
+    }
+
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: AppEvent) {
+        if let Some(app) = self.app.as_mut() {
+            app.handle_app_event(event);
         }
     }
 
@@ -89,37 +129,44 @@ impl ApplicationHandler for Shell {
             return;
         }
         if matches!(event, WindowEvent::CloseRequested) {
-            app.close_or_abort();
-            event_loop.exit();
+            self.exit(event_loop);
             return;
         }
         app.handle_window_event(event);
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        if let Some(app) = self.app.as_mut() {
-            if app.smoke_rendered() {
-                app.close_or_abort();
-                event_loop.exit();
-                return;
-            }
-            if self
-                .smoke_deadline
-                .is_some_and(|deadline| Instant::now() >= deadline)
-            {
-                self.error = Some(
-                    format!(
-                        "smoke: no frame rendered within {}s",
-                        SMOKE_DEADLINE.as_secs()
-                    )
-                    .into(),
-                );
-                app.close_or_abort();
-                event_loop.exit();
-                return;
-            }
-            app.step();
+        let Some(app) = self.app.as_ref() else {
+            return;
+        };
+        if app.smoke_rendered() {
+            self.exit(event_loop);
+            return;
         }
+        if self
+            .smoke_deadline
+            .is_some_and(|deadline| Instant::now() >= deadline)
+        {
+            self.error = Some(
+                format!(
+                    "smoke: no frame rendered within {}s",
+                    SMOKE_DEADLINE.as_secs()
+                )
+                .into(),
+            );
+            self.exit(event_loop);
+            return;
+        }
+        // The loop sleeps until a native wake or window event arrives, or
+        // until a paced retry or the smoke deadline comes due.
+        let deadline = [app.retry_at(), self.smoke_deadline]
+            .into_iter()
+            .flatten()
+            .min();
+        event_loop.set_control_flow(match deadline {
+            Some(deadline) => ControlFlow::WaitUntil(deadline),
+            None => ControlFlow::Wait,
+        });
     }
 
     fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
