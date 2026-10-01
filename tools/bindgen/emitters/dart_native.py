@@ -1,8 +1,8 @@
 """Emit the `@Native` declarations that the Dart binding calls.
 
 The output holds only the forms the binding uses: one `@Native` external per C
-function, a `Struct` or `Union` per record, a namespace of integer constants
-per C enum, and a `NativeFunction` typedef per callback typedef. Handle
+function, a `Struct` or `Union` per record, a top-level integer constant per
+C enum constant, and a `NativeFunction` typedef per callback typedef. Handle
 typedefs alias their integer carrier. The handwritten `native_abi.dart`
 declares `mln_diagnostic`, which the frontend strips from every signature it
 describes, and the library re-exports it.
@@ -133,10 +133,10 @@ class Declarations:
 
     def enum(self, name: str) -> str:
         members = "".join(
-            f"  static const {value.name} = {value.value};\n"
+            f"const {value.name} = {value.value};\n"
             for value in self.enums[name].values
         )
-        return f"abstract final class {name} {{\n{members}}}\n"
+        return f"// {name}\n{members}"
 
     def callback_typedef(self, name: str) -> str:
         typedef = self.typedefs[name]

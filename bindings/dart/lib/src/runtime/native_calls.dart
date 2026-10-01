@@ -38,8 +38,7 @@ Future<CommandCompletion> _command(_NativeStart start) =>
 
 /// Starts an operation that completes without a value.
 Future<void> _run(_NativeStart start) => startNativeCompletion(
-  copyKind:
-      raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+  copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
   elementSize: 0,
   start: _withArena(start),
   decode: (_) {},
@@ -116,8 +115,7 @@ A _attach<T extends Object, A>(
 ) {
   var handle = 0;
   final completed = startNativeCompletion<void>(
-    copyKind:
-        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+    copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
     elementSize: 0,
     start: (completion) => withNativeArena((arena) {
       final output = arena<Uint64>();

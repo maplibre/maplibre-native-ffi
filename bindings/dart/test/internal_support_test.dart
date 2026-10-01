@@ -175,9 +175,8 @@ void main() {
         transition.type = 22;
         transition.source_type = 0;
         transition.code = 0;
-        transition.payload_type = raw
-            .mln_runtime_event_payload_type
-            .MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED;
+        transition.payload_type =
+            raw.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED;
         transition.payload.camera_transition_finished.transition_id = -1;
         transition.message_offset = 15;
         transition.message_size = 11;

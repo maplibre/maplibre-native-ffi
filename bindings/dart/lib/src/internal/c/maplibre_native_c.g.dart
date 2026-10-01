@@ -1658,627 +1658,546 @@ final class mln_wgl_context_descriptor extends Struct {
   external Pointer<Void> get_proc_address;
 }
 
-abstract final class mln_adapter_completion_copy_kind {
-  static const MLN_ADAPTER_COMPLETION_COPY_FLAT = 0;
-  static const MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW = 3303399434;
-  static const MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS = 1729514601;
-  static const MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT = 1485572681;
-  static const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG = 2638194669;
-  static const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS = 3400515811;
-  static const MLN_ADAPTER_COMPLETION_COPY_MAP = 438078448;
-  static const MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION = 3555078466;
-  static const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO = 3939645993;
-  static const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS = 1567541687;
-  static const MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE = 3048968095;
-  static const MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT = 990046368;
-  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT = 2311975790;
-  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT =
-      167536911;
-  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY = 2945408873;
-  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT = 2005255953;
-  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT = 514529690;
-  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT =
-      3638232521;
-  static const MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS = 221419390;
-  static const MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT = 2875519289;
-}
-
-abstract final class mln_adapter_dart_port_callback {
-  static const MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE =
-      3644896267;
-  static const MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE =
-      433183623;
-  static const MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE =
-      658252347;
-  static const MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE =
-      1073125309;
-  static const MLN_ADAPTER_DART_PORT_WAKE_CALLBACK = 2393247646;
-  static const MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK =
-      1605404209;
-}
-
-abstract final class mln_adapter_deferred_callback {
-  static const MLN_ADAPTER_DEFERRED_LOG_CALLBACK = 2203584336;
-  static const MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK = 2143245793;
-}
-
-abstract final class mln_adapter_resource_route_flags {
-  static const MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE = 0;
-  static const MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB = 1;
-  static const MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL = 2;
-}
-
-abstract final class mln_adapter_url_match_flags {
-  static const MLN_ADAPTER_URL_MATCH_FLAGS_NONE = 0;
-  static const MLN_ADAPTER_URL_MATCH_GLOB = 1;
-}
-
-abstract final class mln_ambient_cache_operation {
-  static const MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE = 1;
-  static const MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE = 2;
-  static const MLN_AMBIENT_CACHE_OPERATION_INVALIDATE = 3;
-  static const MLN_AMBIENT_CACHE_OPERATION_CLEAR = 4;
-}
-
-abstract final class mln_animation_option_field {
-  static const MLN_ANIMATION_OPTION_DURATION = 1;
-  static const MLN_ANIMATION_OPTION_VELOCITY = 2;
-  static const MLN_ANIMATION_OPTION_MIN_ZOOM = 4;
-  static const MLN_ANIMATION_OPTION_EASING = 8;
-  static const MLN_ANIMATION_OPTION_TRANSITION_ID = 16;
-}
-
-abstract final class mln_bound_option_field {
-  static const MLN_BOUND_OPTION_BOUNDS = 1;
-  static const MLN_BOUND_OPTION_MIN_ZOOM = 2;
-  static const MLN_BOUND_OPTION_MAX_ZOOM = 4;
-  static const MLN_BOUND_OPTION_MIN_PITCH = 8;
-  static const MLN_BOUND_OPTION_MAX_PITCH = 16;
-  static const MLN_BOUND_OPTION_UNBOUNDED = 32;
-}
-
-abstract final class mln_camera_change_mode {
-  static const MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0;
-  static const MLN_CAMERA_CHANGE_MODE_ANIMATED = 1;
-}
-
-abstract final class mln_camera_delta_kind {
-  static const MLN_CAMERA_DELTA_MOVE = 0;
-  static const MLN_CAMERA_DELTA_SCALE = 1;
-  static const MLN_CAMERA_DELTA_BEARING = 2;
-  static const MLN_CAMERA_DELTA_PITCH = 3;
-}
-
-abstract final class mln_camera_fit_option_field {
-  static const MLN_CAMERA_FIT_OPTION_PADDING = 1;
-  static const MLN_CAMERA_FIT_OPTION_BEARING = 2;
-  static const MLN_CAMERA_FIT_OPTION_PITCH = 4;
-}
-
-abstract final class mln_camera_option_field {
-  static const MLN_CAMERA_OPTION_CENTER = 1;
-  static const MLN_CAMERA_OPTION_ZOOM = 2;
-  static const MLN_CAMERA_OPTION_BEARING = 4;
-  static const MLN_CAMERA_OPTION_PITCH = 8;
-  static const MLN_CAMERA_OPTION_CENTER_ALTITUDE = 16;
-  static const MLN_CAMERA_OPTION_PADDING = 32;
-  static const MLN_CAMERA_OPTION_ANCHOR = 64;
-  static const MLN_CAMERA_OPTION_ROLL = 128;
-  static const MLN_CAMERA_OPTION_FOV = 256;
-}
-
-abstract final class mln_camera_update_mode {
-  static const MLN_CAMERA_UPDATE_MODE_JUMP = 0;
-  static const MLN_CAMERA_UPDATE_MODE_EASE = 1;
-  static const MLN_CAMERA_UPDATE_MODE_FLY = 2;
-}
-
-abstract final class mln_command_disposition {
-  static const MLN_COMMAND_DISPOSITION_COMMITTED = 0;
-  static const MLN_COMMAND_DISPOSITION_SUPERSEDED = 1;
-  static const MLN_COMMAND_DISPOSITION_FAILED = 2;
-  static const MLN_COMMAND_DISPOSITION_CANCELLED = 3;
-}
-
-abstract final class mln_constrain_mode {
-  static const MLN_CONSTRAIN_MODE_NONE = 0;
-  static const MLN_CONSTRAIN_MODE_HEIGHT_ONLY = 1;
-  static const MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT = 2;
-  static const MLN_CONSTRAIN_MODE_SCREEN = 3;
-}
-
-abstract final class mln_custom_geometry_source_option_field {
-  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM = 1;
-  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM = 2;
-  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE = 4;
-  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE = 8;
-  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER = 16;
-  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP = 32;
-  static const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP = 64;
-}
-
-abstract final class mln_custom_mvt_vector_source_option_field {
-  static const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1;
-  static const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2;
-}
-
-abstract final class mln_feature_state_selector_field {
-  static const MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1;
-  static const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 2;
-  static const MLN_FEATURE_STATE_SELECTOR_STATE_KEY = 4;
-}
-
-abstract final class mln_frame_demand_flag {
-  static const MLN_FRAME_DEMAND_IF_NEEDED = 1;
-  static const MLN_FRAME_DEMAND_PRESENT = 2;
-}
-
-abstract final class mln_free_camera_option_field {
-  static const MLN_FREE_CAMERA_OPTION_POSITION = 1;
-  static const MLN_FREE_CAMERA_OPTION_ORIENTATION = 2;
-}
-
-abstract final class mln_geojson_source_option_field {
-  static const MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM = 1;
-  static const MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM = 2;
-  static const MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 4;
-  static const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 8;
-  static const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES = 16;
-  static const MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE = 32;
-  static const MLN_GEOJSON_SOURCE_OPTION_BUFFER = 64;
-  static const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 128;
-  static const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 256;
-  static const MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 512;
-  static const MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1024;
-  static const MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 2048;
-}
-
-abstract final class mln_gesture_phase {
-  static const MLN_GESTURE_PHASE_NONE = 0;
-  static const MLN_GESTURE_PHASE_BEGIN = 1;
-  static const MLN_GESTURE_PHASE_UPDATE = 2;
-  static const MLN_GESTURE_PHASE_END = 3;
-  static const MLN_GESTURE_PHASE_CANCEL = 4;
-}
-
-abstract final class mln_gpu_sync_kind {
-  static const MLN_GPU_SYNC_CPU_COMPLETE = 0;
-  static const MLN_GPU_SYNC_METAL_SHARED_EVENT = 1;
-  static const MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2;
-  static const MLN_GPU_SYNC_OPENGL_FENCE = 3;
-  static const MLN_GPU_SYNC_WEBGPU_TOKEN = 4;
-}
-
-abstract final class mln_location_indicator_image_kind {
-  static const MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP = 0;
-  static const MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING = 1;
-  static const MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW = 2;
-}
-
-abstract final class mln_log_event {
-  static const MLN_LOG_EVENT_GENERAL = 0;
-  static const MLN_LOG_EVENT_SETUP = 1;
-  static const MLN_LOG_EVENT_SHADER = 2;
-  static const MLN_LOG_EVENT_PARSE_STYLE = 3;
-  static const MLN_LOG_EVENT_PARSE_TILE = 4;
-  static const MLN_LOG_EVENT_RENDER = 5;
-  static const MLN_LOG_EVENT_STYLE = 6;
-  static const MLN_LOG_EVENT_DATABASE = 7;
-  static const MLN_LOG_EVENT_HTTP_REQUEST = 8;
-  static const MLN_LOG_EVENT_SPRITE = 9;
-  static const MLN_LOG_EVENT_IMAGE = 10;
-  static const MLN_LOG_EVENT_GRAPHICS_BACKEND = 11;
-  static const MLN_LOG_EVENT_JNI = 12;
-  static const MLN_LOG_EVENT_ANDROID = 13;
-  static const MLN_LOG_EVENT_CRASH = 14;
-  static const MLN_LOG_EVENT_GLYPH = 15;
-  static const MLN_LOG_EVENT_TIMING = 16;
-}
-
-abstract final class mln_log_severity {
-  static const MLN_LOG_SEVERITY_INFO = 1;
-  static const MLN_LOG_SEVERITY_WARNING = 2;
-  static const MLN_LOG_SEVERITY_ERROR = 3;
-}
-
-abstract final class mln_log_severity_mask {
-  static const MLN_LOG_SEVERITY_MASK_INFO = 2;
-  static const MLN_LOG_SEVERITY_MASK_WARNING = 4;
-  static const MLN_LOG_SEVERITY_MASK_ERROR = 8;
-  static const MLN_LOG_SEVERITY_MASK_DEFAULT = 6;
-  static const MLN_LOG_SEVERITY_MASK_ALL = 14;
-}
-
-abstract final class mln_map_debug_option {
-  static const MLN_MAP_DEBUG_TILE_BORDERS = 2;
-  static const MLN_MAP_DEBUG_PARSE_STATUS = 4;
-  static const MLN_MAP_DEBUG_TIMESTAMPS = 8;
-  static const MLN_MAP_DEBUG_COLLISION = 16;
-  static const MLN_MAP_DEBUG_OVERDRAW = 32;
-  static const MLN_MAP_DEBUG_STENCIL_CLIP = 64;
-  static const MLN_MAP_DEBUG_DEPTH_BUFFER = 128;
-}
-
-abstract final class mln_map_mode {
-  static const MLN_MAP_MODE_CONTINUOUS = 0;
-  static const MLN_MAP_MODE_STATIC = 1;
-  static const MLN_MAP_MODE_TILE = 2;
-}
-
-abstract final class mln_map_tile_option_field {
-  static const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA = 1;
-  static const MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS = 2;
-  static const MLN_MAP_TILE_OPTION_LOD_SCALE = 4;
-  static const MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD = 8;
-  static const MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT = 16;
-  static const MLN_MAP_TILE_OPTION_LOD_MODE = 32;
-}
-
-abstract final class mln_map_viewport_option_field {
-  static const MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION = 1;
-  static const MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE = 2;
-  static const MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE = 4;
-  static const MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8;
-}
-
-abstract final class mln_network_status {
-  static const MLN_NETWORK_STATUS_ONLINE = 1;
-  static const MLN_NETWORK_STATUS_OFFLINE = 2;
-}
-
-abstract final class mln_north_orientation {
-  static const MLN_NORTH_ORIENTATION_UP = 0;
-  static const MLN_NORTH_ORIENTATION_RIGHT = 1;
-  static const MLN_NORTH_ORIENTATION_DOWN = 2;
-  static const MLN_NORTH_ORIENTATION_LEFT = 3;
-}
-
-abstract final class mln_offline_region_definition_type {
-  static const MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID = 1;
-  static const MLN_OFFLINE_REGION_DEFINITION_GEOMETRY = 2;
-}
-
-abstract final class mln_offline_region_download_state {
-  static const MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE = 0;
-  static const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1;
-}
-
-abstract final class mln_opengl_client_api {
-  static const MLN_OPENGL_CLIENT_API_UNSPECIFIED = 0;
-  static const MLN_OPENGL_CLIENT_API_GL = 1;
-  static const MLN_OPENGL_CLIENT_API_GLES = 2;
-}
-
-abstract final class mln_opengl_context_ownership {
-  static const MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED = 0;
-  static const MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED = 1;
-}
-
-abstract final class mln_opengl_context_platform {
-  static const MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED = 0;
-  static const MLN_OPENGL_CONTEXT_PLATFORM_WGL = 1;
-  static const MLN_OPENGL_CONTEXT_PLATFORM_EGL = 2;
-  static const MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = 3;
-}
-
-abstract final class mln_opengl_context_provider_flag {
-  static const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL = 1;
-  static const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL = 2;
-  static const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL = 4;
-}
-
-abstract final class mln_projection_mode_field {
-  static const MLN_PROJECTION_MODE_AXONOMETRIC = 1;
-  static const MLN_PROJECTION_MODE_X_SKEW = 2;
-  static const MLN_PROJECTION_MODE_Y_SKEW = 4;
-}
-
-abstract final class mln_queried_feature_field {
-  static const MLN_QUERIED_FEATURE_SOURCE_ID = 1;
-  static const MLN_QUERIED_FEATURE_SOURCE_LAYER_ID = 2;
-  static const MLN_QUERIED_FEATURE_STATE = 4;
-}
-
-abstract final class mln_render_abandon_disposition {
-  static const MLN_RENDER_ABANDON_DISPOSITION_CLEAN = 0;
-  static const MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED = 1;
-}
-
-abstract final class mln_render_backend_flag {
-  static const MLN_RENDER_BACKEND_FLAG_METAL = 1;
-  static const MLN_RENDER_BACKEND_FLAG_VULKAN = 2;
-  static const MLN_RENDER_BACKEND_FLAG_OPENGL = 4;
-  static const MLN_RENDER_BACKEND_FLAG_WEBGPU = 8;
-}
-
-abstract final class mln_render_driver_kind {
-  static const MLN_RENDER_DRIVER_CORE_WORKER = 1;
-  static const MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD = 2;
-}
-
-abstract final class mln_render_mode {
-  static const MLN_RENDER_MODE_PARTIAL = 0;
-  static const MLN_RENDER_MODE_FULL = 1;
-}
-
-abstract final class mln_render_result {
-  static const MLN_RENDER_RESULT_RENDERED = 0;
-  static const MLN_RENDER_RESULT_NO_UPDATE = 1;
-  static const MLN_RENDER_RESULT_SIZE_PENDING = 2;
-  static const MLN_RENDER_RESULT_TARGET_NOT_READY = 3;
-  static const MLN_RENDER_RESULT_SUPERSEDED = 4;
-  static const MLN_RENDER_RESULT_DEADLINE_MISSED = 5;
-}
-
-abstract final class mln_render_session_capability_flag {
-  static const MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1;
-  static const MLN_RENDER_SESSION_CAPABILITY_READBACK = 2;
-  static const MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC = 4;
-  static const MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 8;
-}
-
-abstract final class mln_render_session_state {
-  static const MLN_RENDER_SESSION_STATE_ATTACHING = 1;
-  static const MLN_RENDER_SESSION_STATE_ATTACHED = 2;
-  static const MLN_RENDER_SESSION_STATE_DETACHING = 3;
-  static const MLN_RENDER_SESSION_STATE_DETACHED = 4;
-  static const MLN_RENDER_SESSION_STATE_TARGET_LOST = 5;
-  static const MLN_RENDER_SESSION_STATE_ABANDONED = 6;
-}
-
-abstract final class mln_rendered_feature_query_option_field {
-  static const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1;
-}
-
-abstract final class mln_rendered_query_geometry_type {
-  static const MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT = 1;
-  static const MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX = 2;
-  static const MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING = 3;
-}
-
-abstract final class mln_resource_error_reason {
-  static const MLN_RESOURCE_ERROR_REASON_NONE = 0;
-  static const MLN_RESOURCE_ERROR_REASON_NOT_FOUND = 1;
-  static const MLN_RESOURCE_ERROR_REASON_SERVER = 2;
-  static const MLN_RESOURCE_ERROR_REASON_CONNECTION = 3;
-  static const MLN_RESOURCE_ERROR_REASON_RATE_LIMIT = 4;
-  static const MLN_RESOURCE_ERROR_REASON_OTHER = 5;
-}
-
-abstract final class mln_resource_kind {
-  static const MLN_RESOURCE_KIND_UNKNOWN = 0;
-  static const MLN_RESOURCE_KIND_STYLE = 1;
-  static const MLN_RESOURCE_KIND_SOURCE = 2;
-  static const MLN_RESOURCE_KIND_TILE = 3;
-  static const MLN_RESOURCE_KIND_GLYPHS = 4;
-  static const MLN_RESOURCE_KIND_SPRITE_IMAGE = 5;
-  static const MLN_RESOURCE_KIND_SPRITE_JSON = 6;
-  static const MLN_RESOURCE_KIND_IMAGE = 7;
-}
-
-abstract final class mln_resource_loading_method {
-  static const MLN_RESOURCE_LOADING_METHOD_ALL = 0;
-  static const MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY = 1;
-  static const MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY = 2;
-}
-
-abstract final class mln_resource_priority {
-  static const MLN_RESOURCE_PRIORITY_REGULAR = 0;
-  static const MLN_RESOURCE_PRIORITY_LOW = 1;
-}
-
-abstract final class mln_resource_provider_decision {
-  static const MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH = 0;
-  static const MLN_RESOURCE_PROVIDER_DECISION_HANDLE = 1;
-}
-
-abstract final class mln_resource_response_status {
-  static const MLN_RESOURCE_RESPONSE_STATUS_OK = 0;
-  static const MLN_RESOURCE_RESPONSE_STATUS_ERROR = 1;
-  static const MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT = 2;
-  static const MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED = 3;
-}
-
-abstract final class mln_resource_storage_policy {
-  static const MLN_RESOURCE_STORAGE_POLICY_PERMANENT = 0;
-  static const MLN_RESOURCE_STORAGE_POLICY_VOLATILE = 1;
-}
-
-abstract final class mln_resource_usage {
-  static const MLN_RESOURCE_USAGE_ONLINE = 0;
-  static const MLN_RESOURCE_USAGE_OFFLINE = 1;
-}
-
-abstract final class mln_runtime_event_mask {
-  static const MLN_RUNTIME_EVENT_MASK_NONE = 0;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE = 2;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING = 4;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE = 8;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED = 16;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED = 32;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED = 64;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 128;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 256;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE = 512;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1024;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED = 2048;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED = 4096;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED = 8192;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED = 16384;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED = 32768;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED = 65536;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING = 131072;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION = 262144;
-  static const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED = 4194304;
-  static const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 524288;
-  static const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576;
-  static const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED =
-      2097152;
-  static const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 4718590;
-  static const MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 3670016;
-  static const MLN_RUNTIME_EVENT_MASK_ALL = 8388606;
-}
-
-abstract final class mln_runtime_event_payload_type {
-  static const MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0;
-  static const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 1;
-  static const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP = 2;
-  static const MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 4;
-  static const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5;
-  static const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6;
-  static const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7;
-  static const MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9;
-}
-
-abstract final class mln_runtime_event_source_type {
-  static const MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0;
-  static const MLN_RUNTIME_EVENT_SOURCE_MAP = 1;
-}
-
-abstract final class mln_runtime_event_type {
-  static const MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1;
-  static const MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING = 2;
-  static const MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE = 3;
-  static const MLN_RUNTIME_EVENT_MAP_STYLE_LOADED = 4;
-  static const MLN_RUNTIME_EVENT_MAP_LOADING_STARTED = 5;
-  static const MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6;
-  static const MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7;
-  static const MLN_RUNTIME_EVENT_MAP_IDLE = 8;
-  static const MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE = 9;
-  static const MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 10;
-  static const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED = 11;
-  static const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED = 12;
-  static const MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 13;
-  static const MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 14;
-  static const MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 15;
-  static const MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED = 16;
-  static const MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING = 17;
-  static const MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 18;
-  static const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19;
-  static const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20;
-  static const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21;
-  static const MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 22;
-}
-
-abstract final class mln_source_feature_query_option_field {
-  static const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1;
-}
-
-abstract final class mln_status {
-  static const MLN_STATUS_OK = 0;
-  static const MLN_STATUS_INVALID_ARGUMENT = -1;
-  static const MLN_STATUS_INVALID_STATE = -2;
-  static const MLN_STATUS_WRONG_THREAD = -3;
-  static const MLN_STATUS_UNSUPPORTED = -4;
-  static const MLN_STATUS_NATIVE_ERROR = -5;
-  static const MLN_STATUS_CANCELLED = -6;
-  static const MLN_STATUS_BUSY = -7;
-  static const MLN_STATUS_TARGET_LOST = -8;
-  static const MLN_STATUS_NOT_READY = -9;
-  static const MLN_STATUS_NOT_FOUND = -10;
-}
-
-abstract final class mln_style_image_option_field {
-  static const MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO = 1;
-  static const MLN_STYLE_IMAGE_OPTION_SDF = 2;
-  static const MLN_STYLE_IMAGE_OPTION_STRETCH_X = 4;
-  static const MLN_STYLE_IMAGE_OPTION_STRETCH_Y = 8;
-  static const MLN_STYLE_IMAGE_OPTION_CONTENT = 16;
-  static const MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH = 32;
-  static const MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT = 64;
-}
-
-abstract final class mln_style_image_text_fit {
-  static const MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK = 0;
-  static const MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY = 1;
-  static const MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL = 2;
-}
-
-abstract final class mln_style_layer_visibility {
-  static const MLN_STYLE_LAYER_VISIBILITY_VISIBLE = 0;
-  static const MLN_STYLE_LAYER_VISIBILITY_NONE = 1;
-}
-
-abstract final class mln_style_raster_dem_encoding {
-  static const MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX = 0;
-  static const MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1;
-}
-
-abstract final class mln_style_source_info_field {
-  static const MLN_STYLE_SOURCE_INFO_URL = 1;
-  static const MLN_STYLE_SOURCE_INFO_TILEJSON = 2;
-  static const MLN_STYLE_SOURCE_INFO_BOUNDS = 4;
-  static const MLN_STYLE_SOURCE_INFO_TILE_SIZE = 8;
-  static const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 16;
-  static const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 32;
-}
-
-abstract final class mln_style_source_type {
-  static const MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0;
-  static const MLN_STYLE_SOURCE_TYPE_VECTOR = 1;
-  static const MLN_STYLE_SOURCE_TYPE_RASTER = 2;
-  static const MLN_STYLE_SOURCE_TYPE_RASTER_DEM = 3;
-  static const MLN_STYLE_SOURCE_TYPE_GEOJSON = 4;
-  static const MLN_STYLE_SOURCE_TYPE_IMAGE = 5;
-  static const MLN_STYLE_SOURCE_TYPE_VIDEO = 6;
-  static const MLN_STYLE_SOURCE_TYPE_ANNOTATIONS = 7;
-  static const MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 8;
-  static const MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR = 9;
-}
-
-abstract final class mln_style_tile_scheme {
-  static const MLN_STYLE_TILE_SCHEME_XYZ = 0;
-  static const MLN_STYLE_TILE_SCHEME_TMS = 1;
-}
-
-abstract final class mln_style_tile_source_option_field {
-  static const MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM = 1;
-  static const MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM = 2;
-  static const MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION = 4;
-  static const MLN_STYLE_TILE_SOURCE_OPTION_SCHEME = 8;
-  static const MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS = 16;
-  static const MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE = 32;
-  static const MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING = 64;
-  static const MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING = 128;
-}
-
-abstract final class mln_style_transition_option_field {
-  static const MLN_STYLE_TRANSITION_OPTION_DURATION = 1;
-  static const MLN_STYLE_TRANSITION_OPTION_DELAY = 2;
-  static const MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS = 4;
-}
-
-abstract final class mln_style_vector_tile_encoding {
-  static const MLN_STYLE_VECTOR_TILE_ENCODING_MVT = 0;
-  static const MLN_STYLE_VECTOR_TILE_ENCODING_MLT = 1;
-}
-
-abstract final class mln_tile_lod_mode {
-  static const MLN_TILE_LOD_MODE_DEFAULT = 0;
-  static const MLN_TILE_LOD_MODE_DISTANCE = 1;
-}
-
-abstract final class mln_tile_operation {
-  static const MLN_TILE_OPERATION_REQUESTED_FROM_CACHE = 0;
-  static const MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK = 1;
-  static const MLN_TILE_OPERATION_LOAD_FROM_NETWORK = 2;
-  static const MLN_TILE_OPERATION_LOAD_FROM_CACHE = 3;
-  static const MLN_TILE_OPERATION_START_PARSE = 4;
-  static const MLN_TILE_OPERATION_END_PARSE = 5;
-  static const MLN_TILE_OPERATION_ERROR = 6;
-  static const MLN_TILE_OPERATION_CANCELLED = 7;
-  static const MLN_TILE_OPERATION_NULL = 8;
-}
-
-abstract final class mln_viewport_mode {
-  static const MLN_VIEWPORT_MODE_DEFAULT = 0;
-  static const MLN_VIEWPORT_MODE_FLIPPED_Y = 1;
-}
-
-abstract final class mln_webgl_context_kind {
-  static const MLN_WEBGL_CONTEXT_EXISTING = 0;
-  static const MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS = 1;
-}
+// mln_adapter_completion_copy_kind
+const MLN_ADAPTER_COMPLETION_COPY_FLAT = 0;
+const MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW = 3303399434;
+const MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS = 1729514601;
+const MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT = 1485572681;
+const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG = 2638194669;
+const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS = 3400515811;
+const MLN_ADAPTER_COMPLETION_COPY_MAP = 438078448;
+const MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION = 3555078466;
+const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO = 3939645993;
+const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS = 1567541687;
+const MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE = 3048968095;
+const MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT = 990046368;
+const MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT = 2311975790;
+const MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT = 167536911;
+const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY = 2945408873;
+const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT = 2005255953;
+const MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT = 514529690;
+const MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT = 3638232521;
+const MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS = 221419390;
+const MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT = 2875519289;
+
+// mln_adapter_dart_port_callback
+const MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE =
+    3644896267;
+const MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE =
+    433183623;
+const MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE =
+    658252347;
+const MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE =
+    1073125309;
+const MLN_ADAPTER_DART_PORT_WAKE_CALLBACK = 2393247646;
+const MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK =
+    1605404209;
+
+// mln_adapter_deferred_callback
+const MLN_ADAPTER_DEFERRED_LOG_CALLBACK = 2203584336;
+const MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK = 2143245793;
+
+// mln_adapter_resource_route_flags
+const MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE = 0;
+const MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB = 1;
+const MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL = 2;
+
+// mln_adapter_url_match_flags
+const MLN_ADAPTER_URL_MATCH_FLAGS_NONE = 0;
+const MLN_ADAPTER_URL_MATCH_GLOB = 1;
+
+// mln_ambient_cache_operation
+const MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE = 1;
+const MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE = 2;
+const MLN_AMBIENT_CACHE_OPERATION_INVALIDATE = 3;
+const MLN_AMBIENT_CACHE_OPERATION_CLEAR = 4;
+
+// mln_animation_option_field
+const MLN_ANIMATION_OPTION_DURATION = 1;
+const MLN_ANIMATION_OPTION_VELOCITY = 2;
+const MLN_ANIMATION_OPTION_MIN_ZOOM = 4;
+const MLN_ANIMATION_OPTION_EASING = 8;
+const MLN_ANIMATION_OPTION_TRANSITION_ID = 16;
+
+// mln_bound_option_field
+const MLN_BOUND_OPTION_BOUNDS = 1;
+const MLN_BOUND_OPTION_MIN_ZOOM = 2;
+const MLN_BOUND_OPTION_MAX_ZOOM = 4;
+const MLN_BOUND_OPTION_MIN_PITCH = 8;
+const MLN_BOUND_OPTION_MAX_PITCH = 16;
+const MLN_BOUND_OPTION_UNBOUNDED = 32;
+
+// mln_camera_change_mode
+const MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0;
+const MLN_CAMERA_CHANGE_MODE_ANIMATED = 1;
+
+// mln_camera_delta_kind
+const MLN_CAMERA_DELTA_MOVE = 0;
+const MLN_CAMERA_DELTA_SCALE = 1;
+const MLN_CAMERA_DELTA_BEARING = 2;
+const MLN_CAMERA_DELTA_PITCH = 3;
+
+// mln_camera_fit_option_field
+const MLN_CAMERA_FIT_OPTION_PADDING = 1;
+const MLN_CAMERA_FIT_OPTION_BEARING = 2;
+const MLN_CAMERA_FIT_OPTION_PITCH = 4;
+
+// mln_camera_option_field
+const MLN_CAMERA_OPTION_CENTER = 1;
+const MLN_CAMERA_OPTION_ZOOM = 2;
+const MLN_CAMERA_OPTION_BEARING = 4;
+const MLN_CAMERA_OPTION_PITCH = 8;
+const MLN_CAMERA_OPTION_CENTER_ALTITUDE = 16;
+const MLN_CAMERA_OPTION_PADDING = 32;
+const MLN_CAMERA_OPTION_ANCHOR = 64;
+const MLN_CAMERA_OPTION_ROLL = 128;
+const MLN_CAMERA_OPTION_FOV = 256;
+
+// mln_camera_update_mode
+const MLN_CAMERA_UPDATE_MODE_JUMP = 0;
+const MLN_CAMERA_UPDATE_MODE_EASE = 1;
+const MLN_CAMERA_UPDATE_MODE_FLY = 2;
+
+// mln_command_disposition
+const MLN_COMMAND_DISPOSITION_COMMITTED = 0;
+const MLN_COMMAND_DISPOSITION_SUPERSEDED = 1;
+const MLN_COMMAND_DISPOSITION_FAILED = 2;
+const MLN_COMMAND_DISPOSITION_CANCELLED = 3;
+
+// mln_constrain_mode
+const MLN_CONSTRAIN_MODE_NONE = 0;
+const MLN_CONSTRAIN_MODE_HEIGHT_ONLY = 1;
+const MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT = 2;
+const MLN_CONSTRAIN_MODE_SCREEN = 3;
+
+// mln_custom_geometry_source_option_field
+const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM = 1;
+const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM = 2;
+const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE = 4;
+const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE = 8;
+const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER = 16;
+const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP = 32;
+const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP = 64;
+
+// mln_custom_mvt_vector_source_option_field
+const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1;
+const MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2;
+
+// mln_feature_state_selector_field
+const MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1;
+const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 2;
+const MLN_FEATURE_STATE_SELECTOR_STATE_KEY = 4;
+
+// mln_frame_demand_flag
+const MLN_FRAME_DEMAND_IF_NEEDED = 1;
+const MLN_FRAME_DEMAND_PRESENT = 2;
+
+// mln_free_camera_option_field
+const MLN_FREE_CAMERA_OPTION_POSITION = 1;
+const MLN_FREE_CAMERA_OPTION_ORIENTATION = 2;
+
+// mln_geojson_source_option_field
+const MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM = 1;
+const MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM = 2;
+const MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 4;
+const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 8;
+const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES = 16;
+const MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE = 32;
+const MLN_GEOJSON_SOURCE_OPTION_BUFFER = 64;
+const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 128;
+const MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 256;
+const MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 512;
+const MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1024;
+const MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 2048;
+
+// mln_gesture_phase
+const MLN_GESTURE_PHASE_NONE = 0;
+const MLN_GESTURE_PHASE_BEGIN = 1;
+const MLN_GESTURE_PHASE_UPDATE = 2;
+const MLN_GESTURE_PHASE_END = 3;
+const MLN_GESTURE_PHASE_CANCEL = 4;
+
+// mln_gpu_sync_kind
+const MLN_GPU_SYNC_CPU_COMPLETE = 0;
+const MLN_GPU_SYNC_METAL_SHARED_EVENT = 1;
+const MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2;
+const MLN_GPU_SYNC_OPENGL_FENCE = 3;
+const MLN_GPU_SYNC_WEBGPU_TOKEN = 4;
+
+// mln_location_indicator_image_kind
+const MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP = 0;
+const MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING = 1;
+const MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW = 2;
+
+// mln_log_event
+const MLN_LOG_EVENT_GENERAL = 0;
+const MLN_LOG_EVENT_SETUP = 1;
+const MLN_LOG_EVENT_SHADER = 2;
+const MLN_LOG_EVENT_PARSE_STYLE = 3;
+const MLN_LOG_EVENT_PARSE_TILE = 4;
+const MLN_LOG_EVENT_RENDER = 5;
+const MLN_LOG_EVENT_STYLE = 6;
+const MLN_LOG_EVENT_DATABASE = 7;
+const MLN_LOG_EVENT_HTTP_REQUEST = 8;
+const MLN_LOG_EVENT_SPRITE = 9;
+const MLN_LOG_EVENT_IMAGE = 10;
+const MLN_LOG_EVENT_GRAPHICS_BACKEND = 11;
+const MLN_LOG_EVENT_JNI = 12;
+const MLN_LOG_EVENT_ANDROID = 13;
+const MLN_LOG_EVENT_CRASH = 14;
+const MLN_LOG_EVENT_GLYPH = 15;
+const MLN_LOG_EVENT_TIMING = 16;
+
+// mln_log_severity
+const MLN_LOG_SEVERITY_INFO = 1;
+const MLN_LOG_SEVERITY_WARNING = 2;
+const MLN_LOG_SEVERITY_ERROR = 3;
+
+// mln_log_severity_mask
+const MLN_LOG_SEVERITY_MASK_INFO = 2;
+const MLN_LOG_SEVERITY_MASK_WARNING = 4;
+const MLN_LOG_SEVERITY_MASK_ERROR = 8;
+const MLN_LOG_SEVERITY_MASK_DEFAULT = 6;
+const MLN_LOG_SEVERITY_MASK_ALL = 14;
+
+// mln_map_debug_option
+const MLN_MAP_DEBUG_TILE_BORDERS = 2;
+const MLN_MAP_DEBUG_PARSE_STATUS = 4;
+const MLN_MAP_DEBUG_TIMESTAMPS = 8;
+const MLN_MAP_DEBUG_COLLISION = 16;
+const MLN_MAP_DEBUG_OVERDRAW = 32;
+const MLN_MAP_DEBUG_STENCIL_CLIP = 64;
+const MLN_MAP_DEBUG_DEPTH_BUFFER = 128;
+
+// mln_map_mode
+const MLN_MAP_MODE_CONTINUOUS = 0;
+const MLN_MAP_MODE_STATIC = 1;
+const MLN_MAP_MODE_TILE = 2;
+
+// mln_map_tile_option_field
+const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA = 1;
+const MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS = 2;
+const MLN_MAP_TILE_OPTION_LOD_SCALE = 4;
+const MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD = 8;
+const MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT = 16;
+const MLN_MAP_TILE_OPTION_LOD_MODE = 32;
+
+// mln_map_viewport_option_field
+const MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION = 1;
+const MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE = 2;
+const MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE = 4;
+const MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8;
+
+// mln_network_status
+const MLN_NETWORK_STATUS_ONLINE = 1;
+const MLN_NETWORK_STATUS_OFFLINE = 2;
+
+// mln_north_orientation
+const MLN_NORTH_ORIENTATION_UP = 0;
+const MLN_NORTH_ORIENTATION_RIGHT = 1;
+const MLN_NORTH_ORIENTATION_DOWN = 2;
+const MLN_NORTH_ORIENTATION_LEFT = 3;
+
+// mln_offline_region_definition_type
+const MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID = 1;
+const MLN_OFFLINE_REGION_DEFINITION_GEOMETRY = 2;
+
+// mln_offline_region_download_state
+const MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE = 0;
+const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1;
+
+// mln_opengl_client_api
+const MLN_OPENGL_CLIENT_API_UNSPECIFIED = 0;
+const MLN_OPENGL_CLIENT_API_GL = 1;
+const MLN_OPENGL_CLIENT_API_GLES = 2;
+
+// mln_opengl_context_ownership
+const MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED = 0;
+const MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED = 1;
+
+// mln_opengl_context_platform
+const MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED = 0;
+const MLN_OPENGL_CONTEXT_PLATFORM_WGL = 1;
+const MLN_OPENGL_CONTEXT_PLATFORM_EGL = 2;
+const MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = 3;
+
+// mln_opengl_context_provider_flag
+const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL = 1;
+const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL = 2;
+const MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL = 4;
+
+// mln_projection_mode_field
+const MLN_PROJECTION_MODE_AXONOMETRIC = 1;
+const MLN_PROJECTION_MODE_X_SKEW = 2;
+const MLN_PROJECTION_MODE_Y_SKEW = 4;
+
+// mln_queried_feature_field
+const MLN_QUERIED_FEATURE_SOURCE_ID = 1;
+const MLN_QUERIED_FEATURE_SOURCE_LAYER_ID = 2;
+const MLN_QUERIED_FEATURE_STATE = 4;
+
+// mln_render_abandon_disposition
+const MLN_RENDER_ABANDON_DISPOSITION_CLEAN = 0;
+const MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED = 1;
+
+// mln_render_backend_flag
+const MLN_RENDER_BACKEND_FLAG_METAL = 1;
+const MLN_RENDER_BACKEND_FLAG_VULKAN = 2;
+const MLN_RENDER_BACKEND_FLAG_OPENGL = 4;
+const MLN_RENDER_BACKEND_FLAG_WEBGPU = 8;
+
+// mln_render_driver_kind
+const MLN_RENDER_DRIVER_CORE_WORKER = 1;
+const MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD = 2;
+
+// mln_render_mode
+const MLN_RENDER_MODE_PARTIAL = 0;
+const MLN_RENDER_MODE_FULL = 1;
+
+// mln_render_result
+const MLN_RENDER_RESULT_RENDERED = 0;
+const MLN_RENDER_RESULT_NO_UPDATE = 1;
+const MLN_RENDER_RESULT_SIZE_PENDING = 2;
+const MLN_RENDER_RESULT_TARGET_NOT_READY = 3;
+const MLN_RENDER_RESULT_SUPERSEDED = 4;
+const MLN_RENDER_RESULT_DEADLINE_MISSED = 5;
+
+// mln_render_session_capability_flag
+const MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1;
+const MLN_RENDER_SESSION_CAPABILITY_READBACK = 2;
+const MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC = 4;
+const MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 8;
+
+// mln_render_session_state
+const MLN_RENDER_SESSION_STATE_ATTACHING = 1;
+const MLN_RENDER_SESSION_STATE_ATTACHED = 2;
+const MLN_RENDER_SESSION_STATE_DETACHING = 3;
+const MLN_RENDER_SESSION_STATE_DETACHED = 4;
+const MLN_RENDER_SESSION_STATE_TARGET_LOST = 5;
+const MLN_RENDER_SESSION_STATE_ABANDONED = 6;
+
+// mln_rendered_feature_query_option_field
+const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1;
+
+// mln_rendered_query_geometry_type
+const MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT = 1;
+const MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX = 2;
+const MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING = 3;
+
+// mln_resource_error_reason
+const MLN_RESOURCE_ERROR_REASON_NONE = 0;
+const MLN_RESOURCE_ERROR_REASON_NOT_FOUND = 1;
+const MLN_RESOURCE_ERROR_REASON_SERVER = 2;
+const MLN_RESOURCE_ERROR_REASON_CONNECTION = 3;
+const MLN_RESOURCE_ERROR_REASON_RATE_LIMIT = 4;
+const MLN_RESOURCE_ERROR_REASON_OTHER = 5;
+
+// mln_resource_kind
+const MLN_RESOURCE_KIND_UNKNOWN = 0;
+const MLN_RESOURCE_KIND_STYLE = 1;
+const MLN_RESOURCE_KIND_SOURCE = 2;
+const MLN_RESOURCE_KIND_TILE = 3;
+const MLN_RESOURCE_KIND_GLYPHS = 4;
+const MLN_RESOURCE_KIND_SPRITE_IMAGE = 5;
+const MLN_RESOURCE_KIND_SPRITE_JSON = 6;
+const MLN_RESOURCE_KIND_IMAGE = 7;
+
+// mln_resource_loading_method
+const MLN_RESOURCE_LOADING_METHOD_ALL = 0;
+const MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY = 1;
+const MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY = 2;
+
+// mln_resource_priority
+const MLN_RESOURCE_PRIORITY_REGULAR = 0;
+const MLN_RESOURCE_PRIORITY_LOW = 1;
+
+// mln_resource_provider_decision
+const MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH = 0;
+const MLN_RESOURCE_PROVIDER_DECISION_HANDLE = 1;
+
+// mln_resource_response_status
+const MLN_RESOURCE_RESPONSE_STATUS_OK = 0;
+const MLN_RESOURCE_RESPONSE_STATUS_ERROR = 1;
+const MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT = 2;
+const MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED = 3;
+
+// mln_resource_storage_policy
+const MLN_RESOURCE_STORAGE_POLICY_PERMANENT = 0;
+const MLN_RESOURCE_STORAGE_POLICY_VOLATILE = 1;
+
+// mln_resource_usage
+const MLN_RESOURCE_USAGE_ONLINE = 0;
+const MLN_RESOURCE_USAGE_OFFLINE = 1;
+
+// mln_runtime_event_mask
+const MLN_RUNTIME_EVENT_MASK_NONE = 0;
+const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE = 2;
+const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING = 4;
+const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE = 8;
+const MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED = 16;
+const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED = 32;
+const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED = 64;
+const MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 128;
+const MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 256;
+const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE = 512;
+const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1024;
+const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED = 2048;
+const MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED = 4096;
+const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED = 8192;
+const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED = 16384;
+const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED = 32768;
+const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED = 65536;
+const MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING = 131072;
+const MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION = 262144;
+const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED = 4194304;
+const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 524288;
+const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576;
+const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152;
+const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 4718590;
+const MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 3670016;
+const MLN_RUNTIME_EVENT_MASK_ALL = 8388606;
+
+// mln_runtime_event_payload_type
+const MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0;
+const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME = 1;
+const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP = 2;
+const MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 4;
+const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5;
+const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6;
+const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7;
+const MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9;
+
+// mln_runtime_event_source_type
+const MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0;
+const MLN_RUNTIME_EVENT_SOURCE_MAP = 1;
+
+// mln_runtime_event_type
+const MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1;
+const MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING = 2;
+const MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE = 3;
+const MLN_RUNTIME_EVENT_MAP_STYLE_LOADED = 4;
+const MLN_RUNTIME_EVENT_MAP_LOADING_STARTED = 5;
+const MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED = 6;
+const MLN_RUNTIME_EVENT_MAP_LOADING_FAILED = 7;
+const MLN_RUNTIME_EVENT_MAP_IDLE = 8;
+const MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE = 9;
+const MLN_RUNTIME_EVENT_MAP_RENDER_ERROR = 10;
+const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED = 11;
+const MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED = 12;
+const MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED = 13;
+const MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED = 14;
+const MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED = 15;
+const MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED = 16;
+const MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING = 17;
+const MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 18;
+const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19;
+const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20;
+const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21;
+const MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 22;
+
+// mln_source_feature_query_option_field
+const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1;
+
+// mln_status
+const MLN_STATUS_OK = 0;
+const MLN_STATUS_INVALID_ARGUMENT = -1;
+const MLN_STATUS_INVALID_STATE = -2;
+const MLN_STATUS_WRONG_THREAD = -3;
+const MLN_STATUS_UNSUPPORTED = -4;
+const MLN_STATUS_NATIVE_ERROR = -5;
+const MLN_STATUS_CANCELLED = -6;
+const MLN_STATUS_BUSY = -7;
+const MLN_STATUS_TARGET_LOST = -8;
+const MLN_STATUS_NOT_READY = -9;
+const MLN_STATUS_NOT_FOUND = -10;
+
+// mln_style_image_option_field
+const MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO = 1;
+const MLN_STYLE_IMAGE_OPTION_SDF = 2;
+const MLN_STYLE_IMAGE_OPTION_STRETCH_X = 4;
+const MLN_STYLE_IMAGE_OPTION_STRETCH_Y = 8;
+const MLN_STYLE_IMAGE_OPTION_CONTENT = 16;
+const MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH = 32;
+const MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT = 64;
+
+// mln_style_image_text_fit
+const MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK = 0;
+const MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY = 1;
+const MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL = 2;
+
+// mln_style_layer_visibility
+const MLN_STYLE_LAYER_VISIBILITY_VISIBLE = 0;
+const MLN_STYLE_LAYER_VISIBILITY_NONE = 1;
+
+// mln_style_raster_dem_encoding
+const MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX = 0;
+const MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1;
+
+// mln_style_source_info_field
+const MLN_STYLE_SOURCE_INFO_URL = 1;
+const MLN_STYLE_SOURCE_INFO_TILEJSON = 2;
+const MLN_STYLE_SOURCE_INFO_BOUNDS = 4;
+const MLN_STYLE_SOURCE_INFO_TILE_SIZE = 8;
+const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 16;
+const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 32;
+
+// mln_style_source_type
+const MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0;
+const MLN_STYLE_SOURCE_TYPE_VECTOR = 1;
+const MLN_STYLE_SOURCE_TYPE_RASTER = 2;
+const MLN_STYLE_SOURCE_TYPE_RASTER_DEM = 3;
+const MLN_STYLE_SOURCE_TYPE_GEOJSON = 4;
+const MLN_STYLE_SOURCE_TYPE_IMAGE = 5;
+const MLN_STYLE_SOURCE_TYPE_VIDEO = 6;
+const MLN_STYLE_SOURCE_TYPE_ANNOTATIONS = 7;
+const MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 8;
+const MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR = 9;
+
+// mln_style_tile_scheme
+const MLN_STYLE_TILE_SCHEME_XYZ = 0;
+const MLN_STYLE_TILE_SCHEME_TMS = 1;
+
+// mln_style_tile_source_option_field
+const MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM = 1;
+const MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM = 2;
+const MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION = 4;
+const MLN_STYLE_TILE_SOURCE_OPTION_SCHEME = 8;
+const MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS = 16;
+const MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE = 32;
+const MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING = 64;
+const MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING = 128;
+
+// mln_style_transition_option_field
+const MLN_STYLE_TRANSITION_OPTION_DURATION = 1;
+const MLN_STYLE_TRANSITION_OPTION_DELAY = 2;
+const MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS = 4;
+
+// mln_style_vector_tile_encoding
+const MLN_STYLE_VECTOR_TILE_ENCODING_MVT = 0;
+const MLN_STYLE_VECTOR_TILE_ENCODING_MLT = 1;
+
+// mln_tile_lod_mode
+const MLN_TILE_LOD_MODE_DEFAULT = 0;
+const MLN_TILE_LOD_MODE_DISTANCE = 1;
+
+// mln_tile_operation
+const MLN_TILE_OPERATION_REQUESTED_FROM_CACHE = 0;
+const MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK = 1;
+const MLN_TILE_OPERATION_LOAD_FROM_NETWORK = 2;
+const MLN_TILE_OPERATION_LOAD_FROM_CACHE = 3;
+const MLN_TILE_OPERATION_START_PARSE = 4;
+const MLN_TILE_OPERATION_END_PARSE = 5;
+const MLN_TILE_OPERATION_ERROR = 6;
+const MLN_TILE_OPERATION_CANCELLED = 7;
+const MLN_TILE_OPERATION_NULL = 8;
+
+// mln_viewport_mode
+const MLN_VIEWPORT_MODE_DEFAULT = 0;
+const MLN_VIEWPORT_MODE_FLIPPED_Y = 1;
+
+// mln_webgl_context_kind
+const MLN_WEBGL_CONTEXT_EXISTING = 0;
+const MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS = 1;
 
 @Native<Int32 Function(mln_acquired_frame, Pointer<mln_diagnostic>)>()
 external int mln_acquired_frame_dispose(

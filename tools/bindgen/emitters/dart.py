@@ -94,8 +94,7 @@ def lower_port_registration(plan, registration, callback, values):
     value = inputs[registration.callback]
     values.check(value)
     key = (
-        "(raw.mln_adapter_dart_port_callback."
-        f"{native_ports.constant(plan.name, registration.callback)} & 0xffffffff)"
+        f"(raw.{native_ports.constant(plan.name, registration.callback)} & 0xffffffff)"
     )
     decoded, offset = [], 1
     for parameter in callback.parameters:
@@ -512,7 +511,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         public, decode = adopt_owner(
             plan.completion.result_owner, "handle", receiver, function, values
         )
-        operation = f"_queryOwned(raw.mln_adapter_completion_copy_kind.{copy_kind(plan.result.native)}, {start}, (handle) => {decode})"
+        operation = f"_queryOwned(raw.{copy_kind(plan.result.native)}, {start}, (handle) => {decode})"
     else:
         result = plan.result
         values.check(result)
@@ -587,7 +586,7 @@ def completion_value(values: Values, element, read) -> str:
         else ".value"
     )
     code = (
-        f"_CompletionValue(raw.mln_adapter_completion_copy_kind.{kind}, sizeOf<{ffi}>(), "
+        f"_CompletionValue(raw.{kind}, sizeOf<{ffi}>(), "
         f"(element) => {values.copy(read, f'element.cast<{ffi}>(){suffix}')})"
     )
     stem = "_result" + re.sub(r"\W", "", values.public(read).replace("?", "OrNull"))

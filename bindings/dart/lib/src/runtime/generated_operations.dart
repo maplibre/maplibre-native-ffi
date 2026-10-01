@@ -102,69 +102,47 @@ Pointer<raw.mln_animation_options> _writeAnimationOptions(
   final result = arena<raw.mln_animation_options>();
   result.ref = raw.mln_animation_options_default();
   if (value.durationMs != null) {
-    result.ref.fields |=
-        raw.mln_animation_option_field.MLN_ANIMATION_OPTION_DURATION;
+    result.ref.fields |= raw.MLN_ANIMATION_OPTION_DURATION;
     result.ref.duration_ms = value.durationMs!;
   }
   if (value.velocity != null) {
-    result.ref.fields |=
-        raw.mln_animation_option_field.MLN_ANIMATION_OPTION_VELOCITY;
+    result.ref.fields |= raw.MLN_ANIMATION_OPTION_VELOCITY;
     result.ref.velocity = value.velocity!;
   }
   if (value.minZoom != null) {
-    result.ref.fields |=
-        raw.mln_animation_option_field.MLN_ANIMATION_OPTION_MIN_ZOOM;
+    result.ref.fields |= raw.MLN_ANIMATION_OPTION_MIN_ZOOM;
     result.ref.min_zoom = value.minZoom!;
   }
   if (value.easing != null) {
-    result.ref.fields |=
-        raw.mln_animation_option_field.MLN_ANIMATION_OPTION_EASING;
+    result.ref.fields |= raw.MLN_ANIMATION_OPTION_EASING;
     result.ref.easing = _writeUnitBezier(value.easing!, arena).ref;
   }
   if (value.transitionId != null) {
-    result.ref.fields |=
-        raw.mln_animation_option_field.MLN_ANIMATION_OPTION_TRANSITION_ID;
+    result.ref.fields |= raw.MLN_ANIMATION_OPTION_TRANSITION_ID;
     result.ref.transition_id = uint64ToNative(value.transitionId!, 'uint64_t');
   }
   return result;
 }
 
-AnimationOptions _readAnimationOptions(
-  raw.mln_animation_options source,
-) => AnimationOptions(
-  durationMs:
-      (source.fields &
-              raw.mln_animation_option_field.MLN_ANIMATION_OPTION_DURATION) !=
-          0
-      ? source.duration_ms
-      : null,
-  velocity:
-      (source.fields &
-              raw.mln_animation_option_field.MLN_ANIMATION_OPTION_VELOCITY) !=
-          0
-      ? source.velocity
-      : null,
-  minZoom:
-      (source.fields &
-              raw.mln_animation_option_field.MLN_ANIMATION_OPTION_MIN_ZOOM) !=
-          0
-      ? source.min_zoom
-      : null,
-  easing:
-      (source.fields &
-              raw.mln_animation_option_field.MLN_ANIMATION_OPTION_EASING) !=
-          0
-      ? _readUnitBezier(source.easing)
-      : null,
-  transitionId:
-      (source.fields &
-              raw
-                  .mln_animation_option_field
-                  .MLN_ANIMATION_OPTION_TRANSITION_ID) !=
-          0
-      ? uint64FromNative(source.transition_id)
-      : null,
-);
+AnimationOptions _readAnimationOptions(raw.mln_animation_options source) =>
+    AnimationOptions(
+      durationMs: (source.fields & raw.MLN_ANIMATION_OPTION_DURATION) != 0
+          ? source.duration_ms
+          : null,
+      velocity: (source.fields & raw.MLN_ANIMATION_OPTION_VELOCITY) != 0
+          ? source.velocity
+          : null,
+      minZoom: (source.fields & raw.MLN_ANIMATION_OPTION_MIN_ZOOM) != 0
+          ? source.min_zoom
+          : null,
+      easing: (source.fields & raw.MLN_ANIMATION_OPTION_EASING) != 0
+          ? _readUnitBezier(source.easing)
+          : null,
+      transitionId:
+          (source.fields & raw.MLN_ANIMATION_OPTION_TRANSITION_ID) != 0
+          ? uint64FromNative(source.transition_id)
+          : null,
+    );
 
 Pointer<raw.mln_lat_lng> _writeLatLng(LatLng value, Arena arena) {
   final result = arena<raw.mln_lat_lng>();
@@ -198,57 +176,46 @@ Pointer<raw.mln_bound_options> _writeBoundOptions(
   final result = arena<raw.mln_bound_options>();
   result.ref = raw.mln_bound_options_default();
   if (value.unbounded) {
-    result.ref.fields |= raw.mln_bound_option_field.MLN_BOUND_OPTION_UNBOUNDED;
+    result.ref.fields |= raw.MLN_BOUND_OPTION_UNBOUNDED;
   }
   if (value.bounds != null) {
-    result.ref.fields |= raw.mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS;
+    result.ref.fields |= raw.MLN_BOUND_OPTION_BOUNDS;
     result.ref.bounds = _writeLatLngBounds(value.bounds!, arena).ref;
   }
   if (value.minZoom != null) {
-    result.ref.fields |= raw.mln_bound_option_field.MLN_BOUND_OPTION_MIN_ZOOM;
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MIN_ZOOM;
     result.ref.min_zoom = value.minZoom!;
   }
   if (value.maxZoom != null) {
-    result.ref.fields |= raw.mln_bound_option_field.MLN_BOUND_OPTION_MAX_ZOOM;
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MAX_ZOOM;
     result.ref.max_zoom = value.maxZoom!;
   }
   if (value.minPitch != null) {
-    result.ref.fields |= raw.mln_bound_option_field.MLN_BOUND_OPTION_MIN_PITCH;
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MIN_PITCH;
     result.ref.min_pitch = value.minPitch!;
   }
   if (value.maxPitch != null) {
-    result.ref.fields |= raw.mln_bound_option_field.MLN_BOUND_OPTION_MAX_PITCH;
+    result.ref.fields |= raw.MLN_BOUND_OPTION_MAX_PITCH;
     result.ref.max_pitch = value.maxPitch!;
   }
   return result;
 }
 
 BoundOptions _readBoundOptions(raw.mln_bound_options source) => BoundOptions(
-  unbounded:
-      (source.fields & raw.mln_bound_option_field.MLN_BOUND_OPTION_UNBOUNDED) !=
-      0,
-  bounds:
-      (source.fields & raw.mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS) != 0
+  unbounded: (source.fields & raw.MLN_BOUND_OPTION_UNBOUNDED) != 0,
+  bounds: (source.fields & raw.MLN_BOUND_OPTION_BOUNDS) != 0
       ? _readLatLngBounds(source.bounds)
       : null,
-  minZoom:
-      (source.fields & raw.mln_bound_option_field.MLN_BOUND_OPTION_MIN_ZOOM) !=
-          0
+  minZoom: (source.fields & raw.MLN_BOUND_OPTION_MIN_ZOOM) != 0
       ? source.min_zoom
       : null,
-  maxZoom:
-      (source.fields & raw.mln_bound_option_field.MLN_BOUND_OPTION_MAX_ZOOM) !=
-          0
+  maxZoom: (source.fields & raw.MLN_BOUND_OPTION_MAX_ZOOM) != 0
       ? source.max_zoom
       : null,
-  minPitch:
-      (source.fields & raw.mln_bound_option_field.MLN_BOUND_OPTION_MIN_PITCH) !=
-          0
+  minPitch: (source.fields & raw.MLN_BOUND_OPTION_MIN_PITCH) != 0
       ? source.min_pitch
       : null,
-  maxPitch:
-      (source.fields & raw.mln_bound_option_field.MLN_BOUND_OPTION_MAX_PITCH) !=
-          0
+  maxPitch: (source.fields & raw.MLN_BOUND_OPTION_MAX_PITCH) != 0
       ? source.max_pitch
       : null,
 );
@@ -314,45 +281,32 @@ Pointer<raw.mln_camera_fit_options> _writeCameraFitOptions(
   final result = arena<raw.mln_camera_fit_options>();
   result.ref = raw.mln_camera_fit_options_default();
   if (value.padding != null) {
-    result.ref.fields |=
-        raw.mln_camera_fit_option_field.MLN_CAMERA_FIT_OPTION_PADDING;
+    result.ref.fields |= raw.MLN_CAMERA_FIT_OPTION_PADDING;
     result.ref.padding = _writeEdgeInsets(value.padding!, arena).ref;
   }
   if (value.bearing != null) {
-    result.ref.fields |=
-        raw.mln_camera_fit_option_field.MLN_CAMERA_FIT_OPTION_BEARING;
+    result.ref.fields |= raw.MLN_CAMERA_FIT_OPTION_BEARING;
     result.ref.bearing = value.bearing!;
   }
   if (value.pitch != null) {
-    result.ref.fields |=
-        raw.mln_camera_fit_option_field.MLN_CAMERA_FIT_OPTION_PITCH;
+    result.ref.fields |= raw.MLN_CAMERA_FIT_OPTION_PITCH;
     result.ref.pitch = value.pitch!;
   }
   return result;
 }
 
-CameraFitOptions _readCameraFitOptions(
-  raw.mln_camera_fit_options source,
-) => CameraFitOptions(
-  padding:
-      (source.fields &
-              raw.mln_camera_fit_option_field.MLN_CAMERA_FIT_OPTION_PADDING) !=
-          0
-      ? _readEdgeInsets(source.padding)
-      : null,
-  bearing:
-      (source.fields &
-              raw.mln_camera_fit_option_field.MLN_CAMERA_FIT_OPTION_BEARING) !=
-          0
-      ? source.bearing
-      : null,
-  pitch:
-      (source.fields &
-              raw.mln_camera_fit_option_field.MLN_CAMERA_FIT_OPTION_PITCH) !=
-          0
-      ? source.pitch
-      : null,
-);
+CameraFitOptions _readCameraFitOptions(raw.mln_camera_fit_options source) =>
+    CameraFitOptions(
+      padding: (source.fields & raw.MLN_CAMERA_FIT_OPTION_PADDING) != 0
+          ? _readEdgeInsets(source.padding)
+          : null,
+      bearing: (source.fields & raw.MLN_CAMERA_FIT_OPTION_BEARING) != 0
+          ? source.bearing
+          : null,
+      pitch: (source.fields & raw.MLN_CAMERA_FIT_OPTION_PITCH) != 0
+          ? source.pitch
+          : null,
+    );
 
 Pointer<raw.mln_camera_options> _writeCameraOptions(
   CameraOptions value,
@@ -361,41 +315,40 @@ Pointer<raw.mln_camera_options> _writeCameraOptions(
   final result = arena<raw.mln_camera_options>();
   result.ref = raw.mln_camera_options_default();
   if (value.center != null) {
-    result.ref.fields |= raw.mln_camera_option_field.MLN_CAMERA_OPTION_CENTER;
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER;
     result.ref.latitude = value.center!.latitude;
     result.ref.longitude = value.center!.longitude;
   }
   if (value.centerAltitude != null) {
-    result.ref.fields |=
-        raw.mln_camera_option_field.MLN_CAMERA_OPTION_CENTER_ALTITUDE;
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE;
     result.ref.center_altitude = value.centerAltitude!;
   }
   if (value.padding != null) {
-    result.ref.fields |= raw.mln_camera_option_field.MLN_CAMERA_OPTION_PADDING;
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_PADDING;
     result.ref.padding = _writeEdgeInsets(value.padding!, arena).ref;
   }
   if (value.anchor != null) {
-    result.ref.fields |= raw.mln_camera_option_field.MLN_CAMERA_OPTION_ANCHOR;
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_ANCHOR;
     result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
   }
   if (value.zoom != null) {
-    result.ref.fields |= raw.mln_camera_option_field.MLN_CAMERA_OPTION_ZOOM;
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_ZOOM;
     result.ref.zoom = value.zoom!;
   }
   if (value.bearing != null) {
-    result.ref.fields |= raw.mln_camera_option_field.MLN_CAMERA_OPTION_BEARING;
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_BEARING;
     result.ref.bearing = value.bearing!;
   }
   if (value.pitch != null) {
-    result.ref.fields |= raw.mln_camera_option_field.MLN_CAMERA_OPTION_PITCH;
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_PITCH;
     result.ref.pitch = value.pitch!;
   }
   if (value.roll != null) {
-    result.ref.fields |= raw.mln_camera_option_field.MLN_CAMERA_OPTION_ROLL;
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_ROLL;
     result.ref.roll = value.roll!;
   }
   if (value.fieldOfView != null) {
-    result.ref.fields |= raw.mln_camera_option_field.MLN_CAMERA_OPTION_FOV;
+    result.ref.fields |= raw.MLN_CAMERA_OPTION_FOV;
     result.ref.field_of_view = value.fieldOfView!;
   }
   return result;
@@ -404,46 +357,27 @@ Pointer<raw.mln_camera_options> _writeCameraOptions(
 CameraOptions _readCameraOptions(
   raw.mln_camera_options source,
 ) => CameraOptions(
-  center:
-      (source.fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_CENTER) !=
-          0
+  center: (source.fields & raw.MLN_CAMERA_OPTION_CENTER) != 0
       ? LatLng(source.latitude, source.longitude)
       : null,
-  centerAltitude:
-      (source.fields &
-              raw.mln_camera_option_field.MLN_CAMERA_OPTION_CENTER_ALTITUDE) !=
-          0
+  centerAltitude: (source.fields & raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0
       ? source.center_altitude
       : null,
-  padding:
-      (source.fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_PADDING) !=
-          0
+  padding: (source.fields & raw.MLN_CAMERA_OPTION_PADDING) != 0
       ? _readEdgeInsets(source.padding)
       : null,
-  anchor:
-      (source.fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_ANCHOR) !=
-          0
+  anchor: (source.fields & raw.MLN_CAMERA_OPTION_ANCHOR) != 0
       ? _readScreenPoint(source.anchor)
       : null,
-  zoom:
-      (source.fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_ZOOM) != 0
-      ? source.zoom
-      : null,
-  bearing:
-      (source.fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_BEARING) !=
-          0
+  zoom: (source.fields & raw.MLN_CAMERA_OPTION_ZOOM) != 0 ? source.zoom : null,
+  bearing: (source.fields & raw.MLN_CAMERA_OPTION_BEARING) != 0
       ? source.bearing
       : null,
-  pitch:
-      (source.fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_PITCH) != 0
+  pitch: (source.fields & raw.MLN_CAMERA_OPTION_PITCH) != 0
       ? source.pitch
       : null,
-  roll:
-      (source.fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_ROLL) != 0
-      ? source.roll
-      : null,
-  fieldOfView:
-      (source.fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_FOV) != 0
+  roll: (source.fields & raw.MLN_CAMERA_OPTION_ROLL) != 0 ? source.roll : null,
+  fieldOfView: (source.fields & raw.MLN_CAMERA_OPTION_FOV) != 0
       ? source.field_of_view
       : null,
 );
@@ -494,9 +428,7 @@ _prepareCustomGeometrySourceOptions(
     }
     port = roots.register({
       if (value.fetchTile != null)
-        (raw
-                .mln_adapter_dart_port_callback
-                .MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE &
+        (raw.MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE &
             0xffffffff): (message) => value.fetchTile!(
           CanonicalTileId(
             z: message[1] as int,
@@ -505,9 +437,7 @@ _prepareCustomGeometrySourceOptions(
           ),
         ),
       if (value.cancelTile != null)
-        (raw
-                .mln_adapter_dart_port_callback
-                .MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE &
+        (raw.MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE &
             0xffffffff): (message) => value.cancelTile!(
           CanonicalTileId(
             z: message[1] as int,
@@ -520,9 +450,7 @@ _prepareCustomGeometrySourceOptions(
         ? nullptr
         : raw
               .mln_adapter_dart_port_function(
-                (raw
-                        .mln_adapter_dart_port_callback
-                        .MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE &
+                (raw.MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE &
                     0xffffffff),
               )
               .cast();
@@ -530,52 +458,36 @@ _prepareCustomGeometrySourceOptions(
         ? nullptr
         : raw
               .mln_adapter_dart_port_function(
-                (raw
-                        .mln_adapter_dart_port_callback
-                        .MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE &
+                (raw.MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE &
                     0xffffffff),
               )
               .cast();
     if (value.minZoom != null) {
-      result.ref.fields |= raw
-          .mln_custom_geometry_source_option_field
-          .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
       result.ref.min_zoom = value.minZoom!;
     }
     if (value.maxZoom != null) {
-      result.ref.fields |= raw
-          .mln_custom_geometry_source_option_field
-          .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
       result.ref.max_zoom = value.maxZoom!;
     }
     if (value.tolerance != null) {
-      result.ref.fields |= raw
-          .mln_custom_geometry_source_option_field
-          .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
       result.ref.tolerance = value.tolerance!;
     }
     if (value.tileSize != null) {
-      result.ref.fields |= raw
-          .mln_custom_geometry_source_option_field
-          .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
       result.ref.tile_size = _nativeInteger(value.tileSize!, 0, 4294967295);
     }
     if (value.buffer != null) {
-      result.ref.fields |= raw
-          .mln_custom_geometry_source_option_field
-          .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
       result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
     }
     if (value.clip != null) {
-      result.ref.fields |= raw
-          .mln_custom_geometry_source_option_field
-          .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
       result.ref.clip = value.clip!;
     }
     if (value.wrap != null) {
-      result.ref.fields |= raw
-          .mln_custom_geometry_source_option_field
-          .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
+      result.ref.fields |= raw.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
       result.ref.wrap = value.wrap!;
     }
     result.ref.user_data = port.context;
@@ -629,9 +541,7 @@ _prepareCustomMvtVectorSourceOptions(
     }
     port = roots.register({
       if (value.fetchTile != null)
-        (raw
-                .mln_adapter_dart_port_callback
-                .MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE &
+        (raw.MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE &
             0xffffffff): (message) => value.fetchTile!(
           CanonicalTileId(
             z: message[1] as int,
@@ -640,9 +550,7 @@ _prepareCustomMvtVectorSourceOptions(
           ),
         ),
       if (value.cancelTile != null)
-        (raw
-                .mln_adapter_dart_port_callback
-                .MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE &
+        (raw.MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE &
             0xffffffff): (message) => value.cancelTile!(
           CanonicalTileId(
             z: message[1] as int,
@@ -655,9 +563,7 @@ _prepareCustomMvtVectorSourceOptions(
         ? nullptr
         : raw
               .mln_adapter_dart_port_function(
-                (raw
-                        .mln_adapter_dart_port_callback
-                        .MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE &
+                (raw.MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE &
                     0xffffffff),
               )
               .cast();
@@ -665,22 +571,16 @@ _prepareCustomMvtVectorSourceOptions(
         ? nullptr
         : raw
               .mln_adapter_dart_port_function(
-                (raw
-                        .mln_adapter_dart_port_callback
-                        .MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE &
+                (raw.MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE &
                     0xffffffff),
               )
               .cast();
     if (value.minZoom != null) {
-      result.ref.fields |= raw
-          .mln_custom_mvt_vector_source_option_field
-          .MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
+      result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
       result.ref.min_zoom = value.minZoom!;
     }
     if (value.maxZoom != null) {
-      result.ref.fields |= raw
-          .mln_custom_mvt_vector_source_option_field
-          .MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+      result.ref.fields |= raw.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
       result.ref.max_zoom = value.maxZoom!;
     }
     result.ref.user_data = port.context;
@@ -939,13 +839,11 @@ Pointer<raw.mln_free_camera_options> _writeFreeCameraOptions(
   final result = arena<raw.mln_free_camera_options>();
   result.ref = raw.mln_free_camera_options_default();
   if (value.position != null) {
-    result.ref.fields |=
-        raw.mln_free_camera_option_field.MLN_FREE_CAMERA_OPTION_POSITION;
+    result.ref.fields |= raw.MLN_FREE_CAMERA_OPTION_POSITION;
     result.ref.position = _writeVec3(value.position!, arena).ref;
   }
   if (value.orientation != null) {
-    result.ref.fields |=
-        raw.mln_free_camera_option_field.MLN_FREE_CAMERA_OPTION_ORIENTATION;
+    result.ref.fields |= raw.MLN_FREE_CAMERA_OPTION_ORIENTATION;
     result.ref.orientation = _writeQuaternion(value.orientation!, arena).ref;
   }
   return result;
@@ -953,20 +851,10 @@ Pointer<raw.mln_free_camera_options> _writeFreeCameraOptions(
 
 FreeCameraOptions _readFreeCameraOptions(raw.mln_free_camera_options source) =>
     FreeCameraOptions(
-      position:
-          (source.fields &
-                  raw
-                      .mln_free_camera_option_field
-                      .MLN_FREE_CAMERA_OPTION_POSITION) !=
-              0
+      position: (source.fields & raw.MLN_FREE_CAMERA_OPTION_POSITION) != 0
           ? _readVec3(source.position)
           : null,
-      orientation:
-          (source.fields &
-                  raw
-                      .mln_free_camera_option_field
-                      .MLN_FREE_CAMERA_OPTION_ORIENTATION) !=
-              0
+      orientation: (source.fields & raw.MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0
           ? _readQuaternion(source.orientation)
           : null,
     );
@@ -978,49 +866,38 @@ Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
   final result = arena<raw.mln_geojson_source_options>();
   result.ref = raw.mln_geojson_source_options_default();
   if (value.minZoom != null) {
-    result.ref.fields |=
-        raw.mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
     result.ref.min_zoom = value.minZoom!;
   }
   if (value.maxZoom != null) {
-    result.ref.fields |=
-        raw.mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
     result.ref.max_zoom = value.maxZoom!;
   }
   if (value.tolerance != null) {
-    result.ref.fields |=
-        raw.mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
     result.ref.tolerance = value.tolerance!;
   }
   if (value.clusterMaxZoom != null) {
-    result.ref.fields |= raw
-        .mln_geojson_source_option_field
-        .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
     result.ref.cluster_max_zoom = value.clusterMaxZoom!;
   }
   if (value.clusterProperties != null) {
-    result.ref.fields |= raw
-        .mln_geojson_source_option_field
-        .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
     result.ref.cluster_properties = nativeBufferView(
       value.clusterProperties!,
       arena,
     );
   }
   if (value.tileSize != null) {
-    result.ref.fields |=
-        raw.mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
     result.ref.tile_size = _nativeInteger(value.tileSize!, 0, 4294967295);
   }
   if (value.buffer != null) {
-    result.ref.fields |=
-        raw.mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_BUFFER;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_BUFFER;
     result.ref.buffer = _nativeInteger(value.buffer!, 0, 4294967295);
   }
   if (value.clusterRadius != null) {
-    result.ref.fields |= raw
-        .mln_geojson_source_option_field
-        .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
     result.ref.cluster_radius = _nativeInteger(
       value.clusterRadius!,
       0,
@@ -1028,9 +905,7 @@ Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
     );
   }
   if (value.clusterMinPoints != null) {
-    result.ref.fields |= raw
-        .mln_geojson_source_option_field
-        .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
     result.ref.cluster_min_points = _nativeInteger(
       value.clusterMinPoints!,
       0,
@@ -1038,20 +913,15 @@ Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
     );
   }
   if (value.lineMetrics != null) {
-    result.ref.fields |= raw
-        .mln_geojson_source_option_field
-        .MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
     result.ref.line_metrics = value.lineMetrics!;
   }
   if (value.cluster != null) {
-    result.ref.fields |=
-        raw.mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
     result.ref.cluster = value.cluster!;
   }
   if (value.synchronousTiling != null) {
-    result.ref.fields |= raw
-        .mln_geojson_source_option_field
-        .MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+    result.ref.fields |= raw.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
     result.ref.synchronous_tiling = value.synchronousTiling!;
   }
   return result;
@@ -1060,100 +930,45 @@ Pointer<raw.mln_geojson_source_options> _writeGeojsonSourceOptions(
 GeojsonSourceOptions _readGeojsonSourceOptions(
   raw.mln_geojson_source_options source,
 ) => GeojsonSourceOptions(
-  minZoom:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM) !=
-          0
+  minZoom: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM) != 0
       ? source.min_zoom
       : null,
-  maxZoom:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM) !=
-          0
+  maxZoom: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM) != 0
       ? source.max_zoom
       : null,
-  tolerance:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_TOLERANCE) !=
-          0
+  tolerance: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE) != 0
       ? source.tolerance
       : null,
   clusterMaxZoom:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM) !=
-          0
+      (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM) != 0
       ? source.cluster_max_zoom
       : null,
   clusterProperties:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES) !=
-          0
+      (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES) != 0
       ? _copyBufferView(source.cluster_properties)
       : null,
-  tileSize:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE) !=
-          0
+  tileSize: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE) != 0
       ? source.tile_size
       : null,
-  buffer:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_BUFFER) !=
-          0
+  buffer: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_BUFFER) != 0
       ? source.buffer
       : null,
   clusterRadius:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS) !=
-          0
+      (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS) != 0
       ? source.cluster_radius
       : null,
   clusterMinPoints:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS) !=
-          0
+      (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS) != 0
       ? source.cluster_min_points
       : null,
-  lineMetrics:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS) !=
-          0
+  lineMetrics: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS) != 0
       ? source.line_metrics
       : null,
-  cluster:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_CLUSTER) !=
-          0
+  cluster: (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_CLUSTER) != 0
       ? source.cluster
       : null,
   synchronousTiling:
-      (source.fields &
-              raw
-                  .mln_geojson_source_option_field
-                  .MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING) !=
-          0
+      (source.fields & raw.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING) != 0
       ? source.synchronous_tiling
       : null,
 );
@@ -1223,51 +1038,35 @@ Pointer<raw.mln_style_tile_source_options> _writeStyleTileSourceOptions(
   final result = arena<raw.mln_style_tile_source_options>();
   result.ref = raw.mln_style_tile_source_options_default();
   if (value.minZoom != null) {
-    result.ref.fields |= raw
-        .mln_style_tile_source_option_field
-        .MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
+    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
     result.ref.min_zoom = value.minZoom!;
   }
   if (value.maxZoom != null) {
-    result.ref.fields |= raw
-        .mln_style_tile_source_option_field
-        .MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
+    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
     result.ref.max_zoom = value.maxZoom!;
   }
   if (value.attribution != null) {
-    result.ref.fields |= raw
-        .mln_style_tile_source_option_field
-        .MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
+    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
     result.ref.attribution = nativeStringView(value.attribution!, arena).value;
   }
   if (value.scheme != null) {
-    result.ref.fields |= raw
-        .mln_style_tile_source_option_field
-        .MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
+    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
     result.ref.scheme = value.scheme!.rawValue;
   }
   if (value.bounds != null) {
-    result.ref.fields |= raw
-        .mln_style_tile_source_option_field
-        .MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
+    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
     result.ref.bounds = _writeLatLngBounds(value.bounds!, arena).ref;
   }
   if (value.tileSize != null) {
-    result.ref.fields |= raw
-        .mln_style_tile_source_option_field
-        .MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
+    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
     result.ref.tile_size = _nativeInteger(value.tileSize!, 0, 4294967295);
   }
   if (value.vectorEncoding != null) {
-    result.ref.fields |= raw
-        .mln_style_tile_source_option_field
-        .MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
+    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
     result.ref.vector_encoding = value.vectorEncoding!.rawValue;
   }
   if (value.rasterEncoding != null) {
-    result.ref.fields |= raw
-        .mln_style_tile_source_option_field
-        .MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
+    result.ref.fields |= raw.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
     result.ref.raster_encoding = value.rasterEncoding!.rawValue;
   }
   return result;
@@ -1276,68 +1075,31 @@ Pointer<raw.mln_style_tile_source_options> _writeStyleTileSourceOptions(
 StyleTileSourceOptions _readStyleTileSourceOptions(
   raw.mln_style_tile_source_options source,
 ) => StyleTileSourceOptions(
-  minZoom:
-      (source.fields &
-              raw
-                  .mln_style_tile_source_option_field
-                  .MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM) !=
-          0
+  minZoom: (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM) != 0
       ? source.min_zoom
       : null,
-  maxZoom:
-      (source.fields &
-              raw
-                  .mln_style_tile_source_option_field
-                  .MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM) !=
-          0
+  maxZoom: (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM) != 0
       ? source.max_zoom
       : null,
   attribution:
-      (source.fields &
-              raw
-                  .mln_style_tile_source_option_field
-                  .MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION) !=
-          0
+      (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION) != 0
       ? utf8.decode(_copyBufferView(source.attribution))
       : null,
-  scheme:
-      (source.fields &
-              raw
-                  .mln_style_tile_source_option_field
-                  .MLN_STYLE_TILE_SOURCE_OPTION_SCHEME) !=
-          0
+  scheme: (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME) != 0
       ? StyleTileScheme.fromRawValue(source.scheme)
       : null,
-  bounds:
-      (source.fields &
-              raw
-                  .mln_style_tile_source_option_field
-                  .MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS) !=
-          0
+  bounds: (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS) != 0
       ? _readLatLngBounds(source.bounds)
       : null,
-  tileSize:
-      (source.fields &
-              raw
-                  .mln_style_tile_source_option_field
-                  .MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE) !=
-          0
+  tileSize: (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE) != 0
       ? source.tile_size
       : null,
   vectorEncoding:
-      (source.fields &
-              raw
-                  .mln_style_tile_source_option_field
-                  .MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING) !=
-          0
+      (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING) != 0
       ? StyleVectorTileEncoding.fromRawValue(source.vector_encoding)
       : null,
   rasterEncoding:
-      (source.fields &
-              raw
-                  .mln_style_tile_source_option_field
-                  .MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING) !=
-          0
+      (source.fields & raw.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING) != 0
       ? StyleRasterDemEncoding.fromRawValue(source.raster_encoding)
       : null,
 );
@@ -1424,24 +1186,18 @@ Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
   result.ref.size = sizeOf<raw.mln_feature_state_selector>();
   result.ref.source_id = nativeStringView(value.sourceId, arena).value;
   if (value.sourceLayerId != null) {
-    result.ref.fields |= raw
-        .mln_feature_state_selector_field
-        .MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
+    result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
     result.ref.source_layer_id = nativeStringView(
       value.sourceLayerId!,
       arena,
     ).value;
   }
   if (value.featureId != null) {
-    result.ref.fields |= raw
-        .mln_feature_state_selector_field
-        .MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
+    result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
     result.ref.feature_id = nativeStringView(value.featureId!, arena).value;
   }
   if (value.stateKey != null) {
-    result.ref.fields |= raw
-        .mln_feature_state_selector_field
-        .MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
+    result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
     result.ref.state_key = nativeStringView(value.stateKey!, arena).value;
   }
   return result;
@@ -1522,87 +1278,58 @@ StyleLayerResult _readStyleLayerResult(raw.mln_style_layer_result source) =>
           : utf8.decode(_copyBufferView(source.source_layer)),
     );
 
-StyleSourceInfo _readStyleSourceInfo(
-  raw.mln_style_source_info source,
-) => StyleSourceInfo(
-  type: StyleSourceType.fromRawValue(source.type),
-  idSize: source.id_size,
-  isVolatile: source.is_volatile,
-  attributionSize: source.has_attribution ? source.attribution_size : null,
-  urlSize:
-      (source.fields &
-              raw.mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_URL) !=
-          0
-      ? source.url_size
-      : null,
-  tilejson:
-      (source.fields &
-              raw.mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_TILEJSON) !=
-          0
-      ? StyleSourceTileInfo(
-          tileCount: source.tile_count,
-          minZoom: source.min_zoom,
-          maxZoom: source.max_zoom,
-          scheme: StyleTileScheme.fromRawValue(source.scheme),
-        )
-      : null,
-  bounds:
-      (source.fields &
-              raw.mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_BOUNDS) !=
-          0
-      ? _readLatLngBounds(source.bounds)
-      : null,
-  tileSize:
-      (source.fields &
-              raw
-                  .mln_style_source_info_field
-                  .MLN_STYLE_SOURCE_INFO_TILE_SIZE) !=
-          0
-      ? source.tile_size
-      : null,
-  vectorEncoding:
-      (source.fields &
-              raw
-                  .mln_style_source_info_field
-                  .MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) !=
-          0
-      ? StyleVectorTileEncoding.fromRawValue(source.vector_encoding)
-      : null,
-  rasterEncoding:
-      (source.fields &
-              raw
-                  .mln_style_source_info_field
-                  .MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) !=
-          0
-      ? StyleRasterDemEncoding.fromRawValue(source.raster_encoding)
-      : null,
-);
+StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
+    StyleSourceInfo(
+      type: StyleSourceType.fromRawValue(source.type),
+      idSize: source.id_size,
+      isVolatile: source.is_volatile,
+      attributionSize: source.has_attribution ? source.attribution_size : null,
+      urlSize: (source.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
+          ? source.url_size
+          : null,
+      tilejson: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0
+          ? StyleSourceTileInfo(
+              tileCount: source.tile_count,
+              minZoom: source.min_zoom,
+              maxZoom: source.max_zoom,
+              scheme: StyleTileScheme.fromRawValue(source.scheme),
+            )
+          : null,
+      bounds: (source.fields & raw.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0
+          ? _readLatLngBounds(source.bounds)
+          : null,
+      tileSize: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILE_SIZE) != 0
+          ? source.tile_size
+          : null,
+      vectorEncoding:
+          (source.fields & raw.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) != 0
+          ? StyleVectorTileEncoding.fromRawValue(source.vector_encoding)
+          : null,
+      rasterEncoding:
+          (source.fields & raw.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0
+          ? StyleRasterDemEncoding.fromRawValue(source.raster_encoding)
+          : null,
+    );
 
-StyleSourceResult _readStyleSourceResult(
-  raw.mln_style_source_result source,
-) => StyleSourceResult(
-  info: _readStyleSourceInfo(source.info),
-  attribution: source.info.has_attribution
-      ? utf8.decode(_copyBufferView(source.attribution))
-      : null,
-  url:
-      (source.info.fields &
-              raw.mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_URL) !=
-          0
-      ? utf8.decode(_copyBufferView(source.url))
-      : null,
-  tileUrls:
-      (source.info.fields &
-              raw.mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_TILEJSON) !=
-          0
-      ? List<String>.unmodifiable(
-          List.generate(
-            source.tile_url_count,
-            (index) => utf8.decode(_copyBufferView(source.tile_urls[index])),
-          ),
-        )
-      : null,
-);
+StyleSourceResult _readStyleSourceResult(raw.mln_style_source_result source) =>
+    StyleSourceResult(
+      info: _readStyleSourceInfo(source.info),
+      attribution: source.info.has_attribution
+          ? utf8.decode(_copyBufferView(source.attribution))
+          : null,
+      url: (source.info.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
+          ? utf8.decode(_copyBufferView(source.url))
+          : null,
+      tileUrls: (source.info.fields & raw.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0
+          ? List<String>.unmodifiable(
+              List.generate(
+                source.tile_url_count,
+                (index) =>
+                    utf8.decode(_copyBufferView(source.tile_urls[index])),
+              ),
+            )
+          : null,
+    );
 
 StyleSourceTileUrlsResult _readStyleSourceTileUrlsResult(
   raw.mln_style_source_tile_urls_result source,
@@ -1622,20 +1349,16 @@ Pointer<raw.mln_style_transition_options> _writeStyleTransitionOptions(
   final result = arena<raw.mln_style_transition_options>();
   result.ref = raw.mln_style_transition_options_default();
   if (value.durationMs != null) {
-    result.ref.fields |= raw
-        .mln_style_transition_option_field
-        .MLN_STYLE_TRANSITION_OPTION_DURATION;
+    result.ref.fields |= raw.MLN_STYLE_TRANSITION_OPTION_DURATION;
     result.ref.duration_ms = value.durationMs!;
   }
   if (value.delayMs != null) {
-    result.ref.fields |=
-        raw.mln_style_transition_option_field.MLN_STYLE_TRANSITION_OPTION_DELAY;
+    result.ref.fields |= raw.MLN_STYLE_TRANSITION_OPTION_DELAY;
     result.ref.delay_ms = value.delayMs!;
   }
   if (value.enablePlacementTransitions != null) {
-    result.ref.fields |= raw
-        .mln_style_transition_option_field
-        .MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
+    result.ref.fields |=
+        raw.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
     result.ref.enable_placement_transitions = value.enablePlacementTransitions!;
   }
   return result;
@@ -1644,27 +1367,15 @@ Pointer<raw.mln_style_transition_options> _writeStyleTransitionOptions(
 StyleTransitionOptions _readStyleTransitionOptions(
   raw.mln_style_transition_options source,
 ) => StyleTransitionOptions(
-  durationMs:
-      (source.fields &
-              raw
-                  .mln_style_transition_option_field
-                  .MLN_STYLE_TRANSITION_OPTION_DURATION) !=
-          0
+  durationMs: (source.fields & raw.MLN_STYLE_TRANSITION_OPTION_DURATION) != 0
       ? source.duration_ms
       : null,
-  delayMs:
-      (source.fields &
-              raw
-                  .mln_style_transition_option_field
-                  .MLN_STYLE_TRANSITION_OPTION_DELAY) !=
-          0
+  delayMs: (source.fields & raw.MLN_STYLE_TRANSITION_OPTION_DELAY) != 0
       ? source.delay_ms
       : null,
   enablePlacementTransitions:
       (source.fields &
-              raw
-                  .mln_style_transition_option_field
-                  .MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS) !=
+              raw.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS) !=
           0
       ? source.enable_placement_transitions
       : null,
@@ -1689,45 +1400,32 @@ Pointer<raw.mln_projection_mode> _writeProjectionMode(
   final result = arena<raw.mln_projection_mode>();
   result.ref = raw.mln_projection_mode_default();
   if (value.axonometric != null) {
-    result.ref.fields |=
-        raw.mln_projection_mode_field.MLN_PROJECTION_MODE_AXONOMETRIC;
+    result.ref.fields |= raw.MLN_PROJECTION_MODE_AXONOMETRIC;
     result.ref.axonometric = value.axonometric!;
   }
   if (value.xSkew != null) {
-    result.ref.fields |=
-        raw.mln_projection_mode_field.MLN_PROJECTION_MODE_X_SKEW;
+    result.ref.fields |= raw.MLN_PROJECTION_MODE_X_SKEW;
     result.ref.x_skew = value.xSkew!;
   }
   if (value.ySkew != null) {
-    result.ref.fields |=
-        raw.mln_projection_mode_field.MLN_PROJECTION_MODE_Y_SKEW;
+    result.ref.fields |= raw.MLN_PROJECTION_MODE_Y_SKEW;
     result.ref.y_skew = value.ySkew!;
   }
   return result;
 }
 
-ProjectionMode _readProjectionMode(
-  raw.mln_projection_mode source,
-) => ProjectionMode(
-  axonometric:
-      (source.fields &
-              raw.mln_projection_mode_field.MLN_PROJECTION_MODE_AXONOMETRIC) !=
-          0
-      ? source.axonometric
-      : null,
-  xSkew:
-      (source.fields &
-              raw.mln_projection_mode_field.MLN_PROJECTION_MODE_X_SKEW) !=
-          0
-      ? source.x_skew
-      : null,
-  ySkew:
-      (source.fields &
-              raw.mln_projection_mode_field.MLN_PROJECTION_MODE_Y_SKEW) !=
-          0
-      ? source.y_skew
-      : null,
-);
+ProjectionMode _readProjectionMode(raw.mln_projection_mode source) =>
+    ProjectionMode(
+      axonometric: (source.fields & raw.MLN_PROJECTION_MODE_AXONOMETRIC) != 0
+          ? source.axonometric
+          : null,
+      xSkew: (source.fields & raw.MLN_PROJECTION_MODE_X_SKEW) != 0
+          ? source.x_skew
+          : null,
+      ySkew: (source.fields & raw.MLN_PROJECTION_MODE_Y_SKEW) != 0
+          ? source.y_skew
+          : null,
+    );
 
 Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
   StyleImageOptions value,
@@ -1736,8 +1434,7 @@ Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
   final result = arena<raw.mln_style_image_options>();
   result.ref = raw.mln_style_image_options_default();
   if (value.stretchX != null) {
-    result.ref.fields |=
-        raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_STRETCH_X;
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_STRETCH_X;
     result.ref.stretch_x = arena<raw.mln_image_stretch>(
       value.stretchX!.isEmpty ? 1 : value.stretchX!.length,
     );
@@ -1750,8 +1447,7 @@ Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
     }
   }
   if (value.stretchY != null) {
-    result.ref.fields |=
-        raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
     result.ref.stretch_y = arena<raw.mln_image_stretch>(
       value.stretchY!.isEmpty ? 1 : value.stretchY!.length,
     );
@@ -1764,101 +1460,64 @@ Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
     }
   }
   if (value.content != null) {
-    result.ref.fields |=
-        raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_CONTENT;
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_CONTENT;
     result.ref.content = _writeImageContent(value.content!, arena).ref;
   }
   if (value.textFitWidth != null) {
-    result.ref.fields |=
-        raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
     result.ref.text_fit_width = value.textFitWidth!.rawValue;
   }
   if (value.textFitHeight != null) {
-    result.ref.fields |=
-        raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
     result.ref.text_fit_height = value.textFitHeight!.rawValue;
   }
   if (value.pixelRatio != null) {
-    result.ref.fields |=
-        raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
     result.ref.pixel_ratio = value.pixelRatio!;
   }
   if (value.sdf != null) {
-    result.ref.fields |=
-        raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_SDF;
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_SDF;
     result.ref.sdf = value.sdf!;
   }
   return result;
 }
 
-StyleImageOptions _readStyleImageOptions(
-  raw.mln_style_image_options source,
-) => StyleImageOptions(
-  stretchX:
-      (source.fields &
-              raw
-                  .mln_style_image_option_field
-                  .MLN_STYLE_IMAGE_OPTION_STRETCH_X) !=
-          0
-      ? List<ImageStretch>.unmodifiable(
-          List.generate(
-            source.stretch_x_count,
-            (index) => _readImageStretch(source.stretch_x[index]),
-          ),
-        )
-      : null,
-  stretchY:
-      (source.fields &
-              raw
-                  .mln_style_image_option_field
-                  .MLN_STYLE_IMAGE_OPTION_STRETCH_Y) !=
-          0
-      ? List<ImageStretch>.unmodifiable(
-          List.generate(
-            source.stretch_y_count,
-            (index) => _readImageStretch(source.stretch_y[index]),
-          ),
-        )
-      : null,
-  content:
-      (source.fields &
-              raw
-                  .mln_style_image_option_field
-                  .MLN_STYLE_IMAGE_OPTION_CONTENT) !=
-          0
-      ? _readImageContent(source.content)
-      : null,
-  textFitWidth:
-      (source.fields &
-              raw
-                  .mln_style_image_option_field
-                  .MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH) !=
-          0
-      ? StyleImageTextFit.fromRawValue(source.text_fit_width)
-      : null,
-  textFitHeight:
-      (source.fields &
-              raw
-                  .mln_style_image_option_field
-                  .MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT) !=
-          0
-      ? StyleImageTextFit.fromRawValue(source.text_fit_height)
-      : null,
-  pixelRatio:
-      (source.fields &
-              raw
-                  .mln_style_image_option_field
-                  .MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO) !=
-          0
-      ? source.pixel_ratio
-      : null,
-  sdf:
-      (source.fields &
-              raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_SDF) !=
-          0
-      ? source.sdf
-      : null,
-);
+StyleImageOptions _readStyleImageOptions(raw.mln_style_image_options source) =>
+    StyleImageOptions(
+      stretchX: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_STRETCH_X) != 0
+          ? List<ImageStretch>.unmodifiable(
+              List.generate(
+                source.stretch_x_count,
+                (index) => _readImageStretch(source.stretch_x[index]),
+              ),
+            )
+          : null,
+      stretchY: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_STRETCH_Y) != 0
+          ? List<ImageStretch>.unmodifiable(
+              List.generate(
+                source.stretch_y_count,
+                (index) => _readImageStretch(source.stretch_y[index]),
+              ),
+            )
+          : null,
+      content: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_CONTENT) != 0
+          ? _readImageContent(source.content)
+          : null,
+      textFitWidth:
+          (source.fields & raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH) != 0
+          ? StyleImageTextFit.fromRawValue(source.text_fit_width)
+          : null,
+      textFitHeight:
+          (source.fields & raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT) != 0
+          ? StyleImageTextFit.fromRawValue(source.text_fit_height)
+          : null,
+      pixelRatio: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO) != 0
+          ? source.pixel_ratio
+          : null,
+      sdf: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_SDF) != 0
+          ? source.sdf
+          : null,
+    );
 
 Pointer<raw.mln_map_tile_options> _writeMapTileOptions(
   MapTileOptions value,
@@ -1867,8 +1526,7 @@ Pointer<raw.mln_map_tile_options> _writeMapTileOptions(
   final result = arena<raw.mln_map_tile_options>();
   result.ref = raw.mln_map_tile_options_default();
   if (value.prefetchZoomDelta != null) {
-    result.ref.fields |=
-        raw.mln_map_tile_option_field.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
     result.ref.prefetch_zoom_delta = _nativeInteger(
       value.prefetchZoomDelta!,
       0,
@@ -1876,28 +1534,23 @@ Pointer<raw.mln_map_tile_options> _writeMapTileOptions(
     );
   }
   if (value.lodMinRadius != null) {
-    result.ref.fields |=
-        raw.mln_map_tile_option_field.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
     result.ref.lod_min_radius = value.lodMinRadius!;
   }
   if (value.lodScale != null) {
-    result.ref.fields |=
-        raw.mln_map_tile_option_field.MLN_MAP_TILE_OPTION_LOD_SCALE;
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_SCALE;
     result.ref.lod_scale = value.lodScale!;
   }
   if (value.lodPitchThreshold != null) {
-    result.ref.fields |=
-        raw.mln_map_tile_option_field.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
     result.ref.lod_pitch_threshold = value.lodPitchThreshold!;
   }
   if (value.lodZoomShift != null) {
-    result.ref.fields |=
-        raw.mln_map_tile_option_field.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
     result.ref.lod_zoom_shift = value.lodZoomShift!;
   }
   if (value.lodMode != null) {
-    result.ref.fields |=
-        raw.mln_map_tile_option_field.MLN_MAP_TILE_OPTION_LOD_MODE;
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_MODE;
     result.ref.lod_mode = value.lodMode!.rawValue;
   }
   return result;
@@ -1907,47 +1560,23 @@ MapTileOptions _readMapTileOptions(
   raw.mln_map_tile_options source,
 ) => MapTileOptions(
   prefetchZoomDelta:
-      (source.fields &
-              raw
-                  .mln_map_tile_option_field
-                  .MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) !=
-          0
+      (source.fields & raw.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0
       ? source.prefetch_zoom_delta
       : null,
-  lodMinRadius:
-      (source.fields &
-              raw
-                  .mln_map_tile_option_field
-                  .MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) !=
-          0
+  lodMinRadius: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0
       ? source.lod_min_radius
       : null,
-  lodScale:
-      (source.fields &
-              raw.mln_map_tile_option_field.MLN_MAP_TILE_OPTION_LOD_SCALE) !=
-          0
+  lodScale: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_SCALE) != 0
       ? source.lod_scale
       : null,
   lodPitchThreshold:
-      (source.fields &
-              raw
-                  .mln_map_tile_option_field
-                  .MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) !=
-          0
+      (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0
       ? source.lod_pitch_threshold
       : null,
-  lodZoomShift:
-      (source.fields &
-              raw
-                  .mln_map_tile_option_field
-                  .MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) !=
-          0
+  lodZoomShift: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0
       ? source.lod_zoom_shift
       : null,
-  lodMode:
-      (source.fields &
-              raw.mln_map_tile_option_field.MLN_MAP_TILE_OPTION_LOD_MODE) !=
-          0
+  lodMode: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_MODE) != 0
       ? TileLodMode.fromRawValue(source.lod_mode)
       : null,
 );
@@ -1959,26 +1588,19 @@ Pointer<raw.mln_map_viewport_options> _writeMapViewportOptions(
   final result = arena<raw.mln_map_viewport_options>();
   result.ref = raw.mln_map_viewport_options_default();
   if (value.northOrientation != null) {
-    result.ref.fields |= raw
-        .mln_map_viewport_option_field
-        .MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
     result.ref.north_orientation = value.northOrientation!.rawValue;
   }
   if (value.constrainMode != null) {
-    result.ref.fields |= raw
-        .mln_map_viewport_option_field
-        .MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
     result.ref.constrain_mode = value.constrainMode!.rawValue;
   }
   if (value.viewportMode != null) {
-    result.ref.fields |=
-        raw.mln_map_viewport_option_field.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
     result.ref.viewport_mode = value.viewportMode!.rawValue;
   }
   if (value.frustumOffset != null) {
-    result.ref.fields |= raw
-        .mln_map_viewport_option_field
-        .MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
     result.ref.frustum_offset = _writeEdgeInsets(
       value.frustumOffset!,
       arena,
@@ -1991,35 +1613,18 @@ MapViewportOptions _readMapViewportOptions(
   raw.mln_map_viewport_options source,
 ) => MapViewportOptions(
   northOrientation:
-      (source.fields &
-              raw
-                  .mln_map_viewport_option_field
-                  .MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) !=
-          0
+      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0
       ? NorthOrientation.fromRawValue(source.north_orientation)
       : null,
   constrainMode:
-      (source.fields &
-              raw
-                  .mln_map_viewport_option_field
-                  .MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) !=
-          0
+      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0
       ? ConstrainMode.fromRawValue(source.constrain_mode)
       : null,
-  viewportMode:
-      (source.fields &
-              raw
-                  .mln_map_viewport_option_field
-                  .MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) !=
-          0
+  viewportMode: (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0
       ? ViewportMode.fromRawValue(source.viewport_mode)
       : null,
   frustumOffset:
-      (source.fields &
-              raw
-                  .mln_map_viewport_option_field
-                  .MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) !=
-          0
+      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0
       ? _readEdgeInsets(source.frustum_offset)
       : null,
 );
@@ -2109,20 +1714,14 @@ _NativeRegistration<raw.mln_wake> _prepareWake(
     }
     port = roots.register({
       if (value.callback != null)
-        (raw
-                .mln_adapter_dart_port_callback
-                .MLN_ADAPTER_DART_PORT_WAKE_CALLBACK &
-            0xffffffff): (message) =>
+        (raw.MLN_ADAPTER_DART_PORT_WAKE_CALLBACK & 0xffffffff): (message) =>
             value.callback!(),
     });
     result.ref.callback = value.callback == null
         ? nullptr
         : raw
               .mln_adapter_dart_port_function(
-                (raw
-                        .mln_adapter_dart_port_callback
-                        .MLN_ADAPTER_DART_PORT_WAKE_CALLBACK &
-                    0xffffffff),
+                (raw.MLN_ADAPTER_DART_PORT_WAKE_CALLBACK & 0xffffffff),
               )
               .cast();
     result.ref.user_data = port.context;
@@ -2551,9 +2150,7 @@ _writeRenderedFeatureQueryOptions(
   final result = arena<raw.mln_rendered_feature_query_options>();
   result.ref = raw.mln_rendered_feature_query_options_default();
   if (value.layerIds != null) {
-    result.ref.fields |= raw
-        .mln_rendered_feature_query_option_field
-        .MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
+    result.ref.fields |= raw.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
     result.ref.layer_ids = arena<raw.mln_buffer_view>(
       value.layerIds!.isEmpty ? 1 : value.layerIds!.length,
     );
@@ -2579,11 +2176,7 @@ RenderedFeatureQueryOptions _readRenderedFeatureQueryOptions(
   raw.mln_rendered_feature_query_options source,
 ) => RenderedFeatureQueryOptions(
   layerIds:
-      (source.fields &
-              raw
-                  .mln_rendered_feature_query_option_field
-                  .MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS) !=
-          0
+      (source.fields & raw.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS) != 0
       ? List<String>.unmodifiable(
           List.generate(
             source.layer_id_count,
@@ -2594,31 +2187,20 @@ RenderedFeatureQueryOptions _readRenderedFeatureQueryOptions(
   filter: source.filter == nullptr ? null : _copyBufferView(source.filter.ref),
 );
 
-QueriedFeature _readQueriedFeature(
-  raw.mln_queried_feature source,
-) => QueriedFeature(
-  feature: _copyBufferView(source.feature),
-  sourceId:
-      (source.fields &
-              raw.mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_ID) !=
-          0
-      ? utf8.decode(_copyBufferView(source.source_id))
-      : null,
-  sourceLayerId:
-      (source.fields &
-              raw
-                  .mln_queried_feature_field
-                  .MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) !=
-          0
-      ? utf8.decode(_copyBufferView(source.source_layer_id))
-      : null,
-  state:
-      (source.fields &
-              raw.mln_queried_feature_field.MLN_QUERIED_FEATURE_STATE) !=
-          0
-      ? _copyBufferView(source.state)
-      : null,
-);
+QueriedFeature _readQueriedFeature(raw.mln_queried_feature source) =>
+    QueriedFeature(
+      feature: _copyBufferView(source.feature),
+      sourceId: (source.fields & raw.MLN_QUERIED_FEATURE_SOURCE_ID) != 0
+          ? utf8.decode(_copyBufferView(source.source_id))
+          : null,
+      sourceLayerId:
+          (source.fields & raw.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0
+          ? utf8.decode(_copyBufferView(source.source_layer_id))
+          : null,
+      state: (source.fields & raw.MLN_QUERIED_FEATURE_STATE) != 0
+          ? _copyBufferView(source.state)
+          : null,
+    );
 
 Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
   SourceFeatureQueryOptions value,
@@ -2627,9 +2209,7 @@ Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
   final result = arena<raw.mln_source_feature_query_options>();
   result.ref = raw.mln_source_feature_query_options_default();
   if (value.sourceLayerIds != null) {
-    result.ref.fields |= raw
-        .mln_source_feature_query_option_field
-        .MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
+    result.ref.fields |= raw.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
     result.ref.source_layer_ids = arena<raw.mln_buffer_view>(
       value.sourceLayerIds!.isEmpty ? 1 : value.sourceLayerIds!.length,
     );
@@ -2655,10 +2235,7 @@ SourceFeatureQueryOptions _readSourceFeatureQueryOptions(
   raw.mln_source_feature_query_options source,
 ) => SourceFeatureQueryOptions(
   sourceLayerIds:
-      (source.fields &
-              raw
-                  .mln_source_feature_query_option_field
-                  .MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS) !=
+      (source.fields & raw.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS) !=
           0
       ? List<String>.unmodifiable(
           List.generate(
@@ -3069,10 +2646,7 @@ _writeAdapterRoutedResourceProvider(
     ).ref;
   }
   final portCallback = ports.registerDeferred(
-    (raw
-            .mln_adapter_deferred_callback
-            .MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK &
-        0xffffffff),
+    (raw.MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK & 0xffffffff),
     (message) => _deliverResourceProviderCallback(value.callback, message),
   );
   arena.adoptRelease(
@@ -3083,10 +2657,7 @@ _writeAdapterRoutedResourceProvider(
   );
   result.ref.callback = raw
       .mln_adapter_deferred_callback_function(
-        (raw
-                .mln_adapter_deferred_callback
-                .MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK &
-            0xffffffff),
+        (raw.MLN_ADAPTER_DEFERRED_RESOURCE_PROVIDER_CALLBACK & 0xffffffff),
       )
       .cast();
   result.ref.user_data = portCallback.context;
@@ -3493,156 +3064,128 @@ WebgpuSurfaceDescriptor _readWebgpuSurfaceDescriptor(
 );
 
 final _resultCameraOptions = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS,
+  raw.MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS,
   sizeOf<raw.mln_camera_options>(),
   (element) => _readCameraOptions(element.cast<raw.mln_camera_options>().ref),
 );
 final _resultCameraQueryResult = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT,
+  raw.MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT,
   sizeOf<raw.mln_camera_query_result>(),
   (element) =>
       _readCameraQueryResult(element.cast<raw.mln_camera_query_result>().ref),
 );
 final _resultLatLng = _CompletionValue(
-  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_LAT_LNG,
+  raw.MLN_ADAPTER_COMPLETION_COPY_LAT_LNG,
   sizeOf<raw.mln_lat_lng>(),
   (element) => _readLatLng(element.cast<raw.mln_lat_lng>().ref),
 );
 final _resultLatLngBounds = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS,
+  raw.MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS,
   sizeOf<raw.mln_lat_lng_bounds>(),
   (element) => _readLatLngBounds(element.cast<raw.mln_lat_lng_bounds>().ref),
 );
 final _resultOfflineRegionInfo = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO,
+  raw.MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO,
   sizeOf<raw.mln_offline_region_info>(),
   (element) =>
       _readOfflineRegionInfo(element.cast<raw.mln_offline_region_info>().ref),
 );
 final _resultOfflineRegionStatus = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS,
+  raw.MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS,
   sizeOf<raw.mln_offline_region_status>(),
   (element) => _readOfflineRegionStatus(
     element.cast<raw.mln_offline_region_status>().ref,
   ),
 );
 final _resultQueriedFeature = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE,
+  raw.MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE,
   sizeOf<raw.mln_queried_feature>(),
   (element) => _readQueriedFeature(element.cast<raw.mln_queried_feature>().ref),
 );
 final _resultScreenPoint = _CompletionValue(
-  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT,
+  raw.MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT,
   sizeOf<raw.mln_screen_point>(),
   (element) => _readScreenPoint(element.cast<raw.mln_screen_point>().ref),
 );
 final _resultString = _CompletionValue(
-  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
+  raw.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
   sizeOf<raw.mln_buffer_view>(),
   (element) =>
       utf8.decode(_copyBufferView(element.cast<raw.mln_buffer_view>().ref)),
 );
 final _resultStringOrNull = _CompletionValue(
-  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
+  raw.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
   sizeOf<raw.mln_buffer_view>(),
   (element) => element.cast<raw.mln_buffer_view>().ref.data == nullptr
       ? null
       : utf8.decode(_copyBufferView(element.cast<raw.mln_buffer_view>().ref)),
 );
 final _resultStyleImageResult = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT,
+  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT,
   sizeOf<raw.mln_style_image_result>(),
   (element) =>
       _readStyleImageResult(element.cast<raw.mln_style_image_result>().ref),
 );
 final _resultStyleImageStretchesResult = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT,
+  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT,
   sizeOf<raw.mln_style_image_stretches_result>(),
   (element) => _readStyleImageStretchesResult(
     element.cast<raw.mln_style_image_stretches_result>().ref,
   ),
 );
 final _resultStyleLayerEntry = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY,
+  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY,
   sizeOf<raw.mln_style_layer_entry>(),
   (element) =>
       _readStyleLayerEntry(element.cast<raw.mln_style_layer_entry>().ref),
 );
 final _resultStyleLayerResult = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT,
+  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT,
   sizeOf<raw.mln_style_layer_result>(),
   (element) =>
       _readStyleLayerResult(element.cast<raw.mln_style_layer_result>().ref),
 );
 final _resultStyleSourceResult = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT,
+  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT,
   sizeOf<raw.mln_style_source_result>(),
   (element) =>
       _readStyleSourceResult(element.cast<raw.mln_style_source_result>().ref),
 );
 final _resultStyleSourceTileUrlsResult = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT,
+  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT,
   sizeOf<raw.mln_style_source_tile_urls_result>(),
   (element) => _readStyleSourceTileUrlsResult(
     element.cast<raw.mln_style_source_tile_urls_result>().ref,
   ),
 );
 final _resultStyleTransitionOptions = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS,
+  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS,
   sizeOf<raw.mln_style_transition_options>(),
   (element) => _readStyleTransitionOptions(
     element.cast<raw.mln_style_transition_options>().ref,
   ),
 );
 final _resultTextureReadbackResult = _CompletionValue(
-  raw
-      .mln_adapter_completion_copy_kind
-      .MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT,
+  raw.MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT,
   sizeOf<raw.mln_texture_readback_result>(),
   (element) => _readTextureReadbackResult(
     element.cast<raw.mln_texture_readback_result>().ref,
   ),
 );
 final _resultUint8List = _CompletionValue(
-  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
+  raw.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
   sizeOf<raw.mln_buffer_view>(),
   (element) => _copyBufferView(element.cast<raw.mln_buffer_view>().ref),
 );
 final _resultUint8ListOrNull = _CompletionValue(
-  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
+  raw.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
   sizeOf<raw.mln_buffer_view>(),
   (element) => element.cast<raw.mln_buffer_view>().ref.data == nullptr
       ? null
       : _copyBufferView(element.cast<raw.mln_buffer_view>().ref),
 );
 final _resultdouble = _CompletionValue(
-  raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+  raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
   sizeOf<Double>(),
   (element) => element.cast<Double>().value,
 );
@@ -3793,8 +3336,7 @@ void logSetAsyncSeverityMask(LogSeverityMask mask) {
 void logSetCallback(LogCallback callback) {
   ensureAbiVersion();
   final port = _globalCallbackPorts.registerDeferred(
-    (raw.mln_adapter_deferred_callback.MLN_ADAPTER_DEFERRED_LOG_CALLBACK &
-        0xffffffff),
+    (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
     (message) => _deliverLogCallback(callback, message),
   );
   var accepted = false;
@@ -3803,10 +3345,7 @@ void logSetCallback(LogCallback callback) {
       raw.mln_log_set_callback(
         raw
             .mln_adapter_deferred_callback_function(
-              (raw
-                      .mln_adapter_deferred_callback
-                      .MLN_ADAPTER_DEFERRED_LOG_CALLBACK &
-                  0xffffffff),
+              (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
             )
             .cast(),
         port.context,
@@ -5027,9 +4566,7 @@ final class MapHandle implements Finalizable {
         );
       });
   Future<MapProjectionHandle> projectionCreate() => _queryOwned(
-    raw
-        .mln_adapter_completion_copy_kind
-        .MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION,
+    raw.MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION,
     (arena, completion) => raw.mln_map_projection_create(
       _handle.raw,
       completion,
@@ -6421,9 +5958,7 @@ final class ResourceRequestHandle implements Finalizable {
     final handle = _handle;
     final declined = arena<Bool>();
     final port = _callbackPorts.register({
-      (raw
-              .mln_adapter_dart_port_callback
-              .MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK &
+      (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK &
           0xffffffff): (message) {
         if (!isClosed) {
           callback();
@@ -6437,9 +5972,7 @@ final class ResourceRequestHandle implements Finalizable {
           handle.raw,
           raw
               .mln_adapter_dart_port_function(
-                (raw
-                        .mln_adapter_dart_port_callback
-                        .MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK &
+                (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK &
                     0xffffffff),
               )
               .cast(),
@@ -6487,7 +6020,7 @@ final class RuntimeHandle implements Finalizable {
   BigInt get identity => uint64FromNative(_state.handleId);
 
   Future<MapHandle> mapCreate(MapOptions options) => _queryOwned(
-    raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_MAP,
+    raw.MLN_ADAPTER_COMPLETION_COPY_MAP,
     (arena, completion) => raw.mln_map_create(
       _handle.raw,
       _writeMapOptions(options, arena),

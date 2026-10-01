@@ -207,8 +207,7 @@ Future<CommandCompletion> _startCommand(
   NativeCompletionStart start, {
   void Function()? onRejected,
 }) => startNativeCompletion(
-  copyKind:
-      raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+  copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
   elementSize: 0,
   start: start,
   onRejected: onRejected,

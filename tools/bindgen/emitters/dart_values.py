@@ -52,10 +52,7 @@ SCALARS = {
 
 def deferred_key(callback) -> str:
     """The Dart expression for a deferred callback's port message key."""
-    return (
-        "(raw.mln_adapter_deferred_callback."
-        f"{deferred_constant(callback.native)} & 0xffffffff)"
-    )
+    return f"(raw.{deferred_constant(callback.native)} & 0xffffffff)"
 
 
 def owner_names(native: str) -> tuple[str, str]:
@@ -563,10 +560,9 @@ class Values:
         return result
 
     def enum_constant(self, bit):
-        enum = next(
-            e for e in self.bound.source.enums if any(v.name == bit for v in e.values)
-        )
-        return f"raw.{enum.name}.{bit}"
+        if not any(v.name == bit for e in self.bound.source.enums for v in e.values):
+            raise Unsupported(f"{bit}: no C enum declares this constant")
+        return f"raw.{bit}"
 
     def present(self, mask, bit):
         return (
@@ -730,7 +726,7 @@ class Values:
             )
             if field.name in ports:
                 callback, _ = ports[field.name]
-                key = f"(raw.mln_adapter_dart_port_callback.{native_ports.constant(value.native, field.name)} & 0xffffffff)"
+                key = f"(raw.{native_ports.constant(value.native, field.name)} & 0xffffffff)"
                 decoded, offset = [], 1
                 for parameter in callback.parameters:
                     if parameter.name == callback.context:
