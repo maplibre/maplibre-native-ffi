@@ -532,15 +532,34 @@ endfunction()
 
 # Each exit program makes its calls and returns from main at once, so the
 # process exit that follows is the check. They link the shipped library, as
-# the ABI suite does, and run only where the suites run one process per file.
+# the ABI suite does, and a program whose name ends in a backend tag builds
+# only on matching presets, as a suite file does.
 function(mln_native_add_exit_tests out_tests)
-  file(GLOB programs CONFIGURE_DEPENDS "${MLN_NATIVE_TESTS_DIR}/exit/*.c")
+  mln_native_active_file_tags(active_tags)
+  file(GLOB programs RELATIVE "${MLN_NATIVE_TESTS_DIR}/exit" CONFIGURE_DEPENDS
+       "${MLN_NATIVE_TESTS_DIR}/exit/*.c")
+  if(NOT WIN32)
+    find_package(Threads REQUIRED)
+  endif()
   set(tests)
   foreach(program IN LISTS programs)
+    mln_native_file_selected("${program}" "${active_tags}" selected)
+    if(NOT selected)
+      continue()
+    endif()
     get_filename_component(stem "${program}" NAME_WE)
     set(target "mln_native_exit_${stem}")
-    add_executable(${target} "${program}")
+    add_executable(${target} "${MLN_NATIVE_TESTS_DIR}/exit/${program}")
+    set_target_properties(
+      ${target}
+      PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED YES)
     target_link_libraries(${target} PRIVATE maplibre_native_c)
+    if(NOT WIN32)
+      target_link_libraries(${target} PRIVATE Threads::Threads)
+    endif()
+    if(TARGET mln_test_graphics_objects)
+      target_link_libraries(${target} PRIVATE mln_test_graphics_objects)
+    endif()
     add_test(NAME "native-exit/${stem}" COMMAND ${target})
     set_tests_properties("native-exit/${stem}" PROPERTIES TIMEOUT 60)
     list(APPEND tests "native-exit/${stem}")

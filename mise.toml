@@ -324,17 +324,21 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # as pages in headless Chromium, four for the ABI suite and one for the internal
 # suite; see scripts/run-browser-test.mjs for how a browser is located. Every
 # target that runs through ctest first runs the Rust platform crate's host unit
-# tests with cargo. Emulator and musl targets run each executable once instead,
-# with the ABI suite's plugin group in an invocation of its own after the rest,
-# since a plugin registration lasts for
-# the rest of the process.
+# tests with cargo. Emulator and musl targets run each executable once instead:
+# the suites, then the exit programs, then the ABI suite's plugin group in an
+# invocation of its own, since a plugin registration lasts for the rest of the
+# process.
 run = '''
 build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset"
 suite="$build_dir/mln_native_abi_tests"
 internal="$build_dir/mln_native_internal_tests"
+exit_programs=("$build_dir"/mln_native_exit_*)
 if [[ "$usage_preset" == linux-musl-* ]]; then
   "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset" "$suite" -x /abi/plugin/
   "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset" "$internal"
+  for program in "${exit_programs[@]}"; do
+    "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset" "$program"
+  done
   exec "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset" "$suite" -f /abi/plugin/
 elif [[ "$usage_preset" == ios-simulator-* ]]; then
   mise run //:apple-simulator:boot iOS
@@ -368,6 +372,7 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-arm64-* ||
     fi
   fi
   "${runner[@]}" -x /abi/plugin/ -- "$suite" "$internal"
+  "${runner[@]}" -- "${exit_programs[@]}"
   exec "${runner[@]}" -f /abi/plugin/ -- "$suite"
 fi
 # The Rust platform crate's pure helpers, such as redirect resolution, have

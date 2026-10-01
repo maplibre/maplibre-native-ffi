@@ -58,10 +58,16 @@ the `Dart_CObject` layout. Where the VM would run a native-pointer finalizer for
 an undelivered message, the case runs it.
 
 Each program in `exit/` makes its calls and returns from `main` at once, so its
-process exits with no harness teardown in between, and a crash at exit fails its
-CTest entry, `native-exit/<file>`. It links the shipped library, as the ABI
-suite does. A behavior belongs there only when process exit is what it promises,
-such as a process that prepares GeoJSON data and exits without a runtime.
+process exits with no harness teardown in between, and a crash or a nonzero
+status at exit fails its entry, `native-exit/<file>` under CTest. It links the
+shipped library, as the ABI suite does. A behavior belongs there only when
+process exit is what it promises. The programs leave native work running as they
+exit: live runtimes and maps loading a style, a core-worker render session with
+frames queued, and the resource provider, wakes, and log callback all installed.
+`exit/probe.h` holds what they share, and `exit/render_probe.h` the
+render-session program, which each backend's tagged file attaches. A program
+whose name ends in a backend tag builds only on matching presets, as a suite
+file does.
 
 ## The internal suite
 
@@ -184,8 +190,8 @@ Each target runs the suites in the shape that suits it:
 - **iOS and tvOS simulators:** one CTest entry for the ABI suite, one for its
   plugin group, and one for the internal suite.
 - **Android, OpenHarmony, and musl:** the runner script pushes and runs the ABI
-  suite and then the internal suite, then runs the ABI suite again for the
-  plugin group.
+  suite and then the internal suite, then each exit program, then the ABI suite
+  again for the plugin group.
 
 The plugin group runs last because a plugin registration lasts for the rest of
 the process. Every target except the browser also runs it in an invocation of
