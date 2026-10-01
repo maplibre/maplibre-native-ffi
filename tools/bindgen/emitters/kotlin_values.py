@@ -1,4 +1,10 @@
-"""Resolve Kotlin values and emit conversions for each Kotlin native boundary."""
+"""Resolve Kotlin value types and emit their common native codecs.
+
+A codec reads or writes one C record at an address through the typed accessors
+in the binding's `internal/memory` package. Only the directions an operation
+or callback uses are emitted: `putX` writes a record in place, `writeX`
+allocates and writes one, and `readX` copies one into its Kotlin value.
+"""
 
 from __future__ import annotations
 
@@ -6,37 +12,86 @@ from dataclasses import replace
 from os.path import commonprefix
 
 from ..names import camel, pascal
+from .kotlin_abi import Abi, LayoutError, width_expression
 
 
 class Unsupported(ValueError):
     pass
 
 
+# Public Kotlin type and accessor suffix for each portable scalar carrier.
 SCALARS = {
-    "bool": ("Boolean", "BOOLEAN"),
-    "_Bool": ("Boolean", "BOOLEAN"),
-    "double": ("Double", "DOUBLE"),
-    "float": ("Float", "FLOAT"),
-    "uint8_t": ("UByte", "BYTE"),
-    "unsigned char": ("UByte", "BYTE"),
-    "int8_t": ("Byte", "BYTE"),
-    "signed char": ("Byte", "BYTE"),
-    "char": ("Byte", "BYTE"),
-    "uint16_t": ("UShort", "SHORT"),
-    "unsigned short": ("UShort", "SHORT"),
-    "int16_t": ("Short", "SHORT"),
-    "short": ("Short", "SHORT"),
-    "uint32_t": ("UInt", "INT"),
-    "unsigned int": ("UInt", "INT"),
-    "int32_t": ("Int", "INT"),
-    "int": ("Int", "INT"),
-    "uint64_t": ("ULong", "LONG"),
-    "unsigned long long": ("ULong", "LONG"),
-    "unsigned long": ("ULong", "LONG"),
-    "size_t": ("ULong", "LONG"),
-    "int64_t": ("Long", "LONG"),
-    "long long": ("Long", "LONG"),
-    "long": ("Long", "LONG"),
+    "bool": ("Boolean", "Bool"),
+    "_Bool": ("Boolean", "Bool"),
+    "double": ("Double", "F64"),
+    "float": ("Float", "F32"),
+    "uint8_t": ("UByte", "U8"),
+    "unsigned char": ("UByte", "U8"),
+    "int8_t": ("Byte", "I8"),
+    "signed char": ("Byte", "I8"),
+    "char": ("Byte", "I8"),
+    "uint16_t": ("UShort", "U16"),
+    "unsigned short": ("UShort", "U16"),
+    "int16_t": ("Short", "I16"),
+    "short": ("Short", "I16"),
+    "uint32_t": ("UInt", "U32"),
+    "unsigned int": ("UInt", "U32"),
+    "int32_t": ("Int", "I32"),
+    "int": ("Int", "I32"),
+    "uint64_t": ("ULong", "U64"),
+    "unsigned long long": ("ULong", "U64"),
+    "unsigned long": ("ULong", "Size"),
+    "size_t": ("ULong", "Size"),
+    "int64_t": ("Long", "I64"),
+    "long long": ("Long", "I64"),
+    "long": ("Long", "I64"),
+}
+
+# The conversion from a public scalar type to its native-call carrier.
+CARRIER = {
+    "Boolean": "",
+    "Double": "",
+    "Float": "",
+    "Byte": "",
+    "Short": "",
+    "Int": "",
+    "Long": "",
+    "UByte": ".toByte()",
+    "UShort": ".toShort()",
+    "UInt": ".toInt()",
+    "ULong": ".toLong()",
+}
+
+# The conversion from a native-call carrier back to a public scalar type.
+PUBLIC = {
+    "Boolean": "",
+    "Double": "",
+    "Float": "",
+    "Byte": "",
+    "Short": "",
+    "Int": "",
+    "Long": "",
+    "UByte": ".toUByte()",
+    "UShort": ".toUShort()",
+    "UInt": ".toUInt()",
+    "ULong": ".toULong()",
+}
+
+KEYWORDS = {
+    "class",
+    "object",
+    "when",
+    "in",
+    "is",
+    "as",
+    "fun",
+    "val",
+    "var",
+    "return",
+    "interface",
+    "null",
+    "true",
+    "false",
 }
 
 
@@ -46,31 +101,7 @@ def name(native):
 
 def identifier(native):
     value = camel(native)
-    return (
-        "`" + value + "`"
-        if value
-        in {
-            "class",
-            "object",
-            "when",
-            "in",
-            "is",
-            "as",
-            "fun",
-            "val",
-            "var",
-            "return",
-            "interface",
-            "null",
-            "true",
-            "false",
-        }
-        else value
-    )
-
-
-def native_identifier(native):
-    return "`" + native + "`" if identifier(native).startswith("`") else native
+    return "`" + value + "`" if value in KEYWORDS else value
 
 
 def owner_name(native):
@@ -79,38 +110,48 @@ def owner_name(native):
 
 
 def owner_class(native):
-    return "org.maplibre.nativeffi.generated." + owner_name(native)
+    return owner_name(native)
 
 
-def native_call(function, prefix, arguments):
-    """Call a C function, throwing its diagnostic when it returns a failed status.
-
-    The call's value is Unit when it checks a status and the raw result otherwise.
-    """
-    if not function.diagnostic:
-        if "mln_status" in (
-            function.return_type.declaration,
-            function.return_type.spelling,
-        ):
-            raise Unsupported("status result requires a diagnostic parameter")
-        return f"{prefix}{function.name}({', '.join(arguments)})"
-    call = f"{prefix}{function.name}({', '.join([*arguments, 'diagnostic'])})"
-    return f"NativeDiagnostics.check {{ diagnostic -> {call} }}"
-
-
-from . import kotlin_callbacks
+def literal(number, typ):
+    """A Kotlin literal of [typ] for the integer [number]."""
+    if typ in {"ULong", "UInt", "UShort", "UByte"}:
+        bits = {"ULong": 64, "UInt": 32, "UShort": 16, "UByte": 8}[typ]
+        text = f"{number % (1 << bits)}u" + ("L" if typ == "ULong" else "")
+        return text if typ in {"ULong", "UInt"} else f"{text}.to{typ}()"
+    if typ == "Long":
+        return f"{number}L"
+    if typ == "Boolean":
+        return "true" if number else "false"
+    if typ == "Double":
+        return f"{number}.0"
+    if typ == "Float":
+        return f"{number}f"
+    return str(number)
 
 
 class Values:
     def __init__(self, bound):
         self.bound = bound
+        self.abi = Abi(bound.source)
         self.used = {}
-        self.arrays = {}
         self.groups = {}
         self.views = set()
         self.item_buffers = {}
         self.multiple = {}
         self.attachments = {}
+        self.writers = {}
+        self.readers = {}
+        # The C functions that codecs call, which the native shims declare.
+        self.functions = {}
+
+    def default_call(self, value):
+        """Initialize a record at `target` with its C default constructor."""
+        function = self.bound.source.functions_by_name[value.default]
+        self.functions[function.name] = function
+        return f"C.{function.name}(target)"
+
+    # Public types.
 
     def needs_registration(self, value):
         return bool(
@@ -156,6 +197,8 @@ class Values:
         return tuple(f for f in value.fields if f.name not in controls)
 
     def check(self, value):
+        from . import kotlin_callbacks
+
         if kotlin_callbacks.check(value, self):
             return
         if value.kind == "native_pointer":
@@ -179,7 +222,6 @@ class Values:
             if value.element.kind not in {"record", "buffer"}:
                 raise Unsupported("array element needs a Kotlin storage rule")
             self.check(value.element)
-            self.arrays[value.element.native] = value.element
             return
         if value.kind == "reference" and value.element:
             self.check(value.element)
@@ -188,6 +230,10 @@ class Values:
             raise Unsupported(
                 f"{value.native}: {value.kind} needs another Kotlin value rule"
             )
+        try:
+            self.abi.record_named(value.native, 64)
+        except LayoutError as error:
+            raise Unsupported(str(error)) from error
         for field in self.fields(value):
             if field.value.kind == "union":
                 if not field.presence or not field.presence.tag:
@@ -204,12 +250,14 @@ class Values:
         self.used[value.native] = value
 
     def public(self, value):
+        from . import kotlin_callbacks
+
         self.check(value)
         callback_type = kotlin_callbacks.public(value, self)
         if callback_type is not None:
             return callback_type
         if value.kind == "native_pointer":
-            result = "org.maplibre.nativeffi.render.NativePointer"
+            result = "NativePointer"
         elif value.kind == "handle":
             result = owner_class(value.native)
         elif value.kind in {"record", "enum"}:
@@ -224,7 +272,23 @@ class Values:
             result = self.scalar(value)[0]
         return result + ("?" if value.nullable or value.optional else "")
 
+    def group_prefix(self, group):
+        enum = next(
+            (
+                e
+                for e in self.bound.source.enums
+                if any(v.name == group.bit for v in e.values)
+            ),
+            None,
+        )
+        return (
+            commonprefix([v.name for v in enum.values]).rsplit("_", 1)[0] + "_"
+            if enum
+            else "has_"
+        )
+
     def members(self, value):
+        """The public members of a record: (name, type, fields, presence group)."""
         fields = self.fields(value)
         grouped = {
             field: group
@@ -240,21 +304,10 @@ class Values:
                 if key in seen:
                     continue
                 seen.add(key)
-                enum = next(
-                    (
-                        e
-                        for e in self.bound.source.enums
-                        if any(v.name == group.bit for v in e.values)
-                    ),
-                    None,
-                )
-                prefix = (
-                    commonprefix([v.name for v in enum.values]).rsplit("_", 1)[0] + "_"
-                    if enum
-                    else "has_"
-                )
                 member = identifier(
-                    (group.bit or group.mask).removeprefix(prefix).lower()
+                    (group.bit or group.mask)
+                    .removeprefix(self.group_prefix(group))
+                    .lower()
                 )
                 group_name = (
                     name(group.type)
@@ -293,35 +346,17 @@ class Values:
         if value.nullable or value.optional:
             return "null"
         if value.kind == "scalar":
-            public = self.public(value)
-            return {
-                "Double": "0.0",
-                "Float": "0f",
-                "Boolean": "false",
-                "ULong": "0uL",
-                "UInt": "0u",
-                "UShort": "0u",
-                "UByte": "0u",
-                "Long": "0L",
-                "Int": "0",
-                "Short": "0",
-                "Byte": "0",
-            }[public]
+            return literal(0, self.public(value))
         if value.kind == "array":
             return "emptyList()"
         if value.kind == "buffer":
             return '""' if value.encoding == "utf8" else "byteArrayOf()"
         if value.kind == "enum":
+            scalar = self.scalar(value)[0]
             return (
                 name(value.native)
                 + "("
-                + (
-                    "0uL"
-                    if self.scalar(value)[0] == "ULong"
-                    else "0u"
-                    if self.scalar(value)[0] == "UInt"
-                    else "0"
-                )
+                + ("0uL" if scalar == "ULong" else "0u" if scalar == "UInt" else "0")
                 + ")"
                 if any(n == 0 for _, n in value.enum_values)
                 else None
@@ -338,9 +373,14 @@ class Values:
         return None
 
     def common(self):
+        """The public value types."""
+        from . import kotlin_callbacks
+
         result = [
             "// Generated by tools/bindgen. Do not edit.",
             "package org.maplibre.nativeffi.generated",
+            "",
+            "import org.maplibre.nativeffi.render.NativePointer",
             "",
         ]
         for value in self.used.values():
@@ -353,20 +393,10 @@ class Values:
                     commonprefix([n for n, _ in value.enum_values]).rsplit("_", 1)[0]
                     + "_"
                 )
-                constants = []
-                for native, number in value.enum_values:
-                    literal = str(number) + (
-                        "uL"
-                        if scalar == "ULong"
-                        else "u"
-                        if scalar == "UInt"
-                        else "L"
-                        if scalar == "Long"
-                        else ""
-                    )
-                    constants.append(
-                        f"    public val {native.removeprefix(prefix)}: {public} = {public}({literal})"
-                    )
+                constants = [
+                    f"    public val {native.removeprefix(prefix)}: {public} = {public}({literal(number, scalar)})"
+                    for native, number in value.enum_values
+                ]
                 result.extend(
                     [
                         f"public data class {public}(public val rawValue: {scalar}) {{",
@@ -385,66 +415,65 @@ class Values:
                         "}",
                     ]
                 )
-            else:
-                for field in self.fields(value):
-                    if field.value.kind != "union":
-                        continue
-                    union_name = name(value.native) + pascal(field.name)
-                    variants = [
-                        f"  public data class {pascal(v.name)}(public val value: {self.public(v.value)}): {union_name}"
-                        for v in field.value.fields
-                    ]
-                    if field.value.empty_variant:
-                        variants.append(f"  public data object None: {union_name}")
-                    variants.append(
-                        f"  public data class Unknown(public val tag: UInt, public val bytes: ByteArray): {union_name}"
-                    )
-                    result.append(
-                        f"public sealed interface {union_name} {{\n"
-                        + "\n".join(variants)
-                        + "\n}"
-                    )
-                args = []
-                for member, typ, children, group in self.members(value):
-                    default = (
-                        "null" if typ.endswith("?") else self.default(children[0].value)
-                    )
-                    args.append(
-                        f"  public val {member}: {typ}"
-                        + (" = " + default if default is not None else "")
-                    )
-                if value.native in self.item_buffers:
-                    arena = self.item_buffers[value.native]
-                    args.append(
-                        f"  public val {identifier(arena.field)}: "
-                        + (
-                            'String = ""'
-                            if arena.encoding == "utf8"
-                            else "ByteArray = byteArrayOf()"
-                        )
-                    )
-                args.extend(
-                    f"  public val {self.flag_name(value, flag)}: Boolean = false"
-                    for flag in value.mask_flags
+                continue
+            for field in self.fields(value):
+                if field.value.kind != "union":
+                    continue
+                union_name = public + pascal(field.name)
+                variants = [
+                    f"  public data class {pascal(v.name)}(public val value: {self.public(v.value)}): {union_name}"
+                    for v in field.value.fields
+                ]
+                if field.value.empty_variant:
+                    variants.append(f"  public data object None: {union_name}")
+                variants.append(
+                    f"  public data class Unknown(public val tag: UInt, public val bytes: ByteArray): {union_name}"
                 )
-                if value.native in self.views:
-                    members = self.members(value)
-                    args = [arg.replace("public val ", "") for arg in args]
-                    getters = [
-                        f"  private val stored{pascal(member.strip('`'))}: {typ} = {member}\n  public val {member}: {typ} get() {{ bindingScope?.ensureActive(); return stored{pascal(member.strip('`'))} }}"
-                        for member, typ, _, _ in members
-                    ]
-                    result.append(
-                        f"public class {public}(\n"
-                        + ",\n".join(args)
-                        + "\n) {\n  internal var bindingScope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null\n"
-                        + "\n".join(getters)
-                        + "\n}"
+                result.append(
+                    f"public sealed interface {union_name} {{\n"
+                    + "\n".join(variants)
+                    + "\n}"
+                )
+            args = []
+            for member, typ, children, _group in self.members(value):
+                default = (
+                    "null" if typ.endswith("?") else self.default(children[0].value)
+                )
+                args.append(
+                    f"  public val {member}: {typ}"
+                    + (" = " + default if default is not None else "")
+                )
+            if value.native in self.item_buffers:
+                arena = self.item_buffers[value.native]
+                args.append(
+                    f"  public val {identifier(arena.field)}: "
+                    + (
+                        'String = ""'
+                        if arena.encoding == "utf8"
+                        else "ByteArray = byteArrayOf()"
                     )
-                else:
-                    result.append(
-                        f"public data class {public}(\n" + ",\n".join(args) + "\n)"
-                    )
+                )
+            args.extend(
+                f"  public val {self.flag_name(value, flag)}: Boolean = false"
+                for flag in value.mask_flags
+            )
+            if value.native in self.views:
+                args = [arg.replace("public val ", "") for arg in args]
+                getters = [
+                    f"  private val stored{pascal(member.strip('`'))}: {typ} = {member}\n  public val {member}: {typ} get() {{ bindingScope?.ensureActive(); return stored{pascal(member.strip('`'))} }}"
+                    for member, typ, _, _ in self.members(value)
+                ]
+                result.append(
+                    f"public class {public}(\n"
+                    + ",\n".join(args)
+                    + "\n) {\n  internal var bindingScope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null\n"
+                    + "\n".join(getters)
+                    + "\n}"
+                )
+            else:
+                result.append(
+                    f"public data class {public}(\n" + ",\n".join(args) + "\n)"
+                )
         for public, fields in self.groups.items():
             args = []
             for field in fields:
@@ -469,717 +498,531 @@ class Values:
             )
         return "\n".join(result) + "\n" + kotlin_callbacks.common(self)
 
-    def cast_native(self, value, expression, platform):
-        callback = kotlin_callbacks.cast_native(value, expression, self, platform)
+    # Layout facts.
+
+    def size(self, native):
+        return width_expression(
+            (
+                self.abi.record_named(native, 32).size,
+                self.abi.record_named(native, 64).size,
+            )
+        )
+
+    def align(self, native):
+        return width_expression(
+            (
+                self.abi.record_named(native, 32).align,
+                self.abi.record_named(native, 64).align,
+            )
+        )
+
+    def element_size(self, element):
+        if element.kind == "buffer":
+            return "2 * NativeMemory.addressSize"
+        return self.size(element.native)
+
+    def element_align(self, element):
+        if element.kind == "buffer":
+            return "NativeMemory.addressSize"
+        return self.align(element.native)
+
+    def at(self, base, record, path):
+        offset = width_expression(self.abi.offset(record.native, path))
+        return base if offset == "0" else f"{base} + {offset}"
+
+    def field_plan(self, record, path):
+        value = record
+        for part in path.split("."):
+            field = next(f for f in value.fields if f.name == part)
+            value = field.value
+        return field
+
+    def accessor(self, value):
+        """The accessor suffix and public type of a scalar or enum's storage."""
+        typ, suffix = self.scalar(value)
+        return suffix, typ
+
+    # Writing.
+
+    def write_scalar(self, value, address, expression):
+        suffix, _typ = self.accessor(value)
+        return f"write{suffix}({address}, {expression})"
+
+    def put(self, record):
+        """Name the in-place writer of [record], emitting it once."""
+        self.writers.setdefault(record.native, record)
+        return "put" + name(record.native)
+
+    def write(self, record):
+        """Name the allocating writer of [record], emitting it once."""
+        self.put(record)
+        return "write" + name(record.native)
+
+    def argument(self, value, expression):
+        """An expression for [value] as a native-call carrier, in a NativeArena receiver."""
+        from . import kotlin_callbacks
+
+        callback = kotlin_callbacks.argument(value, expression, self)
         if callback is not None:
             return callback
-        if value.kind == "reference":
-            raw = self.cast_native(
-                value.element, expression + ("!!" if value.nullable else ""), platform
-            )
-            absent = "MemorySegment.NULL" if platform == "jvmMain" else "null"
-            return (
-                f"if ({expression} == null) {absent} else {raw}"
-                if value.nullable
-                else raw
-            )
+        if value.kind == "handle":
+            return f"{expression}.binding.handle()"
         if value.kind == "native_pointer":
-            raw = expression + ".address"
-            if value.ctype.kind == "pointer" or "*" in value.ctype.canonical:
-                return (
-                    f"MemorySegment.ofAddress({raw})"
-                    if platform == "jvmMain"
-                    else f"({raw}).toCPointer<ByteVar>()"
-                    if platform == "nativeMain"
-                    else f"org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer({raw})"
-                )
-            return raw + (".toULong()" if platform == "nativeMain" else "")
-        if value.kind == "buffer" and value.nullable and value.buffer_form == "view":
-            return f"GeneratedValues.optional{'String' if value.encoding == 'utf8' else 'Bytes'}View(arena, {expression})"
-        if value.kind == "array":
-            return f"GeneratedValues.write{name(value.element.native)}Array(arena, {expression})"
-        if value.kind == "buffer" and value.optional:
-            expression = (
-                f"({expression} ?: "
-                + ('""' if value.encoding == "utf8" else "byteArrayOf()")
-                + ")"
-            )
+            return f"{expression}.address"
+        if value.kind == "reference":
+            if value.element.kind not in {"record", "buffer"}:
+                raise Unsupported("pointer input requires a record")
+            if value.nullable:
+                inner = self.argument(value.element, "it")
+                return f"{expression}?.let {{ {inner} }} ?: 0L"
+            return self.argument(value.element, expression)
         if value.kind == "enum":
-            return self.cast_native(
-                replace(
-                    value,
-                    kind="scalar",
-                    native=(value.enum_underlying or value.ctype).spelling,
-                    ctype=value.enum_underlying or value.ctype,
-                ),
-                expression + ".rawValue",
-                platform,
-            )
-        if (
-            value.kind == "scalar"
-            and (value.scalar_carrier or value.ctype.spelling) == "size_t"
-            and platform == "nativeMain"
-        ):
-            return expression + ".convert<size_t>()"
+            _suffix, typ = self.accessor(value)
+            return expression + ".rawValue" + CARRIER[typ]
         if value.kind == "scalar":
-            typ, _layout = self.scalar(value)
-            return (
-                expression
-                if platform == "nativeMain" or not typ.startswith("U")
-                else expression + ".to" + typ[1:] + "()"
-            )
+            typ = self.scalar(value)[0]
+            return expression + CARRIER[typ]
         if value.kind == "record":
-            return (
-                f"GeneratedValues.write{name(value.native)}(arena, {expression}"
-                + (", registrations" if self.needs_registration(value) else "")
-                + ")"
+            return f"{self.write(value)}({expression})"
+        if value.kind == "array":
+            element = value.element
+            nullable = value.nullable or value.optional
+            items = "it" if nullable else expression
+            written = (
+                f"array({items}, {self.element_size(element)}, {self.element_align(element)}) "
+                f"{{ at, item -> {self.place(element, 'at', 'item')} }}"
             )
-        if value.kind == "buffer" and value.buffer_form != "view" and value.nullable:
-            present = self.cast_native(
-                replace(value, nullable=False), expression + "!!", platform
-            )
-            null = "MemorySegment.NULL" if platform == "jvmMain" else "null"
-            return f"if ({expression} == null) {null} else {present}"
+            return f"{expression}?.let {{ {written} }} ?: 0L" if nullable else written
+        if value.kind == "buffer" and value.buffer_form == "view":
+            if value.optional:
+                empty = '""' if value.encoding == "utf8" else "byteArrayOf()"
+                return f"view({expression} ?: {empty})"
+            return f"view({expression})"
         if value.kind == "buffer" and value.length == "nul":
-            return f"GeneratedValues.cString(arena, {expression})"
-        if value.kind == "buffer" and value.buffer_form != "view":
+            if value.nullable or value.optional:
+                return f"{expression}?.let {{ cString(it) }} ?: 0L"
+            return f"cString({expression})"
+        if value.kind == "buffer":
             data = (
                 f"{expression}.encodeToByteArray()"
                 if value.encoding == "utf8"
                 else expression
             )
-            pointer = f"GeneratedValues.rawBytes(arena, {data})"
-            if (
-                platform == "nativeMain"
-                and value.ctype.pointee
-                and value.ctype.pointee.spelling not in {"void", "char", "const char"}
-            ):
-                pointer += ".reinterpret()"
-            return pointer
-        if value.kind == "buffer":
-            return f"GeneratedValues.{'stringView' if value.encoding == 'utf8' else 'byteView'}(arena, {expression})"
+            if value.nullable or value.optional:
+                data = data.replace(expression, "it", 1)
+                return f"{expression}?.let {{ bytes({data}) }} ?: 0L"
+            return f"bytes({data})"
         raise Unsupported("input storage requires another Kotlin rule")
 
-    def cast_public(self, value, expression, platform, scope=None):
-        callback = kotlin_callbacks.cast_public(
-            value, expression, self, platform, scope
-        )
-        if callback is not None:
-            return callback
-        if value.kind == "reference":
-            child = value.element
-            pointer = expression + (
-                f".reinterpret({child.native}.sizeof())"
-                if platform == "jvmMain"
-                else "!!.pointed"
-                if platform == "nativeMain"
-                else ""
-            )
-            raw = self.cast_public(child, pointer, platform, scope)
-            absent = expression + (
-                ".address() == 0L"
-                if platform == "jvmMain"
-                else " == null"
-                if platform == "nativeMain"
-                else f" == null || {expression}.isNull"
-            )
-            return f"if ({absent}) null else {raw}" if value.nullable else raw
-        if value.kind == "native_pointer":
-            raw = expression
-            if value.ctype.kind == "pointer" or "*" in value.ctype.canonical:
-                raw = (
-                    f"({expression}?.rawValue?.toLong() ?: 0L)"
-                    if platform == "nativeMain"
-                    else expression + ".address()"
-                    if platform == "jvmMain"
-                    else f"({expression}?.address() ?: 0L)"
-                )
-            elif platform == "nativeMain":
-                raw += ".toLong()"
-            return (
-                f"if ({scope} != null) org.maplibre.nativeffi.render.NativePointer.scoped({raw}, {scope}) else org.maplibre.nativeffi.render.NativePointer.ofAddress({raw})"
-                if scope
-                else f"org.maplibre.nativeffi.render.NativePointer.ofAddress({raw})"
-            )
-        if value.kind == "buffer" and value.length == "nul":
-            decoded = expression + (
-                ".reinterpret(Long.MAX_VALUE).getString(0)"
-                if platform == "jvmMain"
-                else "!!.toKString()"
-                if platform == "nativeMain"
-                else ".string"
-            )
-            if value.nullable:
-                absent = expression + (
-                    ".address() == 0L"
-                    if platform == "jvmMain"
-                    else " == null"
-                    if platform == "nativeMain"
-                    else f" == null || {expression}.isNull"
-                )
-                return f"if ({absent}) null else {decoded}"
-            return decoded
-        if value.kind == "enum":
-            raw = self.cast_public(
-                replace(
-                    value,
-                    kind="scalar",
-                    native=(value.enum_underlying or value.ctype).spelling,
-                    ctype=value.enum_underlying or value.ctype,
-                ),
-                expression,
-                platform,
-            )
-            return f"{name(value.native)}({raw})"
-        if (
-            value.kind == "scalar"
-            and (value.scalar_carrier or value.ctype.spelling) == "size_t"
-            and platform == "nativeMain"
-        ):
-            return expression + ".toULong()"
-        if value.kind == "scalar":
-            typ = self.scalar(value)[0]
-            return (
-                expression
-                if platform == "nativeMain" or not typ.startswith("U")
-                else expression + ".to" + typ + "()"
-            )
+    def length(self, value, expression):
+        """The element or byte count of an input array or buffer, as a carrier."""
+        if value.kind == "buffer" and value.encoding == "utf8":
+            expression += ".encodeToByteArray()"
+        if value.nullable or value.optional:
+            return f"({expression}?.size ?: 0).toLong()"
+        return f"{expression}.size.toLong()"
+
+    def place(self, value, address, expression):
+        """A statement that writes [value] at [address]."""
         if value.kind == "record":
-            return f"GeneratedValues.read{name(value.native)}({expression})"
-        if value.kind == "buffer":
-            result = f"GeneratedValues.{'readString' if value.encoding == 'utf8' else 'readBytes'}({expression})"
-            if value.optional:
-                return result + ".takeIf { it.isNotEmpty() }"
-            if value.nullable:
-                absent = (
-                    f"mln_buffer_view.data({expression}).address() == 0L"
-                    if platform == "jvmMain"
-                    else f"{expression}.data == null"
-                    if platform == "nativeMain"
-                    else f"{expression}.data() == null || {expression}.data().isNull"
+            return f"{self.put(value)}({address}, {expression})"
+        if value.kind == "buffer" and value.buffer_form == "view":
+            return f"putView({address}, {expression})"
+        if value.kind in {"scalar", "enum"}:
+            raw = expression + (".rawValue" if value.kind == "enum" else "")
+            return self.write_scalar(value, address, raw)
+        return f"writeAddress({address}, {self.argument(value, expression)})"
+
+    def receiver(self, value):
+        """The receiver a record's writer needs: a call when it registers callbacks."""
+        return "NativeCall" if self.needs_registration(value) else "NativeArena"
+
+    def put_function(self, value):
+        if value.registration:
+            from . import kotlin_callbacks
+
+            return kotlin_callbacks.put_function(value, self)
+        public = name(value.native)
+        receiver = self.receiver(value)
+        lines = [
+            f"internal fun {receiver}.{self.put(value)}(target: Long, value: {public}) {{"
+        ]
+        if value.default:
+            lines.append("  " + self.default_call(value) + "")
+        else:
+            for field in value.fields:
+                if field.role == "size":
+                    lines.append(
+                        "  "
+                        + self.write_scalar(
+                            field.value,
+                            self.at("target", value, field.name),
+                            f"{self.size(value.native)}.toUInt()",
+                        )
+                    )
+        for field in value.fields:
+            if field.role == "presence_mask" and value.default:
+                lines.append(
+                    "  "
+                    + self.write_scalar(
+                        field.value,
+                        self.at("target", value, field.name),
+                        literal(0, self.scalar(field.value)[0]),
+                    )
                 )
-                return f"if ({absent}) null else {result}"
-            return result
-        raise Unsupported("output storage requires another Kotlin rule")
-
-    def read_buffer(self, value, pointer, count, platform):
-        count = count + ".toULong()" if platform == "nativeMain" else count
-        result = f"GeneratedValues.readRawBytes({pointer}, {count})"
-        if value.encoding == "utf8":
-            result += ".decodeToString()"
-        if value.optional:
-            result += ".takeIf { it.isNotEmpty() }"
-        return result
-
-    def read_array(self, value, pointer, count, platform):
-        count = count + ".toULong()" if platform == "nativeMain" else count
-        return (
-            f"GeneratedValues.read{name(value.element.native)}Array({pointer}, {count})"
-        )
-
-    def union_arm(self, record, field, variant, base, platform):
-        anonymous = field.value.native.startswith("@")
-        if platform == "jvmMain":
-            union_type = (
-                record.native + "." + field.name if anonymous else field.value.native
-            )
-            return f"{union_type}.{variant.name}({record.native}.{field.name}({base}))"
-        if platform == "androidMain":
-            return (
-                f"{base}.{field.name}_{variant.name}()"
-                if anonymous
-                else f"{base}.{field.name}().{variant.name}()"
-            )
-        return f"{base}.{field.name}.{variant.name}"
-
-    def union_write(self, record, field, expression, base, platform):
-        public = name(record.native) + pascal(field.name)
-        lines = [f"    when (val variant = {expression}) {{"]
-        for variant in field.value.fields:
-            constant = (
-                f"MapLibreNativeC.{variant.presence.variant}()"
-                if platform == "jvmMain"
-                else f"MaplibreNativeC.{variant.presence.variant}"
-                if platform == "androidMain"
-                else variant.presence.variant
-            )
-            target = self.union_arm(record, field, variant, base, platform)
-            encoded = self.cast_native(variant.value, "variant.value", platform)
-            write = (
-                target + f".copyFrom({encoded})"
-                if platform == "jvmMain"
-                else f"{encoded}.pointed.readValue().place({target}.ptr)"
-                if platform == "nativeMain"
-                else target[:-2] + f"({encoded})"
-            )
-            tag = self.assign(record, field.presence.tag, base, constant, platform)
+        for flag in value.mask_flags:
+            member = self.flag_name(value, flag)
             lines.append(
-                f"      is {public}.{pascal(variant.name)} -> {{ {tag}; {write} }}"
+                f"  if (value.{member}) {self.mark(value, flag.mask, flag.name)}"
             )
-        if field.value.empty_variant:
-            constant = (
-                f"MapLibreNativeC.{field.value.empty_variant[0]}()"
-                if platform == "jvmMain"
-                else f"MaplibreNativeC.{field.value.empty_variant[0]}"
-                if platform == "androidMain"
-                else field.value.empty_variant[0]
-            )
-            lines.append(
-                f"      {public}.None -> {{ {self.assign(record, field.presence.tag, base, constant, platform)} }}"
-            )
+        for member, _typ, children, group in self.members(value):
+            first = children[0]
+            if first.value.kind == "union":
+                lines += self.union_write(value, first, f"value.{member}")
+                continue
+            presence = group or first.presence
+            optional = bool(presence and presence.mask)
+            body = []
+            local = "it" if optional else f"value.{member}"
+            if optional:
+                body.append(self.mark(value, presence.mask, presence.bit))
+            for field in children:
+                expression = local + ("." + identifier(field.name) if group else "")
+                body += self.field_write(value, field, expression)
+            if optional:
+                lines.append(f"  value.{member}?.let {{")
+                lines += ["    " + line for line in body]
+                lines.append("  }")
+            else:
+                lines += ["  " + line for line in body]
+        lines.append("}")
         lines.append(
-            f'      is {public}.Unknown -> throw IllegalArgumentException("unknown native union variants cannot be submitted")'
+            f"internal fun {receiver}.{self.write(value)}(value: {public}): Long = "
+            f"allocate({self.size(value.native)}, {self.align(value.native)}).also {{ {self.put(value)}(it, value) }}"
         )
-        lines.append("    }")
+        return "\n".join(lines)
+
+    def field_write(self, record, field, expression):
+        value = field.value
+        lines = [self.place(value, self.at("target", record, field.name), expression)]
+        if value.kind == "array" or (
+            value.kind == "buffer" and value.length not in {None, "nul", "1"}
+        ):
+            lines.append(self.write_count(record, value, expression))
         return lines
 
-    def union_read(self, record, field, base, platform):
+    def write_count(self, record, value, expression):
+        count = self.field_plan(record, value.length)
+        typ = self.scalar(count.value)[0]
+        size = (
+            f"{expression}.encodeToByteArray().size"
+            if (value.kind == "buffer" and value.encoding == "utf8")
+            else f"{expression}.size"
+        )
+        if value.nullable or value.optional:
+            size = size.replace(f"{expression}.", f"{expression}?.", 1) + " ?: 0"
+            size = f"({size})"
+        converted = {
+            "ULong": f"{size}.toULong()",
+            "UInt": f"{size}.toUInt()",
+            "UShort": f"{size}.toUShort()",
+            "UByte": f"{size}.toUByte()",
+            "Long": f"{size}.toLong()",
+            "Int": size,
+            "Short": f"{size}.toShort()",
+            "Byte": f"{size}.toByte()",
+        }[typ]
+        return self.write_scalar(
+            count.value, self.at("target", record, value.length), converted
+        )
+
+    def mark(self, record, mask, bit):
+        mask_field = self.field_plan(record, mask)
+        address = self.at("target", record, mask)
+        if not bit:
+            return f"writeBool({address}, true)"
+        typ = self.scalar(mask_field.value)[0]
+        number = next(
+            number
+            for e in self.bound.values.values()
+            for key, number in e.enum_values
+            if key == bit
+        )
+        suffix = self.accessor(mask_field.value)[0]
+        return f"write{suffix}({address}, read{suffix}({address}) or {literal(number, typ)})"
+
+    def union_write(self, record, field, expression):
         public = name(record.native) + pascal(field.name)
-        tag = self.field(record, field.presence.tag, base, platform)
+        union = self.at("target", record, field.name)
+        tag = self.field_plan(record, field.presence.tag)
+        tag_address = self.at("target", record, field.presence.tag)
+        tag_type = self.scalar(tag.value)[0]
+        lines = [f"  when (val variant = {expression}) {{"]
+        for variant in field.value.fields:
+            number = self.enum_number(variant.presence.variant)
+            lines.append(
+                f"    is {public}.{pascal(variant.name)} -> {{ "
+                + self.write_scalar(tag.value, tag_address, literal(number, tag_type))
+                + "; "
+                + self.place(variant.value, union, "variant.value")
+                + " }"
+            )
+        if field.value.empty_variant:
+            lines.append(
+                f"    {public}.None -> "
+                + self.write_scalar(
+                    tag.value,
+                    tag_address,
+                    literal(field.value.empty_variant[1], tag_type),
+                )
+            )
+        lines.append(
+            f'    is {public}.Unknown -> throw IllegalArgumentException("unknown native union variants cannot be submitted")'
+        )
+        lines.append("  }")
+        return lines
+
+    def enum_number(self, symbol):
+        return next(
+            number
+            for value in self.bound.values.values()
+            for key, number in value.enum_values
+            if key == symbol
+        )
+
+    # Reading.
+
+    def read(self, record):
+        """Name the reader of [record], emitting it once."""
+        self.readers.setdefault(record.native, record)
+        return "read" + name(record.native)
+
+    def decode(self, value, address, scope=None):
+        """An expression that copies the [value] stored at [address]."""
+        from . import kotlin_callbacks
+
+        callback = kotlin_callbacks.decode(value, address, self)
+        if callback is not None:
+            return callback
+        if value.kind == "native_pointer":
+            raw = (
+                f"readAddress({address})"
+                if value.ctype.kind == "pointer" or "*" in value.ctype.canonical
+                else f"readI64({address})"
+            )
+            pointer = f"NativePointer.ofAddress({raw})"
+            if scope:
+                return f"{raw}.let {{ if ({scope} != null) NativePointer.scoped(it, {scope}) else NativePointer.ofAddress(it) }}"
+            return pointer
+        if value.kind == "enum":
+            suffix, _typ = self.accessor(value)
+            return f"{name(value.native)}(read{suffix}({address}))"
+        if value.kind == "scalar":
+            suffix, _typ = self.accessor(value)
+            return f"read{suffix}({address})"
+        if value.kind == "record":
+            reader = self.read(value)
+            return (
+                f"{reader}({address}, {scope})"
+                if value.native in self.views and scope
+                else f"{reader}({address})"
+            )
+        if value.kind == "reference":
+            inner = self.decode(value.element, "it", scope)
+            if value.nullable:
+                return (
+                    f"readAddress({address}).takeIf {{ it != 0L }}?.let {{ {inner} }}"
+                )
+            return self.decode(value.element, f"readAddress({address})", scope)
+        if value.kind == "buffer" and value.length == "nul":
+            return (
+                f"readCStringOrNull(readAddress({address}))"
+                if value.nullable
+                else f"readCString(readAddress({address}))"
+            )
+        if value.kind == "buffer" and value.buffer_form == "view":
+            text = value.encoding == "utf8"
+            if value.nullable:
+                return f"readView{'String' if text else ''}OrNull({address})"
+            result = f"readView{'String' if text else ''}({address})"
+            return result + (".takeIf { it.isNotEmpty() }" if value.optional else "")
+        raise Unsupported("output storage requires another Kotlin rule")
+
+    def read_function(self, value):
+        if value.registration:
+            from . import kotlin_callbacks
+
+            return kotlin_callbacks.read_function(value, self)
+        public = name(value.native)
+        scoped = value.native in self.views
+        scope = "scope" if scoped else None
+        parameters = "source: Long"
+        if scoped:
+            parameters += (
+                ", scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null"
+            )
+        if value.native in self.item_buffers:
+            item = self.item_buffers[value.native]
+            parameters += ", message: " + (
+                'String = ""'
+                if item.encoding == "utf8"
+                else "ByteArray = byteArrayOf()"
+            )
+        arguments = []
+        for flag in value.mask_flags:
+            arguments.append(
+                f"{self.flag_name(value, flag)} = {self.present('source', value, flag.mask, flag.name)}"
+            )
+        for member, typ, children, group in self.members(value):
+            first = children[0]
+            if first.value.kind == "union":
+                arguments.append(f"{member} = {self.union_read(value, first)}")
+                continue
+            copied = []
+            for field in children:
+                decoded = self.field_read(value, field, scope)
+                copied.append(
+                    (identifier(field.name) + " = " if group else "") + decoded
+                )
+            decoded = (
+                f"{typ.removesuffix('?')}(" + ", ".join(copied) + ")"
+                if group
+                else copied[0]
+            )
+            presence = group or first.presence
+            if presence and presence.mask:
+                decoded = f"if ({self.present('source', value, presence.mask, presence.bit)}) {decoded} else null"
+            arguments.append(f"{member} = {decoded}")
+        if value.native in self.item_buffers:
+            arguments.append(
+                f"{identifier(self.item_buffers[value.native].field)} = message"
+            )
+        body = f"{public}(" + ", ".join(arguments) + ")"
+        if scoped:
+            body += ".also { it.bindingScope = scope }"
+        return f"internal fun {self.read(value)}({parameters}): {public} = {body}"
+
+    def field_read(self, record, field, scope):
+        value = field.value
+        address = self.at("source", record, field.name)
+        if value.kind == "array" or (
+            value.kind == "buffer" and value.length not in {None, "nul", "1"}
+        ):
+            count = self.read_count(record, value.length)
+            pointer = f"readAddress({address})"
+            if value.kind == "buffer":
+                result = f"readBytes({pointer}, {count})"
+                if value.encoding == "utf8":
+                    result += ".decodeToString()"
+                if value.optional:
+                    result += ".takeIf { it.isNotEmpty() }"
+                return result
+            element = value.element
+            if value.stride:
+                stride = self.read_count(record, value.stride)
+                item = self.decode_item(element, "item", value.item_buffer, record)
+                return f"readStrided({pointer}, {count}, {stride}, {self.element_size(element)}) {{ item -> {item} }}"
+            item = self.decode_item(element, "item", None, record)
+            return f"readArray({pointer}, {count}, {self.element_size(element)}.toLong()) {{ item -> {item} }}"
+        return self.decode(value, address, scope)
+
+    def decode_item(self, element, address, item_buffer, record):
+        if element.kind == "buffer":
+            return self.decode(element, address)
+        reader = self.read(element)
+        if not item_buffer:
+            return f"{reader}({address})"
+        data = f"readAddress({self.at('source', record, item_buffer.data)})"
+        size = self.read_count(record, item_buffer.size)
+        offset = self.decode(
+            self.field_plan(element, item_buffer.offset).value,
+            self.at(address, element, item_buffer.offset),
+        )
+        length = self.decode(
+            self.field_plan(element, item_buffer.length).value,
+            self.at(address, element, item_buffer.length),
+        )
+        message = (
+            f"readItem({data}, {size}, ({offset}).toULong(), ({length}).toULong())"
+        )
+        if item_buffer.encoding == "utf8":
+            message += ".decodeToString()"
+        return f"{reader}({address}, {message})"
+
+    def read_count(self, record, path):
+        field = self.field_plan(record, path)
+        suffix, typ = self.accessor(field.value)
+        raw = f"read{suffix}({self.at('source', record, path)})"
+        return raw if typ == "ULong" else f"{raw}.toULong()"
+
+    def present(self, base, record, mask, bit):
+        mask_field = self.field_plan(record, mask)
+        address = self.at(base, record, mask)
+        if not bit:
+            return f"readBool({address})"
+        suffix, typ = self.accessor(mask_field.value)
+        number = self.enum_number(bit)
+        zero = literal(0, typ)
+        return f"(read{suffix}({address}) and {literal(number, typ)}) != {zero}"
+
+    def union_read(self, record, field):
+        public = name(record.native) + pascal(field.name)
+        tag = self.field_plan(record, field.presence.tag)
+        tag_suffix, tag_type = self.accessor(tag.value)
+        union = self.at("source", record, field.name)
         arms = []
         for variant in field.value.fields:
-            constant = (
-                f"MapLibreNativeC.{variant.presence.variant}()"
-                if platform == "jvmMain"
-                else f"MaplibreNativeC.{variant.presence.variant}"
-                if platform == "androidMain"
-                else variant.presence.variant
+            number = self.enum_number(variant.presence.variant)
+            arms.append(
+                f"{literal(number, tag_type)} -> {public}.{pascal(variant.name)}({self.decode(variant.value, union)})"
             )
-            decoded = self.cast_public(
-                variant.value,
-                self.union_arm(record, field, variant, base, platform),
-                platform,
-            )
-            arms.append(f"{constant} -> {public}.{pascal(variant.name)}({decoded})")
         if field.value.empty_variant:
-            constant = (
-                f"MapLibreNativeC.{field.value.empty_variant[0]}()"
-                if platform == "jvmMain"
-                else f"MaplibreNativeC.{field.value.empty_variant[0]}"
-                if platform == "androidMain"
-                else field.value.empty_variant[0]
+            arms.append(
+                f"{literal(field.value.empty_variant[1], tag_type)} -> {public}.None"
             )
-            arms.append(f"{constant} -> {public}.None")
-        union = self.field(record, field.name, base, platform)
-        raw = (
-            f"{union}.toArray(ValueLayout.JAVA_BYTE)"
-            if platform == "jvmMain"
-            else f"GeneratedValues.readUnionBytes({union})"
-            if platform == "nativeMain"
-            else f"ByteArray({union}.sizeof()).also {{ BytePointer({union}).get(it) }}"
+        sizes = (
+            self.abi.size_align(self.abi.classify(field.value.ctype), 32)[0],
+            self.abi.size_align(self.abi.classify(field.value.ctype), 64)[0],
         )
-        if platform == "androidMain" and field.value.native.startswith("@"):
-            raise Unsupported(
-                "anonymous union requires a named C typedef for safe JavaCPP copying"
-            )
-        arms.append(f"else -> {public}.Unknown({tag}.toUInt(), {raw})")
-        return f"when ({tag}) {{ " + "; ".join(arms) + " }"
-
-    def field(self, record, path, base, platform):
-        for part in path.split("."):
-            field = next(f for f in record.fields if f.name == part)
-            native_part = native_identifier(part)
-            if platform == "jvmMain":
-                base = f"{record.native}.{native_part}({base})"
-            elif platform == "androidMain":
-                base += f".{'_' + part if part in {'position', 'limit', 'capacity', 'address'} else native_part}()"
-            else:
-                base += f".{native_part}"
-            record = field.value
-        return base
-
-    def assign(self, record, path, base, expression, platform):
-        parts = path.split(".")
-        for part in parts[:-1]:
-            field = next(f for f in record.fields if f.name == part)
-            base = self.field(record, part, base, platform)
-            record = field.value
-        field = next(f for f in record.fields if f.name == parts[-1])
-        member = parts[-1]
-        android_member = (
-            "_" + member
-            if member in {"position", "limit", "capacity", "address"}
-            else native_identifier(member)
+        arms.append(
+            f"else -> {public}.Unknown(tag.toUInt(), NativeMemory.getBytes({union}, {width_expression(sizes)}))"
         )
-        native_member = native_identifier(member)
-        if (
-            platform == "nativeMain"
-            and (field.value.scalar_carrier or field.value.ctype.spelling) == "size_t"
-        ):
-            expression = f"({expression}).convert()"
-        if field.value.kind == "record" or field.value.buffer_form == "view":
-            target = self.field(record, member, base, platform)
-            return (
-                f"{target}.copyFrom({expression})"
-                if platform == "jvmMain"
-                else f"{expression}.pointed.readValue().place({target}.ptr)"
-                if platform == "nativeMain"
-                else f"{base}.{android_member}({expression})"
-            )
         return (
-            f"{record.native}.{native_member}({base}, {expression})"
-            if platform == "jvmMain"
-            else f"{base}.{android_member}({expression})"
-            if platform == "androidMain"
-            else f"{base}.{native_member} = {expression}"
+            f"read{tag_suffix}({self.at('source', record, field.presence.tag)}).let {{ tag -> when (tag) {{ "
+            + "; ".join(arms)
+            + " } }"
         )
 
-    def condition(self, record, presence, base, platform):
-        mask = self.field(record, presence.mask, base, platform)
-        if not presence.bit:
-            return mask
-        bit = (
-            f"MapLibreNativeC.{presence.bit}()"
-            if platform == "jvmMain"
-            else f"MaplibreNativeC.{presence.bit}"
-            if platform == "androidMain"
-            else presence.bit
-        )
-        return f"({mask} and {bit}) != " + ("0u" if platform == "nativeMain" else "0")
-
-    def mark(self, record, presence, base, platform):
-        mask = self.field(record, presence.mask, base, platform)
-        bit = (
-            f"MapLibreNativeC.{presence.bit}()"
-            if platform == "jvmMain"
-            else f"MaplibreNativeC.{presence.bit}"
-            if platform == "androidMain"
-            else presence.bit
-        )
-        return self.assign(
-            record,
-            presence.mask,
-            base,
-            f"{mask} or {bit}" if presence.bit else "true",
-            platform,
-        )
-
-    def conversions(self, platform):
-        imports = {
-            "jvmMain": [
-                "java.lang.foreign.*",
-                "org.maplibre.nativeffi.internal.c.*",
-                "org.maplibre.nativeffi.internal.loader.NativeAccess",
-            ],
-            "nativeMain": [
-                "kotlinx.cinterop.*",
-                "platform.posix.size_t",
-                "platform.posix.size_tVar",
-                "org.maplibre.nativeffi.internal.c.*",
-            ],
-            "androidMain": [
-                "org.bytedeco.javacpp.*",
-                "org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC",
-            ],
-        }[platform]
-        imports.append("org.maplibre.nativeffi.internal.callback.*")
-        imports.append("org.maplibre.nativeffi.internal.status.Status as BindingStatus")
-        result = [
-            "// Generated by tools/bindgen. Do not edit.",
-            *(
-                ['@file:kotlin.jvm.JvmName("GeneratedPlatformValues")']
-                if platform in {"jvmMain", "androidMain"}
-                else []
-            ),
-            "package org.maplibre.nativeffi.generated",
-            *(f"import {i}" for i in imports),
-            "",
-        ]
-        if platform == "nativeMain":
-            result.append("@OptIn(ExperimentalForeignApi::class)")
-        result.append("internal object GeneratedValues {")
-        arena_type = {
-            "jvmMain": "Arena",
-            "nativeMain": "MemScope",
-            "androidMain": "PointerScope",
-        }[platform]
-        for value in self.used.values():
-            if value.kind != "record" or value.registration or value.response:
-                continue
-            public = name(value.native)
-            native = value.native
-            input_type = (
-                "MemorySegment"
-                if platform == "jvmMain"
-                else native
-                if platform == "nativeMain"
-                else "MaplibreNativeC." + native
-            )
-            output_type = (
-                f"CPointer<{native}>" if platform == "nativeMain" else input_type
-            )
-            if platform == "jvmMain":
-                init = (
-                    f"MapLibreNativeC.{value.default}(arena)"
-                    if value.default
-                    else f"{native}.allocate(arena)"
-                )
-            elif platform == "androidMain":
-                init = (
-                    f"MaplibreNativeC.{value.default}()"
-                    if value.default
-                    else f"MaplibreNativeC.{native}()"
-                )
-            else:
-                init = f"arena.alloc<{native}>().ptr"
-            write = [
-                f"  fun write{public}(arena: {arena_type}, value: {public}"
-                + (
-                    ", registrations: org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope"
-                    if self.needs_registration(value)
-                    else ""
-                )
-                + f"): {output_type} {{",
-                f"    val result = {init}",
+    def codecs(self):
+        """The common read and write functions for every record a binding uses."""
+        functions = []
+        emitted_writers, emitted_readers = set(), set()
+        while True:
+            pending = [
+                (native, value)
+                for native, value in list(self.writers.items())
+                if native not in emitted_writers
             ]
-            base = "result.pointed" if platform == "nativeMain" else "result"
-            if platform == "nativeMain" and value.default:
-                write.append(f"    {value.default}().place(result)")
-            if not value.default and platform == "nativeMain":
-                write.append(
-                    f"    result.reinterpret<ByteVar>().let {{ bytes -> repeat(sizeOf<{native}>().toInt()) {{ bytes[it] = 0 }} }}"
-                )
-            if not value.default:
-                for field in value.fields:
-                    if field.role == "size":
-                        size = (
-                            f"{native}.sizeof().toInt()"
-                            if platform == "jvmMain"
-                            else f"sizeOf<{native}>().toUInt()"
-                            if platform == "nativeMain"
-                            else "result.sizeof()"
-                        )
-                        write.append(
-                            "    "
-                            + self.assign(value, field.name, base, size, platform)
-                        )
-            read = []
-            for field in value.fields:
-                if field.role == "presence_mask":
-                    scalar = replace(
-                        field.value,
-                        kind="scalar",
-                        ctype=field.value.enum_underlying or field.value.ctype,
-                        nullable=False,
-                        optional=None,
-                    )
-                    zero = self.cast_native(scalar, self.default(scalar), platform)
-                    write.append(
-                        "    " + self.assign(value, field.name, base, zero, platform)
-                    )
-            for flag in value.mask_flags:
-                member = self.flag_name(value, flag)
-                from ..semantic import PresenceGroup
-
-                presence = PresenceGroup(flag.mask, flag.name, ())
-                write.append(
-                    f"    if (value.{member}) {{ {self.mark(value, presence, base, platform)} }}"
-                )
-                read.append(
-                    f"      {member} = {self.condition(value, presence, 'source', platform)}"
-                )
-            for member, typ, children, group in self.members(value):
-                if children[0].value.kind == "union":
-                    field = children[0]
-                    write += self.union_write(
-                        value, field, f"value.{member}", base, platform
-                    )
-                    read.append(
-                        f"      {member} = {self.union_read(value, field, 'source', platform)}"
-                    )
-                    continue
-                presence = group or children[0].presence
-                optional = bool(presence and presence.mask)
-                expression = f"value.{member}" + ("!!" if optional else "")
-                if optional:
-                    write.append(f"    if (value.{member} != null) {{")
-                    write.append("      " + self.mark(value, presence, base, platform))
-                copied = []
-                for field in children:
-                    child_expression = expression + (
-                        "." + identifier(field.name) if group else ""
-                    )
-                    write.append(
-                        "    "
-                        + self.assign(
-                            value,
-                            field.name,
-                            base,
-                            self.cast_native(field.value, child_expression, platform),
-                            platform,
-                        )
-                    )
-                    if field.value.kind == "array" or (
-                        field.value.kind == "buffer"
-                        and field.value.length not in {None, "nul", "1"}
-                    ):
-                        count_field = next(
-                            f for f in value.fields if f.name == field.value.length
-                        )
-                        length_expression = child_expression + (
-                            ".encodeToByteArray()"
-                            if field.value.kind == "buffer"
-                            and field.value.encoding == "utf8"
-                            else ""
-                        )
-                        count_expression = (
-                            length_expression
-                            + ".size."
-                            + ("toULong()" if platform == "nativeMain" else "toLong()")
-                        )
-                        write.append(
-                            "    "
-                            + self.assign(
-                                value,
-                                count_field.name,
-                                base,
-                                count_expression,
-                                platform,
-                            )
-                        )
-                        if field.value.stride:
-                            from .kotlin_arrays import read_strided
-
-                            decoded_field = read_strided(value, field, self, platform)
-                        else:
-                            decoded_field = (
-                                self.read_array
-                                if field.value.kind == "array"
-                                else self.read_buffer
-                            )(
-                                field.value,
-                                self.field(value, field.name, "source", platform),
-                                self.field(
-                                    value, field.value.length, "source", platform
-                                ),
-                                platform,
-                            )
-                    else:
-                        decoded_field = self.cast_public(
-                            field.value,
-                            self.field(value, field.name, "source", platform),
-                            platform,
-                            "scope" if value.native in self.views else None,
-                        )
-                    copied.append(
-                        (identifier(field.name) + " = " if group else "")
-                        + decoded_field
-                    )
-                if optional:
-                    write.append("    }")
-                decoded = (
-                    f"{typ.removesuffix('?')}(" + ", ".join(copied) + ")"
-                    if group
-                    else copied[0]
-                )
-                if optional:
-                    decoded = f"if ({self.condition(value, presence, 'source', platform)}) {decoded} else null"
-                read.append(f"      {member} = {decoded}")
-            write += ["    return result", "  }"]
-            scope_parameter = (
-                ", scope: org.maplibre.nativeffi.internal.lifecycle.ViewScope? = null"
-                if value.native in self.views
-                else ""
-            )
-            if value.native in self.item_buffers:
-                item = self.item_buffers[value.native]
-                scope_parameter += ", message: " + (
-                    'String = ""'
-                    if item.encoding == "utf8"
-                    else "ByteArray = byteArrayOf()"
-                )
-                read.append(f"      {identifier(item.field)} = message")
-            result += write + [
-                f"  fun read{public}(source: {input_type}{scope_parameter}): {public} = {public}(",
-                ",\n".join(read),
-                "  )"
-                + (
-                    ".also { it.bindingScope = scope }"
-                    if value.native in self.views
-                    else ""
-                ),
+            pending_reads = [
+                (native, value)
+                for native, value in list(self.readers.items())
+                if native not in emitted_readers
             ]
-        for native, element in self.arrays.items():
-            public = self.public(element)
-            suffix = name(native) + "Array"
-            encoded = self.cast_native(element, "item", platform)
-            if platform == "jvmMain":
-                decoded = self.cast_public(
-                    element,
-                    f"source.reinterpret(count * {native}.sizeof()).asSlice(index.toLong() * {native}.sizeof(), {native}.sizeof())",
-                    platform,
-                )
-                result += [
-                    f"  fun write{suffix}(arena: Arena, value: List<{public}>): MemorySegment {{ val result = arena.allocate({native}.layout(), maxOf(1, value.size).toLong()); value.forEachIndexed {{ index, item -> result.asSlice(index.toLong() * {native}.sizeof(), {native}.sizeof()).copyFrom({encoded}) }}; return result }}",
-                    f"  fun read{suffix}(source: MemorySegment, count: Long): List<{public}> {{ require(count in 0..Int.MAX_VALUE.toLong()); return List(count.toInt()) {{ index -> {decoded} }} }}",
-                ]
-            elif platform == "nativeMain":
-                decoded = self.cast_public(element, "source!![index]", platform)
-                result += [
-                    f"  fun write{suffix}(arena: MemScope, value: List<{public}>): CPointer<{native}> {{ val result = arena.allocArray<{native}>(maxOf(1, value.size)); value.forEachIndexed {{ index, item -> {encoded}.pointed.readValue().place(result[index].ptr) }}; return result }}",
-                    f"  fun read{suffix}(source: CPointer<{native}>?, count: ULong): List<{public}> {{ require(count <= Int.MAX_VALUE.toULong()); return List(count.toInt()) {{ index -> {decoded} }} }}",
-                ]
-            else:
-                decoded = self.cast_public(
-                    element, "data.position(index.toLong())", platform
-                )
-                result += [
-                    f"  fun write{suffix}(arena: PointerScope, value: List<{public}>): MaplibreNativeC.{native} {{ val result = MaplibreNativeC.{native}(maxOf(1, value.size).toLong()); value.forEachIndexed {{ index, item -> result.position(index.toLong()).put<MaplibreNativeC.{native}>({encoded}) }}; return result.position(0) }}",
-                    f"  fun read{suffix}(source: MaplibreNativeC.{native}?, count: Long): List<{public}> {{ require(count in 0..Int.MAX_VALUE.toLong()); if (count == 0L) return emptyList(); val data = requireNotNull(source); require(!data.isNull); return List(count.toInt()) {{ index -> {decoded} }} }}",
-                ]
-        if platform == "jvmMain":
-            result += [
-                "  fun rawBytes(arena: Arena, value: ByteArray): MemorySegment = arena.allocate(maxOf(1, value.size).toLong()).also { if (value.isNotEmpty()) it.copyFrom(MemorySegment.ofArray(value)) }",
-                "  fun readRawBytes(source: MemorySegment, count: Long): ByteArray { require(count in 0..Int.MAX_VALUE.toLong()); return if (count == 0L) byteArrayOf() else source.reinterpret(count).toArray(ValueLayout.JAVA_BYTE) }",
-                "  fun optionalBytesView(arena: Arena, value: ByteArray?): MemorySegment = if (value == null) mln_buffer_view.allocate(arena) else byteView(arena, value)",
-                "  fun optionalStringView(arena: Arena, value: String?): MemorySegment = optionalBytesView(arena, value?.encodeToByteArray())",
-                "  fun stringView(arena: Arena, value: String): MemorySegment = byteView(arena, value.encodeToByteArray())",
-                "  fun byteView(arena: Arena, value: ByteArray): MemorySegment = mln_buffer_view.allocate(arena).also { mln_buffer_view.data(it, rawBytes(arena, value)); mln_buffer_view.size(it, value.size.toLong()) }",
-                "  fun readBytes(source: MemorySegment): ByteArray { val count = mln_buffer_view.size(source); require(count in 0..Int.MAX_VALUE.toLong()); return if (count == 0L) byteArrayOf() else mln_buffer_view.data(source).reinterpret(count).toArray(ValueLayout.JAVA_BYTE) }",
-                "  fun readString(source: MemorySegment): String = readBytes(source).decodeToString()",
-            ]
-        elif platform == "nativeMain":
-            result += [
-                "  fun rawBytes(arena: MemScope, value: ByteArray): CPointer<ByteVar> = arena.allocArray<ByteVar>(maxOf(1, value.size)).also { result -> value.forEachIndexed { index, byte -> result[index] = byte } }",
-                "  inline fun <reified T: CVariable> readUnionBytes(source: T): ByteArray = source.ptr.reinterpret<ByteVar>().readBytes(sizeOf<T>().toInt())",
-                "  fun readRawBytes(source: CPointer<*>?, count: ULong): ByteArray { require(count <= Int.MAX_VALUE.toULong()); return if (count == 0uL) byteArrayOf() else source!!.reinterpret<ByteVar>().readBytes(count.toInt()) }",
-                "  fun optionalBytesView(arena: MemScope, value: ByteArray?): CPointer<mln_buffer_view> = if (value == null) arena.alloc<mln_buffer_view>().apply { data = null; size = 0u }.ptr else byteView(arena, value)",
-                "  fun optionalStringView(arena: MemScope, value: String?): CPointer<mln_buffer_view> = optionalBytesView(arena, value?.encodeToByteArray())",
-                "  fun stringView(arena: MemScope, value: String): CPointer<mln_buffer_view> = byteView(arena, value.encodeToByteArray())",
-                "  fun byteView(arena: MemScope, value: ByteArray): CPointer<mln_buffer_view> = arena.alloc<mln_buffer_view>().apply { data = rawBytes(arena, value); size = value.size.convert() }.ptr",
-                "  fun readBytes(source: mln_buffer_view): ByteArray { require(source.size <= Int.MAX_VALUE.toULong()); return source.data?.reinterpret<ByteVar>()?.readBytes(source.size.toInt()) ?: byteArrayOf() }",
-                "  fun readString(source: mln_buffer_view): String = readBytes(source).decodeToString()",
-            ]
-        else:
-            result += [
-                "  fun rawBytes(arena: PointerScope, value: ByteArray): BytePointer = BytePointer(maxOf(1, value.size).toLong()).also { if (value.isNotEmpty()) it.put(*value) }",
-                "  fun readRawBytes(source: Pointer?, count: Long): ByteArray { require(count in 0..Int.MAX_VALUE.toLong()); return ByteArray(count.toInt()).also { if (it.isNotEmpty()) BytePointer(source).get(it) } }",
-                "  fun optionalBytesView(arena: PointerScope, value: ByteArray?): MaplibreNativeC.mln_buffer_view = if (value == null) MaplibreNativeC.mln_buffer_view().data(null as Pointer?).size(0) else byteView(arena, value)",
-                "  fun optionalStringView(arena: PointerScope, value: String?): MaplibreNativeC.mln_buffer_view = optionalBytesView(arena, value?.encodeToByteArray())",
-                "  fun byteView(arena: PointerScope, value: ByteArray): MaplibreNativeC.mln_buffer_view = MaplibreNativeC.mln_buffer_view().data(rawBytes(arena, value)).size(value.size.toLong())",
-                "  fun stringView(arena: PointerScope, value: String): MaplibreNativeC.mln_buffer_view = byteView(arena, value.encodeToByteArray())",
-                "  fun readBytes(source: MaplibreNativeC.mln_buffer_view): ByteArray { require(source.size() in 0..Int.MAX_VALUE.toLong()); return ByteArray(source.size().toInt()).also { if (it.isNotEmpty()) BytePointer(source.data()).get(it) } }",
-                "  fun readString(source: MaplibreNativeC.mln_buffer_view): String = readBytes(source).decodeToString()",
-            ]
-        arena_type = (
-            "Arena"
-            if platform == "jvmMain"
-            else "MemScope"
-            if platform == "nativeMain"
-            else "PointerScope"
-        )
-        pointer_type = (
-            "MemorySegment"
-            if platform == "jvmMain"
-            else "CPointer<ByteVar>"
-            if platform == "nativeMain"
-            else "BytePointer"
-        )
-        result += [
-            f"  fun cString(arena: {arena_type}, value: String): {pointer_type} {{ BindingStatus.requireArgument('\\u0000' !in value) {{ \"text contains an embedded NUL\" }}; return rawBytes(arena, value.encodeToByteArray() + byteArrayOf(0)) }}"
-        ]
-        return "\n".join(result + ["}", ""]) + kotlin_callbacks.conversions(
-            self, platform
+            if not pending and not pending_reads:
+                break
+            for native, value in pending:
+                emitted_writers.add(native)
+                functions.append(self.put_function(value))
+            for native, value in pending_reads:
+                emitted_readers.add(native)
+                functions.append(self.read_function(value))
+        return (
+            "// Generated by tools/bindgen. Do not edit.\n"
+            "package org.maplibre.nativeffi.generated\n\n"
+            "import org.maplibre.nativeffi.internal.c.C\n"
+            "import org.maplibre.nativeffi.internal.memory.*\n\n"
+            + "\n\n".join(functions)
+            + "\n"
         )
 
 

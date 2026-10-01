@@ -3,13 +3,16 @@ package org.maplibre.nativeffi.runtime
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlinx.cinterop.*
-import org.maplibre.nativeffi.generated.GeneratedValues
-import org.maplibre.nativeffi.internal.c.mln_runtime_event
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_batch_view
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_payload
+import org.maplibre.nativeffi.generated.readRuntimeEventBatchView
+import org.maplibre.nativeffi.internal.cinterop.mln_runtime_event
+import org.maplibre.nativeffi.internal.cinterop.mln_runtime_event_batch_view
+import org.maplibre.nativeffi.internal.cinterop.mln_runtime_event_payload
 import platform.posix.memset
 
-/** The cinterop decoder for a drained event batch. */
+/**
+ * The common decoder for a drained event batch, over a batch that cinterop lays out the way the C
+ * compiler does.
+ */
 @OptIn(ExperimentalForeignApi::class)
 class RuntimeEventNativeTest {
   @Test
@@ -43,7 +46,7 @@ class RuntimeEventNativeTest {
       view.messages = messages
       view.messages_size = STRIDED_MESSAGES.size.convert()
       // The decoded batch owns copies, so overwriting the source afterwards changes nothing.
-      GeneratedValues.readRuntimeEventBatchView(view).events.also {
+      readRuntimeEventBatchView(view.ptr.toLong()).events.also {
         memset(bytes, 0, (stride * STRIDED_EVENT_COUNT).convert())
         memset(messages, 0, STRIDED_MESSAGES.size.convert())
       }
@@ -59,7 +62,7 @@ class RuntimeEventNativeTest {
       view.event_size = sizeOf<mln_runtime_event>().toUInt()
       view.events = alloc<mln_runtime_event>().ptr
       view.event_count = UNLISTABLE_EVENT_COUNT.convert()
-      assertFailsWith<IllegalArgumentException> { GeneratedValues.readRuntimeEventBatchView(view) }
+      assertFailsWith<IllegalArgumentException> { readRuntimeEventBatchView(view.ptr.toLong()) }
     }
   }
 }

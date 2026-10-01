@@ -482,7 +482,7 @@ run = 'python3 ci/kotlin_release.py "$@"'
 
 [tasks."bindings:generate"]
 description = "Regenerate native declarations and public binding APIs from C headers."
-depends = ["//bindings/dart:ffigen", "//bindings/kotlin:generate"]
+depends = ["//bindings/dart:ffigen"]
 # ClangSharp reads the handle remaps that bindgen writes, so it runs after.
 depends_post = ["//bindings/dotnet:generate"]
 run = "uv run --no-sync python -m tools.bindgen generate"

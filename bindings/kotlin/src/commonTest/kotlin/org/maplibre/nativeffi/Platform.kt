@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.internal.async.CompletionBridge
+
 /** A native thread that starts running [block] at construction. */
 internal expect class TestThread(block: () -> Unit) {
   /** Waits for the block to return, and rethrows what it threw. */
@@ -33,5 +35,5 @@ internal expect fun awaitCollected(reference: TestWeakReference): Boolean
  */
 internal expect fun requestCollection()
 
-/** Counts the completions the platform's completion bridge has handed to native. */
-internal expect fun pendingCompletionsForTesting(): Int
+/** Counts the completions the completion bridge has handed to native. */
+internal fun pendingCompletionsForTesting(): Int = CompletionBridge.pendingCountForTesting()

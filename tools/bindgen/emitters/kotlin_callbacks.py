@@ -1,12 +1,34 @@
-"""Lower retained callbacks and scoped responses for Kotlin native boundaries."""
+"""Lower retained callbacks, decisions, and scoped responses to common Kotlin.
 
+Each callback a registration hands to native gets one upcall site: a common
+`Upcalls` method that finds the registration's root and runs the host
+callback, and a platform stub that native calls. The platform stub converts
+only primitives, so the C side of every site has the same shape.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
 from types import SimpleNamespace
 
-from .kotlin_values import Unsupported, identifier, name, native_call, owner_class
+from ..model import CType
+from .kotlin_values import Unsupported, identifier, name, owner_class
 
-ROOTS = "org.maplibre.nativeffi.internal.callback.CallbackRoots"
-SCOPE = "org.maplibre.nativeffi.internal.callback.CallbackRegistrationScope"
-ADMISSION = "org.maplibre.nativeffi.internal.callback.CallbackAdmission"
+ADMISSION = "CallbackAdmission"
+
+
+@dataclass(frozen=True)
+class Site:
+    """A C function pointer that calls one `Upcalls` method."""
+
+    name: str
+    # (Kotlin name, C type, carrier) per parameter, then the C result type.
+    parameters: tuple[tuple[str, CType, str], ...]
+    result: CType
+    result_carrier: str
+    body: str
+    # The carrier literal native receives when the upcall cannot run.
+    failure: str = "0"
 
 
 def status_callback(callback):
@@ -43,7 +65,7 @@ def public(value, values):
 def common(values):
     result = []
     for value in list(values.used.values()):
-        public = name(value.native)
+        public_name = name(value.native)
         if value.kind == "callback":
             callback = values.bound.callbacks[value.native]
             parameters = ", ".join(
@@ -56,14 +78,16 @@ def common(values):
                 if callback.result.native == "void" or status_callback(callback)
                 else values.public(callback.result)
             )
-            result.append(f"public typealias {public} = ({parameters}) -> {returns}")
+            result.append(
+                f"public typealias {public_name} = ({parameters}) -> {returns}"
+            )
         elif value.response:
             result.append(
-                f"public class {public} internal constructor(internal val bindingAddress: Long, internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope)"
+                f"public class {public_name} internal constructor(internal val bindingAddress: Long, internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope)"
             )
         elif value.registration:
             parameters = []
-            for member, typ, children, group in values.members(value):
+            for member, typ, children, _group in values.members(value):
                 default = (
                     "null" if typ.endswith("?") else values.default(children[0].value)
                 )
@@ -72,30 +96,26 @@ def common(values):
                     + (f" = {default}" if default else "")
                 )
             result.append(
-                f"public data class {public}(\n" + ",\n".join(parameters) + "\n)"
+                f"public data class {public_name}(\n" + ",\n".join(parameters) + "\n)"
             )
-    for callback, release in getattr(values, "direct_callbacks", {}).values():
-        if release:
-            result.append(
-                f"internal class Generated{name(callback.native)}Registration(val callback: {values.public(callback)})"
-            )
+    for callback in getattr(values, "direct_callbacks", {}).values():
+        result.append(
+            f"internal class {registration_class(callback)}(val callback: {values.public(callback)})"
+        )
     return "\n".join(result) + "\n"
 
 
-def cast_native(value, expression, values, platform):
-    if value.registration:
-        return f"GeneratedCallbacks.prepare{name(value.native)}(arena, {expression}, registrations)"
+def registration_class(callback):
+    return f"Generated{name(callback.native)}Registration"
+
+
+def argument(value, expression, values):
     if value.response:
-        address = f"{expression}.bindingAddress.also {{ {expression}.bindingScope.ensureActive() }}"
-        if platform == "jvmMain":
-            return f"MemorySegment.ofAddress({address}).reinterpret({value.native}.sizeof())"
-        if platform == "androidMain":
-            return f"MaplibreNativeC.{value.native}(org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer({address}))"
-        return f"({address}).toCPointer<{value.native}>()!!"
+        return f"{expression}.bindingAddress.also {{ {expression}.bindingScope.ensureActive() }}"
     return None
 
 
-def cast_public(value, expression, values, platform, scope=None):
+def decode(value, address, values):
     if value.registration:
         if any(
             not field.value.nullable
@@ -105,79 +125,76 @@ def cast_public(value, expression, values, platform, scope=None):
             raise Unsupported(
                 "callback descriptor output has no host callback identity"
             )
-        return f"GeneratedCallbacks.read{name(value.native)}({expression})"
+        return
     if value.response:
-        address = (
-            f"{expression}.address()"
-            if platform == "jvmMain"
-            else f"{expression}.address()"
-            if platform == "androidMain"
-            else f"{expression}.ptr.rawValue.toLong()"
-        )
-        return f"{name(value.native)}({address}, callbackScope)"
-    return None
+        raise Unsupported("a callback response is valid only during its callback")
+    return
 
 
-def native_type(value, values, platform):
-    if value.kind == "reference":
-        child = value.element
-        return (
-            "MemorySegment"
-            if platform == "jvmMain"
-            else f"MaplibreNativeC.{child.native}?"
-            if platform == "androidMain"
-            else f"CPointer<{child.native}>?"
-        )
-    if value.kind == "record":
-        return (
-            "MemorySegment"
-            if platform == "jvmMain"
-            else f"MaplibreNativeC.{value.native}?"
-            if platform == "androidMain"
-            else f"CValue<{value.native}>"
-        )
-    if value.kind in {"buffer", "native_pointer"}:
-        return (
-            "MemorySegment"
-            if platform == "jvmMain"
-            else "BytePointer?"
-            if value.kind == "buffer" and platform == "androidMain"
-            else "Pointer?"
-            if platform == "androidMain"
-            else "CPointer<ByteVar>?"
-            if value.kind == "buffer"
-            else "COpaquePointer?"
-        )
-    if value.kind == "handle":
-        return "ULong" if platform == "nativeMain" else "Long"
+# Upcall sites.
+
+
+VOID_POINTER = CType(
+    "pointer", "void *", "void *", pointee=CType("void", "void", "void")
+)
+VOID = CType("void", "void", "void")
+
+
+def sites(values):
+    """The registry of upcall sites, starting with the runtime's own."""
+    if not hasattr(values, "sites"):
+        values.sites = {}
+        typedefs = values.bound.source.typedefs_by_name
+        completion = typedefs.get("mln_completion_callback")
+        result = completion.parameters[1].type if completion else VOID_POINTER
+        context = ("userData", VOID_POINTER, "Long")
+        for site in (
+            Site(
+                "completion",
+                (context, ("result", result, "Long")),
+                VOID,
+                "Unit",
+                "contain(Unit) { CompletionBridge.complete(userData, result) }",
+            ),
+            Site(
+                "completionRelease",
+                (context,),
+                VOID,
+                "Unit",
+                "contain(Unit) { CompletionBridge.release(userData) }",
+            ),
+            Site(
+                "releaseRoot",
+                (context,),
+                VOID,
+                "Unit",
+                "contain(Unit) { CallbackRoots.release(userData) }",
+            ),
+        ):
+            values.sites[site.name] = site
+    return values.sites
+
+
+def carrier(value, values):
+    """The native-call carrier of a callback parameter or result."""
+    from .kotlin_abi import Record
+
     if value.native == "void":
         return "Unit"
-    typ = values.scalar(value)[0]
-    return typ if platform == "nativeMain" else typ.removeprefix("U")
+    if value.kind in {"reference", "buffer", "native_pointer", "callback"}:
+        return "Long"
+    if value.kind == "handle":
+        return "Long"
+    kind = values.abi.classify(value.ctype)
+    if isinstance(kind, Record):
+        return "Long"
+    return kind.carrier
 
 
-def token_expression(parameter, platform):
-    local = identifier(parameter)
-    return (
-        f"{local}.address()"
-        if platform == "jvmMain"
-        else f"{local}?.address() ?: 0L"
-        if platform == "androidMain"
-        else f"{local}?.rawValue?.toLong() ?: 0L"
-    )
-
-
-def literal(symbol, callback, values, platform):
+def failure_literal(callback, values):
     if callback.result.native == "void":
         return "Unit"
-    if symbol is None:
-        return (
-            "Unit"
-            if callback.result.native == "void"
-            else "0u"
-            if native_type(callback.result, values, platform) == "UInt"
-            else "0"
-        )
+    symbol = callback.failure
     number = next(
         (
             number
@@ -189,321 +206,269 @@ def literal(symbol, callback, values, platform):
     )
     if number is None:
         try:
-            number = int(symbol, 0)
+            number = int(symbol, 0) if symbol else 0
         except ValueError as error:
             raise Unsupported(
                 f"callback failure {symbol} needs a numeric constant"
             ) from error
-    typ = native_type(callback.result, values, platform)
-    if typ == "UInt":
-        return f"{number & 0xFFFFFFFF}u"
+    typ = carrier(callback.result, values)
+    if typ == "Long":
+        return f"{number}L"
     return str(number if number <= 0x7FFFFFFF else number - (1 << 32))
 
 
-def stub(native, function, values, platform):
-    callback = values.bound.callbacks[native]
-    names = ", ".join(identifier(p.name) for p in callback.parameters)
-    if platform == "jvmMain":
-        return f"{native}.allocate({native}.Function {{ {names} -> {function}({names}) }}, Arena.global())"
-    if platform == "nativeMain":
-        return f"staticCFunction(::{function})"
-    parameters = ", ".join(
-        f"{identifier(p.name)}: {native_type(p.value, values, platform)}"
-        for p in callback.parameters
-    )
-    typ = native_type(callback.result, values, platform)
-    return f"object : MaplibreNativeC.{native}() {{ override fun call({parameters}): {typ} = {function}({names}) }}.apply {{ retainReference<Pointer>() }}"
+def callback_argument(parameter, values):
+    """The public value of one callback argument, from its carrier local."""
+    from .kotlin_operations import PUBLIC_FROM_CARRIER
+
+    value = parameter.value
+    local = identifier(parameter.name)
+    if value.kind == "reference":
+        if value.element.response:
+            return f"{name(value.element.native)}({local}, scope)"
+        decoded = values.decode(value.element, local)
+        return f"if ({local} == 0L) null else {decoded}" if value.nullable else decoded
+    if value.kind == "buffer" and value.length == "nul":
+        return (
+            f"readCStringOrNull({local})" if value.nullable else f"readCString({local})"
+        )
+    if value.kind == "record":
+        return values.decode(value, local)
+    if value.kind == "enum":
+        _suffix, typ = values.accessor(value)
+        return f"{name(value.native)}({local}{PUBLIC_FROM_CARRIER[typ]})"
+    if value.kind == "scalar":
+        return local + PUBLIC_FROM_CARRIER[values.scalar(value)[0]]
+    if value.kind == "native_pointer":
+        return f"NativePointer.ofAddress({local})"
+    raise Unsupported("callback argument requires another Kotlin rule")
 
 
-def callback_thunk(value, field, values, platform):
-    callback = values.bound.callbacks[field.value.native]
-    function = "generated" + name(value.native) + name(field.name)
-    parameters = ", ".join(
-        f"{identifier(p.name)}: {native_type(p.value, values, platform)}"
-        for p in callback.parameters
-    )
-    returns = native_type(callback.result, values, platform)
-    failure = literal(callback.failure, callback, values, platform)
-    token = token_expression(callback.context, platform)
-    owner = "null"
+def callback_site(site_name, callback_value, member, root_type, values):
+    """Register the upcall site that runs [member] of the root's [root_type] value."""
+    callback = values.bound.callbacks[callback_value.native]
+    owner = None
     if callback.reentry_policy and callback.reentry_policy.registration_owner:
-        owner = "root.owner"
+        owner = "{ it.owner }"
     elif callback.reentry_policy and callback.reentry_policy.owner_parameter:
-        parameter = next(
-            p
-            for p in callback.parameters
-            if p.name == callback.reentry_policy.owner_parameter
-        )
-        owner = (
-            identifier(parameter.name) + ".toLong()"
-            if parameter.value.kind == "handle"
-            else token_expression(parameter.name, platform)
-        )
+        owner = "{ " + identifier(callback.reentry_policy.owner_parameter) + " }"
     allowed = (
         "null"
         if callback.reentry == "allow"
         else "setOf("
         + ", ".join(
-            '"' + operation + '"'
+            f'"{operation}"'
             for operation in (
                 callback.reentry_policy.operations if callback.reentry_policy else ()
             )
         )
         + ")"
     )
-    lines = [
-        f"private fun {function}({parameters}): {returns} {{",
-        "  try {",
-        f"    val root = {ROOTS}.get({token}) ?: return {failure}",
-        f"    val value = root.value as {name(value.native)}",
-        f"    val invoke = value.{identifier(field.name)}"
-        + (f" ?: return {failure}" if field.value.nullable else ""),
-        f"    val callbackScope = {ADMISSION}.scope({owner}, {allowed})",
-        "    try {",
-    ]
+    failure = failure_literal(callback, values)
+    result = carrier(callback.result, values)
+    parameters = []
+    for parameter in callback.parameters:
+        parameters.append(
+            (
+                identifier(parameter.name),
+                parameter.value.ctype,
+                carrier(parameter.value, values),
+            )
+        )
     arguments = []
+    lines = []
     decision = callback.decision
     for parameter in callback.parameters:
         if parameter.name == callback.context:
             continue
-        local = identifier(parameter.name)
         if decision and parameter.name == decision.parameter:
             lines.append(
-                f"      val decisionOwner = {owner_class(decision.handle.native)}({local})"
+                f"val decisionOwner = {owner_class(decision.handle.native)}({identifier(parameter.name)})"
             )
             arguments.append("decisionOwner")
-        elif parameter.value.kind == "record" and platform == "nativeMain":
-            arguments.append(
-                f"{local}.useContents {{ {values.cast_public(parameter.value, 'this', platform)} }}"
-            )
         else:
-            expression = local + (
-                "!!"
-                if platform == "androidMain"
-                and parameter.value.kind in {"record", "reference", "buffer"}
-                else ""
-            )
-            arguments.append(values.cast_public(parameter.value, expression, platform))
-    invocation = f"invoke({', '.join(arguments)})"
+            arguments.append(callback_argument(parameter, values))
+    invoke = f"value.{member}"
+    if callback_value.nullable:
+        lines.insert(0, f"val invoke = {invoke} ?: return@upcall {failure}")
+        invoke = "invoke"
+    invocation = f"{invoke}({', '.join(arguments)})"
     if decision:
-        lines += [
-            f"      return try {{ decisionOwner.finishBindingDecision({invocation}.rawValue.toUInt()) }} catch (_: Throwable) {{ decisionOwner.finishBindingException() }} finally {{ org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive(decisionOwner) }}"
-            + (".toInt()" if platform != "nativeMain" else "")
-        ]
+        lines.append(
+            f"decisionOwner.binding.decide(decisionOwner) {{ {invocation}.rawValue }}"
+            + (".toInt()" if result == "Int" else "")
+        )
     elif callback.result.native == "void":
-        lines += [f"      {invocation}", "      return Unit"]
+        lines.append(invocation)
     elif status_callback(callback):
-        lines += [f"      {invocation}", "      return 0"]
+        lines.append(invocation)
+        lines.append("0")
     else:
-        lines += [
-            "      return " + values.cast_native(callback.result, invocation, platform)
-        ]
-    lines += [
-        "    } finally { callbackScope.close() }",
-        f"  }} catch (_: Throwable) {{ return {failure} }}",
-        "}",
-    ]
-    return function, "\n".join(lines)
+        lines.append(callback_result(callback.result, invocation, values))
+    context = identifier(callback.context)
+    owner_argument = f", {owner}" if owner else ""
+    body = (
+        f"upcall<{root_type}, {result}>({context}, {failure}, {allowed}{owner_argument}) "
+        f"{{ value, scope -> {'; '.join(lines)} }}"
+    )
+    sites(values)[site_name] = Site(
+        site_name,
+        tuple(parameters),
+        callback.result.ctype,
+        result,
+        body,
+        failure,
+    )
+    return site_name
 
 
-def conversions(values, platform):
-    descriptors = [v for v in list(values.used.values()) if v.registration]
-    if not descriptors:
-        return direct_conversions(values, platform)
-    methods, thunks, stubs = [], [], []
-    arena_type = (
-        "Arena"
-        if platform == "jvmMain"
-        else "PointerScope"
-        if platform == "androidMain"
-        else "MemScope"
-    )
-    for value in descriptors:
-        public = name(value.native)
-        native = value.native
-        typ = (
-            "MemorySegment"
-            if platform == "jvmMain"
-            else f"MaplibreNativeC.{native}"
-            if platform == "androidMain"
-            else f"CPointer<{native}>"
+def callback_result(value, expression, values):
+    from .kotlin_values import CARRIER
+
+    if value.kind == "enum":
+        _suffix, typ = values.accessor(value)
+        return f"{expression}.rawValue{CARRIER[typ]}"
+    if value.kind == "scalar":
+        return expression + CARRIER[values.scalar(value)[0]]
+    raise Unsupported("callback result requires a scalar")
+
+
+def upcalls(values):
+    """The common `Upcalls` methods and the `UpcallStubs` they back."""
+    entries = []
+    for site in sites(values).values():
+        parameters = ", ".join(f"{local}: {typ}" for local, _c, typ in site.parameters)
+        entries.append(
+            f"  @JvmStatic fun {site.name}({parameters}): {site.result_carrier} = {site.body}"
         )
-        source_typ = typ if platform != "nativeMain" else native
-        initialize = (
-            f"MapLibreNativeC.{value.default}(arena)"
-            if value.default and platform == "jvmMain"
-            else f"{native}.allocate(arena)"
-            if platform == "jvmMain"
-            else f"MaplibreNativeC.{value.default}()"
-            if value.default and platform == "androidMain"
-            else f"MaplibreNativeC.{native}()"
-            if platform == "androidMain"
-            else f"arena.alloc<{native}>().ptr"
-        )
-        body = [
-            f"  fun prepare{public}(arena: {arena_type}, value: {public}, registrations: {SCOPE}): {typ} {{",
-            f"    val result = {initialize}",
-        ]
-        base = "result.pointed" if platform == "nativeMain" else "result"
-        if platform == "nativeMain":
-            body.append(
-                f"    result.reinterpret<ByteVar>().let {{ bytes -> repeat(sizeOf<{native}>().toInt()) {{ bytes[it] = 0 }} }}"
-            )
-            if value.default:
-                body.append(f"    {value.default}().place(result)")
-        size = (
-            f"{native}.sizeof().toInt()"
-            if platform == "jvmMain"
-            else "result.sizeof()"
-            if platform == "androidMain"
-            else f"sizeOf<{native}>().toUInt()"
-        )
-        if any(f.role == "size" for f in value.fields):
-            body.append("    " + values.assign(value, "size", base, size, platform))
-        callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
-        for member, _, children, group in values.members(value):
-            if group:
-                raise Unsupported(
-                    "callback descriptor presence group needs recursive preparation"
-                )
-            field = children[0]
-            if field in callbacks:
-                continue
-            expression = "value." + member
-            encoded = values.cast_native(
-                field.value,
-                expression + ("!!" if field.presence and field.presence.mask else ""),
-                platform,
-            )
-            if platform == "nativeMain" and field.value.kind == "record":
-                assignment = (
-                    f"{encoded}.pointed.readValue().place({base}.{field.name}.ptr)"
-                )
-            else:
-                assignment = values.assign(value, field.name, base, encoded, platform)
-            if field.presence and field.presence.mask:
-                assignment = f"if ({expression} != null) {{ {values.mark(value, field.presence, base, platform)}; {assignment} }}"
-            body.append("    " + assignment)
-        if all(f.value.nullable for f in callbacks):
-            body.append(
-                "    if ("
-                + " && ".join(f"value.{identifier(f.name)} == null" for f in callbacks)
-                + ") return result"
-            )
-        body.append("    val token = registrations.register(value)")
-        user_data = (
-            "MemorySegment.ofAddress(token)"
-            if platform == "jvmMain"
-            else "org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer(token)"
-            if platform == "androidMain"
-            else "token.toCPointer<ByteVar>()"
-        )
-        body.append(
-            "    "
-            + values.assign(
-                value, value.registration.user_data, base, user_data, platform
-            )
-        )
-        for field in callbacks:
-            function, thunk = callback_thunk(value, field, values, platform)
-            thunks.append(thunk)
-            property_name = function + "Stub"
-            stubs.append(
-                f"  private val {property_name} = {stub(field.value.native, function, values, platform)}"
-            )
-            pointer = property_name
-            if field.value.nullable:
-                null = "MemorySegment.NULL" if platform == "jvmMain" else "null"
-                pointer = (
-                    f"if (value.{identifier(field.name)} == null) {null} else {pointer}"
-                )
-            body.append(
-                "    " + values.assign(value, field.name, base, pointer, platform)
-            )
-        release_field = next(
-            f for f in value.fields if f.name == value.registration.release
-        )
-        release_callback = values.bound.callbacks[release_field.value.native]
-        release_function = "generatedRelease" + public
-        parameter = identifier(release_callback.context)
-        parameter_type = native_type(
-            release_callback.parameters[0].value, values, platform
-        )
-        thunks.append(
-            f"private fun {release_function}({parameter}: {parameter_type}) {{ try {{ {ROOTS}.release({token_expression(release_callback.context, platform)}) }} catch (_: Throwable) {{}} }}"
-        )
-        stubs.append(
-            f"  private val {release_function}Stub = {stub(release_field.value.native, release_function, values, platform)}"
-        )
-        body.append(
-            "    "
-            + values.assign(
-                value,
-                value.registration.release,
-                base,
-                release_function + "Stub",
-                platform,
-            )
-        )
-        body += ["    return result", "  }"]
-        methods.append("\n".join(body))
-        read = [f"  fun read{public}(source: {source_typ}): {public} {{"]
-        if platform == "androidMain":
-            read.append(
-                f'    check(!org.maplibre.nativeffi.internal.javacpp.GeneratedCallbackBridge.has{public}Callbacks(source)) {{ "cannot copy an installed callback descriptor" }}'
-            )
-        else:
-            for field in callbacks:
-                pointer = values.field(value, field.name, "source", platform)
-                present = (
-                    f"{pointer}.address() != 0L"
-                    if platform == "jvmMain"
-                    else f"{pointer} != null"
-                )
-                read.append(
-                    f'    check(!({present})) {{ "cannot copy an installed callback descriptor" }}'
-                )
-        if not all(f.value.nullable for f in callbacks):
-            methods.append(
-                f'  fun read{public}(source: {source_typ}): {public} = error("cannot copy an installed callback descriptor")'
-            )
-            continue
-        args = []
-        for member, _, children, group in values.members(value):
-            field = children[0]
-            expression = (
-                "null"
-                if field in callbacks
-                else values.cast_public(
-                    field.value,
-                    values.field(value, field.name, "source", platform),
-                    platform,
-                )
-            )
-            if field.presence and field.presence.mask:
-                expression = f"if ({values.condition(value, field.presence, 'source', platform)}) {expression} else null"
-            args.append(f"{member} = {expression}")
-        read += [f"    return {public}({', '.join(args)})", "  }"]
-        methods.append("\n".join(read))
-    annotation = (
-        "@OptIn(ExperimentalForeignApi::class)\n" if platform == "nativeMain" else ""
-    )
+    stubs = [f"  val {site.name}: Long" for site in sites(values).values()]
     return (
-        annotation
-        + "internal object GeneratedCallbacks {\n"
-        + "\n".join(stubs + methods)
-        + "\n}\n"
-        + "\n".join(annotation + thunk for thunk in thunks)
-        + "\n"
-        + direct_conversions(values, platform)
+        "// Generated by tools/bindgen. Do not edit.\n"
+        "package org.maplibre.nativeffi.internal.c\n\n"
+        "import kotlin.jvm.JvmStatic\n"
+        "import org.maplibre.nativeffi.generated.*\n"
+        "import org.maplibre.nativeffi.internal.async.CompletionBridge\n"
+        "import org.maplibre.nativeffi.internal.callback.CallbackRoots\n"
+        "import org.maplibre.nativeffi.internal.callback.contain\n"
+        "import org.maplibre.nativeffi.internal.callback.upcall\n"
+        "import org.maplibre.nativeffi.internal.memory.*\n"
+        "import org.maplibre.nativeffi.render.NativePointer\n\n"
+        "/** The Kotlin side of each C function pointer the binding hands to native. */\n"
+        "internal object Upcalls {\n" + "\n".join(entries) + "\n}\n\n"
+        "/** The C function pointer that calls each [Upcalls] method. */\n"
+        "internal expect object UpcallStubs {\n" + "\n".join(stubs) + "\n}\n"
     )
 
 
-def operation(plan, values, platform):
-    from .kotlin_ir import admission, call_arguments, parameter_name
+# Registration descriptors.
+
+
+def put_function(value, values):
+    """Write a callback registration descriptor, rooting its value until native releases it."""
+    public_name = name(value.native)
+    callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
+    lines = [
+        f"internal fun NativeCall.{values.put(value)}(target: Long, value: {public_name}) {{"
+    ]
+    if value.default:
+        lines.append("  " + values.default_call(value) + "")
+    size = next((f for f in value.fields if f.role == "size"), None)
+    if size:
+        lines.append(
+            "  "
+            + values.write_scalar(
+                size.value,
+                values.at("target", value, size.name),
+                f"{values.size(value.native)}.toUInt()",
+            )
+        )
+    for member, _typ, children, group in values.members(value):
+        if group:
+            raise Unsupported(
+                "callback descriptor presence group needs recursive preparation"
+            )
+        field = children[0]
+        if field in callbacks:
+            continue
+        expression = "value." + member
+        present = bool(field.presence and field.presence.mask)
+        writes = values.field_write(value, field, "it" if present else expression)
+        if present:
+            mark = values.mark(value, field.presence.mask, field.presence.bit)
+            lines.append(f"  {expression}?.let {{ {mark}; {'; '.join(writes)} }}")
+        else:
+            lines += ["  " + line for line in writes]
+    if all(f.value.nullable for f in callbacks):
+        lines.append(
+            "  if ("
+            + " && ".join(f"value.{identifier(f.name)} == null" for f in callbacks)
+            + ") return"
+        )
+    lines.append(
+        f"  writeAddress({values.at('target', value, value.registration.user_data)}, registrations.register(value))"
+    )
+    for field in callbacks:
+        site = callback_site(
+            name(value.native)[0].lower() + name(value.native)[1:] + name(field.name),
+            field.value,
+            identifier(field.name),
+            public_name,
+            values,
+        )
+        stub = f"UpcallStubs.{site}"
+        if field.value.nullable:
+            stub = f"if (value.{identifier(field.name)} == null) 0L else {stub}"
+        lines.append(
+            f"  writeAddress({values.at('target', value, field.name)}, {stub})"
+        )
+    lines.append(
+        f"  writeAddress({values.at('target', value, value.registration.release)}, UpcallStubs.releaseRoot)"
+    )
+    lines.append("}")
+    lines.append(
+        f"internal fun NativeCall.{values.write(value)}(value: {public_name}): Long = "
+        f"allocate({values.size(value.native)}, {values.align(value.native)}).also {{ {values.put(value)}(it, value) }}"
+    )
+    return "\n".join(lines)
+
+
+def read_function(value, values):
+    """Copy a descriptor that holds no installed callback."""
+    public_name = name(value.native)
+    callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
+    checks = " || ".join(
+        f"readAddress({values.at('source', value, f.name)}) != 0L" for f in callbacks
+    )
+    arguments = []
+    for member, _typ, children, _group in values.members(value):
+        field = children[0]
+        if field in callbacks:
+            arguments.append(f"{member} = null")
+            continue
+        decoded = values.field_read(value, field, None)
+        if field.presence and field.presence.mask:
+            decoded = f"if ({values.present('source', value, field.presence.mask, field.presence.bit)}) {decoded} else null"
+        arguments.append(f"{member} = {decoded}")
+    return (
+        f"internal fun {values.read(value)}(source: Long): {public_name} {{ "
+        f'check(!({checks or "false"})) {{ "cannot copy an installed callback descriptor" }}; '
+        f"return {public_name}({', '.join(arguments)}) }}"
+    )
+
+
+# Operations that a callback transaction shapes.
+
+
+def operation(plan, values, native):
+    from .kotlin_operations import (
+        call_arguments,
+        declaration,
+        parameter_name,
+        receiver_arguments,
+    )
 
     if plan.direct_registrations:
-        return direct_operation(plan, values, platform)
+        return direct_operation(plan, values, native)
     decision = next(
         (
             c.decision
@@ -517,141 +482,52 @@ def operation(plan, values, platform):
         inputs = [
             p for p in plan.inputs if p.name != plan.receiver and p.name not in lengths
         ]
-        params = ", ".join(
-            f"{parameter_name(p.name)}: {values.public(p.value)}" for p in inputs
-        )
+        params = [(parameter_name(p.name), values.public(p.value)) for p in inputs]
         method = identifier(plan.name.removeprefix("mln_"))
-        returns = "Boolean" if decision and plan.name == decision.cancelled else "Unit"
-        if platform == "commonMain":
-            return f"  public fun {method}({params}): {returns}\n"
-        prefix = (
-            "MapLibreNativeC."
-            if platform == "jvmMain"
-            else "MaplibreNativeC."
-            if platform == "androidMain"
-            else ""
-        )
-        arena = (
-            "Arena.ofConfined().use { arena ->"
-            if platform == "jvmMain"
-            else "PointerScope().use { arena ->"
-            if platform == "androidMain"
-            else "memScoped { val arena = this;"
-        )
-        arguments = call_arguments(plan, values, platform)
+        arguments = call_arguments(plan, values)
+        if decision and plan.name == decision.cancelled:
+            arguments.append("out")
+            body = (
+                "val out = allocate(1); "
+                + native.checked(plan.function, arguments)
+                + "; readBool(out)"
+            )
+            return (
+                f"  public fun {method}({declaration(params)}): Boolean = "
+                f'nativeCall(this, binding, "{plan.name}", Access.READ) {{ {body} }}\n'
+            )
         if decision:
-            arguments[0] = "raw"
-            hook = (
-                "bindingComplete" if plan.name == decision.complete else "bindingRead"
-            ) + name(decision.handle.native)
-            start = f"{hook} {{ raw -> {arena}"
-            if returns == "Boolean":
-                output = (
-                    "arena.allocate(ValueLayout.JAVA_BOOLEAN)"
-                    if platform == "jvmMain"
-                    else "BoolPointer(1L)"
-                    if platform == "androidMain"
-                    else "alloc<BooleanVar>()"
-                )
-                arguments.append("out" if platform != "nativeMain" else "out.ptr")
-                read = (
-                    "out.get(ValueLayout.JAVA_BOOLEAN, 0)"
-                    if platform == "jvmMain"
-                    else "out.get(0)"
-                    if platform == "androidMain"
-                    else "out.value"
-                )
-                body = f"val out = {output}; {native_call(plan.function, prefix, arguments)}; {read}"
-            else:
-                body = native_call(plan.function, prefix, arguments)
-        else:
-            scoped = parameter_name(plan.scoped_receiver)
-            start = arena
-            body = f'{scoped}.bindingScope.ensureActive(); org.maplibre.nativeffi.internal.callback.CallbackAdmission.check({scoped}.bindingAddress, "{plan.name}"); {native_call(plan.function, prefix, arguments)}'
-        checks = admission(plan) + "; " if decision else ""
-        loaded = (
-            "NativeAccess.ensureLoaded(); "
-            if platform in {"jvmMain", "androidMain"}
-            else ""
+            return (
+                f"  public fun {method}({declaration(params)}): Unit = "
+                f'nativeComplete(this, binding, "{plan.name}") {{ {native.checked(plan.function, arguments)} }}\n'
+            )
+        scoped = parameter_name(plan.scoped_receiver)
+        return (
+            f"  public fun {method}({declaration(params)}): Unit = "
+            f'nativeRespond({scoped}.bindingScope, {scoped}.bindingAddress, "{plan.name}") '
+            f"{{ {native.checked(plan.function, arguments)} }}\n"
         )
-        ending = "} }" if decision else "}"
-        return f"  public actual fun {method}({params}): {returns} {{ {loaded}{checks}return {start} {body} {ending} }}\n"
     if not plan.registrations or plan.owned_outputs:
         return None
     if not plan.completion or plan.result or plan.outputs:
         raise Unsupported(
             "callback registration needs its native admission transaction"
         )
-    from .kotlin_ir import call_arguments, parameter_name
-
     inputs = [p for p in plan.inputs if p.name != plan.receiver]
-    parameters = [(parameter_name(p.name), values.public(p.value)) for p in inputs]
+    params = [(parameter_name(p.name), values.public(p.value)) for p in inputs]
     receiver = next(p for p in plan.inputs if p.name == plan.receiver)
     method = identifier(plan.name.removeprefix(receiver.value.native + "_"))
+    arguments = call_arguments(plan, values) + ["completion"]
+    helper = "nativeCommand" if plan.execution == "command" else "nativeUnit"
     result = "CommandCompletion" if plan.execution == "command" else "Unit"
-    params = ", ".join(f"{n}: {t}" for n, t in parameters)
-    if platform == "commonMain":
-        return f"  public fun {method}({params}): Deferred<{result}>\n"
-    arguments = call_arguments(plan, values, platform) + ["completion"]
-    prefix = (
-        "MapLibreNativeC."
-        if platform == "jvmMain"
-        else "MaplibreNativeC."
-        if platform == "androidMain"
-        else ""
-    )
-    arena = (
-        "Arena.ofConfined().use { arena ->"
-        if platform == "jvmMain"
-        else "PointerScope().use { arena ->"
-        if platform == "androidMain"
-        else "memScoped { val arena = this;"
-    )
-    bridge = "command" if result == "CommandCompletion" else "unit"
-    call = native_call(plan.function, prefix, arguments)
-    return f'  public actual fun {method}({params}): Deferred<{result}> = {SCOPE}().use {{ registrations ->\n    {ADMISSION}.check(binding{name(receiver.value.native)}Handle().toLong(), "{plan.name}")\n    CompletionBridge.{bridge} {{ completion -> {arena}\n      {call}\n      registrations.accept(bindingCallbacks)\n    }} }}\n  }}\n'
-
-
-def direct_conversions(values, platform):
-    stubs, thunks = [], []
-    for callback_value, release in getattr(values, "direct_callbacks", {}).values():
-        public = name(callback_value.native)
-        wrapper = SimpleNamespace(
-            native="mln_generated_"
-            + callback_value.native.removeprefix("mln_")
-            + "_registration"
-        )
-        field = SimpleNamespace(name="callback", value=callback_value)
-        function, thunk = callback_thunk(wrapper, field, values, platform)
-        thunks.append(thunk)
-        stubs.append(
-            f"  val {public}Stub = {stub(callback_value.native, function, values, platform)}"
-        )
-        release_plan = values.bound.callbacks[release.native]
-        parameter = release_plan.parameters[0]
-        release_function = "generatedDirectRelease" + public
-        thunks.append(
-            f"private fun {release_function}({identifier(parameter.name)}: {native_type(parameter.value, values, platform)}) {{ try {{ {ROOTS}.release({token_expression(parameter.name, platform)}) }} catch (_: Throwable) {{}} }}"
-        )
-        stubs.append(
-            f"  val {public}ReleaseStub = {stub(release.native, release_function, values, platform)}"
-        )
-    if not stubs:
-        return ""
-    annotation = (
-        "@OptIn(ExperimentalForeignApi::class)\n" if platform == "nativeMain" else ""
-    )
     return (
-        annotation
-        + "internal object GeneratedDirectCallbacks {\n"
-        + "\n".join(stubs)
-        + "\n}\n"
-        + "\n".join(annotation + thunk for thunk in thunks)
-        + "\n"
+        f"  public fun {method}({', '.join(f'{n}: {t}' for n, t in params)}): Deferred<{result}> = "
+        f'{helper}({receiver_arguments(plan)}, "{plan.name}", bindingCallbacks) '
+        f"{{ {native.checked(plan.function, arguments)} }}\n"
     )
 
 
-def direct_operation(plan, values, platform):
+def direct_operation(plan, values, native):
     """Lower a registration whose root native releases after its last callback.
 
     A receiver's registration roots in that receiver's callback owner, so a
@@ -660,7 +536,7 @@ def direct_operation(plan, values, platform):
     registration that native reports it did not store frees its root before
     returning.
     """
-    from .kotlin_ir import admission, receiver_value
+    from .kotlin_operations import receiver_arguments
 
     if len(plan.direct_registrations) != 1:
         raise Unsupported(
@@ -697,140 +573,48 @@ def direct_operation(plan, values, platform):
     values.check(callback_value)
     if not hasattr(values, "direct_callbacks"):
         values.direct_callbacks = {}
-    values.direct_callbacks[callback_value.native] = (callback_value, release)
-    public = name(callback_value.native)
+    values.direct_callbacks[callback_value.native] = callback_value
+    wrapper = registration_class(callback_value)
+    site = callback_site(
+        name(callback_value.native)[0].lower() + name(callback_value.native)[1:],
+        SimpleNamespace(native=callback_value.native, nullable=False),
+        "callback",
+        wrapper,
+        values,
+    )
     method = identifier(plan.name.removeprefix("mln_"))
-    returns = "Boolean" if condition else "Unit"
-    params = f"callback: {values.public(callback_value)}"
-    if platform == "commonMain":
-        return f"  public fun {method}({params}): {returns}\n"
-    prefix = (
-        "MapLibreNativeC."
-        if platform == "jvmMain"
-        else "MaplibreNativeC."
-        if platform == "androidMain"
-        else ""
-    )
-    null = "MemorySegment.NULL" if platform == "jvmMain" else "null"
-    token = (
-        "MemorySegment.ofAddress(token)"
-        if platform == "jvmMain"
-        else "org.maplibre.nativeffi.internal.javacpp.JavaCppSupport.addressPointer(token)"
-        if platform == "androidMain"
-        else "token.toCPointer<ByteVar>()"
-    )
-    output = (
-        "arena.allocate(ValueLayout.JAVA_BOOLEAN)"
-        if platform == "jvmMain"
-        else "BoolPointer(1L)"
-        if platform == "androidMain"
-        else "alloc<BooleanVar>()"
-    )
-    read = (
-        "out.get(ValueLayout.JAVA_BOOLEAN, 0)"
-        if platform == "jvmMain"
-        else "out.get(0)"
-        if platform == "androidMain"
-        else "out.value"
-    )
-    arena = (
-        "Arena.ofConfined().use { arena ->"
-        if platform == "jvmMain"
-        else "PointerScope().use { arena ->"
-        if platform == "androidMain"
-        else "memScoped {"
-    )
 
     def call(disabled):
         arguments = []
         for parameter in plan.function.parameters:
             if parameter.name == plan.receiver:
-                arguments.append("raw")
+                arguments.append("handle")
             elif parameter.name == registration.callback:
-                arguments.append(
-                    null if disabled else f"GeneratedDirectCallbacks.{public}Stub"
-                )
+                arguments.append("0L" if disabled else f"UpcallStubs.{site}")
             elif parameter.name == registration.user_data:
-                arguments.append(null if disabled else token)
+                arguments.append("0L" if disabled else "token")
             elif parameter.name == registration.release_callback:
-                arguments.append(
-                    null
-                    if disabled
-                    else f"GeneratedDirectCallbacks.{public}ReleaseStub"
-                )
+                arguments.append("0L" if disabled else "UpcallStubs.releaseRoot")
             else:
-                arguments.append("out.ptr" if platform == "nativeMain" else "out")
-        return native_call(plan.function, prefix, arguments)
+                arguments.append("out")
+        return native.checked(plan.function, arguments)
 
-    owner = (
-        "bindingCallbacks"
-        if plan.receiver
-        else "org.maplibre.nativeffi.internal.callback.CallbackOwner.global"
-    )
+    owner = "bindingCallbacks" if plan.receiver else "CallbackOwner.global"
     register = (
-        f"val token = registrations.register(Generated{public}Registration(callback)"
-        + (", raw.toLong()" if owned else "")
+        f"val token = registrations.register({wrapper}(callback)"
+        + (", handle" if owned else "")
         + ")"
     )
     if condition:
         flag = identifier(condition)
-        body = f"{SCOPE}().use {{ registrations -> {arena} {register}; val out = {output}; {call(False)}; val {flag} = {read}; if (!{flag}) registrations.accept({owner}); {flag} }} }}"
+        body = f"{register}; val out = allocate(1); {call(False)}; val {flag} = readBool(out); if (!{flag}) accept({owner}); {flag}"
     else:
-        body = f"{SCOPE}().use {{ registrations -> {register}; {call(False)}; registrations.accept({owner}) }}"
+        body = f"{register}; {call(False)}; accept({owner})"
     if callback_value.nullable:
-        body = f"if (callback == null) {call(True)} else {body}"
-    if plan.receiver:
-        body = f"bindingRead{name(receiver_value(plan).native)} {{ raw -> {body} }}"
-    loaded = (
-        "NativeAccess.ensureLoaded(); "
-        if platform in {"jvmMain", "androidMain"}
-        else ""
+        body = f"if (callback == null) {call(True)} else {{ {body} }}"
+    access = ", Access.READ" if plan.receiver else ""
+    returns = "Boolean" if condition else "Unit"
+    return (
+        f"  public fun {method}(callback: {values.public(callback_value)}): {returns} = "
+        f'nativeCall({receiver_arguments(plan)}, "{plan.name}"{access}) {{ {body} }}\n'
     )
-    if condition:
-        return f"  public actual fun {method}({params}): Boolean {{ {loaded}{admission(plan)}; return {body} }}\n"
-    return f"  public actual fun {method}({params}) {{ {loaded}{admission(plan)}; {body} }}\n"
-
-
-def android_bridge(values):
-    """Inspect C callback fields without allocating JavaCPP FunctionPointer wrappers."""
-    header = [
-        "// Generated by tools/bindgen. Do not edit.",
-        "#pragma once",
-        "#include <maplibre_native_c.h>",
-    ]
-    java = [
-        "// Generated by tools/bindgen. Do not edit.",
-        "package org.maplibre.nativeffi.internal.javacpp;",
-        "import org.bytedeco.javacpp.Pointer;",
-        "import org.bytedeco.javacpp.annotation.Cast;",
-        "import org.bytedeco.javacpp.annotation.Name;",
-        "import org.bytedeco.javacpp.annotation.Platform;",
-        "import org.bytedeco.javacpp.annotation.Properties;",
-        '@Properties(inherit = MaplibreNativeCConfig.class, value = @Platform(include = "callback_bridge_generated.h"))',
-        "public final class GeneratedCallbackBridge {",
-        "private GeneratedCallbackBridge() {}",
-    ]
-    for value in values.used.values():
-        if not value.registration:
-            continue
-        callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
-        if not all(f.value.nullable for f in callbacks):
-            continue
-        function = f"mln_android_{value.native.removeprefix('mln_')}_has_callbacks"
-        present = (
-            " || ".join(f"source->{f.name} != nullptr" for f in callbacks) or "false"
-        )
-        header.append(
-            f"inline bool {function}(const {value.native}* source) {{ return {present}; }}"
-        )
-        java.append(
-            f'@Name("{function}") public static native boolean has{name(value.native)}Callbacks(@Cast("const {value.native}*") Pointer source);'
-        )
-    java.append("}")
-    return {
-        "src/androidMain/javacpp/callback_bridge_generated.h": "\n".join(header) + "\n",
-        "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/GeneratedCallbackBridge.java": "\n".join(
-            java
-        )
-        + "\n",
-    }

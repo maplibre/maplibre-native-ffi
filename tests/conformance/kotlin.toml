@@ -3,24 +3,26 @@
 # or to why it does not apply:
 #   "ID" = { na = "reason" }
 #
-# The commonTest files run on every emitter: FFM on the JVM, JavaCPP in the
-# Android device suite, and cinterop on Kotlin/Native. Cases whose code differs
-# per emitter name one test here and keep a copy per platform:
-# - The ABI check (nativeTest MaplibreNativeTest).
-# - The strided event batch with an unknown payload arm, and the checked
-#   narrowing of a native count to a list index (RuntimeEventJvmTest,
-#   RuntimeEventNativeTest, RuntimeEventAndroidTest). VAL-04's integer half is
-#   that narrowing: Kotlin's unsigned types match the C widths exactly, so only
-#   native counts narrow, to Int. Its open-enum half also runs on the way out,
-#   in the batch test's unknown event and source types.
+# The generated API and its runtime are common code, so the commonTest files
+# exercise them over every native-call shim: FFM on the JVM, JNI in the Android
+# device suite, and cinterop on Kotlin/Native. Cases that depend on a platform
+# name one test here and keep a copy per platform:
 # - The leak report of an abandoned handle, read from standard output
 #   (AbandonedHandleJvmTest in a child JVM, AbandonedHandleAndroidTest). The
-#   disposal half runs on every emitter in commonTest AbandonedHandleTest.
-# - Unreachable-request reclamation (ResourceRequestHandleAndroidTest).
+#   disposal half runs on every platform in commonTest AbandonedHandleTest.
+# - Unreachable-request reclamation, which each garbage collector drives
+#   (ResourceRequestHandleJvmTest, ResourceRequestHandleAndroidTest).
+# The strided event batch with an unknown payload arm needs a batch laid out the
+# way the C compiler does, which cinterop provides, so it runs in nativeTest
+# RuntimeEventNativeTest. It also covers the checked narrowing of a native count
+# to a list index. VAL-04's integer half is that narrowing: Kotlin's unsigned
+# types match the C widths exactly, so only native counts narrow, to Int. Its
+# open-enum half also runs on the way out, in the batch test's unknown event and
+# source types.
 
 [cases]
 "ERR-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/error/StatusMappingTest.kt::everyStatusMapsToItsExceptionAndAnUnknownCodeSurvives"
-"ERR-02" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/internal/loader/NativeAccessTest.kt::abiVersionMismatchReportsActualAndExpectedVersions"
+"ERR-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/internal/loader/AbiVersionTest.kt::abiVersionMismatchReportsActualAndExpectedVersions"
 "LIFE-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::closingAHandleTwiceIsSafeAndLaterUseIsRefused"
 "LIFE-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds"
 "LIFE-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aBorrowOnAnotherThreadHoldsOffTheFramesReleaseUntilItEnds"
@@ -41,7 +43,7 @@
 "CB-08" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/callback/ResourceCallbackTest.kt::aCancelRegistrationNativeDoesNotStoreIsNotRooted"
 "VAL-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::terminatedStringsRejectAnEmbeddedNulAndExplicitLengthsKeepIt"
 "VAL-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::presenceFieldsRoundTripSetAndAbsentValues"
-"VAL-03" = "bindings/kotlin/src/jvmTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeEventJvmTest.kt::aStridedBatchWithAnUnknownPayloadArmDecodesWithoutLoss"
+"VAL-03" = "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeEventNativeTest.kt::aStridedBatchWithAnUnknownPayloadArmDecodesWithoutLoss"
 "VAL-04" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::openEnumsKeepUnknownValuesAnd64BitCarriersKeepTheirHighBits"
 "VAL-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::arrayInputsAreCopiedAtSubmission"
 "VIEW-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aBorrowedFrameViewExpiresWithItsBlockAndHoldsOffItsRelease"

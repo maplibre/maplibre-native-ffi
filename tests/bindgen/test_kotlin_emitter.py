@@ -1,4 +1,4 @@
-"""The Kotlin emitter's record layouts, checked by the C compiler."""
+"""The Kotlin emitter's layouts and native shims, checked by the C compiler."""
 
 import shutil
 import unittest
@@ -11,9 +11,11 @@ from support import (
     parse,
     protocol_groups,
     real_api,
+    require_tool,
     run,
 )
 
+from tools.bindgen.emitters import kotlin
 from tools.bindgen.emitters.kotlin_abi import Abi, LayoutError
 
 # One target per data model a Kotlin target uses: Android ARM32 is ILP32, and
@@ -104,6 +106,29 @@ class KotlinLayoutTests(unittest.TestCase):
             for width in TARGETS:
                 with self.subTest(width=width):
                     self.compile((header,), layout_assertions(api, width), width)
+
+    def test_the_repository_api_generates_completely(self):
+        self.assertEqual(kotlin.coverage(real_api())["unsupported"], {})
+
+    def test_the_jni_glue_compiles_against_the_headers_for_both_data_models(self):
+        # The glue casts each carrier to its C parameter type, so compiling it
+        # against the real prototypes checks every cast.
+        java = Path(require_tool(self, "java", ROOT / "bindings/kotlin").executable)
+        home = java.resolve().parents[1]
+        machine = next((home / "include").glob("*/jni_md.h")).parent
+        source = kotlin.generate(real_api())[kotlin.JNI]
+        for width in TARGETS:
+            with self.subTest(width=width):
+                self.compile(
+                    (),
+                    source,
+                    width,
+                    ROOT / "include",
+                    NATIVE_INCLUDE,
+                    ROOT / "bindings/kotlin/src/androidMain/jni",
+                    home / "include",
+                    machine,
+                )
 
 
 if __name__ == "__main__":

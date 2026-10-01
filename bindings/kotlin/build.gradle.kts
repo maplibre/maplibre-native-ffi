@@ -9,7 +9,6 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
-import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
@@ -41,17 +40,14 @@ val androidTargets =
       .getOrElse(AndroidTarget.defaultAbis(androidBackend)),
     androidBackend,
   )
-val checkedInJextractSources = layout.projectDirectory.dir("src/jvmMain/generated")
 val packagedAndroidBindingLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
-val generatedJavaCppSources =
-  layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
 val mavenGroup = providers.gradleProperty("maplibre.maven.group").get()
 val mavenVersion = providers.gradleProperty("maplibre.maven.version").get()
 val mavenArtifact = "maplibre-native-ffi"
 val minifyAndroidDeviceTests =
   providers.gradleProperty("maplibre.android.testMinify").map(String::toBoolean).getOrElse(false)
 val androidConsumerKeepRules =
-  file("src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-javacpp.pro")
+  file("src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-jni.pro")
 
 kotlin {
   androidNativeArm32()
@@ -76,7 +72,6 @@ kotlin {
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
 
-    withJava()
     // Device-test APK assets are collected only when Android resource processing
     // is enabled. The published AAR has no res/ or assets/ of its own.
     androidResources {
@@ -91,8 +86,8 @@ kotlin {
 
     optimization {
       // CI enables minification while building the device-test artifact. Reuse
-      // the published consumer rules so JavaCPP is optimized exactly as it is
-      // in a shrinking Android application.
+      // the published consumer rules so the JNI shim's natives and upcalls are
+      // kept exactly as they are in a shrinking Android application.
       minify = minifyAndroidDeviceTests
       keepRules.file(androidConsumerKeepRules)
       testKeepRules.file(androidConsumerKeepRules)
@@ -231,8 +226,6 @@ kotlin {
     // Deferred is part of the public binding surface.
     commonMain.dependencies { api(libs.coroutines) }
 
-    androidMain { dependencies { implementation(libs.javacpp) } }
-
     named("androidDeviceTest") {
       dependencies {
         implementation(kotlin("test"))
@@ -293,25 +286,14 @@ canonicalizeKmpRootMetadata(
     ),
 )
 
-configurations.register("javaCppTool") {
-  isCanBeConsumed = false
-  isCanBeResolved = true
-}
-
-dependencies { add("javaCppTool", libs.javacpp) }
-
-apply(from = "gradle/jextract-jvm.gradle.kts")
-
 extensions.extraProperties["maplibreAndroidSdkDirectory"] =
   androidComponents.sdkComponents.sdkDirectory
 
 extensions.extraProperties["maplibreAndroidBindingLibsDirectory"] = packagedAndroidBindingLibs
 
-apply(from = "gradle/javacpp-android.gradle.kts")
+apply(from = "gradle/jni-android.gradle.kts")
 
 apply(from = "gradle/graphics-tests.gradle.kts")
-
-tasks.named<KotlinJvmCompile>("compileKotlinJvm") { source(checkedInJextractSources) }
 
 androidComponents {
   onVariants { variant ->
@@ -326,13 +308,8 @@ androidComponents {
         )
       }
     }
-    // Android KMP does not currently expose a task-provider-backed generated Java source hook.
-    // Keep the explicit task dependencies below in sync with this static source directory.
-    variant.sources.java?.addStaticSourceDirectory(
-      generatedJavaCppSources.get().asFile.absolutePath
-    )
-    // The JavaCPP bridge is private to this binding, so it ships in this AAR
-    // rather than in the shared runtime AARs.
+    // The JNI shim is private to this binding, so it ships in this AAR rather
+    // than in the shared runtime AARs.
     androidTargets.forEach { target ->
       variant.sources.jniLibs?.addStaticSourceDirectory(
         packagedAndroidBindingLibs.get().dir(target.cargoTarget).asFile.absolutePath
@@ -342,13 +319,7 @@ androidComponents {
 }
 
 tasks.configureEach {
-  when (name) {
-    "androidSourcesJar",
-    "compileAndroidMainJavaWithJavac",
-    "compileAndroidMain",
-    "extractAndroidMainAnnotations" -> dependsOn("generateAndroidJavaCppBindings")
-    "mergeAndroidMainJniLibFolders" -> dependsOn("packageAndroidBindingLibraries")
-  }
+  if (name == "mergeAndroidMainJniLibFolders") dependsOn("packageAndroidBindingLibraries")
 }
 
 val hostNativeInstallConfigured = providers.gradleProperty("maplibreNativeCInstallDir").isPresent
@@ -409,7 +380,7 @@ val checkAndroidApiFloor =
   tasks.register<Exec>("checkAndroidApiFloor") {
     group = "verification"
     description = "Verifies androidMain bytecode stays on the android-minSdk floor."
-    dependsOn("compileAndroidMain", "compileAndroidMainJavaWithJavac")
+    dependsOn("compileAndroidMain")
     workingDir = rootProject.layout.projectDirectory.asFile
     commandLine(
       rootProject.layout.projectDirectory.file(".mise/tasks/kotlin/check-android-api-floor").asFile

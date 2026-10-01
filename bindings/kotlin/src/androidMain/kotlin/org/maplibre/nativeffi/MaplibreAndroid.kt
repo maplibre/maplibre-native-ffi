@@ -1,7 +1,8 @@
 package org.maplibre.nativeffi
 
 import android.content.Context
-import org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge
+import org.maplibre.nativeffi.internal.c.Jni
+import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
 import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 /** Android-only platform integration entry points. */
@@ -14,7 +15,7 @@ public object MaplibreAndroid {
    * Activity or Application; `asset://` URLs read that [Context]'s AssetManager.
    */
   public fun initialize(context: Context) {
-    NativeAccess.ensureLoaded()
-    NativeDiagnostics.check { diagnostic -> AndroidNativeBridge.initialize(context, diagnostic) }
+    ensureNativeLibrary()
+    NativeDiagnostics.check { diagnostic -> Jni.androidInit(context, diagnostic) }
   }
 }

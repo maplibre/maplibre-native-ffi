@@ -1,6 +1,9 @@
 package org.maplibre.nativeffi.render
 
-/** The JNI shim that graphics_jni.c exports, compiled with graphics.c by the NDK. */
+/**
+ * The JNI shim that graphics_jni.c exports, compiled with graphics.c by the NDK. It also calls the
+ * binding's completion function pointers, as native would.
+ */
 internal object TestGraphicsJni {
   init {
     System.loadLibrary("binding_test_graphics")
@@ -13,6 +16,10 @@ internal object TestGraphicsJni {
   external fun makeCurrent(graphics: Long): Boolean
 
   external fun lastError(): String
+
+  external fun callCompletion(callback: Long, userData: Long, result: Long)
+
+  external fun callCompletionRelease(release: Long, userData: Long)
 }
 
 /** tests/graphics over JNI. */

@@ -4,7 +4,8 @@
 -dontwarn com.google.errorprone.annotations.MustBeClosed
 
 # AndroidJUnitRunner discovers tests by name and annotation rather than through
-# static calls, so R8 must retain those entry points.
+# static calls, so R8 must retain those entry points and their annotations.
 -keep,allowoptimization class org.maplibre.nativeffi.**Test { *; }
+-keepattributes *Annotation*
 
 -keep class org.maplibre.nativeffi.render.TestGraphicsJni { native <methods>; }

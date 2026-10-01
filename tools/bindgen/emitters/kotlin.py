@@ -1,13 +1,50 @@
-"""Generate Kotlin APIs and native conversions from shared semantic plans."""
+"""Generate the Kotlin binding: one common API over a primitive native-call shim per platform.
+
+The common source set holds every generated value, codec, owner, and operation.
+The JVM, Kotlin/Native, and Android source sets hold only the declarations of
+the C functions and upcall stubs that common code uses (see kotlin_native).
+"""
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import conflicting_functions
 from tools.bindgen.model import Api
 from tools.bindgen.semantic import BoundApi
 
-from . import kotlin_callbacks, kotlin_ir, kotlin_owners
-from .kotlin_values import Unsupported, Values, generated_owners, native_call
+from . import kotlin_callbacks, kotlin_owners
+from .kotlin_native import NativeShims
+from .kotlin_operations import (
+    Native,
+    operation,
+    owner_disposal,
+    receiver_value,
+)
+from .kotlin_owners import state_type
+from .kotlin_values import Unsupported, Values, generated_owners
 from .kotlin_values import name as value_name
+
+COMMON = "src/commonMain/kotlin/org/maplibre/nativeffi"
+PLATFORMS = {"jvmMain": "jvm", "nativeMain": "native", "androidMain": "android"}
+JNI = "src/androidMain/jni/mln_jni_generated.c"
+
+# C functions the hand-written runtime calls through `C`.
+RUNTIME_FUNCTIONS = (
+    "mln_c_version",
+    "mln_plugin_get_register_function_v1",
+    "mln_android_init",
+)
+
+OPERATION_IMPORTS = """\
+import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.internal.async.CompletionBridge
+import org.maplibre.nativeffi.internal.c.C
+import org.maplibre.nativeffi.internal.c.UpcallStubs
+import org.maplibre.nativeffi.internal.call.*
+import org.maplibre.nativeffi.internal.callback.CallbackOwner
+import org.maplibre.nativeffi.internal.lifecycle.*
+import org.maplibre.nativeffi.internal.memory.*
+import org.maplibre.nativeffi.render.NativePointer
+import org.maplibre.nativeffi.runtime.CommandCompletion
+"""
 
 
 def lower(api: Api | BoundApi):
@@ -24,209 +61,114 @@ def lower(api: Api | BoundApi):
             if function.name in conflicts:
                 raise Unsupported("public method name collides after conversion")
             values = Values(bound)
-            for platform in ("commonMain", "jvmMain", "androidMain", "nativeMain"):
-                kotlin_ir.operation(plan, values, platform)
-            for platform in ("jvmMain", "androidMain", "nativeMain"):
-                values.conversions(platform)
+            operation(plan, values, Native(bound))
+            values.codecs()
             functions.append(function)
         except Unsupported as error:
             unsupported[function.name] = f"{function.location}: {error}"
     return functions, unsupported
 
 
+def callback_owner(bound, receiver):
+    """Whether a family roots callback registrations, which common tests observe too."""
+    return any(
+        (operation.registrations or operation.direct_registrations)
+        and (
+            (operation.receiver and receiver_value(operation).native == receiver)
+            or any(
+                output.handle.native == receiver for output in operation.owned_outputs
+            )
+        )
+        for operation in bound.operations
+    )
+
+
 def generate(api: Api | BoundApi) -> dict[str, str]:
     bound = compile_api(api)
     functions, _ = lower(bound)
     values = Values(bound)
+    native = Native(bound)
     for value in bound.public_values.values():
         if value.kind == "enum":
             values.check(value)
+    groups = {}
     for function in functions:
-        kotlin_ir.operation(
-            bound.operations_by_name[function.name], values, "commonMain"
-        )
+        plan = bound.operations_by_name[function.name]
+        receiver = receiver_value(plan).native if plan.receiver else None
+        groups.setdefault(receiver, []).append(plan)
+    # Every generated owner extends its operations class, even when no
+    # operation names it as a receiver.
+    for owner in generated_owners(bound):
+        groups.setdefault(owner, [])
     outputs = {}
-    for platform in ("commonMain", "jvmMain", "androidMain", "nativeMain"):
-        common = platform == "commonMain"
-        source = "// Generated from handle disposal relationships. Do not edit.\npackage org.maplibre.nativeffi.generated\n\n"
-        if not common:
-            source += (
-                "import org.maplibre.nativeffi.internal.status.NativeDiagnostics\n"
-            )
-            if platform == "nativeMain":
-                source += "import kotlinx.cinterop.*\nimport org.maplibre.nativeffi.internal.c.*\n\n@OptIn(ExperimentalForeignApi::class)\n"
-            elif platform == "jvmMain":
-                source += "import org.maplibre.nativeffi.internal.c.MapLibreNativeC\n"
-            else:
-                source += (
-                    "import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC\n"
-                )
-        source += (
-            "internal "
-            + ("expect" if common else "actual")
-            + " object GeneratedOwnerDisposal {\n"
+    for receiver, plans in groups.items():
+        bodies = [operation(plan, values, native) for plan in plans]
+        header = (
+            "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+            "package org.maplibre.nativeffi.generated\n\n" + OPERATION_IMPORTS + "\n"
         )
-        for handle in bound.handles.values():
-            if not handle.dispose or handle.dispose in bound.source.runtime_exports:
-                continue
-            method = value_name(handle.native)
-            method = method[0].lower() + method[1:]
-            source += "  fun " if common else "  actual fun "
-            source += method + "(handle: Long)"
-            if not common:
-                prefix = (
-                    "MapLibreNativeC."
-                    if platform == "jvmMain"
-                    else "MaplibreNativeC."
-                    if platform == "androidMain"
-                    else ""
-                )
-                argument = "handle.toULong()" if platform == "nativeMain" else "handle"
-                call = native_call(
-                    bound.source.functions_by_name[handle.dispose], prefix, [argument]
-                )
-                source += (
-                    f' {{ org.maplibre.nativeffi.internal.callback.CallbackAdmission.check(handle, "{handle.dispose}"); '
-                    + call
-                    + " }"
-                )
-            source += "\n"
-        source += "}\n"
-        outputs[
-            f"src/{platform}/kotlin/org/maplibre/nativeffi/generated/GeneratedOwnerDisposal.kt"
-        ] = source
-    plans = [bound.operations_by_name[function.name] for function in functions]
-    outputs.update(kotlin_owners.generate_owners(bound, plans))
-    for platform in ("commonMain", "jvmMain", "androidMain", "nativeMain"):
-        imports = [
-            "kotlinx.coroutines.Deferred",
-            "org.maplibre.nativeffi.runtime.CommandCompletion",
-            "org.maplibre.nativeffi.generated.*",
-            "org.maplibre.nativeffi.internal.status.NativeDiagnostics",
-            "org.maplibre.nativeffi.internal.async.adoptOwned",
-            "org.maplibre.nativeffi.internal.callback.*",
-        ]
-        imports += [
-            "org.maplibre.nativeffi.generated." + value_name(v.native)
-            for v in values.used.values()
-        ]
-        if platform == "jvmMain":
-            imports += [
-                "java.lang.foreign.Arena",
-                "java.lang.foreign.MemorySegment",
-                "java.lang.foreign.ValueLayout",
-                "org.maplibre.nativeffi.internal.c.*",
-                "org.maplibre.nativeffi.internal.c.MapLibreNativeC",
-                "org.maplibre.nativeffi.internal.loader.CompletionBridge",
-                "org.maplibre.nativeffi.internal.loader.NativeAccess",
+        if receiver:
+            family = value_name(receiver)
+            class_name = f"Generated{family}Operations"
+            members = [
+                f"  internal abstract val binding: {state_type(bound, receiver)}\n"
             ]
-        elif platform == "androidMain":
-            imports += [
-                "org.bytedeco.javacpp.*",
-                "org.bytedeco.javacpp.FloatPointer",
-                "org.bytedeco.javacpp.BoolPointer",
-                "org.maplibre.nativeffi.NativeAccess",
-                "org.maplibre.nativeffi.internal.async.CompletionBridge",
-                "org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope",
-                "org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC",
-            ]
-        elif platform == "nativeMain":
-            imports += [
-                "kotlinx.cinterop.*",
-                "platform.posix.size_t",
-                "platform.posix.size_tVar",
-                "org.maplibre.nativeffi.internal.c.*",
-                "org.maplibre.nativeffi.internal.async.CompletionBridge",
-            ]
-        groups = {}
-        for function in functions:
-            plan = bound.operations_by_name[function.name]
-            receiver = kotlin_ir.receiver_value(plan).native if plan.receiver else None
-            groups.setdefault(receiver, []).append(function)
-        # Every generated owner extends its operations class, even when no
-        # operation names it as a receiver.
-        for owner in generated_owners(bound):
-            groups.setdefault(owner, [])
-        for receiver, members in groups.items():
-            family = value_name(receiver) if receiver else "Api"
-            class_name = "Generated" + family + ("Operations" if receiver else "")
-            source = "// Generated from the C headers by tools/bindgen. Do not edit.\npackage org.maplibre.nativeffi.generated\n\n"
-            source += "\n".join(f"import {n}" for n in sorted(imports)) + "\n\n"
-            if platform == "nativeMain":
-                source += "@OptIn(ExperimentalForeignApi::class)\n"
-            if receiver:
-                source += (
-                    f"public expect abstract class {class_name} internal constructor() {{\n"
-                    if platform == "commonMain"
-                    else f"public actual abstract class {class_name} internal actual constructor() {{\n"
+            if callback_owner(bound, receiver):
+                members.append(
+                    "  internal val bindingCallbacks: CallbackOwner = CallbackOwner()\n"
                 )
-                callback_owner = any(
-                    (operation.registrations or operation.direct_registrations)
-                    and (
-                        (
-                            operation.receiver
-                            and kotlin_ir.receiver_value(operation).native == receiver
-                        )
-                        or any(
-                            output.handle.native == receiver
-                            for output in operation.owned_outputs
-                        )
-                    )
-                    for operation in bound.operations
-                )
-                # Common code sees the owner too, so shared tests can observe
-                # which registrations native still holds.
-                if callback_owner:
-                    source += (
-                        "  internal val bindingCallbacks: org.maplibre.nativeffi.internal.callback.CallbackOwner\n"
-                        if platform == "commonMain"
-                        else "  internal actual val bindingCallbacks = org.maplibre.nativeffi.internal.callback.CallbackOwner()\n"
-                    )
-                if platform != "commonMain":
-                    raw = "ULong" if platform == "nativeMain" else "Long"
-                    needs = kotlin_owners.hooks(
-                        bound,
-                        receiver,
-                        [bound.operations_by_name[f.name] for f in members],
-                    )
-                    source += (
-                        f"  internal abstract fun binding{family}Handle(): {raw}\n"
-                    )
-                    if needs.read:
-                        source += f"  internal abstract fun <T> bindingRead{family}(block: ({raw}) -> T): T\n"
-                    if needs.decision:
-                        source += f"  internal abstract fun bindingComplete{family}(call: ({raw}) -> Unit)\n"
-                    if needs.issued:
-                        source += f"  internal abstract fun bindingIssued{family}Handle(): {raw}\n"
-                    if needs.close:
-                        source += f"  internal abstract fun bindingClose{family}(call: ({raw}) -> Unit)\n"
-                    if needs.retire:
-                        source += f"  internal abstract fun bindingRetire{family}(call: ({raw}) -> Deferred<Unit>): Deferred<Unit>\n"
-            else:
-                source += (
-                    "public expect object GeneratedApi {\n"
-                    if platform == "commonMain"
-                    else "public actual object GeneratedApi {\n"
-                )
-            bodies = []
-            for function in members:
-                bodies.append(
-                    kotlin_ir.operation(
-                        bound.operations_by_name[function.name], values, platform
-                    )
-                )
-            source += "\n".join(bodies) + "}\n"
-            outputs[
-                f"src/{platform}/kotlin/org/maplibre/nativeffi/generated/{class_name}.kt"
-            ] = source
-    outputs[
-        "src/commonMain/kotlin/org/maplibre/nativeffi/generated/GeneratedValues.kt"
-    ] = values.common()
-    for platform in ("jvmMain", "androidMain", "nativeMain"):
-        outputs[
-            f"src/{platform}/kotlin/org/maplibre/nativeffi/generated/GeneratedValues.kt"
-        ] = values.conversions(platform)
-    outputs.update(kotlin_callbacks.android_bridge(values))
+            source = (
+                header
+                + f"public abstract class {class_name} internal constructor() {{\n"
+                + "".join(members)
+                + "\n".join(bodies)
+                + "}\n"
+            )
+        else:
+            class_name = "GeneratedApi"
+            source = (
+                header + "public object GeneratedApi {\n" + "\n".join(bodies) + "}\n"
+            )
+        outputs[f"{COMMON}/generated/{class_name}.kt"] = source
+    outputs.update(
+        kotlin_owners.generate_owners(
+            bound, [bound.operations_by_name[f.name] for f in functions]
+        )
+    )
+    outputs[f"{COMMON}/generated/GeneratedOwnerDisposal.kt"] = (
+        "// Generated from handle disposal relationships by tools/bindgen. Do not edit.\n"
+        "package org.maplibre.nativeffi.generated\n\n"
+        "import org.maplibre.nativeffi.internal.c.C\n"
+        "import org.maplibre.nativeffi.internal.callback.CallbackAdmission\n"
+        "import org.maplibre.nativeffi.internal.status.NativeDiagnostics\n\n"
+        + owner_disposal(bound, native)
+    )
+    codecs = values.codecs()
+    outputs[f"{COMMON}/generated/GeneratedCodecs.kt"] = codecs.replace(
+        "import org.maplibre.nativeffi.internal.c.C\n",
+        "import org.maplibre.nativeffi.internal.c.C\n"
+        "import org.maplibre.nativeffi.internal.c.UpcallStubs\n"
+        "import org.maplibre.nativeffi.internal.call.NativeCall\n"
+        "import org.maplibre.nativeffi.render.NativePointer\n",
+    )
+    outputs[f"{COMMON}/generated/GeneratedValues.kt"] = values.common()
+    outputs[f"{COMMON}/internal/c/Upcalls.kt"] = kotlin_callbacks.upcalls(values)
+    called = {**native.functions, **values.functions}
+    for name in RUNTIME_FUNCTIONS:
+        if name in bound.source.functions_by_name:
+            called[name] = bound.source.functions_by_name[name]
+    shims = NativeShims(bound, called, kotlin_callbacks.sites(values).values())
+    outputs[f"{COMMON}/internal/c/C.kt"] = shims.common()
+    outputs[f"{COMMON}/internal/c/RuntimeLayouts.kt"] = shims.runtime_layouts()
+    for directory, platform in PLATFORMS.items():
+        base = f"src/{directory}/kotlin/org/maplibre/nativeffi/internal/c"
+        if platform == "android":
+            files, jni = shims.android()
+            outputs[JNI] = jni
+        else:
+            files = getattr(shims, platform)()
+        for file, source in files.items():
+            outputs[f"{base}/{file}"] = source
     return outputs
 
 

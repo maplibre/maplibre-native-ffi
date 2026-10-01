@@ -1,18 +1,13 @@
 package org.maplibre.nativeffi.internal.loader
 
-import java.lang.foreign.MemorySegment
 import java.nio.file.Path
 import java.util.NoSuchElementException
-import org.maplibre.nativeffi.error.AbiVersionMismatchException
-import org.maplibre.nativeffi.internal.c.MapLibreNativeC
-import org.maplibre.nativeffi.internal.c.mln_completion_result
+import org.maplibre.nativeffi.internal.c.C
+
+internal actual fun ensureNativeLibrary() = NativeAccess.ensureLoaded()
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
-  fun pluginRegisterFunctionV1(): Long =
-    MapLibreNativeC.mln_plugin_get_register_function_v1().address()
-
-  const val EXPECTED_C_ABI_VERSION: Long = 0L
   private val lock = Any()
 
   @Volatile private var initialized = false
@@ -38,12 +33,6 @@ internal object NativeAccess {
       NativeLibrary.load(libraryPath)
       checkNativeAccessAndAbi()
       initialized = true
-    }
-  }
-
-  internal fun checkAbiVersion(version: Long) {
-    if (version != EXPECTED_C_ABI_VERSION) {
-      throw AbiVersionMismatchException(version, EXPECTED_C_ABI_VERSION)
     }
   }
 
@@ -75,14 +64,7 @@ internal object NativeAccess {
     checkNativeAccessAndAbi(::cVersion)
   }
 
-  internal fun cVersion(): Long = Integer.toUnsignedLong(MapLibreNativeC.mln_c_version())
-
-  /** Borrows the completion payload during its callback. */
-  internal fun completionValue(result: MemorySegment, byteSize: Long): MemorySegment {
-    val value = mln_completion_result.value(result)
-    check(value != MemorySegment.NULL) { "native completion omitted its result value" }
-    return value.reinterpret(byteSize)
-  }
+  internal fun cVersion(): Long = Integer.toUnsignedLong(C.mln_c_version())
 
   private fun nativeAccessFailure(cause: Throwable): IllegalStateException =
     IllegalStateException(

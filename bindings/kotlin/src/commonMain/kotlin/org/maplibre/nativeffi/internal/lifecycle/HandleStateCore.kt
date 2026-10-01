@@ -5,6 +5,7 @@ import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.internal.callback.CallbackAdmission
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Platform-neutral release-state bookkeeping for native handles. */
@@ -14,7 +15,7 @@ internal class HandleStateCore(
   private val handleId: Long,
   vararg parents: Any,
   dispose: ((Long) -> Unit)? = null,
-) {
+) : OwnerState {
   @Suppress("unused") private val parents: Array<out Any> = parents
   val leakReport: LeakReport = LeakReport(typeName, handleId, dispose = dispose)
   private val releaseState = AtomicInt(STATE_LIVE)
@@ -49,6 +50,25 @@ internal class HandleStateCore(
   }
 
   fun isReleased(): Boolean = releaseState.load() == STATE_CLOSED
+
+  override fun handle(): Long {
+    requireLive()
+    return handleId
+  }
+
+  override fun <T> read(block: (Long) -> T): T = withLive { block(handleId) }
+
+  override fun issued(): Long = handleId
+
+  override fun closeHandle(name: String, call: (Long) -> Unit) {
+    closeOnce({
+      CallbackAdmission.check(handleId, name)
+      call(handleId)
+    })
+  }
+
+  override fun retireHandle(call: (Long) -> Deferred<Unit>): Deferred<Unit> =
+    retire({ call(handleId) })
 
   /**
    * Acquires the exclusive close lease before an asynchronous native close starts.

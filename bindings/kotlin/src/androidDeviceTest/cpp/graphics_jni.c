@@ -1,5 +1,6 @@
 // JNI entry points over tests/graphics for the Android device suite. Each one
-// forwards to the function of the same name in mln_test_graphics.h.
+// forwards to the function of the same name in mln_test_graphics.h, except the
+// last two, which call a completion's function pointers as native would.
 
 #include <jni.h>
 #include <stdint.h>
@@ -66,4 +67,24 @@ Java_org_maplibre_nativeffi_render_TestGraphicsJni_lastError(
 ) {
   (void)self;
   return (*env)->NewStringUTF(env, mln_test_graphics_last_error());
+}
+
+JNIEXPORT void JNICALL
+Java_org_maplibre_nativeffi_render_TestGraphicsJni_callCompletion(
+  JNIEnv* env, jobject self, jlong callback, jlong user_data, jlong result
+) {
+  (void)env;
+  (void)self;
+  ((void (*)(void*, const void*))(uintptr_t)callback)(
+    (void*)(uintptr_t)user_data, (const void*)(uintptr_t)result
+  );
+}
+
+JNIEXPORT void JNICALL
+Java_org_maplibre_nativeffi_render_TestGraphicsJni_callCompletionRelease(
+  JNIEnv* env, jobject self, jlong release, jlong user_data
+) {
+  (void)env;
+  (void)self;
+  ((void (*)(void*))(uintptr_t)release)((void*)(uintptr_t)user_data);
 }

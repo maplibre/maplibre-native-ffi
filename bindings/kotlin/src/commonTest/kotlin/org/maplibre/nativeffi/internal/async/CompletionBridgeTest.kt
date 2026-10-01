@@ -8,33 +8,85 @@ import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.CommandDisposition
+import org.maplibre.nativeffi.internal.c.CompletionLayout
+import org.maplibre.nativeffi.internal.c.CompletionResultLayout
+import org.maplibre.nativeffi.internal.memory.NativeArena
+import org.maplibre.nativeffi.internal.memory.readAddress
+import org.maplibre.nativeffi.internal.memory.readU64
+import org.maplibre.nativeffi.internal.memory.writeI32
+import org.maplibre.nativeffi.internal.memory.writeU32
+import org.maplibre.nativeffi.internal.memory.writeU64
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
- * A completion submitted through the platform's completion bridge, which the test delivers and
- * releases by hand through the descriptor the bridge built, as native would.
+ * A completion submitted through the completion bridge, which the test delivers and releases by
+ * hand through the function pointers of the descriptor the bridge built, as native would.
  */
-internal expect class HandDeliveredCompletion<T> {
-  val deferred: Deferred<T>
+internal class HandDeliveredCompletion<T>(
+  val deferred: Deferred<T>,
+  private val callback: Long,
+  private val userData: Long,
+  private val releaseUserData: Long,
+) {
+  fun deliver(status: Int, generation: ULong, diagnostic: String = "", disposition: UInt = 0u) {
+    NativeArena().use { arena ->
+      val result = arena.allocate(CompletionResultLayout.SIZEOF)
+      writeU32(result + CompletionResultLayout.SIZE, CompletionResultLayout.SIZEOF.toUInt())
+      writeI32(result + CompletionResultLayout.STATUS, status)
+      writeU32(result + CompletionResultLayout.DISPOSITION, disposition)
+      writeU64(result + CompletionResultLayout.GENERATION, generation)
+      if (diagnostic.isNotEmpty())
+        arena.putView(result + CompletionResultLayout.DIAGNOSTIC, diagnostic)
+      callCompletion(callback, userData, result)
+    }
+  }
 
-  fun deliver(status: Int, generation: ULong, diagnostic: String = "", disposition: UInt = 0u)
-
-  fun release()
+  fun release() {
+    callCompletionRelease(releaseUserData, userData)
+  }
 }
 
+/** Calls the `mln_completion_callback` at [callback] on this thread. */
+internal expect fun callCompletion(callback: Long, userData: Long, result: Long)
+
+/** Calls the `mln_completion_release` at [release] on this thread. */
+internal expect fun callCompletionRelease(release: Long, userData: Long)
+
+/** Submits through [submit] and keeps the descriptor's fields for hand delivery. */
+private fun <T> capture(submit: ((Long) -> Unit) -> Deferred<T>): HandDeliveredCompletion<T> {
+  var fields: Triple<Long, Long, Long>? = null
+  val deferred = submit { descriptor ->
+    fields =
+      Triple(
+        readAddress(descriptor + CompletionLayout.CALLBACK),
+        readAddress(descriptor + CompletionLayout.USER_DATA),
+        readAddress(descriptor + CompletionLayout.RELEASE_USER_DATA),
+      )
+  }
+  val (callback, userData, release) = requireNotNull(fields)
+  return HandDeliveredCompletion(deferred, callback, userData, release)
+}
+
+private fun generation(result: Long): ULong = readU64(result + CompletionResultLayout.GENERATION)
+
 /** A completion whose value is its result's generation. */
-internal expect fun handDeliveredGeneration(): HandDeliveredCompletion<ULong>
+internal fun handDeliveredGeneration(): HandDeliveredCompletion<ULong> = capture { call ->
+  CompletionBridge.submit(::generation, call)
+}
 
 /** An owned completion that hands a value nobody adopted to [closeDropped]. */
-internal expect fun handDeliveredOwned(
-  closeDropped: (ULong) -> Unit
-): HandDeliveredCompletion<ULong>
+internal fun handDeliveredOwned(closeDropped: (ULong) -> Unit): HandDeliveredCompletion<ULong> =
+  capture { call ->
+    CompletionBridge.submitOwned(::generation, closeDropped, disposeUnadopted = {}, call = call)
+  }
 
 /** An ordered command completion. */
-internal expect fun handDeliveredCommand(): HandDeliveredCompletion<CommandCompletion>
+internal fun handDeliveredCommand(): HandDeliveredCompletion<CommandCompletion> = capture { call ->
+  CompletionBridge.command(call)
+}
 
-/** Each emitter's completion bridge, driven without native. */
+/** The completion bridge and its upcall stubs, driven without native. */
 class CompletionBridgeTest {
   @Test
   fun aCompletionKeepsItsFirstResultAndIgnoresDeliveryAfterRelease(): Unit = runSuspendTest {

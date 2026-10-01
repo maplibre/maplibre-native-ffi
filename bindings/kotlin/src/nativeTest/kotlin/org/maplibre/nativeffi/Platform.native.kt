@@ -18,7 +18,6 @@ import kotlinx.cinterop.get
 import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.staticCFunction
-import org.maplibre.nativeffi.internal.async.CompletionBridge
 import platform.posix.pthread_create
 import platform.posix.pthread_join
 import platform.posix.pthread_tVar
@@ -83,5 +82,3 @@ internal actual fun awaitCollected(reference: TestWeakReference): Boolean {
 internal actual fun requestCollection() {
   GC.collect()
 }
-
-internal actual fun pendingCompletionsForTesting(): Int = CompletionBridge.pendingCountForTesting()

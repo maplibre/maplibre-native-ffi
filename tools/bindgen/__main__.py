@@ -354,6 +354,7 @@ def generated_files(root: Path = ROOT) -> set[str]:
         root / copy_cases.PATH,
     ]
     candidates.extend((root / "bindings/dotnet/src").rglob("*.g.cs"))
+    candidates.extend((root / "bindings/kotlin/src/androidMain/jni").glob("*.c"))
     for language in ("rust", "python", "swift", "dart", "kotlin", "zig"):
         candidates.extend(
             path

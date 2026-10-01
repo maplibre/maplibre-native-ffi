@@ -3,16 +3,12 @@ package org.maplibre.nativeffi.resource
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
-import org.bytedeco.javacpp.BoolPointer
-import org.bytedeco.javacpp.PointerScope
 import org.maplibre.nativeffi.TestWeakReference
 import org.maplibre.nativeffi.awaitCollected
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.ResourceProviderDecision
 import org.maplibre.nativeffi.generated.RuntimeEventType
-import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 
@@ -28,9 +24,7 @@ class ResourceRequestHandleAndroidTest {
       if (request.requestedUrl != STYLE_URL) return@denyingProvider null
       // Only the request's own cancel callback references it once the provider returns.
       handle.resourceRequestSetCancelCallback { handle.close() }
-      claimed.complete(
-        handle.bindingIssuedResourceRequestHandleHandle() to TestWeakReference(handle)
-      )
+      claimed.complete(handle.binding.issued() to TestWeakReference(handle))
       ResourceProviderDecision.HANDLE
     }
     withMap(provider = provider) {
@@ -39,15 +33,9 @@ class ResourceRequestHandleAndroidTest {
       assertTrue(awaitCollected(reference), "the request never became unreachable")
       // Reclamation releases the unanswered request, which fails the style it was loading.
       awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
-      assertTrue(isReleased(raw), "the collected request is still live in native")
+      assertTrue(requestIsReleased(raw), "the collected request is still live in native")
     }
   }
-
-  private fun isReleased(raw: Long): Boolean =
-    PointerScope().use {
-      MaplibreNativeC.mln_resource_request_cancelled(raw, BoolPointer(1L), null) !=
-        MaplibreStatus.OK.nativeCode
-    }
 
   private companion object {
     const val STYLE_URL = "custom://unreachable-style.json"

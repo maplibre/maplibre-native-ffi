@@ -1,24 +1,58 @@
-// Generated from handle disposal relationships. Do not edit.
+// Generated from handle disposal relationships by tools/bindgen. Do not edit.
 package org.maplibre.nativeffi.generated
 
-internal expect object GeneratedOwnerDisposal {
-  fun acquiredFrame(handle: Long)
+import org.maplibre.nativeffi.internal.c.C
+import org.maplibre.nativeffi.internal.callback.CallbackAdmission
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
-  fun buffer(handle: Long)
+internal object GeneratedOwnerDisposal {
+  fun acquiredFrame(handle: Long) {
+    CallbackAdmission.check(handle, "mln_acquired_frame_dispose")
+    NativeDiagnostics.check { diagnostic -> C.mln_acquired_frame_dispose(handle, diagnostic) }
+  }
 
-  fun eventBatch(handle: Long)
+  fun buffer(handle: Long) {
+    CallbackAdmission.check(handle, "mln_buffer_destroy")
+    C.mln_buffer_destroy(handle)
+  }
 
-  fun geojsonSourceData(handle: Long)
+  fun eventBatch(handle: Long) {
+    CallbackAdmission.check(handle, "mln_event_batch_release")
+    C.mln_event_batch_release(handle)
+  }
 
-  fun map(handle: Long)
+  fun geojsonSourceData(handle: Long) {
+    CallbackAdmission.check(handle, "mln_geojson_source_data_destroy")
+    C.mln_geojson_source_data_destroy(handle)
+  }
 
-  fun mapProjection(handle: Long)
+  fun map(handle: Long) {
+    CallbackAdmission.check(handle, "mln_map_dispose")
+    NativeDiagnostics.check { diagnostic -> C.mln_map_dispose(handle, diagnostic) }
+  }
 
-  fun renderFrameBatch(handle: Long)
+  fun mapProjection(handle: Long) {
+    CallbackAdmission.check(handle, "mln_map_projection_close")
+    NativeDiagnostics.check { diagnostic -> C.mln_map_projection_close(handle, diagnostic) }
+  }
 
-  fun renderSession(handle: Long)
+  fun renderFrameBatch(handle: Long) {
+    CallbackAdmission.check(handle, "mln_render_frame_batch_release")
+    C.mln_render_frame_batch_release(handle)
+  }
 
-  fun resourceRequestHandle(handle: Long)
+  fun renderSession(handle: Long) {
+    CallbackAdmission.check(handle, "mln_render_session_dispose")
+    NativeDiagnostics.check { diagnostic -> C.mln_render_session_dispose(handle, diagnostic) }
+  }
 
-  fun runtime(handle: Long)
+  fun resourceRequestHandle(handle: Long) {
+    CallbackAdmission.check(handle, "mln_resource_request_release")
+    C.mln_resource_request_release(handle)
+  }
+
+  fun runtime(handle: Long) {
+    CallbackAdmission.check(handle, "mln_runtime_dispose")
+    NativeDiagnostics.check { diagnostic -> C.mln_runtime_dispose(handle, diagnostic) }
+  }
 }

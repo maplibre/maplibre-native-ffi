@@ -2,7 +2,6 @@ package org.maplibre.nativeffi
 
 import java.lang.ref.ReferenceQueue
 import java.lang.ref.WeakReference
-import org.maplibre.nativeffi.internal.async.CompletionBridge
 
 internal actual class TestThread actual constructor(block: () -> Unit) {
   @Volatile private var failure: Throwable? = null
@@ -49,8 +48,6 @@ internal actual fun awaitCollected(reference: TestWeakReference): Boolean {
 internal actual fun requestCollection() {
   Runtime.getRuntime().gc()
 }
-
-internal actual fun pendingCompletionsForTesting(): Int = CompletionBridge.pendingCountForTesting()
 
 private const val GC_WAIT_NANOS = 30_000_000_000L
 private const val GC_ROUND_MILLIS = 100L

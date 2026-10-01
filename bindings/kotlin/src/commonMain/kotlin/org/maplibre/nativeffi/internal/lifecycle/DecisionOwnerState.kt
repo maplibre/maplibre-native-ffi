@@ -1,5 +1,8 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
+import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.internal.callback.CallbackAdmission
+
 /**
  * The owner state behind a handle that a native callback issues and then decides about.
  *
@@ -9,11 +12,11 @@ package org.maplibre.nativeffi.internal.lifecycle
  */
 internal class DecisionOwnerState(
   typeName: String,
-  handle: Long,
+  private val handle: Long,
   private val accept: UInt,
   private val passThrough: UInt,
   dispose: (Long) -> Unit,
-) {
+) : OwnerState {
   /**
    * The release half of this state. It holds no host callback, so unreachable-owner cleanup can
    * hold it without keeping reachable an owner that its own cancel callback captures.
@@ -25,6 +28,24 @@ internal class DecisionOwnerState(
     get() = core.isClosed
 
   fun <T> withLive(block: () -> T): T = core.withLiveHandle(block)
+
+  override fun handle(): Long = withLive { handle }
+
+  override fun <T> read(block: (Long) -> T): T = withLive { block(handle) }
+
+  override fun issued(): Long = handle
+
+  /**
+   * Marks the owner closed. Its native release waits for in-flight calls, so it may run after this
+   * returns, and takes the disposal path that unreachable cleanup uses instead of [call].
+   */
+  override fun closeHandle(name: String, call: (Long) -> Unit) {
+    CallbackAdmission.check(handle, name)
+    close()
+  }
+
+  override fun retireHandle(call: (Long) -> Deferred<Unit>): Deferred<Unit> =
+    throw UnsupportedOperationException("a decision owner cannot retire asynchronously")
 
   /** Runs a native completion call, keeping the owner retryable when native rejects it. */
   fun complete(call: () -> Unit) {
@@ -50,6 +71,19 @@ internal class DecisionOwnerState(
       passThrough -> finish(core.finishDecision(DecisionOwnerCore.Decision.PASS_THROUGH))
       accept -> finish(core.finishDecision(DecisionOwnerCore.Decision.ACCEPT))
       else -> finishException()
+    }
+
+  /**
+   * Settles the provider callback's [decision], or its exception, and returns the value native
+   * receives. [owner] stays reachable until then.
+   */
+  inline fun decide(owner: Any, decision: () -> UInt): UInt =
+    try {
+      finishDecision(decision())
+    } catch (_: Throwable) {
+      finishException()
+    } finally {
+      bindingKeepAlive(owner)
     }
 
   /** Settles a callback that threw instead of deciding. */

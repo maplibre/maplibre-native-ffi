@@ -28,8 +28,8 @@ import org.maplibre.nativeffi.runtime.awaitFailed
 import org.maplibre.nativeffi.withMap
 
 /**
- * One representative of each generated value shape against the real library. The FFM, JavaCPP, and
- * cinterop emitters each generate these conversions, so every target runs this file.
+ * One representative of each generated value shape against the real library. The conversions are
+ * common code over each platform's native memory, so every target runs this file.
  */
 class GeneratedShapesTest {
   @Test
@@ -142,7 +142,7 @@ class GeneratedShapesTest {
       // A map's event source is its handle, whose top byte carries the handle kind.
       map.setStyleJson(EMPTY_STYLE_JSON.encodeToByteArray()).awaitCommitted()
       val event = awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
-      val handle = map.bindingMapHandle().toULong()
+      val handle = map.binding.handle().toULong()
       assertTrue(handle shr 56 != 0uL, "a map handle carries its kind in the top byte")
       assertEquals(handle, event.source)
     }

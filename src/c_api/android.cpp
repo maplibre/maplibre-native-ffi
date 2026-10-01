@@ -17,7 +17,7 @@ auto mln_android_init(
   void* jni_env, void* jni_class, void* context, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    // JavaCPP static native methods pass the declaring class between JNIEnv*
+    // A JNI static native method receives its declaring class between JNIEnv*
     // and the Java arguments. Keep the C ABI compatible with that call shape.
     (void)jni_class;
     if (jni_env == nullptr || context == nullptr) {
