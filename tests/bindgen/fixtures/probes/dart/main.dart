@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'generated_values.dart';
+import 'values.dart';
 import 'runtime.dart';
 
 void check(bool condition, String message) {

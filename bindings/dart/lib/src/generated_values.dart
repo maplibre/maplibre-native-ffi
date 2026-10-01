@@ -1,113 +1,64 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
-import 'dart:typed_data';
-import 'render/native_pointer.dart';
-import 'runtime/runtime.dart' show ResourceRequestHandle;
+part of 'values.dart';
 
-final class AmbientCacheOperation {
-  const AmbientCacheOperation.fromRawValue(this.rawValue);
-  final int rawValue;
+final class AmbientCacheOperation extends _Enum {
+  const AmbientCacheOperation.fromRawValue(super.rawValue);
   static const resetDatabase = AmbientCacheOperation.fromRawValue(1);
   static const packDatabase = AmbientCacheOperation.fromRawValue(2);
   static const invalidate = AmbientCacheOperation.fromRawValue(3);
   static const clear = AmbientCacheOperation.fromRawValue(4);
-  @override
-  bool operator ==(Object other) =>
-      other is AmbientCacheOperation && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class AnimationOptionField {
-  const AnimationOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class AnimationOptionField extends _Flags<AnimationOptionField> {
+  const AnimationOptionField.fromRawValue(super.rawValue);
   static const duration = AnimationOptionField.fromRawValue(1);
   static const velocity = AnimationOptionField.fromRawValue(2);
   static const minZoom = AnimationOptionField.fromRawValue(4);
   static const easing = AnimationOptionField.fromRawValue(8);
   static const transitionId = AnimationOptionField.fromRawValue(16);
-  AnimationOptionField operator |(AnimationOptionField other) =>
-      AnimationOptionField.fromRawValue(rawValue | other.rawValue);
-  AnimationOptionField operator &(AnimationOptionField other) =>
-      AnimationOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(AnimationOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is AnimationOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  AnimationOptionField _of(int rawValue) =>
+      AnimationOptionField.fromRawValue(rawValue);
 }
 
-final class BoundOptionField {
-  const BoundOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class BoundOptionField extends _Flags<BoundOptionField> {
+  const BoundOptionField.fromRawValue(super.rawValue);
   static const bounds = BoundOptionField.fromRawValue(1);
   static const minZoom = BoundOptionField.fromRawValue(2);
   static const maxZoom = BoundOptionField.fromRawValue(4);
   static const minPitch = BoundOptionField.fromRawValue(8);
   static const maxPitch = BoundOptionField.fromRawValue(16);
   static const unbounded = BoundOptionField.fromRawValue(32);
-  BoundOptionField operator |(BoundOptionField other) =>
-      BoundOptionField.fromRawValue(rawValue | other.rawValue);
-  BoundOptionField operator &(BoundOptionField other) =>
-      BoundOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(BoundOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is BoundOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  BoundOptionField _of(int rawValue) => BoundOptionField.fromRawValue(rawValue);
 }
 
-final class CameraChangeMode {
-  const CameraChangeMode.fromRawValue(this.rawValue);
-  final int rawValue;
+final class CameraChangeMode extends _Enum {
+  const CameraChangeMode.fromRawValue(super.rawValue);
   static const immediate = CameraChangeMode.fromRawValue(0);
   static const animated = CameraChangeMode.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is CameraChangeMode && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class CameraDeltaKind {
-  const CameraDeltaKind.fromRawValue(this.rawValue);
-  final int rawValue;
+final class CameraDeltaKind extends _Enum {
+  const CameraDeltaKind.fromRawValue(super.rawValue);
   static const move = CameraDeltaKind.fromRawValue(0);
   static const scale = CameraDeltaKind.fromRawValue(1);
   static const bearing = CameraDeltaKind.fromRawValue(2);
   static const pitch = CameraDeltaKind.fromRawValue(3);
-  @override
-  bool operator ==(Object other) =>
-      other is CameraDeltaKind && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class CameraFitOptionField {
-  const CameraFitOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class CameraFitOptionField extends _Flags<CameraFitOptionField> {
+  const CameraFitOptionField.fromRawValue(super.rawValue);
   static const padding = CameraFitOptionField.fromRawValue(1);
   static const bearing = CameraFitOptionField.fromRawValue(2);
   static const pitch = CameraFitOptionField.fromRawValue(4);
-  CameraFitOptionField operator |(CameraFitOptionField other) =>
-      CameraFitOptionField.fromRawValue(rawValue | other.rawValue);
-  CameraFitOptionField operator &(CameraFitOptionField other) =>
-      CameraFitOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(CameraFitOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is CameraFitOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  CameraFitOptionField _of(int rawValue) =>
+      CameraFitOptionField.fromRawValue(rawValue);
 }
 
-final class CameraOptionField {
-  const CameraOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class CameraOptionField extends _Flags<CameraOptionField> {
+  const CameraOptionField.fromRawValue(super.rawValue);
   static const center = CameraOptionField.fromRawValue(1);
   static const zoom = CameraOptionField.fromRawValue(2);
   static const bearing = CameraOptionField.fromRawValue(4);
@@ -117,63 +68,37 @@ final class CameraOptionField {
   static const anchor = CameraOptionField.fromRawValue(64);
   static const roll = CameraOptionField.fromRawValue(128);
   static const fov = CameraOptionField.fromRawValue(256);
-  CameraOptionField operator |(CameraOptionField other) =>
-      CameraOptionField.fromRawValue(rawValue | other.rawValue);
-  CameraOptionField operator &(CameraOptionField other) =>
-      CameraOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(CameraOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is CameraOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  CameraOptionField _of(int rawValue) =>
+      CameraOptionField.fromRawValue(rawValue);
 }
 
-final class CameraUpdateMode {
-  const CameraUpdateMode.fromRawValue(this.rawValue);
-  final int rawValue;
+final class CameraUpdateMode extends _Enum {
+  const CameraUpdateMode.fromRawValue(super.rawValue);
   static const jump = CameraUpdateMode.fromRawValue(0);
   static const ease = CameraUpdateMode.fromRawValue(1);
   static const fly = CameraUpdateMode.fromRawValue(2);
-  @override
-  bool operator ==(Object other) =>
-      other is CameraUpdateMode && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class CommandDisposition {
-  const CommandDisposition.fromRawValue(this.rawValue);
-  final int rawValue;
+final class CommandDisposition extends _Enum {
+  const CommandDisposition.fromRawValue(super.rawValue);
   static const committed = CommandDisposition.fromRawValue(0);
   static const superseded = CommandDisposition.fromRawValue(1);
   static const failed = CommandDisposition.fromRawValue(2);
   static const cancelled = CommandDisposition.fromRawValue(3);
-  @override
-  bool operator ==(Object other) =>
-      other is CommandDisposition && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class ConstrainMode {
-  const ConstrainMode.fromRawValue(this.rawValue);
-  final int rawValue;
+final class ConstrainMode extends _Enum {
+  const ConstrainMode.fromRawValue(super.rawValue);
   static const none = ConstrainMode.fromRawValue(0);
   static const heightOnly = ConstrainMode.fromRawValue(1);
   static const widthAndHeight = ConstrainMode.fromRawValue(2);
   static const screen = ConstrainMode.fromRawValue(3);
-  @override
-  bool operator ==(Object other) =>
-      other is ConstrainMode && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class CustomGeometrySourceOptionField {
-  const CustomGeometrySourceOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class CustomGeometrySourceOptionField
+    extends _Flags<CustomGeometrySourceOptionField> {
+  const CustomGeometrySourceOptionField.fromRawValue(super.rawValue);
   static const minZoom = CustomGeometrySourceOptionField.fromRawValue(1);
   static const maxZoom = CustomGeometrySourceOptionField.fromRawValue(2);
   static const tolerance = CustomGeometrySourceOptionField.fromRawValue(4);
@@ -181,99 +106,51 @@ final class CustomGeometrySourceOptionField {
   static const buffer = CustomGeometrySourceOptionField.fromRawValue(16);
   static const clip = CustomGeometrySourceOptionField.fromRawValue(32);
   static const wrap = CustomGeometrySourceOptionField.fromRawValue(64);
-  CustomGeometrySourceOptionField operator |(
-    CustomGeometrySourceOptionField other,
-  ) => CustomGeometrySourceOptionField.fromRawValue(rawValue | other.rawValue);
-  CustomGeometrySourceOptionField operator &(
-    CustomGeometrySourceOptionField other,
-  ) => CustomGeometrySourceOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(CustomGeometrySourceOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is CustomGeometrySourceOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  CustomGeometrySourceOptionField _of(int rawValue) =>
+      CustomGeometrySourceOptionField.fromRawValue(rawValue);
 }
 
-final class CustomMvtVectorSourceOptionField {
-  const CustomMvtVectorSourceOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class CustomMvtVectorSourceOptionField
+    extends _Flags<CustomMvtVectorSourceOptionField> {
+  const CustomMvtVectorSourceOptionField.fromRawValue(super.rawValue);
   static const minZoom = CustomMvtVectorSourceOptionField.fromRawValue(1);
   static const maxZoom = CustomMvtVectorSourceOptionField.fromRawValue(2);
-  CustomMvtVectorSourceOptionField operator |(
-    CustomMvtVectorSourceOptionField other,
-  ) => CustomMvtVectorSourceOptionField.fromRawValue(rawValue | other.rawValue);
-  CustomMvtVectorSourceOptionField operator &(
-    CustomMvtVectorSourceOptionField other,
-  ) => CustomMvtVectorSourceOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(CustomMvtVectorSourceOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is CustomMvtVectorSourceOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  CustomMvtVectorSourceOptionField _of(int rawValue) =>
+      CustomMvtVectorSourceOptionField.fromRawValue(rawValue);
 }
 
-final class FeatureStateSelectorField {
-  const FeatureStateSelectorField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class FeatureStateSelectorField
+    extends _Flags<FeatureStateSelectorField> {
+  const FeatureStateSelectorField.fromRawValue(super.rawValue);
   static const sourceLayerId = FeatureStateSelectorField.fromRawValue(1);
   static const featureId = FeatureStateSelectorField.fromRawValue(2);
   static const stateKey = FeatureStateSelectorField.fromRawValue(4);
-  FeatureStateSelectorField operator |(FeatureStateSelectorField other) =>
-      FeatureStateSelectorField.fromRawValue(rawValue | other.rawValue);
-  FeatureStateSelectorField operator &(FeatureStateSelectorField other) =>
-      FeatureStateSelectorField.fromRawValue(rawValue & other.rawValue);
-  bool contains(FeatureStateSelectorField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is FeatureStateSelectorField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  FeatureStateSelectorField _of(int rawValue) =>
+      FeatureStateSelectorField.fromRawValue(rawValue);
 }
 
-final class FrameDemandFlag {
-  const FrameDemandFlag.fromRawValue(this.rawValue);
-  final int rawValue;
+final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
+  const FrameDemandFlag.fromRawValue(super.rawValue);
   static const ifNeeded = FrameDemandFlag.fromRawValue(1);
   static const present = FrameDemandFlag.fromRawValue(2);
-  FrameDemandFlag operator |(FrameDemandFlag other) =>
-      FrameDemandFlag.fromRawValue(rawValue | other.rawValue);
-  FrameDemandFlag operator &(FrameDemandFlag other) =>
-      FrameDemandFlag.fromRawValue(rawValue & other.rawValue);
-  bool contains(FrameDemandFlag other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is FrameDemandFlag && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  FrameDemandFlag _of(int rawValue) => FrameDemandFlag.fromRawValue(rawValue);
 }
 
-final class FreeCameraOptionField {
-  const FreeCameraOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class FreeCameraOptionField extends _Flags<FreeCameraOptionField> {
+  const FreeCameraOptionField.fromRawValue(super.rawValue);
   static const position = FreeCameraOptionField.fromRawValue(1);
   static const orientation = FreeCameraOptionField.fromRawValue(2);
-  FreeCameraOptionField operator |(FreeCameraOptionField other) =>
-      FreeCameraOptionField.fromRawValue(rawValue | other.rawValue);
-  FreeCameraOptionField operator &(FreeCameraOptionField other) =>
-      FreeCameraOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(FreeCameraOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is FreeCameraOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  FreeCameraOptionField _of(int rawValue) =>
+      FreeCameraOptionField.fromRawValue(rawValue);
 }
 
-final class GeojsonSourceOptionField {
-  const GeojsonSourceOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class GeojsonSourceOptionField extends _Flags<GeojsonSourceOptionField> {
+  const GeojsonSourceOptionField.fromRawValue(super.rawValue);
   static const minZoom = GeojsonSourceOptionField.fromRawValue(1);
   static const maxZoom = GeojsonSourceOptionField.fromRawValue(2);
   static const tolerance = GeojsonSourceOptionField.fromRawValue(4);
@@ -286,65 +163,38 @@ final class GeojsonSourceOptionField {
   static const lineMetrics = GeojsonSourceOptionField.fromRawValue(512);
   static const cluster = GeojsonSourceOptionField.fromRawValue(1024);
   static const synchronousTiling = GeojsonSourceOptionField.fromRawValue(2048);
-  GeojsonSourceOptionField operator |(GeojsonSourceOptionField other) =>
-      GeojsonSourceOptionField.fromRawValue(rawValue | other.rawValue);
-  GeojsonSourceOptionField operator &(GeojsonSourceOptionField other) =>
-      GeojsonSourceOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(GeojsonSourceOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is GeojsonSourceOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  GeojsonSourceOptionField _of(int rawValue) =>
+      GeojsonSourceOptionField.fromRawValue(rawValue);
 }
 
-final class GesturePhase {
-  const GesturePhase.fromRawValue(this.rawValue);
-  final int rawValue;
+final class GesturePhase extends _Enum {
+  const GesturePhase.fromRawValue(super.rawValue);
   static const none = GesturePhase.fromRawValue(0);
   static const begin = GesturePhase.fromRawValue(1);
   static const update = GesturePhase.fromRawValue(2);
   static const end = GesturePhase.fromRawValue(3);
   static const cancel = GesturePhase.fromRawValue(4);
-  @override
-  bool operator ==(Object other) =>
-      other is GesturePhase && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class GpuSyncKind {
-  const GpuSyncKind.fromRawValue(this.rawValue);
-  final int rawValue;
+final class GpuSyncKind extends _Enum {
+  const GpuSyncKind.fromRawValue(super.rawValue);
   static const cpuComplete = GpuSyncKind.fromRawValue(0);
   static const metalSharedEvent = GpuSyncKind.fromRawValue(1);
   static const vulkanTimelineSemaphore = GpuSyncKind.fromRawValue(2);
   static const openglFence = GpuSyncKind.fromRawValue(3);
   static const webgpuToken = GpuSyncKind.fromRawValue(4);
-  @override
-  bool operator ==(Object other) =>
-      other is GpuSyncKind && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class LocationIndicatorImageKind {
-  const LocationIndicatorImageKind.fromRawValue(this.rawValue);
-  final int rawValue;
+final class LocationIndicatorImageKind extends _Enum {
+  const LocationIndicatorImageKind.fromRawValue(super.rawValue);
   static const top = LocationIndicatorImageKind.fromRawValue(0);
   static const bearing = LocationIndicatorImageKind.fromRawValue(1);
   static const shadow = LocationIndicatorImageKind.fromRawValue(2);
-  @override
-  bool operator ==(Object other) =>
-      other is LocationIndicatorImageKind && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class LogEvent {
-  const LogEvent.fromRawValue(this.rawValue);
-  final int rawValue;
+final class LogEvent extends _Enum {
+  const LogEvent.fromRawValue(super.rawValue);
   static const general = LogEvent.fromRawValue(0);
   static const setup = LogEvent.fromRawValue(1);
   static const shader = LogEvent.fromRawValue(2);
@@ -362,50 +212,28 @@ final class LogEvent {
   static const crash = LogEvent.fromRawValue(14);
   static const glyph = LogEvent.fromRawValue(15);
   static const timing = LogEvent.fromRawValue(16);
-  @override
-  bool operator ==(Object other) =>
-      other is LogEvent && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class LogSeverity {
-  const LogSeverity.fromRawValue(this.rawValue);
-  final int rawValue;
+final class LogSeverity extends _Enum {
+  const LogSeverity.fromRawValue(super.rawValue);
   static const info = LogSeverity.fromRawValue(1);
   static const warning = LogSeverity.fromRawValue(2);
   static const error = LogSeverity.fromRawValue(3);
-  @override
-  bool operator ==(Object other) =>
-      other is LogSeverity && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class LogSeverityMask {
-  const LogSeverityMask.fromRawValue(this.rawValue);
-  final int rawValue;
+final class LogSeverityMask extends _Flags<LogSeverityMask> {
+  const LogSeverityMask.fromRawValue(super.rawValue);
   static const info = LogSeverityMask.fromRawValue(2);
   static const warning = LogSeverityMask.fromRawValue(4);
   static const error = LogSeverityMask.fromRawValue(8);
   static const defaultValue = LogSeverityMask.fromRawValue(6);
   static const all = LogSeverityMask.fromRawValue(14);
-  LogSeverityMask operator |(LogSeverityMask other) =>
-      LogSeverityMask.fromRawValue(rawValue | other.rawValue);
-  LogSeverityMask operator &(LogSeverityMask other) =>
-      LogSeverityMask.fromRawValue(rawValue & other.rawValue);
-  bool contains(LogSeverityMask other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is LogSeverityMask && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  LogSeverityMask _of(int rawValue) => LogSeverityMask.fromRawValue(rawValue);
 }
 
-final class MapDebugOption {
-  const MapDebugOption.fromRawValue(this.rawValue);
-  final int rawValue;
+final class MapDebugOption extends _Flags<MapDebugOption> {
+  const MapDebugOption.fromRawValue(super.rawValue);
   static const tileBorders = MapDebugOption.fromRawValue(2);
   static const parseStatus = MapDebugOption.fromRawValue(4);
   static const timestamps = MapDebugOption.fromRawValue(8);
@@ -413,379 +241,208 @@ final class MapDebugOption {
   static const overdraw = MapDebugOption.fromRawValue(32);
   static const stencilClip = MapDebugOption.fromRawValue(64);
   static const depthBuffer = MapDebugOption.fromRawValue(128);
-  MapDebugOption operator |(MapDebugOption other) =>
-      MapDebugOption.fromRawValue(rawValue | other.rawValue);
-  MapDebugOption operator &(MapDebugOption other) =>
-      MapDebugOption.fromRawValue(rawValue & other.rawValue);
-  bool contains(MapDebugOption other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is MapDebugOption && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  MapDebugOption _of(int rawValue) => MapDebugOption.fromRawValue(rawValue);
 }
 
-final class MapMode {
-  const MapMode.fromRawValue(this.rawValue);
-  final int rawValue;
+final class MapMode extends _Enum {
+  const MapMode.fromRawValue(super.rawValue);
   static const continuous = MapMode.fromRawValue(0);
   static const static = MapMode.fromRawValue(1);
   static const tile = MapMode.fromRawValue(2);
-  @override
-  bool operator ==(Object other) =>
-      other is MapMode && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class MapTileOptionField {
-  const MapTileOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class MapTileOptionField extends _Flags<MapTileOptionField> {
+  const MapTileOptionField.fromRawValue(super.rawValue);
   static const prefetchZoomDelta = MapTileOptionField.fromRawValue(1);
   static const lodMinRadius = MapTileOptionField.fromRawValue(2);
   static const lodScale = MapTileOptionField.fromRawValue(4);
   static const lodPitchThreshold = MapTileOptionField.fromRawValue(8);
   static const lodZoomShift = MapTileOptionField.fromRawValue(16);
   static const lodMode = MapTileOptionField.fromRawValue(32);
-  MapTileOptionField operator |(MapTileOptionField other) =>
-      MapTileOptionField.fromRawValue(rawValue | other.rawValue);
-  MapTileOptionField operator &(MapTileOptionField other) =>
-      MapTileOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(MapTileOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is MapTileOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  MapTileOptionField _of(int rawValue) =>
+      MapTileOptionField.fromRawValue(rawValue);
 }
 
-final class MapViewportOptionField {
-  const MapViewportOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class MapViewportOptionField extends _Flags<MapViewportOptionField> {
+  const MapViewportOptionField.fromRawValue(super.rawValue);
   static const northOrientation = MapViewportOptionField.fromRawValue(1);
   static const constrainMode = MapViewportOptionField.fromRawValue(2);
   static const viewportMode = MapViewportOptionField.fromRawValue(4);
   static const frustumOffset = MapViewportOptionField.fromRawValue(8);
-  MapViewportOptionField operator |(MapViewportOptionField other) =>
-      MapViewportOptionField.fromRawValue(rawValue | other.rawValue);
-  MapViewportOptionField operator &(MapViewportOptionField other) =>
-      MapViewportOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(MapViewportOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is MapViewportOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  MapViewportOptionField _of(int rawValue) =>
+      MapViewportOptionField.fromRawValue(rawValue);
 }
 
-final class NetworkStatus {
-  const NetworkStatus.fromRawValue(this.rawValue);
-  final int rawValue;
+final class NetworkStatus extends _Enum {
+  const NetworkStatus.fromRawValue(super.rawValue);
   static const online = NetworkStatus.fromRawValue(1);
   static const offline = NetworkStatus.fromRawValue(2);
-  @override
-  bool operator ==(Object other) =>
-      other is NetworkStatus && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class NorthOrientation {
-  const NorthOrientation.fromRawValue(this.rawValue);
-  final int rawValue;
+final class NorthOrientation extends _Enum {
+  const NorthOrientation.fromRawValue(super.rawValue);
   static const up = NorthOrientation.fromRawValue(0);
   static const right = NorthOrientation.fromRawValue(1);
   static const down = NorthOrientation.fromRawValue(2);
   static const left = NorthOrientation.fromRawValue(3);
-  @override
-  bool operator ==(Object other) =>
-      other is NorthOrientation && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class OfflineRegionDefinitionType {
-  const OfflineRegionDefinitionType.fromRawValue(this.rawValue);
-  final int rawValue;
+final class OfflineRegionDefinitionType extends _Enum {
+  const OfflineRegionDefinitionType.fromRawValue(super.rawValue);
   static const tilePyramid = OfflineRegionDefinitionType.fromRawValue(1);
   static const geometry = OfflineRegionDefinitionType.fromRawValue(2);
-  @override
-  bool operator ==(Object other) =>
-      other is OfflineRegionDefinitionType && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class OfflineRegionDownloadState {
-  const OfflineRegionDownloadState.fromRawValue(this.rawValue);
-  final int rawValue;
+final class OfflineRegionDownloadState extends _Enum {
+  const OfflineRegionDownloadState.fromRawValue(super.rawValue);
   static const inactive = OfflineRegionDownloadState.fromRawValue(0);
   static const active = OfflineRegionDownloadState.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is OfflineRegionDownloadState && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class OpenglClientApi {
-  const OpenglClientApi.fromRawValue(this.rawValue);
-  final int rawValue;
+final class OpenglClientApi extends _Enum {
+  const OpenglClientApi.fromRawValue(super.rawValue);
   static const unspecified = OpenglClientApi.fromRawValue(0);
   static const gl = OpenglClientApi.fromRawValue(1);
   static const gles = OpenglClientApi.fromRawValue(2);
-  @override
-  bool operator ==(Object other) =>
-      other is OpenglClientApi && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class OpenglContextOwnership {
-  const OpenglContextOwnership.fromRawValue(this.rawValue);
-  final int rawValue;
+final class OpenglContextOwnership extends _Enum {
+  const OpenglContextOwnership.fromRawValue(super.rawValue);
   static const shared = OpenglContextOwnership.fromRawValue(0);
   static const dedicated = OpenglContextOwnership.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is OpenglContextOwnership && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class OpenglContextPlatform {
-  const OpenglContextPlatform.fromRawValue(this.rawValue);
-  final int rawValue;
+final class OpenglContextPlatform extends _Enum {
+  const OpenglContextPlatform.fromRawValue(super.rawValue);
   static const unspecified = OpenglContextPlatform.fromRawValue(0);
   static const wgl = OpenglContextPlatform.fromRawValue(1);
   static const egl = OpenglContextPlatform.fromRawValue(2);
   static const webgl = OpenglContextPlatform.fromRawValue(3);
-  @override
-  bool operator ==(Object other) =>
-      other is OpenglContextPlatform && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class OpenglContextProviderFlag {
-  const OpenglContextProviderFlag.fromRawValue(this.rawValue);
-  final int rawValue;
+final class OpenglContextProviderFlag
+    extends _Flags<OpenglContextProviderFlag> {
+  const OpenglContextProviderFlag.fromRawValue(super.rawValue);
   static const wgl = OpenglContextProviderFlag.fromRawValue(1);
   static const egl = OpenglContextProviderFlag.fromRawValue(2);
   static const webgl = OpenglContextProviderFlag.fromRawValue(4);
-  OpenglContextProviderFlag operator |(OpenglContextProviderFlag other) =>
-      OpenglContextProviderFlag.fromRawValue(rawValue | other.rawValue);
-  OpenglContextProviderFlag operator &(OpenglContextProviderFlag other) =>
-      OpenglContextProviderFlag.fromRawValue(rawValue & other.rawValue);
-  bool contains(OpenglContextProviderFlag other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is OpenglContextProviderFlag && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  OpenglContextProviderFlag _of(int rawValue) =>
+      OpenglContextProviderFlag.fromRawValue(rawValue);
 }
 
-final class ProjectionModeField {
-  const ProjectionModeField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class ProjectionModeField extends _Flags<ProjectionModeField> {
+  const ProjectionModeField.fromRawValue(super.rawValue);
   static const axonometric = ProjectionModeField.fromRawValue(1);
   static const xSkew = ProjectionModeField.fromRawValue(2);
   static const ySkew = ProjectionModeField.fromRawValue(4);
-  ProjectionModeField operator |(ProjectionModeField other) =>
-      ProjectionModeField.fromRawValue(rawValue | other.rawValue);
-  ProjectionModeField operator &(ProjectionModeField other) =>
-      ProjectionModeField.fromRawValue(rawValue & other.rawValue);
-  bool contains(ProjectionModeField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is ProjectionModeField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  ProjectionModeField _of(int rawValue) =>
+      ProjectionModeField.fromRawValue(rawValue);
 }
 
-final class QueriedFeatureField {
-  const QueriedFeatureField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class QueriedFeatureField extends _Flags<QueriedFeatureField> {
+  const QueriedFeatureField.fromRawValue(super.rawValue);
   static const sourceId = QueriedFeatureField.fromRawValue(1);
   static const sourceLayerId = QueriedFeatureField.fromRawValue(2);
   static const state = QueriedFeatureField.fromRawValue(4);
-  QueriedFeatureField operator |(QueriedFeatureField other) =>
-      QueriedFeatureField.fromRawValue(rawValue | other.rawValue);
-  QueriedFeatureField operator &(QueriedFeatureField other) =>
-      QueriedFeatureField.fromRawValue(rawValue & other.rawValue);
-  bool contains(QueriedFeatureField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is QueriedFeatureField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  QueriedFeatureField _of(int rawValue) =>
+      QueriedFeatureField.fromRawValue(rawValue);
 }
 
-final class RenderAbandonDisposition {
-  const RenderAbandonDisposition.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RenderAbandonDisposition extends _Enum {
+  const RenderAbandonDisposition.fromRawValue(super.rawValue);
   static const clean = RenderAbandonDisposition.fromRawValue(0);
   static const quarantined = RenderAbandonDisposition.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is RenderAbandonDisposition && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class RenderBackendFlag {
-  const RenderBackendFlag.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RenderBackendFlag extends _Flags<RenderBackendFlag> {
+  const RenderBackendFlag.fromRawValue(super.rawValue);
   static const metal = RenderBackendFlag.fromRawValue(1);
   static const vulkan = RenderBackendFlag.fromRawValue(2);
   static const opengl = RenderBackendFlag.fromRawValue(4);
   static const webgpu = RenderBackendFlag.fromRawValue(8);
-  RenderBackendFlag operator |(RenderBackendFlag other) =>
-      RenderBackendFlag.fromRawValue(rawValue | other.rawValue);
-  RenderBackendFlag operator &(RenderBackendFlag other) =>
-      RenderBackendFlag.fromRawValue(rawValue & other.rawValue);
-  bool contains(RenderBackendFlag other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is RenderBackendFlag && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  RenderBackendFlag _of(int rawValue) =>
+      RenderBackendFlag.fromRawValue(rawValue);
 }
 
-final class RenderDriverKind {
-  const RenderDriverKind.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RenderDriverKind extends _Enum {
+  const RenderDriverKind.fromRawValue(super.rawValue);
   static const coreWorker = RenderDriverKind.fromRawValue(1);
   static const callerGraphicsThread = RenderDriverKind.fromRawValue(2);
-  @override
-  bool operator ==(Object other) =>
-      other is RenderDriverKind && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class RenderMode {
-  const RenderMode.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RenderMode extends _Enum {
+  const RenderMode.fromRawValue(super.rawValue);
   static const partial = RenderMode.fromRawValue(0);
   static const full = RenderMode.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is RenderMode && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class RenderResult {
-  const RenderResult.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RenderResult extends _Enum {
+  const RenderResult.fromRawValue(super.rawValue);
   static const rendered = RenderResult.fromRawValue(0);
   static const noUpdate = RenderResult.fromRawValue(1);
   static const sizePending = RenderResult.fromRawValue(2);
   static const targetNotReady = RenderResult.fromRawValue(3);
   static const superseded = RenderResult.fromRawValue(4);
   static const deadlineMissed = RenderResult.fromRawValue(5);
-  @override
-  bool operator ==(Object other) =>
-      other is RenderResult && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class RenderSessionCapabilityFlag {
-  const RenderSessionCapabilityFlag.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RenderSessionCapabilityFlag
+    extends _Flags<RenderSessionCapabilityFlag> {
+  const RenderSessionCapabilityFlag.fromRawValue(super.rawValue);
   static const frameAcquisition = RenderSessionCapabilityFlag.fromRawValue(1);
   static const readback = RenderSessionCapabilityFlag.fromRawValue(2);
   static const consumerSync = RenderSessionCapabilityFlag.fromRawValue(4);
   static const presentation = RenderSessionCapabilityFlag.fromRawValue(8);
-  RenderSessionCapabilityFlag operator |(RenderSessionCapabilityFlag other) =>
-      RenderSessionCapabilityFlag.fromRawValue(rawValue | other.rawValue);
-  RenderSessionCapabilityFlag operator &(RenderSessionCapabilityFlag other) =>
-      RenderSessionCapabilityFlag.fromRawValue(rawValue & other.rawValue);
-  bool contains(RenderSessionCapabilityFlag other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is RenderSessionCapabilityFlag && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  RenderSessionCapabilityFlag _of(int rawValue) =>
+      RenderSessionCapabilityFlag.fromRawValue(rawValue);
 }
 
-final class RenderSessionState {
-  const RenderSessionState.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RenderSessionState extends _Enum {
+  const RenderSessionState.fromRawValue(super.rawValue);
   static const attaching = RenderSessionState.fromRawValue(1);
   static const attached = RenderSessionState.fromRawValue(2);
   static const detaching = RenderSessionState.fromRawValue(3);
   static const detached = RenderSessionState.fromRawValue(4);
   static const targetLost = RenderSessionState.fromRawValue(5);
   static const abandoned = RenderSessionState.fromRawValue(6);
-  @override
-  bool operator ==(Object other) =>
-      other is RenderSessionState && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class RenderedFeatureQueryOptionField {
-  const RenderedFeatureQueryOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RenderedFeatureQueryOptionField
+    extends _Flags<RenderedFeatureQueryOptionField> {
+  const RenderedFeatureQueryOptionField.fromRawValue(super.rawValue);
   static const ids = RenderedFeatureQueryOptionField.fromRawValue(1);
-  RenderedFeatureQueryOptionField operator |(
-    RenderedFeatureQueryOptionField other,
-  ) => RenderedFeatureQueryOptionField.fromRawValue(rawValue | other.rawValue);
-  RenderedFeatureQueryOptionField operator &(
-    RenderedFeatureQueryOptionField other,
-  ) => RenderedFeatureQueryOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(RenderedFeatureQueryOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is RenderedFeatureQueryOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  RenderedFeatureQueryOptionField _of(int rawValue) =>
+      RenderedFeatureQueryOptionField.fromRawValue(rawValue);
 }
 
-final class RenderedQueryGeometryType {
-  const RenderedQueryGeometryType.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RenderedQueryGeometryType extends _Enum {
+  const RenderedQueryGeometryType.fromRawValue(super.rawValue);
   static const point = RenderedQueryGeometryType.fromRawValue(1);
   static const box = RenderedQueryGeometryType.fromRawValue(2);
   static const lineString = RenderedQueryGeometryType.fromRawValue(3);
-  @override
-  bool operator ==(Object other) =>
-      other is RenderedQueryGeometryType && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class ResourceErrorReason {
-  const ResourceErrorReason.fromRawValue(this.rawValue);
-  final int rawValue;
+final class ResourceErrorReason extends _Enum {
+  const ResourceErrorReason.fromRawValue(super.rawValue);
   static const none = ResourceErrorReason.fromRawValue(0);
   static const notFound = ResourceErrorReason.fromRawValue(1);
   static const server = ResourceErrorReason.fromRawValue(2);
   static const connection = ResourceErrorReason.fromRawValue(3);
   static const rateLimit = ResourceErrorReason.fromRawValue(4);
   static const other = ResourceErrorReason.fromRawValue(5);
-  @override
-  bool operator ==(Object other) =>
-      other is ResourceErrorReason && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class ResourceKind {
-  const ResourceKind.fromRawValue(this.rawValue);
-  final int rawValue;
+final class ResourceKind extends _Enum {
+  const ResourceKind.fromRawValue(super.rawValue);
   static const unknown = ResourceKind.fromRawValue(0);
   static const style = ResourceKind.fromRawValue(1);
   static const source = ResourceKind.fromRawValue(2);
@@ -794,91 +451,49 @@ final class ResourceKind {
   static const spriteImage = ResourceKind.fromRawValue(5);
   static const spriteJson = ResourceKind.fromRawValue(6);
   static const image = ResourceKind.fromRawValue(7);
-  @override
-  bool operator ==(Object other) =>
-      other is ResourceKind && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class ResourceLoadingMethod {
-  const ResourceLoadingMethod.fromRawValue(this.rawValue);
-  final int rawValue;
+final class ResourceLoadingMethod extends _Enum {
+  const ResourceLoadingMethod.fromRawValue(super.rawValue);
   static const all = ResourceLoadingMethod.fromRawValue(0);
   static const cacheOnly = ResourceLoadingMethod.fromRawValue(1);
   static const networkOnly = ResourceLoadingMethod.fromRawValue(2);
-  @override
-  bool operator ==(Object other) =>
-      other is ResourceLoadingMethod && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class ResourcePriority {
-  const ResourcePriority.fromRawValue(this.rawValue);
-  final int rawValue;
+final class ResourcePriority extends _Enum {
+  const ResourcePriority.fromRawValue(super.rawValue);
   static const regular = ResourcePriority.fromRawValue(0);
   static const low = ResourcePriority.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is ResourcePriority && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class ResourceProviderDecision {
-  const ResourceProviderDecision.fromRawValue(this.rawValue);
-  final int rawValue;
+final class ResourceProviderDecision extends _Enum {
+  const ResourceProviderDecision.fromRawValue(super.rawValue);
   static const passThrough = ResourceProviderDecision.fromRawValue(0);
   static const handle = ResourceProviderDecision.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is ResourceProviderDecision && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class ResourceResponseStatus {
-  const ResourceResponseStatus.fromRawValue(this.rawValue);
-  final int rawValue;
+final class ResourceResponseStatus extends _Enum {
+  const ResourceResponseStatus.fromRawValue(super.rawValue);
   static const ok = ResourceResponseStatus.fromRawValue(0);
   static const error = ResourceResponseStatus.fromRawValue(1);
   static const noContent = ResourceResponseStatus.fromRawValue(2);
   static const notModified = ResourceResponseStatus.fromRawValue(3);
-  @override
-  bool operator ==(Object other) =>
-      other is ResourceResponseStatus && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class ResourceStoragePolicy {
-  const ResourceStoragePolicy.fromRawValue(this.rawValue);
-  final int rawValue;
+final class ResourceStoragePolicy extends _Enum {
+  const ResourceStoragePolicy.fromRawValue(super.rawValue);
   static const permanent = ResourceStoragePolicy.fromRawValue(0);
   static const volatile = ResourceStoragePolicy.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is ResourceStoragePolicy && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class ResourceUsage {
-  const ResourceUsage.fromRawValue(this.rawValue);
-  final int rawValue;
+final class ResourceUsage extends _Enum {
+  const ResourceUsage.fromRawValue(super.rawValue);
   static const online = ResourceUsage.fromRawValue(0);
   static const offline = ResourceUsage.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is ResourceUsage && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class RuntimeEventMask {
-  const RuntimeEventMask.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
+  const RuntimeEventMask.fromRawValue(super.rawValue);
   static const none = RuntimeEventMask.fromRawValue(0);
   static const mapCameraWillChange = RuntimeEventMask.fromRawValue(2);
   static const mapCameraIsChanging = RuntimeEventMask.fromRawValue(4);
@@ -912,22 +527,12 @@ final class RuntimeEventMask {
   static const allMapEvents = RuntimeEventMask.fromRawValue(4718590);
   static const allRuntimeEvents = RuntimeEventMask.fromRawValue(3670016);
   static const all = RuntimeEventMask.fromRawValue(8388606);
-  RuntimeEventMask operator |(RuntimeEventMask other) =>
-      RuntimeEventMask.fromRawValue(rawValue | other.rawValue);
-  RuntimeEventMask operator &(RuntimeEventMask other) =>
-      RuntimeEventMask.fromRawValue(rawValue & other.rawValue);
-  bool contains(RuntimeEventMask other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventMask && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  RuntimeEventMask _of(int rawValue) => RuntimeEventMask.fromRawValue(rawValue);
 }
 
-final class RuntimeEventPayloadType {
-  const RuntimeEventPayloadType.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RuntimeEventPayloadType extends _Enum {
+  const RuntimeEventPayloadType.fromRawValue(super.rawValue);
   static const none = RuntimeEventPayloadType.fromRawValue(0);
   static const renderFrame = RuntimeEventPayloadType.fromRawValue(1);
   static const renderMap = RuntimeEventPayloadType.fromRawValue(2);
@@ -940,28 +545,16 @@ final class RuntimeEventPayloadType {
   static const cameraTransitionFinished = RuntimeEventPayloadType.fromRawValue(
     9,
   );
-  @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventPayloadType && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class RuntimeEventSourceType {
-  const RuntimeEventSourceType.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RuntimeEventSourceType extends _Enum {
+  const RuntimeEventSourceType.fromRawValue(super.rawValue);
   static const runtime = RuntimeEventSourceType.fromRawValue(0);
   static const map = RuntimeEventSourceType.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventSourceType && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class RuntimeEventType {
-  const RuntimeEventType.fromRawValue(this.rawValue);
-  final int rawValue;
+final class RuntimeEventType extends _Enum {
+  const RuntimeEventType.fromRawValue(super.rawValue);
   static const mapCameraWillChange = RuntimeEventType.fromRawValue(1);
   static const mapCameraIsChanging = RuntimeEventType.fromRawValue(2);
   static const mapCameraDidChange = RuntimeEventType.fromRawValue(3);
@@ -985,35 +578,19 @@ final class RuntimeEventType {
   static const offlineRegionTileCountLimitExceeded =
       RuntimeEventType.fromRawValue(21);
   static const mapCameraTransitionFinished = RuntimeEventType.fromRawValue(22);
-  @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventType && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class SourceFeatureQueryOptionField {
-  const SourceFeatureQueryOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class SourceFeatureQueryOptionField
+    extends _Flags<SourceFeatureQueryOptionField> {
+  const SourceFeatureQueryOptionField.fromRawValue(super.rawValue);
   static const ids = SourceFeatureQueryOptionField.fromRawValue(1);
-  SourceFeatureQueryOptionField operator |(
-    SourceFeatureQueryOptionField other,
-  ) => SourceFeatureQueryOptionField.fromRawValue(rawValue | other.rawValue);
-  SourceFeatureQueryOptionField operator &(
-    SourceFeatureQueryOptionField other,
-  ) => SourceFeatureQueryOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(SourceFeatureQueryOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is SourceFeatureQueryOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  SourceFeatureQueryOptionField _of(int rawValue) =>
+      SourceFeatureQueryOptionField.fromRawValue(rawValue);
 }
 
-final class Status {
-  const Status.fromRawValue(this.rawValue);
-  final int rawValue;
+final class Status extends _Enum {
+  const Status.fromRawValue(super.rawValue);
   static const ok = Status.fromRawValue(0);
   static const invalidArgument = Status.fromRawValue(-1);
   static const invalidState = Status.fromRawValue(-2);
@@ -1025,16 +602,10 @@ final class Status {
   static const targetLost = Status.fromRawValue(-8);
   static const notReady = Status.fromRawValue(-9);
   static const notFound = Status.fromRawValue(-10);
-  @override
-  bool operator ==(Object other) =>
-      other is Status && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class StyleImageOptionField {
-  const StyleImageOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class StyleImageOptionField extends _Flags<StyleImageOptionField> {
+  const StyleImageOptionField.fromRawValue(super.rawValue);
   static const pixelRatio = StyleImageOptionField.fromRawValue(1);
   static const sdf = StyleImageOptionField.fromRawValue(2);
   static const stretchX = StyleImageOptionField.fromRawValue(4);
@@ -1042,81 +613,45 @@ final class StyleImageOptionField {
   static const content = StyleImageOptionField.fromRawValue(16);
   static const textFitWidth = StyleImageOptionField.fromRawValue(32);
   static const textFitHeight = StyleImageOptionField.fromRawValue(64);
-  StyleImageOptionField operator |(StyleImageOptionField other) =>
-      StyleImageOptionField.fromRawValue(rawValue | other.rawValue);
-  StyleImageOptionField operator &(StyleImageOptionField other) =>
-      StyleImageOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(StyleImageOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is StyleImageOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  StyleImageOptionField _of(int rawValue) =>
+      StyleImageOptionField.fromRawValue(rawValue);
 }
 
-final class StyleImageTextFit {
-  const StyleImageTextFit.fromRawValue(this.rawValue);
-  final int rawValue;
+final class StyleImageTextFit extends _Enum {
+  const StyleImageTextFit.fromRawValue(super.rawValue);
   static const stretchOrShrink = StyleImageTextFit.fromRawValue(0);
   static const stretchOnly = StyleImageTextFit.fromRawValue(1);
   static const proportional = StyleImageTextFit.fromRawValue(2);
-  @override
-  bool operator ==(Object other) =>
-      other is StyleImageTextFit && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class StyleLayerVisibility {
-  const StyleLayerVisibility.fromRawValue(this.rawValue);
-  final int rawValue;
+final class StyleLayerVisibility extends _Enum {
+  const StyleLayerVisibility.fromRawValue(super.rawValue);
   static const visible = StyleLayerVisibility.fromRawValue(0);
   static const none = StyleLayerVisibility.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is StyleLayerVisibility && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class StyleRasterDemEncoding {
-  const StyleRasterDemEncoding.fromRawValue(this.rawValue);
-  final int rawValue;
+final class StyleRasterDemEncoding extends _Enum {
+  const StyleRasterDemEncoding.fromRawValue(super.rawValue);
   static const mapbox = StyleRasterDemEncoding.fromRawValue(0);
   static const terrarium = StyleRasterDemEncoding.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is StyleRasterDemEncoding && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class StyleSourceInfoField {
-  const StyleSourceInfoField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class StyleSourceInfoField extends _Flags<StyleSourceInfoField> {
+  const StyleSourceInfoField.fromRawValue(super.rawValue);
   static const url = StyleSourceInfoField.fromRawValue(1);
   static const tilejson = StyleSourceInfoField.fromRawValue(2);
   static const bounds = StyleSourceInfoField.fromRawValue(4);
   static const tileSize = StyleSourceInfoField.fromRawValue(8);
   static const vectorEncoding = StyleSourceInfoField.fromRawValue(16);
   static const rasterEncoding = StyleSourceInfoField.fromRawValue(32);
-  StyleSourceInfoField operator |(StyleSourceInfoField other) =>
-      StyleSourceInfoField.fromRawValue(rawValue | other.rawValue);
-  StyleSourceInfoField operator &(StyleSourceInfoField other) =>
-      StyleSourceInfoField.fromRawValue(rawValue & other.rawValue);
-  bool contains(StyleSourceInfoField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is StyleSourceInfoField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  StyleSourceInfoField _of(int rawValue) =>
+      StyleSourceInfoField.fromRawValue(rawValue);
 }
 
-final class StyleSourceType {
-  const StyleSourceType.fromRawValue(this.rawValue);
-  final int rawValue;
+final class StyleSourceType extends _Enum {
+  const StyleSourceType.fromRawValue(super.rawValue);
   static const unknown = StyleSourceType.fromRawValue(0);
   static const vector = StyleSourceType.fromRawValue(1);
   static const raster = StyleSourceType.fromRawValue(2);
@@ -1127,28 +662,17 @@ final class StyleSourceType {
   static const annotations = StyleSourceType.fromRawValue(7);
   static const customVector = StyleSourceType.fromRawValue(8);
   static const customMvtVector = StyleSourceType.fromRawValue(9);
-  @override
-  bool operator ==(Object other) =>
-      other is StyleSourceType && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class StyleTileScheme {
-  const StyleTileScheme.fromRawValue(this.rawValue);
-  final int rawValue;
+final class StyleTileScheme extends _Enum {
+  const StyleTileScheme.fromRawValue(super.rawValue);
   static const xyz = StyleTileScheme.fromRawValue(0);
   static const tms = StyleTileScheme.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is StyleTileScheme && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class StyleTileSourceOptionField {
-  const StyleTileSourceOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class StyleTileSourceOptionField
+    extends _Flags<StyleTileSourceOptionField> {
+  const StyleTileSourceOptionField.fromRawValue(super.rawValue);
   static const minZoom = StyleTileSourceOptionField.fromRawValue(1);
   static const maxZoom = StyleTileSourceOptionField.fromRawValue(2);
   static const attribution = StyleTileSourceOptionField.fromRawValue(4);
@@ -1157,66 +681,37 @@ final class StyleTileSourceOptionField {
   static const tileSize = StyleTileSourceOptionField.fromRawValue(32);
   static const vectorEncoding = StyleTileSourceOptionField.fromRawValue(64);
   static const rasterEncoding = StyleTileSourceOptionField.fromRawValue(128);
-  StyleTileSourceOptionField operator |(StyleTileSourceOptionField other) =>
-      StyleTileSourceOptionField.fromRawValue(rawValue | other.rawValue);
-  StyleTileSourceOptionField operator &(StyleTileSourceOptionField other) =>
-      StyleTileSourceOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(StyleTileSourceOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is StyleTileSourceOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  StyleTileSourceOptionField _of(int rawValue) =>
+      StyleTileSourceOptionField.fromRawValue(rawValue);
 }
 
-final class StyleTransitionOptionField {
-  const StyleTransitionOptionField.fromRawValue(this.rawValue);
-  final int rawValue;
+final class StyleTransitionOptionField
+    extends _Flags<StyleTransitionOptionField> {
+  const StyleTransitionOptionField.fromRawValue(super.rawValue);
   static const duration = StyleTransitionOptionField.fromRawValue(1);
   static const delay = StyleTransitionOptionField.fromRawValue(2);
   static const enablePlacementTransitions =
       StyleTransitionOptionField.fromRawValue(4);
-  StyleTransitionOptionField operator |(StyleTransitionOptionField other) =>
-      StyleTransitionOptionField.fromRawValue(rawValue | other.rawValue);
-  StyleTransitionOptionField operator &(StyleTransitionOptionField other) =>
-      StyleTransitionOptionField.fromRawValue(rawValue & other.rawValue);
-  bool contains(StyleTransitionOptionField other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is StyleTransitionOptionField && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  StyleTransitionOptionField _of(int rawValue) =>
+      StyleTransitionOptionField.fromRawValue(rawValue);
 }
 
-final class StyleVectorTileEncoding {
-  const StyleVectorTileEncoding.fromRawValue(this.rawValue);
-  final int rawValue;
+final class StyleVectorTileEncoding extends _Enum {
+  const StyleVectorTileEncoding.fromRawValue(super.rawValue);
   static const mvt = StyleVectorTileEncoding.fromRawValue(0);
   static const mlt = StyleVectorTileEncoding.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is StyleVectorTileEncoding && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class TileLodMode {
-  const TileLodMode.fromRawValue(this.rawValue);
-  final int rawValue;
+final class TileLodMode extends _Enum {
+  const TileLodMode.fromRawValue(super.rawValue);
   static const defaultValue = TileLodMode.fromRawValue(0);
   static const distance = TileLodMode.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is TileLodMode && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class TileOperation {
-  const TileOperation.fromRawValue(this.rawValue);
-  final int rawValue;
+final class TileOperation extends _Enum {
+  const TileOperation.fromRawValue(super.rawValue);
   static const requestedFromCache = TileOperation.fromRawValue(0);
   static const requestedFromNetwork = TileOperation.fromRawValue(1);
   static const loadFromNetwork = TileOperation.fromRawValue(2);
@@ -1226,38 +721,21 @@ final class TileOperation {
   static const error = TileOperation.fromRawValue(6);
   static const cancelled = TileOperation.fromRawValue(7);
   static const nullValue = TileOperation.fromRawValue(8);
-  @override
-  bool operator ==(Object other) =>
-      other is TileOperation && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class ViewportMode {
-  const ViewportMode.fromRawValue(this.rawValue);
-  final int rawValue;
+final class ViewportMode extends _Enum {
+  const ViewportMode.fromRawValue(super.rawValue);
   static const defaultValue = ViewportMode.fromRawValue(0);
   static const flippedY = ViewportMode.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is ViewportMode && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class WebglContextKind {
-  const WebglContextKind.fromRawValue(this.rawValue);
-  final int rawValue;
+final class WebglContextKind extends _Enum {
+  const WebglContextKind.fromRawValue(super.rawValue);
   static const existing = WebglContextKind.fromRawValue(0);
   static const transferredCanvas = WebglContextKind.fromRawValue(1);
-  @override
-  bool operator ==(Object other) =>
-      other is WebglContextKind && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
 }
 
-final class MetalOwnedTextureFrame {
+final class MetalOwnedTextureFrame extends _Value {
   const MetalOwnedTextureFrame({
     required this.generation,
     this.width = 0,
@@ -1278,30 +756,19 @@ final class MetalOwnedTextureFrame {
   final BigInt pixelFormat;
 
   @override
-  bool operator ==(Object other) =>
-      other is MetalOwnedTextureFrame &&
-      _generatedValueEquals(other.generation, generation) &&
-      _generatedValueEquals(other.width, width) &&
-      _generatedValueEquals(other.height, height) &&
-      _generatedValueEquals(other.scaleFactor, scaleFactor) &&
-      _generatedValueEquals(other.frameId, frameId) &&
-      _generatedValueEquals(other.texture, texture) &&
-      _generatedValueEquals(other.device, device) &&
-      _generatedValueEquals(other.pixelFormat, pixelFormat);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(generation),
-    _generatedValueHash(width),
-    _generatedValueHash(height),
-    _generatedValueHash(scaleFactor),
-    _generatedValueHash(frameId),
-    _generatedValueHash(texture),
-    _generatedValueHash(device),
-    _generatedValueHash(pixelFormat),
-  ]);
+  List<Object?> get _members => [
+    generation,
+    width,
+    height,
+    scaleFactor,
+    frameId,
+    texture,
+    device,
+    pixelFormat,
+  ];
 }
 
-final class OpenglOwnedTextureFrame {
+final class OpenglOwnedTextureFrame extends _Value {
   const OpenglOwnedTextureFrame({
     required this.generation,
     this.width = 0,
@@ -1326,34 +793,21 @@ final class OpenglOwnedTextureFrame {
   final int type;
 
   @override
-  bool operator ==(Object other) =>
-      other is OpenglOwnedTextureFrame &&
-      _generatedValueEquals(other.generation, generation) &&
-      _generatedValueEquals(other.width, width) &&
-      _generatedValueEquals(other.height, height) &&
-      _generatedValueEquals(other.scaleFactor, scaleFactor) &&
-      _generatedValueEquals(other.frameId, frameId) &&
-      _generatedValueEquals(other.texture, texture) &&
-      _generatedValueEquals(other.target, target) &&
-      _generatedValueEquals(other.internalFormat, internalFormat) &&
-      _generatedValueEquals(other.format, format) &&
-      _generatedValueEquals(other.type, type);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(generation),
-    _generatedValueHash(width),
-    _generatedValueHash(height),
-    _generatedValueHash(scaleFactor),
-    _generatedValueHash(frameId),
-    _generatedValueHash(texture),
-    _generatedValueHash(target),
-    _generatedValueHash(internalFormat),
-    _generatedValueHash(format),
-    _generatedValueHash(type),
-  ]);
+  List<Object?> get _members => [
+    generation,
+    width,
+    height,
+    scaleFactor,
+    frameId,
+    texture,
+    target,
+    internalFormat,
+    format,
+    type,
+  ];
 }
 
-final class GpuSync {
+final class GpuSync extends _Value {
   const GpuSync({
     this.kind = const GpuSyncKind.fromRawValue(0),
     required this.object,
@@ -1364,20 +818,10 @@ final class GpuSync {
   final BigInt value;
 
   @override
-  bool operator ==(Object other) =>
-      other is GpuSync &&
-      _generatedValueEquals(other.kind, kind) &&
-      _generatedValueEquals(other.object, object) &&
-      _generatedValueEquals(other.value, value);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(kind),
-    _generatedValueHash(object),
-    _generatedValueHash(value),
-  ]);
+  List<Object?> get _members => [kind, object, value];
 }
 
-final class RenderFrameResult {
+final class RenderFrameResult extends _Value {
   const RenderFrameResult({
     this.disposition = const RenderResult.fromRawValue(0),
     required this.token,
@@ -1394,26 +838,17 @@ final class RenderFrameResult {
   final bool needsRepaint;
 
   @override
-  bool operator ==(Object other) =>
-      other is RenderFrameResult &&
-      _generatedValueEquals(other.disposition, disposition) &&
-      _generatedValueEquals(other.token, token) &&
-      _generatedValueEquals(other.mapUpdateGeneration, mapUpdateGeneration) &&
-      _generatedValueEquals(other.extentGeneration, extentGeneration) &&
-      _generatedValueEquals(other.frameGeneration, frameGeneration) &&
-      _generatedValueEquals(other.needsRepaint, needsRepaint);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(disposition),
-    _generatedValueHash(token),
-    _generatedValueHash(mapUpdateGeneration),
-    _generatedValueHash(extentGeneration),
-    _generatedValueHash(frameGeneration),
-    _generatedValueHash(needsRepaint),
-  ]);
+  List<Object?> get _members => [
+    disposition,
+    token,
+    mapUpdateGeneration,
+    extentGeneration,
+    frameGeneration,
+    needsRepaint,
+  ];
 }
 
-final class VulkanOwnedTextureFrame {
+final class VulkanOwnedTextureFrame extends _Value {
   const VulkanOwnedTextureFrame({
     required this.generation,
     this.width = 0,
@@ -1438,34 +873,21 @@ final class VulkanOwnedTextureFrame {
   final int layout;
 
   @override
-  bool operator ==(Object other) =>
-      other is VulkanOwnedTextureFrame &&
-      _generatedValueEquals(other.generation, generation) &&
-      _generatedValueEquals(other.width, width) &&
-      _generatedValueEquals(other.height, height) &&
-      _generatedValueEquals(other.scaleFactor, scaleFactor) &&
-      _generatedValueEquals(other.frameId, frameId) &&
-      _generatedValueEquals(other.image, image) &&
-      _generatedValueEquals(other.imageView, imageView) &&
-      _generatedValueEquals(other.device, device) &&
-      _generatedValueEquals(other.format, format) &&
-      _generatedValueEquals(other.layout, layout);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(generation),
-    _generatedValueHash(width),
-    _generatedValueHash(height),
-    _generatedValueHash(scaleFactor),
-    _generatedValueHash(frameId),
-    _generatedValueHash(image),
-    _generatedValueHash(imageView),
-    _generatedValueHash(device),
-    _generatedValueHash(format),
-    _generatedValueHash(layout),
-  ]);
+  List<Object?> get _members => [
+    generation,
+    width,
+    height,
+    scaleFactor,
+    frameId,
+    image,
+    imageView,
+    device,
+    format,
+    layout,
+  ];
 }
 
-final class WebgpuOwnedTextureFrame {
+final class WebgpuOwnedTextureFrame extends _Value {
   const WebgpuOwnedTextureFrame({
     required this.generation,
     this.width = 0,
@@ -1488,32 +910,20 @@ final class WebgpuOwnedTextureFrame {
   final int format;
 
   @override
-  bool operator ==(Object other) =>
-      other is WebgpuOwnedTextureFrame &&
-      _generatedValueEquals(other.generation, generation) &&
-      _generatedValueEquals(other.width, width) &&
-      _generatedValueEquals(other.height, height) &&
-      _generatedValueEquals(other.scaleFactor, scaleFactor) &&
-      _generatedValueEquals(other.frameId, frameId) &&
-      _generatedValueEquals(other.texture, texture) &&
-      _generatedValueEquals(other.textureView, textureView) &&
-      _generatedValueEquals(other.device, device) &&
-      _generatedValueEquals(other.format, format);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(generation),
-    _generatedValueHash(width),
-    _generatedValueHash(height),
-    _generatedValueHash(scaleFactor),
-    _generatedValueHash(frameId),
-    _generatedValueHash(texture),
-    _generatedValueHash(textureView),
-    _generatedValueHash(device),
-    _generatedValueHash(format),
-  ]);
+  List<Object?> get _members => [
+    generation,
+    width,
+    height,
+    scaleFactor,
+    frameId,
+    texture,
+    textureView,
+    device,
+    format,
+  ];
 }
 
-final class UnitBezier {
+final class UnitBezier extends _Value {
   const UnitBezier(this.x1, this.y1, this.x2, this.y2);
   final double x1;
   final double y1;
@@ -1521,22 +931,10 @@ final class UnitBezier {
   final double y2;
 
   @override
-  bool operator ==(Object other) =>
-      other is UnitBezier &&
-      _generatedValueEquals(other.x1, x1) &&
-      _generatedValueEquals(other.y1, y1) &&
-      _generatedValueEquals(other.x2, x2) &&
-      _generatedValueEquals(other.y2, y2);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(x1),
-    _generatedValueHash(y1),
-    _generatedValueHash(x2),
-    _generatedValueHash(y2),
-  ]);
+  List<Object?> get _members => [x1, y1, x2, y2];
 }
 
-final class AnimationOptions {
+final class AnimationOptions extends _Value {
   const AnimationOptions({
     this.durationMs,
     this.velocity,
@@ -1551,41 +949,25 @@ final class AnimationOptions {
   final BigInt? transitionId;
 
   @override
-  bool operator ==(Object other) =>
-      other is AnimationOptions &&
-      _generatedValueEquals(other.durationMs, durationMs) &&
-      _generatedValueEquals(other.velocity, velocity) &&
-      _generatedValueEquals(other.minZoom, minZoom) &&
-      _generatedValueEquals(other.easing, easing) &&
-      _generatedValueEquals(other.transitionId, transitionId);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(durationMs),
-    _generatedValueHash(velocity),
-    _generatedValueHash(minZoom),
-    _generatedValueHash(easing),
-    _generatedValueHash(transitionId),
-  ]);
+  List<Object?> get _members => [
+    durationMs,
+    velocity,
+    minZoom,
+    easing,
+    transitionId,
+  ];
 }
 
-final class LatLng {
+final class LatLng extends _Value {
   const LatLng(this.latitude, this.longitude);
   final double latitude;
   final double longitude;
 
   @override
-  bool operator ==(Object other) =>
-      other is LatLng &&
-      _generatedValueEquals(other.latitude, latitude) &&
-      _generatedValueEquals(other.longitude, longitude);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(latitude),
-    _generatedValueHash(longitude),
-  ]);
+  List<Object?> get _members => [latitude, longitude];
 }
 
-final class LatLngBounds {
+final class LatLngBounds extends _Value {
   const LatLngBounds({
     this.southwest = const LatLng(0, 0),
     this.northeast = const LatLng(0, 0),
@@ -1594,18 +976,10 @@ final class LatLngBounds {
   final LatLng northeast;
 
   @override
-  bool operator ==(Object other) =>
-      other is LatLngBounds &&
-      _generatedValueEquals(other.southwest, southwest) &&
-      _generatedValueEquals(other.northeast, northeast);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(southwest),
-    _generatedValueHash(northeast),
-  ]);
+  List<Object?> get _members => [southwest, northeast];
 }
 
-final class BoundOptions {
+final class BoundOptions extends _Value {
   const BoundOptions({
     this.bounds,
     this.minZoom,
@@ -1621,41 +995,26 @@ final class BoundOptions {
   final double? maxPitch;
   final bool unbounded;
   @override
-  bool operator ==(Object other) =>
-      other is BoundOptions &&
-      _generatedValueEquals(other.bounds, bounds) &&
-      _generatedValueEquals(other.minZoom, minZoom) &&
-      _generatedValueEquals(other.maxZoom, maxZoom) &&
-      _generatedValueEquals(other.minPitch, minPitch) &&
-      _generatedValueEquals(other.maxPitch, maxPitch) &&
-      other.unbounded == unbounded;
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(bounds),
-    _generatedValueHash(minZoom),
-    _generatedValueHash(maxZoom),
-    _generatedValueHash(minPitch),
-    _generatedValueHash(maxPitch),
+  List<Object?> get _members => [
+    bounds,
+    minZoom,
+    maxZoom,
+    minPitch,
+    maxPitch,
     unbounded,
-  ]);
+  ];
 }
 
-final class ScreenPoint {
+final class ScreenPoint extends _Value {
   const ScreenPoint(this.x, this.y);
   final double x;
   final double y;
 
   @override
-  bool operator ==(Object other) =>
-      other is ScreenPoint &&
-      _generatedValueEquals(other.x, x) &&
-      _generatedValueEquals(other.y, y);
-  @override
-  int get hashCode =>
-      Object.hashAll([_generatedValueHash(x), _generatedValueHash(y)]);
+  List<Object?> get _members => [x, y];
 }
 
-final class CameraDelta {
+final class CameraDelta extends _Value {
   const CameraDelta({
     this.kind = const CameraDeltaKind.fromRawValue(0),
     this.offset = const ScreenPoint(0, 0),
@@ -1670,24 +1029,10 @@ final class CameraDelta {
   final AnimationOptions animation;
 
   @override
-  bool operator ==(Object other) =>
-      other is CameraDelta &&
-      _generatedValueEquals(other.kind, kind) &&
-      _generatedValueEquals(other.offset, offset) &&
-      _generatedValueEquals(other.amount, amount) &&
-      _generatedValueEquals(other.anchor, anchor) &&
-      _generatedValueEquals(other.animation, animation);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(kind),
-    _generatedValueHash(offset),
-    _generatedValueHash(amount),
-    _generatedValueHash(anchor),
-    _generatedValueHash(animation),
-  ]);
+  List<Object?> get _members => [kind, offset, amount, anchor, animation];
 }
 
-final class EdgeInsets {
+final class EdgeInsets extends _Value {
   const EdgeInsets({
     this.top = 0,
     this.left = 0,
@@ -1700,42 +1045,20 @@ final class EdgeInsets {
   final double right;
 
   @override
-  bool operator ==(Object other) =>
-      other is EdgeInsets &&
-      _generatedValueEquals(other.top, top) &&
-      _generatedValueEquals(other.left, left) &&
-      _generatedValueEquals(other.bottom, bottom) &&
-      _generatedValueEquals(other.right, right);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(top),
-    _generatedValueHash(left),
-    _generatedValueHash(bottom),
-    _generatedValueHash(right),
-  ]);
+  List<Object?> get _members => [top, left, bottom, right];
 }
 
-final class CameraFitOptions {
+final class CameraFitOptions extends _Value {
   const CameraFitOptions({this.padding, this.bearing, this.pitch});
   final EdgeInsets? padding;
   final double? bearing;
   final double? pitch;
 
   @override
-  bool operator ==(Object other) =>
-      other is CameraFitOptions &&
-      _generatedValueEquals(other.padding, padding) &&
-      _generatedValueEquals(other.bearing, bearing) &&
-      _generatedValueEquals(other.pitch, pitch);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(padding),
-    _generatedValueHash(bearing),
-    _generatedValueHash(pitch),
-  ]);
+  List<Object?> get _members => [padding, bearing, pitch];
 }
 
-final class CameraOptions {
+final class CameraOptions extends _Value {
   const CameraOptions({
     this.center,
     this.centerAltitude,
@@ -1758,32 +1081,20 @@ final class CameraOptions {
   final double? fieldOfView;
 
   @override
-  bool operator ==(Object other) =>
-      other is CameraOptions &&
-      _generatedValueEquals(other.center, center) &&
-      _generatedValueEquals(other.centerAltitude, centerAltitude) &&
-      _generatedValueEquals(other.padding, padding) &&
-      _generatedValueEquals(other.anchor, anchor) &&
-      _generatedValueEquals(other.zoom, zoom) &&
-      _generatedValueEquals(other.bearing, bearing) &&
-      _generatedValueEquals(other.pitch, pitch) &&
-      _generatedValueEquals(other.roll, roll) &&
-      _generatedValueEquals(other.fieldOfView, fieldOfView);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(center),
-    _generatedValueHash(centerAltitude),
-    _generatedValueHash(padding),
-    _generatedValueHash(anchor),
-    _generatedValueHash(zoom),
-    _generatedValueHash(bearing),
-    _generatedValueHash(pitch),
-    _generatedValueHash(roll),
-    _generatedValueHash(fieldOfView),
-  ]);
+  List<Object?> get _members => [
+    center,
+    centerAltitude,
+    padding,
+    anchor,
+    zoom,
+    bearing,
+    pitch,
+    roll,
+    fieldOfView,
+  ];
 }
 
-final class CameraUpdate {
+final class CameraUpdate extends _Value {
   const CameraUpdate({
     this.mode = const CameraUpdateMode.fromRawValue(0),
     this.camera = const CameraOptions(),
@@ -1796,39 +1107,17 @@ final class CameraUpdate {
   final GesturePhase gesturePhase;
 
   @override
-  bool operator ==(Object other) =>
-      other is CameraUpdate &&
-      _generatedValueEquals(other.mode, mode) &&
-      _generatedValueEquals(other.camera, camera) &&
-      _generatedValueEquals(other.animation, animation) &&
-      _generatedValueEquals(other.gesturePhase, gesturePhase);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(mode),
-    _generatedValueHash(camera),
-    _generatedValueHash(animation),
-    _generatedValueHash(gesturePhase),
-  ]);
+  List<Object?> get _members => [mode, camera, animation, gesturePhase];
 }
 
-final class CanonicalTileId {
+final class CanonicalTileId extends _Value {
   const CanonicalTileId({this.z = 0, this.x = 0, this.y = 0});
   final int z;
   final int x;
   final int y;
 
   @override
-  bool operator ==(Object other) =>
-      other is CanonicalTileId &&
-      _generatedValueEquals(other.z, z) &&
-      _generatedValueEquals(other.x, x) &&
-      _generatedValueEquals(other.y, y);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(z),
-    _generatedValueHash(x),
-    _generatedValueHash(y),
-  ]);
+  List<Object?> get _members => [z, x, y];
 }
 
 typedef CustomGeometrySourceTileCallback = void Function(CanonicalTileId);
@@ -1871,7 +1160,7 @@ final class CustomMvtVectorSourceOptions {
   final double? maxZoom;
 }
 
-final class RenderingStats {
+final class RenderingStats extends _Value {
   const RenderingStats({
     this.encodingTime = 0,
     this.renderingTime = 0,
@@ -1886,24 +1175,16 @@ final class RenderingStats {
   final int totalDrawCallCount;
 
   @override
-  bool operator ==(Object other) =>
-      other is RenderingStats &&
-      _generatedValueEquals(other.encodingTime, encodingTime) &&
-      _generatedValueEquals(other.renderingTime, renderingTime) &&
-      _generatedValueEquals(other.frameCount, frameCount) &&
-      _generatedValueEquals(other.drawCallCount, drawCallCount) &&
-      _generatedValueEquals(other.totalDrawCallCount, totalDrawCallCount);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(encodingTime),
-    _generatedValueHash(renderingTime),
-    _generatedValueHash(frameCount),
-    _generatedValueHash(drawCallCount),
-    _generatedValueHash(totalDrawCallCount),
-  ]);
+  List<Object?> get _members => [
+    encodingTime,
+    renderingTime,
+    frameCount,
+    drawCallCount,
+    totalDrawCallCount,
+  ];
 }
 
-final class RuntimeEventRenderFrame {
+final class RuntimeEventRenderFrame extends _Value {
   const RuntimeEventRenderFrame({
     this.mode = const RenderMode.fromRawValue(0),
     this.needsRepaint = false,
@@ -1916,33 +1197,18 @@ final class RuntimeEventRenderFrame {
   final RenderingStats stats;
 
   @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventRenderFrame &&
-      _generatedValueEquals(other.mode, mode) &&
-      _generatedValueEquals(other.needsRepaint, needsRepaint) &&
-      _generatedValueEquals(other.placementChanged, placementChanged) &&
-      _generatedValueEquals(other.stats, stats);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(mode),
-    _generatedValueHash(needsRepaint),
-    _generatedValueHash(placementChanged),
-    _generatedValueHash(stats),
-  ]);
+  List<Object?> get _members => [mode, needsRepaint, placementChanged, stats];
 }
 
-final class RuntimeEventRenderMap {
+final class RuntimeEventRenderMap extends _Value {
   const RuntimeEventRenderMap({this.mode = const RenderMode.fromRawValue(0)});
   final RenderMode mode;
 
   @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventRenderMap && _generatedValueEquals(other.mode, mode);
-  @override
-  int get hashCode => Object.hashAll([_generatedValueHash(mode)]);
+  List<Object?> get _members => [mode];
 }
 
-final class TileId {
+final class TileId extends _Value {
   const TileId({
     this.overscaledZ = 0,
     this.wrap = 0,
@@ -1957,24 +1223,16 @@ final class TileId {
   final int canonicalY;
 
   @override
-  bool operator ==(Object other) =>
-      other is TileId &&
-      _generatedValueEquals(other.overscaledZ, overscaledZ) &&
-      _generatedValueEquals(other.wrap, wrap) &&
-      _generatedValueEquals(other.canonicalZ, canonicalZ) &&
-      _generatedValueEquals(other.canonicalX, canonicalX) &&
-      _generatedValueEquals(other.canonicalY, canonicalY);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(overscaledZ),
-    _generatedValueHash(wrap),
-    _generatedValueHash(canonicalZ),
-    _generatedValueHash(canonicalX),
-    _generatedValueHash(canonicalY),
-  ]);
+  List<Object?> get _members => [
+    overscaledZ,
+    wrap,
+    canonicalZ,
+    canonicalX,
+    canonicalY,
+  ];
 }
 
-final class RuntimeEventTileAction {
+final class RuntimeEventTileAction extends _Value {
   const RuntimeEventTileAction({
     this.operation = const TileOperation.fromRawValue(0),
     this.tileId = const TileId(),
@@ -1983,18 +1241,10 @@ final class RuntimeEventTileAction {
   final TileId tileId;
 
   @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventTileAction &&
-      _generatedValueEquals(other.operation, operation) &&
-      _generatedValueEquals(other.tileId, tileId);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(operation),
-    _generatedValueHash(tileId),
-  ]);
+  List<Object?> get _members => [operation, tileId];
 }
 
-final class OfflineRegionStatus {
+final class OfflineRegionStatus extends _Value {
   const OfflineRegionStatus({
     this.downloadState = const OfflineRegionDownloadState.fromRawValue(0),
     required this.completedResourceCount,
@@ -2017,44 +1267,20 @@ final class OfflineRegionStatus {
   final bool complete;
 
   @override
-  bool operator ==(Object other) =>
-      other is OfflineRegionStatus &&
-      _generatedValueEquals(other.downloadState, downloadState) &&
-      _generatedValueEquals(
-        other.completedResourceCount,
-        completedResourceCount,
-      ) &&
-      _generatedValueEquals(
-        other.completedResourceSize,
-        completedResourceSize,
-      ) &&
-      _generatedValueEquals(other.completedTileCount, completedTileCount) &&
-      _generatedValueEquals(other.requiredTileCount, requiredTileCount) &&
-      _generatedValueEquals(other.completedTileSize, completedTileSize) &&
-      _generatedValueEquals(
-        other.requiredResourceCount,
-        requiredResourceCount,
-      ) &&
-      _generatedValueEquals(
-        other.requiredResourceCountIsPrecise,
-        requiredResourceCountIsPrecise,
-      ) &&
-      _generatedValueEquals(other.complete, complete);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(downloadState),
-    _generatedValueHash(completedResourceCount),
-    _generatedValueHash(completedResourceSize),
-    _generatedValueHash(completedTileCount),
-    _generatedValueHash(requiredTileCount),
-    _generatedValueHash(completedTileSize),
-    _generatedValueHash(requiredResourceCount),
-    _generatedValueHash(requiredResourceCountIsPrecise),
-    _generatedValueHash(complete),
-  ]);
+  List<Object?> get _members => [
+    downloadState,
+    completedResourceCount,
+    completedResourceSize,
+    completedTileCount,
+    requiredTileCount,
+    completedTileSize,
+    requiredResourceCount,
+    requiredResourceCountIsPrecise,
+    complete,
+  ];
 }
 
-final class RuntimeEventOfflineRegionStatus {
+final class RuntimeEventOfflineRegionStatus extends _Value {
   const RuntimeEventOfflineRegionStatus({
     this.regionId = 0,
     required this.status,
@@ -2063,18 +1289,10 @@ final class RuntimeEventOfflineRegionStatus {
   final OfflineRegionStatus status;
 
   @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventOfflineRegionStatus &&
-      _generatedValueEquals(other.regionId, regionId) &&
-      _generatedValueEquals(other.status, status);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(regionId),
-    _generatedValueHash(status),
-  ]);
+  List<Object?> get _members => [regionId, status];
 }
 
-final class RuntimeEventOfflineRegionResponseError {
+final class RuntimeEventOfflineRegionResponseError extends _Value {
   const RuntimeEventOfflineRegionResponseError({
     this.regionId = 0,
     this.reason = const ResourceErrorReason.fromRawValue(0),
@@ -2083,18 +1301,10 @@ final class RuntimeEventOfflineRegionResponseError {
   final ResourceErrorReason reason;
 
   @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventOfflineRegionResponseError &&
-      _generatedValueEquals(other.regionId, regionId) &&
-      _generatedValueEquals(other.reason, reason);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(regionId),
-    _generatedValueHash(reason),
-  ]);
+  List<Object?> get _members => [regionId, reason];
 }
 
-final class RuntimeEventOfflineRegionTileCountLimit {
+final class RuntimeEventOfflineRegionTileCountLimit extends _Value {
   const RuntimeEventOfflineRegionTileCountLimit({
     this.regionId = 0,
     required this.limit,
@@ -2103,27 +1313,15 @@ final class RuntimeEventOfflineRegionTileCountLimit {
   final BigInt limit;
 
   @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventOfflineRegionTileCountLimit &&
-      _generatedValueEquals(other.regionId, regionId) &&
-      _generatedValueEquals(other.limit, limit);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(regionId),
-    _generatedValueHash(limit),
-  ]);
+  List<Object?> get _members => [regionId, limit];
 }
 
-final class RuntimeEventCameraTransitionFinished {
+final class RuntimeEventCameraTransitionFinished extends _Value {
   const RuntimeEventCameraTransitionFinished({required this.transitionId});
   final BigInt transitionId;
 
   @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventCameraTransitionFinished &&
-      _generatedValueEquals(other.transitionId, transitionId);
-  @override
-  int get hashCode => Object.hashAll([_generatedValueHash(transitionId)]);
+  List<Object?> get _members => [transitionId];
 }
 
 final class RuntimeEvent {
@@ -2201,20 +1399,16 @@ final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
   final Uint8List rawRecord;
 }
 
-final class RuntimeEventBatchView {
+final class RuntimeEventBatchView extends _Value {
   RuntimeEventBatchView({required List<RuntimeEvent> events})
     : events = List.unmodifiable(events);
   final List<RuntimeEvent> events;
 
   @override
-  bool operator ==(Object other) =>
-      other is RuntimeEventBatchView &&
-      _generatedValueEquals(other.events, events);
-  @override
-  int get hashCode => Object.hashAll([_generatedValueHash(events)]);
+  List<Object?> get _members => [events];
 }
 
-final class FrameDemand {
+final class FrameDemand extends _Value {
   const FrameDemand({
     this.flags = const FrameDemandFlag.fromRawValue(0),
     required this.token,
@@ -2227,42 +1421,20 @@ final class FrameDemand {
   final BigInt timeoutNs;
 
   @override
-  bool operator ==(Object other) =>
-      other is FrameDemand &&
-      _generatedValueEquals(other.flags, flags) &&
-      _generatedValueEquals(other.token, token) &&
-      _generatedValueEquals(other.coalescingBoundary, coalescingBoundary) &&
-      _generatedValueEquals(other.timeoutNs, timeoutNs);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(flags),
-    _generatedValueHash(token),
-    _generatedValueHash(coalescingBoundary),
-    _generatedValueHash(timeoutNs),
-  ]);
+  List<Object?> get _members => [flags, token, coalescingBoundary, timeoutNs];
 }
 
-final class Vec3 {
+final class Vec3 extends _Value {
   const Vec3(this.x, this.y, this.z);
   final double x;
   final double y;
   final double z;
 
   @override
-  bool operator ==(Object other) =>
-      other is Vec3 &&
-      _generatedValueEquals(other.x, x) &&
-      _generatedValueEquals(other.y, y) &&
-      _generatedValueEquals(other.z, z);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(x),
-    _generatedValueHash(y),
-    _generatedValueHash(z),
-  ]);
+  List<Object?> get _members => [x, y, z];
 }
 
-final class Quaternion {
+final class Quaternion extends _Value {
   const Quaternion(this.x, this.y, this.z, this.w);
   final double x;
   final double y;
@@ -2270,39 +1442,19 @@ final class Quaternion {
   final double w;
 
   @override
-  bool operator ==(Object other) =>
-      other is Quaternion &&
-      _generatedValueEquals(other.x, x) &&
-      _generatedValueEquals(other.y, y) &&
-      _generatedValueEquals(other.z, z) &&
-      _generatedValueEquals(other.w, w);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(x),
-    _generatedValueHash(y),
-    _generatedValueHash(z),
-    _generatedValueHash(w),
-  ]);
+  List<Object?> get _members => [x, y, z, w];
 }
 
-final class FreeCameraOptions {
+final class FreeCameraOptions extends _Value {
   const FreeCameraOptions({this.position, this.orientation});
   final Vec3? position;
   final Quaternion? orientation;
 
   @override
-  bool operator ==(Object other) =>
-      other is FreeCameraOptions &&
-      _generatedValueEquals(other.position, position) &&
-      _generatedValueEquals(other.orientation, orientation);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(position),
-    _generatedValueHash(orientation),
-  ]);
+  List<Object?> get _members => [position, orientation];
 }
 
-final class GeojsonSourceOptions {
+final class GeojsonSourceOptions extends _Value {
   GeojsonSourceOptions({
     this.minZoom,
     this.maxZoom,
@@ -2333,57 +1485,34 @@ final class GeojsonSourceOptions {
   final bool? synchronousTiling;
 
   @override
-  bool operator ==(Object other) =>
-      other is GeojsonSourceOptions &&
-      _generatedValueEquals(other.minZoom, minZoom) &&
-      _generatedValueEquals(other.maxZoom, maxZoom) &&
-      _generatedValueEquals(other.tolerance, tolerance) &&
-      _generatedValueEquals(other.clusterMaxZoom, clusterMaxZoom) &&
-      _generatedValueEquals(other.clusterProperties, clusterProperties) &&
-      _generatedValueEquals(other.tileSize, tileSize) &&
-      _generatedValueEquals(other.buffer, buffer) &&
-      _generatedValueEquals(other.clusterRadius, clusterRadius) &&
-      _generatedValueEquals(other.clusterMinPoints, clusterMinPoints) &&
-      _generatedValueEquals(other.lineMetrics, lineMetrics) &&
-      _generatedValueEquals(other.cluster, cluster) &&
-      _generatedValueEquals(other.synchronousTiling, synchronousTiling);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(minZoom),
-    _generatedValueHash(maxZoom),
-    _generatedValueHash(tolerance),
-    _generatedValueHash(clusterMaxZoom),
-    _generatedValueHash(clusterProperties),
-    _generatedValueHash(tileSize),
-    _generatedValueHash(buffer),
-    _generatedValueHash(clusterRadius),
-    _generatedValueHash(clusterMinPoints),
-    _generatedValueHash(lineMetrics),
-    _generatedValueHash(cluster),
-    _generatedValueHash(synchronousTiling),
-  ]);
+  List<Object?> get _members => [
+    minZoom,
+    maxZoom,
+    tolerance,
+    clusterMaxZoom,
+    clusterProperties,
+    tileSize,
+    buffer,
+    clusterRadius,
+    clusterMinPoints,
+    lineMetrics,
+    cluster,
+    synchronousTiling,
+  ];
 }
 
-final class ProjectedMeters {
+final class ProjectedMeters extends _Value {
   const ProjectedMeters({this.northing = 0, this.easting = 0});
   final double northing;
   final double easting;
 
   @override
-  bool operator ==(Object other) =>
-      other is ProjectedMeters &&
-      _generatedValueEquals(other.northing, northing) &&
-      _generatedValueEquals(other.easting, easting);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(northing),
-    _generatedValueHash(easting),
-  ]);
+  List<Object?> get _members => [northing, easting];
 }
 
 typedef LogCallback = void Function(LogSeverity, LogEvent, int, String);
 
-final class PremultipliedRgba8Image {
+final class PremultipliedRgba8Image extends _Value {
   PremultipliedRgba8Image({
     this.width = 0,
     this.height = 0,
@@ -2398,22 +1527,10 @@ final class PremultipliedRgba8Image {
   final Uint8List pixels;
 
   @override
-  bool operator ==(Object other) =>
-      other is PremultipliedRgba8Image &&
-      _generatedValueEquals(other.width, width) &&
-      _generatedValueEquals(other.height, height) &&
-      _generatedValueEquals(other.stride, stride) &&
-      _generatedValueEquals(other.pixels, pixels);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(width),
-    _generatedValueHash(height),
-    _generatedValueHash(stride),
-    _generatedValueHash(pixels),
-  ]);
+  List<Object?> get _members => [width, height, stride, pixels];
 }
 
-final class StyleTileSourceOptions {
+final class StyleTileSourceOptions extends _Value {
   const StyleTileSourceOptions({
     this.minZoom,
     this.maxZoom,
@@ -2434,30 +1551,19 @@ final class StyleTileSourceOptions {
   final StyleRasterDemEncoding? rasterEncoding;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleTileSourceOptions &&
-      _generatedValueEquals(other.minZoom, minZoom) &&
-      _generatedValueEquals(other.maxZoom, maxZoom) &&
-      _generatedValueEquals(other.attribution, attribution) &&
-      _generatedValueEquals(other.scheme, scheme) &&
-      _generatedValueEquals(other.bounds, bounds) &&
-      _generatedValueEquals(other.tileSize, tileSize) &&
-      _generatedValueEquals(other.vectorEncoding, vectorEncoding) &&
-      _generatedValueEquals(other.rasterEncoding, rasterEncoding);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(minZoom),
-    _generatedValueHash(maxZoom),
-    _generatedValueHash(attribution),
-    _generatedValueHash(scheme),
-    _generatedValueHash(bounds),
-    _generatedValueHash(tileSize),
-    _generatedValueHash(vectorEncoding),
-    _generatedValueHash(rasterEncoding),
-  ]);
+  List<Object?> get _members => [
+    minZoom,
+    maxZoom,
+    attribution,
+    scheme,
+    bounds,
+    tileSize,
+    vectorEncoding,
+    rasterEncoding,
+  ];
 }
 
-final class CameraQueryResult {
+final class CameraQueryResult extends _Value {
   const CameraQueryResult({
     required this.generation,
     this.camera = const CameraOptions(),
@@ -2466,33 +1572,19 @@ final class CameraQueryResult {
   final CameraOptions camera;
 
   @override
-  bool operator ==(Object other) =>
-      other is CameraQueryResult &&
-      _generatedValueEquals(other.generation, generation) &&
-      _generatedValueEquals(other.camera, camera);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(generation),
-    _generatedValueHash(camera),
-  ]);
+  List<Object?> get _members => [generation, camera];
 }
 
-final class ImageStretch {
+final class ImageStretch extends _Value {
   const ImageStretch(this.from, this.to);
   final double from;
   final double to;
 
   @override
-  bool operator ==(Object other) =>
-      other is ImageStretch &&
-      _generatedValueEquals(other.from, from) &&
-      _generatedValueEquals(other.to, to);
-  @override
-  int get hashCode =>
-      Object.hashAll([_generatedValueHash(from), _generatedValueHash(to)]);
+  List<Object?> get _members => [from, to];
 }
 
-final class StyleImageStretchesResult {
+final class StyleImageStretchesResult extends _Value {
   StyleImageStretchesResult({
     required List<ImageStretch> stretchX,
     required List<ImageStretch> stretchY,
@@ -2502,38 +1594,20 @@ final class StyleImageStretchesResult {
   final List<ImageStretch> stretchY;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleImageStretchesResult &&
-      _generatedValueEquals(other.stretchX, stretchX) &&
-      _generatedValueEquals(other.stretchY, stretchY);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(stretchX),
-    _generatedValueHash(stretchY),
-  ]);
+  List<Object?> get _members => [stretchX, stretchY];
 }
 
-final class LogicalExtent {
+final class LogicalExtent extends _Value {
   const LogicalExtent({this.width = 0, this.height = 0, this.scaleFactor = 0});
   final int width;
   final int height;
   final double scaleFactor;
 
   @override
-  bool operator ==(Object other) =>
-      other is LogicalExtent &&
-      _generatedValueEquals(other.width, width) &&
-      _generatedValueEquals(other.height, height) &&
-      _generatedValueEquals(other.scaleFactor, scaleFactor);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(width),
-    _generatedValueHash(height),
-    _generatedValueHash(scaleFactor),
-  ]);
+  List<Object?> get _members => [width, height, scaleFactor];
 }
 
-final class MapOptions {
+final class MapOptions extends _Value {
   const MapOptions({
     this.initialExtent = const LogicalExtent(),
     this.mapMode = const MapMode.fromRawValue(0),
@@ -2546,22 +1620,15 @@ final class MapOptions {
   final RuntimeEventMask eventMask;
 
   @override
-  bool operator ==(Object other) =>
-      other is MapOptions &&
-      _generatedValueEquals(other.initialExtent, initialExtent) &&
-      _generatedValueEquals(other.mapMode, mapMode) &&
-      _generatedValueEquals(other.fastPforEnabled, fastPforEnabled) &&
-      _generatedValueEquals(other.eventMask, eventMask);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(initialExtent),
-    _generatedValueHash(mapMode),
-    _generatedValueHash(fastPforEnabled),
-    _generatedValueHash(eventMask),
-  ]);
+  List<Object?> get _members => [
+    initialExtent,
+    mapMode,
+    fastPforEnabled,
+    eventMask,
+  ];
 }
 
-final class FeatureStateSelector {
+final class FeatureStateSelector extends _Value {
   const FeatureStateSelector({
     required this.sourceId,
     this.sourceLayerId,
@@ -2574,22 +1641,10 @@ final class FeatureStateSelector {
   final String? stateKey;
 
   @override
-  bool operator ==(Object other) =>
-      other is FeatureStateSelector &&
-      _generatedValueEquals(other.sourceId, sourceId) &&
-      _generatedValueEquals(other.sourceLayerId, sourceLayerId) &&
-      _generatedValueEquals(other.featureId, featureId) &&
-      _generatedValueEquals(other.stateKey, stateKey);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(sourceId),
-    _generatedValueHash(sourceLayerId),
-    _generatedValueHash(featureId),
-    _generatedValueHash(stateKey),
-  ]);
+  List<Object?> get _members => [sourceId, sourceLayerId, featureId, stateKey];
 }
 
-final class ImageContent {
+final class ImageContent extends _Value {
   const ImageContent({
     this.left = 0,
     this.top = 0,
@@ -2602,22 +1657,10 @@ final class ImageContent {
   final double bottom;
 
   @override
-  bool operator ==(Object other) =>
-      other is ImageContent &&
-      _generatedValueEquals(other.left, left) &&
-      _generatedValueEquals(other.top, top) &&
-      _generatedValueEquals(other.right, right) &&
-      _generatedValueEquals(other.bottom, bottom);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(left),
-    _generatedValueHash(top),
-    _generatedValueHash(right),
-    _generatedValueHash(bottom),
-  ]);
+  List<Object?> get _members => [left, top, right, bottom];
 }
 
-final class StyleImageInfo {
+final class StyleImageInfo extends _Value {
   const StyleImageInfo({
     this.width = 0,
     this.height = 0,
@@ -2644,36 +1687,22 @@ final class StyleImageInfo {
   final bool sdf;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleImageInfo &&
-      _generatedValueEquals(other.width, width) &&
-      _generatedValueEquals(other.height, height) &&
-      _generatedValueEquals(other.stride, stride) &&
-      _generatedValueEquals(other.byteLength, byteLength) &&
-      _generatedValueEquals(other.stretchXCount, stretchXCount) &&
-      _generatedValueEquals(other.stretchYCount, stretchYCount) &&
-      _generatedValueEquals(other.content, content) &&
-      _generatedValueEquals(other.textFitWidth, textFitWidth) &&
-      _generatedValueEquals(other.textFitHeight, textFitHeight) &&
-      _generatedValueEquals(other.pixelRatio, pixelRatio) &&
-      _generatedValueEquals(other.sdf, sdf);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(width),
-    _generatedValueHash(height),
-    _generatedValueHash(stride),
-    _generatedValueHash(byteLength),
-    _generatedValueHash(stretchXCount),
-    _generatedValueHash(stretchYCount),
-    _generatedValueHash(content),
-    _generatedValueHash(textFitWidth),
-    _generatedValueHash(textFitHeight),
-    _generatedValueHash(pixelRatio),
-    _generatedValueHash(sdf),
-  ]);
+  List<Object?> get _members => [
+    width,
+    height,
+    stride,
+    byteLength,
+    stretchXCount,
+    stretchYCount,
+    content,
+    textFitWidth,
+    textFitHeight,
+    pixelRatio,
+    sdf,
+  ];
 }
 
-final class StyleImageResult {
+final class StyleImageResult extends _Value {
   StyleImageResult({
     this.info = const StyleImageInfo(),
     Uint8List? pixels,
@@ -2690,22 +1719,10 @@ final class StyleImageResult {
   final List<ImageStretch> stretchY;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleImageResult &&
-      _generatedValueEquals(other.info, info) &&
-      _generatedValueEquals(other.pixels, pixels) &&
-      _generatedValueEquals(other.stretchX, stretchX) &&
-      _generatedValueEquals(other.stretchY, stretchY);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(info),
-    _generatedValueHash(pixels),
-    _generatedValueHash(stretchX),
-    _generatedValueHash(stretchY),
-  ]);
+  List<Object?> get _members => [info, pixels, stretchX, stretchY];
 }
 
-final class StyleLayerInfo {
+final class StyleLayerInfo extends _Value {
   const StyleLayerInfo({
     required this.type,
     this.minZoom = 0,
@@ -2718,42 +1735,20 @@ final class StyleLayerInfo {
   final StyleLayerVisibility visibility;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleLayerInfo &&
-      _generatedValueEquals(other.type, type) &&
-      _generatedValueEquals(other.minZoom, minZoom) &&
-      _generatedValueEquals(other.maxZoom, maxZoom) &&
-      _generatedValueEquals(other.visibility, visibility);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(type),
-    _generatedValueHash(minZoom),
-    _generatedValueHash(maxZoom),
-    _generatedValueHash(visibility),
-  ]);
+  List<Object?> get _members => [type, minZoom, maxZoom, visibility];
 }
 
-final class StyleLayerResult {
+final class StyleLayerResult extends _Value {
   const StyleLayerResult({required this.info, this.sourceId, this.sourceLayer});
   final StyleLayerInfo info;
   final String? sourceId;
   final String? sourceLayer;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleLayerResult &&
-      _generatedValueEquals(other.info, info) &&
-      _generatedValueEquals(other.sourceId, sourceId) &&
-      _generatedValueEquals(other.sourceLayer, sourceLayer);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(info),
-    _generatedValueHash(sourceId),
-    _generatedValueHash(sourceLayer),
-  ]);
+  List<Object?> get _members => [info, sourceId, sourceLayer];
 }
 
-final class StyleSourceTileInfo {
+final class StyleSourceTileInfo extends _Value {
   const StyleSourceTileInfo({
     this.tileCount = 0,
     this.minZoom = 0,
@@ -2766,22 +1761,10 @@ final class StyleSourceTileInfo {
   final StyleTileScheme scheme;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleSourceTileInfo &&
-      _generatedValueEquals(other.tileCount, tileCount) &&
-      _generatedValueEquals(other.minZoom, minZoom) &&
-      _generatedValueEquals(other.maxZoom, maxZoom) &&
-      _generatedValueEquals(other.scheme, scheme);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(tileCount),
-    _generatedValueHash(minZoom),
-    _generatedValueHash(maxZoom),
-    _generatedValueHash(scheme),
-  ]);
+  List<Object?> get _members => [tileCount, minZoom, maxZoom, scheme];
 }
 
-final class StyleSourceInfo {
+final class StyleSourceInfo extends _Value {
   const StyleSourceInfo({
     this.type = const StyleSourceType.fromRawValue(0),
     this.idSize = 0,
@@ -2806,34 +1789,21 @@ final class StyleSourceInfo {
   final StyleRasterDemEncoding? rasterEncoding;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleSourceInfo &&
-      _generatedValueEquals(other.type, type) &&
-      _generatedValueEquals(other.idSize, idSize) &&
-      _generatedValueEquals(other.isVolatile, isVolatile) &&
-      _generatedValueEquals(other.attributionSize, attributionSize) &&
-      _generatedValueEquals(other.urlSize, urlSize) &&
-      _generatedValueEquals(other.tilejson, tilejson) &&
-      _generatedValueEquals(other.bounds, bounds) &&
-      _generatedValueEquals(other.tileSize, tileSize) &&
-      _generatedValueEquals(other.vectorEncoding, vectorEncoding) &&
-      _generatedValueEquals(other.rasterEncoding, rasterEncoding);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(type),
-    _generatedValueHash(idSize),
-    _generatedValueHash(isVolatile),
-    _generatedValueHash(attributionSize),
-    _generatedValueHash(urlSize),
-    _generatedValueHash(tilejson),
-    _generatedValueHash(bounds),
-    _generatedValueHash(tileSize),
-    _generatedValueHash(vectorEncoding),
-    _generatedValueHash(rasterEncoding),
-  ]);
+  List<Object?> get _members => [
+    type,
+    idSize,
+    isVolatile,
+    attributionSize,
+    urlSize,
+    tilejson,
+    bounds,
+    tileSize,
+    vectorEncoding,
+    rasterEncoding,
+  ];
 }
 
-final class StyleSourceResult {
+final class StyleSourceResult extends _Value {
   StyleSourceResult({
     this.info = const StyleSourceInfo(),
     this.attribution,
@@ -2846,35 +1816,19 @@ final class StyleSourceResult {
   final List<String>? tileUrls;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleSourceResult &&
-      _generatedValueEquals(other.info, info) &&
-      _generatedValueEquals(other.attribution, attribution) &&
-      _generatedValueEquals(other.url, url) &&
-      _generatedValueEquals(other.tileUrls, tileUrls);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(info),
-    _generatedValueHash(attribution),
-    _generatedValueHash(url),
-    _generatedValueHash(tileUrls),
-  ]);
+  List<Object?> get _members => [info, attribution, url, tileUrls];
 }
 
-final class StyleSourceTileUrlsResult {
+final class StyleSourceTileUrlsResult extends _Value {
   StyleSourceTileUrlsResult({required List<String> tileUrls})
     : tileUrls = List.unmodifiable(tileUrls);
   final List<String> tileUrls;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleSourceTileUrlsResult &&
-      _generatedValueEquals(other.tileUrls, tileUrls);
-  @override
-  int get hashCode => Object.hashAll([_generatedValueHash(tileUrls)]);
+  List<Object?> get _members => [tileUrls];
 }
 
-final class StyleTransitionOptions {
+final class StyleTransitionOptions extends _Value {
   const StyleTransitionOptions({
     this.durationMs,
     this.delayMs,
@@ -2885,23 +1839,14 @@ final class StyleTransitionOptions {
   final bool? enablePlacementTransitions;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleTransitionOptions &&
-      _generatedValueEquals(other.durationMs, durationMs) &&
-      _generatedValueEquals(other.delayMs, delayMs) &&
-      _generatedValueEquals(
-        other.enablePlacementTransitions,
-        enablePlacementTransitions,
-      );
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(durationMs),
-    _generatedValueHash(delayMs),
-    _generatedValueHash(enablePlacementTransitions),
-  ]);
+  List<Object?> get _members => [
+    durationMs,
+    delayMs,
+    enablePlacementTransitions,
+  ];
 }
 
-final class StyleLayerEntry {
+final class StyleLayerEntry extends _Value {
   const StyleLayerEntry({
     required this.id,
     required this.type,
@@ -2914,42 +1859,20 @@ final class StyleLayerEntry {
   final String? sourceLayer;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleLayerEntry &&
-      _generatedValueEquals(other.id, id) &&
-      _generatedValueEquals(other.type, type) &&
-      _generatedValueEquals(other.sourceId, sourceId) &&
-      _generatedValueEquals(other.sourceLayer, sourceLayer);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(id),
-    _generatedValueHash(type),
-    _generatedValueHash(sourceId),
-    _generatedValueHash(sourceLayer),
-  ]);
+  List<Object?> get _members => [id, type, sourceId, sourceLayer];
 }
 
-final class ProjectionMode {
+final class ProjectionMode extends _Value {
   const ProjectionMode({this.axonometric, this.xSkew, this.ySkew});
   final bool? axonometric;
   final double? xSkew;
   final double? ySkew;
 
   @override
-  bool operator ==(Object other) =>
-      other is ProjectionMode &&
-      _generatedValueEquals(other.axonometric, axonometric) &&
-      _generatedValueEquals(other.xSkew, xSkew) &&
-      _generatedValueEquals(other.ySkew, ySkew);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(axonometric),
-    _generatedValueHash(xSkew),
-    _generatedValueHash(ySkew),
-  ]);
+  List<Object?> get _members => [axonometric, xSkew, ySkew];
 }
 
-final class StyleImageOptions {
+final class StyleImageOptions extends _Value {
   StyleImageOptions({
     List<ImageStretch>? stretchX,
     List<ImageStretch>? stretchY,
@@ -2969,28 +1892,18 @@ final class StyleImageOptions {
   final bool? sdf;
 
   @override
-  bool operator ==(Object other) =>
-      other is StyleImageOptions &&
-      _generatedValueEquals(other.stretchX, stretchX) &&
-      _generatedValueEquals(other.stretchY, stretchY) &&
-      _generatedValueEquals(other.content, content) &&
-      _generatedValueEquals(other.textFitWidth, textFitWidth) &&
-      _generatedValueEquals(other.textFitHeight, textFitHeight) &&
-      _generatedValueEquals(other.pixelRatio, pixelRatio) &&
-      _generatedValueEquals(other.sdf, sdf);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(stretchX),
-    _generatedValueHash(stretchY),
-    _generatedValueHash(content),
-    _generatedValueHash(textFitWidth),
-    _generatedValueHash(textFitHeight),
-    _generatedValueHash(pixelRatio),
-    _generatedValueHash(sdf),
-  ]);
+  List<Object?> get _members => [
+    stretchX,
+    stretchY,
+    content,
+    textFitWidth,
+    textFitHeight,
+    pixelRatio,
+    sdf,
+  ];
 }
 
-final class MapTileOptions {
+final class MapTileOptions extends _Value {
   const MapTileOptions({
     this.prefetchZoomDelta,
     this.lodMinRadius,
@@ -3007,26 +1920,17 @@ final class MapTileOptions {
   final TileLodMode? lodMode;
 
   @override
-  bool operator ==(Object other) =>
-      other is MapTileOptions &&
-      _generatedValueEquals(other.prefetchZoomDelta, prefetchZoomDelta) &&
-      _generatedValueEquals(other.lodMinRadius, lodMinRadius) &&
-      _generatedValueEquals(other.lodScale, lodScale) &&
-      _generatedValueEquals(other.lodPitchThreshold, lodPitchThreshold) &&
-      _generatedValueEquals(other.lodZoomShift, lodZoomShift) &&
-      _generatedValueEquals(other.lodMode, lodMode);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(prefetchZoomDelta),
-    _generatedValueHash(lodMinRadius),
-    _generatedValueHash(lodScale),
-    _generatedValueHash(lodPitchThreshold),
-    _generatedValueHash(lodZoomShift),
-    _generatedValueHash(lodMode),
-  ]);
+  List<Object?> get _members => [
+    prefetchZoomDelta,
+    lodMinRadius,
+    lodScale,
+    lodPitchThreshold,
+    lodZoomShift,
+    lodMode,
+  ];
 }
 
-final class MapViewportOptions {
+final class MapViewportOptions extends _Value {
   const MapViewportOptions({
     this.northOrientation,
     this.constrainMode,
@@ -3039,22 +1943,15 @@ final class MapViewportOptions {
   final EdgeInsets? frustumOffset;
 
   @override
-  bool operator ==(Object other) =>
-      other is MapViewportOptions &&
-      _generatedValueEquals(other.northOrientation, northOrientation) &&
-      _generatedValueEquals(other.constrainMode, constrainMode) &&
-      _generatedValueEquals(other.viewportMode, viewportMode) &&
-      _generatedValueEquals(other.frustumOffset, frustumOffset);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(northOrientation),
-    _generatedValueHash(constrainMode),
-    _generatedValueHash(viewportMode),
-    _generatedValueHash(frustumOffset),
-  ]);
+  List<Object?> get _members => [
+    northOrientation,
+    constrainMode,
+    viewportMode,
+    frustumOffset,
+  ];
 }
 
-final class MapSnapshot {
+final class MapSnapshot extends _Value {
   const MapSnapshot({
     this.debugOptions = const MapDebugOption.fromRawValue(0),
     required this.generation,
@@ -3089,50 +1986,26 @@ final class MapSnapshot {
   final FreeCameraOptions freeCamera;
 
   @override
-  bool operator ==(Object other) =>
-      other is MapSnapshot &&
-      _generatedValueEquals(other.debugOptions, debugOptions) &&
-      _generatedValueEquals(other.generation, generation) &&
-      _generatedValueEquals(other.camera, camera) &&
-      _generatedValueEquals(other.logicalExtent, logicalExtent) &&
-      _generatedValueEquals(other.projectionMode, projectionMode) &&
-      _generatedValueEquals(other.viewport, viewport) &&
-      _generatedValueEquals(other.fullyLoaded, fullyLoaded) &&
-      _generatedValueEquals(
-        other.renderingStatsViewEnabled,
-        renderingStatsViewEnabled,
-      ) &&
-      _generatedValueEquals(other.repaintDemand, repaintDemand) &&
-      _generatedValueEquals(other.gestureInProgress, gestureInProgress) &&
-      _generatedValueEquals(other.eventMask, eventMask) &&
-      _generatedValueEquals(
-        other.latestRenderUpdateGeneration,
-        latestRenderUpdateGeneration,
-      ) &&
-      _generatedValueEquals(other.tile, tile) &&
-      _generatedValueEquals(other.bounds, bounds) &&
-      _generatedValueEquals(other.freeCamera, freeCamera);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(debugOptions),
-    _generatedValueHash(generation),
-    _generatedValueHash(camera),
-    _generatedValueHash(logicalExtent),
-    _generatedValueHash(projectionMode),
-    _generatedValueHash(viewport),
-    _generatedValueHash(fullyLoaded),
-    _generatedValueHash(renderingStatsViewEnabled),
-    _generatedValueHash(repaintDemand),
-    _generatedValueHash(gestureInProgress),
-    _generatedValueHash(eventMask),
-    _generatedValueHash(latestRenderUpdateGeneration),
-    _generatedValueHash(tile),
-    _generatedValueHash(bounds),
-    _generatedValueHash(freeCamera),
-  ]);
+  List<Object?> get _members => [
+    debugOptions,
+    generation,
+    camera,
+    logicalExtent,
+    projectionMode,
+    viewport,
+    fullyLoaded,
+    renderingStatsViewEnabled,
+    repaintDemand,
+    gestureInProgress,
+    eventMask,
+    latestRenderUpdateGeneration,
+    tile,
+    bounds,
+    freeCamera,
+  ];
 }
 
-final class RenderTargetExtent {
+final class RenderTargetExtent extends _Value {
   const RenderTargetExtent({
     this.width = 0,
     this.height = 0,
@@ -3143,20 +2016,10 @@ final class RenderTargetExtent {
   final double scaleFactor;
 
   @override
-  bool operator ==(Object other) =>
-      other is RenderTargetExtent &&
-      _generatedValueEquals(other.width, width) &&
-      _generatedValueEquals(other.height, height) &&
-      _generatedValueEquals(other.scaleFactor, scaleFactor);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(width),
-    _generatedValueHash(height),
-    _generatedValueHash(scaleFactor),
-  ]);
+  List<Object?> get _members => [width, height, scaleFactor];
 }
 
-final class MetalBorrowedTextureDescriptor {
+final class MetalBorrowedTextureDescriptor extends _Value {
   const MetalBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     this.physicalWidth = 0,
@@ -3169,19 +2032,12 @@ final class MetalBorrowedTextureDescriptor {
   final NativePointer texture;
 
   @override
-  bool operator ==(Object other) =>
-      other is MetalBorrowedTextureDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.physicalWidth, physicalWidth) &&
-      _generatedValueEquals(other.physicalHeight, physicalHeight) &&
-      _generatedValueEquals(other.texture, texture);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(physicalWidth),
-    _generatedValueHash(physicalHeight),
-    _generatedValueHash(texture),
-  ]);
+  List<Object?> get _members => [
+    extent,
+    physicalWidth,
+    physicalHeight,
+    texture,
+  ];
 }
 
 typedef WakeCallback = void Function();
@@ -3191,7 +2047,7 @@ final class Wake {
   final WakeCallback? callback;
 }
 
-final class RenderSessionAttachOptions {
+final class RenderSessionAttachOptions extends _Value {
   const RenderSessionAttachOptions({
     required this.driver,
     this.requestedTextureRingDepth = 0,
@@ -3204,37 +2060,23 @@ final class RenderSessionAttachOptions {
   final Wake driverWorkWake;
 
   @override
-  bool operator ==(Object other) =>
-      other is RenderSessionAttachOptions &&
-      _generatedValueEquals(other.driver, driver) &&
-      _generatedValueEquals(
-        other.requestedTextureRingDepth,
-        requestedTextureRingDepth,
-      ) &&
-      _generatedValueEquals(other.frameWake, frameWake) &&
-      _generatedValueEquals(other.driverWorkWake, driverWorkWake);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(driver),
-    _generatedValueHash(requestedTextureRingDepth),
-    _generatedValueHash(frameWake),
-    _generatedValueHash(driverWorkWake),
-  ]);
+  List<Object?> get _members => [
+    driver,
+    requestedTextureRingDepth,
+    frameWake,
+    driverWorkWake,
+  ];
 }
 
-final class MetalContextDescriptor {
+final class MetalContextDescriptor extends _Value {
   const MetalContextDescriptor({this.device = NativePointer.nullPointer});
   final NativePointer device;
 
   @override
-  bool operator ==(Object other) =>
-      other is MetalContextDescriptor &&
-      _generatedValueEquals(other.device, device);
-  @override
-  int get hashCode => Object.hashAll([_generatedValueHash(device)]);
+  List<Object?> get _members => [device];
 }
 
-final class MetalOwnedTextureDescriptor {
+final class MetalOwnedTextureDescriptor extends _Value {
   const MetalOwnedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     this.context = const MetalContextDescriptor(),
@@ -3243,18 +2085,10 @@ final class MetalOwnedTextureDescriptor {
   final MetalContextDescriptor context;
 
   @override
-  bool operator ==(Object other) =>
-      other is MetalOwnedTextureDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.context, context);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(context),
-  ]);
+  List<Object?> get _members => [extent, context];
 }
 
-final class MetalSurfaceDescriptor {
+final class MetalSurfaceDescriptor extends _Value {
   const MetalSurfaceDescriptor({
     this.extent = const RenderTargetExtent(),
     this.context = const MetalContextDescriptor(),
@@ -3265,20 +2099,10 @@ final class MetalSurfaceDescriptor {
   final NativePointer layer;
 
   @override
-  bool operator ==(Object other) =>
-      other is MetalSurfaceDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.context, context) &&
-      _generatedValueEquals(other.layer, layer);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(context),
-    _generatedValueHash(layer),
-  ]);
+  List<Object?> get _members => [extent, context, layer];
 }
 
-final class WglContextDescriptor {
+final class WglContextDescriptor extends _Value {
   const WglContextDescriptor({
     this.deviceContext = NativePointer.nullPointer,
     this.shareContext = NativePointer.nullPointer,
@@ -3289,20 +2113,10 @@ final class WglContextDescriptor {
   final NativePointer getProcAddress;
 
   @override
-  bool operator ==(Object other) =>
-      other is WglContextDescriptor &&
-      _generatedValueEquals(other.deviceContext, deviceContext) &&
-      _generatedValueEquals(other.shareContext, shareContext) &&
-      _generatedValueEquals(other.getProcAddress, getProcAddress);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(deviceContext),
-    _generatedValueHash(shareContext),
-    _generatedValueHash(getProcAddress),
-  ]);
+  List<Object?> get _members => [deviceContext, shareContext, getProcAddress];
 }
 
-final class EglContextDescriptor {
+final class EglContextDescriptor extends _Value {
   const EglContextDescriptor({
     this.display = NativePointer.nullPointer,
     this.config = NativePointer.nullPointer,
@@ -3317,24 +2131,16 @@ final class EglContextDescriptor {
   final NativePointer getProcAddress;
 
   @override
-  bool operator ==(Object other) =>
-      other is EglContextDescriptor &&
-      _generatedValueEquals(other.display, display) &&
-      _generatedValueEquals(other.config, config) &&
-      _generatedValueEquals(other.shareContext, shareContext) &&
-      _generatedValueEquals(other.clientApi, clientApi) &&
-      _generatedValueEquals(other.getProcAddress, getProcAddress);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(display),
-    _generatedValueHash(config),
-    _generatedValueHash(shareContext),
-    _generatedValueHash(clientApi),
-    _generatedValueHash(getProcAddress),
-  ]);
+  List<Object?> get _members => [
+    display,
+    config,
+    shareContext,
+    clientApi,
+    getProcAddress,
+  ];
 }
 
-final class WebglContextDescriptor {
+final class WebglContextDescriptor extends _Value {
   const WebglContextDescriptor({
     this.kind = const WebglContextKind.fromRawValue(0),
     this.context = 0,
@@ -3345,17 +2151,7 @@ final class WebglContextDescriptor {
   final String canvasSelector;
 
   @override
-  bool operator ==(Object other) =>
-      other is WebglContextDescriptor &&
-      _generatedValueEquals(other.kind, kind) &&
-      _generatedValueEquals(other.context, context) &&
-      _generatedValueEquals(other.canvasSelector, canvasSelector);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(kind),
-    _generatedValueHash(context),
-    _generatedValueHash(canvasSelector),
-  ]);
+  List<Object?> get _members => [kind, context, canvasSelector];
 }
 
 final class OpenglContextDescriptor {
@@ -3396,7 +2192,7 @@ final class OpenglContextDescriptorDataUnknown
   final Uint8List rawRecord;
 }
 
-final class OpenglBorrowedTextureDescriptor {
+final class OpenglBorrowedTextureDescriptor extends _Value {
   const OpenglBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     this.physicalWidth = 0,
@@ -3413,26 +2209,17 @@ final class OpenglBorrowedTextureDescriptor {
   final int target;
 
   @override
-  bool operator ==(Object other) =>
-      other is OpenglBorrowedTextureDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.physicalWidth, physicalWidth) &&
-      _generatedValueEquals(other.physicalHeight, physicalHeight) &&
-      _generatedValueEquals(other.context, context) &&
-      _generatedValueEquals(other.texture, texture) &&
-      _generatedValueEquals(other.target, target);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(physicalWidth),
-    _generatedValueHash(physicalHeight),
-    _generatedValueHash(context),
-    _generatedValueHash(texture),
-    _generatedValueHash(target),
-  ]);
+  List<Object?> get _members => [
+    extent,
+    physicalWidth,
+    physicalHeight,
+    context,
+    texture,
+    target,
+  ];
 }
 
-final class OpenglOwnedTextureDescriptor {
+final class OpenglOwnedTextureDescriptor extends _Value {
   const OpenglOwnedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     required this.context,
@@ -3441,18 +2228,10 @@ final class OpenglOwnedTextureDescriptor {
   final OpenglContextDescriptor context;
 
   @override
-  bool operator ==(Object other) =>
-      other is OpenglOwnedTextureDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.context, context);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(context),
-  ]);
+  List<Object?> get _members => [extent, context];
 }
 
-final class OpenglSurfaceDescriptor {
+final class OpenglSurfaceDescriptor extends _Value {
   const OpenglSurfaceDescriptor({
     this.extent = const RenderTargetExtent(),
     required this.context,
@@ -3463,20 +2242,10 @@ final class OpenglSurfaceDescriptor {
   final NativePointer surface;
 
   @override
-  bool operator ==(Object other) =>
-      other is OpenglSurfaceDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.context, context) &&
-      _generatedValueEquals(other.surface, surface);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(context),
-    _generatedValueHash(surface),
-  ]);
+  List<Object?> get _members => [extent, context, surface];
 }
 
-final class RenderAbandonResult {
+final class RenderAbandonResult extends _Value {
   const RenderAbandonResult({
     this.disposition = const RenderAbandonDisposition.fromRawValue(0),
     this.quarantinedResourceCount = 0,
@@ -3485,21 +2254,10 @@ final class RenderAbandonResult {
   final int quarantinedResourceCount;
 
   @override
-  bool operator ==(Object other) =>
-      other is RenderAbandonResult &&
-      _generatedValueEquals(other.disposition, disposition) &&
-      _generatedValueEquals(
-        other.quarantinedResourceCount,
-        quarantinedResourceCount,
-      );
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(disposition),
-    _generatedValueHash(quarantinedResourceCount),
-  ]);
+  List<Object?> get _members => [disposition, quarantinedResourceCount];
 }
 
-final class RenderSessionCapabilities {
+final class RenderSessionCapabilities extends _Value {
   const RenderSessionCapabilities({
     required this.driver,
     this.textureRingDepth = 0,
@@ -3510,20 +2268,10 @@ final class RenderSessionCapabilities {
   final RenderSessionCapabilityFlag flags;
 
   @override
-  bool operator ==(Object other) =>
-      other is RenderSessionCapabilities &&
-      _generatedValueEquals(other.driver, driver) &&
-      _generatedValueEquals(other.textureRingDepth, textureRingDepth) &&
-      _generatedValueEquals(other.flags, flags);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(driver),
-    _generatedValueHash(textureRingDepth),
-    _generatedValueHash(flags),
-  ]);
+  List<Object?> get _members => [driver, textureRingDepth, flags];
 }
 
-final class RenderSessionSnapshot {
+final class RenderSessionSnapshot extends _Value {
   const RenderSessionSnapshot({
     required this.state,
     required this.driver,
@@ -3556,45 +2304,25 @@ final class RenderSessionSnapshot {
   final bool pendingChanges;
 
   @override
-  bool operator ==(Object other) =>
-      other is RenderSessionSnapshot &&
-      _generatedValueEquals(other.state, state) &&
-      _generatedValueEquals(other.driver, driver) &&
-      _generatedValueEquals(other.latestResult, latestResult) &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.generation, generation) &&
-      _generatedValueEquals(other.mapUpdateGeneration, mapUpdateGeneration) &&
-      _generatedValueEquals(
-        other.renderedUpdateGeneration,
-        renderedUpdateGeneration,
-      ) &&
-      _generatedValueEquals(other.extentGeneration, extentGeneration) &&
-      _generatedValueEquals(other.frameGeneration, frameGeneration) &&
-      _generatedValueEquals(other.latestDemandToken, latestDemandToken) &&
-      _generatedValueEquals(other.pendingDemandCount, pendingDemandCount) &&
-      _generatedValueEquals(other.acquiredFrameCount, acquiredFrameCount) &&
-      _generatedValueEquals(other.targetReady, targetReady) &&
-      _generatedValueEquals(other.pendingChanges, pendingChanges);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(state),
-    _generatedValueHash(driver),
-    _generatedValueHash(latestResult),
-    _generatedValueHash(extent),
-    _generatedValueHash(generation),
-    _generatedValueHash(mapUpdateGeneration),
-    _generatedValueHash(renderedUpdateGeneration),
-    _generatedValueHash(extentGeneration),
-    _generatedValueHash(frameGeneration),
-    _generatedValueHash(latestDemandToken),
-    _generatedValueHash(pendingDemandCount),
-    _generatedValueHash(acquiredFrameCount),
-    _generatedValueHash(targetReady),
-    _generatedValueHash(pendingChanges),
-  ]);
+  List<Object?> get _members => [
+    state,
+    driver,
+    latestResult,
+    extent,
+    generation,
+    mapUpdateGeneration,
+    renderedUpdateGeneration,
+    extentGeneration,
+    frameGeneration,
+    latestDemandToken,
+    pendingDemandCount,
+    acquiredFrameCount,
+    targetReady,
+    pendingChanges,
+  ];
 }
 
-final class ScreenBox {
+final class ScreenBox extends _Value {
   const ScreenBox({
     this.min = const ScreenPoint(0, 0),
     this.max = const ScreenPoint(0, 0),
@@ -3603,25 +2331,16 @@ final class ScreenBox {
   final ScreenPoint max;
 
   @override
-  bool operator ==(Object other) =>
-      other is ScreenBox &&
-      _generatedValueEquals(other.min, min) &&
-      _generatedValueEquals(other.max, max);
-  @override
-  int get hashCode =>
-      Object.hashAll([_generatedValueHash(min), _generatedValueHash(max)]);
+  List<Object?> get _members => [min, max];
 }
 
-final class ScreenLineString {
+final class ScreenLineString extends _Value {
   ScreenLineString({required List<ScreenPoint> points})
     : points = List.unmodifiable(points);
   final List<ScreenPoint> points;
 
   @override
-  bool operator ==(Object other) =>
-      other is ScreenLineString && _generatedValueEquals(other.points, points);
-  @override
-  int get hashCode => Object.hashAll([_generatedValueHash(points)]);
+  List<Object?> get _members => [points];
 }
 
 sealed class RenderedQueryGeometry {
@@ -3664,7 +2383,7 @@ final class RenderedQueryGeometryLineString extends RenderedQueryGeometry {
   int get hashCode => value.hashCode;
 }
 
-final class RenderedFeatureQueryOptions {
+final class RenderedFeatureQueryOptions extends _Value {
   RenderedFeatureQueryOptions({List<String>? layerIds, Uint8List? filter})
     : layerIds = layerIds == null ? null : List.unmodifiable(layerIds),
       filter = filter == null
@@ -3674,18 +2393,10 @@ final class RenderedFeatureQueryOptions {
   final Uint8List? filter;
 
   @override
-  bool operator ==(Object other) =>
-      other is RenderedFeatureQueryOptions &&
-      _generatedValueEquals(other.layerIds, layerIds) &&
-      _generatedValueEquals(other.filter, filter);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(layerIds),
-    _generatedValueHash(filter),
-  ]);
+  List<Object?> get _members => [layerIds, filter];
 }
 
-final class QueriedFeature {
+final class QueriedFeature extends _Value {
   QueriedFeature({
     Uint8List? feature,
     this.sourceId,
@@ -3703,22 +2414,10 @@ final class QueriedFeature {
   final Uint8List? state;
 
   @override
-  bool operator ==(Object other) =>
-      other is QueriedFeature &&
-      _generatedValueEquals(other.feature, feature) &&
-      _generatedValueEquals(other.sourceId, sourceId) &&
-      _generatedValueEquals(other.sourceLayerId, sourceLayerId) &&
-      _generatedValueEquals(other.state, state);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(feature),
-    _generatedValueHash(sourceId),
-    _generatedValueHash(sourceLayerId),
-    _generatedValueHash(state),
-  ]);
+  List<Object?> get _members => [feature, sourceId, sourceLayerId, state];
 }
 
-final class SourceFeatureQueryOptions {
+final class SourceFeatureQueryOptions extends _Value {
   SourceFeatureQueryOptions({List<String>? sourceLayerIds, Uint8List? filter})
     : sourceLayerIds = sourceLayerIds == null
           ? null
@@ -3730,18 +2429,10 @@ final class SourceFeatureQueryOptions {
   final Uint8List? filter;
 
   @override
-  bool operator ==(Object other) =>
-      other is SourceFeatureQueryOptions &&
-      _generatedValueEquals(other.sourceLayerIds, sourceLayerIds) &&
-      _generatedValueEquals(other.filter, filter);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(sourceLayerIds),
-    _generatedValueHash(filter),
-  ]);
+  List<Object?> get _members => [sourceLayerIds, filter];
 }
 
-final class ResourceResponse {
+final class ResourceResponse extends _Value {
   ResourceResponse({
     this.status = const ResourceResponseStatus.fromRawValue(0),
     this.errorReason = const ResourceErrorReason.fromRawValue(0),
@@ -3764,34 +2455,22 @@ final class ResourceResponse {
   final int? retryAfterUnixMs;
 
   @override
-  bool operator ==(Object other) =>
-      other is ResourceResponse &&
-      _generatedValueEquals(other.status, status) &&
-      _generatedValueEquals(other.errorReason, errorReason) &&
-      _generatedValueEquals(other.bytes, bytes) &&
-      _generatedValueEquals(other.errorMessage, errorMessage) &&
-      _generatedValueEquals(other.mustRevalidate, mustRevalidate) &&
-      _generatedValueEquals(other.modifiedUnixMs, modifiedUnixMs) &&
-      _generatedValueEquals(other.expiresUnixMs, expiresUnixMs) &&
-      _generatedValueEquals(other.etag, etag) &&
-      _generatedValueEquals(other.retryAfterUnixMs, retryAfterUnixMs);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(status),
-    _generatedValueHash(errorReason),
-    _generatedValueHash(bytes),
-    _generatedValueHash(errorMessage),
-    _generatedValueHash(mustRevalidate),
-    _generatedValueHash(modifiedUnixMs),
-    _generatedValueHash(expiresUnixMs),
-    _generatedValueHash(etag),
-    _generatedValueHash(retryAfterUnixMs),
-  ]);
+  List<Object?> get _members => [
+    status,
+    errorReason,
+    bytes,
+    errorMessage,
+    mustRevalidate,
+    modifiedUnixMs,
+    expiresUnixMs,
+    etag,
+    retryAfterUnixMs,
+  ];
 }
 
 typedef ResourceRequestCancelCallback = void Function();
 
-final class RuntimeOptions {
+final class RuntimeOptions extends _Value {
   const RuntimeOptions({
     this.flags = 0,
     this.assetPath,
@@ -3806,24 +2485,16 @@ final class RuntimeOptions {
   final Wake eventWake;
 
   @override
-  bool operator ==(Object other) =>
-      other is RuntimeOptions &&
-      _generatedValueEquals(other.flags, flags) &&
-      _generatedValueEquals(other.assetPath, assetPath) &&
-      _generatedValueEquals(other.cachePath, cachePath) &&
-      _generatedValueEquals(other.eventMask, eventMask) &&
-      _generatedValueEquals(other.eventWake, eventWake);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(flags),
-    _generatedValueHash(assetPath),
-    _generatedValueHash(cachePath),
-    _generatedValueHash(eventMask),
-    _generatedValueHash(eventWake),
-  ]);
+  List<Object?> get _members => [
+    flags,
+    assetPath,
+    cachePath,
+    eventMask,
+    eventWake,
+  ];
 }
 
-final class OfflineTilePyramidRegionDefinition {
+final class OfflineTilePyramidRegionDefinition extends _Value {
   const OfflineTilePyramidRegionDefinition({
     required this.styleUrl,
     this.bounds = const LatLngBounds(),
@@ -3840,26 +2511,17 @@ final class OfflineTilePyramidRegionDefinition {
   final bool includeIdeographs;
 
   @override
-  bool operator ==(Object other) =>
-      other is OfflineTilePyramidRegionDefinition &&
-      _generatedValueEquals(other.styleUrl, styleUrl) &&
-      _generatedValueEquals(other.bounds, bounds) &&
-      _generatedValueEquals(other.minZoom, minZoom) &&
-      _generatedValueEquals(other.maxZoom, maxZoom) &&
-      _generatedValueEquals(other.pixelRatio, pixelRatio) &&
-      _generatedValueEquals(other.includeIdeographs, includeIdeographs);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(styleUrl),
-    _generatedValueHash(bounds),
-    _generatedValueHash(minZoom),
-    _generatedValueHash(maxZoom),
-    _generatedValueHash(pixelRatio),
-    _generatedValueHash(includeIdeographs),
-  ]);
+  List<Object?> get _members => [
+    styleUrl,
+    bounds,
+    minZoom,
+    maxZoom,
+    pixelRatio,
+    includeIdeographs,
+  ];
 }
 
-final class OfflineGeometryRegionDefinition {
+final class OfflineGeometryRegionDefinition extends _Value {
   OfflineGeometryRegionDefinition({
     required this.styleUrl,
     Uint8List? geometry,
@@ -3878,23 +2540,14 @@ final class OfflineGeometryRegionDefinition {
   final bool includeIdeographs;
 
   @override
-  bool operator ==(Object other) =>
-      other is OfflineGeometryRegionDefinition &&
-      _generatedValueEquals(other.styleUrl, styleUrl) &&
-      _generatedValueEquals(other.geometry, geometry) &&
-      _generatedValueEquals(other.minZoom, minZoom) &&
-      _generatedValueEquals(other.maxZoom, maxZoom) &&
-      _generatedValueEquals(other.pixelRatio, pixelRatio) &&
-      _generatedValueEquals(other.includeIdeographs, includeIdeographs);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(styleUrl),
-    _generatedValueHash(geometry),
-    _generatedValueHash(minZoom),
-    _generatedValueHash(maxZoom),
-    _generatedValueHash(pixelRatio),
-    _generatedValueHash(includeIdeographs),
-  ]);
+  List<Object?> get _members => [
+    styleUrl,
+    geometry,
+    minZoom,
+    maxZoom,
+    pixelRatio,
+    includeIdeographs,
+  ];
 }
 
 sealed class OfflineRegionDefinition {
@@ -3927,7 +2580,7 @@ final class OfflineRegionDefinitionGeometry extends OfflineRegionDefinition {
   int get hashCode => value.hashCode;
 }
 
-final class OfflineRegionInfo {
+final class OfflineRegionInfo extends _Value {
   OfflineRegionInfo({
     this.id = 0,
     required this.definition,
@@ -3940,53 +2593,28 @@ final class OfflineRegionInfo {
   final Uint8List metadata;
 
   @override
-  bool operator ==(Object other) =>
-      other is OfflineRegionInfo &&
-      _generatedValueEquals(other.id, id) &&
-      _generatedValueEquals(other.definition, definition) &&
-      _generatedValueEquals(other.metadata, metadata);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(id),
-    _generatedValueHash(definition),
-    _generatedValueHash(metadata),
-  ]);
+  List<Object?> get _members => [id, definition, metadata];
 }
 
-final class AdapterUrlMatchFlags {
-  const AdapterUrlMatchFlags.fromRawValue(this.rawValue);
-  final int rawValue;
+final class AdapterUrlMatchFlags extends _Flags<AdapterUrlMatchFlags> {
+  const AdapterUrlMatchFlags.fromRawValue(super.rawValue);
   static const flagsNone = AdapterUrlMatchFlags.fromRawValue(0);
   static const glob = AdapterUrlMatchFlags.fromRawValue(1);
-  AdapterUrlMatchFlags operator |(AdapterUrlMatchFlags other) =>
-      AdapterUrlMatchFlags.fromRawValue(rawValue | other.rawValue);
-  AdapterUrlMatchFlags operator &(AdapterUrlMatchFlags other) =>
-      AdapterUrlMatchFlags.fromRawValue(rawValue & other.rawValue);
-  bool contains(AdapterUrlMatchFlags other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is AdapterUrlMatchFlags && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  AdapterUrlMatchFlags _of(int rawValue) =>
+      AdapterUrlMatchFlags.fromRawValue(rawValue);
 }
 
-final class AdapterHttpHeader {
+final class AdapterHttpHeader extends _Value {
   const AdapterHttpHeader({this.name, this.value});
   final String? name;
   final String? value;
 
   @override
-  bool operator ==(Object other) =>
-      other is AdapterHttpHeader &&
-      _generatedValueEquals(other.name, name) &&
-      _generatedValueEquals(other.value, value);
-  @override
-  int get hashCode =>
-      Object.hashAll([_generatedValueHash(name), _generatedValueHash(value)]);
+  List<Object?> get _members => [name, value];
 }
 
-final class AdapterHttpHeaderTransformRule {
+final class AdapterHttpHeaderTransformRule extends _Value {
   AdapterHttpHeaderTransformRule({
     this.kind = 0,
     this.flags = const AdapterUrlMatchFlags.fromRawValue(0),
@@ -3999,33 +2627,17 @@ final class AdapterHttpHeaderTransformRule {
   final List<AdapterHttpHeader> headers;
 
   @override
-  bool operator ==(Object other) =>
-      other is AdapterHttpHeaderTransformRule &&
-      _generatedValueEquals(other.kind, kind) &&
-      _generatedValueEquals(other.flags, flags) &&
-      _generatedValueEquals(other.url, url) &&
-      _generatedValueEquals(other.headers, headers);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(kind),
-    _generatedValueHash(flags),
-    _generatedValueHash(url),
-    _generatedValueHash(headers),
-  ]);
+  List<Object?> get _members => [kind, flags, url, headers];
 }
 
-final class AdapterHttpHeaderTransformRules {
+final class AdapterHttpHeaderTransformRules extends _Value {
   AdapterHttpHeaderTransformRules({
     required List<AdapterHttpHeaderTransformRule> rules,
   }) : rules = List.unmodifiable(rules);
   final List<AdapterHttpHeaderTransformRule> rules;
 
   @override
-  bool operator ==(Object other) =>
-      other is AdapterHttpHeaderTransformRules &&
-      _generatedValueEquals(other.rules, rules);
-  @override
-  int get hashCode => Object.hashAll([_generatedValueHash(rules)]);
+  List<Object?> get _members => [rules];
 }
 
 sealed class HttpHeaderTransform {
@@ -4046,7 +2658,7 @@ final class HttpHeaderTransformHttpHeaderTransformRules
   final AdapterHttpHeaderTransformRules value;
 }
 
-final class AdapterResourceProviderRule {
+final class AdapterResourceProviderRule extends _Value {
   const AdapterResourceProviderRule({
     this.kind = 0,
     this.flags = const AdapterUrlMatchFlags.fromRawValue(0),
@@ -4059,55 +2671,31 @@ final class AdapterResourceProviderRule {
   final ResourceResponse response;
 
   @override
-  bool operator ==(Object other) =>
-      other is AdapterResourceProviderRule &&
-      _generatedValueEquals(other.kind, kind) &&
-      _generatedValueEquals(other.flags, flags) &&
-      _generatedValueEquals(other.requestedUrl, requestedUrl) &&
-      _generatedValueEquals(other.response, response);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(kind),
-    _generatedValueHash(flags),
-    _generatedValueHash(requestedUrl),
-    _generatedValueHash(response),
-  ]);
+  List<Object?> get _members => [kind, flags, requestedUrl, response];
 }
 
-final class AdapterResourceProviderRules {
+final class AdapterResourceProviderRules extends _Value {
   AdapterResourceProviderRules({
     required List<AdapterResourceProviderRule> rules,
   }) : rules = List.unmodifiable(rules);
   final List<AdapterResourceProviderRule> rules;
 
   @override
-  bool operator ==(Object other) =>
-      other is AdapterResourceProviderRules &&
-      _generatedValueEquals(other.rules, rules);
-  @override
-  int get hashCode => Object.hashAll([_generatedValueHash(rules)]);
+  List<Object?> get _members => [rules];
 }
 
-final class AdapterResourceRouteFlags {
-  const AdapterResourceRouteFlags.fromRawValue(this.rawValue);
-  final int rawValue;
+final class AdapterResourceRouteFlags
+    extends _Flags<AdapterResourceRouteFlags> {
+  const AdapterResourceRouteFlags.fromRawValue(super.rawValue);
   static const flagsNone = AdapterResourceRouteFlags.fromRawValue(0);
   static const matchGlob = AdapterResourceRouteFlags.fromRawValue(1);
   static const useRequestedUrl = AdapterResourceRouteFlags.fromRawValue(2);
-  AdapterResourceRouteFlags operator |(AdapterResourceRouteFlags other) =>
-      AdapterResourceRouteFlags.fromRawValue(rawValue | other.rawValue);
-  AdapterResourceRouteFlags operator &(AdapterResourceRouteFlags other) =>
-      AdapterResourceRouteFlags.fromRawValue(rawValue & other.rawValue);
-  bool contains(AdapterResourceRouteFlags other) =>
-      (rawValue & other.rawValue) == other.rawValue;
   @override
-  bool operator ==(Object other) =>
-      other is AdapterResourceRouteFlags && other.rawValue == rawValue;
-  @override
-  int get hashCode => rawValue.hashCode;
+  AdapterResourceRouteFlags _of(int rawValue) =>
+      AdapterResourceRouteFlags.fromRawValue(rawValue);
 }
 
-final class AdapterResourceRoute {
+final class AdapterResourceRoute extends _Value {
   const AdapterResourceRoute({
     this.kind = 0,
     this.flags = const AdapterResourceRouteFlags.fromRawValue(0),
@@ -4118,20 +2706,10 @@ final class AdapterResourceRoute {
   final String? url;
 
   @override
-  bool operator ==(Object other) =>
-      other is AdapterResourceRoute &&
-      _generatedValueEquals(other.kind, kind) &&
-      _generatedValueEquals(other.flags, flags) &&
-      _generatedValueEquals(other.url, url);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(kind),
-    _generatedValueHash(flags),
-    _generatedValueHash(url),
-  ]);
+  List<Object?> get _members => [kind, flags, url];
 }
 
-final class ResourceRequest {
+final class ResourceRequest extends _Value {
   ResourceRequest({
     this.requestedUrl,
     this.resolvedUrl,
@@ -4162,41 +2740,26 @@ final class ResourceRequest {
   final Uint8List priorData;
 
   @override
-  bool operator ==(Object other) =>
-      other is ResourceRequest &&
-      _generatedValueEquals(other.requestedUrl, requestedUrl) &&
-      _generatedValueEquals(other.resolvedUrl, resolvedUrl) &&
-      _generatedValueEquals(other.kind, kind) &&
-      _generatedValueEquals(other.loadingMethod, loadingMethod) &&
-      _generatedValueEquals(other.priority, priority) &&
-      _generatedValueEquals(other.usage, usage) &&
-      _generatedValueEquals(other.storagePolicy, storagePolicy) &&
-      _generatedValueEquals(other.range, range) &&
-      _generatedValueEquals(other.priorModifiedUnixMs, priorModifiedUnixMs) &&
-      _generatedValueEquals(other.priorExpiresUnixMs, priorExpiresUnixMs) &&
-      _generatedValueEquals(other.priorEtag, priorEtag) &&
-      _generatedValueEquals(other.priorData, priorData);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(requestedUrl),
-    _generatedValueHash(resolvedUrl),
-    _generatedValueHash(kind),
-    _generatedValueHash(loadingMethod),
-    _generatedValueHash(priority),
-    _generatedValueHash(usage),
-    _generatedValueHash(storagePolicy),
-    _generatedValueHash(range),
-    _generatedValueHash(priorModifiedUnixMs),
-    _generatedValueHash(priorExpiresUnixMs),
-    _generatedValueHash(priorEtag),
-    _generatedValueHash(priorData),
-  ]);
+  List<Object?> get _members => [
+    requestedUrl,
+    resolvedUrl,
+    kind,
+    loadingMethod,
+    priority,
+    usage,
+    storagePolicy,
+    range,
+    priorModifiedUnixMs,
+    priorExpiresUnixMs,
+    priorEtag,
+    priorData,
+  ];
 }
 
 typedef ResourceProviderCallback =
     void Function(ResourceRequest, ResourceRequestHandle);
 
-final class AdapterRoutedResourceProvider {
+final class AdapterRoutedResourceProvider extends _Value {
   AdapterRoutedResourceProvider({
     required List<AdapterResourceRoute> routes,
     required this.callback,
@@ -4205,15 +2768,7 @@ final class AdapterRoutedResourceProvider {
   final ResourceProviderCallback callback;
 
   @override
-  bool operator ==(Object other) =>
-      other is AdapterRoutedResourceProvider &&
-      _generatedValueEquals(other.routes, routes) &&
-      _generatedValueEquals(other.callback, callback);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(routes),
-    _generatedValueHash(callback),
-  ]);
+  List<Object?> get _members => [routes, callback];
 }
 
 sealed class ResourceProvider {
@@ -4241,7 +2796,7 @@ final class ResourceProviderRoutedResourceProvider extends ResourceProvider {
   final AdapterRoutedResourceProvider value;
 }
 
-final class AdapterResourceRewriteRule {
+final class AdapterResourceRewriteRule extends _Value {
   const AdapterResourceRewriteRule({
     this.kind = 0,
     this.flags = const AdapterUrlMatchFlags.fromRawValue(0),
@@ -4254,32 +2809,16 @@ final class AdapterResourceRewriteRule {
   final String? replacementUrl;
 
   @override
-  bool operator ==(Object other) =>
-      other is AdapterResourceRewriteRule &&
-      _generatedValueEquals(other.kind, kind) &&
-      _generatedValueEquals(other.flags, flags) &&
-      _generatedValueEquals(other.url, url) &&
-      _generatedValueEquals(other.replacementUrl, replacementUrl);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(kind),
-    _generatedValueHash(flags),
-    _generatedValueHash(url),
-    _generatedValueHash(replacementUrl),
-  ]);
+  List<Object?> get _members => [kind, flags, url, replacementUrl];
 }
 
-final class AdapterResourceRewriteRules {
+final class AdapterResourceRewriteRules extends _Value {
   AdapterResourceRewriteRules({required List<AdapterResourceRewriteRule> rules})
     : rules = List.unmodifiable(rules);
   final List<AdapterResourceRewriteRule> rules;
 
   @override
-  bool operator ==(Object other) =>
-      other is AdapterResourceRewriteRules &&
-      _generatedValueEquals(other.rules, rules);
-  @override
-  int get hashCode => Object.hashAll([_generatedValueHash(rules)]);
+  List<Object?> get _members => [rules];
 }
 
 sealed class ResourceTransform {
@@ -4299,7 +2838,7 @@ final class ResourceTransformResourceRewriteRules extends ResourceTransform {
   final AdapterResourceRewriteRules value;
 }
 
-final class TextureImageInfo {
+final class TextureImageInfo extends _Value {
   const TextureImageInfo({
     this.width = 0,
     this.height = 0,
@@ -4312,38 +2851,20 @@ final class TextureImageInfo {
   final int byteLength;
 
   @override
-  bool operator ==(Object other) =>
-      other is TextureImageInfo &&
-      _generatedValueEquals(other.width, width) &&
-      _generatedValueEquals(other.height, height) &&
-      _generatedValueEquals(other.stride, stride) &&
-      _generatedValueEquals(other.byteLength, byteLength);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(width),
-    _generatedValueHash(height),
-    _generatedValueHash(stride),
-    _generatedValueHash(byteLength),
-  ]);
+  List<Object?> get _members => [width, height, stride, byteLength];
 }
 
-final class TextureReadbackResult {
+final class TextureReadbackResult extends _Value {
   TextureReadbackResult({Uint8List? data, this.info = const TextureImageInfo()})
     : data = Uint8List.fromList(data ?? const <int>[]).asUnmodifiableView();
   final Uint8List data;
   final TextureImageInfo info;
 
   @override
-  bool operator ==(Object other) =>
-      other is TextureReadbackResult &&
-      _generatedValueEquals(other.data, data) &&
-      _generatedValueEquals(other.info, info);
-  @override
-  int get hashCode =>
-      Object.hashAll([_generatedValueHash(data), _generatedValueHash(info)]);
+  List<Object?> get _members => [data, info];
 }
 
-final class VulkanContextDescriptor {
+final class VulkanContextDescriptor extends _Value {
   const VulkanContextDescriptor({
     this.instance = NativePointer.nullPointer,
     this.physicalDevice = NativePointer.nullPointer,
@@ -4362,31 +2883,18 @@ final class VulkanContextDescriptor {
   final NativePointer getDeviceProcAddr;
 
   @override
-  bool operator ==(Object other) =>
-      other is VulkanContextDescriptor &&
-      _generatedValueEquals(other.instance, instance) &&
-      _generatedValueEquals(other.physicalDevice, physicalDevice) &&
-      _generatedValueEquals(other.device, device) &&
-      _generatedValueEquals(other.graphicsQueue, graphicsQueue) &&
-      _generatedValueEquals(
-        other.graphicsQueueFamilyIndex,
-        graphicsQueueFamilyIndex,
-      ) &&
-      _generatedValueEquals(other.getInstanceProcAddr, getInstanceProcAddr) &&
-      _generatedValueEquals(other.getDeviceProcAddr, getDeviceProcAddr);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(instance),
-    _generatedValueHash(physicalDevice),
-    _generatedValueHash(device),
-    _generatedValueHash(graphicsQueue),
-    _generatedValueHash(graphicsQueueFamilyIndex),
-    _generatedValueHash(getInstanceProcAddr),
-    _generatedValueHash(getDeviceProcAddr),
-  ]);
+  List<Object?> get _members => [
+    instance,
+    physicalDevice,
+    device,
+    graphicsQueue,
+    graphicsQueueFamilyIndex,
+    getInstanceProcAddr,
+    getDeviceProcAddr,
+  ];
 }
 
-final class VulkanBorrowedTextureDescriptor {
+final class VulkanBorrowedTextureDescriptor extends _Value {
   const VulkanBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     this.physicalWidth = 0,
@@ -4409,32 +2917,20 @@ final class VulkanBorrowedTextureDescriptor {
   final int finalLayout;
 
   @override
-  bool operator ==(Object other) =>
-      other is VulkanBorrowedTextureDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.physicalWidth, physicalWidth) &&
-      _generatedValueEquals(other.physicalHeight, physicalHeight) &&
-      _generatedValueEquals(other.context, context) &&
-      _generatedValueEquals(other.image, image) &&
-      _generatedValueEquals(other.imageView, imageView) &&
-      _generatedValueEquals(other.format, format) &&
-      _generatedValueEquals(other.initialLayout, initialLayout) &&
-      _generatedValueEquals(other.finalLayout, finalLayout);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(physicalWidth),
-    _generatedValueHash(physicalHeight),
-    _generatedValueHash(context),
-    _generatedValueHash(image),
-    _generatedValueHash(imageView),
-    _generatedValueHash(format),
-    _generatedValueHash(initialLayout),
-    _generatedValueHash(finalLayout),
-  ]);
+  List<Object?> get _members => [
+    extent,
+    physicalWidth,
+    physicalHeight,
+    context,
+    image,
+    imageView,
+    format,
+    initialLayout,
+    finalLayout,
+  ];
 }
 
-final class VulkanOwnedTextureDescriptor {
+final class VulkanOwnedTextureDescriptor extends _Value {
   const VulkanOwnedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     this.context = const VulkanContextDescriptor(),
@@ -4443,18 +2939,10 @@ final class VulkanOwnedTextureDescriptor {
   final VulkanContextDescriptor context;
 
   @override
-  bool operator ==(Object other) =>
-      other is VulkanOwnedTextureDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.context, context);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(context),
-  ]);
+  List<Object?> get _members => [extent, context];
 }
 
-final class VulkanSurfaceDescriptor {
+final class VulkanSurfaceDescriptor extends _Value {
   const VulkanSurfaceDescriptor({
     this.extent = const RenderTargetExtent(),
     this.context = const VulkanContextDescriptor(),
@@ -4465,20 +2953,10 @@ final class VulkanSurfaceDescriptor {
   final BigInt surface;
 
   @override
-  bool operator ==(Object other) =>
-      other is VulkanSurfaceDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.context, context) &&
-      _generatedValueEquals(other.surface, surface);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(context),
-    _generatedValueHash(surface),
-  ]);
+  List<Object?> get _members => [extent, context, surface];
 }
 
-final class WebgpuContextDescriptor {
+final class WebgpuContextDescriptor extends _Value {
   const WebgpuContextDescriptor({
     this.instance = NativePointer.nullPointer,
     this.device = NativePointer.nullPointer,
@@ -4489,20 +2967,10 @@ final class WebgpuContextDescriptor {
   final NativePointer queue;
 
   @override
-  bool operator ==(Object other) =>
-      other is WebgpuContextDescriptor &&
-      _generatedValueEquals(other.instance, instance) &&
-      _generatedValueEquals(other.device, device) &&
-      _generatedValueEquals(other.queue, queue);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(instance),
-    _generatedValueHash(device),
-    _generatedValueHash(queue),
-  ]);
+  List<Object?> get _members => [instance, device, queue];
 }
 
-final class WebgpuBorrowedTextureDescriptor {
+final class WebgpuBorrowedTextureDescriptor extends _Value {
   const WebgpuBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     this.physicalWidth = 0,
@@ -4521,28 +2989,18 @@ final class WebgpuBorrowedTextureDescriptor {
   final int format;
 
   @override
-  bool operator ==(Object other) =>
-      other is WebgpuBorrowedTextureDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.physicalWidth, physicalWidth) &&
-      _generatedValueEquals(other.physicalHeight, physicalHeight) &&
-      _generatedValueEquals(other.context, context) &&
-      _generatedValueEquals(other.texture, texture) &&
-      _generatedValueEquals(other.textureView, textureView) &&
-      _generatedValueEquals(other.format, format);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(physicalWidth),
-    _generatedValueHash(physicalHeight),
-    _generatedValueHash(context),
-    _generatedValueHash(texture),
-    _generatedValueHash(textureView),
-    _generatedValueHash(format),
-  ]);
+  List<Object?> get _members => [
+    extent,
+    physicalWidth,
+    physicalHeight,
+    context,
+    texture,
+    textureView,
+    format,
+  ];
 }
 
-final class WebgpuOwnedTextureDescriptor {
+final class WebgpuOwnedTextureDescriptor extends _Value {
   const WebgpuOwnedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     this.context = const WebgpuContextDescriptor(),
@@ -4551,18 +3009,10 @@ final class WebgpuOwnedTextureDescriptor {
   final WebgpuContextDescriptor context;
 
   @override
-  bool operator ==(Object other) =>
-      other is WebgpuOwnedTextureDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.context, context);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(context),
-  ]);
+  List<Object?> get _members => [extent, context];
 }
 
-final class WebgpuSurfaceDescriptor {
+final class WebgpuSurfaceDescriptor extends _Value {
   const WebgpuSurfaceDescriptor({
     this.extent = const RenderTargetExtent(),
     this.context = const WebgpuContextDescriptor(),
@@ -4575,36 +3025,5 @@ final class WebgpuSurfaceDescriptor {
   final int format;
 
   @override
-  bool operator ==(Object other) =>
-      other is WebgpuSurfaceDescriptor &&
-      _generatedValueEquals(other.extent, extent) &&
-      _generatedValueEquals(other.context, context) &&
-      _generatedValueEquals(other.surface, surface) &&
-      _generatedValueEquals(other.format, format);
-  @override
-  int get hashCode => Object.hashAll([
-    _generatedValueHash(extent),
-    _generatedValueHash(context),
-    _generatedValueHash(surface),
-    _generatedValueHash(format),
-  ]);
+  List<Object?> get _members => [extent, context, surface, format];
 }
-
-bool _generatedValueEquals(Object? left, Object? right) {
-  if (left is List && right is List) {
-    if (left.length != right.length) {
-      return false;
-    }
-    for (var index = 0; index < left.length; index++) {
-      if (!_generatedValueEquals(left[index], right[index])) {
-        return false;
-      }
-    }
-    return true;
-  }
-  return left == right;
-}
-
-int _generatedValueHash(Object? value) => value is List
-    ? Object.hashAll(value.map(_generatedValueHash))
-    : value.hashCode;

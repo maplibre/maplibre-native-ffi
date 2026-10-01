@@ -804,34 +804,10 @@ def coverage(api: Api | BoundApi):
 
 
 def generate_values(api: Api | BoundApi) -> str:
+    """The public value types, as a part of the handwritten values.dart."""
     _, _, _, values = lower(api)
     declarations, _ = values.render()
-    # Callback types name the handle owners that the runtime library defines.
-    owners = sorted(
-        name
-        for name in (owner_names(native)[0] for native in values.bound.public_handles)
-        if re.search(rf"\b{name}\b", declarations)
-    )
-    runtime = (
-        f"import 'runtime/runtime.dart' show {', '.join(owners)};\n" if owners else ""
-    )
     return (
-        "// Generated from the C headers by tools/bindgen. Do not edit.\nimport 'dart:typed_data';\nimport 'render/native_pointer.dart';\n"
-        + runtime
-        + "\n"
-        + declarations
-        + """
-bool _generatedValueEquals(Object? left, Object? right) {
-  if (left is List && right is List) {
-    if (left.length != right.length) { return false; }
-    for (var index = 0; index < left.length; index++) {
-      if (!_generatedValueEquals(left[index], right[index])) { return false; }
-    }
-    return true;
-  }
-  return left == right;
-}
-int _generatedValueHash(Object? value) => value is List
-    ? Object.hashAll(value.map(_generatedValueHash)) : value.hashCode;
-"""
+        "// Generated from the C headers by tools/bindgen. Do not edit.\n"
+        "part of 'values.dart';\n\n" + declarations
     )

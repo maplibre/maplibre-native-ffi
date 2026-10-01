@@ -1033,13 +1033,15 @@ class Values:
                     f"  static const {identifier(name.removeprefix(prefix).lower())} = {public}.fromRawValue({number});"
                     for name, number in value.enum_values
                 )
+                bitmask = value.enum_kind == "bitmask"
+                base = f"_Flags<{public}>" if bitmask else "_Enum"
                 operators = (
-                    f"  {public} operator |({public} other) => {public}.fromRawValue(rawValue | other.rawValue);\n  {public} operator &({public} other) => {public}.fromRawValue(rawValue & other.rawValue);\n  bool contains({public} other) => (rawValue & other.rawValue) == other.rawValue;\n"
-                    if value.enum_kind == "bitmask"
+                    f"  @override {public} _of(int rawValue) => {public}.fromRawValue(rawValue);\n"
+                    if bitmask
                     else ""
                 )
                 declarations.append(
-                    f"final class {public} {{\n  const {public}.fromRawValue(this.rawValue);\n  final int rawValue;\n{members}\n{operators}  @override bool operator ==(Object other) => other is {public} && other.rawValue == rawValue;\n  @override int get hashCode => rawValue.hashCode;\n}}\n"
+                    f"final class {public} extends {base} {{\n  const {public}.fromRawValue(super.rawValue);\n{members}\n{operators}}}\n"
                 )
                 continue
             public = public_name(value.native)
@@ -1119,19 +1121,11 @@ class Values:
             signature = ", ".join(args)
             if not positional:
                 signature = "{" + signature + "}"
-            equality = (
-                " && ".join(
-                    f"_generatedValueEquals(other.{name}, {name})"
-                    for name, _, _, _ in members
-                )
-                or "true"
+            compared = ", ".join(
+                [name for name, _, _, _ in members] + [name for name, _ in flags]
             )
-            equality += "".join(f" && other.{name} == {name}" for name, _ in flags)
-            hashes = ", ".join(
-                f"_generatedValueHash({name})" for name, _, _, _ in members
-            ) + "".join(f", {name}" for name, _ in flags)
             declarations.append(
-                f"final class {public} {{\n  {'const ' if not initializers else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n  @override bool operator ==(Object other) => other is {public} && {equality};\n  @override int get hashCode => Object.hashAll([{hashes}]);\n}}\n"
+                f"final class {public} extends _Value {{\n  {'const ' if not initializers else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n  @override List<Object?> get _members => [{compared}];\n}}\n"
             )
             deferred = self.deferred_field(value)
             write = [

@@ -6,7 +6,7 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:typed_data';
 
-import 'generated_values.dart';
+import 'values.dart';
 import 'raw.dart' as raw;
 
 part 'generated_operations.dart';

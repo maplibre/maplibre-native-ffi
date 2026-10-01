@@ -1,5 +1,5 @@
 /// Resource requests, responses, transforms, providers, and request handles.
 library;
 
-export '../generated_values.dart';
+export '../values.dart';
 export '../runtime/runtime.dart' show ResourceRequestHandle;

@@ -1,7 +1,7 @@
 /// Low-level Dart bindings for the MapLibre Native C API.
 library;
 
-export 'src/generated_values.dart';
+export 'src/values.dart';
 export 'src/camera/camera.dart';
 export 'src/error/maplibre_exception.dart';
 export 'src/geo/geo.dart';

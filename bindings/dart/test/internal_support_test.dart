@@ -1,4 +1,4 @@
-import 'package:maplibre_native_ffi/src/generated_values.dart';
+import 'package:maplibre_native_ffi/src/values.dart';
 import 'dart:convert';
 import 'dart:ffi';
 

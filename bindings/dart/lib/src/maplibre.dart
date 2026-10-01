@@ -7,4 +7,4 @@ export 'runtime/runtime.dart'
         decodeRuntimeEventBatchForTesting,
         globalCallbackPortProbeForTesting,
         singleCallbackPortProbeForTesting;
-export 'generated_values.dart';
+export 'values.dart';

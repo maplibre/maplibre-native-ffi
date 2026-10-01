@@ -50,6 +50,17 @@ class DartEmitterTests(unittest.TestCase):
             )
             (root / "render").mkdir()
             shutil.copy(BINDING / "lib/src/render/native_pointer.dart", root / "render")
+            # The probe groups name no handle owners, so the probe's values
+            # library takes the binding's without its runtime import.
+            (root / "values.dart").write_text(
+                "".join(
+                    line
+                    for line in (BINDING / "lib/src/values.dart")
+                    .read_text()
+                    .splitlines(keepends=True)
+                    if "runtime/runtime.dart" not in line
+                )
+            )
             (root / "generated_values.dart").write_text(dart.generate_values(api))
             (root / "generated_operations.dart").write_text(dart.generate(api))
             for path in (FIXTURES / "probes/dart").glob("*.dart"):
