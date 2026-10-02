@@ -221,9 +221,9 @@ A Vulkan core worker submits to the queue that its context descriptor names,
 from the worker thread. Vulkan requires a queue's submissions to be externally
 synchronized, so in the texture modes, where the host also submits, the example
 MUST give the session a second queue from the same graphics family, and the host
-never submits to that queue. A device whose graphics family exposes one queue
-uses the caller driver for the texture modes. A native surface shares the
-device's queue, because the host submits nothing in that mode.
+never submits to that queue. A device whose graphics family exposes one queue,
+as MoltenVK's do, uses the caller driver for the texture modes. A native surface
+shares the device's queue, because the host submits nothing in that mode.
 
 #### Caller-graphics-thread sessions
 
@@ -273,7 +273,8 @@ exactly one line from this table:
   synchronization. The compositor's GPU submission waits on the producer sync,
   and a CPU-complete sync needs no wait.
 - Hold the newest frame until a newer one replaces it, so the compositor can
-  redraw the window without a new render.
+  redraw the window without a new render. Release it before a session resize,
+  which the session rejects while the host holds a frame.
 - Release each frame with consumer-completion sync that covers the compositor's
   reads, or with CPU-complete sync after those reads finish. A held frame keeps
   its ring slot, and a demand waits for a free slot.
@@ -419,6 +420,9 @@ session first.
 - One instance and device serve the compositor and the session. The session gets
   its own queue in the texture modes, as
   [core-worker sessions](#core-worker-sessions) describes.
+- While a core worker submits, the host waits on its own queue or fences.
+  `vkDeviceWaitIdle` requires every queue of the device to be externally
+  synchronized, so the host calls it only after detach completes.
 - `owned-texture` and `borrowed-texture` use the owned and borrowed texture
   descriptors. A borrowed `VkImage` allows color-attachment and sampled use.
 - `native-surface` uses the surface descriptor for the host's `VkSurfaceKHR`. An
