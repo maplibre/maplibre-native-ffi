@@ -204,6 +204,11 @@ authoritative. For the examples, that table gives:
 | Vulkan                         | core worker            | core worker            | core worker            |
 | OpenGL on a WGL or EGL context | caller graphics thread | caller graphics thread | caller graphics thread |
 
+An OpenGL owned texture on a private EGL context accepts a core worker, but it
+fixes its ring depth at one and exposes CPU readback instead of frame
+acquisition. The `owned-texture` mode composes acquired frames, so an OpenGL
+example attaches it on a shared context and services a caller driver.
+
 A browser example uses the caller driver for an existing WebGL context or for
 WebGPU, and a core worker for a transferred `OffscreenCanvas`. The example
 selects the driver in one place, from the graphics API and the mode.
@@ -221,9 +226,12 @@ A Vulkan core worker submits to the queue that its context descriptor names,
 from the worker thread. Vulkan requires a queue's submissions to be externally
 synchronized, so in the texture modes, where the host also submits, the example
 MUST give the session a second queue from the same graphics family, and the host
-never submits to that queue. A device whose graphics family exposes one queue,
-as MoltenVK's do, uses the caller driver for the texture modes. A native surface
-shares the device's queue, because the host submits nothing in that mode.
+never submits to that queue. A device whose graphics family exposes one queue
+uses the caller driver for the texture modes. A native surface shares the
+device's queue, because the host submits nothing in that mode. MoltenVK exposes
+one queue per family, so the texture modes run on the caller driver on macOS,
+and only a device with a second graphics queue exercises a Vulkan core worker in
+a texture mode.
 
 #### Caller-graphics-thread sessions
 
@@ -300,7 +308,9 @@ Resize replaces the texture, because a borrowed texture's owner sets its size:
 2. Start a target replacement with it, and submit a map resize with the new
    logical extent, because a target replacement leaves the map's extent
    unchanged.
-3. Keep drawing the outgoing texture until the replacement completes.
+3. Wait for the replacement to complete. The example MAY block its loop on the
+   completion, which a caller driver services meanwhile. An example that keeps
+   its loop running keeps drawing the outgoing texture until then.
 4. Then demand a frame without the render-if-needed flag, and draw the
    replacement from that demand's rendered result or a later one.
 5. Release the outgoing texture after the compositor's last read of it.
