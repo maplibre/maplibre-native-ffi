@@ -12,10 +12,13 @@ import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderer
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceSession
 import org.maplibre.nativeffi.examples.composemap.surface.ProducerBackend
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
+import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
-import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapHandle
+import org.maplibre.nativeffi.generated.RenderDriverKind
+import org.maplibre.nativeffi.generated.RenderFrameResult
 import org.maplibre.nativeffi.generated.RenderResult
+import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.ScreenPoint
 import org.maplibre.nativeffi.generated.Wake
@@ -23,20 +26,22 @@ import org.maplibre.nativeffi.generated.Wake
 /**
  * The native-surface renderer.
  *
- * [render] runs on the bridge's producer thread, which owns the graphics context, borrowed texture,
- * and render session. It is the driver for the session: Skiko lends the texture only for the
- * frame's draw, so the session renders into it there, demanding a frame, servicing the driver, and
- * draining the result in one pass.
+ * [render] runs inside the bridge's producer access, the only window in which Skiko lends its
+ * texture. There it demands a frame and waits for that demand's result. A Metal or Vulkan session
+ * renders on its core worker meanwhile; an OpenGL session's caller driver runs on the producer
+ * thread, which services it while it waits.
  *
- * Input becomes map commands on the Compose thread. Native wakes ask Compose for a draw: the
- * runtime's when a map update is ready to render, and the session's when it has driver work outside
- * a draw.
+ * Input becomes map commands on the Compose thread. The runtime's event wake asks Compose for a
+ * draw when a map update is ready to render.
  */
 internal class MapLibreSurfaceRenderer(
   private val styleJson: String? = null,
   private val onRendered: () -> Unit = {},
 ) : NativeSurfaceRenderer {
   override val backend: ProducerBackend = MapLibreNativeSurfaceAdapter.backend
+
+  private val driver = MapLibreNativeSurfaceAdapter.driver
+  private val callerDriver = driver == RenderDriverKind.CALLER_GRAPHICS_THREAD
 
   private val closed = AtomicBoolean(false)
   private val mapStateLock = Any()
@@ -53,20 +58,23 @@ internal class MapLibreSurfaceRenderer(
   /** Set by the runtime's event wake until the next draw drains the events. */
   private val eventsPending = AtomicBoolean(false)
 
-  /** Set while a draw services the driver itself, so a driver-work wake needs no further draw. */
-  private val servicing = AtomicBoolean(false)
+  /** Set while a draw waits on the session, so a driver-work wake needs no further draw. */
+  private val drawing = AtomicBoolean(false)
 
-  /** Released by the driver-work wake and by completions that teardown and attachment wait on. */
-  private val driverWork = Semaphore(0)
+  /** Released by the session's wakes and by the completions that a draw waits on. */
+  private val sessionWork = Semaphore(0)
 
   private val eventWake = Wake {
     eventsPending.set(true)
     surfaceSession?.requestFrame()
   }
 
+  private val frameWake = Wake { sessionWork.release() }
+
+  /** Caller-driver work that arrives outside a draw asks for one, which services it. */
   private val driverWorkWake = Wake {
-    driverWork.release()
-    if (!servicing.get()) surfaceSession?.requestFrame()
+    sessionWork.release()
+    if (!drawing.get()) surfaceSession?.requestFrame()
   }
 
   @Volatile private var surfaceSession: NativeSurfaceSession? = null
@@ -74,6 +82,7 @@ internal class MapLibreSurfaceRenderer(
   @Volatile private var mapState: MapState? = null
   @Volatile private var renderSession: AttachedRenderSession? = null
   @Volatile private var currentExtent = SurfaceExtent.Empty
+  private var nextToken = 0uL
 
   override fun onSurfaceAvailable(session: NativeSurfaceSession) {
     surfaceSession = session
@@ -97,6 +106,7 @@ internal class MapLibreSurfaceRenderer(
     val state = ensureMapState(frame.extent)
     state.resize(frame.extent)
     if (eventsPending.getAndSet(false) && state.drainRenderUpdates()) frameWanted.set(true)
+    drawing.set(true)
     return try {
       renderAttached(state.map, frame)
     } catch (error: Throwable) {
@@ -104,48 +114,61 @@ internal class MapLibreSurfaceRenderer(
       // map.
       close()
       throw error
+    } finally {
+      drawing.set(false)
     }
   }
 
   private fun renderAttached(map: MapHandle, frame: NativeSurfaceFrame): NativeSurfaceRenderResult {
     val session = ensureAttachedRenderSession(map, frame).session
-    servicing.set(true)
-    try {
-      val forced = frameForced.getAndSet(false)
-      if (frameWanted.getAndSet(false) || forced) {
-        val demand = GeneratedApi.frameDemandDefault()
-        session.requestFrame(if (forced) demand.copy(flags = FrameDemandFlag(0u)) else demand)
+    if (callerDriver) session.serviceDriverWork(0uL)
+    val forced = frameForced.getAndSet(false)
+    if (!frameWanted.getAndSet(false) && !forced) return NativeSurfaceRenderResult.Skipped
+    val token = ++nextToken
+    session.requestFrame(
+      FrameDemand(
+        flags = if (forced) FrameDemandFlag(0u) else FrameDemandFlag.IF_NEEDED,
+        token = token,
+      )
+    )
+    val result = awaitResult(session, token)
+    // The result carries the map's own follow-up demand, so an ongoing transition needs no runtime
+    // event round trip.
+    if (result.needsRepaint) requestRender()
+    return when (result.disposition) {
+      RenderResult.RENDERED -> {
+        onRendered()
+        NativeSurfaceRenderResult.Rendered
       }
-      session.serviceDriverWork(0uL)
-    } finally {
-      servicing.set(false)
+      RenderResult.TARGET_NOT_READY -> {
+        // The attempt consumed the update, so the next Compose frame forces a retry.
+        requestRender(force = true)
+        NativeSurfaceRenderResult.Skipped
+      }
+      else -> NativeSurfaceRenderResult.Skipped
     }
-    // Driver work that arrived before the flag cleared raised no draw, so it runs now.
-    session.serviceDriverWork(0uL)
-    val batch =
-      try {
-        session.drainFrameResults()
-      } catch (error: MaplibreException) {
-        if (error.status != MaplibreStatus.NOT_READY) throw error
-        return NativeSurfaceRenderResult.Skipped
-      }
-    var rendered = false
-    batch.use { results ->
-      for (index in 0uL until results.count()) {
-        val result = results.get(index)
-        when (result.disposition) {
-          RenderResult.RENDERED -> rendered = true
-          // The next Compose frame retries the frame.
-          RenderResult.TARGET_NOT_READY -> requestRender(force = true)
+  }
+
+  /**
+   * Waits for the result of the demand with [token], draining every result meanwhile. A caller
+   * driver renders only when serviced, so the producer thread services it between waits.
+   */
+  private fun awaitResult(session: RenderSessionHandle, token: ULong): RenderFrameResult {
+    while (true) {
+      if (callerDriver) session.serviceDriverWork(0uL)
+      val batch =
+        try {
+          session.drainFrameResults()
+        } catch (error: MaplibreException) {
+          if (error.status != MaplibreStatus.NOT_READY) throw error
+          null
         }
-        // The result carries the map's own follow-up demand, so an ongoing transition needs no
-        // runtime event round trip.
-        if (result.needsRepaint) requestRender()
+      val result = batch?.use { results ->
+        (0uL until results.count()).map(results::get).lastOrNull { it.token == token }
       }
+      if (result != null) return result
+      sessionWork.acquire()
     }
-    if (!rendered) return NativeSurfaceRenderResult.Skipped
-    onRendered()
-    return NativeSurfaceRenderResult.Rendered
   }
 
   override fun onSurfaceLost() {
@@ -255,7 +278,7 @@ internal class MapLibreSurfaceRenderer(
   /**
    * Renders through a session attached to the texture this frame carries. Skiko reallocates its
    * texture on every resize; handing the replacement to the live session keeps its renderer warm,
-   * so a session is closed and reattached only when the graphics context itself changes.
+   * so a session is closed and reattached only when the graphics context or scale changes.
    */
   private fun ensureAttachedRenderSession(
     map: MapHandle,
@@ -268,10 +291,10 @@ internal class MapLibreSurfaceRenderer(
           return existing
         }
         try {
-          awaitDriverWork(existing.session, borrowed.setTarget(existing.session))
+          await(existing.session, borrowed.setTarget(existing.session))
         } catch (error: RuntimeException) {
-          // A failed handover leaves it unknown which texture the session holds, and Skiko frees
-          // the outgoing one as soon as it moves on, so close the session.
+          // A failed replacement leaves it unknown which texture the session holds, and Skiko
+          // frees the outgoing one as soon as it moves on, so close the session.
           try {
             closeRenderSession()
           } catch (cleanupError: Exception) {
@@ -281,16 +304,24 @@ internal class MapLibreSurfaceRenderer(
         }
         val retargeted = existing.copy(targetKey = borrowed.targetKey)
         renderSession = retargeted
-        // Handing over a texture publishes no map update, so the new texture needs a forced frame.
+        // A replacement publishes no map update, so the new texture needs a forced frame.
         frameForced.set(true)
         return retargeted
       }
     }
 
     closeRenderSession()
-    val attachment = borrowed.attach(map, driverWorkWake)
+    val attachment =
+      borrowed.attach(
+        map,
+        RenderSessionAttachOptions(
+          driver = driver,
+          frameWake = frameWake,
+          driverWorkWake = if (callerDriver) driverWorkWake else Wake(),
+        ),
+      )
     try {
-      awaitDriverWork(attachment.session, attachment.ready)
+      await(attachment.session, attachment.ready)
     } catch (error: Throwable) {
       runCatching { attachment.session.abandon() }
       runCatching { attachment.session.close() }
@@ -303,11 +334,22 @@ internal class MapLibreSurfaceRenderer(
     return attached
   }
 
+  /** Detaches and destroys the session. A failed detach abandons it. */
   private fun closeRenderSession() {
-    val closing = renderSession
+    val closing = renderSession ?: return
     renderSession = null
-    closing?.session?.let { session ->
-      awaitDriverWork(session, session.detach())
+    val session = closing.session
+    try {
+      await(session, session.detach())
+    } catch (error: RuntimeException) {
+      System.err.println("render session detach failed, abandoning: ${error.message}")
+      val abandoned = session.abandon()
+      if (abandoned.quarantinedResourceCount > 0u) {
+        System.err.println(
+          "render session quarantined ${abandoned.quarantinedResourceCount} resources"
+        )
+      }
+    } finally {
       session.close()
     }
   }
@@ -322,24 +364,18 @@ internal class MapLibreSurfaceRenderer(
   }
 
   /**
-   * Services driver work on the producer thread until [completion] finishes, sleeping until the
-   * driver-work wake or the completion arrives.
+   * Waits for a session operation on the producer thread. A caller driver's operation progresses
+   * only through driver service, so the thread services it between waits for a wake or for the
+   * completion.
    */
-  private fun awaitDriverWork(session: RenderSessionHandle, completion: Deferred<Unit>) {
-    // Permits from wakes that draws already serviced would only spin the loop.
-    driverWork.drainPermits()
-    completion.invokeOnCompletion { driverWork.release() }
-    servicing.set(true)
-    try {
-      while (true) {
-        session.serviceDriverWork(0uL)
-        if (completion.isCompleted) break
-        driverWork.acquire()
-      }
-    } finally {
-      servicing.set(false)
+  private fun <T> await(session: RenderSessionHandle, completion: Deferred<T>): T {
+    completion.invokeOnCompletion { sessionWork.release() }
+    while (true) {
+      if (callerDriver) session.serviceDriverWork(0uL)
+      if (completion.isCompleted) break
+      sessionWork.acquire()
     }
-    runBlocking { completion.await() }
+    return runBlocking { completion.await() }
   }
 
   private fun viewportCenter(): ScreenPoint {

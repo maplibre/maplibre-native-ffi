@@ -26,7 +26,6 @@ import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.generated.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
-import org.maplibre.nativeffi.generated.Wake
 import org.maplibre.nativeffi.generated.WglContextDescriptor
 import org.maplibre.nativeffi.render.NativePointer
 
@@ -36,6 +35,22 @@ internal object MapLibreNativeSurfaceAdapter {
       .filter { it in GeneratedApi.supportedRenderBackendMask() }
       .mapNotNull { it.toProducerBackend() }
       .singleOrNull() ?: error("Expected exactly one supported MapLibre render backend")
+
+  /**
+   * The driver for the backend's borrowed textures. Metal and Vulkan accept a core worker, which
+   * renders on its own thread; the bridges submit nothing to the session's Vulkan queue, so the
+   * worker can take the device's only one. OpenGL on a shared WGL or EGL context requires the
+   * caller driver, which the producer thread services inside its access.
+   */
+  val driver: RenderDriverKind =
+    when (backend) {
+      ProducerBackend.METAL,
+      ProducerBackend.VULKAN -> RenderDriverKind.CORE_WORKER
+      ProducerBackend.OPENGL -> RenderDriverKind.CALLER_GRAPHICS_THREAD
+    }
+
+  val driverLabel: String =
+    if (driver == RenderDriverKind.CORE_WORKER) "core-worker" else "caller-graphics-thread"
 
   fun borrowedTarget(target: NativeSurfaceTarget, extent: SurfaceExtent): BorrowedTarget =
     when (target) {
@@ -53,11 +68,9 @@ internal object MapLibreNativeSurfaceAdapter {
         target.texture.toPointer(),
       )
     return BorrowedTarget(
-      sessionKey = SessionKey.Metal(target.device, target.pixelFormat),
+      sessionKey = SessionKey.Metal(target.device, target.pixelFormat, extent.scaleFactor),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map, driverWorkWake ->
-        map.metalBorrowedTextureAttach(descriptor, callerDriverOptions(driverWorkWake))
-      },
+      attach = { map, options -> map.metalBorrowedTextureAttach(descriptor, options) },
       setTarget = { session -> session.metalBorrowedTextureSetTarget(descriptor) },
     )
   }
@@ -82,11 +95,10 @@ internal object MapLibreNativeSurfaceAdapter {
           format = target.format,
           initialLayout = target.initialLayout,
           finalLayout = target.finalLayout,
+          scaleFactor = extent.scaleFactor,
         ),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map, driverWorkWake ->
-        map.vulkanBorrowedTextureAttach(descriptor, callerDriverOptions(driverWorkWake))
-      },
+      attach = { map, options -> map.vulkanBorrowedTextureAttach(descriptor, options) },
       setTarget = { session -> session.vulkanBorrowedTextureSetTarget(descriptor) },
     )
   }
@@ -102,26 +114,26 @@ internal object MapLibreNativeSurfaceAdapter {
         target.textureTarget.toUInt(),
       )
     return BorrowedTarget(
-      sessionKey = SessionKey.OpenGl(target.context),
+      sessionKey = SessionKey.OpenGl(target.context, extent.scaleFactor),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map, driverWorkWake ->
-        map.openglBorrowedTextureAttach(descriptor, callerDriverOptions(driverWorkWake))
-      },
+      attach = { map, options -> map.openglBorrowedTextureAttach(descriptor, options) },
       setTarget = { session -> session.openglBorrowedTextureSetTarget(descriptor) },
     )
   }
 
   /**
    * The part of a target a live render session cannot be moved across. A session takes a
-   * replacement texture only for the graphics context it attached with, so a target whose key still
-   * matches is handed over and one whose key changed closes the session and attaches again.
+   * replacement texture only for the graphics context and the scale factor it attached with, so a
+   * target whose key still matches is handed over and one whose key changed closes the session and
+   * attaches again.
    */
   sealed interface SessionKey {
     /**
      * A Metal texture carries its device and pixel format, which is what a session compares against
      * its own. Attach admits only single-sample textures, so sample count needs no entry.
      */
-    data class Metal(val device: NativeHandle, val pixelFormat: Long) : SessionKey
+    data class Metal(val device: NativeHandle, val pixelFormat: Long, val scaleFactor: Double) :
+      SessionKey
 
     /** A Vulkan session built its render pass around the format and both layouts. */
     data class Vulkan(
@@ -129,10 +141,11 @@ internal object MapLibreNativeSurfaceAdapter {
       val format: Int,
       val initialLayout: Int,
       val finalLayout: Int,
+      val scaleFactor: Double,
     ) : SessionKey
 
-    /** An OpenGL session names its context provider data and nothing else. */
-    data class OpenGl(val context: OpenGlContextHandles) : SessionKey
+    /** An OpenGL session names its context provider data. */
+    data class OpenGl(val context: OpenGlContextHandles, val scaleFactor: Double) : SessionKey
   }
 
   /**
@@ -144,20 +157,10 @@ internal object MapLibreNativeSurfaceAdapter {
   class BorrowedTarget(
     val sessionKey: SessionKey,
     val targetKey: TargetKey,
-    /** Attaches a session whose driver work raises the given wake. */
-    val attach: (MapHandle, Wake) -> RenderSessionAttachment,
+    /** Attaches a session with the given options. */
+    val attach: (MapHandle, RenderSessionAttachOptions) -> RenderSessionAttachment,
     val setTarget: (RenderSessionHandle) -> Deferred<Unit>,
   )
-
-  /**
-   * Each draw drains the frame results its demand produced, so the session raises only its
-   * driver-work wake, for work that arrives outside a draw.
-   */
-  private fun callerDriverOptions(driverWorkWake: Wake) =
-    RenderSessionAttachOptions(
-      driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
-      driverWorkWake = driverWorkWake,
-    )
 }
 
 private fun SurfaceExtent.toRenderTargetExtent(): RenderTargetExtent =

@@ -12,6 +12,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.nativeffi.examples.composemap.app.ComposeMapApp
+import org.maplibre.nativeffi.examples.composemap.map.MapLibreNativeSurfaceAdapter
 import org.maplibre.nativeffi.examples.composemap.map.MapLibreSurfaceRenderer
 import org.maplibre.nativeffi.generated.GeneratedApi
 
@@ -39,6 +40,7 @@ internal object Main {
     println(
       "render target status: renders into a host-owned texture, then samples it into the Compose/Skiko surface"
     )
+    println("render driver: ${MapLibreNativeSurfaceAdapter.driverLabel}")
     printControls()
 
     try {
