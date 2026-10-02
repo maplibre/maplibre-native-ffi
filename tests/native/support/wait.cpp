@@ -103,19 +103,22 @@ void receive_completion(
       }
     }
     probe->completed = true;
+    probe->condition.notify_all();
   }
-  probe->condition.notify_all();
   mln_test_pulse();
 }
 
 void release_completion(void* user_data) noexcept {
   auto* probe = static_cast<CompletionState*>(user_data);
   if (probe == nullptr) return;
+  // Notified under the lock: once the waiter in mln_test_completion_destroy()
+  // can see `released`, it deletes the probe, so this thread must not touch
+  // the probe after letting the lock go.
   {
     const auto lock = std::scoped_lock{probe->mutex};
     probe->released = true;
+    probe->condition.notify_all();
   }
-  probe->condition.notify_all();
   mln_test_pulse();
 }
 
