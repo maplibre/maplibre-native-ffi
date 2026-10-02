@@ -55,7 +55,7 @@ impl RenderTarget {
                 )?;
                 Ok(Self::OwnedTexture {
                     session,
-                    compositor: Box::new(compositor(metal)?),
+                    compositor: Box::new(compositor(metal, viewport)?),
                 })
             }
             Mode::BorrowedTexture => {
@@ -73,7 +73,7 @@ impl RenderTarget {
                 )?;
                 Ok(Self::BorrowedTexture {
                     session,
-                    compositor: Box::new(compositor(metal)?),
+                    compositor: Box::new(compositor(metal, viewport)?),
                     texture: Box::new(texture),
                     replacements: Replacements::default(),
                 })
@@ -207,9 +207,13 @@ impl RenderTarget {
     }
 }
 
+/// Creates the compositor for a texture mode, which sizes the layer's drawable
+/// to the viewport. A surface session sizes it itself.
 fn compositor(
     metal: &crate::metal::MetalContext,
+    viewport: Viewport,
 ) -> maplibre_native_ffi::Result<MetalTextureCompositor> {
+    metal.resize(viewport);
     MetalTextureCompositor::new(metal)
         .map_err(|error| compositor_error(format!("Metal compositor creation failed: {error:?}")))
 }

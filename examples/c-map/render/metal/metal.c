@@ -156,9 +156,7 @@ static void metal_view_deinit(metal_view* view) {
   }
 }
 
-static app_error metal_view_init(
-  metal_view* view, SDL_Window* window, viewport current_viewport
-) {
+static app_error metal_view_init(metal_view* view, SDL_Window* window) {
   *view = (metal_view){};
   view->view = SDL_Metal_CreateView(window);
   if (view->view == nullptr) {
@@ -173,7 +171,6 @@ static app_error metal_view_init(
   view->layer = (id)layer;
   msg_set_id(view->layer, "setDevice:", view->device);
   msg_set_ulong(view->layer, "setPixelFormat:", mtl_pixel_format_bgra8_unorm);
-  metal_view_resize(view, current_viewport);
   return APP_OK;
 }
 
@@ -248,7 +245,10 @@ static app_error metal_compositor_init(
   metal_compositor* compositor, SDL_Window* window, viewport current_viewport
 ) {
   *compositor = (metal_compositor){};
-  MAP_TRY(metal_view_init(&compositor->view, window, current_viewport));
+  MAP_TRY(metal_view_init(&compositor->view, window));
+  // A texture mode's compositor sizes the layer's drawable. A surface session
+  // sizes it itself.
+  metal_view_resize(&compositor->view, current_viewport);
   compositor->queue = msg_id(compositor->view.device, "newCommandQueue");
   app_error error = APP_OK;
   if (compositor->queue == nullptr) {
@@ -426,8 +426,7 @@ app_error render_target_init(
       }
       break;
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      error =
-        metal_view_init(&target->as.surface.view, window, current_viewport);
+      error = metal_view_init(&target->as.surface.view, window);
       break;
   }
   if (error != APP_OK) {

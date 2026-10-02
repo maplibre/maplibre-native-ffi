@@ -42,7 +42,7 @@ pub const MetalRenderTarget = union(enum) {
         return switch (mode) {
             .owned_texture => .{ .owned_texture = try MetalOwnedTextureBackend.init(window, viewport) },
             .borrowed_texture => .{ .borrowed_texture = try MetalBorrowedTextureBackend.init(window, viewport) },
-            .native_surface => .{ .native_surface = .{ .view = try MetalView.init(window, viewport) } },
+            .native_surface => .{ .native_surface = .{ .view = try MetalView.init(window) } },
         };
     }
 
@@ -105,7 +105,7 @@ const MetalView = struct {
     device: objc.Object,
     layer: objc.Object,
 
-    fn init(window: *c.SDL_Window, viewport: types.Viewport) !MetalView {
+    fn init(window: *c.SDL_Window) !MetalView {
         const view = c.SDL_Metal_CreateView(window);
         if (view == null) return types.AppError.BackendSetupFailed;
         errdefer c.SDL_Metal_DestroyView(view);
@@ -120,7 +120,6 @@ const MetalView = struct {
         const layer = objc.Object.fromId(layer_ptr);
         layer.setProperty("device", device);
         layer.setProperty("pixelFormat", @as(u64, MTLPixelFormatBGRA8Unorm));
-        layer.setProperty("drawableSize", drawableSize(viewport));
 
         return .{ .view = view, .device = device, .layer = layer };
     }
@@ -141,8 +140,11 @@ const MetalTextureCompositor = struct {
     pipeline: objc.Object,
 
     fn init(window: *c.SDL_Window, viewport: types.Viewport) !MetalTextureCompositor {
-        var view = try MetalView.init(window, viewport);
+        var view = try MetalView.init(window);
         errdefer view.deinit();
+        // A texture mode's compositor sizes the layer's drawable. A surface
+        // session sizes it itself.
+        view.resize(viewport);
 
         const queue = view.device.msgSend(objc.Object, "newCommandQueue", .{});
         if (queue.value == null) return types.AppError.BackendSetupFailed;

@@ -36,7 +36,6 @@ pub struct MetalBorrowedTexture {
 
 impl MetalContext {
     pub fn new(window: &Window) -> Result<Self, Box<dyn Error>> {
-        let viewport = Viewport::from_window(window);
         let raw_window = window.window_handle()?.as_raw();
         let RawWindowHandle::AppKit(handle) = raw_window else {
             return Err("Metal requires an AppKit window handle".into());
@@ -55,7 +54,6 @@ impl MetalContext {
         unsafe {
             layer.setDevice(Some(&device));
             layer.setPixelFormat(MTLPixelFormat::BGRA8Unorm);
-            layer.setDrawableSize(drawable_size(viewport));
             view.setWantsLayer(true);
             view.setLayer(Some(layer.as_super()));
         }

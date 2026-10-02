@@ -448,7 +448,8 @@ A host swapchain in the texture modes MUST:
   descriptors with the host's `MTLDevice`.
 - `native-surface` uses the surface descriptor for the host's `CAMetalLayer`.
   The session sets the layer's drawable size, and the host sets its frame and
-  contents scale.
+  contents scale. In the texture modes, the host compositor sizes the drawable
+  to the frames it shows.
 - A host compositor treats a `CAMetalLayer` that hands out no drawable as a
   frame to retry. A minimized or occluded window has none to give, and the
   drawable pool empties under load.
