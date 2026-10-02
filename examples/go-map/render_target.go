@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jfreymuth/go-sdl3/sdl"
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
 )
 
@@ -15,25 +16,34 @@ const glTexture2D = 0x0DE1
 // next one.
 const ownedTextureRingDepth = 2
 
-// renderTarget is a render session that the SDL thread drives. The render loop
-// requests frames, services driver work after its wake, and drains frame
-// results after theirs.
+// retryDelay is how long a frame that did not reach the window waits to
+// retry, about one display refresh.
+const retryDelay = 16 * time.Millisecond
+
+// renderTarget is a render session and the frames it shows. OpenGL on an EGL
+// context requires the caller driver, so the SDL thread services the session
+// after its driver-work wake. The loop demands a frame for each map update,
+// and after the frame wake HandleWakes drains the results and shows the newest
+// rendered frame.
 type renderTarget interface {
-	// RequestFrame asks for a frame. A forced frame renders even when the map
+	// RequestFrame demands a frame. A forced frame renders even when the map
 	// has no newer update.
 	RequestFrame(force bool) error
-	ServiceDriverWork() error
-	// DrainFrameResults presents each rendered frame and reports whether one
+	// HandleWakes runs the session's work after its wakes: queued driver
+	// work, a due retry, and the frame results. It reports whether a frame
 	// reached the window.
-	DrainFrameResults() (bool, error)
+	HandleWakes() (bool, error)
 	// RetryAt reports when a paced retry is due, or false with none pending.
 	RetryAt() (time.Time, bool)
-	// RetryIfDue forces the pending paced retry once it is due.
-	RetryIfDue() error
-	// Resize keeps the session attached, either resizing the target in place
-	// or handing the session a replacement.
+	// Resize follows a resized window and keeps the session attached.
 	Resize(viewport) error
 	Close() error
+}
+
+// sessionWakes are the frame and driver-work wakes of one session.
+type sessionWakes struct {
+	frames     *loopWake
+	driverWork *loopWake
 }
 
 // callerDriver is the part of every target that drives its session: frame
@@ -41,26 +51,45 @@ type renderTarget interface {
 // shows the frame the session just rendered.
 type callerDriver struct {
 	session *maplibre.RenderSessionHandle
-	wake    *loopWake
+	wakes   sessionWakes
 	present func() (bool, error)
-	// released is set once a failed handover detached the session, so Close
-	// only retires the handle.
-	released bool
+	// releaseFrames releases the frames that the target holds, before the
+	// session resizes or detaches.
+	releaseFrames func() error
+	nextToken     uint64
 	// retryAt is when a paced retry is due, and zero with none pending.
 	retryAt time.Time
 }
 
-// retryDelay is how long a frame that did not reach the window waits to
-// retry, about one display refresh.
-const retryDelay = 16 * time.Millisecond
+func newCallerDriver(eventType sdl.EventType) callerDriver {
+	return callerDriver{
+		wakes: sessionWakes{
+			frames:     newLoopWake(eventType),
+			driverWork: newLoopWake(eventType),
+		},
+		present:       func() (bool, error) { return true, nil },
+		releaseFrames: func() error { return nil },
+	}
+}
 
-// attach services the attachment until it completes.
-func (driver *callerDriver) attach(session *maplibre.RenderSessionHandle, completion *maplibre.Future[struct{}], wakes loopWakes) error {
+func (driver *callerDriver) attachOptions(ringDepth uint32) maplibre.RenderSessionAttachOptions {
+	options := maplibre.DefaultRenderSessionAttachOptions()
+	options.Driver = maplibre.RenderDriverKindCallerGraphicsThread
+	options.RequestedTextureRingDepth = ringDepth
+	options.FrameWake = driver.wakes.frames.wake()
+	options.DriverWorkWake = driver.wakes.driverWork.wake()
+	return options
+}
+
+// attach services the attachment until it completes. A failed attachment
+// abandons its session.
+func (driver *callerDriver) attach(session *maplibre.RenderSessionHandle, completion *maplibre.Future[struct{}]) error {
 	driver.session = session
-	driver.wake = wakes.driverWork
 	if err := driver.await(completion); err != nil {
 		_, abandonErr := driver.session.Abandon()
-		return errors.Join(err, abandonErr, driver.session.Close())
+		err = errors.Join(err, abandonErr, driver.session.Close())
+		driver.session = nil
+		return err
 	}
 	return nil
 }
@@ -76,13 +105,15 @@ func (driver *callerDriver) await(future *maplibre.Future[struct{}]) error {
 		case <-future.Done():
 			_, err := future.Await(context.Background())
 			return err
-		case <-driver.wake.pending:
+		case <-driver.wakes.driverWork.pending:
 		}
 	}
 }
 
 func (driver *callerDriver) RequestFrame(force bool) error {
+	driver.nextToken++
 	demand := maplibre.DefaultFrameDemand()
+	demand.Token = driver.nextToken
 	demand.Flags = maplibre.FrameDemandFlagPresent
 	if !force {
 		demand.Flags |= maplibre.FrameDemandFlagIfNeeded
@@ -90,16 +121,30 @@ func (driver *callerDriver) RequestFrame(force bool) error {
 	return driver.session.RequestFrame(demand)
 }
 
-func (driver *callerDriver) ServiceDriverWork() error {
-	_, err := driver.session.ServiceDriverWork(0)
-	return err
+func (driver *callerDriver) HandleWakes() (bool, error) {
+	if driver.wakes.driverWork.consume() {
+		if _, err := driver.session.ServiceDriverWork(0); err != nil {
+			return false, err
+		}
+	}
+	if !driver.retryAt.IsZero() && !time.Now().Before(driver.retryAt) {
+		driver.retryAt = time.Time{}
+		if err := driver.RequestFrame(true); err != nil {
+			return false, err
+		}
+	}
+	if !driver.wakes.frames.consume() {
+		return false, nil
+	}
+	return driver.drainFrameResults()
 }
 
-// DrainFrameResults drains every frame result and presents each rendered
-// frame. A result that asks for another frame, as during a paint transition,
-// requests it. A target that was not ready, or a frame that missed the window,
-// consumed its map update, so a paced retry forces the next frame.
-func (driver *callerDriver) DrainFrameResults() (bool, error) {
+// drainFrameResults drains every frame result and shows the newest rendered
+// frame. A rendered frame that asks for another, as during a paint
+// transition, demands it. A target that was not ready, or a frame that missed
+// the window, consumed its map update, so a forced retry follows after about
+// one refresh.
+func (driver *callerDriver) drainFrameResults() (bool, error) {
 	batch, err := driver.session.DrainFrameResults()
 	if errors.Is(err, maplibre.ErrNotReady) {
 		return false, nil
@@ -112,129 +157,140 @@ func (driver *callerDriver) DrainFrameResults() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	presented, missed, needsRepaint := false, false, false
+	rendered, retry, repaint := false, false, false
 	for i := uint(0); i < count; i++ {
 		result, err := batch.Get(i)
 		if err != nil {
-			return presented, err
+			return false, err
 		}
 		switch result.Disposition {
 		case maplibre.RenderResultRendered:
-			shown, err := driver.present()
-			if err != nil {
-				return presented, err
-			}
-			presented = presented || shown
-			missed = missed || !shown
+			rendered = true
+			repaint = repaint || result.NeedsRepaint
 		case maplibre.RenderResultTargetNotReady:
-			missed = true
-		default:
-			continue
+			retry = true
 		}
-		needsRepaint = needsRepaint || result.NeedsRepaint
 	}
-	if missed {
+	shown := false
+	if rendered {
+		if shown, err = driver.present(); err != nil {
+			return false, err
+		}
+		retry = retry || !shown
+	}
+	switch {
+	case retry:
 		driver.retryAt = time.Now().Add(retryDelay)
-		return presented, nil
+	case repaint:
+		err = driver.RequestFrame(false)
 	}
-	if needsRepaint {
-		return presented, driver.RequestFrame(false)
-	}
-	return presented, nil
+	return shown, err
 }
 
 func (driver *callerDriver) RetryAt() (time.Time, bool) {
 	return driver.retryAt, !driver.retryAt.IsZero()
 }
 
-func (driver *callerDriver) RetryIfDue() error {
-	if driver.retryAt.IsZero() || time.Now().Before(driver.retryAt) {
-		return nil
-	}
-	driver.retryAt = time.Time{}
-	return driver.RequestFrame(true)
-}
-
 // Resize carries a new logical extent to the map through the attached
-// session, which is the only extent authority while it stays attached.
+// session. A session resize needs every frame released first.
 func (driver *callerDriver) Resize(v viewport) error {
-	_, err := driver.session.Resize(v.extent())
-	return err
+	if err := driver.releaseFrames(); err != nil {
+		return err
+	}
+	future, err := driver.session.Resize(v.extent())
+	reportFailure(future, err, "render session resize")
+	return nil
 }
 
-// handOver gives the session a replacement target and waits for it. Frames
-// that ran before the handover drew into the outgoing target, so they are
-// drained and presented while that target is still current. A failed
-// handover leaves it unknown which target the session holds, so the session
-// is detached before the caller releases either one.
-func (driver *callerDriver) handOver(future *maplibre.Future[struct{}], err error) error {
+// replaceTarget gives the session a replacement target and waits for it.
+// Frames that ran before the replacement drew into the outgoing target, so
+// they are drained and shown while that target is still current. A failed
+// replacement leaves it unknown which target the session holds, so the
+// session detaches before the caller releases either one.
+func (driver *callerDriver) replaceTarget(future *maplibre.Future[struct{}], err error) error {
 	if err == nil {
 		err = driver.await(future)
 	}
 	if err != nil {
-		driver.released = true
-		return errors.Join(err, driver.detach())
+		return errors.Join(err, driver.Close())
 	}
-	_, err = driver.DrainFrameResults()
+	_, err = driver.drainFrameResults()
 	return err
 }
 
-// resizeMap carries the new logical extent to the map on the paths where the
-// session cannot: a replaced target changes only the graphics resource.
-func (driver *callerDriver) resizeMap(m *maplibre.MapHandle, v viewport) error {
-	_, err := m.Resize(maplibre.LogicalExtent{
-		Width:       v.logicalWidth,
-		Height:      v.logicalHeight,
-		ScaleFactor: v.scaleFactor,
-	})
-	return err
-}
-
-func (driver *callerDriver) detach() error {
-	future, err := driver.session.Detach()
-	if err == nil {
-		err = driver.await(future)
-	}
-	if err != nil {
-		_, abandonErr := driver.session.Abandon()
-		err = errors.Join(err, abandonErr)
-	}
-	return err
-}
-
-// Close detaches on the SDL thread, then destroys the session.
+// Close releases held frames, detaches, and destroys the session. A failed
+// detach abandons the session, which ends its graphics calls at once.
 func (driver *callerDriver) Close() error {
 	if driver.session == nil {
 		return nil
 	}
-	var err error
-	if !driver.released {
-		err = driver.detach()
+	err := driver.releaseFrames()
+	future, detachErr := driver.session.Detach()
+	if detachErr == nil {
+		detachErr = driver.await(future)
+	}
+	if detachErr != nil {
+		fmt.Printf("render session detach failed, abandoning: %v\n", detachErr)
+		abandoned, abandonErr := driver.session.Abandon()
+		if abandoned.QuarantinedResourceCount > 0 {
+			fmt.Printf("render session quarantined %d resources\n", abandoned.QuarantinedResourceCount)
+		}
+		err = errors.Join(err, abandonErr)
 	}
 	err = errors.Join(err, driver.session.Close())
 	driver.session = nil
 	return err
 }
 
-func newOpenGLRenderTarget(context *openGLContext, v viewport, mode renderTargetMode, m *maplibre.MapHandle, wakes loopWakes) (renderTarget, error) {
+// resizeMap carries the new logical extent to the map when the session
+// cannot: a replaced target changes only the graphics resource.
+func resizeMap(m *maplibre.MapHandle, v viewport) {
+	future, err := m.Resize(maplibre.LogicalExtent{
+		Width:       v.logicalWidth,
+		Height:      v.logicalHeight,
+		ScaleFactor: v.scaleFactor,
+	})
+	reportFailure(future, err, "map resize")
+}
+
+// reportFailure logs a command that fails. Nothing waits on its completion.
+func reportFailure[T any](future *maplibre.Future[T], err error, operation string) {
+	if err != nil {
+		fmt.Printf("%s failed: %v\n", operation, err)
+		return
+	}
+	go func() {
+		if _, err := future.Await(context.Background()); err != nil {
+			fmt.Printf("%s failed: %v\n", operation, err)
+		}
+	}()
+}
+
+func newOpenGLRenderTarget(context *openGLContext, v viewport, mode renderTargetMode, m *maplibre.MapHandle, eventType sdl.EventType) (renderTarget, error) {
+	driver := newCallerDriver(eventType)
 	switch mode {
 	case modeOwnedTexture:
-		return newOpenGLOwnedTextureTarget(context, v, m, wakes)
+		return newOpenGLOwnedTextureTarget(context, v, m, driver)
 	case modeBorrowedTexture:
-		return newOpenGLBorrowedTextureTarget(context, v, m, wakes)
+		return newOpenGLBorrowedTextureTarget(context, v, m, driver)
 	case modeNativeSurface:
-		return newOpenGLSurfaceTarget(context, v, m, wakes)
+		return newOpenGLSurfaceTarget(context, v, m, driver)
 	default:
 		return nil, fmt.Errorf("unsupported render target mode: %s", mode)
 	}
 }
 
+// openGLOwnedTextureTarget composes a session-owned texture ring. After a
+// rendered result, it acquires every ready frame, keeps the newest, and
+// composes it. It holds that frame until a newer one replaces it, so the
+// session renders into the ring's other slots meanwhile.
 type openGLOwnedTextureTarget struct {
 	callerDriver
 	compositor *openGLTextureCompositor
+	held       *maplibre.AcquiredFrameHandle
 }
 
-func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, wakes loopWakes) (*openGLOwnedTextureTarget, error) {
+func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGLOwnedTextureTarget, error) {
 	descriptor, err := context.descriptor(true)
 	if err != nil {
 		return nil, err
@@ -243,14 +299,15 @@ func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre
 	if err != nil {
 		return nil, err
 	}
-	target := &openGLOwnedTextureTarget{compositor: compositor}
+	target := &openGLOwnedTextureTarget{callerDriver: driver, compositor: compositor}
 	target.present = target.drawFrame
+	target.releaseFrames = target.releaseHeld
 	attachment, err := m.OpenglOwnedTextureAttach(
 		maplibre.OpenglOwnedTextureDescriptor{Extent: v.extent(), Context: descriptor},
-		wakes.attachOptions(ownedTextureRingDepth),
+		target.attachOptions(ownedTextureRingDepth),
 	)
 	if err == nil {
-		err = target.attach(attachment.Session, attachment.Completion, wakes)
+		err = target.attach(attachment.Session, attachment.Completion)
 	}
 	if err != nil {
 		return nil, errors.Join(fmt.Errorf("OpenGL texture attach failed: %w", err), compositor.Close())
@@ -269,19 +326,29 @@ func (target *openGLOwnedTextureTarget) Resize(v viewport) error {
 	return target.callerDriver.Resize(v)
 }
 
-// drawFrame composes the oldest rendered frame. An empty ring leaves the
-// previously composed frame on screen, and nothing new reaches the window.
+// drawFrame composes the newest ready frame and releases the older ones.
+// DrawTexture finishes its GPU reads, so each frame releases CPU-complete.
 func (target *openGLOwnedTextureTarget) drawFrame() (bool, error) {
-	frame, err := target.session.AcquireFrame()
-	if errors.Is(err, maplibre.ErrNotReady) {
-		return false, nil
+	var newest *maplibre.AcquiredFrameHandle
+	for {
+		frame, err := target.session.AcquireFrame()
+		if errors.Is(err, maplibre.ErrNotReady) {
+			break
+		}
+		if err != nil {
+			return false, errors.Join(err, releaseFrame(newest))
+		}
+		if err := releaseFrame(newest); err != nil {
+			return false, errors.Join(err, releaseFrame(frame))
+		}
+		newest = frame
 	}
-	if err != nil {
-		return false, err
+	if newest == nil {
+		return target.held != nil, nil
 	}
-	accessErr := requireCPUCompleteProducer(frame)
-	if accessErr == nil {
-		accessErr = frame.WithOpenglTexture(func(info maplibre.OpenglOwnedTextureFrameView) error {
+	drawErr := requireCPUCompleteProducer(newest)
+	if drawErr == nil {
+		drawErr = newest.WithOpenglTexture(func(info maplibre.OpenglOwnedTextureFrameView) error {
 			targetID, err := info.Target()
 			if err != nil {
 				return err
@@ -293,9 +360,22 @@ func (target *openGLOwnedTextureTarget) drawFrame() (bool, error) {
 			return target.compositor.DrawTexture(targetID, texture)
 		})
 	}
-	// DrawTexture finishes its GPU reads, so the frame releases CPU-complete.
-	releaseErr := frame.Close(maplibre.GpuSync{Kind: maplibre.GpuSyncKindCpuComplete})
-	return accessErr == nil, errors.Join(accessErr, releaseErr)
+	releaseErr := target.releaseHeld()
+	target.held = newest
+	return drawErr == nil, errors.Join(drawErr, releaseErr)
+}
+
+func (target *openGLOwnedTextureTarget) releaseHeld() error {
+	err := releaseFrame(target.held)
+	target.held = nil
+	return err
+}
+
+func releaseFrame(frame *maplibre.AcquiredFrameHandle) error {
+	if frame == nil {
+		return nil
+	}
+	return frame.Close(maplibre.GpuSync{Kind: maplibre.GpuSyncKindCpuComplete})
 }
 
 func requireCPUCompleteProducer(frame *maplibre.AcquiredFrameHandle) error {
@@ -311,6 +391,9 @@ func requireCPUCompleteProducer(frame *maplibre.AcquiredFrameHandle) error {
 	})
 }
 
+// openGLBorrowedTextureTarget renders into a texture that the example owns.
+// The caller driver renders and composes on the SDL thread in order, so the
+// texture needs no hand-off between them.
 type openGLBorrowedTextureTarget struct {
 	callerDriver
 	compositor *openGLTextureCompositor
@@ -318,20 +401,20 @@ type openGLBorrowedTextureTarget struct {
 	texture    uint32
 }
 
-func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, wakes loopWakes) (*openGLBorrowedTextureTarget, error) {
+func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGLBorrowedTextureTarget, error) {
 	compositor, err := newOpenGLTextureCompositor(context, v)
 	if err != nil {
 		return nil, err
 	}
-	target := &openGLBorrowedTextureTarget{compositor: compositor, mapRef: m}
+	target := &openGLBorrowedTextureTarget{callerDriver: driver, compositor: compositor, mapRef: m}
 	target.present = target.drawTexture
 	descriptor, err := target.describe(v)
 	if err == nil {
 		target.texture = descriptor.Texture
 		var attachment maplibre.OpenglBorrowedTextureAttachResult
-		attachment, err = m.OpenglBorrowedTextureAttach(descriptor, wakes.attachOptions(0))
+		attachment, err = m.OpenglBorrowedTextureAttach(descriptor, target.attachOptions(0))
 		if err == nil {
-			err = target.attach(attachment.Session, attachment.Completion, wakes)
+			err = target.attach(attachment.Session, attachment.Completion)
 		}
 	}
 	if err != nil {
@@ -373,8 +456,8 @@ func (target *openGLBorrowedTextureTarget) Close() error {
 	return errors.Join(err, target.compositor.Close())
 }
 
-// Resize hands the live session a texture at the new size; the session keeps
-// its renderer across the handover.
+// Resize replaces the texture, because its owner sets its size. The outgoing
+// texture stays current until the replacement completes.
 func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 	if err := target.compositor.Resize(v); err != nil {
 		return err
@@ -383,27 +466,35 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 	if err != nil {
 		return err
 	}
-	// The outgoing texture stays current until the handover completes.
-	if err := target.handOver(target.session.OpenglBorrowedTextureSetTarget(descriptor)); err != nil {
+	future, err := target.session.OpenglBorrowedTextureSetTarget(descriptor)
+	if err != nil {
+		target.deleteTexture(descriptor.Texture)
+		return fmt.Errorf("OpenGL borrowed texture set target failed: %w", err)
+	}
+	// A target replacement leaves the map's extent unchanged.
+	resizeMap(target.mapRef, v)
+	if err := target.replaceTarget(future, nil); err != nil {
 		target.deleteTexture(descriptor.Texture)
 		return fmt.Errorf("OpenGL borrowed texture set target failed: %w", err)
 	}
 	target.deleteTexture(target.texture)
 	target.texture = descriptor.Texture
-	return target.resizeMap(target.mapRef, v)
+	return target.RequestFrame(true)
 }
 
 func (target *openGLBorrowedTextureTarget) drawTexture() (bool, error) {
 	return true, target.compositor.DrawTexture(glTexture2D, target.texture)
 }
 
+// openGLSurfaceTarget renders into the window's EGL surface, and the session
+// presents each frame.
 type openGLSurfaceTarget struct {
 	callerDriver
 	context *openGLContext
 	mapRef  *maplibre.MapHandle
 }
 
-func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, wakes loopWakes) (*openGLSurfaceTarget, error) {
+func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGLSurfaceTarget, error) {
 	if err := context.refreshPlatformSurface(); err != nil {
 		return nil, fmt.Errorf("OpenGL surface refresh failed: %w", err)
 	}
@@ -411,15 +502,13 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 	if err != nil {
 		return nil, err
 	}
-	target := &openGLSurfaceTarget{context: context, mapRef: m}
-	// The driver presented the frame already.
-	target.present = func() (bool, error) { return true, nil }
+	target := &openGLSurfaceTarget{callerDriver: driver, context: context, mapRef: m}
 	attachment, err := m.OpenglSurfaceAttach(
 		maplibre.OpenglSurfaceDescriptor{Extent: v.extent(), Context: descriptor, Surface: context.surface()},
-		wakes.attachOptions(0),
+		target.attachOptions(0),
 	)
 	if err == nil {
-		err = target.attach(attachment.Session, attachment.Completion, wakes)
+		err = target.attach(attachment.Session, attachment.Completion)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("OpenGL surface attach failed: %w", err)
@@ -427,15 +516,14 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 	return target, nil
 }
 
-// Resize handles SDL returning a different EGL window surface for the resized
-// window by handing the live session the replacement.
+// Resize resizes the session, or, when SDL returns a different EGL window
+// surface for the resized window, replaces the session's target with it.
 func (target *openGLSurfaceTarget) Resize(v viewport) error {
 	outgoing := target.context.surface()
 	if err := target.context.refreshPlatformSurface(); err != nil {
 		// SDL may already have dropped the surface the session presents
 		// through, so detach rather than leave it naming a dead surface.
-		target.released = true
-		return errors.Join(err, target.detach())
+		return errors.Join(err, target.callerDriver.Close())
 	}
 	if target.context.surface() == outgoing {
 		return target.callerDriver.Resize(v)
@@ -444,12 +532,13 @@ func (target *openGLSurfaceTarget) Resize(v viewport) error {
 	if err != nil {
 		return err
 	}
-	if err := target.handOver(target.session.OpenglSurfaceSetTarget(maplibre.OpenglSurfaceDescriptor{
+	if err := target.replaceTarget(target.session.OpenglSurfaceSetTarget(maplibre.OpenglSurfaceDescriptor{
 		Extent:  v.extent(),
 		Context: descriptor,
 		Surface: target.context.surface(),
 	})); err != nil {
 		return fmt.Errorf("OpenGL surface set target failed: %w", err)
 	}
-	return target.resizeMap(target.mapRef, v)
+	resizeMap(target.mapRef, v)
+	return target.RequestFrame(true)
 }

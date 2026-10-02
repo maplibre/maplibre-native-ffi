@@ -121,31 +121,30 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 	}
 	_ = sdl.GL_SetSwapInterval(1)
 
-	wakes := newLoopWakes()
-	mapState, err := newRuntimeMapState(view, smoke, wakes.events.wake())
+	// Every native wake pushes this SDL event to end the loop's wait.
+	wakeEvent := sdl.RegisterEvents(1)
+	events := newLoopWake(wakeEvent)
+	mapState, err := newRuntimeMapState(view, smoke, events.wake())
 	if err != nil {
 		_ = graphics.Close()
 		return err
 	}
-	target, err := newOpenGLRenderTarget(graphics, view, mode, mapState.mapRef, wakes)
+	target, err := attach(graphics, view, mode, mapState, wakeEvent)
 	if err != nil {
-		return errors.Join(
-			fmt.Errorf("render target attach failed: %w", err),
-			mapState.Close(),
-			graphics.Close(),
-		)
+		return errors.Join(err, mapState.Close(), graphics.Close())
 	}
 	defer func() {
 		result = errors.Join(result, target.Close(), mapState.Close(), graphics.Close())
 	}()
-
-	fmt.Printf("render target: %s\n", mode)
-	fmt.Printf("render target status: %s\n", mode.statusLine())
+	// A session fixes its scale factor at attachment, so a scale change
+	// reattaches.
+	attachedScale := view.scaleFactor
 	logControls()
 
 	// The SDL thread sleeps until input or a native wake arrives. Input
-	// becomes map commands, a map update becomes a frame demand, and each wake
-	// has the thread drain events, service driver work, or drain frame results.
+	// becomes map commands, a map update becomes a frame demand, and the
+	// wakes have the thread drain events, service driver work, and drain frame
+	// results.
 	input := inputController{}
 	smokeDeadline := time.Now().Add(smokeTimeout)
 	for {
@@ -161,9 +160,11 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 			case sdl.EventQuit, sdl.EventWindowCloseRequested:
 				return nil
 			case sdl.EventWindowResized, sdl.EventWindowPixelSizeChanged, sdl.EventWindowDisplayScaleChanged:
-				view = currentViewport(window)
-				view.log("resized viewport")
-				viewportChanged = true
+				if next := currentViewport(window); next != view {
+					view = next
+					view.log("resized viewport")
+					viewportChanged = true
+				}
 			default:
 				if !view.empty() {
 					if err := input.handleEvent(&event, mapState, view); err != nil {
@@ -175,11 +176,17 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 		// A live resize delivers several window events at once, and this
 		// resizes once for all of them.
 		if viewportChanged && !view.empty() {
-			if err := target.Resize(view); err != nil {
+			if view.scaleFactor == attachedScale {
+				err = target.Resize(view)
+			} else if err = target.Close(); err == nil {
+				target, err = attach(graphics, view, mode, mapState, wakeEvent)
+				attachedScale = view.scaleFactor
+			}
+			if err != nil {
 				return err
 			}
 		}
-		if wakes.events.consume() {
+		if events.consume() {
 			update, err := mapState.drainRenderUpdates()
 			if err != nil {
 				return err
@@ -190,25 +197,31 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 				}
 			}
 		}
-		if wakes.driverWork.consume() {
-			if err := target.ServiceDriverWork(); err != nil {
-				return err
-			}
-		}
-		if err := target.RetryIfDue(); err != nil {
+		presented, err := target.HandleWakes()
+		if err != nil {
 			return err
 		}
-		if wakes.frames.consume() {
-			presented, err := target.DrainFrameResults()
-			if err != nil {
-				return err
-			}
-			if smoke && presented {
-				fmt.Println("smoke: rendered one frame")
-				return nil
-			}
+		if smoke && presented {
+			fmt.Println("smoke: rendered a frame")
+			return nil
 		}
 	}
+}
+
+// attach attaches a session, logs its mode and driver, and demands its first
+// frame.
+func attach(graphics *openGLContext, view viewport, mode renderTargetMode, mapState *runtimeMapState, wakeEvent sdl.EventType) (renderTarget, error) {
+	target, err := newOpenGLRenderTarget(graphics, view, mode, mapState.mapRef, wakeEvent)
+	if err != nil {
+		return nil, fmt.Errorf("render target attach failed: %w", err)
+	}
+	fmt.Printf("render target: %s\n", mode)
+	fmt.Printf("render target status: %s\n", mode.statusLine())
+	fmt.Println("render driver: caller-graphics-thread")
+	if err := target.RequestFrame(false); err != nil {
+		return nil, errors.Join(err, target.Close())
+	}
+	return target, nil
 }
 
 // nextWake reports when the loop must wake without an event: for a paced

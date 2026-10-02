@@ -5,39 +5,9 @@ import (
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
 )
 
-// loopWakes are the native wakes that bring the SDL thread back from its
-// wait. Each one marks its receiver's work and pushes an SDL user event, so the
-// wake returns at once and the SDL thread does the work.
-type loopWakes struct {
-	// events reports that the runtime has events to drain.
-	events *loopWake
-	// frames reports that the render session has frame results to drain.
-	frames *loopWake
-	// driverWork reports that the render session has driver work for the SDL
-	// thread.
-	driverWork *loopWake
-}
-
-func newLoopWakes() loopWakes {
-	eventType := sdl.RegisterEvents(1)
-	return loopWakes{
-		events:     newLoopWake(eventType),
-		frames:     newLoopWake(eventType),
-		driverWork: newLoopWake(eventType),
-	}
-}
-
-// attachOptions returns attach options for a session that the SDL thread
-// drives.
-func (wakes loopWakes) attachOptions(ringDepth uint32) maplibre.RenderSessionAttachOptions {
-	options := maplibre.DefaultRenderSessionAttachOptions()
-	options.Driver = maplibre.RenderDriverKindCallerGraphicsThread
-	options.RequestedTextureRingDepth = ringDepth
-	options.FrameWake = wakes.frames.wake()
-	options.DriverWorkWake = wakes.driverWork.wake()
-	return options
-}
-
+// loopWake is a native wake for the SDL thread. The wake marks its work and
+// pushes an SDL user event, so it returns at once and the SDL thread does the
+// work after its wait ends.
 type loopWake struct {
 	pending   chan struct{}
 	eventType sdl.EventType
