@@ -39,6 +39,11 @@ last. Breaking API changes are intentional where they improve that ordering.
 The [review surface](review-surface.md) compares maintained and generated files
 with both `main` and the executor parent, and defines the counting rules.
 
+The [PR #760 review guide](https://claude.ai/artifact/Uo1dN7sLvs6XhSpxChjbAA)
+tracks open findings and decisions. The
+[test architecture plan](https://claude.ai/code/artifact/316f77f8-166a-420d-9a82-ccaae2a74af5)
+records the test rewrite's design and its decisions.
+
 The Astra team split implementation and independent review across the
 [semantic model](architecture-review.md), [native retirement](core-design.md),
 and [callback compiler and host runtimes](compiler-design.md). The coordinator
