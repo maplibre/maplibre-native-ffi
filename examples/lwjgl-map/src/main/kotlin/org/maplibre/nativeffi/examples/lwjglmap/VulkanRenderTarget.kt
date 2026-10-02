@@ -1,11 +1,11 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
+import kotlinx.coroutines.Deferred
 import org.lwjgl.vulkan.VK10
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.GpuSyncKind
 import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.RenderSessionHandle
+import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
@@ -18,52 +18,57 @@ internal object VulkanRenderTarget {
     map: MapHandle,
     viewport: Viewport,
     mode: RenderTargetMode,
-    wakes: LoopWakes,
-  ): RenderTarget =
-    when (mode) {
-      RenderTargetMode.NATIVE_SURFACE -> attachSurface(context, map, viewport, wakes)
-      RenderTargetMode.OWNED_TEXTURE -> attachOwnedTexture(context, map, viewport, wakes)
-      RenderTargetMode.BORROWED_TEXTURE -> attachBorrowedTexture(context, map, viewport, wakes)
-    }
-
-  private fun attachSurface(
-    context: VulkanContext,
-    map: MapHandle,
-    viewport: Viewport,
-    wakes: LoopWakes,
+    driver: SessionDriver,
   ): RenderTarget {
-    val descriptor =
-      VulkanSurfaceDescriptor(
-        RenderTarget.extent(viewport),
-        descriptor(context),
-        context.surfaceAddress().toULong(),
-      )
-    return RenderTarget(
-      RenderTarget.attached(map.vulkanSurfaceAttach(descriptor, wakes.attachOptions()))
-    )
+    // A core worker in a texture mode submits to its own queue. A native surface shares the host's,
+    // because the host submits nothing in that mode, and a caller driver submits from the host's
+    // thread.
+    val queue =
+      if (mode != RenderTargetMode.NATIVE_SURFACE && driver.kind == RenderDriverKind.CORE_WORKER) {
+        context.sessionQueueAddress()
+      } else {
+        context.graphicsQueueAddress()
+      }
+    val session = descriptor(context, queue)
+    return when (mode) {
+      RenderTargetMode.NATIVE_SURFACE ->
+        NativeSurfaceTarget(
+          AttachedSession.attach(driver) { options ->
+            map.vulkanSurfaceAttach(
+              VulkanSurfaceDescriptor(
+                RenderTarget.extent(viewport),
+                session,
+                context.surfaceAddress().toULong(),
+              ),
+              options,
+            )
+          }
+        )
+      RenderTargetMode.OWNED_TEXTURE -> attachOwnedTexture(context, map, viewport, driver, session)
+      RenderTargetMode.BORROWED_TEXTURE ->
+        attachBorrowedTexture(context, map, viewport, driver, session)
+    }
   }
 
   private fun attachOwnedTexture(
     context: VulkanContext,
     map: MapHandle,
     viewport: Viewport,
-    wakes: LoopWakes,
+    driver: SessionDriver,
+    session: VulkanContextDescriptor,
   ): RenderTarget {
-    val descriptor =
-      VulkanOwnedTextureDescriptor(RenderTarget.extent(viewport), descriptor(context))
     val compositor = VulkanTextureCompositor(context, viewport)
     try {
-      return OwnedTexture(
-        RenderTarget.attached(
+      val attached =
+        AttachedSession.attach(driver, RenderTarget.OWNED_TEXTURE_RING_DEPTH) { options ->
           map.vulkanOwnedTextureAttach(
-            descriptor,
-            wakes.attachOptions(RenderTarget.OWNED_TEXTURE_RING_DEPTH),
+            VulkanOwnedTextureDescriptor(RenderTarget.extent(viewport), session),
+            options,
           )
-        ),
-        compositor,
-      )
+        }
+      return OwnedTexture(attached, compositor)
     } catch (error: RuntimeException) {
-      RenderTarget.closeSuppressed(error, compositor)
+      compositor.close()
       throw error
     }
   }
@@ -72,29 +77,27 @@ internal object VulkanRenderTarget {
     context: VulkanContext,
     map: MapHandle,
     viewport: Viewport,
-    wakes: LoopWakes,
+    driver: SessionDriver,
+    session: VulkanContextDescriptor,
   ): RenderTarget {
     val image = VulkanBorrowedImage.create(context, viewport)
     var compositor: VulkanTextureCompositor? = null
     try {
       compositor = VulkanTextureCompositor(context, viewport)
-      val descriptor = borrowedDescriptor(context, viewport, image)
-      return BorrowedTexture(
-        context,
-        map,
-        RenderTarget.attached(map.vulkanBorrowedTextureAttach(descriptor, wakes.attachOptions())),
-        compositor,
-        image,
-      )
+      val attached =
+        AttachedSession.attach(driver) { options ->
+          map.vulkanBorrowedTextureAttach(borrowedDescriptor(session, viewport, image), options)
+        }
+      return BorrowedTexture(attached, map, context, session, compositor, image)
     } catch (error: RuntimeException) {
-      RenderTarget.closeSuppressed(error, compositor)
-      RenderTarget.closeSuppressed(error, image)
+      runCatching { compositor?.close() }.onFailure(error::addSuppressed)
+      image.close()
       throw error
     }
   }
 
   private fun borrowedDescriptor(
-    context: VulkanContext,
+    session: VulkanContextDescriptor,
     viewport: Viewport,
     image: VulkanBorrowedImage,
   ): VulkanBorrowedTextureDescriptor =
@@ -102,7 +105,7 @@ internal object VulkanRenderTarget {
       RenderTarget.extent(viewport),
       viewport.framebufferWidth().toUInt(),
       viewport.framebufferHeight().toUInt(),
-      descriptor(context),
+      session,
       image.imageAddress().toULong(),
       image.viewAddress().toULong(),
       VK10.VK_FORMAT_R8G8B8A8_UNORM.toUInt(),
@@ -110,101 +113,72 @@ internal object VulkanRenderTarget {
       VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.toUInt(),
     )
 
-  private fun descriptor(context: VulkanContext): VulkanContextDescriptor =
+  /** The session's view of the host's device, submitting to [queue]. */
+  private fun descriptor(context: VulkanContext, queue: Long): VulkanContextDescriptor =
     VulkanContextDescriptor(
       NativePointer.ofAddress(context.instanceAddress()),
       NativePointer.ofAddress(context.physicalDeviceAddress()),
       NativePointer.ofAddress(context.deviceAddress()),
-      NativePointer.ofAddress(context.graphicsQueueAddress()),
+      NativePointer.ofAddress(queue),
       context.graphicsQueueFamilyIndex().toUInt(),
       NativePointer.ofAddress(context.getInstanceProcAddrAddress()),
       NativePointer.ofAddress(context.getDeviceProcAddrAddress()),
     )
 
   private class OwnedTexture(
-    session: RenderSessionHandle,
+    attached: AttachedSession,
     private val compositor: VulkanTextureCompositor,
-  ) : RenderTarget(session) {
-    override fun resize(viewport: Viewport) {
+  ) : OwnedTextureTarget(attached) {
+    override fun draw(frame: AcquiredFrameHandle): Boolean = frame.withGetProducerSync { sync ->
+      check(sync.kind == GpuSyncKind.CPU_COMPLETE) {
+        "Vulkan compositor requires CPU-complete producer work"
+      }
+      frame.withGetVulkanTexture { view ->
+        check(view.width > 0u && view.height > 0u) {
+          "MapLibre returned an empty Vulkan owned texture frame"
+        }
+        check(view.layout == VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.toUInt()) {
+          "MapLibre owned texture frame is not shader-readable: layout=${view.layout}"
+        }
+        compositor.drawImageView(view.imageView.toLong())
+      }
+    }
+
+    override fun resizeHost(viewport: Viewport) {
       compositor.resize(viewport)
-      super.resize(viewport)
     }
 
-    override fun present(): Boolean {
-      // An empty ring leaves the previously composited frame on screen, and nothing new reaches
-      // the window.
-      val frameHandle =
-        try {
-          session.acquireFrame()
-        } catch (error: MaplibreException) {
-          if (error.status == MaplibreStatus.NOT_READY) return false
-          throw error
-        }
-      try {
-        return frameHandle.withGetProducerSync { sync ->
-          check(sync.kind == GpuSyncKind.CPU_COMPLETE) {
-            "Vulkan compositor requires CPU-complete producer work"
-          }
-          frameHandle.withGetVulkanTexture { frame ->
-            check(frame.width > 0u && frame.height > 0u) {
-              "MapLibre returned an empty Vulkan owned texture frame"
-            }
-            check(frame.layout == VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.toUInt()) {
-              "MapLibre owned texture frame is not shader-readable: layout=${frame.layout}"
-            }
-            compositor.drawImageView(frame.imageView.toLong())
-          }
-        }
-      } finally {
-        frameHandle.release()
-      }
-    }
-
-    override fun close() {
-      try {
-        compositor.close()
-      } finally {
-        super.close()
-      }
+    override fun closeHost() {
+      compositor.close()
     }
   }
 
   private class BorrowedTexture(
+    attached: AttachedSession,
+    map: MapHandle,
     private val context: VulkanContext,
-    private val map: MapHandle,
-    session: RenderSessionHandle,
+    private val sessionContext: VulkanContextDescriptor,
     private val compositor: VulkanTextureCompositor,
-    private var image: VulkanBorrowedImage,
-  ) : RenderTarget(session) {
-    /** Allocates an image at the new size and hands it to the live session. */
-    override fun resize(viewport: Viewport) {
+    image: VulkanBorrowedImage,
+  ) : BorrowedTextureTarget<VulkanBorrowedImage>(attached, map, image) {
+    override fun allocate(viewport: Viewport): VulkanBorrowedImage =
+      VulkanBorrowedImage.create(context, viewport)
+
+    override fun setTarget(viewport: Viewport, replacement: VulkanBorrowedImage): Deferred<Unit> =
+      session.vulkanBorrowedTextureSetTarget(
+        borrowedDescriptor(sessionContext, viewport, replacement)
+      )
+
+    override fun draw(texture: VulkanBorrowedImage): Boolean =
+      compositor.drawImageView(texture.view())
+
+    override fun resizeHost(viewport: Viewport) {
       compositor.resize(viewport)
-      val replacement = VulkanBorrowedImage.create(context, viewport)
-      try {
-        handOver {
-          session.vulkanBorrowedTextureSetTarget(borrowedDescriptor(context, viewport, replacement))
-        }
-      } catch (error: RuntimeException) {
-        RenderTarget.closeSuppressed(error, replacement)
-        throw error
-      }
-      image.close()
-      image = replacement
-      RenderTarget.resizeMap(map, viewport)
     }
 
-    override fun present(): Boolean = compositor.drawImageView(image.view())
-
-    override fun close() {
-      try {
-        compositor.close()
-      } finally {
-        try {
-          super.close()
-        } finally {
-          image.close()
-        }
-      }
+    override fun closeHost() {
+      compositor.close()
+      texture.close()
     }
   }
 }

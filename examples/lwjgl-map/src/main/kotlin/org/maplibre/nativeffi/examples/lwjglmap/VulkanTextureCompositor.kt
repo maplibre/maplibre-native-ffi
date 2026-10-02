@@ -116,7 +116,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
    * MoltenVK presents succeed but reach no drawable the window shows.
    */
   private fun recreateSwapchain() {
-    context.waitIdle()
+    context.waitHostQueueIdle()
     val retiredSwapchain = swapchain
     val retiredImageViews = imageViews
     val retiredFramebuffers = framebuffers
@@ -716,7 +716,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
   }
 
   override fun close() {
-    context.waitIdle()
+    context.waitHostQueueIdle()
     if (inFlight != NULL) {
       vkDestroyFence(context.device(), inFlight, null)
       inFlight = NULL

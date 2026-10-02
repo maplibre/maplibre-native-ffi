@@ -1,14 +1,13 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
+import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.GpuSyncKind
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.MetalContextDescriptor
 import org.maplibre.nativeffi.generated.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.MetalSurfaceDescriptor
-import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.render.NativePointer
 
 internal object MetalRenderTarget {
@@ -17,49 +16,45 @@ internal object MetalRenderTarget {
     map: MapHandle,
     viewport: Viewport,
     mode: RenderTargetMode,
-    wakes: LoopWakes,
+    driver: SessionDriver,
   ): RenderTarget =
     when (mode) {
-      RenderTargetMode.NATIVE_SURFACE -> attachSurface(context, map, viewport, wakes)
-      RenderTargetMode.OWNED_TEXTURE -> attachOwnedTexture(context, map, viewport, wakes)
-      RenderTargetMode.BORROWED_TEXTURE -> attachBorrowedTexture(context, map, viewport, wakes)
+      RenderTargetMode.NATIVE_SURFACE ->
+        NativeSurfaceTarget(
+          AttachedSession.attach(driver) { options ->
+            map.metalSurfaceAttach(
+              MetalSurfaceDescriptor(
+                RenderTarget.extent(viewport),
+                descriptor(context),
+                NativePointer.ofAddress(context.layerAddress()),
+              ),
+              options,
+            )
+          }
+        )
+      RenderTargetMode.OWNED_TEXTURE -> attachOwnedTexture(context, map, viewport, driver)
+      RenderTargetMode.BORROWED_TEXTURE -> attachBorrowedTexture(context, map, viewport, driver)
     }
-
-  private fun attachSurface(
-    context: MetalContext,
-    map: MapHandle,
-    viewport: Viewport,
-    wakes: LoopWakes,
-  ): RenderTarget {
-    val descriptor =
-      MetalSurfaceDescriptor(
-        RenderTarget.extent(viewport),
-        descriptor(context),
-        NativePointer.ofAddress(context.layerAddress()),
-      )
-    return Surface(RenderTarget.attached(map.metalSurfaceAttach(descriptor, wakes.attachOptions())))
-  }
 
   private fun attachOwnedTexture(
     context: MetalContext,
     map: MapHandle,
     viewport: Viewport,
-    wakes: LoopWakes,
+    driver: SessionDriver,
   ): RenderTarget {
-    val descriptor = MetalOwnedTextureDescriptor(RenderTarget.extent(viewport), descriptor(context))
+    context.resizeDrawable(viewport)
     val compositor = MetalTextureCompositor(context)
     try {
-      return OwnedTexture(
-        RenderTarget.attached(
+      val attached =
+        AttachedSession.attach(driver, RenderTarget.OWNED_TEXTURE_RING_DEPTH) { options ->
           map.metalOwnedTextureAttach(
-            descriptor,
-            wakes.attachOptions(RenderTarget.OWNED_TEXTURE_RING_DEPTH),
+            MetalOwnedTextureDescriptor(RenderTarget.extent(viewport), descriptor(context)),
+            options,
           )
-        ),
-        compositor,
-      )
+        }
+      return OwnedTexture(attached, context, compositor)
     } catch (error: RuntimeException) {
-      RenderTarget.closeSuppressed(error, compositor)
+      compositor.close()
       throw error
     }
   }
@@ -68,23 +63,21 @@ internal object MetalRenderTarget {
     context: MetalContext,
     map: MapHandle,
     viewport: Viewport,
-    wakes: LoopWakes,
+    driver: SessionDriver,
   ): RenderTarget {
+    context.resizeDrawable(viewport)
     val texture = MetalBorrowedTexture(context, viewport)
     var compositor: MetalTextureCompositor? = null
     try {
       compositor = MetalTextureCompositor(context)
-      val descriptor = borrowedDescriptor(viewport, texture)
-      return BorrowedTexture(
-        context,
-        map,
-        RenderTarget.attached(map.metalBorrowedTextureAttach(descriptor, wakes.attachOptions())),
-        compositor,
-        texture,
-      )
+      val attached =
+        AttachedSession.attach(driver) { options ->
+          map.metalBorrowedTextureAttach(borrowedDescriptor(viewport, texture), options)
+        }
+      return BorrowedTexture(attached, map, context, compositor, texture)
     } catch (error: RuntimeException) {
-      RenderTarget.closeSuppressed(error, compositor)
-      RenderTarget.closeSuppressed(error, texture)
+      runCatching { compositor?.close() }.onFailure(error::addSuppressed)
+      texture.close()
       throw error
     }
   }
@@ -103,89 +96,55 @@ internal object MetalRenderTarget {
   private fun descriptor(context: MetalContext): MetalContextDescriptor =
     MetalContextDescriptor(NativePointer.ofAddress(context.deviceAddress()))
 
-  private class Surface(session: RenderSessionHandle) : RenderTarget(session) {
-    override fun needsMetalAutoreleasePool(): Boolean = true
-  }
-
   private class OwnedTexture(
-    session: RenderSessionHandle,
+    attached: AttachedSession,
+    private val context: MetalContext,
     private val compositor: MetalTextureCompositor,
-  ) : RenderTarget(session) {
-    override fun needsMetalAutoreleasePool(): Boolean = true
-
-    override fun present(): Boolean {
-      // An empty ring leaves the previously composited frame on screen, and nothing new reaches
-      // the window.
-      val frameHandle =
-        try {
-          session.acquireFrame()
-        } catch (error: MaplibreException) {
-          if (error.status == MaplibreStatus.NOT_READY) return false
-          throw error
+  ) : OwnedTextureTarget(attached) {
+    override fun draw(frame: AcquiredFrameHandle): Boolean = frame.withGetProducerSync { sync ->
+      check(sync.kind == GpuSyncKind.CPU_COMPLETE) {
+        "Metal compositor requires CPU-complete producer work"
+      }
+      frame.withGetMetalTexture { view ->
+        check(view.width != 0u && view.height != 0u && !view.texture.isNull) {
+          "owned Metal frame has an empty extent or null texture"
         }
-      try {
-        return frameHandle.withGetProducerSync { sync ->
-          check(sync.kind == GpuSyncKind.CPU_COMPLETE) {
-            "Metal compositor requires CPU-complete producer work"
-          }
-          frameHandle.withGetMetalTexture { frame ->
-            check(frame.width != 0u && frame.height != 0u && !frame.texture.isNull) {
-              "owned Metal frame has an empty extent or null texture"
-            }
-            compositor.drawTexture(frame.texture.address)
-          }
-        }
-      } finally {
-        frameHandle.release()
+        compositor.drawTexture(view.texture.address)
       }
     }
 
-    override fun close() {
-      try {
-        compositor.close()
-      } finally {
-        super.close()
-      }
+    override fun resizeHost(viewport: Viewport) {
+      context.resizeDrawable(viewport)
+    }
+
+    override fun closeHost() {
+      compositor.close()
     }
   }
 
   private class BorrowedTexture(
+    attached: AttachedSession,
+    map: MapHandle,
     private val context: MetalContext,
-    private val map: MapHandle,
-    session: RenderSessionHandle,
     private val compositor: MetalTextureCompositor,
-    private var texture: MetalBorrowedTexture,
-  ) : RenderTarget(session) {
-    override fun needsMetalAutoreleasePool(): Boolean = true
+    texture: MetalBorrowedTexture,
+  ) : BorrowedTextureTarget<MetalBorrowedTexture>(attached, map, texture) {
+    override fun allocate(viewport: Viewport): MetalBorrowedTexture =
+      MetalBorrowedTexture(context, viewport)
 
-    /** Allocates a texture at the new size and hands it to the live session. */
-    override fun resize(viewport: Viewport) {
-      val replacement = MetalBorrowedTexture(context, viewport)
-      try {
-        handOver {
-          session.metalBorrowedTextureSetTarget(borrowedDescriptor(viewport, replacement))
-        }
-      } catch (error: RuntimeException) {
-        RenderTarget.closeSuppressed(error, replacement)
-        throw error
-      }
-      texture.close()
-      texture = replacement
-      RenderTarget.resizeMap(map, viewport)
+    override fun setTarget(viewport: Viewport, replacement: MetalBorrowedTexture): Deferred<Unit> =
+      session.metalBorrowedTextureSetTarget(borrowedDescriptor(viewport, replacement))
+
+    override fun draw(texture: MetalBorrowedTexture): Boolean =
+      compositor.drawTexture(texture.texture())
+
+    override fun resizeHost(viewport: Viewport) {
+      context.resizeDrawable(viewport)
     }
 
-    override fun present(): Boolean = compositor.drawTexture(texture.texture())
-
-    override fun close() {
-      try {
-        compositor.close()
-      } finally {
-        try {
-          super.close()
-        } finally {
-          texture.close()
-        }
-      }
+    override fun closeHost() {
+      compositor.close()
+      texture.close()
     }
   }
 }

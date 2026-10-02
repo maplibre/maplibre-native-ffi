@@ -23,23 +23,23 @@ internal class MapState
 private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : AutoCloseable {
 
   fun cancelTransitions() {
-    map.cancelTransitions()
+    map.cancelTransitions().reportFailure("camera transition cancel")
   }
 
   fun setGestureInProgress(inProgress: Boolean) {
-    map.updateCamera(
-      CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END)
-    )
+    map
+      .updateCamera(
+        CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END)
+      )
+      .reportFailure("gesture update")
   }
 
   fun moveBy(dx: Double, dy: Double, durationMs: Double? = null) {
-    map.applyCameraDelta(
-      CameraDelta(offset = ScreenPoint(dx, dy), animation = animation(durationMs))
-    )
+    delta(CameraDelta(offset = ScreenPoint(dx, dy), animation = animation(durationMs)))
   }
 
   fun scaleBy(scale: Double, anchor: ScreenPoint, durationMs: Double? = null) {
-    map.applyCameraDelta(
+    delta(
       CameraDelta(
         kind = CameraDeltaKind.SCALE,
         amount = scale,
@@ -50,13 +50,13 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   }
 
   fun adjustPitch(delta: Double, durationMs: Double? = null) {
-    map.applyCameraDelta(
+    delta(
       CameraDelta(kind = CameraDeltaKind.PITCH, amount = delta, animation = animation(durationMs))
     )
   }
 
   fun adjustBearing(delta: Double, durationMs: Double? = null) {
-    map.applyCameraDelta(
+    delta(
       CameraDelta(kind = CameraDeltaKind.BEARING, amount = delta, animation = animation(durationMs))
     )
   }
@@ -66,13 +66,19 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   }
 
   private fun update(camera: CameraOptions, durationMs: Double? = null) {
-    map.updateCamera(
-      CameraUpdate(
-        mode = if (durationMs == null) CameraUpdateMode.JUMP else CameraUpdateMode.EASE,
-        camera = camera,
-        animation = animation(durationMs),
+    map
+      .updateCamera(
+        CameraUpdate(
+          mode = if (durationMs == null) CameraUpdateMode.JUMP else CameraUpdateMode.EASE,
+          camera = camera,
+          animation = animation(durationMs),
+        )
       )
-    )
+      .reportFailure("camera update")
+  }
+
+  private fun delta(delta: CameraDelta) {
+    map.applyCameraDelta(delta).reportFailure("camera delta")
   }
 
   private fun animation(durationMs: Double?): AnimationOptions =
@@ -144,9 +150,11 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
         }
       try {
         val state = MapState(runtime, map)
-        if (styleJson != null) map.setStyleJson(styleJson.encodeToByteArray())
-        else map.setStyleUrl(STYLE_URL)
-        map.updateCamera(CameraUpdate(camera = initialCamera))
+        val style =
+          if (styleJson != null) map.setStyleJson(styleJson.encodeToByteArray())
+          else map.setStyleUrl(STYLE_URL)
+        style.reportFailure("style load")
+        map.updateCamera(CameraUpdate(camera = initialCamera)).reportFailure("initial camera")
         return state
       } catch (error: Throwable) {
         runBlocking {

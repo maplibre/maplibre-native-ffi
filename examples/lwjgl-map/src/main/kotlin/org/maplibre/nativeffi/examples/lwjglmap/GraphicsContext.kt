@@ -7,8 +7,6 @@ internal interface GraphicsContext : AutoCloseable {
 
   fun backend(): RenderBackendFlag
 
-  fun resize(viewport: Viewport) {}
-
   override fun close()
 
   companion object {

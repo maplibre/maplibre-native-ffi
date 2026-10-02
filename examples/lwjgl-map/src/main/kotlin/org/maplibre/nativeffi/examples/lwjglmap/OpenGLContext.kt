@@ -76,10 +76,6 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
     glfwSwapBuffers(window)
   }
 
-  override fun resize(viewport: Viewport) {
-    makeCurrent()
-  }
-
   override fun close() {
     if (closed) {
       return

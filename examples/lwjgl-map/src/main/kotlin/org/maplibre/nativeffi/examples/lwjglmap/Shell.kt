@@ -13,8 +13,8 @@ import org.maplibre.nativeffi.generated.RenderBackendFlag
  * The GLFW-thread shell that owns the window, graphics context, and render session.
  *
  * The thread sleeps in `glfwWaitEvents` until input arrives or a native wake posts an empty event.
- * Input becomes map commands, a map update becomes a frame demand, and each wake has the thread
- * drain events, service driver work, or drain frame results.
+ * Input becomes map commands, a map update becomes a frame demand, and the wakes have the thread
+ * drain events and frame results.
  */
 internal object Shell {
   private const val INITIAL_WIDTH = 960
@@ -39,19 +39,14 @@ internal object Shell {
       .use { graphics ->
         val viewport = ViewportHolder(Viewport.read(graphics.window()))
         viewport.value.log("initial viewport")
-        val wakes = LoopWakes()
+        val events = GlfwWake()
         val style = if (smoke) MapState.SMOKE_STYLE else null
-        MapState.create(viewport.value, wakes.events.wake, style).use { state ->
-          RenderTarget.attach(graphics, state.map, viewport.value, mode, wakes).use { target ->
-            InputController(graphics.window(), state) { viewport.value }
-              .use {
-                println("render target: ${mode.cliName()}")
-                println("render target status: ${mode.status()}")
-                InputController.printControls()
-                installResizeCallbacks(graphics.window(), viewport)
-                renderLoop(graphics, viewport, state, target, wakes, smoke)
-              }
-          }
+        MapState.create(viewport.value, events.wake, style).use { state ->
+          InputController(graphics.window(), state) { viewport.value }
+            .use {
+              installResizeCallbacks(graphics.window(), viewport)
+              renderLoop(graphics, viewport, state, events, mode, smoke)
+            }
         }
       }
   }
@@ -60,50 +55,66 @@ internal object Shell {
     graphics: GraphicsContext,
     viewport: ViewportHolder,
     state: MapState,
-    target: RenderTarget,
-    wakes: LoopWakes,
+    events: GlfwWake,
+    mode: RenderTargetMode,
     smoke: Boolean,
   ) {
+    var target = attach(graphics, state, viewport.value, mode)
+    // A session fixes its scale factor at attachment, so a scale change reattaches.
+    var attachedScale = viewport.value.scaleFactor()
+    InputController.printControls()
     val smokeDeadline = System.nanoTime() + SMOKE_TIMEOUT_NANOS
-    // Attaching asked the map for a frame, and its wakes may have arrived while the attachment
-    // waited, so the loop handles pending work before its first wait.
-    while (!glfwWindowShouldClose(graphics.window())) {
-      val presented =
-        withAutoreleasePool(target) {
-          if (viewport.consumeChanged()) {
-            viewport.value.log("resized viewport")
-            if (!viewport.value.empty()) {
-              graphics.resize(viewport.value)
-              target.resize(viewport.value)
-            }
+    try {
+      // Wakes may have arrived while the attachment waited, so the loop handles pending work
+      // before its first wait.
+      while (!glfwWindowShouldClose(graphics.window())) {
+        if (viewport.consumeChanged()) {
+          viewport.value.log("resized viewport")
+          val next = viewport.value
+          if (!next.empty() && next.scaleFactor() == attachedScale) {
+            target.resize(next)
+          } else if (!next.empty()) {
+            target.close()
+            target = attach(graphics, state, next, mode)
+            attachedScale = next.scaleFactor()
           }
-          if (wakes.events.consume() && state.drainRenderUpdates() && !viewport.value.empty()) {
-            target.requestFrame()
-          }
-          if (wakes.driverWork.consume()) target.serviceDriverWork()
-          target.retryIfDue()
-          wakes.frames.consume() && target.drainFrameResults()
         }
-      if (smoke && presented) {
-        println("smoke: rendered a frame")
-        return
+        if (events.consume() && state.drainRenderUpdates() && !viewport.value.empty()) {
+          target.requestFrame()
+        }
+        if (target.handleWakes() && smoke) {
+          println("smoke: rendered a frame")
+          return
+        }
+        check(!smoke || System.nanoTime() < smokeDeadline) {
+          "smoke: no frame reached the window within 60 seconds"
+        }
+        val wakeAt = listOfNotNull(target.retryAtNanos, smokeDeadline.takeIf { smoke }).minOrNull()
+        if (wakeAt == null) {
+          glfwWaitEvents()
+        } else {
+          glfwWaitEventsTimeout(maxOf(wakeAt - System.nanoTime(), 0L) / 1e9)
+        }
       }
-      check(!smoke || System.nanoTime() < smokeDeadline) { "smoke: no frame reached the window" }
-      val wakeAt = listOfNotNull(target.retryAtNanos, smokeDeadline.takeIf { smoke }).minOrNull()
-      if (wakeAt == null) {
-        glfwWaitEvents()
-      } else {
-        glfwWaitEventsTimeout(maxOf(wakeAt - System.nanoTime(), 0L) / 1e9)
-      }
+    } finally {
+      target.close()
     }
   }
 
-  private fun <T> withAutoreleasePool(target: RenderTarget, action: () -> T): T =
-    if (target.needsMetalAutoreleasePool()) {
-      MacObjectiveC.autoreleasePool().use { action() }
-    } else {
-      action()
-    }
+  /** Attaches a session, logs its mode and driver, and demands its first frame. */
+  private fun attach(
+    graphics: GraphicsContext,
+    state: MapState,
+    viewport: Viewport,
+    mode: RenderTargetMode,
+  ): RenderTarget {
+    val target = RenderTarget.attach(graphics, state.map, viewport, mode)
+    println("render target: ${mode.cliName()}")
+    println("render target status: ${mode.status()}")
+    println("render driver: ${target.driverLabel}")
+    target.requestFrame()
+    return target
+  }
 
   private fun installResizeCallbacks(window: Long, viewport: ViewportHolder) {
     glfwSetWindowSizeCallback(window) { _, _, _ -> viewport.update(window) }

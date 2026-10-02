@@ -150,7 +150,8 @@ private constructor(
 
   fun drawableTexture(drawable: Long): Long = MacObjectiveC.sendPointer(drawable, "texture")
 
-  override fun resize(viewport: Viewport) {
+  /** Sizes the layer's drawables for the compositor. A native surface session sizes them itself. */
+  fun resizeDrawable(viewport: Viewport) {
     resizeLayer(layer, viewport)
   }
 
