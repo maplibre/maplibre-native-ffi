@@ -55,7 +55,7 @@ internal sealed class MapState : IDisposable
             var style = styleJson is null
                 ? map.SetStyleUrlAsync(StyleUrl)
                 : map.SetStyleJsonAsync(styleJson);
-            style.GetAwaiter().GetResult();
+            style.ReportFailure("style load");
             map.UpdateCameraAsync(
                     CameraUpdate.Default with
                     {
@@ -69,8 +69,7 @@ internal sealed class MapState : IDisposable
                         },
                     }
                 )
-                .GetAwaiter()
-                .GetResult();
+                .ReportFailure("initial camera");
             return new MapState(runtime, map);
         }
         catch
@@ -83,22 +82,23 @@ internal sealed class MapState : IDisposable
 
     public void CancelTransitions()
     {
-        _ = Map.CancelTransitionsAsync();
+        Map.CancelTransitionsAsync().ReportFailure("camera transition cancel");
     }
 
     public void SetGestureInProgress(bool inProgress)
     {
-        _ = Map.UpdateCameraAsync(
-            CameraUpdate.Default with
-            {
-                GesturePhase = inProgress ? GesturePhase.Begin : GesturePhase.End,
-            }
-        );
+        Map.UpdateCameraAsync(
+                CameraUpdate.Default with
+                {
+                    GesturePhase = inProgress ? GesturePhase.Begin : GesturePhase.End,
+                }
+            )
+            .ReportFailure("gesture update");
     }
 
     public void MoveBy(double deltaX, double deltaY, AnimationOptions? animation = null)
     {
-        _ = Map.ApplyCameraDeltaAsync(
+        ApplyDelta(
             new CameraDelta
             {
                 Offset = new ScreenPoint(deltaX, deltaY),
@@ -109,7 +109,7 @@ internal sealed class MapState : IDisposable
 
     public void ScaleBy(double scale, ScreenPoint? anchor, AnimationOptions? animation = null)
     {
-        _ = Map.ApplyCameraDeltaAsync(
+        ApplyDelta(
             new CameraDelta
             {
                 Kind = CameraDeltaKind.Scale,
@@ -122,7 +122,7 @@ internal sealed class MapState : IDisposable
 
     public void AdjustBearing(double delta, AnimationOptions? animation = null)
     {
-        _ = Map.ApplyCameraDeltaAsync(
+        ApplyDelta(
             new CameraDelta
             {
                 Kind = CameraDeltaKind.Bearing,
@@ -134,7 +134,7 @@ internal sealed class MapState : IDisposable
 
     public void AdjustPitch(double delta, AnimationOptions? animation = null)
     {
-        _ = Map.ApplyCameraDeltaAsync(
+        ApplyDelta(
             new CameraDelta
             {
                 Kind = CameraDeltaKind.Pitch,
@@ -181,15 +181,19 @@ internal sealed class MapState : IDisposable
         }
     }
 
+    private void ApplyDelta(CameraDelta delta) =>
+        Map.ApplyCameraDeltaAsync(delta).ReportFailure("camera delta");
+
     private void Update(CameraOptions camera, AnimationOptions? animation)
     {
-        _ = Map.UpdateCameraAsync(
-            CameraUpdate.Default with
-            {
-                Mode = animation is null ? CameraUpdateMode.Jump : CameraUpdateMode.Ease,
-                Camera = camera,
-                Animation = animation ?? new AnimationOptions(),
-            }
-        );
+        Map.UpdateCameraAsync(
+                CameraUpdate.Default with
+                {
+                    Mode = animation is null ? CameraUpdateMode.Jump : CameraUpdateMode.Ease,
+                    Camera = camera,
+                    Animation = animation ?? new AnimationOptions(),
+                }
+            )
+            .ReportFailure("camera update");
     }
 }

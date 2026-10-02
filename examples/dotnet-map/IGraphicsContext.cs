@@ -17,8 +17,6 @@ internal interface IGraphicsContext : IDisposable
 
     Viewport ReadViewport();
 
-    void Resize(Viewport viewport);
-
     void FinishFrame();
 }
 

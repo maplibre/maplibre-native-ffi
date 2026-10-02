@@ -65,7 +65,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
     public void Resize(Viewport viewport)
     {
         this.viewport = viewport;
-        context.WaitIdle();
+        context.WaitHostQueueIdle();
         DestroySwapchainDependents();
         var oldSwapchain = swapchain;
         var oldFormat = swapchainFormat;
@@ -187,7 +187,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
     {
         if (context.Device.Handle != 0)
         {
-            context.WaitIdle();
+            context.WaitHostQueueIdle();
         }
 
         if (inFlight.Handle != 0)

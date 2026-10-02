@@ -79,7 +79,7 @@ internal sealed unsafe class MetalContext : IGraphicsContext
             MacObjectiveC.SendVoid(retainedView, "setLayer:", layer);
 
             var context = new MetalContext(window, retainedView, device, layer);
-            context.Resize(context.ReadViewport());
+            context.SetDrawableSize(context.ReadViewport());
             Console.WriteLine($"GLFW {window.Glfw.GetVersionString()}, Metal, Cocoa");
             return context;
         }
@@ -247,7 +247,10 @@ internal sealed unsafe class MetalContext : IGraphicsContext
 
     public Viewport ReadViewport() => window.ReadViewport();
 
-    public void Resize(Viewport viewport)
+    /// <summary>
+    /// Sizes the layer's drawables for the compositor. A native surface session sizes them itself.
+    /// </summary>
+    public void SetDrawableSize(Viewport viewport)
     {
         MacObjectiveC.SendSize(
             layer,

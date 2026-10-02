@@ -99,12 +99,6 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     public Viewport ReadViewport() => window.ReadViewport();
 
-    public void Resize(Viewport viewport)
-    {
-        _ = viewport;
-        MakeCurrent();
-    }
-
     public void FinishFrame()
     {
         MakeCurrent();

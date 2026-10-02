@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Maplibre.NativeFfi.Base;
+using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Render;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
@@ -7,8 +8,7 @@ namespace Maplibre.NativeFfi.Examples.DotnetMap;
 /// <summary>
 /// App shell. GLFW, the graphics context, and the render session stay on the main thread, which
 /// sleeps until input arrives or a native wake posts an empty event. Input becomes map commands, a
-/// map update becomes a frame demand, and each wake has the thread drain events, service driver
-/// work, or drain frame results.
+/// map update becomes a frame demand, and the wakes have the thread drain events and frame results.
 /// </summary>
 internal static class Shell
 {
@@ -37,72 +37,91 @@ internal static class Shell
             backends,
             visible: !smoke
         );
-        var wakes = new LoopWakes(graphics.Window.Glfw);
+        var events = new GlfwWake(graphics.Window.Glfw);
         using var state = MapState.Create(
             graphics.ReadViewport(),
-            wakes.Events.Wake,
+            events.Wake,
             smoke ? SmokeStyle : null
         );
-        // The thread-affine session closes before the map and runtime are released.
-        using var target = RenderTarget.Attach(graphics, state.Map, mode, wakes);
-        Console.WriteLine($"render target: {mode.CliName}");
-        Console.WriteLine($"render target status: {mode.Status}");
-        InputController.PrintControls();
         using var input = new InputController(graphics.Window, state);
 
         var viewport = graphics.ReadViewport();
-        var smokeDeadline =
-            Stopwatch.GetTimestamp() + (long)(Stopwatch.Frequency * SmokeDeadline.TotalSeconds);
-        // Attaching asked the map for a frame, and its wakes may have arrived while the attachment
-        // waited, so the loop handles pending work before its first wait.
-        while (!graphics.ShouldClose)
+        // The session detaches before the map and runtime are released.
+        var target = Attach(graphics, state.Map, mode);
+        // A session fixes its scale factor at attachment, so a scale change reattaches.
+        var attachedScale = viewport.ScaleFactor;
+        try
         {
-            using (graphics is MetalContext ? MacObjectiveC.AutoreleasePool() : null)
+            InputController.PrintControls();
+            var smokeDeadline =
+                Stopwatch.GetTimestamp() + (long)(Stopwatch.Frequency * SmokeDeadline.TotalSeconds);
+            // Wakes may have arrived while the attachment waited, so the loop handles pending work
+            // before its first wait.
+            while (!graphics.ShouldClose)
             {
-                var currentViewport = graphics.ReadViewport();
-                if (currentViewport != viewport)
+                var current = graphics.ReadViewport();
+                if (current != viewport)
                 {
-                    viewport = currentViewport;
-                    if (!viewport.IsEmpty)
+                    viewport = current;
+                    if (!viewport.IsEmpty && viewport.ScaleFactor == attachedScale)
                     {
-                        graphics.Resize(viewport);
                         target.Resize(viewport);
                     }
+                    else if (!viewport.IsEmpty)
+                    {
+                        target.Dispose();
+                        target = Attach(graphics, state.Map, mode);
+                        attachedScale = viewport.ScaleFactor;
+                    }
                 }
-                if (wakes.Events.Consume() && state.DrainRenderUpdates() && graphics.CanRenderFrame)
+                if (events.Consume() && state.DrainRenderUpdates() && graphics.CanRenderFrame)
                 {
                     target.RequestFrame();
                 }
-                if (wakes.DriverWork.Consume())
+                if (target.HandleWakes() && smoke)
                 {
-                    target.ServiceDriverWork();
-                }
-                target.RetryIfDue();
-                if (wakes.Frames.Consume() && target.DrainFrameResults() && smoke)
-                {
-                    Console.WriteLine($"smoke: rendered a frame with {mode.CliName}");
+                    Console.WriteLine("smoke: rendered a frame");
                     return true;
                 }
-            }
 
-            if (smoke && Stopwatch.GetTimestamp() >= smokeDeadline)
-            {
-                Console.Error.WriteLine($"smoke: no frame rendered within {SmokeDeadline}");
-                return false;
+                if (smoke && Stopwatch.GetTimestamp() >= smokeDeadline)
+                {
+                    Console.Error.WriteLine($"smoke: no frame rendered within {SmokeDeadline}");
+                    return false;
+                }
+                long? wakeAt = smoke
+                    ? Math.Min(smokeDeadline, target.RetryAt ?? long.MaxValue)
+                    : target.RetryAt;
+                if (wakeAt is { } due)
+                {
+                    var remaining = Math.Max(due - Stopwatch.GetTimestamp(), 0);
+                    graphics.Window.WaitEventsTimeout((double)remaining / Stopwatch.Frequency);
+                }
+                else
+                {
+                    graphics.Window.WaitEvents();
+                }
             }
-            long? wakeAt = smoke
-                ? Math.Min(smokeDeadline, target.RetryAt ?? long.MaxValue)
-                : target.RetryAt;
-            if (wakeAt is { } due)
-            {
-                var remaining = Math.Max(due - Stopwatch.GetTimestamp(), 0);
-                graphics.Window.WaitEventsTimeout((double)remaining / Stopwatch.Frequency);
-            }
-            else
-            {
-                graphics.Window.WaitEvents();
-            }
+            return true;
         }
-        return true;
+        finally
+        {
+            target.Dispose();
+        }
+    }
+
+    /// <summary>Attaches a session, logs its mode and driver, and demands its first frame.</summary>
+    private static RenderTarget Attach(
+        IGraphicsContext graphics,
+        MapHandle map,
+        RenderTargetMode mode
+    )
+    {
+        var target = RenderTarget.Attach(graphics, map, mode);
+        Console.WriteLine($"render target: {mode.CliName}");
+        Console.WriteLine($"render target status: {mode.Status}");
+        Console.WriteLine($"render driver: {target.Driver.Label}");
+        target.RequestFrame();
+        return target;
     }
 }
