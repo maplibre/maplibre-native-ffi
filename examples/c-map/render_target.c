@@ -14,13 +14,22 @@ static app_error log_failure(
   return error;
 }
 
-mln_render_session_attach_options render_session_attach_options(void) {
+const char* render_driver_label(mln_render_driver_kind driver) {
+  return driver == MLN_RENDER_DRIVER_CORE_WORKER ? "core-worker"
+                                                 : "caller-graphics-thread";
+}
+
+mln_render_session_attach_options render_session_attach_options(
+  mln_render_driver_kind driver
+) {
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();
-  options.driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
+  options.driver = driver;
   options.requested_texture_ring_depth = 2;
   options.frame_wake = app_event_wake(APP_EVENT_FRAME_RESULTS);
-  options.driver_work_wake = app_event_wake(APP_EVENT_DRIVER_WORK);
+  if (driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+    options.driver_work_wake = app_event_wake(APP_EVENT_DRIVER_WORK);
+  }
   return options;
 }
 
@@ -39,19 +48,42 @@ app_error render_session_service(render_session* session) {
   return APP_OK;
 }
 
-/// Services driver work until a lifecycle submission completes, abandoning the
-/// session when the driver cannot be serviced. Startup and shutdown block here,
-/// between driver wakes.
-static mln_status service_until_complete(
+/// Ends the session's graphics work without graphics calls, which completes
+/// any pending lifecycle submission with target loss.
+static void abandon(render_session* session) {
+  mln_render_abandon_result result = {.size = sizeof(result)};
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status =
+    mln_render_session_abandon(session->handle, &result, &diagnostic);
+  // A session that already released its target reports invalid state.
+  if (status != MLN_STATUS_OK && status != MLN_STATUS_INVALID_STATE) {
+    diagnostics_log_status(
+      "render session abandon failed", status, &diagnostic
+    );
+  } else if (result.quarantined_resource_count > 0) {
+    fprintf(
+      stderr, "render session abandon quarantined %u resource groups\n",
+      result.quarantined_resource_count
+    );
+  }
+}
+
+/// Waits for a lifecycle submission to complete. A core worker needs nothing
+/// from this thread. A caller driver completes the submission inside a service
+/// call, so startup and shutdown service it here between driver wakes, and
+/// abandon the session when it cannot be serviced.
+static mln_status wait_for_lifecycle(
   render_session* session, awaited_completion* completion
 ) {
+  if (session->driver == MLN_RENDER_DRIVER_CORE_WORKER) {
+    awaited_completion_wait(completion, -1);
+    return completion->status;
+  }
   while (true) {
     // A wake that arrives after the clear ends the next wait at once.
     app_events_clear_driver_wait();
     if (render_session_service(session) != APP_OK) {
-      // Abandonment completes the pending submission with target loss.
-      mln_render_abandon_result result = {.size = sizeof(result)};
-      (void)mln_render_session_abandon(session->handle, &result, NULL);
+      abandon(session);
       awaited_completion_wait(completion, -1);
       break;
     }
@@ -63,11 +95,19 @@ static mln_status service_until_complete(
 
 app_error render_session_finish_attach(
   render_session* session, mln_render_session handle, mln_map map,
-  bool presents, awaited_completion* attached, mln_status status,
+  const mln_render_session_attach_options* options, render_target_mode mode,
+  awaited_completion* attached, mln_status status,
   const mln_diagnostic* diagnostic
 ) {
-  *session =
-    (render_session){.handle = handle, .map = map, .presents = presents};
+  *session = (render_session){
+    .handle = handle,
+    .map = map,
+    .driver = options->driver,
+    .presents = mode == RENDER_TARGET_MODE_NATIVE_SURFACE,
+    // A caller driver renders and composes on one thread, in order.
+    .takes_turns = mode == RENDER_TARGET_MODE_BORROWED_TEXTURE &&
+                   options->driver == MLN_RENDER_DRIVER_CORE_WORKER,
+  };
   if (status != MLN_STATUS_OK) {
     awaited_completion_deinit(attached);
     session->handle = MLN_HANDLE_NULL;
@@ -75,11 +115,10 @@ app_error render_session_finish_attach(
       APP_ERROR_ATTACH_FAILED, "render target attach failed", status, diagnostic
     );
   }
-  status = service_until_complete(session, attached);
+  status = wait_for_lifecycle(session, attached);
   awaited_completion_deinit(attached);
   if (status != MLN_STATUS_OK) {
-    mln_render_abandon_result result = {.size = sizeof(result)};
-    (void)mln_render_session_abandon(session->handle, &result, NULL);
+    abandon(session);
     (void)mln_render_session_destroy(session->handle, NULL);
     session->handle = MLN_HANDLE_NULL;
     return log_failure(
@@ -99,7 +138,7 @@ void render_session_close(render_session* session) {
     const mln_status status =
       mln_render_session_detach(session->handle, &completion, &diagnostic);
     if (status == MLN_STATUS_OK) {
-      detached = service_until_complete(session, &completed) == MLN_STATUS_OK;
+      detached = wait_for_lifecycle(session, &completed) == MLN_STATUS_OK;
     } else {
       diagnostics_log_status(
         "render session detach failed", status, &diagnostic
@@ -108,14 +147,21 @@ void render_session_close(render_session* session) {
     awaited_completion_deinit(&completed);
   }
   if (!detached) {
-    mln_render_abandon_result result = {.size = sizeof(result)};
-    (void)mln_render_session_abandon(session->handle, &result, NULL);
+    abandon(session);
   }
   (void)mln_render_session_destroy(session->handle, NULL);
   *session = (render_session){.handle = MLN_HANDLE_NULL};
 }
 
-app_error render_session_request_frame(render_session* session, bool force) {
+app_error render_session_request_frame(
+  render_session* session, bool force, uint64_t* out_token
+) {
+  if (session->takes_turns && session->demand_outstanding) {
+    session->demand_wanted = true;
+    session->wanted_forced = session->wanted_forced || force;
+    if (out_token != nullptr) *out_token = session->next_frame_token + 1;
+    return APP_OK;
+  }
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = (force ? 0 : MLN_FRAME_DEMAND_IF_NEEDED) |
                  (session->presents ? MLN_FRAME_DEMAND_PRESENT : 0);
@@ -128,7 +174,18 @@ app_error render_session_request_frame(render_session* session, bool force) {
       APP_ERROR_RENDER_FAILED, "frame demand failed", status, &diagnostic
     );
   }
+  session->demand_outstanding = true;
+  if (out_token != nullptr) *out_token = demand.token;
   return APP_OK;
+}
+
+app_error render_session_compositor_done(render_session* session) {
+  session->demand_outstanding = false;
+  if (!session->demand_wanted) return APP_OK;
+  const bool force = session->wanted_forced;
+  session->demand_wanted = false;
+  session->wanted_forced = false;
+  return render_session_request_frame(session, force, nullptr);
 }
 
 app_error render_session_drain_results(
@@ -148,6 +205,7 @@ app_error render_session_drain_results(
   }
   size_t count = 0;
   status = mln_render_frame_batch_count(batch, &count, &diagnostic);
+  out_results->any = count > 0;
   for (size_t i = 0; status == MLN_STATUS_OK && i < count; ++i) {
     mln_render_frame_result result = {.size = sizeof(result)};
     status = mln_render_frame_batch_get(batch, i, &result, &diagnostic);
@@ -220,9 +278,9 @@ app_error render_session_resize_map(
 }
 
 app_error render_session_acquire_newest(
-  render_session* session, mln_acquired_frame* out_frame
+  render_session* session, mln_acquired_frame* held, bool* out_acquired
 ) {
-  *out_frame = MLN_HANDLE_NULL;
+  *out_acquired = false;
   while (true) {
     mln_acquired_frame frame = MLN_HANDLE_NULL;
     mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
@@ -235,8 +293,9 @@ app_error render_session_acquire_newest(
         &diagnostic
       );
     }
-    render_session_release_frame(out_frame);
-    *out_frame = frame;
+    render_session_release_frame(held);
+    *held = frame;
+    *out_acquired = true;
   }
 }
 
@@ -289,6 +348,7 @@ static void complete_replacement(
   texture_replacement* replacement = user_data;
   replacement->status = result->status;
   atomic_store_explicit(&replacement->completed, true, memory_order_release);
+  app_event_push(APP_EVENT_TARGET_REPLACED);
 }
 
 texture_replacement* texture_replacement_begin(
@@ -351,8 +411,7 @@ app_error texture_replacements_take_shown(
     );
   }
   if (oldest->shown_token == 0) {
-    MAP_TRY(render_session_request_frame(session, true));
-    oldest->shown_token = session->next_frame_token;
+    MAP_TRY(render_session_request_frame(session, true, &oldest->shown_token));
   }
   if (session->rendered_token < oldest->shown_token) return APP_OK;
   *out_texture = take_oldest(replacements);

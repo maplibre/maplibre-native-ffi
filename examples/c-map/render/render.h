@@ -40,8 +40,9 @@ void render_target_frame_scope_close(void* scope);
   render_target_mode mode
 );
 
-/// Attaches a render session to the live map on the render-loop thread, which
-/// owns the graphics context the session drives.
+/// Attaches a render session to the live map, selecting its driver from the
+/// backend and the mode. A caller driver runs on the render-loop thread, which
+/// owns the graphics context.
 [[nodiscard]] app_error render_target_attach(
   render_target* target, mln_map map, viewport current_viewport
 );
@@ -58,9 +59,9 @@ render_session* render_target_session(render_target* target);
   render_target* target, viewport current_viewport
 );
 
-/// Services caller-driver work, then shows any replacement texture a rendered
-/// frame has drawn into.
-[[nodiscard]] app_error render_target_service(render_target* target);
+/// Follows a completed borrowed-texture replacement: demands the frame that
+/// draws into it, and shows any replacement a rendered frame has drawn into.
+[[nodiscard]] app_error render_target_show_replacements(render_target* target);
 
 /// Shows the newest rendered frame: the texture modes sample it into the
 /// window, switching to a replacement texture once a frame has rendered into

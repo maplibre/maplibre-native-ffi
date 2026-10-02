@@ -31,7 +31,7 @@ bool app_event_code_of(const SDL_Event* event, app_event_code* out_code) {
   return true;
 }
 
-static void push_app_event(app_event_code code) {
+void app_event_push(app_event_code code) {
   SDL_Event event = {.user = {.type = app_event_type, .code = code}};
   // A native queue wakes again only after its next drain, so a lost push
   // stalls the loop. SDL's queue holds far more events than these wakes post.
@@ -42,7 +42,7 @@ static void push_app_event(app_event_code code) {
 
 static void wake_render_loop(void* user_data) {
   const app_event_code code = (app_event_code)(intptr_t)user_data;
-  push_app_event(code);
+  app_event_push(code);
   if (code == APP_EVENT_DRIVER_WORK) SDL_SignalSemaphore(driver_wait);
 }
 
@@ -58,7 +58,7 @@ static Uint32 push_timed_app_event(
   void* user_data, [[maybe_unused]] SDL_TimerID timer,
   [[maybe_unused]] Uint32 interval
 ) {
-  push_app_event((app_event_code)(intptr_t)user_data);
+  app_event_push((app_event_code)(intptr_t)user_data);
   return 0;
 }
 

@@ -80,7 +80,9 @@ static app_error create_instance(vulkan_context* context) {
   return error;
 }
 
-static app_error pick_device(vulkan_context* context) {
+static app_error pick_device(
+  vulkan_context* context, uint32_t* out_family_queue_count
+) {
   uint32_t count = 0;
   MAP_TRY(
     expect_vk(vkEnumeratePhysicalDevices(context->instance, &count, nullptr))
@@ -123,6 +125,7 @@ static app_error pick_device(vulkan_context* context) {
       }
       context->physical_device = device;
       context->queue_family_index = family_index;
+      *out_family_queue_count = families[family_index].queueCount;
       error = APP_OK;
       break;
     }
@@ -160,13 +163,13 @@ static app_error has_device_extension(
   return error;
 }
 
-static app_error create_device(vulkan_context* context) {
-  const float priority = 1.0f;
+static app_error create_device(vulkan_context* context, uint32_t queue_count) {
+  const float priorities[] = {1.0f, 1.0f};
   const VkDeviceQueueCreateInfo queue_info = {
     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
     .queueFamilyIndex = context->queue_family_index,
-    .queueCount = 1,
-    .pQueuePriorities = &priority,
+    .queueCount = queue_count,
+    .pQueuePriorities = priorities,
   };
   // A device that exposes the portability subset requires enabling it. The name
   // is spelled out because its constant lives behind vulkan_beta.h.
@@ -194,21 +197,33 @@ static app_error create_device(vulkan_context* context) {
   vkGetDeviceQueue(
     context->device, context->queue_family_index, 0, &context->queue
   );
+  vkGetDeviceQueue(
+    context->device, context->queue_family_index, queue_count - 1,
+    &context->session_queue
+  );
   return APP_OK;
 }
 
-static app_error context_create(vulkan_context* context, SDL_Window* window) {
+static app_error context_create(
+  vulkan_context* context, SDL_Window* window, bool separate_session_queue
+) {
   MAP_TRY(create_instance(context));
   MAP_TRY(expect_sdl(SDL_Vulkan_CreateSurface(
     window, context->instance, nullptr, &context->surface
   )));
-  MAP_TRY(pick_device(context));
-  return create_device(context);
+  uint32_t family_queue_count = 0;
+  MAP_TRY(pick_device(context, &family_queue_count));
+  return create_device(
+    context, separate_session_queue && family_queue_count >= 2 ? 2 : 1
+  );
 }
 
-app_error vulkan_context_init(vulkan_context* context, SDL_Window* window) {
+app_error vulkan_context_init(
+  vulkan_context* context, SDL_Window* window, bool separate_session_queue
+) {
   *context = (vulkan_context){};
-  const app_error error = context_create(context, window);
+  const app_error error =
+    context_create(context, window, separate_session_queue);
   if (error != APP_OK) {
     vulkan_context_deinit(context);
   }

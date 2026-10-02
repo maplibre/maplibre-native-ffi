@@ -17,6 +17,8 @@ typedef enum app_event_code : int32_t {
   APP_EVENT_FRAME_RESULTS,
   /// The render session has caller-driver work to service.
   APP_EVENT_DRIVER_WORK,
+  /// A borrowed-texture replacement completed.
+  APP_EVENT_TARGET_REPLACED,
   /// A paced retry after a frame that could not reach the screen.
   APP_EVENT_RETRY_FRAME,
   /// A smoke run waited too long for its first frame.
@@ -32,12 +34,16 @@ bool app_event_code_of(const SDL_Event* event, app_event_code* out_code);
 /// A wake that pushes an app event with code from any native thread.
 mln_wake app_event_wake(app_event_code code);
 
+/// Pushes an app event with code from any thread.
+void app_event_push(app_event_code code);
+
 /// Pushes an app event with code after delay_ms.
 void app_event_push_after(app_event_code code, Uint32 delay_ms);
 
-/// Startup and shutdown block on a session's lifecycle completion outside the
-/// SDL loop. Every driver wake and every awaited completion also signals this
-/// wait, so it services driver work only when there is some.
+/// Startup and shutdown block on a caller-driver session's lifecycle
+/// completion outside the SDL loop. Every driver wake and every awaited
+/// completion also signals this wait, so it services driver work only when
+/// there is some.
 void app_events_clear_driver_wait(void);
 void app_events_wait_driver(void);
 

@@ -2,8 +2,8 @@
 //
 // The render loop only reacts to SDL events. Input submits camera commands,
 // and native wakes post app events: a runtime event drain demands a frame for
-// each map update, a driver wake services the session, and a frame-result
-// drain shows what the driver rendered.
+// each map update, and a frame-result drain shows what the session rendered.
+// A caller-driver session also gets driver wakes, which service it.
 
 #include <SDL3/SDL.h>
 #include <maplibre_native_c.h>
@@ -57,7 +57,7 @@ static app_error show_frame_results(app* app) {
     MAP_TRY(render_target_present(app->target, app->viewport, &presented));
   }
   if (presented && app->smoke) {
-    puts("smoke: rendered one frame");
+    puts("smoke: rendered a frame");
     app->running = false;
     return APP_OK;
   }
@@ -65,12 +65,10 @@ static app_error show_frame_results(app* app) {
     // The map update was consumed without reaching the window, so the retry
     // forces a frame rather than waiting for another update.
     app_event_push_after(APP_EVENT_RETRY_FRAME, frame_retry_milliseconds);
-    return APP_OK;
+  } else if (results.needs_repaint) {
+    MAP_TRY(render_session_request_frame(session, false, nullptr));
   }
-  if (results.needs_repaint) {
-    return render_session_request_frame(session, false);
-  }
-  return APP_OK;
+  return results.any ? render_session_compositor_done(session) : APP_OK;
 }
 
 static app_error handle_app_event(app* app, app_event_code code) {
@@ -79,15 +77,18 @@ static app_error handle_app_event(app* app, app_event_code code) {
     case APP_EVENT_RUNTIME_EVENTS: {
       bool render_update = false;
       MAP_TRY(map_state_drain_events(&app->map, &render_update));
-      return render_update ? render_session_request_frame(session, false)
-                           : APP_OK;
+      return render_update
+               ? render_session_request_frame(session, false, nullptr)
+               : APP_OK;
     }
     case APP_EVENT_DRIVER_WORK:
-      return render_target_service(app->target);
+      return render_session_service(session);
+    case APP_EVENT_TARGET_REPLACED:
+      return render_target_show_replacements(app->target);
     case APP_EVENT_FRAME_RESULTS:
       return show_frame_results(app);
     case APP_EVENT_RETRY_FRAME:
-      return render_session_request_frame(session, true);
+      return render_session_request_frame(session, true, nullptr);
     case APP_EVENT_SMOKE_TIMEOUT:
       return APP_ERROR_SMOKE_FRAME_TIMED_OUT;
   }
@@ -126,8 +127,10 @@ static app_error handle_event(app* app, const SDL_Event* event) {
 static app_error render_loop(app* app, render_target_mode mode) {
   MAP_TRY(render_target_attach(app->target, app->map.map, app->viewport));
 
+  render_session* session = render_target_session(app->target);
   printf("render target: %s\n", render_target_mode_label(mode));
   printf("render target status: %s\n", render_target_mode_status_line(mode));
+  printf("render driver: %s\n", render_driver_label(session->driver));
   input_log_controls();
 
   if (app->smoke) {
@@ -135,9 +138,7 @@ static app_error render_loop(app* app, render_target_mode mode) {
   }
   // Updates the map published before attachment have no event left to demand
   // their frame.
-  MAP_TRY(
-    render_session_request_frame(render_target_session(app->target), false)
-  );
+  MAP_TRY(render_session_request_frame(session, false, nullptr));
   app->running = true;
   while (app->running) {
     SDL_Event event;

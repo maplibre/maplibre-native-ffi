@@ -357,6 +357,8 @@ struct render_target {
   union {
     struct {
       metal_compositor compositor;
+      /// The newest frame, held until a newer one replaces it.
+      mln_acquired_frame held;
     } owned;
     struct {
       metal_compositor compositor;
@@ -461,8 +463,9 @@ app_error render_target_attach(
   awaited_completion attached;
   mln_completion completion;
   MAP_TRY(awaited_completion_init(&attached, &completion));
+  // Every Metal target accepts a core worker, which renders on its own thread.
   const mln_render_session_attach_options options =
-    render_session_attach_options();
+    render_session_attach_options(MLN_RENDER_DRIVER_CORE_WORKER);
   mln_render_session session = MLN_HANDLE_NULL;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_status status = MLN_STATUS_INVALID_STATE;
@@ -502,8 +505,7 @@ app_error render_target_attach(
     }
   }
   return render_session_finish_attach(
-    &target->session, session, map,
-    target->mode == RENDER_TARGET_MODE_NATIVE_SURFACE, &attached, status,
+    &target->session, session, map, &options, target->mode, &attached, status,
     &diagnostic
   );
 }
@@ -511,6 +513,9 @@ app_error render_target_attach(
 void render_target_deinit(render_target* target) {
   if (target == nullptr) {
     return;
+  }
+  if (target->mode == RENDER_TARGET_MODE_OWNED_TEXTURE) {
+    render_session_release_frame(&target->as.owned.held);
   }
   render_session_close(&target->session);
   switch (target->mode) {
@@ -576,11 +581,13 @@ app_error render_target_resize(
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
       metal_compositor_resize(&target->as.owned.compositor, current_viewport);
+      // A session resizes only while the host holds none of its frames.
+      render_session_release_frame(&target->as.owned.held);
       return render_session_resize(&target->session, current_viewport);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
       return resize_borrowed(target, current_viewport);
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      metal_view_resize(&target->as.surface.view, current_viewport);
+      // The session sets the layer's drawable size.
       return render_session_resize(&target->session, current_viewport);
   }
   return APP_ERROR_BACKEND_SETUP_FAILED;
@@ -588,7 +595,7 @@ app_error render_target_resize(
 
 /// Switches the compositor to each replacement a rendered frame has drawn
 /// into, releasing the texture it retires.
-static app_error show_replacements(render_target* target) {
+app_error render_target_show_replacements(render_target* target) {
   while (true) {
     id replacement = nullptr;
     MAP_TRY(texture_replacements_take_shown(
@@ -600,36 +607,29 @@ static app_error show_replacements(render_target* target) {
   }
 }
 
-app_error render_target_service(render_target* target) {
-  MAP_TRY(render_session_service(&target->session));
-  return target->mode == RENDER_TARGET_MODE_BORROWED_TEXTURE
-           ? show_replacements(target)
-           : APP_OK;
-}
-
 static app_error present_owned(render_target* target, bool* out_presented) {
-  mln_acquired_frame acquired = MLN_HANDLE_NULL;
-  MAP_TRY(render_session_acquire_newest(&target->session, &acquired));
-  if (acquired == MLN_HANDLE_NULL) {
+  mln_acquired_frame* held = &target->as.owned.held;
+  bool acquired = false;
+  MAP_TRY(render_session_acquire_newest(&target->session, held, &acquired));
+  if (!acquired) {
     // The window keeps the frame it already shows.
     *out_presented = true;
     return APP_OK;
   }
-  app_error error = render_session_require_cpu_complete_producer(
-    acquired, "Metal texture acquire failed"
-  );
-  if (error == APP_OK) {
-    mln_metal_owned_texture_frame frame = {.size = sizeof(frame)};
-    const mln_status status =
-      mln_acquired_frame_get_metal_texture(acquired, &frame, NULL);
-    error = status == MLN_STATUS_OK
-              ? metal_compositor_draw_texture(
-                  &target->as.owned.compositor, (id)frame.texture, out_presented
-                )
-              : APP_ERROR_BACKEND_DRAW_FAILED;
+  MAP_TRY(render_session_require_cpu_complete_producer(
+    *held, "Metal texture acquire failed"
+  ));
+  mln_metal_owned_texture_frame frame = {.size = sizeof(frame)};
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status =
+    mln_acquired_frame_get_metal_texture(*held, &frame, &diagnostic);
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("Metal texture access failed", status, &diagnostic);
+    return APP_ERROR_BACKEND_DRAW_FAILED;
   }
-  render_session_release_frame(&acquired);
-  return error;
+  return metal_compositor_draw_texture(
+    &target->as.owned.compositor, (id)frame.texture, out_presented
+  );
 }
 
 app_error render_target_present(
@@ -641,7 +641,7 @@ app_error render_target_present(
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
       return present_owned(target, out_presented);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
-      MAP_TRY(show_replacements(target));
+      MAP_TRY(render_target_show_replacements(target));
       return metal_compositor_draw_texture(
         &target->as.borrowed.compositor, target->as.borrowed.texture,
         out_presented
