@@ -133,8 +133,14 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 	if err != nil {
 		return errors.Join(err, mapState.Close(), graphics.Close())
 	}
+	// A failed reattach leaves no target, so shutdown closes only what
+	// exists.
 	defer func() {
-		result = errors.Join(result, target.Close(), mapState.Close(), graphics.Close())
+		var targetErr error
+		if target != nil {
+			targetErr = target.Close()
+		}
+		result = errors.Join(result, targetErr, mapState.Close(), graphics.Close())
 	}()
 	// A session fixes its scale factor at attachment, so a scale change
 	// reattaches.
@@ -178,9 +184,15 @@ func run(mode renderTargetMode, smoke bool) (result error) {
 		if viewportChanged && !view.empty() {
 			if view.scaleFactor == attachedScale {
 				err = target.Resize(view)
-			} else if err = target.Close(); err == nil {
-				target, err = attach(graphics, view, mode, mapState, wakeEvent)
-				attachedScale = view.scaleFactor
+			} else {
+				// Close releases the target even when it fails, so the
+				// deferred shutdown must not close it again.
+				err = target.Close()
+				target = nil
+				if err == nil {
+					target, err = attach(graphics, view, mode, mapState, wakeEvent)
+					attachedScale = view.scaleFactor
+				}
 			}
 			if err != nil {
 				return err
