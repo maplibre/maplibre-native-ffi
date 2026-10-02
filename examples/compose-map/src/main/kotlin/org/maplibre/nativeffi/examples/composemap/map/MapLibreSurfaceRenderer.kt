@@ -107,16 +107,20 @@ internal class MapLibreSurfaceRenderer(
     state.resize(frame.extent)
     if (eventsPending.getAndSet(false) && state.drainRenderUpdates()) frameWanted.set(true)
     drawing.set(true)
-    return try {
-      renderAttached(state.map, frame)
-    } catch (error: Throwable) {
-      // The caller stops driving frames after this, so close the render session before the
-      // map.
-      close()
-      throw error
-    } finally {
-      drawing.set(false)
-    }
+    val result =
+      try {
+        renderAttached(state.map, frame)
+      } catch (error: Throwable) {
+        drawing.set(false)
+        // The caller stops driving frames after this, so close the render session before the
+        // map.
+        close()
+        throw error
+      }
+    drawing.set(false)
+    // Driver work that arrived before the flag cleared asked for no draw, so it runs now.
+    if (callerDriver) renderSession?.session?.serviceDriverWork(0uL)
+    return result
   }
 
   private fun renderAttached(map: MapHandle, frame: NativeSurfaceFrame): NativeSurfaceRenderResult {
