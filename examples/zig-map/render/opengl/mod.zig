@@ -237,11 +237,19 @@ const PlatformOpenGLRenderTarget = union(enum) {
         };
     }
 
-    /// Attaches the render session on the graphics thread.
+    /// Attaches the render session. An OpenGL target on the host's WGL or
+    /// EGL context renders where that context is current, so the render loop
+    /// services a caller driver.
     pub fn attach(self: *PlatformOpenGLRenderTarget, map: *maplibre.Map, viewport: types.Viewport) !void {
         switch (self.*) {
-            inline else => |*backend| try backend.attach(map, viewport),
+            inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(.caller_graphics_thread)),
         }
+    }
+
+    /// Releases any held frame, then detaches the session.
+    pub fn detach(self: *PlatformOpenGLRenderTarget) void {
+        if (self.* == .owned_texture) render_target.releaseFrame(&self.owned_texture.held);
+        self.session().deinit();
     }
 
     pub fn deinit(self: *PlatformOpenGLRenderTarget) void {
@@ -263,10 +271,8 @@ const PlatformOpenGLRenderTarget = union(enum) {
         }
     }
 
-    /// Services caller-driver work, then shows any replacement a rendered
-    /// frame has drawn into.
-    pub fn service(self: *PlatformOpenGLRenderTarget) !void {
-        try self.session().service();
+    /// Follows a completed borrowed-texture replacement.
+    pub fn showReplacements(self: *PlatformOpenGLRenderTarget) !void {
         if (self.* == .borrowed_texture) try self.borrowed_texture.showReplacements();
     }
 
@@ -497,33 +503,38 @@ const OpenGLTextureCompositor = struct {
 const OpenGLOwnedTextureBackend = struct {
     compositor: OpenGLTextureCompositor,
     session: render_target.Session = .{},
+    /// The newest frame, held until a newer one replaces it.
+    held: ?maplibre.AcquiredFrame = null,
 
     fn deinit(self: *OpenGLOwnedTextureBackend) void {
+        render_target.releaseFrame(&self.held);
         self.session.deinit();
         self.compositor.deinit();
     }
 
-    fn attach(self: *OpenGLOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
+    fn attach(self: *OpenGLOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
         const attachment = maplibre.openglOwnedTextureAttach(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .context = self.compositor.context.descriptor(),
-        }, render_target.attachOptions(), &diagnostic) catch |err| {
+        }, options, &diagnostic) catch |err| {
             diagnostics.logError("OpenGL texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, false);
+        self.session = try render_target.Session.attach(map, attachment, options, .owned_texture);
     }
 
     fn resize(self: *OpenGLOwnedTextureBackend, viewport: types.Viewport) !void {
         self.compositor.resize(viewport);
+        // A session resizes only while the host holds none of its frames.
+        render_target.releaseFrame(&self.held);
         try self.session.resize(viewport);
     }
 
     fn present(self: *OpenGLOwnedTextureBackend) !bool {
         // Without a new frame, the window keeps the one it already shows.
-        const frame = try self.session.acquireNewest() orelse return true;
-        defer render_target.releaseFrame(frame);
+        if (!try self.session.acquireNewest(&self.held)) return true;
+        const frame = self.held.?;
         const Context = struct {
             backend: *OpenGLOwnedTextureBackend,
             frame: maplibre.AcquiredFrame,
@@ -600,7 +611,7 @@ const OpenGLBorrowedTextureBackend = struct {
         self.compositor.deinit();
     }
 
-    fn attach(self: *OpenGLBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
+    fn attach(self: *OpenGLBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
         const attachment = maplibre.openglBorrowedTextureAttach(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
@@ -609,11 +620,11 @@ const OpenGLBorrowedTextureBackend = struct {
             .context = self.compositor.context.descriptor(),
             .texture = self.texture.texture,
             .target = gl_texture_target,
-        }, render_target.attachOptions(), &diagnostic) catch |err| {
+        }, options, &diagnostic) catch |err| {
             diagnostics.logError("OpenGL borrowed texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, false);
+        self.session = try render_target.Session.attach(map, attachment, options, .borrowed_texture);
     }
 
     /// Follows a resized window: allocates a texture at the new size and hands
@@ -660,17 +671,17 @@ const OpenGLSurfaceBackend = struct {
         self.context.deinit();
     }
 
-    fn attach(self: *OpenGLSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
+    fn attach(self: *OpenGLSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
         const attachment = maplibre.openglSurfaceAttach(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
-        }, render_target.attachOptions(), &diagnostic) catch |err| {
+        }, options, &diagnostic) catch |err| {
             diagnostics.logError("OpenGL surface attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, true);
+        self.session = try render_target.Session.attach(map, attachment, options, .native_surface);
     }
 
     /// Follows a resized window. When SDL hands back a different EGL window

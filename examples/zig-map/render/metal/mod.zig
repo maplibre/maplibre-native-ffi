@@ -46,11 +46,18 @@ pub const MetalRenderTarget = union(enum) {
         };
     }
 
-    /// Attaches the render session on the graphics thread.
+    /// Attaches the render session. Every Metal target accepts a core
+    /// worker, which renders on its own thread.
     pub fn attach(self: *MetalRenderTarget, map: *maplibre.Map, viewport: types.Viewport) !void {
         switch (self.*) {
-            inline else => |*backend| try backend.attach(map, viewport),
+            inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(.core_worker)),
         }
+    }
+
+    /// Releases any held frame, then detaches the session.
+    pub fn detach(self: *MetalRenderTarget) void {
+        if (self.* == .owned_texture) render_target.releaseFrame(&self.owned_texture.held);
+        self.session().deinit();
     }
 
     pub fn deinit(self: *MetalRenderTarget) void {
@@ -72,10 +79,8 @@ pub const MetalRenderTarget = union(enum) {
         }
     }
 
-    /// Services caller-driver work, then shows any replacement a rendered
-    /// frame has drawn into.
-    pub fn service(self: *MetalRenderTarget) !void {
-        try self.session().service();
+    /// Follows a completed borrowed-texture replacement.
+    pub fn showReplacements(self: *MetalRenderTarget) !void {
         if (self.* == .borrowed_texture) try self.borrowed_texture.showReplacements();
     }
 
@@ -217,37 +222,42 @@ const MetalTextureCompositor = struct {
 const MetalOwnedTextureBackend = struct {
     compositor: MetalTextureCompositor,
     session: render_target.Session = .{},
+    /// The newest frame, held until a newer one replaces it.
+    held: ?maplibre.AcquiredFrame = null,
 
     fn init(window: *c.SDL_Window, viewport: types.Viewport) !MetalOwnedTextureBackend {
         return .{ .compositor = try MetalTextureCompositor.init(window, viewport) };
     }
 
     fn deinit(self: *MetalOwnedTextureBackend) void {
+        render_target.releaseFrame(&self.held);
         self.session.deinit();
         self.compositor.deinit();
     }
 
-    fn attach(self: *MetalOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
+    fn attach(self: *MetalOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
         const attachment = maplibre.metalOwnedTextureAttach(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .context = .{ .device = (self.compositor.view.device.value.?) },
-        }, render_target.attachOptions(), &diagnostic) catch |err| {
+        }, options, &diagnostic) catch |err| {
             diagnostics.logError("Metal texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, false);
+        self.session = try render_target.Session.attach(map, attachment, options, .owned_texture);
     }
 
     fn resize(self: *MetalOwnedTextureBackend, viewport: types.Viewport) !void {
         self.compositor.resize(viewport);
+        // A session resizes only while the host holds none of its frames.
+        render_target.releaseFrame(&self.held);
         try self.session.resize(viewport);
     }
 
     fn present(self: *MetalOwnedTextureBackend) !bool {
         // Without a new frame, the window keeps the one it already shows.
-        const frame = try self.session.acquireNewest() orelse return true;
-        defer render_target.releaseFrame(frame);
+        if (!try self.session.acquireNewest(&self.held)) return true;
+        const frame = self.held.?;
         const Context = struct {
             backend: *MetalOwnedTextureBackend,
             frame: maplibre.AcquiredFrame,
@@ -289,18 +299,18 @@ const MetalBorrowedTextureBackend = struct {
         self.compositor.deinit();
     }
 
-    fn attach(self: *MetalBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
+    fn attach(self: *MetalBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
         const attachment = maplibre.metalBorrowedTextureAttach(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
             .texture = (self.texture.value.?),
-        }, render_target.attachOptions(), &diagnostic) catch |err| {
+        }, options, &diagnostic) catch |err| {
             diagnostics.logError("Metal borrowed texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, false);
+        self.session = try render_target.Session.attach(map, attachment, options, .borrowed_texture);
     }
 
     /// Follows a resized window: allocates a texture at the new size and hands
@@ -345,21 +355,21 @@ const MetalSurfaceBackend = struct {
         self.view.deinit();
     }
 
-    fn attach(self: *MetalSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport) !void {
+    fn attach(self: *MetalSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
         const attachment = maplibre.metalSurfaceAttach(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .context = .{ .device = (self.view.device.value.?) },
             .layer = (self.view.layer.value.?),
-        }, render_target.attachOptions(), &diagnostic) catch |err| {
+        }, options, &diagnostic) catch |err| {
             diagnostics.logError("Metal surface attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
-        self.session = try render_target.Session.attach(map, attachment, true);
+        self.session = try render_target.Session.attach(map, attachment, options, .native_surface);
     }
 
     fn resize(self: *MetalSurfaceBackend, viewport: types.Viewport) !void {
-        self.view.resize(viewport);
+        // The session sets the layer's drawable size.
         try self.session.resize(viewport);
     }
 };

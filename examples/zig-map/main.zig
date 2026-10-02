@@ -10,6 +10,7 @@ const maplibre = @import("maplibre_native_ffi");
 const input = @import("input.zig");
 const map_state = @import("map_state.zig");
 const render = @import("render/mod.zig");
+const render_target = @import("render_target.zig");
 const types = @import("types.zig");
 const viewport = @import("viewport.zig");
 
@@ -97,17 +98,17 @@ pub fn main(init_args: std.process.Init) !void {
     try app.target.attach(&app.map.map, app.viewport);
     // The session detaches before its map and runtime close, and the graphics
     // resources go after them.
-    defer app.target.session().deinit();
+    defer app.target.detach();
 
-    printStartupStatus(target_mode);
+    printStartupStatus(target_mode, app.target.session().driver);
     input.logControls();
     try app.run();
 }
 
 /// The render loop only reacts to SDL events. Input submits camera commands,
 /// and native wakes post app events: a runtime event drain demands a frame for
-/// each map update, a driver wake services the session, and a frame-result
-/// drain shows what the driver rendered.
+/// each map update, and a frame-result drain shows what the session rendered.
+/// A caller-driver session also gets driver wakes, which service it.
 const App = struct {
     window: *c.SDL_Window,
     viewport: types.Viewport,
@@ -121,7 +122,7 @@ const App = struct {
         if (self.smoke) events.pushAfter(.smoke_timeout, smoke_timeout_ms);
         // Updates the map published before attachment have no event left to
         // demand their frame.
-        try self.target.session().requestFrame(false);
+        _ = try self.target.session().requestFrame(false);
         while (self.running) {
             var event: c.SDL_Event = undefined;
             if (!c.SDL_WaitEventTimeout(&event, signal_check_ms)) continue;
@@ -156,10 +157,13 @@ const App = struct {
     fn handleAppEvent(self: *App, code: events.Code) !void {
         const session = self.target.session();
         switch (code) {
-            .runtime_events => if (try self.map.drainEvents()) try session.requestFrame(false),
-            .driver_work => try self.target.service(),
+            .runtime_events => if (try self.map.drainEvents()) {
+                _ = try session.requestFrame(false);
+            },
+            .driver_work => try session.service(),
+            .target_replaced => try self.target.showReplacements(),
             .frame_results => try self.showFrameResults(),
-            .retry_frame => try session.requestFrame(true),
+            .retry_frame => _ = try session.requestFrame(true),
             .smoke_timeout => {
                 std.debug.print("smoke: no frame rendered within 60 s\n", .{});
                 return types.AppError.SmokeFrameTimedOut;
@@ -168,18 +172,22 @@ const App = struct {
     }
 
     fn showFrameResults(self: *App) !void {
-        const results = try self.target.session().drainResults();
+        const session = self.target.session();
+        const results = try session.drainResults();
         const presented = results.rendered and try self.target.present(self.viewport);
         if (presented and self.smoke) {
-            std.debug.print("smoke: rendered one frame\n", .{});
+            std.debug.print("smoke: rendered a frame\n", .{});
             self.running = false;
-        } else if (results.target_not_ready or (results.rendered and !presented)) {
+            return;
+        }
+        if (results.target_not_ready or (results.rendered and !presented)) {
             // The map update was consumed without reaching the window, so the
             // retry forces a frame rather than waiting for another update.
             events.pushAfter(.retry_frame, frame_retry_ms);
         } else if (results.needs_repaint) {
-            try self.target.session().requestFrame(false);
+            _ = try session.requestFrame(false);
         }
+        if (results.any) try session.compositorDone();
     }
 };
 
@@ -194,9 +202,10 @@ fn validateNativeRenderBackend() !void {
     if (build_options.supports_vulkan and !support.vulkan) return error.NativeRenderBackendMismatch;
 }
 
-fn printStartupStatus(target_mode: types.RenderTargetMode) void {
+fn printStartupStatus(target_mode: types.RenderTargetMode, driver: maplibre.RenderDriverKind) void {
     std.debug.print("render target: {s}\n", .{target_mode.label()});
     std.debug.print("render target status: {s}\n", .{target_mode.statusLine()});
+    std.debug.print("render driver: {s}\n", .{render_target.driverLabel(driver)});
 }
 
 fn renderBackendSupportLabel(buffer: []u8, support: maplibre.RenderBackendFlag) []const u8 {

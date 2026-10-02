@@ -15,6 +15,8 @@ pub const Code = enum(i32) {
     frame_results,
     /// The render session has caller-driver work to service.
     driver_work,
+    /// A borrowed-texture replacement completed.
+    target_replaced,
     /// A paced retry after a frame that could not reach the screen.
     retry_frame,
     /// A smoke run waited too long for its first frame.
@@ -36,9 +38,9 @@ pub fn init() !void {
     };
 }
 
-/// Startup and shutdown block on a session's lifecycle completion outside the
-/// SDL loop. Every driver wake also signals this wait, so it services driver
-/// work only when there is some.
+/// Startup and shutdown block on a caller-driver session's lifecycle
+/// completion outside the SDL loop. Every driver wake also signals this wait,
+/// so it services driver work only when there is some.
 pub fn clearDriverWait() void {
     while (c.SDL_TryWaitSemaphore(driver_wait)) {}
 }
@@ -74,7 +76,8 @@ fn codeFor(context: ?*anyopaque) Code {
     return @enumFromInt(@as(i32, @intCast(@intFromPtr(context) - 1)));
 }
 
-fn push(code: Code) void {
+/// Pushes an app event with `code` from any thread.
+pub fn push(code: Code) void {
     var event = std.mem.zeroes(c.SDL_Event);
     event.user.type = event_type;
     event.user.code = @intFromEnum(code);
