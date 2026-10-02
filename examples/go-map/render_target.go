@@ -52,7 +52,10 @@ type sessionWakes struct {
 type callerDriver struct {
 	session *maplibre.RenderSessionHandle
 	wakes   sessionWakes
-	present func() (bool, error)
+	// presents is set for a native surface, the only target whose demands
+	// ask the session to present.
+	presents bool
+	present  func() (bool, error)
 	// releaseFrames releases the frames that the target holds, before the
 	// session resizes or detaches.
 	releaseFrames func() error
@@ -114,9 +117,11 @@ func (driver *callerDriver) RequestFrame(force bool) error {
 	driver.nextToken++
 	demand := maplibre.DefaultFrameDemand()
 	demand.Token = driver.nextToken
-	demand.Flags = maplibre.FrameDemandFlagPresent
-	if !force {
-		demand.Flags |= maplibre.FrameDemandFlagIfNeeded
+	if force {
+		demand.Flags &^= maplibre.FrameDemandFlagIfNeeded
+	}
+	if driver.presents {
+		demand.Flags |= maplibre.FrameDemandFlagPresent
 	}
 	return driver.session.RequestFrame(demand)
 }
@@ -503,6 +508,7 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 		return nil, err
 	}
 	target := &openGLSurfaceTarget{callerDriver: driver, context: context, mapRef: m}
+	target.presents = true
 	attachment, err := m.OpenglSurfaceAttach(
 		maplibre.OpenglSurfaceDescriptor{Extent: v.extent(), Context: descriptor, Surface: context.surface()},
 		target.attachOptions(0),

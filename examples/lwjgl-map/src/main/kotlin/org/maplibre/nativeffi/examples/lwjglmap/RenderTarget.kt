@@ -85,6 +85,9 @@ internal open class RenderTarget(
    * at most one demand outstanding, and holds a wanted frame until the outstanding result arrives.
    */
   protected open val exclusiveTexture: Boolean = false
+
+  /** Set by a native surface, the only target whose demands ask the session to present. */
+  protected open val presents: Boolean = false
   private var demandOutstanding = false
   private var wanted: Boolean? = null
 
@@ -99,8 +102,9 @@ internal open class RenderTarget(
       return
     }
     demandOutstanding = true
-    val flags =
-      if (force) FrameDemandFlag.PRESENT else FrameDemandFlag.IF_NEEDED or FrameDemandFlag.PRESENT
+    var flags = FrameDemandFlag(0u)
+    if (!force) flags = flags or FrameDemandFlag.IF_NEEDED
+    if (presents) flags = flags or FrameDemandFlag.PRESENT
     session.requestFrame(FrameDemand(flags = flags, token = ++nextToken))
   }
 
@@ -285,7 +289,9 @@ internal class AttachedSession(
 
 /** A window surface, where the session presents each frame that it renders. */
 internal class NativeSurfaceTarget(attached: AttachedSession) :
-  RenderTarget(attached.session, attached.driver, attached.frames)
+  RenderTarget(attached.session, attached.driver, attached.frames) {
+  override val presents: Boolean = true
+}
 
 /**
  * A session-owned texture ring. After a rendered result, the target acquires every ready frame,

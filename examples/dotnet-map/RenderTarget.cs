@@ -155,6 +155,11 @@ internal abstract class RenderTarget : IDisposable
     /// </summary>
     protected virtual bool ExclusiveTexture => false;
 
+    /// <summary>
+    /// Set by a native surface, the only target whose demands ask the session to present.
+    /// </summary>
+    protected virtual bool Presents => false;
+
     public static RenderTarget Attach(
         IGraphicsContext graphics,
         MapHandle map,
@@ -200,15 +205,12 @@ internal abstract class RenderTarget : IDisposable
             return;
         }
         demandOutstanding = true;
-        Session.RequestFrame(
-            FrameDemand.Default with
-            {
-                Flags = force
-                    ? FrameDemandFlag.Present
-                    : FrameDemandFlag.IfNeeded | FrameDemandFlag.Present,
-                Token = ++nextToken,
-            }
-        );
+        FrameDemandFlag flags = force ? 0 : FrameDemandFlag.IfNeeded;
+        if (Presents)
+        {
+            flags |= FrameDemandFlag.Present;
+        }
+        Session.RequestFrame(FrameDemand.Default with { Flags = flags, Token = ++nextToken });
     }
 
     /// <summary>
@@ -808,6 +810,8 @@ internal sealed class NativeSurfaceRenderTarget : RenderTarget
                     ),
                 }
         );
+
+    protected override bool Presents => true;
 
     protected override bool Present() => true;
 }
