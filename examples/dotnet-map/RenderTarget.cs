@@ -11,7 +11,9 @@ namespace Maplibre.NativeFfi.Examples.DotnetMap;
 /// </summary>
 internal sealed class SessionDriver(RenderDriverKind kind, GlfwWindow window)
 {
-    private readonly GlfwWake work = new(window.Glfw);
+    /// <summary>The driver-work wake, which only a caller driver has.</summary>
+    private readonly GlfwWake? work =
+        kind == RenderDriverKind.CallerGraphicsThread ? new(window.Glfw) : null;
 
     public RenderDriverKind Kind => kind;
 
@@ -26,13 +28,13 @@ internal sealed class SessionDriver(RenderDriverKind kind, GlfwWindow window)
             Driver = kind,
             RequestedTextureRingDepth = ringDepth,
             FrameWake = frames.Wake,
-            DriverWorkWake = Caller ? work.Wake : default,
+            DriverWorkWake = work?.Wake ?? default,
         };
 
     /// <summary>Runs every queued item after the driver-work wake.</summary>
     public void Service(RenderSessionHandle session)
     {
-        if (Caller && work.Consume())
+        if (work?.Consume() == true)
         {
             session.ServiceDriverWork(0);
         }

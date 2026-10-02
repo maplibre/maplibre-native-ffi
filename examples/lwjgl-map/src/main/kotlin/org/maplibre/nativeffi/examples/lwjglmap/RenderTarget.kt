@@ -24,10 +24,10 @@ import org.maplibre.nativeffi.generated.Wake
  * queues it for the GLFW thread, which services it after the driver-work wake.
  */
 internal class SessionDriver(val kind: RenderDriverKind) {
-  private val work = GlfwWake()
+  private val caller = kind == RenderDriverKind.CALLER_GRAPHICS_THREAD
 
-  private val caller: Boolean
-    get() = kind == RenderDriverKind.CALLER_GRAPHICS_THREAD
+  /** The driver-work wake, which only a caller driver has. */
+  private val work = if (caller) GlfwWake() else null
 
   val label: String
     get() = if (caller) "caller-graphics-thread" else "core-worker"
@@ -37,12 +37,12 @@ internal class SessionDriver(val kind: RenderDriverKind) {
       driver = kind,
       requestedTextureRingDepth = ringDepth,
       frameWake = frames.wake,
-      driverWorkWake = if (caller) work.wake else Wake(),
+      driverWorkWake = work?.wake ?: Wake(),
     )
 
   /** Runs every queued item after the driver-work wake. */
   fun service(session: RenderSessionHandle) {
-    if (caller && work.consume()) session.serviceDriverWork(0uL)
+    if (work?.consume() == true) session.serviceDriverWork(0uL)
   }
 
   /**

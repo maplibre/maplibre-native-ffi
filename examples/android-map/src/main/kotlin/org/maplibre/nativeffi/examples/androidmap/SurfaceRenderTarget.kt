@@ -27,7 +27,8 @@ internal class SurfaceRenderTarget
 private constructor(
   private val session: RenderSessionHandle,
   val driver: RenderDriverKind,
-  private val driverWork: Semaphore,
+  /** Permits from the driver-work wake, which only a caller driver has. */
+  private val driverWork: Semaphore?,
 ) : AutoCloseable {
   private var nextToken = 0uL
 
@@ -161,7 +162,7 @@ private constructor(
    * everything else follows the wakes.
    */
   fun await(completion: Deferred<*>) {
-    if (callerDriver) {
+    if (driverWork != null) {
       // Permits from wakes the UI thread already serviced would only spin the loop.
       driverWork.drainPermits()
       completion.invokeOnCompletion { driverWork.release() }
@@ -190,7 +191,6 @@ private constructor(
       onDriverWork: () -> Unit,
       onAttached: (Throwable?) -> Unit,
     ): SurfaceRenderTarget {
-      val driverWork = Semaphore(0)
       // A Vulkan surface accepts a core worker. An OpenGL surface on an EGL context requires the
       // caller driver.
       val driver =
@@ -198,19 +198,18 @@ private constructor(
           is VulkanGraphicsContext -> RenderDriverKind.CORE_WORKER
           else -> RenderDriverKind.CALLER_GRAPHICS_THREAD
         }
+      val driverWork = if (driver == RenderDriverKind.CALLER_GRAPHICS_THREAD) Semaphore(0) else null
       val options =
         RenderSessionAttachOptions(
           driver = driver,
           frameWake = frameWake,
           driverWorkWake =
-            if (driver == RenderDriverKind.CALLER_GRAPHICS_THREAD) {
+            driverWork?.let { work ->
               Wake {
-                driverWork.release()
+                work.release()
                 onDriverWork()
               }
-            } else {
-              Wake()
-            },
+            } ?: Wake(),
         )
       val attachment =
         when (graphics) {
