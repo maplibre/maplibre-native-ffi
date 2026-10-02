@@ -73,6 +73,11 @@ final class MetalRenderTarget {
   private var replacement: (texture: MetalBorrowedTexture, token: UInt64)?
   /// The newest owned-texture frame, held until a newer one replaces it.
   private var heldFrame: AcquiredFrameHandle?
+  /// Whether an owned-texture resize is in flight. The binding call leaves
+  /// the main actor before it reaches the session, and the session rejects a
+  /// resize while the host holds a frame, so nothing acquires one until the
+  /// call returns.
+  private var resizing = false
   /// Whether a borrowed-texture demand is outstanding. The texture belongs to
   /// the session from a demand until its result, and to the host until the
   /// compositor's reads finish, so at most one demand is outstanding.
@@ -216,6 +221,9 @@ final class MetalRenderTarget {
   func present() throws -> Bool {
     switch kind {
     case let .ownedTexture(compositor):
+      // A frame skipped during a resize did not reach the layer, so the loop
+      // retries it once the resize returns.
+      guard !resizing else { return false }
       // Without a new frame, the layer keeps the one it already shows.
       guard let frame = try acquireNewestFrame() else { return true }
       return try compositor.draw(frame: frame)
@@ -241,6 +249,8 @@ final class MetalRenderTarget {
   ) async throws {
     guard case .borrowedTexture = kind else {
       // A session resizes only while the host holds none of its frames.
+      resizing = true
+      defer { resizing = false }
       try releaseHeldFrame()
       try await session.resize(extent: viewport.extent)
       return

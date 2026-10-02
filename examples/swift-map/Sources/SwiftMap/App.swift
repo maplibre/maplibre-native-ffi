@@ -18,9 +18,9 @@ enum SwiftMapMain {
       clearCAPILogging()
       exit(status)
     }
-    // The run loop drains the main queue on the main thread, which the caller
-    // driver keeps as its graphics thread. dispatchMain() would drain it on
-    // pool threads instead.
+    // The run loop drains the main queue, and with it the main actor, on the
+    // main thread, as the app's AppKit run loop does. dispatchMain() would
+    // drain it on pool threads instead.
     RunLoop.main.run()
   }
 }
