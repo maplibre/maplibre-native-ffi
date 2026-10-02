@@ -3364,6 +3364,39 @@ auto render_session_detach_start(
   auto async = CompletionOperation{};
   const auto status = create_completion_operation(completion, {}, async);
   if (status != MLN_STATUS_OK) return status;
+  // Built before the lock below, because building it allocates and may throw.
+  auto detach_work = RenderDriverWork{
+    [live, operation = async.operation]() {
+      static_cast<void>(map_set_render_session_publish_callback(live->map, {}));
+      const auto detach_status = render_session_detach(*live);
+      auto stranded = std::deque<PendingFrameDemand>{};
+      {
+        const auto lock = std::scoped_lock{live->control_mutex};
+        live->state = detach_status == MLN_STATUS_OK
+                        ? MLN_RENDER_SESSION_STATE_DETACHED
+                        : MLN_RENDER_SESSION_STATE_TARGET_LOST;
+        ++live->generation;
+        // A demand parked by a full texture ring keeps no work item, so
+        // detach is the last place that can give it its terminal result.
+        stranded.swap(live->demands);
+        for (const auto& pending : stranded) {
+          publish_frame_result_locked(
+            *live,
+            mln_render_frame_result{
+              sizeof(mln_render_frame_result),
+              MLN_RENDER_RESULT_TARGET_NOT_READY, pending.demand.token,
+              live->map_update_generation, live->extent_generation, 0, false
+            }
+          );
+        }
+      }
+      settle_barriers(*live);
+      operation->complete(detach_status, {}, {});
+    },
+    [operation = async.operation]() {
+      operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
+    }
+  };
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     if (
@@ -3377,47 +3410,16 @@ auto render_session_detach_start(
     live->state = MLN_RENDER_SESSION_STATE_DETACHING;
     ++live->barrier_epoch;
     ++live->generation;
+    // The work is queued under the lock that marks the session detaching. An
+    // abandon that takes the lock later finds the work in the queue and
+    // completes it as abandoned; one queued after the abandon emptied the
+    // queue would never run, and the detach would never complete. The
+    // completion is accepted first, so the driver, rather than this thread,
+    // delivers it.
+    async.completion->accept();
+    push_driver_work_locked(*live, std::move(detach_work));
   }
-  // Accepted before the driver can take the work, so the driver, rather than
-  // this thread, delivers the detach completion.
-  async.completion->accept();
-  enqueue_work(
-    live,
-    RenderDriverWork{
-      [live, operation = async.operation]() {
-        static_cast<void>(
-          map_set_render_session_publish_callback(live->map, {})
-        );
-        const auto detach_status = render_session_detach(*live);
-        auto stranded = std::deque<PendingFrameDemand>{};
-        {
-          const auto lock = std::scoped_lock{live->control_mutex};
-          live->state = detach_status == MLN_STATUS_OK
-                          ? MLN_RENDER_SESSION_STATE_DETACHED
-                          : MLN_RENDER_SESSION_STATE_TARGET_LOST;
-          ++live->generation;
-          // A demand parked by a full texture ring keeps no work item, so
-          // detach is the last place that can give it its terminal result.
-          stranded.swap(live->demands);
-          for (const auto& pending : stranded) {
-            publish_frame_result_locked(
-              *live,
-              mln_render_frame_result{
-                sizeof(mln_render_frame_result),
-                MLN_RENDER_RESULT_TARGET_NOT_READY, pending.demand.token,
-                live->map_update_generation, live->extent_generation, 0, false
-              }
-            );
-          }
-        }
-        settle_barriers(*live);
-        operation->complete(detach_status, {}, {});
-      },
-      [operation = async.operation]() {
-        operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
-      }
-    }
-  );
+  mln::testing::hit(mln::testing::SyncPoint::RenderDetachQueued);
   return MLN_STATUS_OK;
 }
 

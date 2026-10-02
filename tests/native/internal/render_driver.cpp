@@ -341,6 +341,95 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
   destroy_fixture(fixture);
 }
 
+struct DetachSubmission {
+  mln_render_session session;
+  mln_test_completion completion;
+  mln_status status = MLN_STATUS_NATIVE_ERROR;
+};
+
+void submit_detach(void* argument) {
+  auto& detach = *static_cast<DetachSubmission*>(argument);
+  detach.status = mln_render_session_detach(
+    detach.session, &detach.completion.descriptor, nullptr
+  );
+}
+
+struct BlockerRelease {
+  SyncPointScope* points;
+  mln_test_gate* gate;
+  std::atomic_bool abandon_returned{false};
+};
+
+// Lets the blocked driver call end once abandon waits for it, or once abandon
+// returned without waiting, as it does for a caller driver.
+void release_blocker_when_abandon_waits(void* argument) {
+  auto& release = *static_cast<BlockerRelease*>(argument);
+  static_cast<void>(await(
+    [&] {
+      return release.points->hits(SyncPoint::RenderAbandonWaits) > 0 ||
+             release.abandon_returned.load();
+    },
+    "abandon to wait for the driver call"
+  ));
+  mln_test_gate_release(release.gate);
+}
+
+// A host can abandon a session while another thread's detach is still
+// returning, after it marked the session detaching. Its work is queued by
+// then, so the abandon completes the detach as abandoned instead of leaving it
+// queued for a driver that has stopped. The blocked driver keeps the detach
+// queued until the abandon takes it.
+void an_abandon_during_a_detach_submission_completes_the_detach() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  auto blocker = DriverBlocker{};
+  block_driver(fixture, blocker);
+  points.hold(SyncPoint::RenderDetachQueued);
+  auto detach = DetachSubmission{
+    .session = fixture.render.session,
+    .completion = mln_test_completion_default(0),
+  };
+  auto* detaching = mln_test_thread_start(submit_detach, &detach);
+  TEST_ASSERT_TRUE(points.wait_for_hits(SyncPoint::RenderDetachQueued, 1));
+
+  auto release = BlockerRelease{.points = &points, .gate = blocker.gate.get()};
+  auto* releasing =
+    mln_test_thread_start(release_blocker_when_abandon_waits, &release);
+  auto result =
+    mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
+  const auto abandon_status =
+    mln_render_session_abandon(fixture.render.session, &result, nullptr);
+  release.abandon_returned.store(true);
+  mln_test_pulse();
+  mln_test_thread_join(releasing);
+  points.release(SyncPoint::RenderDetachQueued);
+  mln_test_thread_join(detaching);
+
+  MLN_TEST_OK(abandon_status);
+  MLN_TEST_OK(detach.status);
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_completion_wait(&detach.completion, -1),
+    "the detach completion never arrived"
+  );
+  MLN_TEST_STATUS(
+    MLN_STATUS_TARGET_LOST, mln_test_completion_status(&detach.completion)
+  );
+  mln_test_completion_destroy(&detach.completion);
+  // A core worker finished the blocked call before the abandon took the
+  // queue; a caller driver never ran it.
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&blocker.completion, -1));
+  MLN_TEST_STATUS(
+    fixture.render.driver == MLN_RENDER_DRIVER_CORE_WORKER
+      ? MLN_STATUS_OK
+      : MLN_STATUS_TARGET_LOST,
+    mln_test_completion_status(&blocker.completion)
+  );
+  mln_test_completion_destroy(&blocker.completion);
+  blocker.submitted = false;
+  destroy_fixture(fixture);
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
@@ -350,4 +439,5 @@ MLN_TEST_GROUP {
     a_parked_demand_misses_a_deadline_that_passes_while_the_ring_is_full
   );
   RUN_TEST(abandon_after_a_published_frame_waits_for_a_core_worker_call);
+  RUN_TEST(an_abandon_during_a_detach_submission_completes_the_detach);
 }

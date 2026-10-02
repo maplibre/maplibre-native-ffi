@@ -55,6 +55,10 @@ enum class SyncPoint : std::uint8_t {
   // Abandoning a core-worker session found a driver call in flight and is
   // about to wait for it to end. It fires only when abandon has to wait.
   RenderAbandonWaits,
+  // A detach has marked its session detaching and queued the work that
+  // detaches it, and is about to return. No lock is held, so an abandon can
+  // run while a detaching thread is parked here.
+  RenderDetachQueued,
   // A map's run loop handed MapLibre a finished frame of an update older than
   // the map's pending still-image request, reported as partial so that it
   // cannot complete the image.
