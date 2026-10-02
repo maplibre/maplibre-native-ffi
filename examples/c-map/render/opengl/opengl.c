@@ -583,7 +583,9 @@ app_error render_target_attach(
   // An OpenGL target on the host's EGL context renders where that context is
   // current, so the render loop services a caller driver.
   const mln_render_session_attach_options options =
-    render_session_attach_options(MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
+    render_session_attach_options(
+      target->mode, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+    );
   mln_render_session session = MLN_HANDLE_NULL;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_status status = MLN_STATUS_INVALID_STATE;

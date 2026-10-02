@@ -457,7 +457,7 @@ app_error render_target_attach(
   mln_completion completion;
   MAP_TRY(awaited_completion_init(&attached, &completion));
   const mln_render_session_attach_options options =
-    render_session_attach_options(select_driver(target));
+    render_session_attach_options(target->mode, select_driver(target));
   mln_render_session session = MLN_HANDLE_NULL;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_status status = MLN_STATUS_INVALID_STATE;

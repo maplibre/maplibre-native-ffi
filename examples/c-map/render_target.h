@@ -48,9 +48,9 @@ typedef struct frame_results {
 const char* render_driver_label(mln_render_driver_kind driver);
 
 /// Attach options for driver whose wakes post APP_EVENT_FRAME_RESULTS and, for
-/// a caller driver, APP_EVENT_DRIVER_WORK.
+/// a caller driver, APP_EVENT_DRIVER_WORK. Only an owned texture has a ring.
 mln_render_session_attach_options render_session_attach_options(
-  mln_render_driver_kind driver
+  render_target_mode mode, mln_render_driver_kind driver
 );
 
 /// Finishes an attach call: awaits the attachment, servicing a caller driver

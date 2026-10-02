@@ -25,7 +25,7 @@ const MTLClearColor = extern struct {
     alpha: f64,
 };
 
-pub const MetalRenderTarget = union(enum) {
+pub const MetalRenderTarget = union(types.RenderTargetMode) {
     pub const window_flags = c.SDL_WINDOW_METAL;
 
     owned_texture: MetalOwnedTextureBackend,
@@ -50,7 +50,7 @@ pub const MetalRenderTarget = union(enum) {
     /// worker, which renders on its own thread.
     pub fn attach(self: *MetalRenderTarget, map: *maplibre.Map, viewport: types.Viewport) !void {
         switch (self.*) {
-            inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(.core_worker)),
+            inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(self.*, .core_worker)),
         }
     }
 

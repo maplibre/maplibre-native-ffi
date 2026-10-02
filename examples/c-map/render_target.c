@@ -20,12 +20,13 @@ const char* render_driver_label(mln_render_driver_kind driver) {
 }
 
 mln_render_session_attach_options render_session_attach_options(
-  mln_render_driver_kind driver
+  render_target_mode mode, mln_render_driver_kind driver
 ) {
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();
   options.driver = driver;
-  options.requested_texture_ring_depth = 2;
+  options.requested_texture_ring_depth =
+    mode == RENDER_TARGET_MODE_OWNED_TEXTURE ? 2 : 0;
   options.frame_wake = app_event_wake(APP_EVENT_FRAME_RESULTS);
   if (driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
     options.driver_work_wake = app_event_wake(APP_EVENT_DRIVER_WORK);

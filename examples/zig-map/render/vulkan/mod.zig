@@ -11,7 +11,7 @@ const Pipeline = @import("pipeline.zig").Pipeline;
 const Swapchain = @import("swapchain.zig").Swapchain;
 const util = @import("util.zig");
 
-pub const VulkanRenderTarget = union(enum) {
+pub const VulkanRenderTarget = union(types.RenderTargetMode) {
     pub const window_flags = c.SDL_WINDOW_VULKAN;
 
     owned_texture: VulkanOwnedTextureBackend,
@@ -45,7 +45,7 @@ pub const VulkanRenderTarget = union(enum) {
                 .caller_graphics_thread,
         };
         switch (self.*) {
-            inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(driver)),
+            inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(self.*, driver)),
         }
     }
 

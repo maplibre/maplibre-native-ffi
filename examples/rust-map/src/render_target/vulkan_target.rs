@@ -52,7 +52,7 @@ impl RenderTarget {
         } else {
             RenderDriverKind::CallerGraphicsThread
         };
-        let options = attach_options(wakes, driver);
+        let options = attach_options(wakes, mode, driver);
         match mode {
             Mode::OwnedTexture => {
                 let descriptor = VulkanOwnedTextureDescriptor {

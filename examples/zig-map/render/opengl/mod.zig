@@ -216,7 +216,7 @@ const gl_internal_format: gl.int = gl.RGBA;
 const gl_pixel_format: gl.@"enum" = gl.RGBA;
 const gl_pixel_type: gl.@"enum" = gl.UNSIGNED_BYTE;
 
-const PlatformOpenGLRenderTarget = union(enum) {
+const PlatformOpenGLRenderTarget = union(types.RenderTargetMode) {
     pub const window_flags = c.SDL_WINDOW_OPENGL;
 
     owned_texture: OpenGLOwnedTextureBackend,
@@ -242,7 +242,7 @@ const PlatformOpenGLRenderTarget = union(enum) {
     /// services a caller driver.
     pub fn attach(self: *PlatformOpenGLRenderTarget, map: *maplibre.Map, viewport: types.Viewport) !void {
         switch (self.*) {
-            inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(.caller_graphics_thread)),
+            inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(self.*, .caller_graphics_thread)),
         }
     }
 

@@ -40,7 +40,7 @@ impl RenderTarget {
         let metal = graphics.metal();
         // Every Metal target accepts a core worker, which renders on its own
         // thread.
-        let options = attach_options(wakes, RenderDriverKind::CoreWorker);
+        let options = attach_options(wakes, mode, RenderDriverKind::CoreWorker);
         match mode {
             Mode::OwnedTexture => {
                 let descriptor = maplibre_native_ffi::MetalOwnedTextureDescriptor {

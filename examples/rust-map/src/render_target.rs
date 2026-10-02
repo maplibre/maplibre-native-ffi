@@ -93,11 +93,16 @@ pub fn driver_label(driver: RenderDriverKind) -> &'static str {
 }
 
 /// Attach options for `driver` whose wakes post frame-result events and, for a
-/// caller driver, driver-work events to the winit loop.
-pub fn attach_options(wakes: &Wakes, driver: RenderDriverKind) -> RenderSessionAttachOptions {
+/// caller driver, driver-work events to the winit loop. Only an owned texture
+/// has a ring.
+pub fn attach_options(
+    wakes: &Wakes,
+    mode: Mode,
+    driver: RenderDriverKind,
+) -> RenderSessionAttachOptions {
     let mut options = RenderSessionAttachOptions {
         driver,
-        requested_texture_ring_depth: 2,
+        requested_texture_ring_depth: if mode == Mode::OwnedTexture { 2 } else { 0 },
         frame_wake: wakes.wake(AppEvent::FrameResults),
         ..RenderSessionAttachOptions::default()
     };

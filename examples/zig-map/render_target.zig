@@ -25,11 +25,11 @@ pub fn driverLabel(driver: maplibre.RenderDriverKind) []const u8 {
 }
 
 /// Attach options for `driver` whose wakes post `frame_results` and, for a
-/// caller driver, `driver_work` app events.
-pub fn attachOptions(driver: maplibre.RenderDriverKind) maplibre.RenderSessionAttachOptions {
+/// caller driver, `driver_work` app events. Only an owned texture has a ring.
+pub fn attachOptions(mode: types.RenderTargetMode, driver: maplibre.RenderDriverKind) maplibre.RenderSessionAttachOptions {
     return .{
         .driver = driver,
-        .requested_texture_ring_depth = 2,
+        .requested_texture_ring_depth = if (mode == .owned_texture) 2 else 0,
         .frame_wake = events.wake(.frame_results),
         .driver_work_wake = if (driver == .caller_graphics_thread) events.wake(.driver_work) else .{},
     };

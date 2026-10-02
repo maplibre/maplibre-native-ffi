@@ -46,7 +46,7 @@ impl RenderTarget {
         })?;
         // An OpenGL target on the host's WGL or EGL context renders where that
         // context is current, so the event loop services a caller driver.
-        let options = attach_options(wakes, RenderDriverKind::CallerGraphicsThread);
+        let options = attach_options(wakes, mode, RenderDriverKind::CallerGraphicsThread);
         match mode {
             Mode::OwnedTexture => {
                 let descriptor = OpenglOwnedTextureDescriptor {

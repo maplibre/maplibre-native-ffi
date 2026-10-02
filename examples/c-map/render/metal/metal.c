@@ -464,7 +464,7 @@ app_error render_target_attach(
   MAP_TRY(awaited_completion_init(&attached, &completion));
   // Every Metal target accepts a core worker, which renders on its own thread.
   const mln_render_session_attach_options options =
-    render_session_attach_options(MLN_RENDER_DRIVER_CORE_WORKER);
+    render_session_attach_options(target->mode, MLN_RENDER_DRIVER_CORE_WORKER);
   mln_render_session session = MLN_HANDLE_NULL;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_status status = MLN_STATUS_INVALID_STATE;
