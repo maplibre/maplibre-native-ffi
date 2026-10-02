@@ -15,6 +15,7 @@ class MainActivity : Activity() {
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     installMaplibreLogging()
     MaplibreAndroid.initialize(this)
+    Log.i(TAG, "native render backends: ${GeneratedApi.supportedRenderBackendMask()}")
     // A smoke launch renders an inline style, so it needs no network, logs its first rendered
     // frame, and finishes.
     val smoke = intent.getBooleanExtra(SMOKE_EXTRA, false)

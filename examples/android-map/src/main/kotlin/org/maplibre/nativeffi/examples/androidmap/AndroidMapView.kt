@@ -18,7 +18,7 @@ import org.maplibre.nativeffi.generated.Wake
  *
  * Touch input becomes map commands. A map update schedules one frame demand on the next
  * Choreographer frame. Native wakes post the work they announce to the UI thread: runtime events to
- * drain, driver work to service, and frame results to drain.
+ * drain, frame results to drain, and, for a caller driver, driver work to service.
  */
 internal class AndroidMapView(
   context: Context,
@@ -74,9 +74,15 @@ internal class AndroidMapView(
     scheduleFrame()
   }
 
+  /** Pauses demand, and waits until no frame renders after the app leaves the foreground. */
   fun enterBackground() {
     appForeground = false
     stopFrames()
+    try {
+      renderTarget?.barrier()
+    } catch (error: RuntimeException) {
+      Log.w(TAG, "the background render barrier failed", error)
+    }
     finishPendingDrawing()
   }
 
@@ -152,7 +158,7 @@ internal class AndroidMapView(
       detachSurface()
       val nextGraphics = GraphicsContext.create(holder.surface)
       graphics = nextGraphics
-      Log.i(TAG, "render-target=native-surface status=${nextGraphics.backendName}")
+      Log.i(TAG, "graphics context: ${nextGraphics.backendName}")
     }
     val state = mapState
     if (state == null) {
@@ -177,7 +183,7 @@ internal class AndroidMapView(
         try {
           graphics?.releaseSurface {
             // The context outlived the surface, so the session parks on it until a surface returns.
-            followSurface("surface released")?.let { target?.awaitDriverWork(it) }
+            followSurface("surface released")?.let { target?.await(it) }
           } == true
         } catch (error: RuntimeException) {
           Log.w(TAG, "parking the render session failed; closing it", error)
@@ -213,6 +219,9 @@ internal class AndroidMapView(
       detachSurface()
       return
     }
+    Log.i(TAG, "render target: native-surface")
+    Log.i(TAG, "render target status: renders directly to the host window surface")
+    Log.i(TAG, "render driver: ${target.driverLabel}")
     // The viewport may have changed while the session attached.
     if (target.viewport != viewport) followSurface("attached")
     scheduleFrame()

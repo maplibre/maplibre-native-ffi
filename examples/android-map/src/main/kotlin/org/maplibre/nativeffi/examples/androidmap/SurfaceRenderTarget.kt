@@ -6,8 +6,8 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
-import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.OpenglSurfaceDescriptor
@@ -19,12 +19,18 @@ import org.maplibre.nativeffi.generated.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.generated.Wake
 
 /**
- * A caller-driver native surface that the UI thread drives. The session's wakes post its driver
- * work and frame results to the UI thread, where the view services and drains them.
+ * A native-surface render session. A Vulkan session renders and presents on its core worker. An EGL
+ * window surface requires the caller driver, so the session's driver-work wake posts its work to
+ * the UI thread, which services it. Either way the frame wake posts the results to the UI thread.
  */
 internal class SurfaceRenderTarget
-private constructor(private val session: RenderSessionHandle, private val driverWork: Semaphore) :
-  AutoCloseable {
+private constructor(
+  private val session: RenderSessionHandle,
+  val driver: RenderDriverKind,
+  private val driverWork: Semaphore,
+) : AutoCloseable {
+  private var nextToken = 0uL
+
   /** Set once the attachment completes; a session accepts frame demand only after that. */
   @Volatile
   var attached = false
@@ -34,17 +40,22 @@ private constructor(private val session: RenderSessionHandle, private val driver
   var viewport: Viewport? = null
     private set
 
-  /**
-   * Asks for a frame. A forced frame renders and presents even when the map has no newer update.
-   */
+  private val callerDriver: Boolean
+    get() = driver == RenderDriverKind.CALLER_GRAPHICS_THREAD
+
+  val driverLabel: String
+    get() = if (callerDriver) "caller-graphics-thread" else "core-worker"
+
+  /** Demands a frame. A forced frame renders and presents even when the map has no newer update. */
   fun requestFrame(force: Boolean) {
     val flags =
       if (force) FrameDemandFlag.PRESENT else FrameDemandFlag.IF_NEEDED or FrameDemandFlag.PRESENT
-    session.requestFrame(GeneratedApi.frameDemandDefault().copy(flags = flags))
+    session.requestFrame(FrameDemand(flags = flags, token = ++nextToken))
   }
 
+  /** Runs every queued item of a caller driver after its wake. */
   fun serviceDriverWork() {
-    session.serviceDriverWork(0uL)
+    if (callerDriver) session.serviceDriverWork(0uL)
   }
 
   /**
@@ -81,10 +92,10 @@ private constructor(private val session: RenderSessionHandle, private val driver
 
   /**
    * Points the session at the surface the graphics context presents through now, and at the
-   * viewport. A session resize carries the map's extent itself. An EGL surface handover replaces
-   * only the graphics resource, so that path submits the map resize alongside it. The returned
-   * handover or resize completes through driver work; a caller whose outgoing surface is about to
-   * go passes it to [awaitDriverWork], and a failure otherwise reaches [onFailure].
+   * viewport. A session resize carries the map's extent itself. An EGL surface replacement changes
+   * only the graphics resource, so that path submits the map resize alongside it. A caller whose
+   * outgoing surface is about to go passes the returned completion to [await], and a failure
+   * otherwise reaches [onFailure].
    */
   fun follow(
     map: MapHandle,
@@ -96,7 +107,7 @@ private constructor(private val session: RenderSessionHandle, private val driver
     val completion =
       when (graphics) {
         is EglGraphicsContext -> {
-          val handover =
+          val replacement =
             session.openglSurfaceSetTarget(
               OpenglSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
             )
@@ -107,7 +118,7 @@ private constructor(private val session: RenderSessionHandle, private val driver
               viewport.scaleFactor,
             )
           )
-          handover
+          replacement
         }
         is VulkanGraphicsContext -> session.resize(viewport.extent)
         else -> error("Unsupported graphics context: ${graphics::class.java.name}")
@@ -117,32 +128,48 @@ private constructor(private val session: RenderSessionHandle, private val driver
   }
 
   /**
-   * Releases the session. Detach services driver work on the UI thread until it completes; a
-   * platform callback that arrives after the surface is gone falls back to abandoning it.
+   * Waits until every frame demanded before it has a result, so that no frame renders after the app
+   * leaves the foreground.
+   */
+  fun barrier() {
+    if (attached) await(session.barrier())
+  }
+
+  /**
+   * Releases the session. A failed detach, such as from a platform callback that arrives after the
+   * surface is gone, abandons it instead.
    */
   override fun close() {
     try {
-      awaitDriverWork(session.detach())
+      await(session.detach())
     } catch (error: RuntimeException) {
       Log.w(TAG, "detaching the render session failed; abandoning it instead", error)
       runCatching { session.abandon() }
+        .onSuccess { result ->
+          if (result.quarantinedResourceCount > 0u) {
+            Log.w(TAG, "render session quarantined ${result.quarantinedResourceCount} resources")
+          }
+        }
     }
     session.close()
   }
 
   /**
-   * Services driver work until [completion] finishes, sleeping until the session's driver-work wake
-   * or the completion arrives. Only teardown and a surface loss wait like this; everything else
-   * follows the wakes.
+   * Waits for [completion] on the UI thread. A caller driver's completion progresses only through
+   * driver service, so the thread services the session between waits for the driver-work wake or
+   * for the completion. Only teardown, the background barrier, and a surface loss wait like this;
+   * everything else follows the wakes.
    */
-  fun awaitDriverWork(completion: Deferred<*>) {
-    // Permits from wakes the UI thread already serviced would only spin the loop.
-    driverWork.drainPermits()
-    completion.invokeOnCompletion { driverWork.release() }
-    while (true) {
-      session.serviceDriverWork(0uL)
-      if (completion.isCompleted) break
-      driverWork.acquire()
+  fun await(completion: Deferred<*>) {
+    if (callerDriver) {
+      // Permits from wakes the UI thread already serviced would only spin the loop.
+      driverWork.drainPermits()
+      completion.invokeOnCompletion { driverWork.release() }
+      while (true) {
+        session.serviceDriverWork(0uL)
+        if (completion.isCompleted) break
+        driverWork.acquire()
+      }
     }
     runBlocking { completion.await() }
   }
@@ -151,10 +178,9 @@ private constructor(private val session: RenderSessionHandle, private val driver
     private const val TAG = "MapLibreAndroidMap"
 
     /**
-     * Starts attaching a session on the UI thread, which owns it until close. The session raises
-     * [frameWake] with frame results and [onDriverWork] with driver work. The attachment completes
-     * through that driver work, and then [onAttached] runs on a native thread with the attachment's
-     * failure, or null.
+     * Starts attaching a session, which the UI thread owns until close. The session raises
+     * [frameWake] with frame results and, for a caller driver, [onDriverWork] with driver work.
+     * [onAttached] runs on a native thread with the attachment's failure, or null.
      */
     fun attach(
       map: MapHandle,
@@ -165,14 +191,25 @@ private constructor(private val session: RenderSessionHandle, private val driver
       onAttached: (Throwable?) -> Unit,
     ): SurfaceRenderTarget {
       val driverWork = Semaphore(0)
+      // A Vulkan surface accepts a core worker. An OpenGL surface on an EGL context requires the
+      // caller driver.
+      val driver =
+        when (graphics) {
+          is VulkanGraphicsContext -> RenderDriverKind.CORE_WORKER
+          else -> RenderDriverKind.CALLER_GRAPHICS_THREAD
+        }
       val options =
         RenderSessionAttachOptions(
-          driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
+          driver = driver,
           frameWake = frameWake,
           driverWorkWake =
-            Wake {
-              driverWork.release()
-              onDriverWork()
+            if (driver == RenderDriverKind.CALLER_GRAPHICS_THREAD) {
+              Wake {
+                driverWork.release()
+                onDriverWork()
+              }
+            } else {
+              Wake()
             },
         )
       val attachment =
@@ -193,7 +230,7 @@ private constructor(private val session: RenderSessionHandle, private val driver
             )
           else -> error("Unsupported graphics context: ${graphics::class.java.name}")
         }
-      val target = SurfaceRenderTarget(attachment.session, driverWork)
+      val target = SurfaceRenderTarget(attachment.session, driver, driverWork)
       target.viewport = viewport
       attachment.ready.invokeOnCompletion { error ->
         if (error == null) target.attached = true
