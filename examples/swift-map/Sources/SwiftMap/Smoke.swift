@@ -36,7 +36,7 @@ func runSmoke(mode: RenderTargetMode) async -> Int32 {
       print("smoke: no \(mode.rawValue) frame rendered before the deadline")
       return 1
     }
-    print("smoke: rendered one \(mode.rawValue) frame")
+    print("smoke: rendered a frame")
     return 0
   } catch {
     print("smoke: \(mode.rawValue) failed: \(error)")

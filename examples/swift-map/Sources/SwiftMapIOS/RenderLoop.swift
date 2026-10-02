@@ -2,9 +2,9 @@ import Foundation
 import MaplibreNativeFFI
 
 /// The render loop for one map and its surface. Native wakes reach it on the
-/// main actor: a runtime event drain demands a frame for each map update, a
-/// driver wake services the session, and a frame-result drain re-arms
-/// demand. Gestures submit camera commands to `mapState` directly.
+/// main actor: a runtime event drain demands a frame for each map update, and
+/// a frame-result drain re-arms demand. The session renders on its own core
+/// worker. Gestures submit camera commands to `mapState` directly.
 @MainActor
 final class RenderLoop {
   /// How long a frame that did not reach the layer waits before it retries,
@@ -18,7 +18,7 @@ final class RenderLoop {
   /// skipped.
   private var resizeCount = 0
   /// Whether the view is visible with the app in the foreground. Frame demand
-  /// pauses otherwise, while driver work keeps being serviced.
+  /// pauses otherwise, while the runtime keeps loading.
   var isPresenting = true {
     didSet {
       if isPresenting, !oldValue { requestFrame() }
@@ -58,7 +58,6 @@ final class RenderLoop {
     }
     let loop = RenderLoop(mapState: mapState, target: target)
     mapState.onFailure = { [weak loop] in loop?.fail($0) }
-    target.onFailure = { [weak loop] in loop?.fail($0) }
     relay.loop = loop
     // Wakes that arrived before the relay knew the loop found nothing to
     // forward to, so drain and demand once now.
@@ -77,6 +76,22 @@ final class RenderLoop {
     mapState.submit { [weak self] in
       guard let self, count == self.resizeCount else { return }
       try await self.target.resize(viewport)
+    }
+  }
+
+  /// The session driver, for the startup log.
+  var driver: RenderDriverKind {
+    target.driver
+  }
+
+  /// Waits for the frames demanded before demand paused, so none renders
+  /// once the app is in the background.
+  func awaitRenderBarrier() async {
+    guard !isClosed else { return }
+    do {
+      try await target.barrier()
+    } catch {
+      fail(error)
     }
   }
 

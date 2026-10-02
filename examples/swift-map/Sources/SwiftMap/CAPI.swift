@@ -38,8 +38,10 @@ func logControls() {
   )
 }
 
-func logStartupStatus(mode: RenderTargetMode) {
+func logStartupStatus(mode: RenderTargetMode, driver: RenderDriverKind) {
   print("render target: \(mode.rawValue)")
   print("render target status: \(mode.statusLine)")
-  logControls()
+  print(
+    "render driver: \(driver == .coreWorker ? "core-worker" : "caller-graphics-thread")"
+  )
 }

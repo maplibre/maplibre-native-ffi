@@ -2,9 +2,9 @@ import Foundation
 import MaplibreNativeFFI
 
 /// The render loop for one map and render target. Native wakes reach it on the
-/// main actor: a runtime event drain demands a frame for each map update, a
-/// driver wake services the session, and a frame-result drain shows what
-/// rendered. Input submits camera commands to `mapState` directly.
+/// main actor: a runtime event drain demands a frame for each map update, and
+/// a frame-result drain shows what rendered. The session renders on its own
+/// core worker. Input submits camera commands to `mapState` directly.
 @MainActor
 final class RenderLoop {
   /// How long a frame that did not reach the layer waits before it retries,
@@ -67,8 +67,8 @@ final class RenderLoop {
       target: target
     )
     mapState.onFailure = { [weak loop] in loop?.fail($0) }
-    target.onFailure = { [weak loop] in loop?.fail($0) }
     relay.loop = loop
+    logStartupStatus(mode: mode, driver: target.driver)
     // Wakes that arrived before the relay knew the loop found nothing to
     // forward to, so drain and demand once now.
     loop.drainEvents()
@@ -137,6 +137,7 @@ final class RenderLoop {
       } else if results.needsRepaint {
         requestFrame()
       }
+      if results.any { try target.compositorDone() }
     } catch {
       fail(error)
     }

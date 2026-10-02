@@ -25,13 +25,12 @@ final class MetalGraphicsContext {
     nativePointer(layer)
   }
 
+  /// Follows a new viewport. A surface session sets the layer's drawable
+  /// size, and the compositor sizes it to each frame it draws, so the host
+  /// sets only the contents scale.
   func resize(_ viewport: Viewport) {
     guard !viewport.isEmpty else { return }
     layer.contentsScale = viewport.scaleFactor
-    layer.drawableSize = CGSize(
-      width: Int(viewport.physicalWidth),
-      height: Int(viewport.physicalHeight)
-    )
   }
 
   private func configureLayer() {
@@ -43,6 +42,8 @@ final class MetalGraphicsContext {
 
 /// What one drain of the frame-result queue found.
 struct FrameResults {
+  /// The drain found at least one result.
+  var any = false
   /// A demand rendered a frame.
   var rendered = false
   /// The map asked for another frame while it rendered one.
@@ -51,8 +52,9 @@ struct FrameResults {
   var targetNotReady = false
 }
 
-/// The render session and its mode-specific resources. A driver wake services
-/// caller-driver work on the main thread that owns the Metal objects.
+/// The render session and its mode-specific resources. Every Metal target
+/// accepts a core worker, which renders on its own thread, so the host runs
+/// nothing for the session.
 @MainActor
 final class MetalRenderTarget {
   private enum Kind {
@@ -62,13 +64,22 @@ final class MetalRenderTarget {
   }
 
   let session: RenderSessionHandle
+  let driver = RenderDriverKind.coreWorker
   private let kind: Kind
-  private let driverRelay: DriverRelay
   /// The caller-owned texture the compositor samples.
   private var borrowedTexture: MetalBorrowedTexture?
   /// A completed replacement, which the compositor samples once the frame
   /// demanded with `token` has rendered into it.
   private var replacement: (texture: MetalBorrowedTexture, token: UInt64)?
+  /// The newest owned-texture frame, held until a newer one replaces it.
+  private var heldFrame: AcquiredFrameHandle?
+  /// Whether a borrowed-texture demand is outstanding. The texture belongs to
+  /// the session from a demand until its result, and to the host until the
+  /// compositor's reads finish, so at most one demand is outstanding.
+  private var demandOutstanding = false
+  /// A demand that arrived while one was outstanding, sent once the
+  /// compositor is done. A forced one renders without a newer map update.
+  private var wantedDemand: Bool?
   private var nextToken: UInt64 = 0
   /// The newest demand token with a rendered result.
   private var renderedToken: UInt64 = 0
@@ -76,20 +87,11 @@ final class MetalRenderTarget {
   private init(
     session: RenderSessionHandle,
     kind: Kind,
-    driverRelay: DriverRelay,
     borrowedTexture: MetalBorrowedTexture? = nil
   ) {
     self.session = session
     self.kind = kind
-    self.driverRelay = driverRelay
     self.borrowedTexture = borrowedTexture
-  }
-
-  /// Receives a failure to service driver work. The session is abandoned by
-  /// then, so it renders nothing more.
-  var onFailure: (@MainActor (Error) -> Void)? {
-    get { driverRelay.onFailure }
-    set { driverRelay.onFailure = newValue }
   }
 
   /// Attaches a session against the map. `frameWake` reports frame results.
@@ -100,12 +102,10 @@ final class MetalRenderTarget {
     viewport: Viewport,
     frameWake: Wake
   ) async throws -> MetalRenderTarget {
-    let driverRelay = DriverRelay()
     let options = RenderSessionAttachOptions(
-      driver: .callerGraphicsThread,
+      driver: .coreWorker,
       requestedTextureRingDepth: mode == .ownedTexture ? 3 : 0,
-      frameWake: frameWake,
-      driverWorkWake: driverRelay.wake
+      frameWake: frameWake
     )
     switch mode {
     case .ownedTexture:
@@ -116,15 +116,10 @@ final class MetalRenderTarget {
             context: graphics.contextDescriptor
           ),
           options: options
-        ),
-        relay: driverRelay
+        )
       )
       return try withCompositor(session, graphics: graphics) {
-        MetalRenderTarget(
-          session: session,
-          kind: .ownedTexture($0),
-          driverRelay: driverRelay
-        )
+        MetalRenderTarget(session: session, kind: .ownedTexture($0))
       }
     case .borrowedTexture:
       let texture = try MetalBorrowedTexture(
@@ -135,14 +130,12 @@ final class MetalRenderTarget {
         map.metalBorrowedTextureAttach(
           descriptor: texture.descriptor(viewport),
           options: options
-        ),
-        relay: driverRelay
+        )
       )
       return try withCompositor(session, graphics: graphics) {
         MetalRenderTarget(
           session: session,
           kind: .borrowedTexture($0),
-          driverRelay: driverRelay,
           borrowedTexture: texture
         )
       }
@@ -155,21 +148,22 @@ final class MetalRenderTarget {
             layer: graphics.layerPointer
           ),
           options: options
-        ),
-        relay: driverRelay
+        )
       )
-      return MetalRenderTarget(
-        session: session,
-        kind: .nativeSurface,
-        driverRelay: driverRelay
-      )
+      return MetalRenderTarget(session: session, kind: .nativeSurface)
     }
   }
 
-  /// Demands a frame and returns its token. A forced demand renders even
-  /// without a newer map update, which a retry after an undrawn frame needs.
+  /// Demands a frame and returns the token whose result shows it. A forced
+  /// demand renders even without a newer map update, which a retry after an
+  /// undrawn frame needs. While a borrowed-texture demand is outstanding, the
+  /// demand waits for ``compositorDone()``.
   @discardableResult
   func requestFrame(force: Bool = false) throws -> UInt64 {
+    if case .borrowedTexture = kind, demandOutstanding {
+      wantedDemand = force || (wantedDemand ?? false)
+      return nextToken + 1
+    }
     nextToken += 1
     var flags: FrameDemandFlag = force ? [] : [.ifNeeded]
     if case .nativeSurface = kind {
@@ -179,7 +173,18 @@ final class MetalRenderTarget {
       flags: flags,
       token: nextToken
     ))
+    demandOutstanding = true
     return nextToken
+  }
+
+  /// Ends the host's turn with the borrowed texture after a drain that found
+  /// results, sending any demand that waited for it.
+  func compositorDone() throws {
+    demandOutstanding = false
+    if let force = wantedDemand {
+      wantedDemand = nil
+      try requestFrame(force: force)
+    }
   }
 
   /// Drains every queued frame result.
@@ -189,10 +194,11 @@ final class MetalRenderTarget {
     catch let error as MaplibreError
       where error.kind == .notReady { return FrameResults() }
     defer { try? batch.close() }
-    var results = FrameResults()
+    let count = try batch.count()
+    var results = FrameResults(any: count > 0)
     // No update and size pending wait for the map's next update, superseded
     // demands have a newer one behind them, and no demand carries a timeout.
-    for index in try 0 ..< (batch.count()) {
+    for index in 0 ..< count {
       let result = try batch.get(index: index)
       if result.disposition == .rendered {
         results.rendered = true
@@ -212,7 +218,6 @@ final class MetalRenderTarget {
     case let .ownedTexture(compositor):
       // Without a new frame, the layer keeps the one it already shows.
       guard let frame = try acquireNewestFrame() else { return true }
-      defer { try? frame.release(consumerCompletion: .default) }
       return try compositor.draw(frame: frame)
     case let .borrowedTexture(compositor):
       if let replacement, renderedToken >= replacement.token {
@@ -235,6 +240,8 @@ final class MetalRenderTarget {
     map: MapHandle
   ) async throws {
     guard case .borrowedTexture = kind else {
+      // A session resizes only while the host holds none of its frames.
+      try releaseHeldFrame()
       try await session.resize(extent: viewport.extent)
       return
     }
@@ -259,6 +266,7 @@ final class MetalRenderTarget {
 
   func close() async throws {
     do {
+      try releaseHeldFrame()
       try await session.detach()
       try session.close()
     } catch {
@@ -268,17 +276,26 @@ final class MetalRenderTarget {
     }
   }
 
+  /// Holds the newest rendered frame, releasing every older one, and returns
+  /// it when it is new. The compositor waits for its reads before returning,
+  /// so CPU-complete release is accurate.
   private func acquireNewestFrame() throws -> AcquiredFrameHandle? {
-    var newest: AcquiredFrameHandle?
+    var acquired = false
     while true {
       do {
         let frame = try session.acquireFrame()
-        try newest?.release(consumerCompletion: .default)
-        newest = frame
+        try releaseHeldFrame()
+        heldFrame = frame
+        acquired = true
       } catch let error as MaplibreError where error.kind == .notReady {
-        return newest
+        return acquired ? heldFrame : nil
       }
     }
+  }
+
+  private func releaseHeldFrame() throws {
+    try heldFrame?.release(consumerCompletion: .default)
+    heldFrame = nil
   }
 
   private static func withCompositor(
@@ -296,19 +313,16 @@ final class MetalRenderTarget {
   }
 
   private static func finishAttachment(
-    _ attachment: RenderSessionAttachment, relay: DriverRelay
+    _ attachment: RenderSessionAttachment
   ) async throws -> RenderSessionHandle {
     let session = attachment.session
     do {
-      relay.session = session
-      relay.service()
       try await attachment.completion.value
       return session
     } catch {
       _ = try? session.abandon()
       try? session.close()
-      // A service failure abandons the session, which fails the attachment.
-      throw relay.failure ?? error
+      throw error
     }
   }
 }
@@ -350,6 +364,9 @@ final class MetalTextureCompositor {
     texture: any MTLTexture,
     producerSynchronization: GpuSyncView? = nil
   ) throws -> Bool {
+    // The layer's drawable matches the frame it shows.
+    let size = CGSize(width: texture.width, height: texture.height)
+    if layer.drawableSize != size { layer.drawableSize = size }
     guard let drawable = layer.nextDrawable() else { return false }
     let passDescriptor = MTLRenderPassDescriptor()
     guard let colorAttachment = passDescriptor.colorAttachments[0] else {
@@ -516,28 +533,3 @@ fragment float4 fragment_main(
   return map_texture.sample(map_sampler, in.uv);
 }
 """
-
-/// Services caller-driver work on the main actor when the driver wakes. A
-/// session that cannot be serviced is abandoned, which completes its pending
-/// work with target loss, and the failure is reported.
-@MainActor
-private final class DriverRelay {
-  weak var session: RenderSessionHandle?
-  var onFailure: (@MainActor (Error) -> Void)?
-  private(set) var failure: Error?
-
-  var wake: Wake {
-    Wake(callback: { [self] in Task { @MainActor in service() } })
-  }
-
-  func service() {
-    guard failure == nil, let session else { return }
-    do {
-      _ = try session.serviceDriverWork(maxWork: 0)
-    } catch {
-      failure = error
-      _ = try? session.abandon()
-      onFailure?(error)
-    }
-  }
-}

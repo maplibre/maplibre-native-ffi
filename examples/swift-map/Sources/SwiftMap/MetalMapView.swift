@@ -136,7 +136,7 @@ final class MetalMapView: NSView {
         )
         loop.onFailure = { [weak self] in self?.fail(String(describing: $0)) }
         self.loop = loop
-        logStartupStatus(mode: mode)
+        logControls()
         // The viewport can change while startup is in flight.
         if let latest = currentViewport, latest != viewport, !latest.isEmpty {
           loop.resize(latest)

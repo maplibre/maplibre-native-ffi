@@ -89,6 +89,14 @@ final class MetalMapView: UIView {
   @objc private func enterBackground() {
     appForeground = false
     updatePresenting()
+    // The app may not render in the background, so it keeps running until
+    // the frames demanded before the pause have their results.
+    guard let loop else { return }
+    let task = UIApplication.shared.beginBackgroundTask()
+    Task { @MainActor in
+      await loop.awaitRenderBarrier()
+      UIApplication.shared.endBackgroundTask(task)
+    }
   }
 
   @objc private func closeMap() {
@@ -96,7 +104,7 @@ final class MetalMapView: UIView {
   }
 
   /// Demands frames only while the view is visible in the foreground. The
-  /// native scheduler keeps loading, and driver wakes keep being serviced.
+  /// native scheduler keeps loading.
   private func updatePresenting() {
     loop?.isPresenting = viewVisible && appForeground
   }
@@ -131,7 +139,10 @@ final class MetalMapView: UIView {
         updatePresenting()
         log.info("render target: native-surface")
         log.info(
-          "render target status: renders directly to the host view surface"
+          "render target status: renders directly to the host window surface"
+        )
+        log.info(
+          "render driver: \(loop.driver == .coreWorker ? "core-worker" : "caller-graphics-thread", privacy: .public)"
         )
         // The viewport can change while startup is in flight.
         if let latest = currentViewport, latest != viewport, !latest.isEmpty {

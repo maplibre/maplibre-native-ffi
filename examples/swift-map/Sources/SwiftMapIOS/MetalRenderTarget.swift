@@ -24,13 +24,11 @@ final class MetalGraphicsContext {
     nativePointer(layer)
   }
 
+  /// Follows a new viewport. The session sets the layer's drawable size, so
+  /// the host sets only the contents scale.
   func resize(_ viewport: Viewport) {
     guard !viewport.isEmpty else { return }
     layer.contentsScale = viewport.scaleFactor
-    layer.drawableSize = CGSize(
-      width: Int(viewport.physicalWidth),
-      height: Int(viewport.physicalHeight)
-    )
   }
 
   private func configureLayer() {
@@ -50,24 +48,17 @@ struct FrameResults {
   var targetNotReady = false
 }
 
-/// The render session for the host `CAMetalLayer`. A driver wake services
-/// caller-driver work on the main thread that owns the Metal objects.
+/// The render session for the host `CAMetalLayer`. A Metal surface accepts a
+/// core worker, which renders and presents on its own thread, so the host runs
+/// nothing for the session.
 @MainActor
 final class MetalRenderTarget {
   private let session: RenderSessionHandle
-  private let driverRelay: DriverRelay
+  let driver = RenderDriverKind.coreWorker
   private var nextToken: UInt64 = 0
 
-  private init(session: RenderSessionHandle, driverRelay: DriverRelay) {
+  private init(session: RenderSessionHandle) {
     self.session = session
-    self.driverRelay = driverRelay
-  }
-
-  /// Receives a failure to service driver work. The session is abandoned by
-  /// then, so it renders nothing more.
-  var onFailure: (@MainActor (Error) -> Void)? {
-    get { driverRelay.onFailure }
-    set { driverRelay.onFailure = newValue }
   }
 
   /// Attaches a session against the map. `frameWake` reports frame results.
@@ -77,30 +68,22 @@ final class MetalRenderTarget {
     viewport: Viewport,
     frameWake: Wake
   ) async throws -> MetalRenderTarget {
-    let driverRelay = DriverRelay()
     let attachment = try map.metalSurfaceAttach(
       descriptor: MetalSurfaceDescriptor(
         extent: viewport.extent,
         context: graphics.contextDescriptor,
         layer: graphics.layerPointer
       ),
-      options: .init(
-        driver: .callerGraphicsThread,
-        frameWake: frameWake,
-        driverWorkWake: driverRelay.wake
-      )
+      options: .init(driver: .coreWorker, frameWake: frameWake)
     )
     let session = attachment.session
     do {
-      driverRelay.session = session
-      driverRelay.service()
       try await attachment.completion.value
-      return MetalRenderTarget(session: session, driverRelay: driverRelay)
+      return MetalRenderTarget(session: session)
     } catch {
       _ = try? session.abandon()
       try? session.close()
-      // A service failure abandons the session, which fails the attachment.
-      throw driverRelay.failure ?? error
+      throw error
     }
   }
 
@@ -118,6 +101,12 @@ final class MetalRenderTarget {
       flags: force ? [.present] : [.ifNeeded, .present],
       token: nextToken
     ))
+  }
+
+  /// Waits until every demand accepted so far has its result, so no frame
+  /// renders after the app enters the background.
+  func barrier() async throws {
+    try await session.barrier()
   }
 
   /// Drains every queued frame result.
@@ -166,29 +155,4 @@ private func nativePointer(_ object: AnyObject) -> NativePointer {
 
 private func metalError(_ message: String) -> MaplibreError {
   MaplibreError(kind: .nativeError, rawStatus: nil, diagnostic: message)
-}
-
-/// Services caller-driver work on the main actor when the driver wakes. A
-/// session that cannot be serviced is abandoned, which completes its pending
-/// work with target loss, and the failure is reported.
-@MainActor
-private final class DriverRelay {
-  weak var session: RenderSessionHandle?
-  var onFailure: (@MainActor (Error) -> Void)?
-  private(set) var failure: Error?
-
-  var wake: Wake {
-    Wake(callback: { [self] in Task { @MainActor in service() } })
-  }
-
-  func service() {
-    guard failure == nil, let session else { return }
-    do {
-      _ = try session.serviceDriverWork(maxWork: 0)
-    } catch {
-      failure = error
-      _ = try? session.abandon()
-      onFailure?(error)
-    }
-  }
 }
