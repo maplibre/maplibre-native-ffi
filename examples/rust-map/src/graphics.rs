@@ -9,7 +9,6 @@ use winit::window::WindowAttributes;
 use crate::metal::MetalContext;
 #[cfg(maplibre_render_backend = "opengl")]
 use crate::opengl::OpenGLContext;
-use crate::viewport::Viewport;
 #[cfg(maplibre_render_backend = "vulkan")]
 use crate::vulkan::VulkanContext;
 
@@ -61,11 +60,6 @@ impl GraphicsContext {
         Ok(())
     }
 
-    pub fn resize(&self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
-        self.0.resize(viewport);
-        Ok(())
-    }
-
     pub fn metal(&self) -> &MetalContext {
         &self.0
     }
@@ -96,10 +90,6 @@ impl GraphicsContext {
         Ok(())
     }
 
-    pub fn resize(&self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
-        self.0.resize(viewport)
-    }
-
     pub fn opengl(&self) -> &OpenGLContext {
         &self.0
     }
@@ -128,11 +118,6 @@ impl GraphicsContext {
 
     pub fn wait_idle(&self) -> Result<(), Box<dyn Error>> {
         self.0.wait_idle().map_err(Into::into)
-    }
-
-    pub fn resize(&self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
-        let _ = viewport;
-        Ok(())
     }
 
     pub fn vulkan(&self) -> &VulkanContext {

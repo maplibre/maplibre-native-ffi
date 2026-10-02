@@ -601,8 +601,10 @@ impl VulkanTextureCompositor {
         }
     }
 
+    /// Waits for the host's queue, the only one that reads the swapchain and
+    /// the sampled map image.
     pub fn wait_idle(&self) -> Result<(), vk::Result> {
-        unsafe { self.device.device_wait_idle() }
+        unsafe { self.device.queue_wait_idle(self.graphics_queue) }
     }
 
     fn destroy_swapchain_dependents(&mut self) {

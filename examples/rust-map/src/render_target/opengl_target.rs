@@ -1,8 +1,8 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    GpuSync, MapHandle, OpenglBorrowedTextureDescriptor, OpenglContextDescriptor,
-    OpenglOwnedTextureDescriptor, OpenglSurfaceDescriptor,
+    MapHandle, OpenglBorrowedTextureDescriptor, OpenglContextDescriptor,
+    OpenglOwnedTextureDescriptor, OpenglSurfaceDescriptor, RenderDriverKind,
 };
 
 use crate::graphics::GraphicsContext;
@@ -44,7 +44,9 @@ impl RenderTarget {
         let context = gl.descriptor().map_err(|error| {
             compositor_error(format!("OpenGL context descriptor failed: {error}"))
         })?;
-        let options = attach_options(wakes, mode);
+        // An OpenGL target on the host's WGL or EGL context renders where that
+        // context is current, so the event loop services a caller driver.
+        let options = attach_options(wakes, RenderDriverKind::CallerGraphicsThread);
         match mode {
             Mode::OwnedTexture => {
                 let descriptor = OpenglOwnedTextureDescriptor {
@@ -53,7 +55,8 @@ impl RenderTarget {
                 };
                 let session = Session::new(
                     unsafe { map.opengl_owned_texture_attach(&descriptor, &options) }?,
-                    false,
+                    &options,
+                    mode,
                     wakes,
                 )?;
                 Ok(Self::OwnedTexture {
@@ -68,7 +71,8 @@ impl RenderTarget {
                 let descriptor = borrowed_descriptor(context, &texture, viewport);
                 let session = Session::new(
                     unsafe { map.opengl_borrowed_texture_attach(&descriptor, &options) }?,
-                    false,
+                    &options,
+                    mode,
                     wakes,
                 )?;
                 Ok(Self::BorrowedTexture {
@@ -90,7 +94,8 @@ impl RenderTarget {
                 Ok(Self::Surface {
                     session: Session::new(
                         unsafe { map.opengl_surface_attach(&descriptor, &options) }?,
-                        true,
+                        &options,
+                        mode,
                         wakes,
                     )?,
                 })
@@ -112,7 +117,9 @@ impl RenderTarget {
         graphics: &GraphicsContext,
         map: &MapState,
         viewport: Viewport,
+        wakes: &Wakes,
     ) -> Result<(), Box<dyn StdError>> {
+        graphics.opengl().resize(viewport)?;
         match self {
             Self::OwnedTexture {
                 session,
@@ -141,7 +148,7 @@ impl RenderTarget {
                         .handle()
                         .opengl_borrowed_texture_set_target(&descriptor)
                 }?;
-                replacements.push(completion, replacement);
+                replacements.push(completion, replacement, wakes);
                 compositor.resize(viewport);
                 // Target replacement changes only the graphics resource, so
                 // the map takes the new extent directly.
@@ -154,16 +161,13 @@ impl RenderTarget {
         }
     }
 
-    /// Services caller-driver work, then shows any replacement a rendered
-    /// frame has drawn into.
-    pub fn service(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
-        self.session_mut().service()?;
-        self.show_replacements(graphics)
-    }
-
     /// Switches the compositor to each replacement a rendered frame has drawn
     /// into, closing the texture it retires.
-    fn show_replacements(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
+    pub fn show_replacements(
+        &mut self,
+        graphics: &GraphicsContext,
+        wakes: &Wakes,
+    ) -> maplibre_native_ffi::Result<()> {
         if let Self::BorrowedTexture {
             session,
             texture,
@@ -171,7 +175,7 @@ impl RenderTarget {
             ..
         } = self
         {
-            while let Some(replacement) = replacements.take_shown(session)? {
+            while let Some(replacement) = replacements.take_shown(session, wakes)? {
                 std::mem::replace(&mut **texture, replacement).close(Some(graphics.opengl()));
             }
         }
@@ -180,8 +184,12 @@ impl RenderTarget {
 
     /// Shows the newest rendered frame, reporting false when no frame reached
     /// the window.
-    pub fn present(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<bool> {
-        self.show_replacements(graphics)?;
+    pub fn present(
+        &mut self,
+        graphics: &GraphicsContext,
+        wakes: &Wakes,
+    ) -> maplibre_native_ffi::Result<bool> {
+        self.show_replacements(graphics, wakes)?;
         match self {
             Self::OwnedTexture {
                 session,
@@ -192,10 +200,8 @@ impl RenderTarget {
                 let Some(frame) = session.acquire_newest()? else {
                     return Ok(true);
                 };
-                require_cpu_complete_producer(&frame)?;
-                let drawn = compositor.draw_frame(graphics.opengl(), &frame);
-                frame.release(&GpuSync::default())?;
-                drawn?;
+                require_cpu_complete_producer(frame)?;
+                compositor.draw_frame(graphics.opengl(), frame)?;
             }
             Self::BorrowedTexture {
                 compositor,

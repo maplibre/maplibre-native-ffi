@@ -1,6 +1,6 @@
 use std::error::Error as StdError;
 
-use maplibre_native_ffi::{GpuSync, MapHandle};
+use maplibre_native_ffi::{MapHandle, RenderDriverKind};
 
 use crate::graphics::GraphicsContext;
 use crate::map_state::MapState;
@@ -38,7 +38,9 @@ impl RenderTarget {
         wakes: &Wakes,
     ) -> maplibre_native_ffi::Result<Self> {
         let metal = graphics.metal();
-        let options = attach_options(wakes, mode);
+        // Every Metal target accepts a core worker, which renders on its own
+        // thread.
+        let options = attach_options(wakes, RenderDriverKind::CoreWorker);
         match mode {
             Mode::OwnedTexture => {
                 let descriptor = maplibre_native_ffi::MetalOwnedTextureDescriptor {
@@ -47,7 +49,8 @@ impl RenderTarget {
                 };
                 let session = Session::new(
                     unsafe { map.metal_owned_texture_attach(&descriptor, &options) }?,
-                    false,
+                    &options,
+                    mode,
                     wakes,
                 )?;
                 Ok(Self::OwnedTexture {
@@ -64,7 +67,8 @@ impl RenderTarget {
                             &options,
                         )
                     }?,
-                    false,
+                    &options,
+                    mode,
                     wakes,
                 )?;
                 Ok(Self::BorrowedTexture {
@@ -83,7 +87,8 @@ impl RenderTarget {
                 Ok(Self::Surface {
                     session: Session::new(
                         unsafe { map.metal_surface_attach(&descriptor, &options) }?,
-                        true,
+                        &options,
+                        mode,
                         wakes,
                     )?,
                 })
@@ -105,6 +110,7 @@ impl RenderTarget {
         graphics: &GraphicsContext,
         map: &MapState,
         viewport: Viewport,
+        wakes: &Wakes,
     ) -> Result<(), Box<dyn StdError>> {
         match self {
             Self::BorrowedTexture {
@@ -112,6 +118,7 @@ impl RenderTarget {
                 replacements,
                 ..
             } => {
+                graphics.metal().resize(viewport);
                 let replacement = MetalBorrowedTexture::new(graphics.metal(), viewport)?;
                 let completion = unsafe {
                     session
@@ -121,28 +128,31 @@ impl RenderTarget {
                             viewport,
                         ))
                 }?;
-                replacements.push(completion, replacement);
+                replacements.push(completion, replacement, wakes);
                 // Target replacement changes only the graphics resource, so
                 // the map takes the new extent directly.
                 map.resize(viewport)
             }
-            Self::OwnedTexture { session, .. } | Self::Surface { session } => {
+            Self::OwnedTexture { session, .. } => {
+                graphics.metal().resize(viewport);
+                session.resize(viewport)?;
+                Ok(())
+            }
+            // The session sets the layer's drawable size.
+            Self::Surface { session } => {
                 session.resize(viewport)?;
                 Ok(())
             }
         }
     }
 
-    /// Services caller-driver work, then shows any replacement a rendered
-    /// frame has drawn into.
-    pub fn service(&mut self, _graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
-        self.session_mut().service()?;
-        self.show_replacements()
-    }
-
     /// Switches the compositor to each replacement a rendered frame has drawn
     /// into, releasing the texture it retires.
-    fn show_replacements(&mut self) -> maplibre_native_ffi::Result<()> {
+    pub fn show_replacements(
+        &mut self,
+        _graphics: &GraphicsContext,
+        wakes: &Wakes,
+    ) -> maplibre_native_ffi::Result<()> {
         if let Self::BorrowedTexture {
             session,
             texture,
@@ -150,7 +160,7 @@ impl RenderTarget {
             ..
         } = self
         {
-            while let Some(replacement) = replacements.take_shown(session)? {
+            while let Some(replacement) = replacements.take_shown(session, wakes)? {
                 **texture = replacement;
             }
         }
@@ -159,8 +169,12 @@ impl RenderTarget {
 
     /// Shows the newest rendered frame, reporting false when no frame reached
     /// the window.
-    pub fn present(&mut self, _graphics: &GraphicsContext) -> maplibre_native_ffi::Result<bool> {
-        self.show_replacements()?;
+    pub fn present(
+        &mut self,
+        graphics: &GraphicsContext,
+        wakes: &Wakes,
+    ) -> maplibre_native_ffi::Result<bool> {
+        self.show_replacements(graphics, wakes)?;
         match self {
             Self::OwnedTexture {
                 session,
@@ -171,10 +185,8 @@ impl RenderTarget {
                 let Some(frame) = session.acquire_newest()? else {
                     return Ok(true);
                 };
-                require_cpu_complete_producer(&frame)?;
-                let presented = compositor.draw(&frame);
-                frame.release(&GpuSync::default())?;
-                presented
+                require_cpu_complete_producer(frame)?;
+                compositor.draw(frame)
             }
             Self::BorrowedTexture {
                 compositor,

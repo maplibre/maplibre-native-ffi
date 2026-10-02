@@ -3,6 +3,7 @@
 
 use std::error::Error;
 use std::sync::{Arc, Condvar, Mutex};
+use std::task::{Wake as TaskWake, Waker};
 use std::time::{Duration, Instant};
 
 use maplibre_native_ffi::Wake;
@@ -29,6 +30,8 @@ pub enum AppEvent {
     FrameResults,
     /// The render session has caller-driver work to service.
     DriverWork,
+    /// A borrowed-texture replacement completed.
+    TargetReplaced,
 }
 
 /// Builds wakes that post an [`AppEvent`] to the event loop from any native
@@ -53,14 +56,25 @@ impl Wakes {
         })
     }
 
+    /// A task waker that posts `event`, for native futures the loop polls.
+    pub fn waker(&self, event: AppEvent) -> Waker {
+        struct PostEvent(EventLoopProxy<AppEvent>, AppEvent);
+        impl TaskWake for PostEvent {
+            fn wake(self: Arc<Self>) {
+                let _ = self.0.send_event(self.1);
+            }
+        }
+        Waker::from(Arc::new(PostEvent(self.proxy.clone(), event)))
+    }
+
     pub fn driver_wait(&self) -> DriverWait {
         self.driver_wait.clone()
     }
 }
 
-/// Startup and shutdown block on a session's lifecycle completion outside the
-/// event loop. Every driver wake also signals this wait, so it services driver
-/// work only when there is some.
+/// Startup and shutdown block on a caller-driver session's lifecycle
+/// completion outside the event loop. Every driver wake also signals this
+/// wait, so it services driver work only when there is some.
 #[derive(Clone, Default)]
 pub struct DriverWait(Arc<(Mutex<bool>, Condvar)>);
 
@@ -128,7 +142,7 @@ impl Shell {
     fn startup(&mut self, event_loop: &ActiveEventLoop) -> Result<(), Box<dyn Error>> {
         let (window, graphics) =
             GraphicsContext::create_window(event_loop, window_attributes(), self.backends)?;
-        let app = App::new(window, graphics, self.mode, &self.wakes)?;
+        let mut app = App::new(window, graphics, self.mode, &self.wakes)?;
         app.print_status();
         self.app = Some(app);
         Ok(())

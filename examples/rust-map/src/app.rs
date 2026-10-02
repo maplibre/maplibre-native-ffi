@@ -1,7 +1,8 @@
 //! The winit event loop owns the window, graphics context, and render session.
 //! Input submits camera commands, and native wakes reach the app as user
-//! events: a runtime event drain demands a frame for each map update, a driver
-//! wake services the session, and a frame-result drain shows what rendered.
+//! events: a runtime event drain demands a frame for each map update, and a
+//! frame-result drain shows what rendered. A caller-driver session also gets
+//! driver wakes, which service it.
 
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -12,7 +13,7 @@ use winit::window::{Window, WindowId};
 use crate::graphics::GraphicsContext;
 use crate::input::Controller;
 use crate::map_state::MapState;
-use crate::render_target::{Mode, RenderTarget};
+use crate::render_target::{Mode, RenderTarget, driver_label};
 use crate::shell::{AppEvent, Wakes};
 use crate::viewport::Viewport;
 
@@ -24,6 +25,7 @@ pub struct App {
     target: Option<RenderTarget>,
     map: Option<MapState>,
     graphics: GraphicsContext,
+    wakes: Wakes,
     window: Window,
     viewport: Viewport,
     input: Controller,
@@ -68,6 +70,7 @@ impl App {
             target: Some(target),
             map: Some(map),
             graphics,
+            wakes: wakes.clone(),
             window,
             viewport,
             input: Controller::default(),
@@ -78,9 +81,11 @@ impl App {
         })
     }
 
-    pub fn print_status(&self) {
+    pub fn print_status(&mut self) {
+        let driver = self.target_mut().session_mut().driver();
         println!("render target: {}", self.mode.cli_name());
         println!("render target status: {}", self.mode.status());
+        println!("render driver: {}", driver_label(driver));
         Controller::print_controls();
     }
 
@@ -121,11 +126,16 @@ impl App {
         let result = match event {
             AppEvent::RuntimeEvents => self.drain_events(),
             AppEvent::DriverWork => self
-                .target
-                .as_mut()
-                .expect("render target is open")
-                .service(&self.graphics)
+                .target_mut()
+                .session_mut()
+                .service()
                 .map_err(Into::into),
+            AppEvent::TargetReplaced => {
+                let target = self.target.as_mut().expect("render target is open");
+                target
+                    .show_replacements(&self.graphics, &self.wakes)
+                    .map_err(Into::into)
+            }
             AppEvent::FrameResults => self.show_frame_results(),
         };
         if let Err(error) = result {
@@ -142,7 +152,12 @@ impl App {
         self.retry_at = None;
         // The map update was consumed without reaching the window, so the
         // retry forces a frame rather than waiting for another update.
-        if let Err(error) = self.target_mut().session_mut().request_frame(true) {
+        if let Err(error) = self
+            .target_mut()
+            .session_mut()
+            .request_frame(true)
+            .map(drop)
+        {
             eprintln!("frame retry failed: {error}");
             self.abort_process(1);
         }
@@ -162,14 +177,21 @@ impl App {
     fn show_frame_results(&mut self) -> Result<(), Box<dyn Error>> {
         let target = self.target.as_mut().expect("render target is open");
         let results = target.session_mut().drain_results()?;
-        let presented = results.rendered && target.present(&self.graphics)?;
+        let presented = results.rendered && target.present(&self.graphics, &self.wakes)?;
         if presented && crate::smoke_test() {
             println!("smoke: rendered a frame");
             self.smoke_rendered = true;
-        } else if results.target_not_ready || (results.rendered && !presented) {
+            return Ok(());
+        }
+        if results.target_not_ready || (results.rendered && !presented) {
+            // The map update was consumed without reaching the window, so the
+            // retry forces a frame rather than waiting for another update.
             self.retry_at = Some(Instant::now() + FRAME_RETRY);
         } else if results.needs_repaint {
             target.session_mut().request_frame(false)?;
+        }
+        if results.any {
+            target.session_mut().compositor_done()?;
         }
         Ok(())
     }
@@ -184,7 +206,6 @@ impl App {
         if next.is_empty() {
             return Ok(());
         }
-        self.graphics.resize(next)?;
         // The attached session's resize is the extent authority, except on the
         // paths that hand over a graphics resource instead; the render target
         // resizes the map itself there. A later resize supersedes an earlier
@@ -194,6 +215,7 @@ impl App {
             &self.graphics,
             self.map.as_ref().expect("map is open"),
             next,
+            &self.wakes,
         )
     }
 
@@ -211,17 +233,21 @@ impl App {
         self.closed = true;
         self.retry_at = None;
 
-        let mut first_error = self.graphics.wait_idle().err().map(|error| {
-            format!(
-                "{} device wait idle failed: {error}",
-                self.graphics.backend_name()
-            )
-        });
-
+        let mut first_error = None;
         if let Some(target) = self.target.take()
             && let Err(error) = target.close(&self.graphics)
         {
             append_error(&mut first_error, error.to_string());
+        }
+        // Once the session detached, nothing else submits graphics work.
+        if let Err(error) = self.graphics.wait_idle() {
+            append_error(
+                &mut first_error,
+                format!(
+                    "{} device wait idle failed: {error}",
+                    self.graphics.backend_name()
+                ),
+            );
         }
         if let Some(map) = self.map.take()
             && let Err(error) = map.close()

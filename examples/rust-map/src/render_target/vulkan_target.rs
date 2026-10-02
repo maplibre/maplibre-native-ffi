@@ -1,7 +1,7 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    GpuSync, MapHandle, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor,
+    MapHandle, RenderDriverKind, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor,
     VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
 };
 
@@ -42,19 +42,27 @@ impl RenderTarget {
         wakes: &Wakes,
     ) -> maplibre_native_ffi::Result<Self> {
         let vk = graphics.vulkan();
-        // The window thread submits and presents on the same VkQueue this
-        // descriptor hands over, so the session shares that thread rather than
-        // driving the queue from a core worker.
-        let options = attach_options(wakes, mode);
+        // A core worker drives every target, except a texture target whose
+        // device gave the session no queue of its own. That one shares the
+        // host's queue, so it renders on the event loop through a caller
+        // driver. A surface shares the host's queue too, since the host submits
+        // nothing there.
+        let driver = if mode == Mode::NativeSurface || vk.session_queue_pointer().is_some() {
+            RenderDriverKind::CoreWorker
+        } else {
+            RenderDriverKind::CallerGraphicsThread
+        };
+        let options = attach_options(wakes, driver);
         match mode {
             Mode::OwnedTexture => {
                 let descriptor = VulkanOwnedTextureDescriptor {
                     extent: extent(viewport),
-                    context: context_descriptor(vk),
+                    context: context_descriptor(vk, mode),
                 };
                 let session = Session::new(
                     unsafe { map.vulkan_owned_texture_attach(&descriptor, &options) }?,
-                    false,
+                    &options,
+                    mode,
                     wakes,
                 )?;
                 Ok(Self::OwnedTexture {
@@ -69,7 +77,8 @@ impl RenderTarget {
                 let descriptor = borrowed_descriptor(vk, viewport, &image);
                 let session = Session::new(
                     unsafe { map.vulkan_borrowed_texture_attach(&descriptor, &options) }?,
-                    false,
+                    &options,
+                    mode,
                     wakes,
                 )?;
                 Ok(Self::BorrowedTexture {
@@ -82,13 +91,14 @@ impl RenderTarget {
             Mode::NativeSurface => {
                 let descriptor = VulkanSurfaceDescriptor {
                     extent: extent(viewport),
-                    context: context_descriptor(vk),
+                    context: context_descriptor(vk, mode),
                     surface: vk.surface_handle(),
                 };
                 Ok(Self::Surface {
                     session: Session::new(
                         unsafe { map.vulkan_surface_attach(&descriptor, &options) }?,
-                        true,
+                        &options,
+                        mode,
                         wakes,
                     )?,
                 })
@@ -110,6 +120,7 @@ impl RenderTarget {
         graphics: &GraphicsContext,
         map: &MapState,
         viewport: Viewport,
+        wakes: &Wakes,
     ) -> Result<(), Box<dyn StdError>> {
         match self {
             Self::OwnedTexture {
@@ -138,7 +149,7 @@ impl RenderTarget {
                         .handle()
                         .vulkan_borrowed_texture_set_target(&descriptor)
                 }?;
-                replacements.push(completion, replacement);
+                replacements.push(completion, replacement, wakes);
                 compositor.resize(viewport).map_err(|error| {
                     compositor_error(format!("Vulkan resize failed: {error:?}"))
                 })?;
@@ -153,16 +164,15 @@ impl RenderTarget {
         }
     }
 
-    /// Services caller-driver work, then shows any replacement a rendered
-    /// frame has drawn into.
-    pub fn service(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
-        self.session_mut().service()?;
-        self.show_replacements(graphics)
-    }
-
     /// Switches the compositor to each replacement a rendered frame has drawn
-    /// into, destroying the image it retires.
-    fn show_replacements(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<()> {
+    /// into, destroying the image it retires. The session stopped rendering
+    /// into that image when the replacement completed, and the compositor
+    /// waited for its own reads.
+    pub fn show_replacements(
+        &mut self,
+        _graphics: &GraphicsContext,
+        wakes: &Wakes,
+    ) -> maplibre_native_ffi::Result<()> {
         if let Self::BorrowedTexture {
             session,
             image,
@@ -170,12 +180,7 @@ impl RenderTarget {
             ..
         } = self
         {
-            while let Some(replacement) = replacements.take_shown(session)? {
-                // The compositor waits for its own sampling, but the session's
-                // last render into the outgoing image may still be in flight.
-                graphics.vulkan().wait_idle().map_err(|error| {
-                    compositor_error(format!("Vulkan device wait failed: {error:?}"))
-                })?;
+            while let Some(replacement) = replacements.take_shown(session, wakes)? {
                 **image = replacement;
             }
         }
@@ -185,8 +190,12 @@ impl RenderTarget {
     /// Shows the newest rendered frame, reporting false when no frame reached
     /// the window. The compositor's sampling finishes before this returns, so
     /// the session may render into the sampled image again.
-    pub fn present(&mut self, graphics: &GraphicsContext) -> maplibre_native_ffi::Result<bool> {
-        self.show_replacements(graphics)?;
+    pub fn present(
+        &mut self,
+        graphics: &GraphicsContext,
+        wakes: &Wakes,
+    ) -> maplibre_native_ffi::Result<bool> {
+        self.show_replacements(graphics, wakes)?;
         let presented = match self {
             Self::OwnedTexture {
                 session,
@@ -197,11 +206,11 @@ impl RenderTarget {
                 let Some(frame) = session.acquire_newest()? else {
                     return Ok(true);
                 };
-                require_cpu_complete_producer(&frame)?;
-                let presented = compositor.draw(&frame);
-                let waited = compositor.wait_idle();
-                frame.release(&GpuSync::default())?;
-                waited.map_err(|error| {
+                require_cpu_complete_producer(frame)?;
+                let presented = compositor.draw(frame);
+                // The held frame is released with CPU-complete sync, so the
+                // compositor's reads must finish first.
+                compositor.wait_idle().map_err(|error| {
                     compositor_error(format!("Vulkan consumer wait failed: {error:?}"))
                 })?;
                 presented?
@@ -260,7 +269,7 @@ fn borrowed_descriptor(
         extent: extent(viewport),
         physical_width: viewport.physical_width,
         physical_height: viewport.physical_height,
-        context: context_descriptor(vk),
+        context: context_descriptor(vk, Mode::BorrowedTexture),
         image: image.image_handle(),
         image_view: image.view_handle(),
         format: ash::vk::Format::R8G8B8A8_UNORM.as_raw() as u32,
@@ -269,12 +278,18 @@ fn borrowed_descriptor(
     }
 }
 
-fn context_descriptor(vk: &VulkanContext) -> VulkanContextDescriptor {
+/// Names the session's queue: its own in a texture mode when the device has
+/// one, and the host's otherwise.
+fn context_descriptor(vk: &VulkanContext, mode: Mode) -> VulkanContextDescriptor {
+    let session_queue = match mode {
+        Mode::NativeSurface => None,
+        Mode::OwnedTexture | Mode::BorrowedTexture => vk.session_queue_pointer(),
+    };
     let mut descriptor = VulkanContextDescriptor {
         instance: vk.instance_pointer(),
         physical_device: vk.physical_device_pointer(),
         device: vk.device_pointer(),
-        graphics_queue: vk.graphics_queue_pointer(),
+        graphics_queue: session_queue.unwrap_or_else(|| vk.graphics_queue_pointer()),
         graphics_queue_family_index: vk.graphics_queue_family_index(),
         ..Default::default()
     };
