@@ -261,8 +261,14 @@ impl App {
         }
     }
 
+    /// Exits at once after an error, skipping the ordered shutdown. A
+    /// core-worker session keeps making graphics calls on its own thread, so
+    /// the session is abandoned before the process exits.
     fn abort_process(&mut self, code: i32) -> ! {
         self.closed = true;
+        if let Some(target) = self.target.as_mut() {
+            target.session_mut().abandon();
+        }
         immediate_exit(code);
     }
 }

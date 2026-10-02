@@ -288,7 +288,7 @@ impl Session {
 
     /// Ends the session's graphics work without graphics calls, which
     /// completes any pending lifecycle submission with target loss.
-    fn abandon(&self) {
+    pub fn abandon(&self) {
         match self.session.abandon() {
             Ok(result) if result.quarantined_resource_count > 0 => eprintln!(
                 "render session abandon quarantined {} resource groups",
@@ -303,11 +303,12 @@ impl Session {
     }
 
     /// Waits for a lifecycle submission. A core worker needs nothing from this
-    /// thread. A caller driver completes the submission inside a service call,
-    /// so startup and shutdown service it here, between driver wakes.
+    /// thread, so the wait blocks until the submission completes. A caller
+    /// driver completes the submission inside a service call, so startup and
+    /// shutdown service it here, between driver wakes.
     fn wait_for<T>(&self, operation: &NativeFuture<T>) -> maplibre_native_ffi::Result<T> {
         if self.driver == RenderDriverKind::CoreWorker {
-            while !operation.wait(Duration::from_secs(60))? {}
+            operation.wait(Duration::MAX)?;
             return operation.take();
         }
         loop {
