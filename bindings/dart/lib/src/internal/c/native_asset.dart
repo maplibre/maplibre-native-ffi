@@ -1,7 +1,7 @@
 /// Identity of the native library code asset.
 ///
-/// `tool/ffigen.dart` stamps [nativeAssetId] into the generated `@Native`
-/// annotations and `hook/build.dart` declares the asset under the same name.
+/// The generated `@Native` declarations name [nativeAssetId] as their default
+/// asset and `hook/build.dart` declares the asset under the same name.
 /// A mismatch only surfaces at run time, so both read it from here.
 library;
 

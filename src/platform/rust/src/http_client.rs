@@ -489,6 +489,92 @@ fn normalize_url_path(path: &str) -> String {
     normalized
 }
 
+#[cfg(test)]
+mod redirect_tests {
+    use super::{is_redirect_status, normalize_url_path, redirect_url};
+
+    #[test]
+    fn only_the_five_redirect_statuses_are_followed() {
+        for status in [301, 302, 303, 307, 308] {
+            assert!(is_redirect_status(status), "{status}");
+        }
+        for status in [200, 204, 300, 304, 305, 306, 400, 404, 500] {
+            assert!(!is_redirect_status(status), "{status}");
+        }
+    }
+
+    #[test]
+    fn a_location_resolves_against_the_current_url() {
+        let current = "https://tiles.localhost:8443/styles/v1/style.json?key=1#top";
+        let cases = [
+            (
+                "https://other.localhost/a",
+                Some("https://other.localhost/a"),
+            ),
+            ("HTTP://other.localhost/a", Some("HTTP://other.localhost/a")),
+            ("//cdn.localhost/b", Some("https://cdn.localhost/b")),
+            ("/root.json", Some("https://tiles.localhost:8443/root.json")),
+            (
+                "/a/../b/./c.json?x#y",
+                Some("https://tiles.localhost:8443/b/c.json?x#y"),
+            ),
+            (
+                "next.json",
+                Some("https://tiles.localhost:8443/styles/v1/next.json"),
+            ),
+            (
+                "../up.json",
+                Some("https://tiles.localhost:8443/styles/up.json"),
+            ),
+            (
+                "?key=2",
+                Some("https://tiles.localhost:8443/styles/v1/style.json?key=2"),
+            ),
+            (
+                "#bottom",
+                Some("https://tiles.localhost:8443/styles/v1/style.json?key=1#bottom"),
+            ),
+            ("ftp://files.localhost/a", None),
+            ("mailto:someone@tiles.localhost", None),
+        ];
+        for (location, expected) in cases {
+            assert_eq!(
+                redirect_url(current, location).as_deref(),
+                expected,
+                "{location}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_location_needs_an_http_current_url_when_it_is_relative() {
+        assert_eq!(redirect_url("file:///a/b.json", "c.json"), None);
+        assert_eq!(redirect_url("no-scheme", "/c.json"), None);
+        assert_eq!(
+            redirect_url("http://host.localhost", "c.json").as_deref(),
+            Some("http://host.localhost/c.json")
+        );
+    }
+
+    #[test]
+    fn dot_segments_are_removed_from_a_path() {
+        let cases = [
+            ("/a/b/c", "/a/b/c"),
+            ("/a/./b", "/a/b"),
+            ("/a/../b", "/b"),
+            ("/../a", "/a"),
+            ("/a/b/..", "/a/"),
+            ("/a/.", "/a/"),
+            ("/..", "/"),
+            ("a/../b", "b"),
+            ("/a//b/../c", "/a/c"),
+        ];
+        for (path, expected) in cases {
+            assert_eq!(normalize_url_path(path), expected, "{path}");
+        }
+    }
+}
+
 fn map_transport_error(error: &ureq::Error) -> u8 {
     match error {
         ureq::Error::HostNotFound

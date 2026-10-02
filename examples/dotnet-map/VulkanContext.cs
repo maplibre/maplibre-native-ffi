@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi;
+using Maplibre.NativeFfi.Base;
 using Maplibre.NativeFfi.Render;
 using Silk.NET.Core.Native;
 using Silk.NET.GLFW;
@@ -23,7 +24,9 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
     private PhysicalDevice physicalDevice;
     private Device device;
     private Queue graphicsQueue;
+    private Queue sessionQueue;
     private uint graphicsQueueFamilyIndex;
+    private uint graphicsQueueCount;
     private bool closed;
 
     static VulkanContext()
@@ -37,7 +40,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
         this.vk = vk;
     }
 
-    public RenderBackend Backend => RenderBackend.Vulkan;
+    public RenderBackendFlag Backend => RenderBackendFlag.Vulkan;
 
     public nint WindowHandle => window.NativeHandle;
 
@@ -61,7 +64,14 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
     public uint GraphicsQueueFamilyIndex => graphicsQueueFamilyIndex;
 
-    public static VulkanContext Create(string title, int width, int height)
+    /// <summary>
+    /// Whether the device has a second graphics queue for a core-worker session. The worker submits
+    /// from its own thread, so in the texture modes, where the compositor also submits, it needs a
+    /// queue that the host never touches.
+    /// </summary>
+    public bool HasSessionQueue => sessionQueue.Handle != 0;
+
+    public static VulkanContext Create(string title, int width, int height, bool visible)
     {
         SelectWaylandOnLinux();
         var vk = new Vk(Vk.CreateDefaultContext(NativeLibraryResolver.VulkanLibraryCandidates()));
@@ -74,6 +84,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
                 title,
                 width,
                 height,
+                visible,
                 glfw =>
                 {
                     if (!glfw.VulkanSupported())
@@ -147,13 +158,19 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
     private string PlatformStatus() =>
         OperatingSystem.IsLinux() ? $", platform {GlfwNativeAccess.GetPlatform()}" : "";
 
-    public VulkanContextDescriptor Descriptor() =>
+    /// <summary>
+    /// The session's view of the device. With <paramref name="sessionQueue" />, the session submits
+    /// to the queue that the host never touches; otherwise it shares the host's queue.
+    /// </summary>
+    public VulkanContextDescriptor Descriptor(bool sessionQueue = false) =>
         new()
         {
             Instance = NativePointer.FromBorrowedAddress(instance.Handle),
             PhysicalDevice = NativePointer.FromBorrowedAddress(physicalDevice.Handle),
             Device = NativePointer.FromBorrowedAddress(device.Handle),
-            Queue = NativePointer.FromBorrowedAddress(graphicsQueue.Handle),
+            GraphicsQueue = NativePointer.FromBorrowedAddress(
+                sessionQueue ? this.sessionQueue.Handle : graphicsQueue.Handle
+            ),
             GraphicsQueueFamilyIndex = graphicsQueueFamilyIndex,
             GetInstanceProcAddr = NativePointer.FromBorrowedAddress(
                 (nint)vk.GetInstanceProcAddr(instance, "vkGetInstanceProcAddr")
@@ -163,27 +180,21 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
             ),
         };
 
-    public VulkanHandle SurfaceHandle() => new(surface.Handle);
+    public ulong SurfaceHandle() => surface.Handle;
 
     public Viewport ReadViewport() => window.ReadViewport();
 
-    public void Resize(Viewport viewport)
-    {
-        _ = viewport;
-    }
-
-    public void PollEvents()
-    {
-        window.PollEvents();
-    }
-
     public void FinishFrame() { }
 
-    public void WaitIdle()
+    /// <summary>
+    /// Waits for the host's own submissions. A core-worker session may be submitting to its queue
+    /// meanwhile, so the host waits on its queue rather than the whole device.
+    /// </summary>
+    public void WaitHostQueueIdle()
     {
-        if (device.Handle != 0)
+        if (graphicsQueue.Handle != 0)
         {
-            Check(vk.DeviceWaitIdle(device), "vkDeviceWaitIdle");
+            Check(vk.QueueWaitIdle(graphicsQueue), "vkQueueWaitIdle");
         }
     }
 
@@ -313,12 +324,22 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
             physicalDevice = devices[i];
             graphicsQueueFamilyIndex = checked((uint)queueFamily);
+            graphicsQueueCount = QueueCount(devices[i], graphicsQueueFamilyIndex);
             return;
         }
 
         throw new InvalidOperationException(
             "No Vulkan device has a graphics queue that can present."
         );
+    }
+
+    private uint QueueCount(PhysicalDevice candidate, uint family)
+    {
+        uint count = 0;
+        vk.GetPhysicalDeviceQueueFamilyProperties(candidate, &count, null);
+        var families = stackalloc QueueFamilyProperties[checked((int)count)];
+        vk.GetPhysicalDeviceQueueFamilyProperties(candidate, &count, families);
+        return families[family].QueueCount;
     }
 
     private int FindGraphicsPresentQueueFamily(PhysicalDevice candidate)
@@ -376,13 +397,14 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
         );
         try
         {
-            var priority = 1.0f;
+            var queueCount = Math.Min(graphicsQueueCount, 2u);
+            var priorities = stackalloc float[] { 1.0f, 1.0f };
             var queueInfo = new DeviceQueueCreateInfo
             {
                 SType = StructureType.DeviceQueueCreateInfo,
                 QueueFamilyIndex = graphicsQueueFamilyIndex,
-                QueueCount = 1,
-                PQueuePriorities = &priority,
+                QueueCount = queueCount,
+                PQueuePriorities = priorities,
             };
             var createInfo = new DeviceCreateInfo
             {
@@ -395,6 +417,10 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
             Check(vk.CreateDevice(physicalDevice, &createInfo, null, out device), "vkCreateDevice");
             vk.GetDeviceQueue(device, graphicsQueueFamilyIndex, 0, out graphicsQueue);
+            if (queueCount > 1)
+            {
+                vk.GetDeviceQueue(device, graphicsQueueFamilyIndex, 1, out sessionQueue);
+            }
             Console.WriteLine("Enabled Vulkan device extensions: " + string.Join(", ", extensions));
         }
         finally

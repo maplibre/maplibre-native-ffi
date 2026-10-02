@@ -57,14 +57,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.0"
-  cli_util:
-    dependency: transitive
-    description:
-      name: cli_util
-      sha256: ff6785f7e9e3c38ac98b2fb035701789de90154024a75b6cb926445e83197d1c
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.4.2"
   code_assets:
     dependency: "direct main"
     description:
@@ -105,14 +97,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.7"
-  dart_style:
-    dependency: transitive
-    description:
-      name: dart_style
-      sha256: "3f88fc9c96c568d631356507355a2d1e983ee000c9ac008bdcb39b5bf53ce777"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.12"
   ffi:
     dependency: "direct main"
     description:
@@ -121,14 +105,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
-  ffigen:
-    dependency: "direct dev"
-    description:
-      name: ffigen
-      sha256: "56fc0be88937409839a59c133dfdee4165e80da324c9e39f59013060249ffb44"
-      url: "https://pub.dev"
-    source: hosted
-    version: "21.0.0"
   file:
     dependency: transitive
     description:
@@ -138,7 +114,7 @@ packages:
     source: hosted
     version: "7.0.1"
   frontend_server_client:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: frontend_server_client
       sha256: f64a0333a82f30b0cca061bc3d143813a486dc086b574bfb233b7c1372427694
@@ -225,14 +201,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
-  native_toolchain_c:
-    dependency: transitive
-    description:
-      name: native_toolchain_c
-      sha256: a1c26117c48cebe5677b0cf0e33a980a79a7c5577effc86f52e5a0d309cdcb60
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.19.3"
   node_preamble:
     dependency: transitive
     description:
@@ -281,14 +249,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
-  quiver:
-    dependency: transitive
-    description:
-      name: quiver
-      sha256: ea0b925899e64ecdfbf9c7becb60d5b50e706ade44a85b2363be2a22d88117d2
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.2.2"
   record_use:
     dependency: transitive
     description:
@@ -473,13 +433,5 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.3"
-  yaml_edit:
-    dependency: transitive
-    description:
-      name: yaml_edit
-      sha256: "07c9e63ba42519745182b88ca12264a7ba2484d8239958778dfe4d44fe760488"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.2.4"
 sdks:
   dart: ">=3.11.0 <4.0.0"

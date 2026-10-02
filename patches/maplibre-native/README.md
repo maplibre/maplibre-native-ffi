@@ -11,25 +11,11 @@ APIs. This lets the local file source load percent-encoded `file:///C:/...`
 resources whose paths contain spaces or non-ASCII characters. Upstream:
 [maplibre-native#4572](https://github.com/maplibre/maplibre-native/pull/4572).
 
-`0003-run-loop-budget.patch` adds `RunLoop::runOnce(Duration budget)`, which
-stops dequeuing tasks once the budget has elapsed. At least one task runs, the
-remaining tasks stay queued, and the loop wakes itself so the next pass picks
-them up. The C API uses it to bound one pump's drain. Upstream:
-[maplibre-native#4577](https://github.com/maplibre/maplibre-native/pull/4577).
-
 `0004-opengl-valid-api-calls.patch` allocates storage before copying a uniform
 buffer and isolates allocation errors from earlier OpenGL calls. This prevents
 strict implementations and the API 26 Android emulator from turning stale errors
 into false allocation failures. Upstream:
 [maplibre-native#4578](https://github.com/maplibre/maplibre-native/pull/4578).
-
-`0006-process-lifetime-logging.patch` gives the global logger, its observer,
-mutex, severity settings, and scheduler process lifetime. This prevents static
-destruction from joining a logging worker whose thread-local cleanup must detach
-from an already shut down host VM. Explicit observer replacement and removal
-still release the previous observer. Hosts remove observers before tearing down
-their environment; the Node SDK uses its environment cleanup hook. Upstream:
-[maplibre-native#4574](https://github.com/maplibre/maplibre-native/pull/4574).
 
 `0007-retain-active-on-demand-images.patch` keeps present on-demand images
 registered to their requestor when the same request also needs missing images.
@@ -150,6 +136,35 @@ filters at the overscaled tile zoom, matching layer filters and source queries.
 The Native regression covers symbols and circles at fractional and overzoomed
 camera zooms. Upstream:
 [maplibre-native#4704](https://github.com/maplibre/maplibre-native/pull/4704).
+
+`0030-custom-geometry-query-before-data.patch` returns no features from a custom
+geometry tile that has no data yet, as GeoJSON and vector tiles already do. A
+source-feature query that reached a fetched tile before the host delivered its
+data otherwise dereferenced null. The C suite's custom source cases cover it.
+Upstream: not yet filed.
+
+`0031-webgpu-frame-stats.patch` counts frames in the WebGPU backend's rendering
+stats and resets its per-frame draw call count at the start of each frame, as
+the Metal, Vulkan, and OpenGL backends do. It also adds each draw to the total
+draw call count. The WebGPU frame count otherwise stayed at zero. The C suite's
+render lifecycle case covers it. Upstream: not yet filed.
+
+`0032-in-memory-database-reset.patch` keeps a reset of the in-memory database
+from deleting a file named `:memory:`. The reset removed that path relative to
+the working directory, which deleted any such file there and failed where the
+directory was read-only. The C suite's ambient cache reset case covers it.
+Upstream: not yet filed.
+
+`0033-destroy-thread-local-run-loop.patch` keeps the destructor of the run loop
+that `Scheduler::GetCurrent()` creates for a thread with no scheduler. The
+library compiles MapLibre Native without static destructors, so that nothing a
+MapLibre thread reads is destroyed while the process exits, and that option also
+drops thread-local destructors. The run loop is the MapLibre thread-local state
+that owns resources, so the patch marks it `[[clang::always_destroy]]` to free
+it when its thread ends. Vendored glslang's per-thread default pool allocator
+also loses its destructor; glslang compiles shaders in pools that `TShader` and
+`TProgram` own, so a thread leaks only what it allocated from the default pool
+outside them. Upstream: not applicable; it serves this build's compile options.
 
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The

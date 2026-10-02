@@ -126,6 +126,7 @@ runs:
       if: ${{ runner.os == 'Linux' && startsWith(inputs.target, 'linux-') }}
       shell: bash
       run: |
+        # xvfb-run needs xauth, which xvfb only recommends.
         sudo apt-get update
         sudo apt-get install --no-install-recommends --yes \
           libegl-mesa0 \
@@ -133,10 +134,15 @@ runs:
           libvulkan1 \
           mesa-utils \
           mesa-utils-extra \
-          mesa-vulkan-drivers
+          mesa-vulkan-drivers \
+          xauth \
+          xvfb
+        # Software rendering is slower than hardware, so the native suites
+        # stretch their waits and hang watchdog to match.
         {
           echo "EGL_PLATFORM=surfaceless"
           echo "LIBGL_ALWAYS_SOFTWARE=true"
+          echo "MLN_TEST_TIMEOUT_SCALE=3"
         } >> "$GITHUB_ENV"
 
     # The hosted runner image has Android build tools and KVM, but no system

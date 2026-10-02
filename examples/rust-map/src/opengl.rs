@@ -10,7 +10,7 @@ use glutin::display::{GetGlDisplay, GlDisplay};
 use glutin::prelude::*;
 use glutin::surface::{Surface, SurfaceAttributesBuilder, WindowSurface};
 use glutin_winit::DisplayBuilder;
-use maplibre_native_ffi::{NativePointer, OpenGLContextDescriptor, OpenGLOwnedTextureFrameHandle};
+use maplibre_native_ffi::{AcquiredFrameHandle, OpenglContextDescriptor};
 use raw_window_handle::HasWindowHandle;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
@@ -98,11 +98,11 @@ impl OpenGLContext {
         Ok((window, context))
     }
 
-    pub fn descriptor(&self) -> Result<OpenGLContextDescriptor, Box<dyn Error>> {
+    pub fn descriptor(&self) -> Result<OpenglContextDescriptor, Box<dyn Error>> {
         self.platform.descriptor(&self.context)
     }
 
-    pub fn surface_pointer(&self) -> Result<NativePointer, Box<dyn Error>> {
+    pub fn surface_pointer(&self) -> Result<*mut std::ffi::c_void, Box<dyn Error>> {
         self.platform.surface_pointer(&self.surface)
     }
 
@@ -188,20 +188,20 @@ impl OpenGLTextureCompositor {
     pub fn draw_frame(
         &self,
         context: &OpenGLContext,
-        frame: &OpenGLOwnedTextureFrameHandle,
+        frame: &AcquiredFrameHandle,
     ) -> maplibre_native_ffi::Result<()> {
-        let metadata = frame.frame()?;
-        if metadata.width == 0 || metadata.height == 0 {
-            return Err(compositor_error("owned OpenGL frame has an empty extent"));
-        }
-        if metadata.target != TEXTURE_TARGET {
-            return Err(compositor_error(format!(
-                "owned OpenGL frame has target {}, expected TEXTURE_2D",
-                metadata.target
-            )));
-        }
-        let texture = unsafe { frame.texture()?.value() };
-        self.draw_texture(context, texture)
+        frame.get_opengl_texture(|metadata| {
+            if metadata.width == 0 || metadata.height == 0 {
+                return Err(compositor_error("owned OpenGL frame has an empty extent"));
+            }
+            if metadata.target != TEXTURE_TARGET {
+                return Err(compositor_error(format!(
+                    "owned OpenGL frame has target {}, expected TEXTURE_2D",
+                    metadata.target
+                )));
+            }
+            self.draw_texture(context, metadata.texture)
+        })?
     }
 
     pub fn draw_texture(
@@ -246,6 +246,9 @@ impl OpenGLTextureCompositor {
             self.gl.bind_texture(TEXTURE_TARGET, None);
             self.gl.bind_vertex_array(None);
             self.gl.use_program(None);
+            // This example releases the acquired texture with CPU-complete
+            // synchronization, so finish all sampling before that release.
+            self.gl.finish();
         }
         check_gl_error(&self.gl, "draw OpenGL texture")
             .map_err(|error| compositor_error(error.to_string()))?;

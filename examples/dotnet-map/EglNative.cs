@@ -36,6 +36,38 @@ internal static unsafe partial class EglNative
             );
         }
 
+        return ConfigWithId(display, configId);
+    }
+
+    /// <summary>
+    /// The config of the host's context, when it renders to pbuffers too, or a pbuffer config
+    /// otherwise. A surfaceless context has no surface to read the config from.
+    /// </summary>
+    public static nint GetTextureConfig(nint display, nint context)
+    {
+        if (display == 0 || context == 0)
+        {
+            throw new InvalidOperationException("EGL display and context are required.");
+        }
+
+        if (eglQueryContext(display, context, EglConfigId, out var configId) == 0)
+        {
+            throw new InvalidOperationException(
+                $"eglQueryContext(EGL_CONFIG_ID) failed with EGL error 0x{eglGetError():x}."
+            );
+        }
+
+        var contextConfig = ConfigWithId(display, configId);
+        if (SupportsPbuffer(display, contextConfig))
+        {
+            return contextConfig;
+        }
+
+        return ChoosePbufferConfig(display);
+    }
+
+    private static nint ConfigWithId(nint display, int configId)
+    {
         var attributes = stackalloc[] { EglConfigId, configId, EglNone };
         nint config = 0;
         var configCount = 0;
@@ -51,17 +83,6 @@ internal static unsafe partial class EglNative
         }
 
         return config;
-    }
-
-    public static nint GetTextureConfig(nint display, nint surface)
-    {
-        var surfaceConfig = GetSurfaceConfig(display, surface);
-        if (SupportsPbuffer(display, surfaceConfig))
-        {
-            return surfaceConfig;
-        }
-
-        return ChoosePbufferConfig(display);
     }
 
     private static bool SupportsPbuffer(nint display, nint config)
@@ -122,6 +143,14 @@ internal static unsafe partial class EglNative
     private static partial int eglQuerySurface(
         nint display,
         nint surface,
+        int attribute,
+        out int value
+    );
+
+    [LibraryImport("EGL", EntryPoint = "eglQueryContext")]
+    private static partial int eglQueryContext(
+        nint display,
+        nint context,
         int attribute,
         out int value
     );

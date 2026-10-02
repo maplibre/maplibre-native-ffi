@@ -8,9 +8,9 @@
 extern "C" {
 
 mln_status mln_buffer_get(
-  mln_buffer buffer, mln_buffer_view* out_view
+  mln_buffer buffer, mln_buffer_view* out_view, mln_diagnostic* out_diagnostic
 ) noexcept {
-  return mln::c_api::status_boundary([&] {
+  return mln::c_api::status_boundary(out_diagnostic, [&] {
     return mln::core::buffer_get(buffer, out_view);
   });
 }

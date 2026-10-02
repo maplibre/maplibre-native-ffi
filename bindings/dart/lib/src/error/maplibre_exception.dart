@@ -20,6 +20,21 @@ final class MaplibreStatus {
   /// A native MapLibre error or C++ exception was converted to status.
   static const nativeError = MaplibreStatus._('nativeError', -5);
 
+  /// The operation completed after cancellation was requested.
+  static const cancelled = MaplibreStatus._('cancelled', -6);
+
+  /// The call raced a driver call in flight; retry once it returns.
+  static const busy = MaplibreStatus._('busy', -7);
+
+  /// The render target was lost and the session cannot continue with it.
+  static const targetLost = MaplibreStatus._('targetLost', -8);
+
+  /// No result was ready yet; poll or wait for the wake and retry.
+  static const notReady = MaplibreStatus._('notReady', -9);
+
+  /// No object has the requested ID.
+  static const notFound = MaplibreStatus._('notFound', -10);
+
   /// An unknown status value returned by a newer or incompatible native build.
   static MaplibreStatus unknown(int nativeStatusCode) =>
       MaplibreStatus._('unknown', nativeStatusCode);
@@ -39,6 +54,11 @@ final class MaplibreStatus {
         -3 => wrongThread,
         -4 => unsupported,
         -5 => nativeError,
+        -6 => cancelled,
+        -7 => busy,
+        -8 => targetLost,
+        -9 => notReady,
+        -10 => notFound,
         _ => unknown(nativeStatusCode),
       };
 
@@ -79,6 +99,11 @@ abstract final class MaplibreException implements Exception {
       -3 => WrongThreadException(nativeStatusCode, diagnostic),
       -4 => UnsupportedFeatureException(nativeStatusCode, diagnostic),
       -5 => NativeErrorException(nativeStatusCode, diagnostic),
+      -6 => CancelledException(nativeStatusCode, diagnostic),
+      -7 => BusyException(nativeStatusCode, diagnostic),
+      -8 => TargetLostException(nativeStatusCode, diagnostic),
+      -9 => NotReadyException(nativeStatusCode, diagnostic),
+      -10 => NotFoundException(nativeStatusCode, diagnostic),
       _ => UnknownMaplibreException(status, nativeStatusCode, diagnostic),
     };
   }
@@ -147,6 +172,41 @@ final class NativeErrorException extends MaplibreException {
   /// Creates a native-error exception.
   const NativeErrorException(int? nativeStatusCode, String diagnostic)
     : super(MaplibreStatus.nativeError, nativeStatusCode, diagnostic);
+}
+
+/// Native cancellation: the operation completed after cancellation.
+final class CancelledException extends MaplibreException {
+  /// Creates a cancelled exception.
+  const CancelledException(int? nativeStatusCode, String diagnostic)
+    : super(MaplibreStatus.cancelled, nativeStatusCode, diagnostic);
+}
+
+/// Native busy failure: the call raced a driver call in flight.
+final class BusyException extends MaplibreException {
+  /// Creates a busy exception.
+  const BusyException(int? nativeStatusCode, String diagnostic)
+    : super(MaplibreStatus.busy, nativeStatusCode, diagnostic);
+}
+
+/// Native target-loss failure: the render target can no longer be used.
+final class TargetLostException extends MaplibreException {
+  /// Creates a target-lost exception.
+  const TargetLostException(int? nativeStatusCode, String diagnostic)
+    : super(MaplibreStatus.targetLost, nativeStatusCode, diagnostic);
+}
+
+/// Native not-ready failure: no result was ready yet.
+final class NotReadyException extends MaplibreException {
+  /// Creates a not-ready exception.
+  const NotReadyException(int? nativeStatusCode, String diagnostic)
+    : super(MaplibreStatus.notReady, nativeStatusCode, diagnostic);
+}
+
+/// Native not-found failure: no object has the requested ID.
+final class NotFoundException extends MaplibreException {
+  /// Creates a not-found exception.
+  const NotFoundException(int? nativeStatusCode, String diagnostic)
+    : super(MaplibreStatus.notFound, nativeStatusCode, diagnostic);
 }
 
 /// Loaded native library uses a different C ABI contract version.

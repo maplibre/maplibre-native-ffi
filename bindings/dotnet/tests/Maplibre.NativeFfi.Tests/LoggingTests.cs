@@ -1,213 +1,88 @@
-using System.Reflection;
-using Maplibre.NativeFfi.Error;
-using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Callback;
-using Maplibre.NativeFfi.Internal.Status;
-using Maplibre.NativeFfi.Log;
+using System.Runtime.CompilerServices;
+using Maplibre.NativeFfi.Internal.Memory;
+using Maplibre.NativeFfi.Internal.Struct;
+using Maplibre.NativeFfi.Logging;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
+/// <summary>The process-global log callback.</summary>
+[Collection(nameof(GlobalState))]
 public sealed class LoggingTests
 {
-    [BindingSpecTest("BND-120")]
+    // Native swaps the observer under the lock its dispatch holds, so a replaced registration is
+    // released before the replacing call returns.
     [Fact]
-    public void CanInstallAndClearLogCallback()
+    public void ReplacingTheLogCallbackReleasesThePreviousOne()
     {
-        Maplibre.SetLogCallback(_ => true);
-        Maplibre.ClearLogCallback();
-    }
-
-    [BindingSpecTest("BND-020")]
-    [Fact]
-    public void InvalidAsyncSeverityMaskMapsNativeStatus()
-    {
-        var error = Assert.Throws<InvalidArgumentException>(() =>
-            Maplibre.SetAsyncLogSeverities((LogSeverityMask)(1u << 31))
-        );
-
-        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
-        Assert.Equal((int)MaplibreStatus.InvalidArgument, error.RawStatus);
-        Assert.Contains("severity", error.Diagnostic, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [BindingSpecTest("BND-120", "BND-121")]
-    [Fact]
-    public unsafe void LogCallbackInstallReplaceClearAndHostFailureUseDocumentedBehavior()
-    {
-        using var methods = LogCallbackState.UseCallbackMethodsForTest(
-            (_, _) => mln_status.MLN_STATUS_OK,
-            () => mln_status.MLN_STATUS_OK
-        );
-        var records = new List<LogRecord>();
-
         try
         {
-            Maplibre.SetLogCallback(record =>
-            {
-                records.Add(record);
-                return true;
-            });
-            Assert.Equal(
-                1u,
-                LogCallbackState.EmitForTest(
-                    (uint)LogSeverity.Warning,
-                    (uint)LogEvent.Render,
-                    42,
-                    "first"
-                )
-            );
+            var first = InstallCapturingCallback();
+            Assert.True(Gc.IsAlive(first));
 
-            Maplibre.SetLogCallback(record =>
-            {
-                records.Add(record with { Message = "replacement:" + record.Message });
-                return false;
-            });
-            Assert.Equal(
-                0u,
-                LogCallbackState.EmitForTest(
-                    (uint)LogSeverity.Error,
-                    (uint)LogEvent.Style,
-                    7,
-                    "second"
-                )
-            );
+            var second = InstallCapturingCallback();
+            Assert.False(Gc.IsAlive(first));
+            Assert.True(Gc.IsAlive(second));
 
-            Maplibre.SetLogCallback(_ => throw new InvalidOperationException("boom"));
-            Assert.Equal(
-                0u,
-                LogCallbackState.EmitForTest(
-                    (uint)LogSeverity.Info,
-                    (uint)LogEvent.General,
-                    0,
-                    "third"
-                )
-            );
+            Maplibre.LogSetCallback(null);
+            Assert.False(Gc.IsAlive(second));
 
-            Maplibre.ClearLogCallback();
-            Assert.Equal(
-                0u,
-                LogCallbackState.EmitForTest(
-                    (uint)LogSeverity.Info,
-                    (uint)LogEvent.General,
-                    0,
-                    "after"
-                )
-            );
+            var third = InstallCapturingCallback();
+            Maplibre.LogClearCallback();
+            Assert.False(Gc.IsAlive(third));
         }
         finally
         {
-            Maplibre.ClearLogCallback();
+            Maplibre.LogClearCallback();
         }
+    }
 
-        Assert.Collection(
-            records,
-            first =>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference InstallCapturingCallback()
+    {
+        var captured = new object();
+        Maplibre.LogSetCallback(
+            (_, _, _, _) =>
             {
-                Assert.Equal(LogSeverity.Warning, first.Severity);
-                Assert.Equal((uint)LogSeverity.Warning, first.RawSeverity);
-                Assert.Equal(LogEvent.Render, first.Event);
-                Assert.Equal((uint)LogEvent.Render, first.RawEvent);
-                Assert.Equal(42, first.Code);
-                Assert.Equal("first", first.Message);
-            },
-            second =>
-            {
-                Assert.Equal(LogSeverity.Error, second.Severity);
-                Assert.Equal(LogEvent.Style, second.Event);
-                Assert.Equal(7, second.Code);
-                Assert.Equal("replacement:second", second.Message);
+                GC.KeepAlive(captured);
+                return 0;
             }
         );
+        return new WeakReference(captured);
     }
 
-    [BindingSpecTest("BND-062")]
     [Fact]
-    public void UnknownLogEnumValuesPreserveRawValues()
+    public unsafe void TheLogTrampolineCopiesUnknownValuesRejectsReentryAndContainsExceptions()
     {
-        LogRecord? copiedRecord = null;
-
-        try
+        (uint Severity, uint Event, long Code, string Message)? copied = null;
+        var rejectedReentry = false;
+        Func<LogSeverity, LogEvent, long, string, uint> callback = (
+            severity,
+            @event,
+            code,
+            message
+        ) =>
         {
-            Maplibre.SetLogCallback(record =>
+            copied = ((uint)severity, (uint)@event, code, message);
+            try
             {
-                copiedRecord = record;
-                return true;
-            });
-
-            Assert.Equal(1u, LogCallbackState.EmitForTest(999, 998, 0, "unknown"));
-        }
-        finally
-        {
-            Maplibre.ClearLogCallback();
-        }
-
-        Assert.NotNull(copiedRecord);
-        Assert.Equal((LogSeverity)999, copiedRecord.Severity);
-        Assert.Equal(999u, copiedRecord.RawSeverity);
-        Assert.Equal((LogEvent)998, copiedRecord.Event);
-        Assert.Equal(998u, copiedRecord.RawEvent);
-    }
-
-    [BindingSpecTest("BND-026", "BND-122")]
-    [Fact]
-    public unsafe void LogCallbackInstallFailurePreservesPreviousCallbackAndReleasesReplacement()
-    {
-        var failInstall = false;
-        LogCallbackState? failedReplacement = null;
-        var diagnostic = "install failed";
-        using var methods = LogCallbackState.UseCallbackMethodsForTest(
-            (_, userData) =>
+                _ = Maplibre.CVersion();
+            }
+            catch (InvalidOperationException)
             {
-                if (!failInstall)
-                {
-                    return mln_status.MLN_STATUS_OK;
-                }
+                rejectedReentry = true;
+            }
+            throw new FormatException("Host callback failed.");
+        };
+        using var scope = new NativeCallScope();
+        var root = scope.Register(callback);
+        delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, uint> invoke =
+            &GeneratedValues.InvokeLogCallback;
 
-                failedReplacement = LogCallbackState.StateForTokenForTest((nint)userData);
-                return mln_status.MLN_STATUS_INVALID_STATE;
-            },
-            () => mln_status.MLN_STATUS_OK
-        );
-        using var diagnostics = NativeStatus.UseDiagnosticProviderForTest(() => diagnostic);
-
-        Maplibre.SetLogCallback(_ => true);
-        var previous = Assert.IsType<LogCallbackState>(LogCallbackState.CurrentForTest);
-
-        try
-        {
-            failInstall = true;
-            var error = Assert.Throws<InvalidStateException>(() =>
-                Maplibre.SetLogCallback(_ => false)
-            );
-
-            Assert.Same(previous, LogCallbackState.CurrentForTest);
-            Assert.False(previous.IsRetiredForTest);
-            Assert.NotNull(failedReplacement);
-            Assert.True(failedReplacement.IsRetiredForTest);
-            Assert.Equal("install failed", error.Diagnostic);
-        }
-        finally
-        {
-            Maplibre.ClearLogCallback();
-        }
-    }
-
-    [BindingSpecTest("BND-123")]
-    [Fact]
-    public void LogCallbackStateDisposeIsIdempotent()
-    {
-        var state = Assert.IsAssignableFrom<IDisposable>(
-            Activator.CreateInstance(
-                typeof(LogCallbackState),
-                BindingFlags.Instance | BindingFlags.NonPublic,
-                binder: null,
-                args: [new LogCallback(_ => true)],
-                culture: null
-            )
-        );
-
-        state.Dispose();
-        state.Dispose();
+        Assert.Equal(0u, invoke(root, 999, 998, 42, scope.CString("é")));
+        Assert.Equal((999u, 998u, 42L, "é"), copied);
+        Assert.True(rejectedReentry);
+        // The guard ends with the callback, so the thread may call native again.
+        _ = Maplibre.CVersion();
     }
 }

@@ -45,4 +45,19 @@ auto set_thread_error(const std::exception& exception) noexcept -> void {
   set_thread_error(exception.what());
 }
 
+auto write_diagnostic(mln_diagnostic* diagnostic, const char* message) noexcept
+  -> void {
+  constexpr auto message_offset = offsetof(mln_diagnostic, message);
+  if (diagnostic == nullptr || diagnostic->size <= message_offset) {
+    return;
+  }
+  const auto capacity = std::min<std::size_t>(
+    diagnostic->size - message_offset, sizeof(diagnostic->message)
+  );
+  const auto length =
+    std::min(std::char_traits<char>::length(message), capacity - 1);
+  std::ranges::copy(std::string_view{message, length}, diagnostic->message);
+  diagnostic->message[length] = '\0';
+}
+
 }  // namespace mln::core

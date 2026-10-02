@@ -17,8 +17,15 @@ function(mln_ffi_add_maplibre_native)
                             _USE_MATH_DEFINES)
   endif()
 
+  # Every target MapLibre Native defines, its vendored libraries included,
+  # compiles without static destructors, as the C API objects do. The option
+  # applies to that directory alone.
+  get_directory_property(compile_options COMPILE_OPTIONS)
+  mln_ffi_no_static_destructors_option(no_static_destructors)
+  add_compile_options(${no_static_destructors})
   add_subdirectory("${MLN_FFI_SOURCE_DIR}"
                    "${PROJECT_BINARY_DIR}/maplibre-native")
+  set_directory_properties(PROPERTIES COMPILE_OPTIONS "${compile_options}")
 
   if(MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(

@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi;
+using Maplibre.NativeFfi.Base;
 using Maplibre.NativeFfi.Render;
 using Silk.NET.GLFW;
 
@@ -26,7 +27,7 @@ internal sealed unsafe class MetalContext : IGraphicsContext
         this.layer = layer;
     }
 
-    public RenderBackend Backend => RenderBackend.Metal;
+    public RenderBackendFlag Backend => RenderBackendFlag.Metal;
 
     public nint WindowHandle => window.NativeHandle;
 
@@ -36,7 +37,7 @@ internal sealed unsafe class MetalContext : IGraphicsContext
 
     public bool CanRenderFrame => window.CanRenderFrame();
 
-    public static MetalContext Create(string title, int width, int height)
+    public static MetalContext Create(string title, int width, int height, bool visible)
     {
         if (!OperatingSystem.IsMacOS())
         {
@@ -47,6 +48,7 @@ internal sealed unsafe class MetalContext : IGraphicsContext
             title,
             width,
             height,
+            visible,
             glfw => glfw.WindowHint(WindowHintClientApi.ClientApi, ClientApi.NoApi)
         );
         nint retainedView = 0;
@@ -77,7 +79,7 @@ internal sealed unsafe class MetalContext : IGraphicsContext
             MacObjectiveC.SendVoid(retainedView, "setLayer:", layer);
 
             var context = new MetalContext(window, retainedView, device, layer);
-            context.Resize(context.ReadViewport());
+            context.SetDrawableSize(context.ReadViewport());
             Console.WriteLine($"GLFW {window.Glfw.GetVersionString()}, Metal, Cocoa");
             return context;
         }
@@ -245,7 +247,10 @@ internal sealed unsafe class MetalContext : IGraphicsContext
 
     public Viewport ReadViewport() => window.ReadViewport();
 
-    public void Resize(Viewport viewport)
+    /// <summary>
+    /// Sizes the layer's drawables for the compositor. A native surface session sizes them itself.
+    /// </summary>
+    public void SetDrawableSize(Viewport viewport)
     {
         MacObjectiveC.SendSize(
             layer,
@@ -253,11 +258,6 @@ internal sealed unsafe class MetalContext : IGraphicsContext
             viewport.PhysicalWidth,
             viewport.PhysicalHeight
         );
-    }
-
-    public void PollEvents()
-    {
-        window.PollEvents();
     }
 
     public void FinishFrame() { }

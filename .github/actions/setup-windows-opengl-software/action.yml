@@ -54,4 +54,7 @@ runs:
         New-ItemProperty -Path $openglDriverKey -Name Version -PropertyType DWord -Value 2 -Force | Out-Null
 
         "GALLIUM_DRIVER=llvmpipe" >> $env:GITHUB_ENV
+        # Software rendering is slower than hardware, so the native suites
+        # stretch their waits and hang watchdog to match.
+        "MLN_TEST_TIMEOUT_SCALE=3" >> $env:GITHUB_ENV
         "Path=$($mesaWglDriver.Directory.FullName);$env:Path" >> $env:GITHUB_ENV

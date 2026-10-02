@@ -16,8 +16,19 @@ EMULATOR_TESTED = {
 }
 
 
+# Linux runners have no display server. A command that opens a window gets a
+# virtual one, and draws on the X11 platform rather than the surfaceless one
+# that the job exports for the headless suites.
+XVFB_RUN = "env -u EGL_PLATFORM xvfb-run --auto-servernum"
+
+
+def mise_command(command: str) -> str:
+    """The `mise run` command a step runs, without the display wrapper."""
+    return command.removeprefix(f"{XVFB_RUN} ")
+
+
 def runtime_tested(preset: str, tested: set[str]) -> bool:
-    """Whether CI executes this target's C API suite rather than only building it."""
+    """Whether CI executes this target's native suite rather than only building it."""
     return preset in tested or preset in EMULATOR_TESTED
 
 
@@ -105,7 +116,10 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
             if command.get("preset", True):
                 arguments.append(preset)
             arguments.extend(str(argument) for argument in command.get("args", []))
-            commands.append(f"mise run {shlex.join(arguments)}")
+            line = f"mise run {shlex.join(arguments)}"
+            if command.get("display") and platform(preset) == "linux-gnu":
+                line = f"{XVFB_RUN} {line}"
+            commands.append(line)
     return commands
 
 
@@ -132,9 +146,46 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
             f"mise run //bindings/zig:build {preset}",
         ]
     if build_map:
-        commands.append(f"mise run //examples/android-map:build {arguments} --prebuilt")
+        # The example draws with either backend, so every emulator target
+        # renders it; the others only build it.
+        if preset in EMULATOR_TESTED:
+            commands.append(f"mise run //examples/android-map:smoke {preset}")
+        else:
+            commands.append(
+                f"mise run //examples/android-map:build {arguments} --prebuilt"
+            )
     commands.append(f"mise run //bindings/dart:build:mobile {preset}")
     return commands
+
+
+def device_boot(preset: str) -> tuple[str, str] | None:
+    """The named step that boots the device a target's suites run on, if any.
+
+    The suites boot the device themselves when it is not ready, and every boot
+    task reuses a ready device. Booting in a step of its own lets CI tell a
+    device that never came up from a suite that failed on it.
+    """
+    target_platform = platform(preset)
+    if target_platform == "android" and preset in EMULATOR_TESTED:
+        # The EGL target's suites run on API 26, as the root `test` task and
+        # the device test scripts boot it.
+        api = " --api 26" if backend(preset) == "egl" else ""
+        return "Boot Android emulator", f"mise run //:android-emulator:boot x86_64{api}"
+    if target_platform == "ohos" and preset in EMULATOR_TESTED:
+        return "Boot OpenHarmony emulator", "mise run //:ohos-emulator:boot"
+    if target_platform == "ios-simulator":
+        return "Boot iOS simulator", "mise run //:ios-simulator:boot"
+    if target_platform == "tvos-simulator":
+        return "Boot tvOS simulator", "mise run //:tvos-simulator:boot"
+    return None
+
+
+SWIFT_PROJECTS = ("mise run //bindings/swift:", "mise run //examples/swift-map:")
+
+
+def uses_swift(commands: list[str]) -> bool:
+    """Whether a row builds a Swift package, which resolves its dependencies."""
+    return any(mise_command(command).startswith(SWIFT_PROJECTS) for command in commands)
 
 
 def ohos_commands(preset: str) -> list[str]:
@@ -148,10 +199,13 @@ def ohos_commands(preset: str) -> list[str]:
 
 
 def native_commands(preset: str, tested: set[str]) -> list[str]:
+    """The build, then the checks against its tree. The build always comes first."""
     target_platform = platform(preset)
-    commands = [
-        f"mise run {'test' if runtime_tested(preset, tested) else 'build'} {preset}"
-    ]
+    # The build is its own step so that a failing C suite leaves the binding
+    # suites a tree to run against.
+    commands = [f"mise run build {preset}"]
+    if runtime_tested(preset, tested):
+        commands.append(f"mise run test {preset}")
     if target_platform == "linux-gnu":
         commands.append(f"mise run check-glibc-floor {preset}")
     elif target_platform == "linux-musl":
@@ -230,7 +284,7 @@ def uses_zig(commands: list[str]) -> bool:
     would claim the key with an incomplete cache.
     """
     return all(
-        any(command.startswith(project) for command in commands)
+        any(mise_command(command).startswith(project) for command in commands)
         for project in ZIG_PROJECTS
     )
 
@@ -252,7 +306,7 @@ def uses_gradle(commands: list[str]) -> bool:
     Gradle build pays that setup and teardown for an empty cache entry.
     """
     return any(
-        command.startswith(project)
+        mise_command(command).startswith(project)
         for command in commands
         for project in GRADLE_PROJECTS
     )
@@ -261,6 +315,15 @@ def uses_gradle(commands: list[str]) -> bool:
 def preset_sets(
     presets: dict[str, object],
 ) -> tuple[list[str], set[str], set[str], set[str]]:
+    # A configure preset whose vendor settings opt out of CI is a local tool,
+    # such as the coverage build. CI builds no preset that references it.
+    local = {
+        preset["name"]
+        for preset in presets.get("configurePresets", [])
+        if preset.get("vendor", {}).get("maplibre-native-ffi", {}).get("ci", True)
+        is False
+    }
+
     def names(kind: str) -> list[str]:
         # Hidden presets carry settings for others to inherit and name no
         # target, so they take part in no preset pairing.
@@ -268,6 +331,8 @@ def preset_sets(
             preset["name"]
             for preset in presets.get(kind, [])
             if not preset.get("hidden", False)
+            and preset["name"] not in local
+            and preset.get("configurePreset") not in local
         ]
 
     configured = names("configurePresets")
@@ -304,6 +369,8 @@ def target_rows(
             "package": preset in packaged,
             "zig": uses_zig(native + consumers),
             "gradle": uses_gradle(native + consumers),
+            "swift": uses_swift(native + consumers),
+            "boot": device_boot(preset),
             "save_toolchains": row_runner not in claimed_runners,
             "native_commands": native if preset in packaged else native + consumers,
         }

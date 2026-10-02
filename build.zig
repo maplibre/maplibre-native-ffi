@@ -4,7 +4,6 @@
 
 const builtin = @import("builtin");
 const std = @import("std");
-const zigglgen = @import("zigglgen");
 
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
@@ -14,6 +13,7 @@ const BuildOptions = struct {
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
     system_root: ?std.Build.LazyPath,
+    target_libc: ?std.Build.LazyPath,
 };
 
 pub const RenderBackend = enum {
@@ -90,6 +90,10 @@ pub const LinkOptions = struct {
     render_backend: RenderBackend,
     dependency_library_dirs: []const std.Build.LazyPath,
     system_root: ?std.Build.LazyPath,
+    /// Whether to link the render backend's graphics libraries, such as EGL
+    /// and GLESv2, for a consumer that calls them itself. maplibre-native-c
+    /// loads them at run time and needs no link.
+    link_render_backend: bool = true,
 };
 
 pub const DependencyOptions = struct {
@@ -162,6 +166,14 @@ pub fn maybeSystemRootPath(b: *std.Build) ?std.Build.LazyPath {
     return b.option(std.Build.LazyPath, "system-root", "Target platform SDK or sysroot");
 }
 
+fn takeTargetLibCPath(b: *std.Build) ?std.Build.LazyPath {
+    const path = b.libc_file orelse return null;
+    // `--libc` is a global Zig build option. Keep it off host tools, and attach
+    // it only to target executables.
+    b.libc_file = null;
+    return lazyPath(path);
+}
+
 pub fn addIncludePaths(module: *std.Build.Module, include_dirs: []const std.Build.LazyPath) void {
     for (include_dirs) |include_dir| {
         module.addIncludePath(include_dir);
@@ -229,6 +241,7 @@ fn maplibreNativeCHeader(b: *std.Build) std.Build.LazyPath {
     return header.add("maplibre_native_c_import.h",
         \\#include <maplibre_native_c.h>
         \\#include <maplibre_native_c/plugin.h>
+        \\#include <maplibre_native_c/callback_adapter.h>
         \\
     );
 }
@@ -244,6 +257,9 @@ fn eglBindingsHeader(b: *std.Build) std.Build.LazyPath {
         \\#define EGL_EGLEXT_PROTOTYPES 1
         \\#include <EGL/egl.h>
         \\#include <EGL/eglext.h>
+        \\#if __has_include(<EGL/eglext_angle.h>)
+        \\#include <EGL/eglext_angle.h>
+        \\#endif
         \\
     );
 }
@@ -502,12 +518,35 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         addRPaths(module_, runtime_library_dirs);
         module_.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .no });
     }
+    if (!options.link_render_backend) return addPlatformSystemPaths(b, module_, options.target, options.system_root);
     linkRenderBackend(b, module_, .{
         .target = options.target,
         .render_backend = options.render_backend,
         .dependency_library_dirs = options.dependency_library_dirs,
         .system_root = options.system_root,
     });
+}
+
+/// Test executables link no graphics library themselves: tests/graphics loads
+/// the one each backend uses at run time, and a second copy linked beside it,
+/// such as ANGLE's EGL on macOS, would hand the session a context from another
+/// instance of the library.
+fn testLinkOptions(options: BuildOptions) LinkOptions {
+    var link_options = repoLinkOptions(options);
+    link_options.link_render_backend = false;
+    return link_options;
+}
+
+/// The binding module that the test executables import, linked like
+/// `testLinkOptions`.
+fn addTestBindingModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
+    const module_ = b.createModule(.{
+        .root_source_file = b.path("bindings/zig/src/maplibre_native_ffi.zig"),
+        .target = options.target,
+        .optimize = options.optimize,
+    });
+    linkMaplibreNativeC(b, module_, testLinkOptions(options));
+    return module_;
 }
 
 fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
@@ -567,51 +606,65 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
         }),
         .use_lld = if (isAppleMobile(options.target)) false else null,
     });
+    tests.setLibCFile(options.target_libc);
     if (isAppleMobile(options.target)) {
         tests.root_module.addCSourceFile(.{ .file = b.path("src/zig_test_support/ios_simulator_dyld_stub.m") });
     }
-    linkMaplibreNativeC(b, tests.root_module, repoLinkOptions(options));
+    linkMaplibreNativeC(b, tests.root_module, testLinkOptions(options));
     return tests;
+}
+
+/// Gives a test module the GPU fixtures of tests/graphics as the
+/// `mln_test_graphics` import. A target that runs tests loads the shared
+/// library that `mise run build` installs beside maplibre-native-c. An Apple
+/// device target builds its tests without running them, and its preset
+/// installs no shared library, so it compiles the fixture source instead.
+fn addTestGraphics(b: *std.Build, module: *std.Build.Module, options: BuildOptions) void {
+    const include_dir = b.path("tests/graphics/include");
+    module.addIncludePath(include_dir);
+    module.addImport("mln_test_graphics", translateCModule(b, .{
+        .root_source_file = b.path("tests/graphics/include/mln_test_graphics.h"),
+        .target = options.target,
+        .optimize = options.optimize,
+        .include_dirs = &.{include_dir},
+        .system_root = options.system_root,
+    }));
+    if (isAppleMobile(options.target) and !isAppleSimulator(options.target)) {
+        module.addCSourceFile(.{ .file = b.path("tests/graphics/graphics.c"), .flags = &.{"-std=c11"} });
+    } else if (options.target.result.os.tag == .windows) {
+        module.addObjectFile(installPath(b, options.native_install_dir, "lib/mln_test_graphics.lib"));
+    } else {
+        module.linkSystemLibrary("mln_test_graphics", .{ .use_pkg_config = .no });
+    }
+}
+
+/// An executable that leaves a runtime, a map, and process-global callbacks
+/// live when it returns, so the test step checks that the process still exits
+/// cleanly.
+fn addShutdownProbe(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Build.Module) *std.Build.Step.Compile {
+    const probe = b.addExecutable(.{
+        .name = "zig-shutdown-probe",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bindings/zig/tests/shutdown_probe.zig"),
+            .target = options.target,
+            .optimize = options.optimize,
+        }),
+        .use_lld = if (isAppleMobile(options.target)) false else null,
+    });
+    probe.setLibCFile(options.target_libc);
+    if (isAppleMobile(options.target)) {
+        probe.root_module.addCSourceFile(.{ .file = b.path("src/zig_test_support/ios_simulator_dyld_stub.m") });
+    }
+    linkMaplibreNativeC(b, probe.root_module, testLinkOptions(options));
+    probe.root_module.addImport("maplibre_native_ffi", maplibre_native_ffi);
+    return probe;
 }
 
 fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Build.Module) *std.Build.Step.Compile {
     const tests = addTestCompile(b, options, b.path("bindings/zig/tests/main.zig"));
     tests.root_module.addImport("maplibre_native_ffi", maplibre_native_ffi);
+    addTestGraphics(b, tests.root_module, options);
     addRenderBackendOptions(b, tests.root_module, options.render_backend);
-    addRenderBackendTranslateC(b, tests.root_module, .{
-        .target = options.target,
-        .optimize = options.optimize,
-        .include_dirs = options.include_dirs,
-        .render_backend = options.render_backend,
-        .system_root = options.system_root,
-    });
-    if (options.render_backend == .opengl) {
-        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
-            .{ .api = .gles, .version = .@"3.0" }
-        else
-            .{ .api = .gl, .version = .@"3.0" });
-        tests.root_module.addImport("gl", gl_bindings);
-        if (options.target.result.os.tag == .windows) {
-            const wgl_test_context = b.createModule(.{
-                .root_source_file = b.path("src/zig_test_support/wgl_context.zig"),
-                .target = options.target,
-                .optimize = options.optimize,
-            });
-            wgl_test_context.addImport("gl", gl_bindings);
-            tests.root_module.addImport("wgl_test_context", wgl_test_context);
-        }
-    }
-    if (options.render_backend == .metal) {
-        if (isAppleMobile(options.target)) {
-            tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_ios.m") });
-            tests.root_module.linkSystemLibrary("objc", .{});
-            tests.root_module.linkFramework("Foundation", .{});
-        }
-        if (options.target.result.os.tag == .macos) {
-            tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_macos.m") });
-            tests.root_module.linkFramework("AppKit", .{});
-        }
-    }
     return tests;
 }
 
@@ -640,15 +693,24 @@ pub fn addTestRunStep(
 fn addAndroidTestRunStep(
     b: *std.Build,
     tests: []const *std.Build.Step.Compile,
+    target: std.Build.ResolvedTarget,
     native_install_dir: std.Build.LazyPath,
     android_runner: std.Build.LazyPath,
     emulator_api: ?[]const u8,
 ) *std.Build.Step.Run {
+    const abi = switch (target.result.cpu.arch) {
+        .aarch64 => "arm64-v8a",
+        .x86_64 => "x86_64",
+        else => @panic("Android test runner supports ARM64 and x64 targets only"),
+    };
     const run_tests = b.addSystemCommand(&.{
         "bash",
         android_runner.getPath(b),
         "180",
+        abi,
         installPath(b, native_install_dir, "lib/libmaplibre-native-c.so").getPath(b),
+        "--library",
+        installPath(b, native_install_dir, "lib/libmln_test_graphics.so").getPath(b),
     });
     if (emulator_api) |api| {
         run_tests.addArgs(&.{ "--api", api });
@@ -662,6 +724,7 @@ fn addAndroidTestRunStep(
 
 pub fn build(b: *std.Build) void {
     const native_install_dir = maybeNativeInstallDirPath(b);
+    const target_libc = takeTargetLibCPath(b);
     const target = if (native_install_dir) |install_dir|
         nativeTarget(b, install_dir)
     else
@@ -695,35 +758,42 @@ pub fn build(b: *std.Build) void {
         .dependency_library_dirs = dependency_library_dirs,
         .render_backend = backend,
         .system_root = system_root,
+        .target_libc = target_libc,
     };
 
-    const maplibre_native_ffi = addMaplibreNativeModule(b, options);
+    _ = addMaplibreNativeModule(b, options);
+    const test_binding_module = addTestBindingModule(b, options);
 
+    // The hand-written runtime modules' inline tests build and run on their
+    // own, from one root that reaches each module once.
     const test_sources = [_]std.Build.LazyPath{
-        b.path("bindings/zig/src/c.zig"),
-        b.path("bindings/zig/src/status.zig"),
-        b.path("bindings/zig/src/runtime.zig"),
-        b.path("bindings/zig/src/logging.zig"),
-        b.path("bindings/zig/src/map.zig"),
+        b.path("bindings/zig/src/runtime_tests.zig"),
     };
 
     const test_step = b.step("test", "Run Zig binding tests");
 
-    const binding_tests = addBindingTests(b, options, maplibre_native_ffi);
-    var test_compiles: [test_sources.len + 1]*std.Build.Step.Compile = undefined;
+    const binding_tests = addBindingTests(b, options, test_binding_module);
+    const shutdown_probe = addShutdownProbe(b, options, test_binding_module);
+    var test_compiles: [test_sources.len + 2]*std.Build.Step.Compile = undefined;
     test_compiles[0] = binding_tests;
+    test_compiles[1] = shutdown_probe;
     b.default_step.dependOn(&binding_tests.step);
+    b.default_step.dependOn(&shutdown_probe.step);
 
-    for (test_sources, 1..) |source, index| {
+    for (test_sources, 2..) |source, index| {
         const tests = addTestCompile(b, options, source);
         test_compiles[index] = tests;
         b.default_step.dependOn(&tests.step);
     }
 
-    if (options.target.result.abi == .android) {
+    if (options.target.result.abi == .android and options.target.result.cpu.arch == .arm) {
+        const unsupported = b.addFail("The Android emulator runs ARM64 and x64 guests; build this target without the test step.");
+        test_step.dependOn(&unsupported.step);
+    } else if (options.target.result.abi == .android) {
         const run_tests = addAndroidTestRunStep(
             b,
             &test_compiles,
+            options.target,
             options.native_install_dir,
             b.path("scripts/run-android-emulator-test.sh"),
             if (options.target.result.cpu.arch == .x86_64 and options.render_backend == .opengl) "26" else null,

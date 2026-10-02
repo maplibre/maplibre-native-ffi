@@ -7,7 +7,7 @@ preset=${1:?usage: run-musl-test.sh <preset> [executable [arguments...]]}
 container_image=${MLN_FFI_MUSL_TEST_IMAGE:-alpine:3.22}
 shift
 if [[ $# -eq 0 ]]; then
-  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_ffi_c_api_tests"
+  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_native_abi_tests"
 fi
 
 if [[ "$1" == */* && ! -x "$1" ]]; then
@@ -45,7 +45,10 @@ esac
       vulkan) apk add --no-cache mesa-vulkan-swrast vulkan-loader ;;
     esac
     export LIBGL_ALWAYS_SOFTWARE=true
-    export MLN_FFI_TEST_FIXTURE_DIR="$2/third_party/maplibre-native/test/fixtures"
-    shift 2
+    # Software rendering is slow, so waits and the native hang watchdog stretch
+    # by the timeout scale.
+    export MLN_TEST_TIMEOUT_SCALE="$3"
+    export MLN_FFI_TEST_FIXTURE_DIR="$2/tests/native/fixtures"
+    shift 3
     exec timeout 300 "$@"
-  ' sh "$backend" "$MISE_MONOREPO_ROOT" "$@"
+  ' sh "$backend" "$MISE_MONOREPO_ROOT" "${MLN_TEST_TIMEOUT_SCALE:-3}" "$@"

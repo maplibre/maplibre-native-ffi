@@ -21,6 +21,21 @@ public enum MaplibreStatus
     /// <summary>A native MapLibre error or C++ exception was converted to status.</summary>
     NativeError = -5,
 
+    /// <summary>The operation reached its terminal cancelled disposition.</summary>
+    Cancelled = -6,
+
+    /// <summary>A conflicting driver call or lifecycle transition is in flight.</summary>
+    Busy = -7,
+
+    /// <summary>The render target or graphics receiver was irreversibly lost.</summary>
+    TargetLost = -8,
+
+    /// <summary>A nonblocking acquisition or service call has no result yet.</summary>
+    NotReady = -9,
+
+    /// <summary>A command or operation named an ID with no live object behind it.</summary>
+    NotFound = -10,
+
     /// <summary>The loaded C ABI version is incompatible with this binding.</summary>
     AbiMismatch = -1000,
 

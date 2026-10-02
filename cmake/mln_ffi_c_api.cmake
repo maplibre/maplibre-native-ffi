@@ -1,5 +1,6 @@
 include(mln_ffi_lint)
 include(mln_ffi_archive)
+include(mln_ffi_coverage)
 include(mln_ffi_platform)
 include(mln_ffi_render_backend)
 
@@ -85,7 +86,26 @@ function(mln_ffi_set_c_api_output_properties target)
       maplibre-native-c)
 endfunction()
 
+# The library's threads keep running while the process exits: nothing at exit
+# stops or joins them, and the operating system reclaims them once exit ends.
+# The objects with static storage duration that those threads read must
+# therefore outlive them, so no C++ source in the library registers a static
+# destructor, neither ours nor MapLibre Native's. The flag also drops
+# thread-local destructors, so per-thread state that must be destroyed when
+# its thread ends, such as a cache that owns memory, is declared
+# [[clang::always_destroy]].
+function(mln_ffi_no_static_destructors_option out_var)
+  if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    set(flag "/clang:-fno-c++-static-destructors")
+  else()
+    set(flag "-fno-c++-static-destructors")
+  endif()
+  set(${out_var} "$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:${flag}>" PARENT_SCOPE)
+endfunction()
+
 function(mln_ffi_configure_c_api_compile_options target)
+  mln_ffi_no_static_destructors_option(no_static_destructors)
+  target_compile_options(${target} PRIVATE ${no_static_destructors})
   if(MSVC)
     target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/GR->)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -108,9 +128,12 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/android.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/buffer.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/callback_adapter.cpp
-      ${PROJECT_SOURCE_DIR}/src/c_api/diagnostics.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/camera.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/map.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/projection.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/query.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/style.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/network.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/plugin.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/render_session.cpp
@@ -118,14 +141,21 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/surface.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/texture.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/version.cpp
+      ${PROJECT_SOURCE_DIR}/src/completion/completion.cpp
       ${PROJECT_SOURCE_DIR}/src/diagnostics/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson.cpp
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson_source_data.cpp
       ${PROJECT_SOURCE_DIR}/src/handles/handle_table.cpp
+      ${PROJECT_SOURCE_DIR}/src/execution/process_exit.cpp
+      ${PROJECT_SOURCE_DIR}/src/execution/runtime_executor.cpp
+      ${PROJECT_SOURCE_DIR}/src/execution/worker_thread.cpp
       ${PROJECT_SOURCE_DIR}/src/logging/logging.cpp
+      ${PROJECT_SOURCE_DIR}/src/operation/operation.cpp
       ${PROJECT_SOURCE_DIR}/src/map/feature_state.cpp
       ${PROJECT_SOURCE_DIR}/src/map/map.cpp
+      ${PROJECT_SOURCE_DIR}/src/map/style.cpp
       ${PROJECT_SOURCE_DIR}/src/render/render_session_common.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/render_session_query.cpp
       ${PROJECT_SOURCE_DIR}/src/render/surface_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/texture_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/unsupported_sessions.cpp
@@ -134,7 +164,10 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/resources/network_status.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/resource_loader.cpp
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
-      ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
+      ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp
+      ${PROJECT_SOURCE_DIR}/src/testing/render_clock.cpp
+      ${PROJECT_SOURCE_DIR}/src/testing/sync_point.cpp)
+  list(APPEND MLN_FFI_C_API_SOURCES ${PROJECT_SOURCE_DIR}/src/wake/wake.cpp)
 
   # Every Apple target needs the pool, not just the Metal backend: MoltenVK and
   # the platform frameworks hand back autoreleased objects under Vulkan and
@@ -216,7 +249,9 @@ function(mln_ffi_add_c_api_library target)
   set(MLN_FFI_C_API_OBJECT_TARGET "${target}_objects")
   add_library(${MLN_FFI_C_API_OBJECT_TARGET} OBJECT)
   mln_ffi_configure_c_api_implementation(${MLN_FFI_C_API_OBJECT_TARGET})
+  mln_ffi_configure_coverage_objects(${MLN_FFI_C_API_OBJECT_TARGET})
   mln_ffi_complete_static_dependencies_for_target(MLN_FFI_STATIC_DEPS)
+  mln_ffi_append_coverage_static_dependencies(MLN_FFI_STATIC_DEPS)
 
   get_target_property(MLN_FFI_SHARED_SUPPORTED mln_ffi_platform_dependencies
                       MLN_FFI_SHARED_SUPPORTED)
@@ -224,6 +259,7 @@ function(mln_ffi_add_c_api_library target)
     add_library(${target} STATIC)
     mln_ffi_configure_static_c_api_wrapper(${target}
                                            ${MLN_FFI_C_API_OBJECT_TARGET})
+    mln_ffi_configure_coverage_library(${target})
     mln_ffi_configure_complete_static_archive(${target} ${MLN_FFI_STATIC_DEPS})
     return()
   endif()
@@ -231,11 +267,13 @@ function(mln_ffi_add_c_api_library target)
   add_library(${target} SHARED)
   mln_ffi_configure_shared_c_api_wrapper(${target}
                                          ${MLN_FFI_C_API_OBJECT_TARGET})
+  mln_ffi_configure_coverage_library(${target})
 
   set(MLN_FFI_STATIC_TARGET "${target}_static")
   add_library(${MLN_FFI_STATIC_TARGET} STATIC)
   mln_ffi_configure_static_c_api_wrapper(${MLN_FFI_STATIC_TARGET}
                                          ${MLN_FFI_C_API_OBJECT_TARGET})
+  mln_ffi_configure_coverage_library(${MLN_FFI_STATIC_TARGET})
   get_target_property(
     MLN_FFI_STATIC_BASE_OUTPUT_NAME mln_ffi_platform_dependencies
     MLN_FFI_STATIC_BASE_OUTPUT_NAME)

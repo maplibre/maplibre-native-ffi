@@ -14,11 +14,11 @@ def warn_unclosed(
     closed: bool,
     _warn: Callable[..., None] = _warnings.warn,
 ) -> None:
-    """Report an unclosed handle without destroying thread-affine native state."""
+    """Report an owner that reached garbage collection without explicit close."""
     if closed:
         return
     _warn(
-        f"{handle_name} was not closed; native state was intentionally leaked",
+        f"{handle_name} was not explicitly closed",
         ResourceWarning,
         stacklevel=2,
     )
@@ -27,8 +27,13 @@ def warn_unclosed(
 class ContextHandleMixin:
     """Provide context-manager behavior for explicit-close handles."""
 
-    def close(self) -> None:
-        """Release this handle."""
+    def close(self) -> object:
+        """Release this handle.
+
+        A handle whose release reports asynchronous teardown returns a future
+        here. Leaving the ``with`` block discards it, so a host that must
+        observe teardown calls ``close`` itself and waits.
+        """
         raise NotImplementedError
 
     def __enter__(self) -> Self:
@@ -70,6 +75,15 @@ class NativeHandleMixin(WarnUnclosedMixin, ContextHandleMixin):
         """Return whether the private native handle has been closed."""
         return bool(self._native.closed)
 
-    def close(self) -> None:
+    @property
+    def id(self) -> int:
+        """Return the native handle ID that runtime events report as a source.
+
+        The ID stays readable after close, so events drained later still match
+        the handle that produced them.
+        """
+        return int(self._native.id)
+
+    def close(self) -> object:
         """Release the private native handle exactly once."""
-        self._native.close()
+        return self._native.close()

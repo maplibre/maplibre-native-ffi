@@ -7,6 +7,7 @@
 #include <SDL3/SDL.h>
 #include <maplibre_native_c.h>
 
+#include "../render_target.h"
 #include "../types.h"
 
 typedef struct render_target render_target;
@@ -24,9 +25,9 @@ void render_target_apply_sdl_hints(void);
 /// The SDL window flag the active backend's surface needs.
 SDL_WindowFlags render_target_window_flags(void);
 
-/// Opens the scope one render-loop iteration runs inside. Metal returns an
-/// autorelease pool that collects the iteration's presentation objects; the
-/// other backends return null.
+/// Opens the scope one render-loop event runs inside. Metal returns an
+/// autorelease pool that collects the event's presentation objects; the other
+/// backends return null.
 void* render_target_frame_scope_open(void);
 
 /// Closes a scope returned by render_target_frame_scope_open().
@@ -39,8 +40,9 @@ void render_target_frame_scope_close(void* scope);
   render_target_mode mode
 );
 
-/// Attaches a render session against the published map. The calling thread
-/// becomes the session's owner thread for its whole life.
+/// Attaches a render session to the live map, selecting its driver from the
+/// backend and the mode. A caller driver runs on the render-loop thread, which
+/// owns the graphics context.
 [[nodiscard]] app_error render_target_attach(
   render_target* target, mln_map map, viewport current_viewport
 );
@@ -49,18 +51,24 @@ void render_target_frame_scope_close(void* scope);
 /// no session attached.
 void render_target_deinit(render_target* target);
 
+render_session* render_target_session(render_target* target);
+
+/// Starts the session resize or target replacement a new viewport needs and
+/// returns without waiting for it.
 [[nodiscard]] app_error render_target_resize(
   render_target* target, viewport current_viewport
 );
 
-/// Runs once per render loop iteration, before the render request is consumed:
-/// fences, pacing, and deferred presentation cleanup.
-[[nodiscard]] app_error render_target_finish_frame(render_target* target);
+/// Follows a completed borrowed-texture replacement: demands the frame that
+/// draws into it, and shows any replacement a rendered frame has drawn into.
+[[nodiscard]] app_error render_target_show_replacements(render_target* target);
 
-/// Consumes one render request: renders, composites when the mode needs it,
-/// and presents. Reports completion; false requests a target retry.
-[[nodiscard]] app_error render_target_render_update(
-  render_target* target, viewport current_viewport, bool* out_completed
+/// Shows the newest rendered frame: the texture modes sample it into the
+/// window, switching to a replacement texture once a frame has rendered into
+/// it, and a surface target already presented it. Reports false when no
+/// frame reached the window.
+[[nodiscard]] app_error render_target_present(
+  render_target* target, viewport current_viewport, bool* out_presented
 );
 
 #endif  // C_MAP_RENDER_RENDER_H

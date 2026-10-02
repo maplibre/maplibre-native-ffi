@@ -4,7 +4,6 @@ use std::fs;
 use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Duration;
 
 use flate2::read::GzDecoder;
@@ -18,17 +17,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_TEST_SNAPSHOT_BASE_URL");
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
     let install_dir = native_install_dir()?;
-    let include_dir = install_dir.join("include");
     let link_dir = native_library_dir(&install_dir);
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     let out_path = PathBuf::from(env::var("OUT_DIR")?);
-    let header = include_dir.join("maplibre_native_c.h");
-    // Layer plugin registration stays outside the umbrella header; see
-    // include/maplibre_native_c/plugin.h.
-    let plugin_header = include_dir.join("maplibre_native_c/plugin.h");
 
-    require_dir(&include_dir, "native include directory")?;
     require_dir(&link_dir, "native link directory")?;
 
     if target_env == "musl" {
@@ -36,6 +29,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rustc-link-search=native={}", aliases.display());
     }
     println!("cargo:rustc-link-search=native={}", link_dir.display());
+    if target_os == "macos" {
+        // ld64 resolves a library name to the shared library when both forms
+        // sit in one directory, so this crate's own test binary needs that
+        // directory on its run-time search path. The argument reaches only
+        // this package's own targets, not the crates that depend on it.
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", link_dir.display());
+    }
     print_rerun_if_changed(&link_dir);
     let descriptor_path = install_dir.join("share/maplibre-native-c/artifact.json");
     println!("cargo:rerun-if-changed={}", descriptor_path.display());
@@ -60,74 +60,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("cargo:rustc-link-lib=framework={framework}");
         }
     }
-    println!("cargo:rerun-if-env-changed=EMSDK");
-    println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
-    println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
-    println!("cargo:rerun-if-env-changed=SDKROOT");
-    print_rerun_if_changed(&include_dir);
-
-    let mut builder = bindgen::Builder::default()
-        .header(header.display().to_string())
-        .header(plugin_header.display().to_string())
-        .clang_arg("-xc")
-        .clang_arg("-std=c23")
-        .clang_arg(format!("-I{}", include_dir.display()));
-
-    // Cross-build frontends such as cibuildwheel expose the NDK compiler but
-    // do not know bindgen's target-specific environment variable. Derive the
-    // same target and sysroot arguments from that compiler when needed.
-    if target_os == "android" {
-        let target = env::var("TARGET")?;
-        let target_env = target.replace('-', "_");
-        if env::var_os(format!("BINDGEN_EXTRA_CLANG_ARGS_{target_env}")).is_none()
-            && env::var_os("BINDGEN_EXTRA_CLANG_ARGS").is_none()
-            && let Some(compiler) = env::var_os("CC")
-            && let Some(prebuilt) = Path::new(&compiler).parent().and_then(Path::parent)
-        {
-            builder = builder
-                .clang_arg(format!("--target={target}"))
-                .clang_arg(format!("--sysroot={}", prebuilt.join("sysroot").display()));
-        }
-    }
-
-    // libclang cannot locate an Apple SDK on its own, and these headers include
-    // the SDK's stdint.h. A caller-set SDKROOT already reaches libclang.
-    if env::var_os("SDKROOT").is_none() {
-        let target = env::var("TARGET")?;
-        if let Some(sdk_path) = apple_sdk_name(&target_os, &target).and_then(apple_sdk_path) {
-            builder = builder.clang_arg(format!("-isysroot{sdk_path}"));
-        }
-    }
-
-    if target_os == "emscripten" {
-        let emsdk =
-            env::var("EMSDK").map_err(|_| "EMSDK is required to generate Emscripten bindings")?;
-        builder = builder
-            .clang_arg("--target=wasm32-unknown-emscripten")
-            .clang_arg(format!(
-                "--sysroot={emsdk}/upstream/emscripten/cache/sysroot"
-            ))
-            .clang_arg("-fvisibility=default");
-    }
-
-    let bindings = builder
-        .allowlist_function("^mln_.*")
-        .allowlist_type("^mln_.*")
-        .allowlist_var("^MLN_.*")
-        // Every C handle is the same uint64_t; a transparent newtype per handle
-        // keeps a map from being passed where a runtime is expected.
-        .new_type_alias(concat!(
-            "^mln_(buffer|runtime|map|map_projection|render_session|wake_source",
-            "|resource_request_handle|geojson_source_data|offline_region_snapshot",
-            "|offline_region_list|style_id_list|style_string_list|style_layer_list|queried_feature_list)$"
-        ))
-        .prepend_enum_name(false)
-        .layout_tests(true)
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-        .generate()?;
-
-    bindings.write_to_file(out_path.join("bindings.rs"))?;
-
     Ok(())
 }
 
@@ -218,33 +150,6 @@ fn native_library_dir(install_dir: &Path) -> PathBuf {
     install_dir.join("lib")
 }
 
-/// The SDK that xcrun knows this target by, or None for a target that needs no
-/// Apple SDK.
-fn apple_sdk_name(target_os: &str, target: &str) -> Option<&'static str> {
-    let simulator = target.ends_with("-sim");
-    match target_os {
-        "macos" => Some("macosx"),
-        "ios" if simulator => Some("iphonesimulator"),
-        "ios" => Some("iphoneos"),
-        _ => None,
-    }
-}
-
-/// Where the installed Xcode command line tools keep that SDK. Reports None on
-/// a host without them, leaving libclang to its own header search.
-fn apple_sdk_path(sdk_name: &str) -> Option<String> {
-    let output = Command::new("xcrun")
-        .args(["--sdk", sdk_name, "--show-sdk-path"])
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let path = String::from_utf8(output.stdout).ok()?;
-    let path = path.trim().to_owned();
-    if path.is_empty() { None } else { Some(path) }
-}
-
 fn require_dir(path: &Path, label: &str) -> Result<(), Box<dyn Error>> {
     if path.is_dir() {
         return Ok(());
@@ -276,9 +181,7 @@ fn print_rerun_if_changed(path: &Path) {
 /// Acquires a native install prefix from the published snapshot release.
 ///
 /// The release is floating and its asset URLs never change, so the cache is
-/// keyed on the digest of `SHA256SUMS` rather than on the URL. Contract:
-/// `docs/src/content/docs/development/binding-specification.md`, "Native
-/// Artifact Acquisition".
+/// keyed on the digest of `SHA256SUMS` rather than on the URL.
 mod download {
     use super::*;
 

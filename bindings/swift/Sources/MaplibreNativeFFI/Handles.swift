@@ -1,13 +1,23 @@
 
 /// Its only stored property is the lock-guarded `NativeHandleState`, so the box
-/// itself is safe to share. The public handles that hold a box stay
-/// non-`Sendable`.
+/// itself is safe to share. Each public handle chooses whether its API contract
+/// permits sharing.
 class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
   private let state: NativeHandleState<Handle>
 
-  init(typeName: String, handle: Handle) throws {
+  init(
+    typeName: String,
+    handle: Handle,
+    parent: AnyObject? = nil,
+    pendingDecision: Bool = false
+  ) throws {
     do {
-      state = try NativeHandleState(typeName: typeName, handle: handle)
+      state = try NativeHandleState(
+        typeName: typeName,
+        handle: handle,
+        parent: parent,
+        pendingDecision: pendingDecision
+      )
     } catch let failure as NativeStatusFailure {
       throw MaplibreError.invalidArgument(failure.diagnostic)
     }
@@ -17,21 +27,25 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
     state.isClosed
   }
 
-  /// Runs `use` with release held off. See `NativeHandleState.withLive`.
-  /// Only the box's own liveness failure translates to an invalid-state
-  /// error; a native status thrown inside `use` keeps its own status.
+  var issued: Handle {
+    state.issued
+  }
+
+  /// Holds the owner through the native call and any borrowed-data copy.
   func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
-    do {
-      return try state.withLive(use)
-    } catch let failure as NativeStatusFailure {
-      if failure.rawStatus == 0 {
-        throw MaplibreError(
-          kind: .invalidState,
-          rawStatus: nil,
-          diagnostic: failure.diagnostic
-        )
-      }
-      throw failure
+    let access = try borrow()
+    defer { access.end() }
+    return try use(access.handle)
+  }
+
+  func borrow() throws -> NativeHandleRead<Handle> {
+    do { return try state.borrow() }
+    catch let failure as NativeStatusFailure {
+      throw MaplibreError(
+        kind: .invalidState,
+        rawStatus: nil,
+        diagnostic: failure.diagnostic
+      )
     }
   }
 
@@ -47,7 +61,7 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
     }
   }
 
-  func closeOnce(_ destroy: (Handle) throws -> Void) throws {
+  func closeOnce(_ destroy: @escaping (Handle) throws -> Void) throws {
     do {
       try state.closeOnce(destroy)
     } catch let failure as NativeStatusFailure {
@@ -60,5 +74,13 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
       }
       throw MaplibreError.fromNativeFailure(failure)
     }
+  }
+
+  func beginClaim() throws -> NativeClaim {
+    try state.beginClaim()
+  }
+
+  func finishDecision(accepted: Bool) -> Bool {
+    state.finishDecision(accepted: accepted)
   }
 }

@@ -22,8 +22,10 @@
 #include "resources/custom_resource_provider.hpp"
 
 #include "diagnostics/diagnostics.hpp"
+#include "execution/process_exit.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
+#include "testing/sync_point.hpp"
 
 namespace mln::core {
 
@@ -36,16 +38,30 @@ struct ResourceRequestObject {
   bool cancelled = false;
   bool completed = false;
   bool retired = false;
+  // The provider callback is running, has claimed the request, or saw its
+  // handle released before it answered.
+  bool deciding = false;
+  bool claimed = false;
+  bool released_while_deciding = false;
   mln_resource_request_cancel_callback cancel_callback = nullptr;
+  mln_runtime_callback_release cancel_release = nullptr;
   void* cancel_user_data = nullptr;
   bool cancel_callback_registered = false;
   bool cancel_callback_running = false;
+  // A release took a registration whose callback never ran and is invoking
+  // its release_user_data. The request is not retired to a waiter, and no
+  // other release removes the table entry, until it returns.
+  bool releasing_cancel_user_data = false;
+  std::thread::id releasing_cancel_user_data_thread;
   // Set when the callback released its own request: the callback wrapper
   // removes the table entry once the callback returns.
   bool remove_after_cancel_callback = false;
   std::thread::id cancel_callback_thread;
   mln_resource_request_handle handle = MLN_HANDLE_NULL;
   mln::ActorRef<mln::FileSourceRequest> actor;
+  // The cached bytes MapLibre withheld from the requester until this request
+  // revalidates them. Set before the provider sees the handle, then only read.
+  std::shared_ptr<const std::string> prior_data;
 };
 
 // Host code may complete a request from any thread, and mbgl's cancel path runs
@@ -211,10 +227,31 @@ auto response_from_abi(const mln_resource_response& provider_response)
   return response;
 }
 
+// Answers a claimed request the host released without a response, so MapLibre
+// does not wait on it forever. The caller holds object.mutex.
+void fail_unanswered_locked(ResourceRequestObject& object) noexcept {
+  if (object.completed || object.cancelled) {
+    return;
+  }
+  object.completed = true;
+  try {
+    object.actor.invoke(
+      &mln::FileSourceRequest::setResponse,
+      error_response(
+        "resource request was released without a response",
+        mln::Response::Error::Reason::Other
+      )
+    );
+  } catch (...) {
+    // The request already went away, so nothing is waiting on it.
+  }
+}
+
 // Runs the registered cancel callback, if any, for a request that has not been
 // completed. Callers hold no lock; the callback may call back into this handle.
 void run_cancel_callback(ResourceRequestObject& object) noexcept {
   mln_resource_request_cancel_callback callback = nullptr;
+  mln_runtime_callback_release release = nullptr;
   void* user_data = nullptr;
   {
     const std::scoped_lock lock(object.mutex);
@@ -222,14 +259,25 @@ void run_cancel_callback(ResourceRequestObject& object) noexcept {
       return;
     }
     callback = std::exchange(object.cancel_callback, nullptr);
+    release = std::exchange(object.cancel_release, nullptr);
     user_data = std::exchange(object.cancel_user_data, nullptr);
     object.cancel_callback_running = true;
     object.cancel_callback_thread = std::this_thread::get_id();
   }
-  try {
-    callback(user_data);
-  } catch (...) {
-    // Host callbacks must not unwind through MapLibre's cancel path.
+  if (!process_exiting()) {
+    try {
+      callback(user_data);
+    } catch (...) {
+      // Host callbacks must not unwind through MapLibre's cancel path.
+    }
+  }
+  // The callback runs at most once, so its context retires as it returns.
+  if (release != nullptr && !process_exiting()) {
+    try {
+      release(user_data);
+    } catch (...) {
+      // Host callbacks must not unwind through MapLibre's cancel path.
+    }
   }
   auto remove_from_table = false;
   {
@@ -244,22 +292,32 @@ void run_cancel_callback(ResourceRequestObject& object) noexcept {
   }
 }
 
-// Retires the id so no later call can reach this request. Idempotent.
+// Retires the id so no later call can reach this request. Idempotent, and
+// safe to run on several threads at once.
 //
-// The table entry stays until a running cancel callback returns, so a release
-// on any other thread finds the object and waits, whether or not an earlier
-// release already retired it. Release from inside the callback returns without
-// waiting and leaves the removal to the callback wrapper.
+// The table entry stays until a running cancel callback returns, and until
+// the release_user_data of a registration whose callback never ran returns. A
+// release on any other thread finds the object and waits, whether or not an
+// earlier release already retired it. A release from inside either callback
+// returns without waiting and leaves the removal to the call running it.
 void retire_request(mln_resource_request_handle handle) noexcept {
   auto object = handle_table<ResourceRequestObject>().try_lease(handle);
   if (object == nullptr) {
     return;
   }
+  // A registration whose callback never ran retires with the request.
+  mln_runtime_callback_release release = nullptr;
+  void* user_data = nullptr;
   {
     auto lock = std::unique_lock{object->mutex};
     object->retired = true;
     object->cancel_callback = nullptr;
-    object->cancel_user_data = nullptr;
+    release = std::exchange(object->cancel_release, nullptr);
+    user_data = std::exchange(object->cancel_user_data, nullptr);
+    if (release != nullptr) {
+      object->releasing_cancel_user_data = true;
+      object->releasing_cancel_user_data_thread = std::this_thread::get_id();
+    }
     if (object->cancel_callback_running) {
       if (object->cancel_callback_thread == std::this_thread::get_id()) {
         object->remove_after_cancel_callback = true;
@@ -267,12 +325,38 @@ void retire_request(mln_resource_request_handle handle) noexcept {
         object->state_changed.notify_all();
         return;
       }
+      mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelWait);
       object->state_changed.wait(lock, [&object] {
         return !object->cancel_callback_running;
+      });
+    } else if (release == nullptr && object->releasing_cancel_user_data) {
+      // Another release took the registration and is releasing its user
+      // data. Removing the entry now would retire the request to a waiter
+      // before that release returns.
+      if (
+        object->releasing_cancel_user_data_thread == std::this_thread::get_id()
+      ) {
+        return;
+      }
+      mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelWait);
+      object->state_changed.wait(lock, [&object] {
+        return !object->releasing_cancel_user_data;
       });
     }
   }
   object->state_changed.notify_all();
+  if (release != nullptr) {
+    try {
+      if (!process_exiting()) release(user_data);
+    } catch (...) {
+      // Host callbacks must not unwind through the release path.
+    }
+    {
+      const std::scoped_lock lock(object->mutex);
+      object->releasing_cancel_user_data = false;
+    }
+    object->state_changed.notify_all();
+  }
   handle_table<ResourceRequestObject>().remove(handle);
 }
 
@@ -333,6 +417,35 @@ struct CustomProviderInvocation {
   void* user_data = nullptr;
 };
 
+// Answers a request that the provider did not answer with an error, and
+// retires it.
+auto fail_request(
+  mln_resource_request_handle handle, const char* message
+) noexcept -> void {
+  const auto response = mln_resource_response{
+    .size = sizeof(mln_resource_response),
+    .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
+    .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
+    .bytes = nullptr,
+    .byte_count = 0,
+    .error_message = message,
+    .must_revalidate = false,
+    .has_modified = false,
+    .modified_unix_ms = 0,
+    .has_expires = false,
+    .expires_unix_ms = 0,
+    .etag = nullptr,
+    .has_retry_after = false,
+    .retry_after_unix_ms = 0,
+  };
+  try {
+    static_cast<void>(complete_resource_request(handle, &response));
+  } catch (...) {
+    // The request retires whether or not the response landed.
+  }
+  retire_request(handle);
+}
+
 auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
   -> bool {
   try {
@@ -347,64 +460,42 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
       retire_request(invocation.handle);
       return true;
     }
+    if (process_exiting()) {
+      fail_request(invocation.handle, "the process is exiting");
+      return true;
+    }
     const auto request =
       make_request_view(invocation.resource, invocation.resolved_url);
+    {
+      const std::scoped_lock lock(invocation.object->mutex);
+      invocation.object->deciding = true;
+    }
     const auto decision =
       invocation.callback(invocation.user_data, &request, invocation.handle);
+    {
+      const std::scoped_lock lock(invocation.object->mutex);
+      invocation.object->deciding = false;
+      if (decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
+        invocation.object->claimed = true;
+        if (invocation.object->released_while_deciding) {
+          fail_unanswered_locked(*invocation.object);
+        }
+      }
+    }
     if (decision == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH) {
       retire_request(invocation.handle);
       return false;
     }
     if (decision != MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
-      auto response = mln_resource_response{
-        .size = sizeof(mln_resource_response),
-        .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-        .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
-        .bytes = nullptr,
-        .byte_count = 0,
-        .error_message = "resource provider returned an unknown decision",
-        .must_revalidate = false,
-        .has_modified = false,
-        .modified_unix_ms = 0,
-        .has_expires = false,
-        .expires_unix_ms = 0,
-        .etag = nullptr,
-        .has_retry_after = false,
-        .retry_after_unix_ms = 0,
-      };
-      static_cast<void>(
-        complete_resource_request(invocation.handle, &response)
+      fail_request(
+        invocation.handle, "resource provider returned an unknown decision"
       );
-      retire_request(invocation.handle);
       return true;
     }
     // A handled request stays reachable by id until the host releases it.
     return true;
   } catch (...) {
-    auto response = mln_resource_response{
-      .size = sizeof(mln_resource_response),
-      .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-      .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
-      .bytes = nullptr,
-      .byte_count = 0,
-      .error_message = "resource provider threw an exception",
-      .must_revalidate = false,
-      .has_modified = false,
-      .modified_unix_ms = 0,
-      .has_expires = false,
-      .expires_unix_ms = 0,
-      .etag = nullptr,
-      .has_retry_after = false,
-      .retry_after_unix_ms = 0,
-    };
-    try {
-      static_cast<void>(
-        complete_resource_request(invocation.handle, &response)
-      );
-    } catch (...) {
-      static_cast<void>(response);
-    }
-    retire_request(invocation.handle);
+    fail_request(invocation.handle, "resource provider threw an exception");
     return true;
   }
 }
@@ -419,6 +510,7 @@ auto request_custom_resource(
   auto request =
     std::make_unique<mln::FileSourceRequest>(std::move(file_source_callback));
   auto object = std::make_shared<ResourceRequestObject>(request->actor());
+  object->prior_data = resource.priorData;
   const auto handle = handle_table<ResourceRequestObject>().insert(object);
   object->handle = handle;
   // mbgl runs this on every request destruction, including after a response
@@ -429,6 +521,7 @@ auto request_custom_resource(
       object->cancelled = true;
     }
     run_cancel_callback(*object);
+    mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelled);
   });
   try {
     const auto handled = invoke_custom_provider(
@@ -477,6 +570,13 @@ auto complete_resource_request(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto native_response = response_from_abi(*response);
+  // A requester whose cached copy had to be revalidated has not seen that copy
+  // yet, so NOT_MODIFIED delivers it, as MapLibre's online source does for a
+  // 304.
+  if (native_response.notModified && live->prior_data != nullptr) {
+    native_response.data = live->prior_data;
+    native_response.notModified = false;
+  }
   {
     const std::scoped_lock lock(live->mutex);
     if (live->retired) {
@@ -527,7 +627,7 @@ auto resource_request_cancelled(
 auto set_resource_request_cancel_callback(
   mln_resource_request_handle handle,
   mln_resource_request_cancel_callback callback, void* user_data,
-  bool* out_cancelled
+  mln_runtime_callback_release release_user_data, bool* out_cancelled
 ) -> mln_status {
   if (callback == nullptr) {
     set_thread_error("callback must not be null");
@@ -554,6 +654,7 @@ auto set_resource_request_cancel_callback(
   *out_cancelled = live->cancelled && !live->completed;
   if (!*out_cancelled) {
     live->cancel_callback = callback;
+    live->cancel_release = release_user_data;
     live->cancel_user_data = user_data;
   }
   return MLN_STATUS_OK;
@@ -572,15 +673,36 @@ auto wait_for_resource_request_retired(mln_resource_request_handle handle)
     return MLN_STATUS_OK;
   }
   // A callback that released its own request leaves the entry in place until
-  // it returns, so a drained request is one whose callback has also returned.
+  // it returns, so a drained request is one whose callback has also returned,
+  // and whose registration's user data has been released.
   auto lock = std::unique_lock{live->mutex};
-  live->state_changed.wait(lock, [&live] {
-    return live->retired && !live->cancel_callback_running;
-  });
+  const auto drained = [&live] {
+    return live->retired && !live->cancel_callback_running &&
+           !live->releasing_cancel_user_data;
+  };
+  if (
+    !drained() &&
+    (live->cancel_callback_running || live->releasing_cancel_user_data)
+  ) {
+    mln::testing::hit(mln::testing::SyncPoint::ResourceRequestCancelWait);
+  }
+  live->state_changed.wait(lock, drained);
   return MLN_STATUS_OK;
 }
 
 void release_resource_request(mln_resource_request_handle handle) noexcept {
+  if (
+    const auto object = handle_table<ResourceRequestObject>().try_lease(handle)
+  ) {
+    const std::scoped_lock lock(object->mutex);
+    if (!object->retired) {
+      if (object->claimed) {
+        fail_unanswered_locked(*object);
+      } else if (object->deciding) {
+        object->released_while_deciding = true;
+      }
+    }
+  }
   retire_request(handle);
 }
 

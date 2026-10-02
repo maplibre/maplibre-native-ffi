@@ -12,9 +12,10 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
     private nint commandQueue;
     private nint pipeline;
 
-    public MetalTextureCompositor(MetalContext context)
+    public MetalTextureCompositor(MetalContext context, Viewport viewport)
     {
         this.context = context;
+        context.SetDrawableSize(viewport);
         commandQueue = context.CreateCommandQueue();
         try
         {
@@ -28,12 +29,9 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
         }
     }
 
-    public void Resize(Viewport viewport)
-    {
-        _ = viewport;
-    }
+    public void Resize(Viewport viewport) => context.SetDrawableSize(viewport);
 
-    public bool Draw(MetalOwnedTextureFrame frame)
+    public bool Draw(MetalOwnedTextureFrameView frame)
     {
         if (frame.Width == 0 || frame.Height == 0 || frame.Texture.IsNull)
         {

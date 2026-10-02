@@ -372,12 +372,6 @@ static app_error opengl_compositor_init(
   return error;
 }
 
-static app_error opengl_compositor_finish_frame(opengl_compositor* compositor) {
-  MAP_TRY(opengl_context_make_current(&compositor->context));
-  compositor->procs.Finish();
-  return APP_OK;
-}
-
 static app_error opengl_compositor_draw_texture_quad(
   opengl_compositor* compositor, GLuint texture, viewport current_viewport
 ) {
@@ -406,6 +400,8 @@ static app_error opengl_compositor_draw_texture_quad(
   return check_gl_error(procs, "draw OpenGL texture");
 }
 
+/// Samples texture into the window and presents it. The sampling finishes
+/// before this returns, so the caller may hand the texture back to the session.
 static app_error opengl_compositor_draw_texture(
   opengl_compositor* compositor, GLuint texture, viewport current_viewport
 ) {
@@ -413,7 +409,9 @@ static app_error opengl_compositor_draw_texture(
   MAP_TRY(
     opengl_compositor_draw_texture_quad(compositor, texture, current_viewport)
   );
-  return opengl_context_swap_window(&compositor->context);
+  MAP_TRY(opengl_context_swap_window(&compositor->context));
+  compositor->procs.Finish();
+  return APP_OK;
 }
 
 static app_error borrowed_texture_create(
@@ -461,14 +459,17 @@ struct render_target {
   union {
     struct {
       opengl_compositor compositor;
+      /// The newest frame, held until a newer one replaces it.
+      mln_acquired_frame held;
     } owned;
     struct {
       opengl_compositor compositor;
+      /// The texture the compositor samples.
       GLuint texture;
+      texture_replacements replacements;
     } borrowed;
     struct {
       opengl_context context;
-      gl_procs procs;
     } surface;
   } as;
 };
@@ -503,6 +504,10 @@ void* render_target_frame_scope_open(void) { return nullptr; }
 
 void render_target_frame_scope_close(void* scope) { (void)scope; }
 
+render_session* render_target_session(render_target* target) {
+  return &target->session;
+}
+
 app_error render_target_init(
   render_target** out_target, SDL_Window* window, viewport current_viewport,
   render_target_mode mode
@@ -533,12 +538,6 @@ app_error render_target_init(
       break;
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
       error = opengl_context_init(&target->as.surface.context, window);
-      if (error == APP_OK) {
-        error = load_gl_procs(&target->as.surface.procs);
-        if (error != APP_OK) {
-          opengl_context_deinit(&target->as.surface.context);
-        }
-      }
       break;
   }
   if (error != APP_OK) {
@@ -550,7 +549,7 @@ app_error render_target_init(
 }
 
 static mln_opengl_borrowed_texture_descriptor borrowed_texture_descriptor(
-  render_target* target, viewport current_viewport
+  render_target* target, GLuint texture, viewport current_viewport
 ) {
   mln_opengl_borrowed_texture_descriptor descriptor =
     mln_opengl_borrowed_texture_descriptor_default();
@@ -559,7 +558,7 @@ static mln_opengl_borrowed_texture_descriptor borrowed_texture_descriptor(
   descriptor.physical_height = current_viewport.physical_height;
   descriptor.context =
     opengl_context_descriptor(&target->as.borrowed.compositor.context);
-  descriptor.texture = target->as.borrowed.texture;
+  descriptor.texture = texture;
   descriptor.target = gl_texture_target;
   return descriptor;
 }
@@ -578,7 +577,18 @@ static mln_opengl_surface_descriptor surface_descriptor(
 app_error render_target_attach(
   render_target* target, mln_map map, viewport current_viewport
 ) {
+  awaited_completion attached;
+  mln_completion completion;
+  MAP_TRY(awaited_completion_init(&attached, &completion));
+  // An OpenGL target on the host's EGL context renders where that context is
+  // current, so the render loop services a caller driver.
+  const mln_render_session_attach_options options =
+    render_session_attach_options(
+      target->mode, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+    );
   mln_render_session session = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  mln_status status = MLN_STATUS_INVALID_STATE;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE: {
       mln_opengl_owned_texture_descriptor descriptor =
@@ -586,62 +596,66 @@ app_error render_target_attach(
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         opengl_context_descriptor(&target->as.owned.compositor.context);
-      const mln_status status =
-        mln_opengl_owned_texture_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("OpenGL texture attach failed", status);
-        return APP_ERROR_TEXTURE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
-      return APP_OK;
+      status = mln_opengl_owned_texture_attach(
+        map, &descriptor, &options, &session, &completion, &diagnostic
+      );
+      break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
       const mln_opengl_borrowed_texture_descriptor descriptor =
-        borrowed_texture_descriptor(target, current_viewport);
-      const mln_status status =
-        mln_opengl_borrowed_texture_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("OpenGL borrowed texture attach failed", status);
-        return APP_ERROR_TEXTURE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
-      return APP_OK;
+        borrowed_texture_descriptor(
+          target, target->as.borrowed.texture, current_viewport
+        );
+      status = mln_opengl_borrowed_texture_attach(
+        map, &descriptor, &options, &session, &completion, &diagnostic
+      );
+      break;
     }
     case RENDER_TARGET_MODE_NATIVE_SURFACE: {
       const mln_opengl_surface_descriptor descriptor =
         surface_descriptor(target, current_viewport);
-      const mln_status status =
-        mln_opengl_surface_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("OpenGL surface attach failed", status);
-        return APP_ERROR_SURFACE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_SURFACE, .handle = session};
-      return APP_OK;
+      status = mln_opengl_surface_attach(
+        map, &descriptor, &options, &session, &completion, &diagnostic
+      );
+      break;
     }
   }
-  return APP_ERROR_BACKEND_SETUP_FAILED;
+  return render_session_finish_attach(
+    &target->session, session, map, &options, target->mode, &attached, status,
+    &diagnostic
+  );
 }
 
 void render_target_deinit(render_target* target) {
   if (target == nullptr) {
     return;
   }
+  if (target->mode == RENDER_TARGET_MODE_OWNED_TEXTURE) {
+    render_session_release_frame(&target->as.owned.held);
+  }
   render_session_close(&target->session);
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
       opengl_compositor_deinit(&target->as.owned.compositor);
       break;
-    case RENDER_TARGET_MODE_BORROWED_TEXTURE:
+    case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
+      opengl_compositor* compositor = &target->as.borrowed.compositor;
+      void* replacement = nullptr;
+      do {
+        GLuint texture = (GLuint)(uintptr_t)replacement;
+        borrowed_texture_destroy(
+          &compositor->context, &compositor->procs, &texture
+        );
+        texture_replacements_take_any(
+          &target->as.borrowed.replacements, &replacement
+        );
+      } while (replacement != nullptr);
       borrowed_texture_destroy(
-        &target->as.borrowed.compositor.context,
-        &target->as.borrowed.compositor.procs, &target->as.borrowed.texture
+        &compositor->context, &compositor->procs, &target->as.borrowed.texture
       );
-      opengl_compositor_deinit(&target->as.borrowed.compositor);
+      opengl_compositor_deinit(compositor);
       break;
+    }
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
       opengl_context_deinit(&target->as.surface.context);
       break;
@@ -654,38 +668,36 @@ void render_target_deinit(render_target* target) {
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
 ) {
-  if (target->session.kind != RENDER_SESSION_TEXTURE) {
-    return APP_ERROR_TEXTURE_RESIZE_FAILED;
-  }
-  GLuint previous = target->as.borrowed.texture;
+  opengl_compositor* compositor = &target->as.borrowed.compositor;
   GLuint replacement = 0;
   MAP_TRY(borrowed_texture_create(
-    &target->as.borrowed.compositor.context,
-    &target->as.borrowed.compositor.procs, current_viewport, &replacement
+    &compositor->context, &compositor->procs, current_viewport, &replacement
   ));
-  target->as.borrowed.texture = replacement;
-  const mln_opengl_borrowed_texture_descriptor descriptor =
-    borrowed_texture_descriptor(target, current_viewport);
-  const mln_status status =
-    mln_opengl_borrowed_texture_set_target(target->session.handle, &descriptor);
-  if (status != MLN_STATUS_OK) {
-    // The session may have taken the replacement before failing, so detach
-    // before either texture is released.
-    mln_render_session_detach(target->session.handle);
-    diagnostics_log_status("OpenGL borrowed texture set target failed", status);
-    target->as.borrowed.texture = previous;
-    borrowed_texture_destroy(
-      &target->as.borrowed.compositor.context,
-      &target->as.borrowed.compositor.procs, &replacement
+  mln_completion completion;
+  texture_replacement* entry =
+    texture_replacement_begin((void*)(uintptr_t)replacement, &completion);
+  mln_status status = MLN_STATUS_INVALID_STATE;
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  if (entry != nullptr) {
+    const mln_opengl_borrowed_texture_descriptor descriptor =
+      borrowed_texture_descriptor(target, replacement, current_viewport);
+    status = mln_opengl_borrowed_texture_set_target(
+      target->session.handle, &descriptor, &completion, &diagnostic
     );
-    return APP_ERROR_TEXTURE_RESIZE_FAILED;
+    texture_replacements_queue(
+      &target->as.borrowed.replacements, entry, status
+    );
   }
-  // Released only once the session has taken the replacement.
-  borrowed_texture_destroy(
-    &target->as.borrowed.compositor.context,
-    &target->as.borrowed.compositor.procs, &previous
-  );
-  return APP_OK;
+  if (status != MLN_STATUS_OK) {
+    borrowed_texture_destroy(
+      &compositor->context, &compositor->procs, &replacement
+    );
+    diagnostics_log_status(
+      "OpenGL borrowed texture set target failed", status, &diagnostic
+    );
+    return APP_ERROR_RESIZE_FAILED;
+  }
+  return render_session_resize_map(&target->session, current_viewport);
 }
 
 /// Follows a resized window in native-surface mode. When SDL hands back a
@@ -699,31 +711,26 @@ static app_error resize_surface(
     &target->as.surface.context, &replaced
   );
   if (error != APP_OK) {
-    // SDL may already have dropped the surface the session presents through,
-    // so detach rather than leave it naming a surface that is gone.
-    if (target->session.kind == RENDER_SESSION_SURFACE) {
-      mln_render_session_detach(target->session.handle);
-    }
-    return APP_ERROR_SURFACE_ATTACH_FAILED;
+    return APP_ERROR_RESIZE_FAILED;
   }
   if (!replaced) {
     return render_session_resize(&target->session, current_viewport);
   }
-  if (target->session.kind != RENDER_SESSION_SURFACE) {
-    return APP_ERROR_SURFACE_ATTACH_FAILED;
-  }
   const mln_opengl_surface_descriptor descriptor =
     surface_descriptor(target, current_viewport);
-  const mln_status status =
-    mln_opengl_surface_set_target(target->session.handle, &descriptor);
+  const mln_completion completion =
+    diagnostics_completion("OpenGL surface set target failed");
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status = mln_opengl_surface_set_target(
+    target->session.handle, &descriptor, &completion, &diagnostic
+  );
   if (status != MLN_STATUS_OK) {
-    // SDL already dropped the outgoing surface and the session may have taken
-    // the replacement before failing, so detach.
-    mln_render_session_detach(target->session.handle);
-    diagnostics_log_status("OpenGL surface set target failed", status);
-    return APP_ERROR_SURFACE_ATTACH_FAILED;
+    diagnostics_log_status(
+      "OpenGL surface set target failed", status, &diagnostic
+    );
+    return APP_ERROR_RESIZE_FAILED;
   }
-  return APP_OK;
+  return render_session_resize_map(&target->session, current_viewport);
 }
 
 app_error render_target_resize(
@@ -731,9 +738,8 @@ app_error render_target_resize(
 ) {
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      MAP_TRY(
-        opengl_context_make_current(&target->as.owned.compositor.context)
-      );
+      // A session resizes only while the host holds none of its frames.
+      render_session_release_frame(&target->as.owned.held);
       return render_session_resize(&target->session, current_viewport);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
       return resize_borrowed(target, current_viewport);
@@ -743,81 +749,62 @@ app_error render_target_resize(
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }
 
-app_error render_target_finish_frame(render_target* target) {
-  switch (target->mode) {
-    case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      return opengl_compositor_finish_frame(&target->as.owned.compositor);
-    case RENDER_TARGET_MODE_BORROWED_TEXTURE:
-      return opengl_compositor_finish_frame(&target->as.borrowed.compositor);
-    case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      MAP_TRY(opengl_context_make_current(&target->as.surface.context));
-      target->as.surface.procs.Finish();
-      return APP_OK;
+/// Switches the compositor to each replacement a rendered frame has drawn
+/// into, destroying the texture it retires.
+app_error render_target_show_replacements(render_target* target) {
+  opengl_compositor* compositor = &target->as.borrowed.compositor;
+  while (true) {
+    void* replacement = nullptr;
+    MAP_TRY(texture_replacements_take_shown(
+      &target->as.borrowed.replacements, &target->session, &replacement
+    ));
+    if (replacement == nullptr) return APP_OK;
+    borrowed_texture_destroy(
+      &compositor->context, &compositor->procs, &target->as.borrowed.texture
+    );
+    target->as.borrowed.texture = (GLuint)(uintptr_t)replacement;
   }
-  return APP_ERROR_BACKEND_SETUP_FAILED;
 }
 
-static app_error render_update_owned(
-  render_target* target, viewport current_viewport, bool* out_completed
+static app_error present_owned(
+  render_target* target, viewport current_viewport
 ) {
-  mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-  MAP_TRY(render_session_render_update(&target->session, &result));
-  if (result != MLN_RENDER_RESULT_RENDERED) {
-    *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
-    return APP_OK;
-  }
-
+  mln_acquired_frame* held = &target->as.owned.held;
+  bool acquired = false;
+  MAP_TRY(render_session_acquire_newest(&target->session, held, &acquired));
+  // Without a new frame, the window keeps the one it already shows.
+  if (!acquired) return APP_OK;
+  MAP_TRY(render_session_require_cpu_complete_producer(
+    *held, "OpenGL texture acquire failed"
+  ));
   mln_opengl_owned_texture_frame frame = {.size = sizeof(frame)};
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
-    mln_opengl_owned_texture_acquire_frame(target->session.handle, &frame);
-  if (status == MLN_STATUS_INVALID_STATE) {
-    return APP_OK;
-  }
+    mln_acquired_frame_get_opengl_texture(*held, &frame, &diagnostic);
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("OpenGL texture acquire failed", status);
+    diagnostics_log_status("OpenGL texture access failed", status, &diagnostic);
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
-
-  const app_error error = opengl_compositor_draw_texture(
+  return opengl_compositor_draw_texture(
     &target->as.owned.compositor, frame.texture, current_viewport
   );
-  const mln_status release_status =
-    mln_opengl_owned_texture_release_frame(target->session.handle, &frame);
-  if (release_status != MLN_STATUS_OK) {
-    diagnostics_log_status("OpenGL texture release failed", release_status);
-  }
-  MAP_TRY(error);
-  *out_completed = true;
-  return APP_OK;
 }
 
-app_error render_target_render_update(
-  render_target* target, viewport current_viewport, bool* out_completed
+app_error render_target_present(
+  render_target* target, viewport current_viewport, bool* out_presented
 ) {
-  *out_completed = false;
+  *out_presented = true;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      return render_update_owned(target, current_viewport, out_completed);
-    case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
-      mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-      MAP_TRY(render_session_render_update(&target->session, &result));
-      if (result != MLN_RENDER_RESULT_RENDERED) {
-        *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
-        return APP_OK;
-      }
-      MAP_TRY(opengl_compositor_draw_texture(
+      return present_owned(target, current_viewport);
+    case RENDER_TARGET_MODE_BORROWED_TEXTURE:
+      MAP_TRY(render_target_show_replacements(target));
+      return opengl_compositor_draw_texture(
         &target->as.borrowed.compositor, target->as.borrowed.texture,
         current_viewport
-      ));
-      *out_completed = true;
+      );
+    case RENDER_TARGET_MODE_NATIVE_SURFACE:
       return APP_OK;
-    }
-    case RENDER_TARGET_MODE_NATIVE_SURFACE: {
-      mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-      MAP_TRY(render_session_render_update(&target->session, &result));
-      *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
-      return APP_OK;
-    }
   }
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }

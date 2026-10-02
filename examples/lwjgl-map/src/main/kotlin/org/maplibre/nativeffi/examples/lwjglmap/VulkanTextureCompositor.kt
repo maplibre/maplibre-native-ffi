@@ -88,7 +88,8 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
           imageIndex,
         )
       if (acquire == VK_ERROR_OUT_OF_DATE_KHR) {
-        // The surface outgrew this swapchain, so nothing reaches the screen until it is replaced.
+        // The surface outgrew this swapchain, so nothing reaches the screen until it is
+        // replaced.
         swapchainStale = true
         return@use false
       }
@@ -115,7 +116,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
    * MoltenVK presents succeed but reach no drawable the window shows.
    */
   private fun recreateSwapchain() {
-    context.waitIdle()
+    context.waitHostQueueIdle()
     val retiredSwapchain = swapchain
     val retiredImageViews = imageViews
     val retiredFramebuffers = framebuffers
@@ -715,7 +716,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
   }
 
   override fun close() {
-    context.waitIdle()
+    context.waitHostQueueIdle()
     if (inFlight != NULL) {
       vkDestroyFence(context.device(), inFlight, null)
       inFlight = NULL

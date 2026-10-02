@@ -1,6 +1,6 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
 # $1. Maps musl, Android, and OpenHarmony presets to their Cargo target. Exports
-# the cross-compilation environment (bindgen, CC/CXX, linker) from the Zig and
+# the cross-compilation environment (CC/CXX, linker) from the Zig and
 # Rust toolchains, Android NDK, or OpenHarmony SDK. Leaves `cargo_target` empty
 # for host presets, where Cargo picks its own target and toolchain.
 # shellcheck shell=bash
@@ -68,13 +68,14 @@ case "$1" in
     export "$rustflags_variable=${rustflags# }"
     ;;
   android-*)
-    ndk_prebuilt="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64"
+    if ! ndk_prebuilt="$("$(dirname "${BASH_SOURCE[0]}")/android-ndk-prebuilt.sh")"; then
+      return 2
+    fi
     compiler_target="$cargo_target"
     if [[ "$cargo_target" == armv7-linux-androideabi ]]; then
       compiler_target=armv7a-linux-androideabi
     fi
     target_env="${cargo_target//-/_}"
-    export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=--target=$cargo_target --sysroot=$ndk_prebuilt/sysroot"
     export "CC_$target_env=$ndk_prebuilt/bin/${compiler_target}24-clang"
     export "CXX_$target_env=$ndk_prebuilt/bin/${compiler_target}24-clang++"
     # tr rather than ${var^^}: macOS tasks can run under Bash 3.2.
@@ -87,7 +88,6 @@ case "$1" in
     sysroot="$OHOS_SDK_NATIVE/sysroot"
     target_flags="--target=$compiler_target --sysroot=$sysroot"
     target_env="${cargo_target//-/_}"
-    export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=$target_flags -I$sysroot/usr/include/$compiler_target"
     export "CC_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
     export "CXX_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
     target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"

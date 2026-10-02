@@ -4,11 +4,13 @@ import java.util.LinkedHashSet
 import java.util.Locale
 import org.lwjgl.PointerBuffer
 import org.lwjgl.glfw.GLFW.GLFW_CLIENT_API
+import org.lwjgl.glfw.GLFW.GLFW_FALSE
 import org.lwjgl.glfw.GLFW.GLFW_NO_API
 import org.lwjgl.glfw.GLFW.GLFW_PLATFORM
 import org.lwjgl.glfw.GLFW.GLFW_PLATFORM_WAYLAND
 import org.lwjgl.glfw.GLFW.GLFW_RESIZABLE
 import org.lwjgl.glfw.GLFW.GLFW_TRUE
+import org.lwjgl.glfw.GLFW.GLFW_VISIBLE
 import org.lwjgl.glfw.GLFW.glfwCreateWindow
 import org.lwjgl.glfw.GLFW.glfwDefaultWindowHints
 import org.lwjgl.glfw.GLFW.glfwDestroyWindow
@@ -48,6 +50,7 @@ import org.lwjgl.vulkan.VK10.vkEnumerateInstanceExtensionProperties
 import org.lwjgl.vulkan.VK10.vkEnumeratePhysicalDevices
 import org.lwjgl.vulkan.VK10.vkGetDeviceQueue
 import org.lwjgl.vulkan.VK10.vkGetPhysicalDeviceQueueFamilyProperties
+import org.lwjgl.vulkan.VK10.vkQueueWaitIdle
 import org.lwjgl.vulkan.VkApplicationInfo
 import org.lwjgl.vulkan.VkDevice
 import org.lwjgl.vulkan.VkDeviceCreateInfo
@@ -58,7 +61,7 @@ import org.lwjgl.vulkan.VkInstanceCreateInfo
 import org.lwjgl.vulkan.VkPhysicalDevice
 import org.lwjgl.vulkan.VkQueue
 import org.lwjgl.vulkan.VkQueueFamilyProperties
-import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 internal class VulkanContext private constructor(private val window: Long) : GraphicsContext {
   private var instance: VkInstance? = null
@@ -66,11 +69,13 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   private var physicalDevice: VkPhysicalDevice? = null
   private var device: VkDevice? = null
   private var graphicsQueue: VkQueue? = null
+  private var sessionQueue: VkQueue? = null
   private var graphicsQueueFamilyIndex = 0
+  private var graphicsQueueCount = 0
 
   override fun window(): Long = window
 
-  override fun backend(): RenderBackend = RenderBackend.VULKAN
+  override fun backend(): RenderBackendFlag = RenderBackendFlag.VULKAN
 
   fun instanceAddress(): Long = instance().address()
 
@@ -79,6 +84,16 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   fun deviceAddress(): Long = device().address()
 
   fun graphicsQueueAddress(): Long = graphicsQueue().address()
+
+  /**
+   * Whether the device has a second graphics queue for a core-worker session. The worker submits
+   * from its own thread, so in the texture modes, where the compositor also submits, it needs a
+   * queue that the host never touches.
+   */
+  fun hasSessionQueue(): Boolean = sessionQueue != null
+
+  fun sessionQueueAddress(): Long =
+    checkNotNull(sessionQueue) { "Vulkan device has no session queue" }.address()
 
   fun getInstanceProcAddrAddress(): Long {
     ensureVulkanFunctionProvider()
@@ -106,8 +121,12 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   fun graphicsQueue(): VkQueue =
     checkNotNull(graphicsQueue) { "Vulkan graphics queue is not initialized" }
 
-  fun waitIdle() {
-    device?.let { check(vkDeviceWaitIdle(it), "vkDeviceWaitIdle") }
+  /**
+   * Waits for the host's own submissions. A core-worker session may be submitting to its queue
+   * meanwhile, so the host waits on its queue rather than the whole device.
+   */
+  fun waitHostQueueIdle() {
+    graphicsQueue?.let { check(vkQueueWaitIdle(it), "vkQueueWaitIdle") }
   }
 
   private fun createInstance() {
@@ -173,10 +192,21 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
         if (queueFamily >= 0) {
           physicalDevice = candidate
           graphicsQueueFamilyIndex = queueFamily
+          graphicsQueueCount = queueCount(candidate, queueFamily)
           return
         }
       }
       error("No Vulkan device has a graphics queue that can present")
+    }
+  }
+
+  private fun queueCount(candidate: VkPhysicalDevice, family: Int): Int {
+    MemoryStack.stackPush().use { stack ->
+      val count = stack.mallocInt(1)
+      vkGetPhysicalDeviceQueueFamilyProperties(candidate, count, null)
+      val families = VkQueueFamilyProperties.calloc(count[0], stack)
+      vkGetPhysicalDeviceQueueFamilyProperties(candidate, count, families)
+      return families[family].queueCount()
     }
   }
 
@@ -215,7 +245,9 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
       if (VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME in deviceExtensions) {
         extensions.add(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)
       }
-      val priorities = stack.floats(1.0f)
+      val queueCount = minOf(graphicsQueueCount, 2)
+      val priorities = stack.mallocFloat(queueCount)
+      repeat(queueCount) { priorities.put(it, 1.0f) }
       val queueInfo =
         VkDeviceQueueCreateInfo.calloc(1, stack)
           .sType(VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO)
@@ -232,6 +264,10 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
       val queueOut = stack.mallocPointer(1)
       vkGetDeviceQueue(device(), graphicsQueueFamilyIndex, 0, queueOut)
       graphicsQueue = VkQueue(queueOut[0], device())
+      if (queueCount > 1) {
+        vkGetDeviceQueue(device(), graphicsQueueFamilyIndex, 1, queueOut)
+        sessionQueue = VkQueue(queueOut[0], device())
+      }
       println("Enabled Vulkan device extensions: $extensions")
     }
   }
@@ -257,7 +293,7 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   }
 
   internal companion object {
-    fun create(title: String, width: Int, height: Int): VulkanContext {
+    fun create(title: String, width: Int, height: Int, visible: Boolean): VulkanContext {
       selectWaylandOnLinux()
       check(glfwInit()) { "GLFW initialization failed" }
       val window: Long
@@ -267,6 +303,7 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
         glfwDefaultWindowHints()
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API)
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE)
+        glfwWindowHint(GLFW_VISIBLE, if (visible) GLFW_TRUE else GLFW_FALSE)
         window = glfwCreateWindow(width, height, title, NULL, NULL)
         check(window != NULL) { "GLFW window creation failed" }
       } catch (error: RuntimeException) {
@@ -280,9 +317,10 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
         context.pickPhysicalDeviceAndQueue()
         context.createDevice()
         System.out.printf(
-          "GLFW %s, Vulkan queue family %d, platform %d%n",
+          "GLFW %s, Vulkan queue family %d with %d queues, platform %d%n",
           glfwGetVersionString(),
           context.graphicsQueueFamilyIndex,
+          minOf(context.graphicsQueueCount, 2),
           glfwGetPlatform(),
         )
         return context

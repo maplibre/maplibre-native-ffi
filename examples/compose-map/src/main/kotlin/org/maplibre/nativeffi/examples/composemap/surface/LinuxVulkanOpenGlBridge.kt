@@ -166,9 +166,9 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
     )
   }
 
+  // The session reports a rendered frame once its GPU work completes, so the consumer can read it.
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
     renderedGeneration = frame.target.generation
-    rendererDispatcher.run { vulkan?.waitIdle() }
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
@@ -278,6 +278,9 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   // Holds the outgoing consumer texture for drawing while the replacement is still empty.
   private fun retireTexture() {
     if (renderedGeneration != generation || importedTexture == null) {
+      // The session still names this image until its target replacement completes, after this
+      // returns. Destroying it now is safe only because each draw waits for its own demand's
+      // result, which leaves the core worker idle between draws.
       disposeTexture(consumerContextCurrent = true)
       return
     }

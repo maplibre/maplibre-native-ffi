@@ -1,0 +1,228 @@
+import Foundation
+import GraphicsSupport
+@testable import MaplibreNativeFFI
+import Testing
+
+/// A render fixture: an owned-texture session attached on the map of a map
+/// fixture, with a context from tests/graphics for the build's backend.
+private struct OwnedTextureSession {
+  let fixture: MapFixture
+  let graphics: TestGraphics
+  let session: RenderSessionHandle
+  /// The host thread that drives an OpenGL session, which Metal and Vulkan
+  /// sessions do not need.
+  let thread: RenderThread?
+
+  /// Runs `body`, then closes the fixture, also when `body` throws. The
+  /// graphics device outlives the close: a session still attached when the
+  /// device goes away renders on a destroyed device, which crashes the
+  /// process before the failure that skipped the close is reported.
+  func use<Result>(
+    _ body: (OwnedTextureSession) async throws -> Result
+  ) async throws -> Result {
+    let result: Result
+    do {
+      result = try await body(self)
+    } catch {
+      await close()
+      throw error
+    }
+    await close()
+    return result
+  }
+
+  /// Detaches and closes the session, then closes the map fixture. A session
+  /// that cannot detach, such as one already abandoned or never attached, is
+  /// abandoned instead.
+  func close() async {
+    do {
+      try await session.detach()
+    } catch {
+      thread?.stop()
+      _ = try? session.abandon()
+    }
+    thread?.stop()
+    do { try session.close() } catch {
+      Issue.record("closing the render session failed: \(error)")
+    }
+    await fixture.close()
+    withExtendedLifetime(graphics) {}
+  }
+}
+
+/// Attaches an owned-texture session to a map showing `style` and runs `body`
+/// once the attach completes, closing the session afterwards. A Metal or
+/// Vulkan session drives itself on a core worker. An OpenGL session exposes
+/// its frames only through the host's share group, so it joins the fixture's
+/// context and a host render thread drives it.
+private func withOwnedTextureSession<Result>(
+  style: Data = emptyStyle,
+  ringDepth: UInt32 = RenderSessionAttachOptions.default
+    .requestedTextureRingDepth,
+  _ body: (OwnedTextureSession) async throws -> Result
+) async throws -> Result {
+  let fixture = try await MapFixture.make()
+  var thread: RenderThread?
+  let graphics: TestGraphics
+  let attachment: RenderSessionAttachment
+  do {
+    try await fixture.map.setStyleJson(json: style)
+    graphics = try TestGraphics()
+    if graphics.backend == MLN_TEST_GRAPHICS_BACKEND_EGL {
+      let host = RenderThread()
+      thread = host
+      try await host.perform { try graphics.makeCurrentIfNeeded() }
+    }
+    attachment = try graphics.attachOwnedTexture(
+      map: fixture.map,
+      options: RenderSessionAttachOptions(
+        driver: thread == nil ? .coreWorker : .callerGraphicsThread,
+        requestedTextureRingDepth: ringDepth,
+        frameWake: pulsingFrameWake,
+        driverWorkWake: thread?.driverWorkWake ??
+          RenderSessionAttachOptions.default.driverWorkWake
+      )
+    )
+  } catch {
+    thread?.stop()
+    await fixture.close()
+    throw error
+  }
+  let attached = OwnedTextureSession(
+    fixture: fixture,
+    graphics: graphics,
+    session: attachment.session,
+    thread: thread
+  )
+  return try await attached.use { rendered in
+    rendered.thread?.service(rendered.session)
+    try await attachment.completion.value
+    return try await body(rendered)
+  }
+}
+
+/// An owned-texture session renders a frame, and the binding copies its
+/// pixels out of the native readback.
+@Test func anOwnedTextureSessionRendersPixelsTheBindingReadsBack(
+) async throws {
+  try await withOwnedTextureSession(style: redStyle) { rendered in
+    #expect(try await rendered.session.awaitRenderedFrame() != nil)
+
+    let readback = try await rendered.session.textureReadPremultipliedRgba8()
+    #expect(readback.info.width == 32)
+    #expect(readback.info.height == 32)
+    let pixels = [UInt8](readback.data)
+    #expect(pixels.count >= 32 * 32 * 4)
+    #expect(Array(pixels.prefix(4)) == [255, 0, 0, 255])
+    #expect(stride(from: 0, to: 32 * 32 * 4, by: 4).allSatisfy {
+      Array(pixels[$0 ..< $0 + 4]) == [255, 0, 0, 255]
+    })
+  }
+}
+
+/// A frame view is usable only inside its callback, a second view of the
+/// same frame and an abandon of its session are refused while it is open,
+/// and a sibling frame that the host drops inside the view does not disturb
+/// it.
+@Test func aFrameViewExpiresWithItsScopeAndHoldsOffAbandon() async throws {
+  try await withOwnedTextureSession(ringDepth: 2) { rendered in
+    let session = rendered.session
+    try await session.awaitRenderedFrame()
+    let first = try session.acquireFrame()
+    try await session.awaitRenderedFrame()
+    var sibling: AcquiredFrameHandle? = try session.acquireFrame()
+    weak let weakSibling = sibling
+
+    let escaped = try rendered.graphics.withTextureView(of: first) { view in
+      sibling = nil
+      #expect(weakSibling == nil)
+      #expect(try view.width == 32)
+      #expect(try view.height == 32)
+      #expect(throws: MaplibreError.self) {
+        try rendered.graphics.withTextureView(of: first) { _ in }
+      }
+      do {
+        _ = try session.abandon()
+        Issue.record("abandon inside a frame view should be refused")
+      } catch let error as MaplibreError {
+        #expect(error.kind == .busy)
+      }
+      return view
+    }
+    #expect(throws: MaplibreError.self) { try escaped.width }
+
+    try first.release(consumerCompletion: .default)
+  }
+}
+
+/// A frame the host drops without releasing is disposed by its finalizer,
+/// which abandons the session, since no consumer synchronization says the
+/// host finished with the texture.
+@Test func droppingAnUnreleasedFrameAbandonsItsSession() async throws {
+  try await withOwnedTextureSession { rendered in
+    let session = rendered.session
+    try await session.awaitRenderedFrame()
+    do {
+      let frame = try session.acquireFrame()
+      #expect(try session.getSnapshot().acquiredFrameCount == 1)
+      withExtendedLifetime(frame) {}
+    }
+    #expect(try session.getSnapshot().acquiredFrameCount == 0)
+    try await awaitCondition("the dropped frame's session to be abandoned") {
+      try session.getSnapshot().state == .abandoned
+    }
+  }
+}
+
+/// A caller-driven session runs on a thread the host owns: the thread
+/// services driver work whenever the session's driver-work wake fires, which
+/// completes the attach and renders frames.
+@Test func aCallerDrivenSessionIsServicedOnAHostThread() async throws {
+  let fixture = try await MapFixture.make()
+  let thread = RenderThread()
+  let graphics: TestGraphics
+  let attachment: RenderSessionAttachment
+  do {
+    graphics = try TestGraphics()
+    try await thread.perform { try graphics.makeCurrentIfNeeded() }
+    attachment = try graphics.attachOwnedTexture(
+      map: fixture.map,
+      options: RenderSessionAttachOptions(
+        driver: .callerGraphicsThread,
+        frameWake: pulsingFrameWake,
+        driverWorkWake: thread.driverWorkWake
+      )
+    )
+  } catch {
+    thread.stop()
+    await fixture.close()
+    throw error
+  }
+  let attached = OwnedTextureSession(
+    fixture: fixture,
+    graphics: graphics,
+    session: attachment.session,
+    thread: thread
+  )
+  try await attached.use { rendered in
+    let session = rendered.session
+    #expect(try session.getSnapshot().state == .attaching)
+    thread.service(session)
+    try await attachment.completion.value
+    #expect(try session.getSnapshot().driver == .callerGraphicsThread)
+
+    // A demand that waits for the style's first update wakes the thread when
+    // the update arrives.
+    try session.requestFrame(demand: FrameDemand(flags: [.ifNeeded], token: 1))
+    try await fixture.map.setStyleJson(json: redStyle)
+    #expect(try await session.awaitRenderedFrame()?.disposition == .rendered)
+    let readback = try await session.textureReadPremultipliedRgba8()
+    #expect(Array(readback.data.prefix(4)) == [255, 0, 0, 255])
+
+    // Detaching needs the driver serviced; closing needs the thread done with
+    // the session.
+    try await session.detach()
+    thread.stop()
+    try session.close()
+  }
+}

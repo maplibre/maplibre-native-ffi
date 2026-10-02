@@ -19,7 +19,13 @@ if [[ ! -f "$archive_arg" ]]; then
 fi
 archive="$(realpath "$archive_arg")"
 
-build_dir="$MISE_MONOREPO_ROOT/build/$preset"
+repo_root="$MISE_MONOREPO_ROOT"
+# Git Bash on Windows hands over a path with backslashes, which a glob below
+# would read as escapes, so work from its POSIX form.
+if command -v cygpath >/dev/null 2>&1; then
+  repo_root="$(cygpath -u "$repo_root")"
+fi
+build_dir="$repo_root/build/$preset"
 staging_dir="$build_dir/.package-staging"
 package_root="$staging_dir/maplibre-native-c-$preset"
 install_dir="$build_dir/install"
@@ -38,6 +44,41 @@ if [[ "$preset" == macos-*-egl && -f "$install_dir/lib/libEGL.dylib" ]]; then
   cp -R "$install_dir/include/EGL" "$install_dir/include/GLES2" \
     "$install_dir/include/GLES3" "$install_dir/include/KHR" \
     "$loader_stash/include"
+fi
+
+# The package also leaves out the test-graphics component, the GPU fixtures
+# that binding suites load: the mln_test_graphics library, with its import
+# library on Windows, its header, and its pkg-config file. They are set aside
+# by name and restored below, so a later run of this task finds them the same
+# way.
+test_graphics_files=()
+shopt -s nullglob
+for path in "$install_dir"/bin/*mln_test_graphics* \
+  "$install_dir"/lib/*mln_test_graphics* \
+  "$install_dir"/include/mln_test_graphics.h \
+  "$install_dir"/share/pkgconfig/mln-test-graphics.pc; do
+  if [[ -e "$path" || -L "$path" ]]; then
+    test_graphics_files+=("${path#"$install_dir/"}")
+  fi
+done
+shopt -u nullglob
+# A build tree that installed the component's files but left none of them in the
+# install directory would lose the fixtures without a trace. A target without
+# the library, such as Emscripten, installs the component with an empty manifest.
+if ((${#test_graphics_files[@]} == 0)) &&
+  [[ -s "$build_dir/install_manifest_test-graphics.txt" ]]; then
+  echo "The build installed the test-graphics component, but $install_dir holds none of its files:" >&2
+  cat "$build_dir/install_manifest_test-graphics.txt" >&2
+  exit 1
+fi
+test_graphics_stash=""
+if ((${#test_graphics_files[@]})); then
+  echo "Carrying the test-graphics files across the package install: ${test_graphics_files[*]}"
+  test_graphics_stash="$(mktemp -d)"
+  for relative in "${test_graphics_files[@]}"; do
+    mkdir -p "$test_graphics_stash/$(dirname "$relative")"
+    cp -P "$install_dir/$relative" "$test_graphics_stash/$relative"
+  done
 fi
 
 # Rust cross-builds use the configured Zig wrappers after this task replaces the
@@ -81,6 +122,11 @@ if [[ -n "$loader_stash" ]]; then
     "$loader_stash"/include/GLES3 "$loader_stash"/include/KHR \
     "$install_dir/include"
   rm -rf "$loader_stash"
+fi
+
+if [[ -n "$test_graphics_stash" ]]; then
+  cp -RP "$test_graphics_stash/." "$install_dir"
+  rm -rf "$test_graphics_stash"
 fi
 
 if [[ -n "$zig_shim_stash" ]]; then

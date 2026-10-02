@@ -10,27 +10,7 @@ import PackageDescription
 let testDependencies: [Target.Dependency] = [
   "MaplibreNativeFFI",
   "CMaplibreNativeC",
-]
-
-let testSourceFiles = [
-  "MaplibreNativeFFITests/CameraAdvancedTests.swift",
-  "MaplibreNativeFFITests/HandleIdentityTests.swift",
-  "MaplibreNativeFFITests/LoggingTests.swift",
-  "MaplibreNativeFFITests/MapHandleTests.swift",
-  "MaplibreNativeFFITests/MaplibreTests.swift",
-  "MaplibreNativeFFITests/NativeHandleLeakTestSupport.swift",
-  "MaplibreNativeFFITests/OfflineTests.swift",
-  "MaplibreNativeFFITests/ProjectionTests.swift",
-  "MaplibreNativeFFITests/QueryTests.swift",
-  "MaplibreNativeFFITests/RenderTests.swift",
-  "MaplibreNativeFFITests/RuntimeEventTestSupport.swift",
-  "MaplibreNativeFFITests/RuntimeEventTests.swift",
-  "MaplibreNativeFFITests/RuntimeTests.swift",
-  "MaplibreNativeFFITests/StyleTests.swift",
-  "MaplibreNativeFFITests/SupportHelperTests.swift",
-  "MaplibreNativeFFITests/SyntheticHandles.swift",
-  "MaplibreNativeFFITests/ValueTests.swift",
-  "MaplibreNativeFFITests/WakeSourceTests.swift",
+  "GraphicsSupport",
 ]
 
 let products: [Product] = [
@@ -42,6 +22,17 @@ let products: [Product] = [
 ]
 
 let targets: [Target] = [
+  .target(
+    name: "GraphicsSupport",
+    path: "tests/graphics",
+    exclude: ["README.md"],
+    cSettings: [
+      .headerSearchPath(
+        "../../third_party/maplibre-native/vendor/Vulkan-Headers/include"
+      ),
+    ],
+    linkerSettings: [.linkedLibrary("dl", .when(platforms: [.linux]))]
+  ),
   .systemLibrary(
     name: "CMaplibreNativeC",
     path: "bindings/swift/Sources/CMaplibreNativeC",
@@ -69,12 +60,7 @@ let targets: [Target] = [
   .target(
     name: "MaplibreNativeFFITestCases",
     dependencies: testDependencies,
-    path: "bindings/swift/Tests",
-    exclude: [
-      "MaplibreNativeFFIIOSSimulatorTests",
-      "MaplibreNativeFFITestsHost",
-    ],
-    sources: testSourceFiles
+    path: "bindings/swift/Tests/MaplibreNativeFFITests"
   ),
   .testTarget(
     name: "MaplibreNativeFFITests",

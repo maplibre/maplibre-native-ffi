@@ -7,6 +7,17 @@ class MaplibreNativeCArtifact(val installDir: File, val hostLibraryDirs: List<Fi
   val libraryPath: File
     get() = runtimeLibraryDir.resolve(libraryFileName())
 
+  /** The tests/graphics library that a test build installs beside the C library. */
+  val testGraphicsLibraryPath: File
+    get() =
+      runtimeLibraryDir.resolve(
+        when {
+          targetIsWindows() -> "mln_test_graphics.dll"
+          targetIsMac() -> "libmln_test_graphics.dylib"
+          else -> "libmln_test_graphics.so"
+        }
+      )
+
   val includeDirs: List<File>
     get() = listOf(installDir.resolve("include"))
 

@@ -1,0 +1,10 @@
+// Generated from the C headers by tools/bindgen. Do not edit.
+#nullable enable
+namespace Maplibre.NativeFfi.Style;
+
+public readonly partial record struct StyleSourceTileInfo(
+    ulong TileCount,
+    double MinZoom,
+    double MaxZoom,
+    StyleTileScheme Scheme
+);

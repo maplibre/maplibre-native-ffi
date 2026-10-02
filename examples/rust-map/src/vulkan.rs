@@ -3,7 +3,6 @@ use std::ffi::{CStr, CString};
 
 use ash::vk;
 use ash::vk::Handle;
-use maplibre_native_ffi::{NativePointer, VulkanHandle};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 
@@ -14,7 +13,13 @@ pub struct VulkanContext {
     surface: vk::SurfaceKHR,
     physical_device: vk::PhysicalDevice,
     device: ash::Device,
+    /// The queue the host submits to.
     graphics_queue: vk::Queue,
+    /// A second queue from the graphics family for a texture session's core
+    /// worker, when the family has one. The worker submits from its own
+    /// thread, and Vulkan requires a queue's submissions to be externally
+    /// synchronized, so it cannot share the host's queue.
+    session_queue: Option<vk::Queue>,
     graphics_queue_family_index: u32,
 }
 
@@ -66,7 +71,7 @@ impl VulkanContext {
         };
         let surface_loader = ash::khr::surface::Instance::new(&entry, &instance);
 
-        let (physical_device, graphics_queue_family_index) =
+        let (physical_device, graphics_queue_family_index, family_queue_count) =
             match pick_physical_device(&instance, &surface_loader, surface) {
                 Ok(device) => device,
                 Err(error) => {
@@ -79,10 +84,11 @@ impl VulkanContext {
                 }
             };
 
-        let priorities = [1.0_f32];
+        let priorities = [1.0_f32; 2];
+        let queue_count = family_queue_count.min(2) as usize;
         let queue_info = [vk::DeviceQueueCreateInfo::default()
             .queue_family_index(graphics_queue_family_index)
-            .queue_priorities(&priorities)];
+            .queue_priorities(&priorities[..queue_count])];
         let mut device_extensions = vec![ash::khr::swapchain::NAME.as_ptr()];
         if has_device_extension(
             &instance,
@@ -106,8 +112,10 @@ impl VulkanContext {
                 return Err(error.into());
             }
         };
-        // SAFETY: Queue index 0 exists because the device was created with one queue.
+        // SAFETY: The device was created with queue_count queues in this family.
         let graphics_queue = unsafe { device.get_device_queue(graphics_queue_family_index, 0) };
+        let session_queue = (queue_count == 2)
+            .then(|| unsafe { device.get_device_queue(graphics_queue_family_index, 1) });
 
         Ok(Self {
             entry,
@@ -117,6 +125,7 @@ impl VulkanContext {
             physical_device,
             device,
             graphics_queue,
+            session_queue,
             graphics_queue_family_index,
         })
     }
@@ -150,47 +159,39 @@ impl VulkanContext {
         self.graphics_queue
     }
 
-    pub fn instance_pointer(&self) -> NativePointer {
-        // SAFETY: The Vulkan instance is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.instance.handle().as_raw() as usize) }
+    pub fn instance_pointer(&self) -> *mut std::ffi::c_void {
+        (self.instance.handle().as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn physical_device_pointer(&self) -> NativePointer {
-        // SAFETY: The physical device is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.physical_device.as_raw() as usize) }
+    pub fn physical_device_pointer(&self) -> *mut std::ffi::c_void {
+        (self.physical_device.as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn device_pointer(&self) -> NativePointer {
-        // SAFETY: The Vulkan device is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.device.handle().as_raw() as usize) }
+    pub fn device_pointer(&self) -> *mut std::ffi::c_void {
+        (self.device.handle().as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn graphics_queue_pointer(&self) -> NativePointer {
-        // SAFETY: The Vulkan queue is live for the render session lifetime.
-        unsafe { NativePointer::from_address(self.graphics_queue.as_raw() as usize) }
+    pub fn graphics_queue_pointer(&self) -> *mut std::ffi::c_void {
+        (self.graphics_queue.as_raw() as usize) as *mut std::ffi::c_void
     }
 
-    pub fn get_instance_proc_addr_pointer(&self) -> NativePointer {
-        // SAFETY: The function pointer remains valid while the ash entry is live.
-        unsafe {
-            NativePointer::from_address(
-                self.entry.static_fn().get_instance_proc_addr as *const () as usize,
-            )
-        }
+    pub fn session_queue_pointer(&self) -> Option<*mut std::ffi::c_void> {
+        self.session_queue
+            .map(|queue| (queue.as_raw() as usize) as *mut std::ffi::c_void)
     }
 
-    pub fn get_device_proc_addr_pointer(&self) -> NativePointer {
-        // SAFETY: The function pointer remains valid while the ash instance is live.
-        unsafe {
-            NativePointer::from_address(
-                self.instance.fp_v1_0().get_device_proc_addr as *const () as usize,
-            )
-        }
+    pub fn get_instance_proc_addr_pointer(&self) -> *mut std::ffi::c_void {
+        (self.entry.static_fn().get_instance_proc_addr as *const () as usize)
+            as *mut std::ffi::c_void
     }
 
-    pub fn surface_handle(&self) -> VulkanHandle {
-        // SAFETY: The Vulkan surface is live for the render session lifetime.
-        unsafe { VulkanHandle::from_bits(self.surface.as_raw()) }
+    pub fn get_device_proc_addr_pointer(&self) -> *mut std::ffi::c_void {
+        (self.instance.fp_v1_0().get_device_proc_addr as *const () as usize)
+            as *mut std::ffi::c_void
+    }
+
+    pub fn surface_handle(&self) -> u64 {
+        self.surface.as_raw()
     }
 
     pub fn graphics_queue_family_index(&self) -> u32 {
@@ -304,14 +305,12 @@ impl BorrowedImage {
         self.view
     }
 
-    pub fn image_handle(&self) -> VulkanHandle {
-        // SAFETY: The Vulkan image is live while the borrowed texture session is live.
-        unsafe { VulkanHandle::from_bits(self.image.as_raw()) }
+    pub fn image_handle(&self) -> u64 {
+        self.image.as_raw()
     }
 
-    pub fn view_handle(&self) -> VulkanHandle {
-        // SAFETY: The Vulkan image view is live while the borrowed texture session is live.
-        unsafe { VulkanHandle::from_bits(self.view.as_raw()) }
+    pub fn view_handle(&self) -> u64 {
+        self.view.as_raw()
     }
 }
 
@@ -361,7 +360,7 @@ fn pick_physical_device(
     instance: &ash::Instance,
     surface_loader: &ash::khr::surface::Instance,
     surface: vk::SurfaceKHR,
-) -> Result<(vk::PhysicalDevice, u32), Box<dyn Error>> {
+) -> Result<(vk::PhysicalDevice, u32, u32), Box<dyn Error>> {
     // SAFETY: instance is live and enumeration writes into ash-owned vectors.
     let devices = unsafe { instance.enumerate_physical_devices()? };
     for physical_device in devices {
@@ -379,7 +378,7 @@ fn pick_physical_device(
                 )?
             };
             if supports_graphics && supports_present {
-                return Ok((physical_device, index as u32));
+                return Ok((physical_device, index as u32, family.queue_count));
             }
         }
     }

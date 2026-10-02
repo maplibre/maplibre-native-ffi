@@ -12,6 +12,8 @@ members = ["bindings/python"]
 
 [dependency-groups]
 dev = [
+  "libclang==18.1.1",
+  "lief==0.17.6; sys_platform == 'darwin'",
   "ruamel-yaml==0.19.1",
   "ruff==0.16.8",
   "ty==0.0.82",

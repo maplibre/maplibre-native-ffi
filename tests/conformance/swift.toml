@@ -1,0 +1,45 @@
+# Maps each case in cases.toml to the swift test that covers it:
+#   "ID" = "path/to/test_file::test_name"
+# or to why it does not apply:
+#   "ID" = { na = "reason" }
+
+[cases]
+"ERR-01" = "bindings/swift/Tests/MaplibreNativeFFITests/ErrorTests.swift::aFailedCallMapsItsStatusAndCarriesItsDiagnostic"
+# The test injects another version into the check. Each generated entry point
+# without a receiver calls NativeAbi.ensureCompatible() first, which the
+# generator's Swift probe checks against a stub that reports another version.
+# A value's generated default reads native defaults without the check.
+"ERR-02" = "bindings/swift/Tests/MaplibreNativeFFITests/ErrorTests.swift::aLibraryWithAnotherCAbiVersionIsRejected"
+"LIFE-01" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::closingAHandleTwiceDoesNothingTheSecondTime"
+"LIFE-02" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aRefusedCloseLeavesTheRuntimeUsableAndALaterCloseSucceeds"
+"LIFE-03" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aBorrowOnAnotherThreadHoldsOffAClose"
+"LIFE-04" = "bindings/swift/Tests/MaplibreNativeFFITests/GlobalStateTests.swift::anAbandonedHandleIsDisposedOffTheCallbackStackAndReported"
+"LIFE-05" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aMapKeepsItsRuntimeAlive"
+"COMP-01" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::aCompletionDeliversOnceAndAFailedConversionIsDisposed"
+"COMP-02" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::aRejectedSubmissionFreesItsCompletionState"
+"COMP-03" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::cancellingACreationWaitRetiresTheCreatedMap"
+"COMP-04" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::aFailedCommandDispositionArrivesAsData"
+"COMP-05" = "bindings/swift/Tests/MaplibreNativeFFITests/CompletionTests.swift::cancellingAWaitEndsItAndDisposesTheLateResult"
+"CB-01" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aRegistrationIsRootedUntilNativeReleasesIt"
+"CB-02" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aCancelCallbackDoesNotKeepItsRequestAlive"
+"CB-03" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aProviderCallbackAdmitsOnlyItsRequestsCalls"
+"CB-04" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aThrowingProviderPassesTheRequestThrough"
+"CB-05" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aProviderAnswersATakenRequestLater"
+"CB-06" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aTransformResponseExpiresWithItsCallback"
+"CB-07" = "bindings/swift/Tests/MaplibreNativeFFITests/GlobalStateTests.swift::replacingTheLogCallbackReleasesThePreviousOne"
+"CB-08" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aRegistrationOnACancelledRequestIsNotRooted"
+"VAL-01" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::stringsCrossAsCountedViewsOrTerminatedCStrings"
+"VAL-02" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::presenceFieldsTellAbsentFromZero"
+"VAL-03" = "bindings/swift/Tests/MaplibreNativeFFITests/EventDecodeTests.swift::unknownEventSourceAndPayloadKindsSurviveAsRawValues"
+"VAL-04" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::valuesCheckNarrowingKeepUnknownEnumsAndCarryFullWidthHandles"
+"VAL-05" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::inputsAreCopiedAtSubmission"
+"VIEW-01" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::aFrameViewExpiresWithItsScopeAndHoldsOffAbandon"
+"REND-01" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::anOwnedTextureSessionRendersPixelsTheBindingReadsBack"
+"REND-02" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::aCallerDrivenSessionIsServicedOnAHostThread"
+"PLAT-01" = { na = "The binding has no loader, package step, or build hook of its own: SwiftPM links the library through pkg-config and an rpath, so every test that runs has loaded it the way a consumer does" }
+"PLAT-02" = "bindings/swift/Tests/MaplibreNativeFFITests/PlatformTests.swift::exitingWithLiveHandlesAndCallbacksIsClean"
+"PLAT-03" = { na = "Swift reclaims objects by reference counting and has no collector: deinit disposes an abandoned handle (LIFE-04, COMP-03), and a callback that captures its own receiver is a cycle the language leaves alive" }
+# `mise run //examples/swift-map:smoke` renders one frame in each render-target
+# mode through this path. The iOS target, swift-map-ios, is a UIKit app with
+# no headless path, so it only builds, through build:ios-simulator.
+"EX-01" = "examples/swift-map/Sources/SwiftMap/Smoke.swift::runSmoke"

@@ -36,7 +36,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
   }
 
   private func validateMetalBackend() {
-    let backends = Maplibre.supportedRenderBackends()
+    let backends = (try! Maplibre.supportedRenderBackendMask())
     log.info("native render backends: \(renderBackendLabel(backends))")
     guard backends.contains(.metal) else {
       fatalError("the loaded MapLibre native library does not support Metal")
@@ -58,12 +58,12 @@ final class MapViewController: UIViewController {
   }
 }
 
-private func renderBackendLabel(_ backends: RenderBackend) -> String {
+private func renderBackendLabel(_ backends: RenderBackendFlag) -> String {
   var labels: [String] = []
   if backends.contains(.metal) {
     labels.append("metal")
   }
-  if backends.contains(.openGL) {
+  if backends.contains(.opengl) {
     labels.append("opengl")
   }
   if backends.contains(.vulkan) {
@@ -78,11 +78,11 @@ private func installCAPILogging() {
     category: "MapLibre"
   )
   do {
-    try Maplibre.setLogCallback { record in
+    try Maplibre.logSetCallback { severity, event, code, message in
       log.info(
-        "severity=\(String(describing: record.severity), privacy: .public) event=\(String(describing: record.event), privacy: .public) code=\(record.code): \(record.message, privacy: .public)"
+        "severity=\(String(describing: severity), privacy: .public) event=\(String(describing: event), privacy: .public) code=\(code): \(message, privacy: .public)"
       )
-      return true
+      return 1
     }
   } catch {
     log
@@ -94,7 +94,7 @@ private func installCAPILogging() {
 
 private func clearCAPILogging() {
   do {
-    try Maplibre.clearLogCallback()
+    try Maplibre.logClearCallback()
   } catch {
     let log = Logger(
       subsystem: "org.maplibre.nativeffi.examples.swift-map-ios",

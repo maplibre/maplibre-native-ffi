@@ -1,11 +1,8 @@
 package org.maplibre.nativeffi
 
-import kotlinx.cinterop.CPointed
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.toCPointer
-import org.maplibre.nativeffi.internal.c.mln_android_init
-import org.maplibre.nativeffi.internal.status.Status
-import platform.android.JNIEnvVar
+import org.maplibre.nativeffi.internal.c.C
+import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 
 /** Borrowed JNI environment address for the current Android host thread. */
 public class AndroidJniEnvironment private constructor(internal val address: Long) {
@@ -35,7 +32,6 @@ public class AndroidContextReference private constructor(internal val address: L
 }
 
 /** Android-only platform integration entry points for Kotlin/Native. */
-@OptIn(ExperimentalForeignApi::class)
 public object MaplibreAndroid {
   /**
    * Initializes Android platform services using JNI handles from the host.
@@ -45,13 +41,10 @@ public object MaplibreAndroid {
    * AssetManager.
    */
   public fun initialize(jniEnvironment: AndroidJniEnvironment, context: AndroidContextReference) {
-    Status.check(
-      mln_android_init(
-        jniEnvironment.address.toCPointer<JNIEnvVar>(),
-        null,
-        context.address.toCPointer<CPointed>(),
-      )
-    )
+    ensureNativeLibrary()
+    NativeDiagnostics.check { diagnostic ->
+      C.mln_android_init(jniEnvironment.address, 0L, context.address, diagnostic)
+    }
   }
 }
 

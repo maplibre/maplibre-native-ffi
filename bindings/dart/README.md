@@ -2,8 +2,8 @@
 
 `maplibre_native_ffi` is the low-level Dart binding for the public MapLibre
 Native C API. The package exposes explicit native handle lifetimes, copied value
-types, runtime event batches, resource callbacks, offline operations, and the
-render backend descriptors used by host integrations.
+types, owned runtime event batches, ordinary futures, resource callbacks, and
+the render backend descriptors used by host integrations.
 
 ## Build and test
 
@@ -16,19 +16,34 @@ mise run //bindings/dart:test linux-gnu-x64-vulkan
 mise run //bindings/dart:build:mobile android-arm64-egl
 mise run //bindings/dart:build:mobile ios-arm64-metal
 mise run //bindings/dart:build:mobile ios-simulator-arm64-metal
-mise run --force //bindings/dart:ffigen
 ```
 
 The test task builds the selected CMake preset, points the build hook at the
 resulting install prefix, analyzes the package, and runs the Dart tests. The
-private raw declarations are checked in so Git and pub package consumers receive
-a complete library; CI regenerates them and fails on any diff. Generation is
-configured in `tool/ffigen.dart`.
+private raw declarations in `lib/src/internal/c/maplibre_native_c.g.dart` are
+checked in so Git and pub package consumers receive a complete library.
+`mise run bindings:generate` writes them with the rest of the generated binding,
+and `mise run bindings:check` fails on any diff.
+
+The suite tests what the binding adds on top of the C API: handle ownership,
+completions, callback ports, generated value shapes, rendering through a
+session, and loading and shutdown. `tests/conformance/dart.toml` maps each
+shared conformance case to its test. Every test builds on the fixture in
+`test/support/fixture.dart`, which closes each handle it opens in a teardown and
+installs a resource provider that answers every request with an error, so no
+test reaches the network. Render tests take their GPU context from
+`mln_test_graphics` in `tests/graphics`. `test/log_test.dart` is the only suite
+that installs process-global state, because `dart test` runs suites concurrently
+in one process.
 
 The mobile build task creates a temporary Flutter host, builds the selected
 native preset, and verifies that Flutter packages its code asset. Device and
 simulator iOS use separate presets because their dynamic libraries target
 different Apple SDKs.
+
+On macOS, the EGL target uses prebuilt ANGLE libraries that the native build
+pads with extra Mach-O header space (`scripts/pad-macos-angle.py`), so Dart
+native assets can rewrite their install names.
 
 The native library reaches Dart as a code asset that `hook/build.dart` declares,
 which is how the generated `@Native` declarations resolve it. Build hooks run in
@@ -37,11 +52,6 @@ hook reads the install prefix from `.dart_tool/maplibre_native_install_dir`
 rather than from an environment variable; the mise tasks write it. Without that
 file the hook downloads the artifact matching the target from the snapshot
 release, which is what a consumer taking this package as a git dependency gets.
-
-Dart runs the hook for `dart run` as well as `dart test`, so regenerating the
-bindings resolves a library it never calls. Run the test task first and the
-pointer already names a local build; on its own,
-`mise run //bindings/dart:ffigen` downloads one.
 
 ## Android host integration
 
@@ -69,54 +79,73 @@ copy of the same library.
 
 ## Ownership and execution
 
-Owned handles have an idempotent `close()` or `discard()` operation. Close child
-maps, render sessions, frames, snapshots, request handles, and offline
+Runtime and map handles have an idempotent `close()`. Runtime close remains
+asynchronous in Dart so callback roots stay alive through native teardown. Close
+child maps, render sessions, frames, snapshots, request handles, and offline
 operations before their parent runtime. Scoped backend values remain valid only
 until their frame or owner is closed.
 
-Runtime and map work is synchronous and owner-thread-affine. Keep a handle and
-all calls that use it on the isolate that created it. Run queued callbacks with
-`RuntimeHandle.pump()`, then take the events it produced with
-`RuntimeHandle.drainEvents()`. Narrow what a map or a runtime queues with
-`setEventMask`.
+Close every handle explicitly. When the collector reclaims a handle that is
+still open, a native finalizer disposes it, and the binding writes
+`Leaked <type> native handle 0x<id>; close it explicitly.` to standard error.
+That warning comes from a Dart finalizer, which runs from the event loop after
+the collection, and it is skipped for handles that the isolate's shutdown
+disposes.
 
-A render session is the exception: it belongs to the isolate that attached it,
-which need not be the map's. A `MapHandle` cannot cross isolates, so
-`MapHandle.attachRef()` produces a `MapAttachRef` that can. It carries the
-native address and attaches; every other map call stays on the map's isolate.
+Projection handles are created asynchronously and are synchronous after that:
+every projection call, `close()` included, runs on the calling isolate's thread,
+may be made from any isolate, and never observes map changes made after creation
+and remains usable after its source map and runtime close.
 
-## Known draft deviation: do not await in an isolate that holds a handle
+Create runtimes and maps with `await`. Runtime and map commands copy their input
+and return `Future` values. Snapshot methods synchronously copy immutable state.
+Ordered queries and lifecycle operations also return `Future` values. Direct
+wake callbacks report queued events without participating in future completion.
+Read queued events with `RuntimeHandle.drainEvents()`. Narrow what a map or a
+runtime queues with `setEventMask`.
 
-The C API keys owner-thread checks on the OS thread. This binding keys them on
-`Isolate.current.hashCode`, and the two are not equivalent: the Dart VM moves an
-isolate between OS threads, and it does so when an isolate resumes from awaited
-I/O. The isolate hash does not change, so the binding's own check still passes
-while the native check starts failing.
+Runtime, map, camera, and projection calls remain valid when Dart resumes an
+isolate on another native thread after `await`. Attach a render session directly
+from its map on the isolate that will own the graphics session.
 
-Until that is addressed, do not `await` I/O on an isolate that holds a runtime,
-map, projection, or render session. Create the handles, use them, and close them
-without yielding to I/O in between. Dart offers no equivalent of Go's
-`runtime.LockOSThread()`, so the binding cannot pin the isolate on your behalf.
+Dart hosts render through core-worker sessions, on Metal, on Vulkan, or on an
+EGL context that the session creates for itself. That EGL context shares nothing
+with the host, so an EGL session renders to a surface or offers its texture as
+readback rather than as frames to sample. A caller-driven session belongs to the
+native thread that first services it, and `serviceDriverWork()` from any other
+thread throws `WrongThreadException`. Dart can resume an isolate on another
+thread after any `await`, so an isolate has no thread that it can keep for such
+a session. A WGL texture shares the host's context, which only a caller-driven
+session can drive, so a Dart host on Windows renders through Vulkan.
 
-Exceeding this produces `wrongThread` from every call on the handle, including
-`close()`. Because close fails too, the native runtime is never destroyed and
-`mln_runtime_destroy` refuses for the rest of the process.
-
-Tracked in [#412](https://github.com/maplibre/maplibre-native-ffi/issues/412).
+A pending completion keeps its isolate alive, so every future that the binding
+returns resolves before the isolate finishes. Callback registrations leave the
+isolate free to finish: a wake, a resource provider or transform, a custom
+source callback, and the log callback. A program that waits for one of those
+callbacks keeps the isolate alive itself, for example with a `ReceivePort` that
+it closes once the callback runs.
 
 Resource-request completion is one-shot. Calling `complete()` or `close()`
 releases the provider reference even when completion reports a native error.
-Callback exceptions are contained at the native boundary and reported through
-the native diagnostic path.
+Closing a request without completing it fails the request, so the load reports
+an error instead of waiting.
+
+Native code never waits on a Dart callback. Resource providers and the log
+callback answer native code immediately and run on the registering isolate
+later, as do cancel callbacks. An exception a callback throws goes to the
+registering zone's error handler; a resource provider that throws also fails its
+request.
 
 `ResourceRequestHandle.setCancelCallback()` registers one callback per request
 that runs when MapLibre discards a request the provider left open. The binding
-queues the callback to the isolate that registered it, and a request that is
-already cancelled runs the callback before registration returns. Register,
-complete, and release such a request on that isolate. An exception the callback
-throws is contained inside the binding.
+queues the callback to the isolate and zone that registered it, and drops it
+once the handle is closed. A request that is already cancelled returns true,
+stores nothing, and never runs the callback. Register, complete, and release
+such a request on that isolate. An exception the callback throws goes to the
+registering zone's error handler.
 
 Unsigned C `uint64_t` JSON values, feature identifiers, and camera transition
-IDs use Dart `BigInt` so the complete native range is preserved. Native buffers
-return copied bytes; direct pointer access is explicitly unsafe and ends at
-`NativeBuffer.close()`.
+IDs use Dart `BigInt` so the complete native range is preserved. Native byte
+views are copied into Dart-owned lists before a call returns; the scoped pointer
+accessors that expose native addresses are explicitly unsafe and end with the
+frame or handle that owns them.

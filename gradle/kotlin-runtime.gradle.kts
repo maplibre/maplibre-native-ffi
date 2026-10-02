@@ -161,12 +161,16 @@ fun configureJvmRuntimeArtifacts(
       destinationDirectory.set(layout.buildDirectory.dir("libs"))
 
       val resourcePath = "META-INF/maplibre-native-ffi/${runtimeInstall.classifier}"
+      // A build tree's install also holds the test graphics fixtures, which the
+      // runtime leaves out.
       from(runtimeInstall.installDirectory.resolve("lib")) {
         include("*.so", "*.so.*", "*.dylib")
+        exclude("*mln_test_graphics*")
         into(resourcePath)
       }
       from(runtimeInstall.installDirectory.resolve("bin")) {
         include("*.dll")
+        exclude("*mln_test_graphics*")
         into(resourcePath)
       }
       from(runtimeInstall.installDirectory.resolve("share/maplibre-native-c/licenses")) {

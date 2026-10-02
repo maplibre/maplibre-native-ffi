@@ -3,33 +3,34 @@ package main
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
-	"runtime"
+	stdruntime "runtime"
 	"strings"
+	"time"
 
 	"github.com/jfreymuth/go-sdl3/sdl"
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
 )
 
 func main() {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
+	// SDL and OpenGL keep the render-session graphics calls on this thread.
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
 
-	mode, ok := parseArgs(os.Args[1:])
+	mode, smoke, ok := parseArgs(os.Args[1:])
 	if !ok {
 		return
 	}
-	if err := run(mode); err != nil {
+	if err := run(mode, smoke); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
 
-func parseArgs(args []string) (renderTargetMode, bool) {
+func parseArgs(args []string) (renderTargetMode, bool, bool) {
 	if len(args) == 1 && args[0] == "--help" {
 		printUsage()
-		return 0, false
+		return 0, false, false
 	}
 	if len(args) != 1 || strings.HasPrefix(args[0], "-") {
 		printUsage()
@@ -40,7 +41,13 @@ func parseArgs(args []string) (renderTargetMode, bool) {
 		printUsage()
 		os.Exit(1)
 	}
-	return mode, true
+	return mode, smokeMode(), true
+}
+
+// smokeMode reports whether MLN_EXAMPLE_SMOKE=1 selects a smoke run, which
+// renders one frame of a local style in a hidden window and exits.
+func smokeMode() bool {
+	return os.Getenv("MLN_EXAMPLE_SMOKE") == "1"
 }
 
 func printUsage() {
@@ -53,17 +60,21 @@ Modes:
 `)
 }
 
-func run(mode renderTargetMode) (result error) {
+// smokeTimeout bounds a smoke run, which exits with an error when no frame
+// renders in time.
+const smokeTimeout = 60 * time.Second
+
+func run(mode renderTargetMode, smoke bool) (result error) {
 	if err := validateNativeRenderBackend(); err != nil {
 		return err
 	}
-	if err := maplibre.SetLogCallback(func(record maplibre.LogRecord) bool {
-		fmt.Printf("maplibre[%s/%s] %d: %s\n", logSeverity(record.Severity), logEvent(record.Event), record.Code, record.Message)
-		return true
+	if err := maplibre.LogSetCallback(func(severity maplibre.LogSeverity, event maplibre.LogEvent, code int64, message string) uint32 {
+		fmt.Printf("maplibre[%s/%s] %d: %s\n", logSeverity(severity), logEvent(event), code, message)
+		return 1
 	}); err != nil {
 		return err
 	}
-	defer func() { _ = maplibre.ClearLogCallback() }()
+	defer func() { _ = maplibre.LogClearCallback() }()
 
 	if usesEGL() {
 		_ = sdl.SetHint(sdl.HintVideoForceEgl, "1")
@@ -85,12 +96,18 @@ func run(mode renderTargetMode) (result error) {
 		}
 	}
 
-	window, err := sdl.CreateWindow("MapLibre Go SDL3 Map", initialWindowWidth, initialWindowHeight, sdl.WindowOpenGL|sdl.WindowResizable|sdl.WindowHighPixelDensity)
+	windowFlags := sdl.WindowOpenGL | sdl.WindowResizable | sdl.WindowHighPixelDensity
+	if smoke {
+		windowFlags |= sdl.WindowHidden
+	}
+	window, err := sdl.CreateWindow("MapLibre Go SDL3 Map", initialWindowWidth, initialWindowHeight, windowFlags)
 	if err != nil {
 		return fmt.Errorf("SDL_CreateWindow failed: %w", err)
 	}
 	defer window.Destroy()
-	_ = window.Raise()
+	if !smoke {
+		_ = window.Raise()
+	}
 
 	view := currentViewport(window)
 	view.log("initial viewport")
@@ -104,148 +121,157 @@ func run(mode renderTargetMode) (result error) {
 	}
 	_ = sdl.GL_SetSwapInterval(1)
 
-	shared := newSharedState()
-	commands := &commandQueue{}
-	published := make(chan runtimeLoopHandles, 1)
-	runtimeDone := make(chan struct{})
-	go func() {
-		defer close(runtimeDone)
-		runRuntimeLoop(view, commands, published, shared)
-	}()
-	handles, ok := <-published
-	if !ok {
-		<-runtimeDone
-		_ = graphics.Close()
-		if failure := shared.firstFailure(); failure != nil {
-			return fmt.Errorf("runtime loop startup failed: %w", failure)
-		}
-		return errors.New("runtime loop stopped before publishing the map")
-	}
-
-	state, err := newRenderMapState(graphics, handles.mapRef, view, mode)
+	// Every native wake pushes this SDL event to end the loop's wait.
+	wakeEvent := sdl.RegisterEvents(1)
+	events := newLoopWake(wakeEvent)
+	mapState, err := newRuntimeMapState(view, smoke, events.wake())
 	if err != nil {
-		shared.requestShutdown()
-		_ = handles.wake.Signal()
-		<-runtimeDone
-		return errors.Join(
-			fmt.Errorf("render target attach failed: %w", err),
-			shared.firstFailure(),
-			graphics.Close(),
-		)
+		_ = graphics.Close()
+		return err
 	}
+	target, err := attach(graphics, view, mode, mapState, wakeEvent)
+	if err != nil {
+		return errors.Join(err, mapState.Close(), graphics.Close())
+	}
+	// A failed reattach leaves no target, so shutdown closes only what
+	// exists.
 	defer func() {
-		result = errors.Join(result, state.finishFrame(), state.closeTarget())
-		shared.requestShutdown()
-		_ = handles.wake.Signal()
-		<-runtimeDone
-		result = errors.Join(result, shared.firstFailure(), graphics.Close())
+		var targetErr error
+		if target != nil {
+			targetErr = target.Close()
+		}
+		result = errors.Join(result, targetErr, mapState.Close(), graphics.Close())
 	}()
-
-	fmt.Printf("render target: %s\n", mode)
-	fmt.Printf("render target status: %s\n", mode.statusLine())
+	// A session fixes its scale factor at attachment, so a scale change
+	// reattaches.
+	attachedScale := view.scaleFactor
 	logControls()
 
-	running := true
+	// The SDL thread sleeps until input or a native wake arrives. Input
+	// becomes map commands, a map update becomes a frame demand, and the
+	// wakes have the thread drain events, service driver work, and drain frame
+	// results.
 	input := inputController{}
-	handleEvent := func(event *sdl.Event) error {
-		switch event.Type() {
-		case sdl.EventQuit, sdl.EventWindowCloseRequested:
-			running = false
-		case sdl.EventWindowResized, sdl.EventWindowPixelSizeChanged, sdl.EventWindowDisplayScaleChanged:
-			view = currentViewport(window)
-			view.log("resized viewport")
-			if view.empty() {
-				return nil
-			}
-			if err := state.resize(view); err != nil {
-				return err
-			}
-			shared.requestRender()
-		default:
-			if view.empty() {
-				return nil
-			}
-			if input.handleEvent(event, commands, view) {
-				if err := handles.wake.Signal(); err != nil {
-					return fmt.Errorf("wake runtime loop failed: %w", err)
-				}
-				shared.requestRender()
-			}
-		}
-		return nil
-	}
-	for running {
-		if failure := shared.firstFailure(); failure != nil {
-			return fmt.Errorf("runtime loop failed: %w", failure)
-		}
-		didWork := false
+	smokeDeadline := time.Now().Add(smokeTimeout)
+	for {
+		viewportChanged := false
 		var event sdl.Event
-		for sdl.PollEvent(&event) {
-			didWork = true
-			if err := handleEvent(&event); err != nil {
-				return err
+		deadline, hasDeadline := nextWake(target, smoke, smokeDeadline)
+		ok := waitEvent(&event, deadline, hasDeadline)
+		if smoke && !time.Now().Before(smokeDeadline) {
+			return fmt.Errorf("smoke: no frame rendered within %s", smokeTimeout)
+		}
+		for ; ok; ok = sdl.PollEvent(&event) {
+			switch event.Type() {
+			case sdl.EventQuit, sdl.EventWindowCloseRequested:
+				return nil
+			case sdl.EventWindowResized, sdl.EventWindowPixelSizeChanged, sdl.EventWindowDisplayScaleChanged:
+				if next := currentViewport(window); next != view {
+					view = next
+					view.log("resized viewport")
+					viewportChanged = true
+				}
+			default:
+				if !view.empty() {
+					if err := input.handleEvent(&event, mapState, view); err != nil {
+						return err
+					}
+				}
 			}
 		}
-
-		if shared.consumeRenderRequest() && !view.empty() && running {
-			completed, err := state.renderUpdate()
+		// A live resize delivers several window events at once, and this
+		// resizes once for all of them.
+		if viewportChanged && !view.empty() {
+			if view.scaleFactor == attachedScale {
+				err = target.Resize(view)
+			} else {
+				// Close releases the target even when it fails, so the
+				// deferred shutdown must not close it again.
+				err = target.Close()
+				target = nil
+				if err == nil {
+					target, err = attach(graphics, view, mode, mapState, wakeEvent)
+					attachedScale = view.scaleFactor
+				}
+			}
 			if err != nil {
 				return err
 			}
-			if completed {
-				didWork = true
-			} else {
-				shared.requestRender()
+		}
+		if events.consume() {
+			update, err := mapState.drainRenderUpdates()
+			if err != nil {
+				return err
 			}
-		}
-		if err := state.finishFrame(); err != nil {
-			return err
-		}
-
-		if !didWork && running {
-			if sdl.WaitEventTimeout(&event, displayRefreshTimeoutMS(window)) {
-				if err := handleEvent(&event); err != nil {
+			if update && !view.empty() {
+				if err := target.RequestFrame(false); err != nil {
 					return err
 				}
 			}
 		}
+		presented, err := target.HandleWakes()
+		if err != nil {
+			return err
+		}
+		if smoke && presented {
+			fmt.Println("smoke: rendered a frame")
+			return nil
+		}
 	}
-	return nil
 }
 
-func displayRefreshTimeoutMS(window *sdl.Window) int32 {
-	display, err := sdl.GetDisplayForWindow(window)
+// attach attaches a session, logs its mode and driver, and demands its first
+// frame.
+func attach(graphics *openGLContext, view viewport, mode renderTargetMode, mapState *runtimeMapState, wakeEvent sdl.EventType) (renderTarget, error) {
+	target, err := newOpenGLRenderTarget(graphics, view, mode, mapState.mapRef, wakeEvent)
 	if err != nil {
-		return 16
+		return nil, fmt.Errorf("render target attach failed: %w", err)
 	}
-	mode, err := display.CurrentDisplayMode()
-	if err != nil {
-		return 16
+	fmt.Printf("render target: %s\n", mode)
+	fmt.Printf("render target status: %s\n", mode.statusLine())
+	fmt.Println("render driver: caller-graphics-thread")
+	if err := target.RequestFrame(false); err != nil {
+		return nil, errors.Join(err, target.Close())
 	}
-	hz := float64(mode.RefreshRate)
-	if mode.RefreshRateNumerator > 0 && mode.RefreshRateDenominator > 0 {
-		hz = float64(mode.RefreshRateNumerator) / float64(mode.RefreshRateDenominator)
+	return target, nil
+}
+
+// nextWake reports when the loop must wake without an event: for a paced
+// retry, or at a smoke run's deadline.
+func nextWake(target renderTarget, smoke bool, smokeDeadline time.Time) (time.Time, bool) {
+	retryAt, retry := target.RetryAt()
+	if smoke && (!retry || smokeDeadline.Before(retryAt)) {
+		return smokeDeadline, true
 	}
-	if hz <= 0 {
-		return 16
+	return retryAt, retry
+}
+
+// waitEvent sleeps until the next SDL event, or until a deadline when it has
+// one, and reports whether an event arrived.
+func waitEvent(event *sdl.Event, deadline time.Time, hasDeadline bool) bool {
+	if !hasDeadline {
+		return sdl.WaitEvent(event) == nil
 	}
-	timeout := int32(math.Floor(1000 / hz))
-	if timeout < 1 {
-		return 1
-	}
-	return timeout
+	remaining := time.Until(deadline)
+	return sdl.WaitEventTimeout(event, int32(max(remaining.Milliseconds(), 0))+1)
 }
 
 func validateNativeRenderBackend() error {
-	backends := maplibre.SupportedRenderBackends()
+	backends, err := maplibre.SupportedRenderBackendMask()
+	if err != nil {
+		return err
+	}
 	fmt.Printf("native render backends: %s\n", renderBackendSupportLabel(backends))
-	if !backends.Has(maplibre.RenderBackendOpenGL) {
+	if !backends.Has(maplibre.RenderBackendFlagOpengl) {
 		return errors.New("loaded native library does not support OpenGL")
 	}
-	providers := maplibre.SupportedOpenGLContextProviders()
-	required := maplibre.OpenGLContextProviderEGL
-	if runtime.GOOS == "windows" {
-		required = maplibre.OpenGLContextProviderWGL
+	providers, err := maplibre.OpenglSupportedContextProviderMask()
+	if err != nil {
+		return err
+	}
+	required := maplibre.OpenglContextProviderFlagEgl
+	if stdruntime.GOOS == "windows" {
+		required = maplibre.OpenglContextProviderFlagWgl
 	}
 	if !providers.Has(required) {
 		return fmt.Errorf("loaded native library does not support required OpenGL context provider: %s", openGLProviderLabel(required))
@@ -253,15 +279,15 @@ func validateNativeRenderBackend() error {
 	return nil
 }
 
-func renderBackendSupportLabel(mask maplibre.RenderBackendMask) string {
+func renderBackendSupportLabel(mask maplibre.RenderBackendFlag) string {
 	var labels []string
-	if mask.Has(maplibre.RenderBackendMetal) {
+	if mask.Has(maplibre.RenderBackendFlagMetal) {
 		labels = append(labels, "metal")
 	}
-	if mask.Has(maplibre.RenderBackendOpenGL) {
+	if mask.Has(maplibre.RenderBackendFlagOpengl) {
 		labels = append(labels, "opengl")
 	}
-	if mask.Has(maplibre.RenderBackendVulkan) {
+	if mask.Has(maplibre.RenderBackendFlagVulkan) {
 		labels = append(labels, "vulkan")
 	}
 	if len(labels) == 0 {
@@ -270,11 +296,11 @@ func renderBackendSupportLabel(mask maplibre.RenderBackendMask) string {
 	return strings.Join(labels, ",")
 }
 
-func openGLProviderLabel(provider maplibre.OpenGLContextProviderMask) string {
+func openGLProviderLabel(provider maplibre.OpenglContextProviderFlag) string {
 	switch provider {
-	case maplibre.OpenGLContextProviderWGL:
+	case maplibre.OpenglContextProviderFlagWgl:
 		return "wgl"
-	case maplibre.OpenGLContextProviderEGL:
+	case maplibre.OpenglContextProviderFlagEgl:
 		return "egl"
 	default:
 		return "unknown"
@@ -300,7 +326,7 @@ func logEvent(event maplibre.LogEvent) string {
 		return "graphics-backend"
 	case maplibre.LogEventRender:
 		return "render"
-	case maplibre.LogEventHTTPRequest:
+	case maplibre.LogEventHttpRequest:
 		return "http"
 	case maplibre.LogEventParseStyle:
 		return "style-parse"

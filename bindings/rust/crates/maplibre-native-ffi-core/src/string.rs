@@ -7,7 +7,6 @@ use std::str;
 use maplibre_native_ffi_sys as sys;
 
 use crate::error::{Error, Result};
-use crate::handle::NativeHandle;
 
 #[derive(Debug, Clone, Copy)]
 pub struct StringView<'a> {
@@ -64,27 +63,6 @@ pub fn buffer_view(value: &[u8]) -> sys::mln_buffer_view {
         },
         size: value.len(),
     }
-}
-
-/// Copies and releases an owned native buffer.
-///
-/// # Safety
-///
-/// `buffer` must be null or an owned buffer returned by the C API.
-pub unsafe fn copy_owned_buffer(buffer: sys::mln_buffer) -> Result<Vec<u8>> {
-    if buffer.to_raw() == 0 {
-        return Ok(Vec::new());
-    }
-    // SAFETY: The caller transfers ownership of the live buffer to this guard.
-    let buffer = unsafe { crate::handle::buffer(buffer) }?;
-    let mut view = sys::mln_buffer_view {
-        data: ptr::null(),
-        size: 0,
-    };
-    // SAFETY: buffer is live and view points to writable storage.
-    crate::check(unsafe { sys::mln_buffer_get(buffer.handle(), &mut view) })?;
-    // SAFETY: The returned view remains valid while the guard is live.
-    unsafe { copy_string_view_bytes(view) }
 }
 
 /// Copies a borrowed native string view into an owned Rust string.
@@ -158,16 +136,6 @@ mod tests {
             error.diagnostic(),
             "C string inputs must not contain embedded NUL characters"
         );
-    }
-
-    #[test]
-    fn string_views_materialize_with_explicit_length() {
-        let value = "hello";
-        let view = string_view(value).raw();
-
-        assert_eq!(view.size, 5);
-        assert!(!view.data.is_null());
-        assert_eq!(unsafe { copy_string_view(view) }.unwrap(), value);
     }
 
     #[test]

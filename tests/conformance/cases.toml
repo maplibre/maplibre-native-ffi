@@ -1,0 +1,53 @@
+# The cases every binding suite covers. Each binding's file in this directory
+# maps every case ID to the test that covers it, or to the reason it does not
+# apply. scripts/check-conformance.py checks both. Native semantics are tested
+# once, in tests/native; these cases cover what a binding adds on top.
+
+[cases]
+# Status and diagnostics
+"ERR-01" = "A failed call maps its status to the language's error, keeps an unknown status code, and carries the call's diagnostic message"
+"ERR-02" = "Loading a library with a different C ABI version fails before any other call"
+
+# Handle lifecycle
+"LIFE-01" = "Closing a handle twice is safe and the second close does nothing"
+"LIFE-02" = "A close the native side refuses leaves the handle usable, and a later close succeeds"
+"LIFE-03" = "A borrow in progress on another thread holds off a close until the borrow ends"
+"LIFE-04" = "An abandoned handle is disposed off the callback stack, and the leak is reported through the binding's public output"
+"LIFE-05" = "A child handle keeps its parent alive"
+
+# Completions
+"COMP-01" = "A completion delivers exactly once, and a value that fails to convert is disposed"
+"COMP-02" = "A submission the native side rejects frees the binding's completion state"
+"COMP-03" = "Dropping the future of a creation retires the object it creates"
+"COMP-04" = "A failed command disposition arrives as data, not as an error"
+"COMP-05" = "Waiting on a completion can time out or be cancelled in the language's idiom"
+
+# Callbacks
+"CB-01" = "A callback registration is rooted while native holds it and released when native releases it, including when the registration is rejected"
+"CB-02" = "A registered callback does not keep its receiver alive"
+"CB-03" = "A call the admission policy forbids inside a callback fails, and an allowed one succeeds"
+"CB-04" = "An error thrown by a callback is contained and reported through the language's idiom"
+"CB-05" = "A resource provider can hand a request to a decision handle and answer it later"
+"CB-06" = "A scoped response object rejects use after its callback returns and use from another thread"
+"CB-07" = "Replacing a process-global callback releases the previous registration"
+"CB-08" = "A registration whose accepted_unless output reports rejection is not rooted"
+
+# Generated value shapes
+"VAL-01" = "Strings cross as NUL-terminated and as explicit-length views, and an embedded NUL is rejected where the C API needs termination"
+"VAL-02" = "Presence fields and masks round-trip optional values"
+"VAL-03" = "A strided batch and a union with an unknown arm decode without losing data"
+"VAL-04" = "Integer narrowing is checked, open enums keep unknown values, and 64-bit carriers round-trip"
+"VAL-05" = "An array input is copied at submission, so changing it afterwards has no effect"
+
+# Views and rendering
+"VIEW-01" = "A borrowed view expires with its scope, and closing its owner while it is borrowed reports busy"
+"REND-01" = "An owned-texture session renders a frame the binding reads back as pixels, on each backend the build supports"
+"REND-02" = "A caller-driven session is serviced from a thread the language manages (event loop, coroutine, isolate)"
+
+# Platform
+"PLAT-01" = "The binding finds and loads the native library as it ships (package, loader, build hook)"
+"PLAT-02" = "Process exit, or language runtime shutdown, with live handles and callbacks that the host did not retire first exits cleanly"
+"PLAT-03" = "The garbage collector or cycle collector reclaims abandoned handles and callback cycles"
+
+# Examples
+"EX-01" = "Each example in this binding's language renders one frame headless and exits cleanly, or builds where no backend can run"

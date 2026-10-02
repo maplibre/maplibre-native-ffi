@@ -838,6 +838,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "inventory"
+version = "0.3.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4f0c30c76f2f4ccee3fe55a2435f691ca00c0e4bd87abe4f4a851b1d4dac39b"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "itertools"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1012,16 +1021,11 @@ dependencies = [
 name = "maplibre-native-ffi"
 version = "0.0.0"
 dependencies = [
- "ash",
  "bindgen",
  "bitflags 2.13.0",
- "gl_generator",
- "glow",
- "glutin_egl_sys",
  "libloading",
  "maplibre-native-ffi-core",
  "maplibre-native-ffi-sys",
- "serde_json",
  "static_assertions",
 ]
 
@@ -1029,7 +1033,6 @@ dependencies = [
 name = "maplibre-native-ffi-core"
 version = "0.0.0"
 dependencies = [
- "bitflags 2.13.0",
  "maplibre-native-ffi-sys",
 ]
 
@@ -1046,7 +1049,6 @@ dependencies = [
 name = "maplibre-native-ffi-sys"
 version = "0.0.0"
 dependencies = [
- "bindgen",
  "flate2",
  "mln-ffi-platform",
  "serde",
@@ -1656,6 +1658,7 @@ version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd274650b21d4bfc26a0a47587962c1edb425f69287324355cd040c3ea66071c"
 dependencies = [
+ "inventory",
  "libc",
  "once_cell",
  "portable-atomic",

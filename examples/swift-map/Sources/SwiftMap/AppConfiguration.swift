@@ -15,7 +15,7 @@ struct AppConfiguration {
       exit(0)
     }
 
-    let backends = Maplibre.supportedRenderBackends()
+    let backends = (try! Maplibre.supportedRenderBackendMask())
     print("native render backends: \(renderBackendLabel(backends))")
     guard backends.contains(.metal) else {
       printError("the loaded MapLibre native library does not support Metal")
@@ -54,12 +54,14 @@ struct AppConfiguration {
     )
   }
 
-  private static func renderBackendLabel(_ backends: RenderBackend) -> String {
+  private static func renderBackendLabel(_ backends: RenderBackendFlag)
+    -> String
+  {
     var labels: [String] = []
     if backends.contains(.metal) {
       labels.append("metal")
     }
-    if backends.contains(.openGL) {
+    if backends.contains(.opengl) {
       labels.append("opengl")
     }
     if backends.contains(.vulkan) {

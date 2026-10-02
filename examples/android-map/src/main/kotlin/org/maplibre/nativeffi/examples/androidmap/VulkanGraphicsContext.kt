@@ -1,9 +1,8 @@
 package org.maplibre.nativeffi.examples.androidmap
 
 import android.view.Surface
+import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.NativePointer
-import org.maplibre.nativeffi.render.VulkanContextDescriptor
-import org.maplibre.nativeffi.render.VulkanHandle
 
 /**
  * The Vulkan context. The instance, the device, and the queue are chosen for the `VkSurfaceKHR`
@@ -24,13 +23,13 @@ internal class VulkanGraphicsContext private constructor(private var handle: Lon
         NativePointer.ofAddress(VulkanNativeBridge.physicalDevice(handle)),
         NativePointer.ofAddress(VulkanNativeBridge.device(handle)),
         NativePointer.ofAddress(VulkanNativeBridge.graphicsQueue(handle)),
-        VulkanNativeBridge.graphicsQueueFamilyIndex(handle),
+        VulkanNativeBridge.graphicsQueueFamilyIndex(handle).toUInt(),
         NativePointer.ofAddress(VulkanNativeBridge.getInstanceProcAddr()),
         NativePointer.ofAddress(VulkanNativeBridge.getDeviceProcAddr()),
       )
 
-  val surfaceHandle: VulkanHandle
-    get() = VulkanHandle.ofBits(VulkanNativeBridge.surface(handle))
+  val surfaceHandle: ULong
+    get() = VulkanNativeBridge.surface(handle).toULong()
 
   /**
    * Takes the window this context was built for, which is the only one that reaches here: a live
@@ -43,7 +42,7 @@ internal class VulkanGraphicsContext private constructor(private var handle: Lon
    * outgoing one to still be valid, so the session and this context close together and attach again
    * against the next window, accepting a cold renderer.
    */
-  override fun releaseSurface(): Boolean = false
+  override fun releaseSurface(handOver: () -> Unit): Boolean = false
 
   override fun close() {
     if (handle == 0L) {

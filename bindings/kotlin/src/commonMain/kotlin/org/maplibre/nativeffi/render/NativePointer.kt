@@ -1,9 +1,11 @@
 package org.maplibre.nativeffi.render
 
+import org.maplibre.nativeffi.internal.lifecycle.ViewScope
+
 /** Opaque borrowed native address value used for backend interop handles. */
 public class NativePointer
-private constructor(private val addressValue: Long, private val scope: FrameScope?) {
-  /** Borrowed address bit pattern. Access rejects use after a scoped frame closes. */
+private constructor(private val addressValue: Long, private val scope: ViewScope?) {
+  /** Borrowed address bit pattern. Access rejects use after its borrowed view closes. */
   public val address: Long
     get() {
       ensureActive()
@@ -57,7 +59,7 @@ private constructor(private val addressValue: Long, private val scope: FrameScop
     public fun ofAddress(address: Long): NativePointer =
       if (address == 0L) NULL_POINTER else NativePointer(address, null)
 
-    internal fun scoped(address: Long, scope: FrameScope): NativePointer =
+    internal fun scoped(address: Long, scope: ViewScope): NativePointer =
       if (address == 0L) NULL_POINTER else NativePointer(address, scope)
   }
 }

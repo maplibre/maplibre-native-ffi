@@ -16,13 +16,13 @@ import providerSnippet from "../../../../snippets/c/resource-provider.c?raw";
 Three extension points intercept resource requests. A resource transform
 rewrites a URL before the network request. An HTTP header transform adds headers
 to the request that follows. A resource provider supplies the response bytes.
-Register each one on the runtime owner thread.
+Register each one with an any-thread runtime command.
 
 MapLibre can invoke any of these callbacks concurrently on network and worker
 threads. Protect every value that a callback reads and return quickly because
-the resource request waits. A transform callback sets a replacement URL. A
-header transform callback sets header names and values. A provider callback
-operates only on the request handle that it received.
+the resource request waits. A transform callback sets a replacement URL. A header transform callback sets
+header names and values. A provider callback operates only on the request
+handle that it received.
 
 ## Rewrite a URL with a transform
 
@@ -40,8 +40,8 @@ a non-OK status preserves the original request.
 
 <Code code={region(transformSnippet, "rewrite")} lang="c" title="resource-transform.c" />
 
-Registering a transform replaces the previous transform. After the registration
-call returns, the replaced transform has no in-flight callbacks.
+Registering a transform replaces the previous transform in runtime submission
+order.
 
 <Code code={region(transformSnippet, "install")} lang="c" title="resource-transform.c" />
 
@@ -63,10 +63,9 @@ headers from that invocation and sends the request unchanged.
 
 <Code code={region(headerSnippet, "set")} lang="c" title="http-header-transform.c" />
 
-Register the transform on the runtime, and use
-`mln_runtime_clear_http_header_transform` to stop adding headers. Both calls
-work while maps are live, so a host installs a refreshed credential without
-recreating the runtime.
+Submit the transform command on the runtime, and submit the corresponding clear
+command to stop adding headers. Both commands work while maps are live, so a
+host installs a refreshed credential without recreating the runtime.
 
 <Code code={region(headerSnippet, "install")} lang="c" title="http-header-transform.c" />
 
@@ -108,18 +107,17 @@ MapLibre cancels a request when the map stops wanting the resource, for example
 after a style change or map teardown. Check for cancellation before expensive
 work, or register a cancel callback to abort an in-flight fetch. A request takes
 one callback. It runs once, for a request the provider has not completed, on the
-thread that discards the request. That is the owner thread inside a map call
-such as a style change or map destruction, and a MapLibre thread otherwise. The
-callback may complete or release the same handle. A request that was cancelled
-before the registration reports that through the out-parameter instead, and the
-callback never runs.
+MapLibre thread that discards the request: the runtime's native scheduler thread
+when a map or runtime command discards it, and a MapLibre worker thread
+otherwise. The callback may complete or release the same handle. A request that
+MapLibre cancelled before the registration reports that to the registering call
+instead, and the callback never runs.
 
 <Code code={region(providerSnippet, "cancel")} lang="c" title="resource-provider.c" />
 
 ## Keep callback state reachable
 
-The runtime stores each callback and its user data by reference. Keep callback
-state reachable until replacing or clearing the callback, or destroying the
-runtime. Each operation waits for in-flight callbacks to return. Release any
-host lock that a callback also acquires before destroying the runtime. Holding
-that lock can deadlock destruction.
+The runtime owns callback state after accepting a registration. It releases the
+state after replacement, clear, or runtime teardown retires every in-flight
+callback. Release any host lock that a callback also acquires before starting
+close; holding that lock can deadlock teardown.

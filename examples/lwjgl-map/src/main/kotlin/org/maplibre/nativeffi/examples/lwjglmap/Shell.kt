@@ -1,157 +1,119 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
-import org.lwjgl.glfw.GLFW.glfwPollEvents
+import org.lwjgl.glfw.GLFW.glfwPostEmptyEvent
 import org.lwjgl.glfw.GLFW.glfwSetFramebufferSizeCallback
 import org.lwjgl.glfw.GLFW.glfwSetWindowContentScaleCallback
 import org.lwjgl.glfw.GLFW.glfwSetWindowSizeCallback
+import org.lwjgl.glfw.GLFW.glfwWaitEvents
 import org.lwjgl.glfw.GLFW.glfwWaitEventsTimeout
 import org.lwjgl.glfw.GLFW.glfwWindowShouldClose
-import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 /**
- * The two loops the example runs on two native threads.
+ * The GLFW-thread shell that owns the window, graphics context, and render session.
  *
- * GLFW requires window creation and event polling on the process main thread, so the main thread is
- * the render loop: it owns the window, input decoding, the graphics context, and the render session
- * it attaches. The spawned thread is the runtime loop: it owns the runtime and the map for their
- * whole lifetime.
+ * The thread sleeps in `glfwWaitEvents` until input arrives or a native wake posts an empty event.
+ * Input becomes map commands, a map update becomes a frame demand, and the wakes have the thread
+ * drain events and frame results.
  */
 internal object Shell {
   private const val INITIAL_WIDTH = 960
   private const val INITIAL_HEIGHT = 640
-  private const val IDLE_WAIT_SECONDS = 0.004
 
-  fun run(mode: RenderTargetMode, backends: Set<RenderBackend>) {
-    GraphicsContext.create("MapLibre LWJGL Map", INITIAL_WIDTH, INITIAL_HEIGHT, backends).use {
-      graphics ->
-      val initialViewport = Viewport.read(graphics.window())
-      val viewport = ViewportHolder(initialViewport)
-      initialViewport.log("initial viewport")
-
-      val commands = CommandQueue()
-      val renderRequest = RenderRequest()
-      val channel = MapChannel()
-      val runtimeThread =
-        Thread(
-          { runtimeLoop(initialViewport, commands, renderRequest, channel) },
-          "maplibre-runtime",
-        )
-      runtimeThread.start()
-
-      try {
-        renderLoop(graphics, mode, viewport, commands, renderRequest, channel)
-      } finally {
-        // A map with an attached session cannot be destroyed, so the runtime loop tears down only
-        // after the render loop has closed its session.
-        channel.requestShutdown()
-        runtimeThread.join()
-      }
-      channel.failure()?.let { throw it }
-    }
-  }
+  /** How long the smoke check waits for its first frame before it fails. */
+  private const val SMOKE_TIMEOUT_NANOS = 60_000_000_000L
 
   /**
-   * Owns the runtime and the map for their whole lifetime, on a thread that is not the one
-   * presenting. The render loop attaches its own session against the map published here.
+   * Runs the example until its window closes. A smoke run instead renders an inline style in a
+   * hidden window, so it needs neither the network nor a user, and returns after the first frame
+   * that reaches the window.
    */
-  private fun runtimeLoop(
-    viewport: Viewport,
-    commands: CommandQueue,
-    renderRequest: RenderRequest,
-    channel: MapChannel,
-  ) {
-    try {
-      MapState.create(viewport).use { state ->
-        state.acquireWakeSource().use { wake ->
-          channel.publish(state.map, wake)
-          commands.onEnqueue = { channel.wakeRuntimeLoop() }
-          try {
-            while (!channel.shutdownRequested()) {
-              state.step(commands, renderRequest)
+  fun run(mode: RenderTargetMode, backends: RenderBackendFlag, smoke: Boolean = false) {
+    GraphicsContext.create(
+        "MapLibre LWJGL Map",
+        INITIAL_WIDTH,
+        INITIAL_HEIGHT,
+        backends,
+        visible = !smoke,
+      )
+      .use { graphics ->
+        val viewport = ViewportHolder(Viewport.read(graphics.window()))
+        viewport.value.log("initial viewport")
+        val events = GlfwWake()
+        val style = if (smoke) MapState.SMOKE_STYLE else null
+        MapState.create(viewport.value, events.wake, style).use { state ->
+          InputController(graphics.window(), state) { viewport.value }
+            .use {
+              installResizeCallbacks(graphics.window(), viewport)
+              renderLoop(graphics, viewport, state, events, mode, smoke)
             }
-          } catch (error: Throwable) {
-            // Publish before the wait below, so the render loop sees the failure and closes its
-            // session rather than stalling until the bound expires.
-            channel.fail(error)
-          }
-          // A map with an attached session cannot be destroyed, so wait for the render loop to
-          // close its session before `use` tears this down.
-          channel.awaitShutdown()
         }
       }
-    } catch (error: Throwable) {
-      channel.fail(error)
-    }
   }
 
-  /** The display-paced render loop. Owns the window, input, and the render session it attaches. */
   private fun renderLoop(
     graphics: GraphicsContext,
-    mode: RenderTargetMode,
     viewport: ViewportHolder,
-    commands: CommandQueue,
-    renderRequest: RenderRequest,
-    channel: MapChannel,
+    state: MapState,
+    events: GlfwWake,
+    mode: RenderTargetMode,
+    smoke: Boolean,
   ) {
-    val map = awaitMap(channel) ?: return
-    val target = RenderTarget.attach(graphics, map, viewport.value, mode)
+    var target = attach(graphics, state, viewport.value, mode)
+    // A session fixes its scale factor at attachment, so a scale change reattaches.
+    var attachedScale = viewport.value.scaleFactor()
+    InputController.printControls()
+    val smokeDeadline = System.nanoTime() + SMOKE_TIMEOUT_NANOS
     try {
-      InputController(graphics.window(), commands, renderRequest) { viewport.value }
-        .use {
-          println("render target: ${mode.cliName()}")
-          println("render target status: ${mode.status()}")
-          InputController.printControls()
-          installResizeCallbacks(graphics.window(), viewport)
-          // TODO(map-example-spec): Replace poll-and-wait with a display-paced host loop. See Frame
-          // loop.
-          while (!glfwWindowShouldClose(graphics.window()) && channel.failure() == null) {
-            glfwPollEvents()
-            if (viewport.consumeChanged()) {
-              viewport.value.log("resized viewport")
-              if (!viewport.value.empty()) {
-                graphics.resize(viewport.value)
-                target.resize(viewport.value)
-                renderRequest.set()
-              }
-            }
-            if (viewport.value.empty()) {
-              glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
-              continue
-            }
-            var completed = false
-            if (renderRequest.consume()) {
-              completed = render(target)
-              if (!completed) {
-                renderRequest.set()
-              }
-            }
-            if (!completed) {
-              glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
-            }
+      // Wakes may have arrived while the attachment waited, so the loop handles pending work
+      // before its first wait.
+      while (!glfwWindowShouldClose(graphics.window())) {
+        if (viewport.consumeChanged()) {
+          viewport.value.log("resized viewport")
+          val next = viewport.value
+          if (!next.empty() && next.scaleFactor() == attachedScale) {
+            target.resize(next)
+          } else if (!next.empty()) {
+            target.close()
+            target = attach(graphics, state, next, mode)
+            attachedScale = next.scaleFactor()
           }
         }
+        if (events.consume() && state.drainRenderUpdates() && !viewport.value.empty()) {
+          target.requestFrame()
+        }
+        if (target.handleWakes() && smoke) {
+          println("smoke: rendered a frame")
+          return
+        }
+        check(!smoke || System.nanoTime() < smokeDeadline) {
+          "smoke: no frame reached the window within 60 seconds"
+        }
+        val wakeAt = listOfNotNull(target.retryAtNanos, smokeDeadline.takeIf { smoke }).minOrNull()
+        if (wakeAt == null) {
+          glfwWaitEvents()
+        } else {
+          glfwWaitEventsTimeout(maxOf(wakeAt - System.nanoTime(), 0L) / 1e9)
+        }
+      }
     } finally {
       target.close()
     }
   }
 
-  private fun render(target: RenderTarget): Boolean =
-    if (target.needsMetalAutoreleasePool()) {
-      MacObjectiveC.autoreleasePool().use { target.renderUpdate() }
-    } else {
-      target.renderUpdate()
-    }
-
-  /** Waits for the runtime loop to publish its map, or returns null when it failed first. */
-  private fun awaitMap(channel: MapChannel): MapHandle? {
-    while (channel.failure() == null) {
-      channel.mapHandle()?.let {
-        return it
-      }
-      Thread.sleep(1)
-    }
-    return null
+  /** Attaches a session, logs its mode and driver, and demands its first frame. */
+  private fun attach(
+    graphics: GraphicsContext,
+    state: MapState,
+    viewport: Viewport,
+    mode: RenderTargetMode,
+  ): RenderTarget {
+    val target = RenderTarget.attach(graphics, state.map, viewport, mode)
+    println("render target: ${mode.cliName()}")
+    println("render target status: ${mode.status()}")
+    println("render driver: ${target.driverLabel}")
+    target.requestFrame()
+    return target
   }
 
   private fun installResizeCallbacks(window: Long, viewport: ViewportHolder) {
@@ -160,7 +122,10 @@ internal object Shell {
     glfwSetWindowContentScaleCallback(window) { _, _, _ -> viewport.update(window) }
   }
 
-  /** Render loop state: GLFW delivers every resize callback on the thread that polls. */
+  /**
+   * GLFW delivers every resize callback on the thread that waits for events. A Cocoa resize arrives
+   * as a notification rather than an event, so the callback posts one to end the wait.
+   */
   private class ViewportHolder(var value: Viewport) {
     private var changed = false
 
@@ -169,6 +134,7 @@ internal object Shell {
       if (next != value) {
         value = next
         changed = true
+        glfwPostEmptyEvent()
       }
     }
 

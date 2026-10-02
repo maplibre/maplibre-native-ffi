@@ -65,7 +65,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
     public void Resize(Viewport viewport)
     {
         this.viewport = viewport;
-        context.WaitIdle();
+        context.WaitHostQueueIdle();
         DestroySwapchainDependents();
         var oldSwapchain = swapchain;
         var oldFormat = swapchainFormat;
@@ -95,7 +95,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         swapchainStale = false;
     }
 
-    public bool Draw(VulkanOwnedTextureFrame frame)
+    public bool Draw(VulkanOwnedTextureFrameView frame)
     {
         if (frame.Width == 0 || frame.Height == 0)
         {
@@ -111,12 +111,12 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             );
         }
 
-        if (frame.ImageView.IsNull)
+        if (frame.ImageView == 0)
         {
             throw new InvalidOperationException("MapLibre returned a null Vulkan image view.");
         }
 
-        return DrawImageView(new ImageView(frame.ImageView.Bits));
+        return DrawImageView(new ImageView(frame.ImageView));
     }
 
     public bool DrawImageView(ImageView imageView)
@@ -187,7 +187,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
     {
         if (context.Device.Handle != 0)
         {
-            context.WaitIdle();
+            context.WaitHostQueueIdle();
         }
 
         if (inFlight.Handle != 0)

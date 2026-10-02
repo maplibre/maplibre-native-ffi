@@ -1,0 +1,23 @@
+// The probe takes its records from the generated declarations, and looks its
+// functions up in the stub library, because the generated `@Native` externals
+// resolve the binding's code asset, which the probe does not build.
+// ignore_for_file: non_constant_identifier_names
+import 'dart:ffi';
+import 'dart:io';
+
+import 'maplibre_native_c.g.dart' hide mln_keyword_combine, mln_probe_roundtrip;
+export 'maplibre_native_c.g.dart' hide mln_keyword_combine, mln_probe_roundtrip;
+
+final _library = DynamicLibrary.open(Platform.environment['MLN_PROBE_LIBRARY']!);
+
+final mln_probe_roundtrip = _library.lookupFunction<
+    Int32 Function(
+        mln_probe_options, Pointer<mln_probe_options>, Pointer<mln_diagnostic>),
+    int Function(mln_probe_options, Pointer<mln_probe_options>,
+        Pointer<mln_diagnostic>)>('mln_probe_roundtrip');
+
+final mln_keyword_combine = _library.lookupFunction<
+    Int32 Function(Double, Double, Double, Double, Pointer<mln_keyword_entry>,
+        Pointer<mln_diagnostic>),
+    int Function(double, double, double, double, Pointer<mln_keyword_entry>,
+        Pointer<mln_diagnostic>)>('mln_keyword_combine');

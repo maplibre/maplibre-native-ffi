@@ -6,10 +6,11 @@ package maplibre
 import "C"
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-
-	internalstatus "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/status"
+	"sync"
+	"unsafe"
 )
 
 var (
@@ -18,17 +19,25 @@ var (
 	ErrInvalidArgument = errors.New("maplibre: invalid argument")
 	// ErrInvalidState reports valid objects used in an invalid lifecycle state.
 	ErrInvalidState = errors.New("maplibre: invalid state")
-	// ErrWrongThread reports use of an owner-thread-affine handle from the wrong
-	// OS thread.
+	// ErrWrongThread reports use of a thread-affine render handle from the
+	// wrong OS thread.
 	ErrWrongThread = errors.New("maplibre: wrong thread")
 	// ErrUnsupported reports a backend, platform, or operation unavailable in
 	// the linked native build.
 	ErrUnsupported = errors.New("maplibre: unsupported")
 	// ErrNative reports a MapLibre Native error converted to a C status.
 	ErrNative = errors.New("maplibre: native error")
-	// ErrABIVersionMismatch reports that the loaded C ABI version is
-	// incompatible with this binding.
-	ErrABIVersionMismatch = errors.New("maplibre: ABI version mismatch")
+	// ErrCancelled reports a terminal cancelled operation.
+	ErrCancelled = errors.New("maplibre: cancelled")
+	// ErrBusy reports a conflicting driver or lifecycle call.
+	ErrBusy = errors.New("maplibre: busy")
+	// ErrTargetLost reports irreversible render-target loss.
+	ErrTargetLost = errors.New("maplibre: target lost")
+	// ErrNotReady reports that a nonblocking call has no result yet.
+	ErrNotReady = errors.New("maplibre: not ready")
+	// ErrNotFound reports a command or operation that named an ID with no live
+	// object behind it.
+	ErrNotFound = errors.New("maplibre: not found")
 	// ErrUnknownStatus reports a status value unknown to this binding version.
 	ErrUnknownStatus = errors.New("maplibre: unknown native status")
 )
@@ -45,19 +54,12 @@ func newBindingError(kind error, diagnostic string) *Error {
 	return &Error{kind: kind, diagnostic: diagnostic}
 }
 
-func newABIVersionMismatchError(expected, actual uint32) *Error {
-	return newBindingError(
-		ErrABIVersionMismatch,
-		fmt.Sprintf("unsupported MapLibre Native C ABI version %d; expected %d", actual, expected),
-	)
-}
-
-func newStatusError(failure *internalstatus.NativeError) *Error {
+func newStatusError(status int32, diagnostic string) *Error {
 	return &Error{
-		kind:       kindForStatus(failure.Status),
-		rawStatus:  int32(failure.Status),
+		kind:       kindForStatus(status),
+		rawStatus:  status,
 		hasStatus:  true,
-		diagnostic: failure.Diagnostic,
+		diagnostic: diagnostic,
 	}
 }
 
@@ -97,16 +99,30 @@ func (e *Error) Diagnostic() string {
 	return e.diagnostic
 }
 
-func checkNative[S ~int32](call func() S) error {
-	failure := internalstatus.CheckCall(call, threadLastErrorMessage)
-	if failure == nil {
+// Native writes a call's diagnostic at call exit, and checkNative copies the
+// message before returning the diagnostic to the pool, so calls reuse
+// diagnostics instead of allocating a message buffer each. A diagnostic holds
+// no Go pointers, so cgo permits passing it to native.
+var diagnosticPool = sync.Pool{New: func() any { return new(C.mln_diagnostic) }}
+
+// checkNative runs a status-returning call with a diagnostic and converts a
+// failure status into an *Error that carries the call's diagnostic.
+func checkNative(call func(*C.mln_diagnostic) int32) error {
+	diagnostic := diagnosticPool.Get().(*C.mln_diagnostic)
+	defer diagnosticPool.Put(diagnostic)
+	diagnostic.size = C.uint32_t(unsafe.Sizeof(*diagnostic))
+	// A call without a diagnostic parameter leaves the message untouched, so
+	// clear any message a previous call left behind.
+	diagnostic.message[0] = 0
+	status := call(diagnostic)
+	if status == int32(C.MLN_STATUS_OK) {
 		return nil
 	}
-	return newStatusError(failure)
-}
-
-func threadLastErrorMessage() string {
-	return C.GoString(C.mln_thread_last_error_message())
+	message := unsafe.Slice((*byte)(unsafe.Pointer(&diagnostic.message[0])), len(diagnostic.message))
+	if end := bytes.IndexByte(message, 0); end >= 0 {
+		message = message[:end]
+	}
+	return newStatusError(status, string(message))
 }
 
 func kindForStatus(status int32) error {
@@ -121,6 +137,16 @@ func kindForStatus(status int32) error {
 		return ErrUnsupported
 	case int32(C.MLN_STATUS_NATIVE_ERROR):
 		return ErrNative
+	case int32(C.MLN_STATUS_CANCELLED):
+		return ErrCancelled
+	case int32(C.MLN_STATUS_BUSY):
+		return ErrBusy
+	case int32(C.MLN_STATUS_TARGET_LOST):
+		return ErrTargetLost
+	case int32(C.MLN_STATUS_NOT_READY):
+		return ErrNotReady
+	case int32(C.MLN_STATUS_NOT_FOUND):
+		return ErrNotFound
 	default:
 		return ErrUnknownStatus
 	}

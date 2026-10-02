@@ -137,9 +137,9 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
     )
   }
 
+  // The session reports a rendered frame once its GPU work completes, so the consumer can read it.
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
     renderedGeneration = frame.target.generation
-    rendererDispatcher.run { vulkan?.waitIdle() }
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
@@ -241,6 +241,9 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
       disposeCurrentTexture()
       return
     }
+    // The session still names this image until its target replacement completes, after this
+    // returns. Destroying it now is safe only because each draw waits for its own demand's result,
+    // which leaves the core worker idle between draws.
     importedTexture?.close()
     importedTexture = null
     releaseDirect3DTexture(retiredDirect3DTexture)

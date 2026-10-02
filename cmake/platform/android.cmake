@@ -2,14 +2,13 @@ function(mln_ffi_configure_platform_dependencies target)
   target_link_libraries(${target} INTERFACE android atomic log z)
   mln_ffi_bundle_clang_cxx_runtime(${target} "${CMAKE_ANDROID_NDK}/NOTICE")
   string(REGEX REPLACE "^android-" "" android_api_level "${ANDROID_PLATFORM}")
-  # The emulator this repository boots runs x86_64 with SwiftShader drivers for
-  # both render backends, so every x86_64 configuration can execute its suite.
+  # Both emulator architectures run the suite through the Android task runner.
   if(ANDROID_ABI STREQUAL "x86_64")
     set(android_test_supported TRUE)
     set(android_target_platform android-x64)
     set(android_target_triple x86_64-linux-android)
   elseif(ANDROID_ABI STREQUAL "arm64-v8a")
-    set(android_test_supported FALSE)
+    set(android_test_supported TRUE)
     set(android_target_platform android-arm64)
     set(android_target_triple aarch64-linux-android)
   elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
@@ -45,9 +44,6 @@ function(mln_ffi_configure_platform target)
   include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
 
   set(MLN_FFI_VENDOR_ANDROID_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/android/src/async_task.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/android/src/run_loop.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/android/src/timer.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/collator.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
@@ -61,6 +57,9 @@ function(mln_ffi_configure_platform target)
       ${PROJECT_SOURCE_DIR}/src/platform/android/asset_manager.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/logging_logcat.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/thread.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/run_loop/async_task.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/run_loop/run_loop.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/run_loop/timer.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
 

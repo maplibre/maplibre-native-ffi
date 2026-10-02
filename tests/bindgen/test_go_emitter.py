@@ -1,0 +1,122 @@
+"""Compile new C value shapes and execute their generated Go round trips."""
+
+import shutil
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from support import (
+    FIXTURES,
+    PROTOCOLS_STUB,
+    ROOT,
+    parse_sources,
+    protocol_header,
+    require_tool,
+)
+
+from tools.bindgen.emitters import go
+from tools.bindgen.schema import validate
+
+
+class GoEmitterTests(unittest.TestCase):
+    def test_header_mutation_compiles_counted_arrays_and_keyword_names(self):
+        for scalar, literal in (("double", "3.25"), ("_Bool", "true")):
+            with self.subTest(scalar=scalar), TemporaryDirectory() as directory:
+                root = Path(directory)
+                include = root / "include"
+                include.mkdir()
+                header = protocol_header(
+                    groups=("values", "keywords"),
+                    defines=(f"MLN_PROTOCOL_GAIN_TYPE {scalar}",),
+                )
+                (include / "api.h").write_text(header)
+                shutil.copy(PROTOCOLS_STUB, root / "protocols_stub.c")
+                api = parse_sources({"api.h": header})
+                validate(api)
+                self.assertEqual(
+                    go.coverage(api),
+                    {
+                        "generated": [
+                            "mln_keyword_combine",
+                            "mln_probe_nullable_text",
+                            "mln_probe_roundtrip",
+                        ],
+                        "unsupported": {},
+                    },
+                )
+                files = go.generate(api)
+                source = files["generated_api.go"]
+                source = source.replace(
+                    "#cgo pkg-config: maplibre-native-c",
+                    "#cgo CFLAGS: -I${SRCDIR}/include",
+                )
+                source = source.replace(
+                    '#include "maplibre_native_c/plugin.h"', '#include "api.h"'
+                )
+                source = source.replace(
+                    '#include "maplibre_native_c/callback_adapter.h"', ""
+                )
+                (root / "generated.go").write_text(source)
+                (root / "generated_callbacks.h").write_text(
+                    "enum { binding_operation_mln_probe_roundtrip = 1, binding_operation_mln_probe_nullable_text = 2, binding_operation_mln_keyword_combine = 3 };\n"
+                )
+                (root / "go.mod").write_text("module fixture\n\ngo 1.24\n")
+                (root / "runtime.go").write_text(
+                    """package maplibre
+/*
+#cgo CFLAGS: -I${SRCDIR}/include -IFIXTURES -DMLN_PROTOCOL_GAIN_TYPE=SCALAR
+#include <stdlib.h>
+#include "api.h"
+*/
+import "C"
+import "unsafe"
+import "fmt"
+type bindingArena struct { pointers []unsafe.Pointer }
+func (a *bindingArena) allocate(size uintptr) unsafe.Pointer { if size==0 { return nil }; p := C.calloc(1, C.size_t(size)); a.pointers = append(a.pointers,p); return p }
+func (a *bindingArena) bytes(value []byte) unsafe.Pointer { if len(value)==0 { return nil }; p:=a.allocate(uintptr(len(value))); copy(unsafe.Slice((*byte)(p),len(value)),value); return p }
+func bindingString(p unsafe.Pointer,n uint64) string { return string(unsafe.Slice((*byte)(p),int(n))) }
+func (a *bindingArena) array(count int,size uintptr) unsafe.Pointer { return a.allocate(uintptr(count)*size) }
+func (a *bindingArena) close() { for _, p := range a.pointers { C.free(p) } }
+func (a *bindingArena) fail(message string) { panic(message) }
+func bindingCall[T any](f func() T) (T,error) { return f(),nil }
+func bindingCheck(f func(*C.mln_diagnostic) int32) { if f(nil)!=0 { panic("native failure") } }
+func bindingAdmission(_ uint32,_ uint64) {}
+func bindingCount[T ~uint16 | ~uint32](n int) T { if uint64(T(n)) != uint64(n) { panic("overflow") }; return T(n) }
+func bindingCountLike[T ~uint16 | ~uint32](_ T,n int) T { if uint64(T(n)) != uint64(n) { panic("overflow") }; return T(n) }
+func bindingLength(n uint64) int { return int(n) }
+func bindingElement(p unsafe.Pointer,i int,stride uint64,size,align uintptr) unsafe.Pointer { if stride < uint64(size) || stride%uint64(align)!=0 { panic(fmt.Sprint("invalid stride",stride)) }; return unsafe.Add(p,uintptr(i)*uintptr(stride)) }
+type bindingTarget struct { operation uint32 }
+func bindingGlobal(operation uint32) bindingTarget { return bindingTarget{operation} }
+func bindingGet[T any](target bindingTarget, call func(*bindingArena, uint64, *C.mln_diagnostic) int32, result func(*bindingArena) T) (T, error) { a := &bindingArena{}; defer a.close(); bindingAdmission(target.operation, 0); bindingCheck(func(d *C.mln_diagnostic) int32 { return call(a, 0, d) }); return result(a), nil }
+""".replace("FIXTURES", str(FIXTURES)).replace("SCALAR", scalar)
+                )
+                # The value conversions need no C declarations, so the probe
+                # compiles the binding's own file over the arena above.
+                shutil.copy(ROOT / "bindings/go/convert.go", root / "convert.go")
+                (root / "values_test.go").write_text(
+                    """package maplibre
+import "testing"
+func TestRoundtrip(t *testing.T) {
+    point := ProbePoint{Type: 9.5, Gain: LITERAL}
+    empty := ""
+    input := ProbeOptions{Title: &empty, Point: &point, Left: []ProbePoint{point}, Right: []ProbePoint{point,point}}
+    output, err := ProbeRoundtrip(input)
+    if err != nil || output.Title == nil || *output.Title != "" || output.Point == nil || *output.Point != point || len(output.Left)!=1 || len(output.Right)!=2 || output.Right[1]!=point { t.Fatalf("round trip: %+v, %v",output,err) }
+    emptyArray, err := ProbeRoundtrip(ProbeOptions{Left: []ProbePoint{}})
+    if err != nil || emptyArray.Left == nil || len(emptyArray.Left)!=0 { t.Fatalf("present empty array: %+v, %v",emptyArray,err) }
+    for _, text := range []*string{nil, &empty, func() *string { value:="text";return &value }()} {
+        result, err := ProbeNullableText(text)
+        copied := result.Text
+        if err != nil || (text==nil)!=(copied==nil) || (text!=nil && *text!=*copied) { t.Fatalf("nullable text: %v, %v",copied,err) }
+    }
+    input.Left[0].Type = 0
+    if output.Left[0].Type != 9.5 { t.Fatal("result aliases input storage") }
+    absent, err := ProbeRoundtrip(ProbeOptions{})
+    if err != nil || absent.Title != nil || absent.Point != nil || len(absent.Left)!=0 || len(absent.Right)!=0 { t.Fatalf("absence: %+v, %v",absent,err) }
+    keywords, err := KeywordCombine(5, 2, 7, 11)
+    if err != nil || keywords != (KeywordEntry{Type: 3, Defer: 7, Raw: 11}) { t.Fatalf("keyword names: %+v, %v",keywords,err) }
+}
+""".replace("LITERAL", literal)
+                )
+                go_tool = require_tool(self, "go", ROOT / "bindings/go")
+                go_tool.run(self, "test", "./...", cwd=root)

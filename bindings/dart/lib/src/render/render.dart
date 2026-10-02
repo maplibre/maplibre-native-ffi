@@ -2,6 +2,6 @@
 library;
 
 export '../runtime/runtime.dart'
-    show RenderResult, RenderSessionHandle, RenderUpdate;
+    show AcquiredFrameHandle, RenderSessionAttachment, RenderSessionHandle;
 export 'native_pointer.dart';
 export 'targets.dart';

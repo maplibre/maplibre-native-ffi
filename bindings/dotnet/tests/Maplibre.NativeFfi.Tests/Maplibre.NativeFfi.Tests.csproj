@@ -17,5 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Maplibre.NativeFfi/Maplibre.NativeFfi.csproj" />
+    <!-- Builds the exit probe beside the tests, which run it as a child process. -->
+    <ProjectReference Include="../Maplibre.NativeFfi.ExitProbe/Maplibre.NativeFfi.ExitProbe.csproj" />
   </ItemGroup>
 </Project>

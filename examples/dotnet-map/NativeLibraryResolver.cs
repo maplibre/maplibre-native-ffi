@@ -41,6 +41,12 @@ internal static class NativeLibraryResolver
 
             preloadedGlfw = true;
             ResolveNativeLibrary("glfw", typeof(NativeLibraryResolver).Assembly, null);
+            // GLFW asks the OS loader for ANGLE's libEGL by name on macOS, which finds
+            // it only once it is loaded, so the build's copy is loaded here first.
+            if (OperatingSystem.IsMacOS())
+            {
+                ResolveNativeLibrary("EGL", typeof(NativeLibraryResolver).Assembly, null);
+            }
         }
     }
 
@@ -101,6 +107,15 @@ internal static class NativeLibraryResolver
 
     private static IEnumerable<string> CandidateLibraryDirectories()
     {
+        foreach (
+            var directory in SplitLibraryDirectories(
+                Environment.GetEnvironmentVariable("MAPLIBRE_NATIVE_FFI_LIBRARY_DIRS")
+            )
+        )
+        {
+            yield return directory;
+        }
+
         // The MapLibre install's runtime, including the ANGLE libEGL the OpenGL presets ship.
         yield return AppContext.BaseDirectory;
 
@@ -111,5 +126,23 @@ internal static class NativeLibraryResolver
             RuntimeInformation.RuntimeIdentifier,
             "native"
         );
+    }
+
+    private static IEnumerable<string> SplitLibraryDirectories(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            yield break;
+        }
+
+        foreach (
+            var directory in value.Split(
+                Path.PathSeparator,
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            )
+        )
+        {
+            yield return directory;
+        }
     }
 }

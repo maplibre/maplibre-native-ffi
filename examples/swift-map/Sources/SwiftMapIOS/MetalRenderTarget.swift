@@ -24,13 +24,11 @@ final class MetalGraphicsContext {
     nativePointer(layer)
   }
 
+  /// Follows a new viewport. The session sets the layer's drawable size, so
+  /// the host sets only the contents scale.
   func resize(_ viewport: Viewport) {
     guard !viewport.isEmpty else { return }
     layer.contentsScale = viewport.scaleFactor
-    layer.drawableSize = CGSize(
-      width: Int(viewport.physicalWidth),
-      height: Int(viewport.physicalHeight)
-    )
   }
 
   private func configureLayer() {
@@ -40,50 +38,112 @@ final class MetalGraphicsContext {
   }
 }
 
-/// The render session for the host `CAMetalLayer`. Attach records the calling
-/// thread as the session's owner, so every call here runs on the render loop
-/// thread that owns the view and its layer.
+/// What one drain of the frame-result queue found.
+struct FrameResults {
+  /// A demand rendered and presented a frame.
+  var rendered = false
+  /// The map asked for another frame while it rendered one.
+  var needsRepaint = false
+  /// The target could not produce a frame, so the loop retries later.
+  var targetNotReady = false
+}
+
+/// The render session for the host `CAMetalLayer`. A Metal surface accepts a
+/// core worker, which renders and presents on its own thread, so the host runs
+/// nothing for the session.
 @MainActor
 final class MetalRenderTarget {
   private let session: RenderSessionHandle
+  let driver = RenderDriverKind.coreWorker
+  private var nextToken: UInt64 = 0
 
   private init(session: RenderSessionHandle) {
     self.session = session
   }
 
-  /// Attaches a session against the map the runtime loop published.
+  /// Attaches a session against the map. `frameWake` reports frame results.
   static func attach(
-    attachRef: MapAttachRef,
+    map: MapHandle,
     graphics: MetalGraphicsContext,
-    viewport: Viewport
-  ) throws -> MetalRenderTarget {
-    let session = try attachRef.attachMetalSurface(MetalSurfaceDescriptor(
-      extent: viewport.extent,
-      context: graphics.contextDescriptor,
-      layer: graphics.layerPointer
-    ))
-    return MetalRenderTarget(session: session)
-  }
-
-  func resize(_ viewport: Viewport) throws {
-    try session.resize(
-      width: viewport.logicalWidth,
-      height: viewport.logicalHeight,
-      scaleFactor: viewport.scaleFactor
+    viewport: Viewport,
+    frameWake: Wake
+  ) async throws -> MetalRenderTarget {
+    let attachment = try map.metalSurfaceAttach(
+      descriptor: MetalSurfaceDescriptor(
+        extent: viewport.extent,
+        context: graphics.contextDescriptor,
+        layer: graphics.layerPointer
+      ),
+      options: .init(driver: .coreWorker, frameWake: frameWake)
     )
+    let session = attachment.session
+    do {
+      try await attachment.completion.value
+      return MetalRenderTarget(session: session)
+    } catch {
+      _ = try? session.abandon()
+      try? session.close()
+      throw error
+    }
   }
 
-  /// Services a render request. False requests a target retry.
-  func renderUpdate() throws -> Bool {
-    try session.renderUpdate().result != .targetNotReady
+  /// Carries a new viewport to the session, which carries the extent to the
+  /// map.
+  func resize(_ viewport: Viewport) async throws {
+    try await session.resize(extent: viewport.extent)
   }
 
-  func finishFrame() throws {
-    // The Metal surface path needs no per-iteration host upkeep here.
+  /// Demands a presented frame. A forced demand renders even without a newer
+  /// map update, which a retry after an undrawn frame needs.
+  func requestFrame(force: Bool = false) throws {
+    nextToken += 1
+    try session.requestFrame(demand: FrameDemand(
+      flags: force ? [.present] : [.ifNeeded, .present],
+      token: nextToken
+    ))
   }
 
-  func close() throws {
-    try session.close()
+  /// Waits until every demand accepted so far has its result, so no frame
+  /// renders after the app enters the background.
+  func barrier() async throws {
+    try await session.barrier()
+  }
+
+  /// Drains every queued frame result.
+  func drainResults() throws -> FrameResults {
+    let batch: RenderFrameBatchHandle
+    do { batch = try session.drainFrameResults() }
+    catch let error as MaplibreError
+      where error.kind == .notReady { return FrameResults() }
+    defer { try? batch.close() }
+    var results = FrameResults()
+    // No update and size pending wait for the map's next update, superseded
+    // demands have a newer one behind them, and no demand carries a timeout.
+    for index in try 0 ..< (batch.count()) {
+      let result = try batch.get(index: index)
+      if result.disposition == .rendered {
+        results.rendered = true
+        results.needsRepaint = result.needsRepaint
+      } else if result.disposition == .targetNotReady {
+        results.targetNotReady = true
+      }
+    }
+    return results
+  }
+
+  func close() async throws {
+    do {
+      try await session.detach()
+      try session.close()
+    } catch {
+      abandon()
+      throw error
+    }
+  }
+
+  func abandon() {
+    _ = try? session.abandon()
+    try? session.close()
   }
 }
 
