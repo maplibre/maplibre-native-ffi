@@ -278,6 +278,9 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   // Holds the outgoing consumer texture for drawing while the replacement is still empty.
   private fun retireTexture() {
     if (renderedGeneration != generation || importedTexture == null) {
+      // The session still names this image until its target replacement completes, after this
+      // returns. Destroying it now is safe only because each draw waits for its own demand's
+      // result, which leaves the core worker idle between draws.
       disposeTexture(consumerContextCurrent = true)
       return
     }

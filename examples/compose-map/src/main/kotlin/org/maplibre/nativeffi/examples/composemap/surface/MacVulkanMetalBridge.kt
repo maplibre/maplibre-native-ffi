@@ -156,6 +156,9 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
       return
     }
 
+    // The session still names this image until its target replacement completes, after this
+    // returns. Destroying it now is safe only because each draw waits for its own demand's result,
+    // which leaves the core worker idle between draws.
     importedTexture?.close()
     importedTexture = null
     if (newTexture != oldTexture) {
