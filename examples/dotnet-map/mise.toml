@@ -46,6 +46,6 @@ for mode in owned-texture borrowed-texture native-surface; do
       --project examples/dotnet-map/Maplibre.NativeFfi.Examples.DotnetMap.csproj \
       -p:Platform="Any CPU" \
       -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/dotnet/$usage_preset/" \
-      -- "$mode"
+      -- "$mode" || exit
 done
 '''

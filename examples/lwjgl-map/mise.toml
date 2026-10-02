@@ -36,6 +36,6 @@ for mode in owned-texture borrowed-texture native-surface; do
   "${runner[@]}" ./gradlew \
     -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
     :examples:lwjgl-map:run \
-    --args="$mode"
+    --args="$mode" || exit
 done
 '''
