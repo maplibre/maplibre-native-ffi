@@ -615,8 +615,10 @@ termination. The runtime keeps loading while the view is off screen.
 
 The example tracks view visibility and app foreground separately, and demands
 frames only while the view is visible and the app is in the foreground. On a
-transition to the background, it also awaits a render-session barrier, so that
-no frame renders after the transition returns.
+transition to the background, it also awaits a render-session barrier while the
+platform keeps the app running, such as inside an iOS background task, so that
+no frame renders once the app is suspended. The transition callback itself
+returns without waiting.
 
 A platform callback that ends a surface's life, such as Android's
 surface-destroyed callback, returns only after the session stops using that

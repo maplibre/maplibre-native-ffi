@@ -89,13 +89,15 @@ final class MetalMapView: UIView {
   @objc private func enterBackground() {
     appForeground = false
     updatePresenting()
-    // The app may not render in the background, so it keeps running until
-    // the frames demanded before the pause have their results.
+    // The app may not render once it is suspended, so a background task keeps
+    // it running until the frames demanded before the pause have their
+    // results. The transition itself returns at once, as UIKit expects.
     guard let loop else { return }
-    let task = UIApplication.shared.beginBackgroundTask()
+    let task = BackgroundTask()
+    task.begin()
     Task { @MainActor in
       await loop.awaitRenderBarrier()
-      UIApplication.shared.endBackgroundTask(task)
+      task.end()
     }
   }
 
@@ -399,5 +401,24 @@ extension MetalMapView: UIGestureRecognizerDelegate {
       return true
     }
     return false
+  }
+}
+
+/// A UIKit background task that ends once, when its work finishes or when
+/// UIKit expires it.
+@MainActor
+private final class BackgroundTask {
+  private var identifier = UIBackgroundTaskIdentifier.invalid
+
+  func begin() {
+    identifier = UIApplication.shared.beginBackgroundTask { [self] in
+      MainActor.assumeIsolated { end() }
+    }
+  }
+
+  func end() {
+    guard identifier != .invalid else { return }
+    UIApplication.shared.endBackgroundTask(identifier)
+    identifier = .invalid
   }
 }
