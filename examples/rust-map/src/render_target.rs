@@ -123,6 +123,7 @@ pub struct Session {
     /// until its result, and the host owns it until the compositor's reads
     /// finish, so at most one demand is outstanding.
     takes_turns: bool,
+    /// Whether a turn-taking session has a demand outstanding.
     demand_outstanding: bool,
     /// A demand that arrived while one was outstanding, sent once the
     /// compositor is done. A forced one renders without a newer map update.
@@ -183,7 +184,7 @@ impl Session {
     /// undrawn frame needs. While a turn-taking session has a demand
     /// outstanding, the demand waits for [`Session::compositor_done`].
     pub fn request_frame(&mut self, force: bool) -> maplibre_native_ffi::Result<u64> {
-        if self.takes_turns && self.demand_outstanding {
+        if self.demand_outstanding {
             self.wanted = Some(force || self.wanted.unwrap_or(false));
             return Ok(self.next_token + 1);
         }
@@ -196,7 +197,7 @@ impl Session {
             token: self.next_token,
             ..FrameDemand::default()
         })?;
-        self.demand_outstanding = true;
+        self.demand_outstanding = self.takes_turns;
         Ok(self.next_token)
     }
 

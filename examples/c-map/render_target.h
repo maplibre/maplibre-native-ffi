@@ -23,6 +23,7 @@ typedef struct render_session {
   /// until its result, and the host owns it until the compositor's reads
   /// finish, so at most one demand is outstanding.
   bool takes_turns;
+  /// Whether a turn-taking session has a demand outstanding.
   bool demand_outstanding;
   /// A demand that arrived while one was outstanding, sent once the
   /// compositor is done. A forced one renders without a newer map update.

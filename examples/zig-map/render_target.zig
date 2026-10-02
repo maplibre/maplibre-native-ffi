@@ -50,6 +50,7 @@ pub const Session = struct {
     /// until its result, and the host owns it until the compositor's reads
     /// finish, so at most one demand is outstanding.
     takes_turns: bool = false,
+    /// Whether a turn-taking session has a demand outstanding.
     demand_outstanding: bool = false,
     /// A demand that arrived while one was outstanding, sent once the
     /// compositor is done. A forced one renders without a newer map update.
@@ -114,7 +115,7 @@ pub const Session = struct {
     /// undrawn frame needs. While a turn-taking session has a demand
     /// outstanding, the demand waits for `compositorDone`.
     pub fn requestFrame(self: *Session, force: bool) !u64 {
-        if (self.takes_turns and self.demand_outstanding) {
+        if (self.demand_outstanding) {
             self.wanted = force or (self.wanted orelse false);
             return self.next_token + 1;
         }
@@ -127,7 +128,7 @@ pub const Session = struct {
             diagnostics.logError("frame demand failed", err, &diagnostic);
             return types.AppError.RenderFailed;
         };
-        self.demand_outstanding = true;
+        self.demand_outstanding = self.takes_turns;
         return self.next_token;
     }
 

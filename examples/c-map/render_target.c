@@ -157,7 +157,7 @@ void render_session_close(render_session* session) {
 app_error render_session_request_frame(
   render_session* session, bool force, uint64_t* out_token
 ) {
-  if (session->takes_turns && session->demand_outstanding) {
+  if (session->demand_outstanding) {
     session->demand_wanted = true;
     session->wanted_forced = session->wanted_forced || force;
     if (out_token != nullptr) *out_token = session->next_frame_token + 1;
@@ -175,7 +175,7 @@ app_error render_session_request_frame(
       APP_ERROR_RENDER_FAILED, "frame demand failed", status, &diagnostic
     );
   }
-  session->demand_outstanding = true;
+  session->demand_outstanding = session->takes_turns;
   if (out_token != nullptr) *out_token = demand.token;
   return APP_OK;
 }

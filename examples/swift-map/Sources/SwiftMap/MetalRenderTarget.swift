@@ -165,7 +165,7 @@ final class MetalRenderTarget {
   /// demand waits for ``compositorDone()``.
   @discardableResult
   func requestFrame(force: Bool = false) throws -> UInt64 {
-    if case .borrowedTexture = kind, demandOutstanding {
+    if demandOutstanding {
       wantedDemand = force || (wantedDemand ?? false)
       return nextToken + 1
     }
@@ -178,7 +178,7 @@ final class MetalRenderTarget {
       flags: flags,
       token: nextToken
     ))
-    demandOutstanding = true
+    if case .borrowedTexture = kind { demandOutstanding = true }
     return nextToken
   }
 
