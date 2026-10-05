@@ -1,0 +1,34 @@
+diff --git a/src/mln/webgpu/context.cpp b/src/mln/webgpu/context.cpp
+--- a/src/mln/webgpu/context.cpp
++++ b/src/mln/webgpu/context.cpp
+@@ -67,6 +67,8 @@
+ 
+ void Context::performCleanup() {
+     backend.getThreadPool().runRenderJobs();
++    stats.numDrawCalls = 0;
++    stats.numFrames++;
+ }
+ 
+ void Context::reduceMemoryUsage() {
+diff --git a/src/mln/webgpu/drawable.cpp b/src/mln/webgpu/drawable.cpp
+--- a/src/mln/webgpu/drawable.cpp
++++ b/src/mln/webgpu/drawable.cpp
+@@ -975,6 +975,7 @@
+                                              baseInstance);                                // firstInstance
+ 
+             context.renderingStats().numDrawCalls++;
++            context.renderingStats().totalDrawCalls++;
+         }
+     }
+ }
+diff --git a/src/mln/webgpu/render_pass.cpp b/src/mln/webgpu/render_pass.cpp
+--- a/src/mln/webgpu/render_pass.cpp
++++ b/src/mln/webgpu/render_pass.cpp
+@@ -179,6 +179,7 @@
+     impl->encoder = wgpuCommandEncoderBeginRenderPass(impl->commandEncoder, &renderPassDesc);
+ 
+     if (impl->encoder) {
++        context.performCleanup();
+         auto size = descriptor.renderable.getSize();
+         wgpuRenderPassEncoderSetViewport(
+             impl->encoder, 0.0f, 0.0f, static_cast<float>(size.width), static_cast<float>(size.height), 0.0f, 1.0f);

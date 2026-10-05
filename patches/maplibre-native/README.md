@@ -157,6 +157,20 @@ icons on existing tiles. Native pixel regressions cover late registration with
 synchronous and asynchronous GeoJSON, with and without text. Upstream:
 [maplibre-native#4714](https://github.com/maplibre/maplibre-native/pull/4714).
 
+`0031-custom-geometry-query-before-data.patch` returns an empty source query
+while a custom geometry tile awaits its first data. The Native tile regression
+queries before delivery and after parsing.
+
+`0032-webgpu-frame-stats.patch` resets WebGPU's per-frame draw count and
+advances the frame count when a render pass begins, matching Metal and Vulkan
+cleanup. Each drawable draw also advances the cumulative count. The Rust browser
+regression checks frame progression and draw counts before and after hiding a
+layer.
+
+`0033-in-memory-database-reset.patch` resets SQLite's in-memory database without
+deleting a file named `:memory:`. The Native database regression checks cache
+removal and preservation of an unrelated file with that name.
+
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 publication patch includes the transition setters for our bearing-accuracy

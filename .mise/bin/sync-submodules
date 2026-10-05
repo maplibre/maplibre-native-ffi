@@ -74,6 +74,9 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0028-hit-test-camera-zoom.patch"
   "$repo_root/patches/maplibre-native/0029-query-filter-overscaled-zoom.patch"
   "$repo_root/patches/maplibre-native/0030-late-style-image-layout.patch"
+  "$repo_root/patches/maplibre-native/0031-custom-geometry-query-before-data.patch"
+  "$repo_root/patches/maplibre-native/0032-webgpu-frame-stats.patch"
+  "$repo_root/patches/maplibre-native/0033-in-memory-database-reset.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the

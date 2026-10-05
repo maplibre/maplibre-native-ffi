@@ -2,8 +2,12 @@ use super::*;
 
 // One drain schedules at most one frame of the latest state. The idle event
 // closes the feedback loop after resource loading and transitions finish.
-fn render_to_idle(runtime: &mut RuntimeHandle, session: &RenderSessionHandle) {
+fn render_to_idle(
+    runtime: &mut RuntimeHandle,
+    session: &RenderSessionHandle,
+) -> crate::RenderingStats {
     let deadline = Instant::now() + Duration::from_secs(10);
+    let mut stats = None;
     while Instant::now() < deadline {
         runtime.pump(Some(Duration::from_millis(10)), None).unwrap();
         let batch = runtime.drain_events(0).unwrap();
@@ -16,16 +20,59 @@ fn render_to_idle(runtime: &mut RuntimeHandle, session: &RenderSessionHandle) {
                     idle = false;
                 }
                 RuntimeEventType::MapIdle => idle = true,
+                RuntimeEventType::MapRenderFrameFinished => {
+                    if let RuntimeEventPayload::RenderFrame(frame) = event.payload() {
+                        stats = Some(frame.stats);
+                    }
+                }
                 _ => {}
             }
         }
         if dirty {
             session.render_update().unwrap();
         } else if idle {
-            return;
+            return stats.expect("idle rendering should report frame statistics");
         }
     }
     panic!("event-driven rendering did not reach idle");
+}
+
+#[test]
+#[cfg(mln_webgpu_backend)]
+fn webgpu_stats_track_draws_across_frames() {
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) = create_owned_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(64, 64, 1.0),
+    )
+    .unwrap();
+    map.set_style_json(FEATURE_STATE_STYLE_JSON.as_bytes())
+        .unwrap();
+    let first = render_to_idle(&mut runtime, &session);
+    assert!(first.frame_count > 0);
+    assert!(first.draw_call_count > 0);
+    assert!(first.total_draw_call_count >= first.draw_call_count);
+
+    map.request_repaint().unwrap();
+    let second = render_to_idle(&mut runtime, &session);
+    assert!(second.draw_call_count > 0);
+    assert_eq!(second.frame_count, first.frame_count + 1);
+    assert_eq!(
+        second.total_draw_call_count,
+        first.total_draw_call_count + second.draw_call_count
+    );
+
+    map.set_layer_property("circle", "visibility", br#""none""#)
+        .unwrap();
+    let empty = render_to_idle(&mut runtime, &session);
+    // Source fading can request several empty frames after the layer is hidden.
+    assert!(empty.frame_count > second.frame_count);
+    assert_eq!(empty.draw_call_count, 0);
+    assert_eq!(empty.total_draw_call_count, second.total_draw_call_count);
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
 }
 
 fn center_pixel(session: &RenderSessionHandle) -> [u8; 4] {
