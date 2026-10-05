@@ -40,8 +40,7 @@ function(mln_ffi_bundle_clang_cxx_runtime target notice)
         "--print-file-name=${component}"
       OUTPUT_VARIABLE MLN_FFI_ARCHIVE OUTPUT_STRIP_TRAILING_WHITESPACE
       RESULT_VARIABLE MLN_FFI_ARCHIVE_RESULT)
-    if(NOT MLN_FFI_ARCHIVE_RESULT EQUAL 0
-       OR NOT EXISTS "${MLN_FFI_ARCHIVE}")
+    if(NOT MLN_FFI_ARCHIVE_RESULT EQUAL 0 OR NOT EXISTS "${MLN_FFI_ARCHIVE}")
       message(FATAL_ERROR "The SDK resolved no ${component} to bundle")
     endif()
     list(APPEND MLN_FFI_RUNTIME_ARCHIVES "${MLN_FFI_ARCHIVE}")
