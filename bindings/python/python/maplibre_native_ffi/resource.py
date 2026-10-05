@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import threading
 import weakref
 from collections.abc import Callable
@@ -173,7 +174,7 @@ class ResourceResponse:
 
     status: ResourceResponseStatus = ResourceResponseStatus.OK
     error_reason: ResourceErrorReason = ResourceErrorReason.NONE
-    bytes: bytes = b""
+    bytes: builtins.bytes = b""
     error_message: str | None = None
     must_revalidate: bool = False
     modified_unix_ms: int | None = None
