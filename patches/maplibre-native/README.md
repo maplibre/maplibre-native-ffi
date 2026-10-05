@@ -159,17 +159,20 @@ synchronous and asynchronous GeoJSON, with and without text. Upstream:
 
 `0031-custom-geometry-query-before-data.patch` returns an empty source query
 while a custom geometry tile awaits its first data. The Native tile regression
-queries before delivery and after parsing.
+queries before delivery and after parsing. Upstream:
+[maplibre-native#4718](https://github.com/maplibre/maplibre-native/pull/4718).
 
 `0032-webgpu-frame-stats.patch` resets WebGPU's per-frame draw count and
 advances the frame count when a render pass begins, matching Metal and Vulkan
 cleanup. Each drawable draw also advances the cumulative count. The Rust browser
 regression checks frame progression and draw counts before and after hiding a
-layer.
+layer. Upstream:
+[maplibre-native#4719](https://github.com/maplibre/maplibre-native/pull/4719).
 
 `0033-in-memory-database-reset.patch` resets SQLite's in-memory database without
 deleting a file named `:memory:`. The Native database regression checks cache
-removal and preservation of an unrelated file with that name.
+removal and preservation of an unrelated file with that name. Upstream:
+[maplibre-native#4720](https://github.com/maplibre/maplibre-native/pull/4720).
 
 `0034-opengl-large-uniform-blocks.patch` fixes allocator alignment at the 8 KiB
 page boundary and updates dedicated OpenGL uniform buffers without reading an
@@ -186,7 +189,8 @@ uniform and feature-driven bindings. Upstream:
 `0036-plugin-paint-dependencies.patch` reports plugin paint dependencies when
 creating a render layer and updating its properties. This refreshes camera paint
 expressions when zoom changes; a rendering regression covers initial camera
-paint and switching between constant and camera expressions.
+paint and switching between constant and camera expressions. Upstream:
+[maplibre-native#4721](https://github.com/maplibre/maplibre-native/pull/4721).
 
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
