@@ -131,8 +131,9 @@ at commit `02ddb45fbfad`.
 state when no layers supply placement data. Source fade bookkeeping and paint
 transitions continue, and symbols that return receive a fresh placement. Native
 regressions cover repeated background-only frames, paint transitions, and symbol
-removal and reappearance within the placement update interval. See
-[issue #735](https://github.com/maplibre/maplibre-native-ffi/issues/735).
+removal and reappearance within the placement update interval. Upstream:
+[maplibre-native#4722](https://github.com/maplibre/maplibre-native/pull/4722).
+See [issue #735](https://github.com/maplibre/maplibre-native-ffi/issues/735).
 
 `0027-line-hit-test-endpoint-offset.patch` applies the full line offset to the
 last vertex during rendered-feature hit testing. The Native regression checks
