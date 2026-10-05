@@ -879,12 +879,12 @@ index 5c9634227e40..6240b4106283 100644
  
  std::optional<Immutable<style::Image::Impl>> Style::Impl::getImage(const std::string& id) const {
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index fb3fba226b51..1464d2bd7535 100644
+index ccce7b882136..93d14cd5c093 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -2466,3 +2466,37 @@ TEST(Map, LocationIndicatorAccuracyColorsTransition) {
-     }
-     EXPECT_GT(greenPixels, 0u) << "The accuracy border should finish transitioning to green";
+@@ -2461,3 +2461,37 @@ TEST(Map, LocationIndicatorAccuracyColorsTransition) {
+     EXPECT_LT(centerChannel(result, 2), 10);
+     EXPECT_GT(countGreenPixels(result), 0u) << "The accuracy border should finish transitioning to green";
  }
 +
 +TEST(Map, TileSelectionOptionsPublishUpdates) {

@@ -1,8 +1,8 @@
 diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_orchestrator.cpp
-index bccc35207fb..d74c942afb3 100644
+index ef2d2e4052b0..48e3532a8c8c 100644
 --- a/src/mln/renderer/render_orchestrator.cpp
 +++ b/src/mln/renderer/render_orchestrator.cpp
-@@ -540,7 +540,17 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
+@@ -547,7 +547,17 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
          }
      }
  
@@ -22,7 +22,7 @@ index bccc35207fb..d74c942afb3 100644
  
          std::optional<Duration> placementUpdatePeriodOverride;
 diff --git a/src/mln/text/placement.cpp b/src/mln/text/placement.cpp
-index 2834336fece..bfcc63a9bd2 100644
+index 2834336fece9..bfcc63a9bd2c 100644
 --- a/src/mln/text/placement.cpp
 +++ b/src/mln/text/placement.cpp
 @@ -150,13 +150,20 @@ public:
@@ -48,7 +48,7 @@ index 2834336fece..bfcc63a9bd2 100644
                                              const float zoom,
                                              std::optional<Duration> periodOverride) const {
 diff --git a/src/mln/text/placement.hpp b/src/mln/text/placement.hpp
-index 48e295d87cc..e3900d7bac0 100644
+index 48e295d87cc4..e3900d7bac0c 100644
 --- a/src/mln/text/placement.hpp
 +++ b/src/mln/text/placement.hpp
 @@ -98,12 +98,15 @@ class PlacementController {
@@ -68,17 +68,19 @@ index 48e295d87cc..e3900d7bac0 100644
      bool stale = false;
  };
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 383efcc7784..90698a5241b 100644
+index 93d14cd5c093..81bf8c6ee450 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -1977,6 +1977,34 @@ TEST(Map, ObserveTileLifecycle) {
+@@ -1984,6 +1984,36 @@ TEST(Map, ObserveTileLifecycle) {
      }
  }
  
 +TEST(Map, EmptyPlacementDoesNotRequestRepaint) {
 +    MapTest<> test{1, MapMode::Continuous};
 +    std::optional<MapObserver::RenderFrameStatus> status;
-+    test.observer.didFinishRenderingFrameCallback = [&](auto value) { status = value; };
++    test.observer.didFinishRenderingFrameCallback = [&](auto value) {
++        status = value;
++    };
 +    test.map.getStyle().loadJSON(R"({
 +        "version": 8, "sources": {}, "transition": {"duration": 0},
 +        "layers": [{"id": "background", "type": "background", "paint": {"background-color": "white"}}]

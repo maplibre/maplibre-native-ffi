@@ -11,18 +11,19 @@ index 3b42e4119476..c8c03057ca79 100644
  - [OpenGL] Fix invisible raster layers on Adreno 3xx by avoiding an in-place alpha assignment in the fragment shader.
  - [core] Draw numbers and short uppercase codes upright in vertical CJK line labels ([#4565](https://github.com/maplibre/maplibre-native/issues/4565)), compat to [maplibre-gl-js#8205](https://github.com/maplibre/maplibre-gl-js/pull/8205).
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
-index 2edfd668fe64..f63904c2136b 100644
+index 2edfd668fe64..ecfd8c969643 100644
 --- a/src/mln/geometry/feature_index.cpp
 +++ b/src/mln/geometry/feature_index.cpp
-@@ -290,9 +290,15 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
+@@ -290,9 +290,16 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
  
          bool needsCrossTileIndex = renderLayer->baseImpl->getTypeInfo()->crossTileIndex ==
                                     style::LayerTypeInfo::CrossTileIndex::Required;
 -        if (!needsCrossTileIndex &&
 -            !renderLayer->queryIntersectsFeature(
 -                queryGeometry, *geometryTileFeature, tileID.z, transformState, pixelsToTileUnits, posMatrix, state)) {
-+        // Paint properties follow the camera zoom, including fractional zoom and overzooming.
-+        // The canonical tile zoom describes the geometry, not its rendered size.
++        // we use the float camera zoom here, not the integer tile ID zoom,
++        // because for the query we take into account the actual rendered
++        // size of the geometry (#2781)
 +        if (!needsCrossTileIndex && !renderLayer->queryIntersectsFeature(queryGeometry,
 +                                                                         *geometryTileFeature,
 +                                                                         static_cast<float>(transformState.getZoom()),

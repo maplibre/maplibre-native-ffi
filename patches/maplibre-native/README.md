@@ -75,7 +75,7 @@ indicator's evaluated paint properties each frame so that accuracy-circle fill
 and border colors reach their transition targets. It includes the upstream
 pixel-readback regression. Upstream:
 [maplibre-native#4639](https://github.com/maplibre/maplibre-native/pull/4639),
-at commit `c6b6de35de0001d1b6005105199cc639a7956fa0`.
+at commit `a1823f138f306133cdba462ed1f07575a134b6b4`.
 
 `0017-location-indicator-top-image-hit-testing.patch` includes the location
 indicator's top image in rendered-feature queries. Each top and bearing image
@@ -129,9 +129,9 @@ at commit `02ddb45fbfad`.
 
 `0026-empty-symbol-placement.patch` clears deferred symbol placement and query
 state when no layers supply placement data. Source fade bookkeeping and paint
-transitions continue, and symbols that return receive a fresh placement. Native
-regression checks that repeated background-only frames stop requesting repaints
-while paint transitions still request frames. Upstream:
+transitions continue, and symbols that return receive a fresh placement. A
+Native regression checks that repeated background-only frames stop requesting
+repaints while paint transitions still request frames. Upstream:
 [maplibre-native#4722](https://github.com/maplibre/maplibre-native/pull/4722).
 See [issue #735](https://github.com/maplibre/maplibre-native-ffi/issues/735).
 
@@ -199,6 +199,8 @@ Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 publication patch includes the transition setters for our bearing-accuracy
 properties, and the query-filter patch preserves the preceding camera-zoom fix.
+Tests reuse includes from earlier patches, and the plugin camera patch extends
+the paint fixture from the preceding OpenGL attribute patch.
 
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied
