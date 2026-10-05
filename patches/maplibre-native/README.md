@@ -190,8 +190,9 @@ uniform and feature-driven bindings. Upstream:
 
 `0036-plugin-paint-dependencies.patch` reports plugin paint dependencies when
 creating a render layer and updating its properties. This refreshes camera paint
-expressions when zoom changes; a rendering regression covers initial camera
-paint and switching between constant and camera expressions. Upstream:
+expressions when zoom changes; a rendering regression switches a constant paint
+property to a camera expression and checks the values passed to the plugin
+callback at two zoom levels. Upstream:
 [maplibre-native#4721](https://github.com/maplibre/maplibre-native/pull/4721).
 
 Each patch is a squashed diff applied on top of the patches before it. Patch
