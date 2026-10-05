@@ -164,14 +164,15 @@ queries before delivery and after parsing. Upstream:
 
 `0032-webgpu-frame-stats.patch` resets WebGPU's per-frame draw count and
 advances the frame count when a render pass begins, matching Metal and Vulkan
-cleanup. Each drawable draw also advances the cumulative count. The Rust browser
-regression checks frame progression and draw counts before and after hiding a
-layer. Upstream:
+cleanup. Each drawable draw also advances the cumulative count in WebGPU, Metal,
+and Vulkan. A Native map regression checks frame progression and draw counts
+before and after hiding a layer; the Rust browser regression also covers the
+binding’s statistics. Upstream:
 [maplibre-native#4719](https://github.com/maplibre/maplibre-native/pull/4719).
 
 `0033-in-memory-database-reset.patch` resets SQLite's in-memory database without
-deleting a file named `:memory:`. The Native database regression checks cache
-removal and preservation of an unrelated file with that name. Upstream:
+deleting a file named `:memory:`. The Native database regression checks that an
+unrelated file with that name survives the reset. Upstream:
 [maplibre-native#4720](https://github.com/maplibre/maplibre-native/pull/4720).
 
 `0034-opengl-large-uniform-blocks.patch` fixes allocator alignment at the 8 KiB
