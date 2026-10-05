@@ -1,0 +1,65 @@
+diff --git a/src/mln/renderer/layers/render_plugin_style_layer.cpp b/src/mln/renderer/layers/render_plugin_style_layer.cpp
+index 377d9a6..ac6fb39 100644
+--- a/src/mln/renderer/layers/render_plugin_style_layer.cpp
++++ b/src/mln/renderer/layers/render_plugin_style_layer.cpp
+@@ -52,10 +52,12 @@ RenderPluginStyleLayer::RenderPluginStyleLayer(Immutable<style::PluginStyleLayer
+     }
+     evaluatedPaintSnapshot = std::make_shared<const style::PluginPropertyMap>(evaluatedPluginProperties);
+     passes = RenderPass::Translucent;
++    styleDependencies = layerImpl.getDependencies();
+ }
+ 
+ void RenderPluginStyleLayer::transition(const TransitionParameters& parameters) {
+     const auto& impl = pluginImpl(baseImpl);
++    styleDependencies = impl.getDependencies();
+     const auto& definitions = impl.registration->properties;
+     for (const auto& definition : definitions) {
+         const auto property = impl.pluginProperties.find(definition.name);
+diff --git a/test/plugin/rendering.test.cpp b/test/plugin/rendering.test.cpp
+index cdb060f..dfa979e 100644
+--- a/test/plugin/rendering.test.cpp
++++ b/test/plugin/rendering.test.cpp
+@@ -83,7 +83,7 @@ void registerTriangles(const std::string& pluginID,
+     radius.struct_size = sizeof(radius);
+     radius.name = {"test-radius", 11};
+     radius.type = MLN_PLUGIN_VALUE_FLOAT;
+-    radius.expression_capabilities = MLN_PLUGIN_EXPRESSION_FEATURE;
++    radius.expression_capabilities = MLN_PLUGIN_EXPRESSION_FEATURE | MLN_PLUGIN_EXPRESSION_CAMERA;
+     radius.default_value = {sizeof(mln_plugin_value), MLN_PLUGIN_VALUE_FLOAT, {.float_value = 1}};
+     auto opacity = radius;
+     opacity.name = {"test-opacity", 12};
+@@ -402,6 +402,34 @@ TEST(PluginRendering, UniformPaintBetweenVertexAttributes) {
+     }
+ }
+ 
++TEST(PluginRendering, CameraPaintRefreshesAfterZoomAndPropertyChanges) {
++    ASSERT_NO_FATAL_FAILURE(registerTriangles("test.camera-paint", false, true));
++    RenderTest test;
++    test.map.getStyle().loadJSON(R"({"version":8,"sources":{"points":{"type":"geojson","maxzoom":0,"data":{
++        "type":"Feature","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}}},"layers":[
++        {"id":"left","type":"test.camera-paint.left","source":"points","paint":{
++            "test-opacity":["interpolate",["linear"],["zoom"],0,1,1,0.5]}}]})");
++    const auto expectOpacity = [&](double zoom, int expected) {
++        test.map.jumpTo(CameraOptions().withZoom(zoom));
++        const auto image = test.frontend.render(test.map).image;
++        const auto* pixel = image.data.get() + (32 * 64 + 16) * 4;
++        EXPECT_NEAR(expected, pixel[0], 1);
++        EXPECT_NEAR(expected, pixel[3], 1);
++    };
++    expectOpacity(0, 255);
++    expectOpacity(1, 128);
++    auto* layer = test.map.getStyle().getLayer("left");
++    for (const char* json : {"0.25", R"(["interpolate",["linear"],["zoom"],0,1,1,0.5])"}) {
++        JSDocument value;
++        value.Parse(json);
++        ASSERT_FALSE(layer->setProperty(
++            "test-opacity", style::conversion::Convertible(static_cast<const JSValue*>(&value))));
++        const bool constant = value.IsNumber();
++        expectOpacity(0, constant ? 64 : 255);
++        expectOpacity(1, constant ? 64 : 128);
++    }
++}
++
+ TEST(PluginRendering, UnchangedUniformUploadsAreSkippedButPaintChangesUpload) {
+     ASSERT_NO_FATAL_FAILURE(registerTriangles("test.cached-uniforms", false, true));
+     RenderTest test;

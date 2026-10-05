@@ -171,6 +171,23 @@ layer.
 deleting a file named `:memory:`. The Native database regression checks cache
 removal and preservation of an unrelated file with that name.
 
+`0034-opengl-large-uniform-blocks.patch` fixes allocator alignment at the 8 KiB
+page boundary and updates dedicated OpenGL uniform buffers without reading an
+absent CPU copy. The regression reads back allocations and repeated updates at
+both sides of the boundary. Upstream:
+[maplibre-native#4707](https://github.com/maplibre/maplibre-native/pull/4707).
+
+`0035-plugin-gl-attributes-by-name.patch` matches reflected OpenGL attributes by
+name, preserving stable attribute IDs when linked locations differ from metadata
+order. Regressions cover reordered locations and plugin paint switching between
+uniform and feature-driven bindings. Upstream:
+[maplibre-native#4708](https://github.com/maplibre/maplibre-native/pull/4708).
+
+`0036-plugin-paint-dependencies.patch` reports plugin paint dependencies when
+creating a render layer and updating its properties. This refreshes camera paint
+expressions when zoom changes; a rendering regression covers initial camera
+paint and switching between constant and camera expressions.
+
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 publication patch includes the transition setters for our bearing-accuracy
