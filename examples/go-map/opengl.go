@@ -18,11 +18,8 @@ type renderTarget interface {
 	// handing the session a replacement.
 	Resize(viewport) error
 	FinishFrame() error
-	// RenderUpdate renders the latest map update, and reports whether a frame
-	// reached the screen. It reports true only for a rendered frame, so the
-	// render loop asks for another one when the map has no update yet, the map
-	// has not applied the session's size yet, or the target had no frame to
-	// draw into.
+	// RenderUpdate services one request. False requests a target retry;
+	// map-driven outcomes wait for a render-update-available event.
 	RenderUpdate() (bool, error)
 }
 
@@ -342,7 +339,7 @@ func (target *openGLOwnedTextureTarget) RenderUpdate() (bool, error) {
 		return false, fmt.Errorf("OpenGL texture render failed: %w", err)
 	}
 	if update.Result != maplibre.RenderResultRendered {
-		return false, nil
+		return update.Result != maplibre.RenderResultTargetNotReady, nil
 	}
 	frame, err := target.session.AcquireOpenGLTextureFrame()
 	if err != nil {
@@ -463,7 +460,7 @@ func (target *openGLBorrowedTextureTarget) RenderUpdate() (bool, error) {
 		return false, fmt.Errorf("OpenGL borrowed texture render failed: %w", err)
 	}
 	if update.Result != maplibre.RenderResultRendered {
-		return false, nil
+		return update.Result != maplibre.RenderResultTargetNotReady, nil
 	}
 	return true, target.compositor.DrawTexture(glTexture2D, target.texture)
 }
@@ -562,7 +559,7 @@ func (target *openGLSurfaceTarget) RenderUpdate() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("OpenGL surface render failed: %w", err)
 	}
-	return update.Result == maplibre.RenderResultRendered, nil
+	return update.Result != maplibre.RenderResultTargetNotReady, nil
 }
 
 func createTextureProgram() (uint32, error) {

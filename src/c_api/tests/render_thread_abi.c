@@ -43,7 +43,9 @@ typedef struct render_probe {
   bool attached;
   bool rendered;
   mln_status render_status;
+  mln_status projection_status;
   mln_status readback_status;
+  mln_map_projection projection;
   uint32_t width;
   uint32_t height;
   uint8_t pixel[4];
@@ -59,6 +61,8 @@ static void attach_render_readback(void* argument) {
   }
 
   probe->render_status = render_until_frame(fixture.session, &probe->rendered);
+  probe->projection_status =
+    mln_render_session_projection_create(fixture.session, &probe->projection);
 
   static uint8_t pixels[64 * 64 * 4];
   mln_texture_image_info info = {.size = sizeof(mln_texture_image_info)};
@@ -93,6 +97,18 @@ static void a_second_thread_attaches_and_renders(void) {
 
   TEST_ASSERT_TRUE(probe.attached);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.render_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.projection_status);
+  mln_screen_point point = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_pixel_for_lat_lng(
+                     probe.projection, (mln_lat_lng){0, 0}, &point
+                   )
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 32.0, point.x);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 32.0, point.y);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_destroy(probe.projection)
+  );
   TEST_ASSERT_TRUE(probe.rendered);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.readback_status);
   TEST_ASSERT_EQUAL_UINT32(64, probe.width);
@@ -111,6 +127,7 @@ typedef struct foreign_call_probe {
   mln_render_session session;
   atomic_bool finished;
   mln_status render_status;
+  mln_status projection_status;
   mln_status resize_status;
   mln_status detach_status;
   mln_status destroy_status;
@@ -127,6 +144,9 @@ static void call_session_from_a_foreign_thread(void* argument) {
   bool needs_repaint = false;
   probe->render_status =
     mln_render_session_render_update(probe->session, &result, &needs_repaint);
+  mln_map_projection projection = MLN_HANDLE_NULL;
+  probe->projection_status =
+    mln_render_session_projection_create(probe->session, &projection);
   probe->resize_status = mln_render_session_resize(probe->session, 32, 32, 1.0);
   probe->detach_status = mln_render_session_detach(probe->session);
   probe->destroy_status = mln_render_session_destroy(probe->session);
@@ -188,6 +208,7 @@ static void session_entry_points_reject_a_foreign_thread(void) {
   mln_test_thread_join(thread);
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_WRONG_THREAD, probe.render_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_WRONG_THREAD, probe.projection_status);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_WRONG_THREAD, probe.resize_status);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_WRONG_THREAD, probe.detach_status);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_WRONG_THREAD, probe.destroy_status);

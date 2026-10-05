@@ -45,6 +45,10 @@ struct NativeStyleIdListHandle: NativeHandle {
   let raw: UInt64
 }
 
+struct NativeStyleLayerListHandle: NativeHandle {
+  let raw: UInt64
+}
+
 struct NativeStyleStringListHandle: NativeHandle {
   let raw: UInt64
 }

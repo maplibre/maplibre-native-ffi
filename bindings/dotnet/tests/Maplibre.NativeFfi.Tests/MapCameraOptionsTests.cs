@@ -203,6 +203,10 @@ public sealed class MapCameraOptionsTests
         Assert.Equal(MaplibreStatus.InvalidArgument, projectionError.Status);
         Assert.NotNull(projectionError.RawStatus);
         Assert.NotEmpty(projectionError.Diagnostic);
+
+        using var projection = map.CreateProjection();
+        Assert.Throws<InvalidArgumentException>(() => map.MetersPerPixelAtLatitude(91));
+        Assert.Throws<InvalidArgumentException>(() => projection.MetersPerPixelAtLatitude(91));
     }
 
     [BindingSpecTest("BND-103")]
@@ -248,6 +252,22 @@ public sealed class MapCameraOptionsTests
         Assert.InRange(projection.LatLngForPixel(points[1]).Longitude, -180, 180);
         var projectedRight = projection.LatLngForPixelUnwrapped(points[1]);
         Assert.Equal(right.Longitude, projectedRight.Longitude, CoordinatePrecision);
+    }
+
+    [BindingSpecTest("BND-103")]
+    [Fact]
+    public void MetersPerPixelMatchesProjectionAndHalvesPerZoomLevel()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.JumpTo(new CameraOptions { Center = new LatLng(0, 0), Zoom = 3 });
+        using var projection = map.CreateProjection();
+
+        var metersPerPixel = map.MetersPerPixelAtLatitude(45);
+        Assert.Equal(metersPerPixel, projection.MetersPerPixelAtLatitude(45), CoordinatePrecision);
+
+        map.JumpTo(new CameraOptions { Zoom = 4 });
+        Assert.Equal(metersPerPixel / 2, map.MetersPerPixelAtLatitude(45), CoordinatePrecision);
     }
 
     [BindingSpecTest("BND-103")]

@@ -15,7 +15,6 @@
 #include <shared_mutex>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -216,21 +215,35 @@ auto runtime_from_platform_context(void* platform_context) noexcept
   return found == registry.end() ? MLN_HANDLE_NULL : found->second;
 }
 
-auto live_runtime_threads_mutex() -> std::mutex& {
-  static std::mutex value;
-  return value;
-}
+constexpr auto kOrphanedRuntimeError =
+  "runtime is orphaned: its owner thread exited without destroying it";
 
-// Mirrors the owner thread of every live runtime, so runtime creation can
-// reject a thread that already owns one. The handle table does not iterate.
-auto live_runtime_threads() -> std::unordered_set<std::thread::id>& {
-  static std::unordered_set<std::thread::id> value;
-  return value;
-}
+// Holds the calling thread's live runtime, so runtime creation can reject a
+// thread that already owns one. Only the owner thread can destroy a runtime,
+// so one that is still live when the thread exits can never be destroyed: the
+// destructor marks it orphaned, so later calls on it name the leak rather than
+// the wrong thread.
+struct OwnerThreadGuard {
+  mln_runtime runtime = MLN_HANDLE_NULL;
 
-auto owner_thread_has_live_runtime(std::thread::id owner_thread) -> bool {
-  const std::scoped_lock lock(live_runtime_threads_mutex());
-  return live_runtime_threads().contains(owner_thread);
+  ~OwnerThreadGuard() {
+    if (runtime == MLN_HANDLE_NULL) {
+      return;
+    }
+    auto& table = mln::core::handle_table<mln::core::RuntimeObject>();
+    const std::scoped_lock lock(table.mutex());
+    auto* live = table.try_resolve_locked(runtime);
+    if (live != nullptr) {
+      live->owner_thread_exited.store(true, std::memory_order_relaxed);
+    }
+  }
+};
+
+// Runtime creation and destruction are owner-thread calls, so the calling
+// thread's guard always tracks the runtime in question.
+auto owner_thread_guard() -> OwnerThreadGuard& {
+  thread_local OwnerThreadGuard value;
+  return value;
 }
 
 // Leases the resource transform registration for a MapLibre-owned thread. Only
@@ -1089,8 +1102,12 @@ auto validate_runtime(mln_runtime runtime, RuntimeObject*& out_runtime)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  if (out_runtime->owner_thread != std::this_thread::get_id()) {
-    set_thread_error("runtime call must be made on its owner thread");
+  if (out_runtime->owner_thread != current_owner_thread()) {
+    set_thread_error(
+      out_runtime->owner_thread_exited.load(std::memory_order_relaxed)
+        ? kOrphanedRuntimeError
+        : "runtime call must be made on its owner thread"
+    );
     return MLN_STATUS_WRONG_THREAD;
   }
 
@@ -1115,8 +1132,8 @@ auto create_runtime(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto owner_thread = std::this_thread::get_id();
-  if (owner_thread_has_live_runtime(owner_thread)) {
+  auto& guard = owner_thread_guard();
+  if (guard.runtime != MLN_HANDLE_NULL) {
     set_thread_error("owner thread already has a live runtime");
     return MLN_STATUS_INVALID_STATE;
   }
@@ -1126,7 +1143,7 @@ auto create_runtime(
   }
 
   auto owned_runtime = std::make_shared<RuntimeObject>();
-  owned_runtime->owner_thread = owner_thread;
+  owned_runtime->owner_thread = current_owner_thread();
   owned_runtime->wake_state = std::make_shared<WakeState>();
   // The mask cell exists before the run loop, so every producer this runtime
   // can reach reads a live cell.
@@ -1143,28 +1160,6 @@ auto create_runtime(
   // run loop is reachable only from this thread.
   owned_runtime->run_loop->setPlatformCallback(
     [state = owned_runtime->wake_state]() -> void { signal_wake(state); }
-  );
-  // The gate runs on the owner thread inside the drain, and the runtime owns
-  // the run loop, so the raw pointer cannot outlive it.
-  owned_runtime->run_loop->setProcessGate(
-    [live = owned_runtime.get()]() -> bool {
-      if (!live->pump_deadline.has_value()) {
-        return true;
-      }
-      if (!live->pump_ran_task) {
-        live->pump_ran_task = true;
-        return true;
-      }
-      if (std::chrono::steady_clock::now() < *live->pump_deadline) {
-        return true;
-      }
-      live->pump_budget_exhausted = true;
-      // Denying disarms the gate: a task inside the drain can wait for this
-      // same run loop to empty, and that nested drain must run to completion
-      // rather than spin against an expired budget.
-      live->pump_deadline.reset();
-      return false;
-    }
   );
   owned_runtime->asset_path =
     options == nullptr || options->asset_path == nullptr
@@ -1189,31 +1184,22 @@ auto create_runtime(
   owned_runtime->resource_provider_state =
     std::make_shared<ResourceProviderState>();
   auto* published = owned_runtime.get();
-  // Reserving the token allocates, so it happens before this thread is marked
-  // as owning a runtime. The failure path below reads the local, not the
-  // object: the insert takes the shared_ptr by value, so a throw there destroys
-  // the runtime while unwinding.
+  // The failure path below reads the local, not the object: the insert takes
+  // the shared_ptr by value, so a throw there destroys the runtime while
+  // unwinding.
   auto* const platform_context = reserve_platform_context();
   published->platform_context = platform_context;
-  {
-    const std::scoped_lock lock(live_runtime_threads_mutex());
-    live_runtime_threads().insert(owner_thread);
-  }
   try {
     *out_runtime =
       handle_table<RuntimeObject>().insert(std::move(owned_runtime));
   } catch (...) {
-    // The caller receives no handle, so it has no way to give the owner thread
-    // back. Releasing it here keeps a failed creation from rejecting every
-    // later one on the same thread.
-    {
-      const std::scoped_lock lock(live_runtime_threads_mutex());
-      live_runtime_threads().erase(owner_thread);
-    }
     unregister_platform_context(platform_context);
     throw;
   }
   published->self = *out_runtime;
+  // Marked as owning a runtime only once the caller holds the handle that
+  // gives the thread back.
+  guard.runtime = *out_runtime;
   bind_platform_context(platform_context, *out_runtime);
   return MLN_STATUS_OK;
 }
@@ -2883,7 +2869,6 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
   // process-global table lock before any teardown step that can block on a
   // native callback. The waits below then stall this runtime alone.
   std::shared_ptr<RuntimeObject> owned_runtime;
-  auto owner_thread = std::thread::id{};
   {
     auto& table = handle_table<RuntimeObject>();
     const std::scoped_lock lock(table.mutex());
@@ -2892,8 +2877,12 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
 
-    if (live->owner_thread != std::this_thread::get_id()) {
-      set_thread_error("runtime must be destroyed on its owner thread");
+    if (live->owner_thread != current_owner_thread()) {
+      set_thread_error(
+        live->owner_thread_exited.load(std::memory_order_relaxed)
+          ? kOrphanedRuntimeError
+          : "runtime must be destroyed on its owner thread"
+      );
       return MLN_STATUS_WRONG_THREAD;
     }
 
@@ -2902,13 +2891,9 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
       return MLN_STATUS_INVALID_STATE;
     }
 
-    owner_thread = live->owner_thread;
     owned_runtime = table.remove_locked(runtime);
   }
-  {
-    const std::scoped_lock lock(live_runtime_threads_mutex());
-    live_runtime_threads().erase(owner_thread);
-  }
+  owner_thread_guard().runtime = MLN_HANDLE_NULL;
   unregister_platform_context(owned_runtime->platform_context);
 
   // A resource transform callback that entered `invoke_resource_transform()`
@@ -3035,26 +3020,12 @@ auto pump_runtime(mln_runtime runtime, int64_t timeout_ms, int64_t budget_ms)
   }
 
   if (budget_ms >= 0) {
-    // A budget past the clock's range would overflow the addition, so it
-    // saturates to an unbounded drain.
-    const auto now = std::chrono::steady_clock::now();
-    const auto headroom = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::steady_clock::time_point::max() - now
-    );
-    live->pump_deadline = std::chrono::milliseconds{budget_ms} < headroom
-                            ? now + std::chrono::milliseconds{budget_ms}
-                            : std::chrono::steady_clock::time_point::max();
+    // The run loop saturates a budget past the clock's range to an unbounded
+    // drain, runs at least one task, and signals the platform callback when
+    // it leaves tasks queued, so an exhausted budget wakes the next pump.
+    live->run_loop->runOnce(std::chrono::milliseconds{budget_ms});
   } else {
-    live->pump_deadline.reset();
-  }
-  live->pump_ran_task = false;
-  live->pump_budget_exhausted = false;
-  live->run_loop->runOnce();
-  live->pump_deadline.reset();
-  // The gate only denies while a task is queued, so an exhausted budget means
-  // work remains.
-  if (live->pump_budget_exhausted) {
-    signal_wake(live->wake_state);
+    live->run_loop->runOnce();
   }
   return MLN_STATUS_OK;
 }

@@ -60,10 +60,6 @@
       vcs="Git"
     />
     <mapping
-      directory="$PROJECT_DIR$/third_party/maplibre-native/vendor/filesystem"
-      vcs="Git"
-    />
-    <mapping
       directory="$PROJECT_DIR$/third_party/maplibre-native/vendor/freetype"
       vcs="Git"
     />

@@ -18,7 +18,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -85,6 +84,7 @@
 #include "geojson/geojson.hpp"
 #include "geojson/geojson_source_data.hpp"
 #include "handles/handle_table.hpp"
+#include "handles/owner_thread.hpp"
 #include "map/feature_state.hpp"
 #include "maplibre_native_c.h"
 #include "runtime/runtime.hpp"
@@ -104,6 +104,23 @@ struct HandleTraits<StyleIdListObject> {
 
 struct StyleStringListObject {
   std::vector<std::string> values;
+};
+
+struct StyleLayerRecord {
+  std::string id;
+  const char* type = "";
+  std::string source_id;
+  std::string source_layer;
+};
+
+struct StyleLayerListObject {
+  std::vector<StyleLayerRecord> layers;
+};
+
+template <>
+struct HandleTraits<StyleLayerListObject> {
+  static constexpr auto kind = HandleKind::StyleLayerList;
+  static constexpr auto leasable = false;
 };
 
 template <>
@@ -1527,7 +1544,11 @@ auto render_frame_payload(const mln::MapObserver::RenderFrameStatus& status)
     .mode = to_c_render_mode(status.mode),
     .needs_repaint = status.needsRepaint,
     .placement_changed = status.placementChanged,
-    .stats = to_c_rendering_stats(status.renderingStats)
+    // Native always attaches the frame's stats; a missing pointer reports
+    // zeroed counters rather than reading through null.
+    .stats = status.renderingStats != nullptr
+               ? to_c_rendering_stats(*status.renderingStats)
+               : mln_rendering_stats{}
   };
   return payload;
 }
@@ -1822,14 +1843,16 @@ class ForwardingRendererObserver final : public mln::RendererObserver {
 
   void onDidFinishRenderingFrame(
     RenderMode mode, bool repaint_needed, bool placement_changed,
-    const mln::gfx::RenderingStats& stats
+    std::shared_ptr<mln::gfx::RenderingStats> stats
   ) override {
-    // The name carries three overloads; mln::Map::Impl implements only this
-    // one.
+    // The name carries four overloads; mln::Map::Impl implements only this
+    // one, and it schedules the next update from it.
     void (mln::RendererObserver::*method)(
-      RenderMode, bool, bool, const mln::gfx::RenderingStats&
+      RenderMode, bool, bool, std::shared_ptr<mln::gfx::RenderingStats>
     ) = &mln::RendererObserver::onDidFinishRenderingFrame;
-    delegate_.invoke(method, mode, repaint_needed, placement_changed, stats);
+    delegate_.invoke(
+      method, mode, repaint_needed, placement_changed, std::move(stats)
+    );
   }
 
   void onDidFinishRenderingMap() override {
@@ -1912,23 +1935,6 @@ class ForwardingRendererObserver final : public mln::RendererObserver {
   mln::ActorRef<mln::RendererObserver> delegate_;
 };
 
-// Map mutations a render session reaches for from its own owner thread. The
-// mailbox on the map's run loop keeps mln::Map single-threaded, and closing it
-// during map teardown turns late messages into no-ops.
-class MapCommands {
- public:
-  explicit MapCommands(mln::Map& map) : map_(map) {}
-
-  auto set_size(uint32_t width, uint32_t height) -> void {
-    map_.setSize(mln::Size{width, height});
-  }
-
-  auto trigger_repaint() -> void { map_.triggerRepaint(); }
-
- private:
-  mln::Map& map_;
-};
-
 class HeadlessFrontend final : public mln::RendererFrontend {
  public:
   // The thread pool tag must be a default-constructed identity, unique per map.
@@ -1968,6 +1974,10 @@ class HeadlessFrontend final : public mln::RendererFrontend {
       const std::scoped_lock lock(latest_update_mutex_);
       latest_update_ = std::move(update);
     }
+    notify_render_update_available();
+  }
+
+  auto notify_render_update_available() -> void {
     if (!mln::core::event_selected(
           event_state_->mask, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
         )) {
@@ -2019,6 +2029,29 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   mln::TaggedScheduler thread_pool_;
   mutable std::mutex latest_update_mutex_;
   std::shared_ptr<mln::UpdateParameters> latest_update_;
+};
+
+// Map commands that a render session posts from its own owner thread. The
+// mailbox on the map's run loop keeps mln::Map single-threaded, and closing it
+// during map teardown turns late messages into no-ops.
+class MapCommands {
+ public:
+  MapCommands(mln::Map& map, HeadlessFrontend& frontend)
+      : map_(map), frontend_(frontend) {}
+
+  auto set_size(uint32_t width, uint32_t height) -> void {
+    map_.setSize(mln::Size{width, height});
+  }
+
+  auto render_work_available() -> void {
+    frontend_.notify_render_update_available();
+  }
+
+  auto trigger_repaint() -> void { map_.triggerRepaint(); }
+
+ private:
+  mln::Map& map_;
+  HeadlessFrontend& frontend_;
 };
 
 auto validate_map_options(const mln_map_options* options) -> mln_status {
@@ -3243,7 +3276,7 @@ namespace mln::core {
 
 struct MapObject {
   mln_runtime runtime = MLN_HANDLE_NULL;
-  std::thread::id owner_thread;
+  OwnerThreadToken owner_thread = kNoOwnerThread;
   uint32_t map_mode = MLN_MAP_MODE_CONTINUOUS;
   double scale_factor = default_scale_factor;
   bool still_image_request_pending = false;
@@ -3361,7 +3394,7 @@ auto validate_map_locked(mln_map map, MapObject*& out_map) -> mln_status {
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (out_map->owner_thread != std::this_thread::get_id()) {
+  if (out_map->owner_thread != current_owner_thread()) {
     set_thread_error("map call must be made on its owner thread");
     return MLN_STATUS_WRONG_THREAD;
   }
@@ -3707,7 +3740,7 @@ auto create_map(
   // already resolves.
   const auto handle = handle_table<MapObject>().insert(owned_map);
   owned_map->runtime = runtime;
-  owned_map->owner_thread = std::this_thread::get_id();
+  owned_map->owner_thread = current_owner_thread();
   owned_map->map_mode = effective.map_mode;
   owned_map->scale_factor = effective.scale_factor;
   owned_map->event_state = std::move(event_state);
@@ -3738,7 +3771,8 @@ auto create_map(
     );
     owned_map->callback_sources->attach(*owned_map->map);
 
-    owned_map->commands = std::make_unique<MapCommands>(*owned_map->map);
+    owned_map->commands =
+      std::make_unique<MapCommands>(*owned_map->map, *owned_map->frontend);
     owned_map->command_mailbox =
       std::make_shared<mln::Mailbox>(runtime_run_loop(live_runtime));
     owned_map->command_ref.emplace(
@@ -3807,6 +3841,42 @@ auto map_request_repaint(mln_map map) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+auto map_set_global_state_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (!validate_string_view(property_name, "property_name")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto native_value = to_native_json_value(value);
+  if (!native_value) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto& style = live->map->getStyle();
+  if (!style.isLoaded()) {
+    set_thread_error("style JSON has not loaded");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  style.setGlobalStateProperty(string_from_view(property_name), *native_value);
+  return MLN_STATUS_OK;
+}
+
+auto map_get_global_state(mln_map map, mln_buffer* out_state) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  return create_buffer(
+    serialize_json_value(mln::Value{live->map->getStyle().getGlobalState()}),
+    out_state
+  );
+}
+
 auto map_set_feature_state(
   mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
 ) -> mln_status {
@@ -3830,12 +3900,15 @@ auto map_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  live->feature_state.set(
-    string_from_view(selector->source_id),
-    feature_state_source_layer(*selector),
-    string_from_view(selector->feature_id), *state_object
-  );
-  live->map->triggerRepaint();
+  if (
+    live->feature_state.set(
+      string_from_view(selector->source_id),
+      feature_state_source_layer(*selector),
+      string_from_view(selector->feature_id), *state_object
+    )
+  ) {
+    live->map->triggerRepaint();
+  }
   return MLN_STATUS_OK;
 }
 
@@ -3875,17 +3948,20 @@ auto map_remove_feature_state(
     return selector_status;
   }
 
-  live->feature_state.remove(
-    string_from_view(selector->source_id),
-    feature_state_source_layer(*selector),
-    optional_selector_string(
-      *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
-    ),
-    optional_selector_string(
-      *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
+  if (
+    live->feature_state.remove(
+      string_from_view(selector->source_id),
+      feature_state_source_layer(*selector),
+      optional_selector_string(
+        *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
+      ),
+      optional_selector_string(
+        *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
+      )
     )
-  );
-  live->map->triggerRepaint();
+  ) {
+    live->map->triggerRepaint();
+  }
   return MLN_STATUS_OK;
 }
 
@@ -3923,10 +3999,10 @@ auto map_scale_factor(mln_map map) -> double {
 }
 
 // Map-thread only. The render path posts through map_post_set_size() and
-// map_post_trigger_repaint() instead.
+// map_post_render_work_available() instead.
 auto map_native(MapObject* map) -> mln::Map* { return map->map.get(); }
 
-// Both posting helpers hold the map table's mutex across the liveness check and
+// Posting helpers hold the map table's mutex across the liveness check and
 // the send, so the map cannot be retired in between. Mailbox::push takes only
 // its own mutex and the run loop's, so there is no path back to this lock.
 auto map_post_set_size(mln_map map, uint32_t width, uint32_t height)
@@ -3938,6 +4014,17 @@ auto map_post_set_size(mln_map map, uint32_t width, uint32_t height)
     return status;
   }
   live->command_ref->invoke(&MapCommands::set_size, width, height);
+  return MLN_STATUS_OK;
+}
+
+auto map_post_render_work_available(mln_map map) -> mln_status {
+  const std::scoped_lock lock(handle_table<MapObject>().mutex());
+  MapObject* live = nullptr;
+  const auto status = validate_map_live_locked(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  live->command_ref->invoke(&MapCommands::render_work_available);
   return MLN_STATUS_OK;
 }
 
@@ -4189,6 +4276,56 @@ auto style_id_list_get(
 
 auto style_id_list_destroy(mln_style_id_list list) -> void {
   static_cast<void>(handle_table<StyleIdListObject>().remove(list));
+}
+
+auto style_layer_list_count(mln_style_layer_list list, size_t* out_count)
+  -> mln_status {
+  if (out_count == nullptr) {
+    set_thread_error("out_count must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto& table = handle_table<StyleLayerListObject>();
+  const std::scoped_lock lock(table.mutex());
+  const auto* live_list = table.resolve_locked(list);
+  if (live_list == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  *out_count = live_list->layers.size();
+  return MLN_STATUS_OK;
+}
+
+auto style_layer_list_get(
+  mln_style_layer_list list, size_t index, mln_style_layer_info* out_layer
+) -> mln_status {
+  if (out_layer == nullptr || out_layer->size < sizeof(mln_style_layer_info)) {
+    set_thread_error("out_layer must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto& table = handle_table<StyleLayerListObject>();
+  const std::scoped_lock lock(table.mutex());
+  const auto* live_list = table.resolve_locked(list);
+  if (live_list == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (index >= live_list->layers.size()) {
+    set_thread_error("index is out of range");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto& record = live_list->layers.at(index);
+  *out_layer = mln_style_layer_info{};
+  out_layer->size = sizeof(mln_style_layer_info);
+  out_layer->id = string_view_from_string(record.id);
+  out_layer->type = string_view_from_literal(record.type);
+  out_layer->source_id = string_view_from_string(record.source_id);
+  out_layer->source_layer = string_view_from_string(record.source_layer);
+  return MLN_STATUS_OK;
+}
+
+auto style_layer_list_destroy(mln_style_layer_list list) -> void {
+  static_cast<void>(handle_table<StyleLayerListObject>().remove(list));
 }
 
 auto style_string_list_count(mln_style_string_list list, size_t* out_count)
@@ -6394,6 +6531,35 @@ auto map_list_style_layer_ids(mln_map map, mln_style_id_list* out_layer_ids)
   return create_style_id_list(std::move(ids), out_layer_ids);
 }
 
+auto map_list_style_layers(mln_map map, mln_style_layer_list* out_layers)
+  -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (out_layers == nullptr || *out_layers != MLN_HANDLE_NULL) {
+    set_thread_error(
+      "out_layers must not be null and *out_layers must be the null handle"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto list = std::make_shared<StyleLayerListObject>();
+  for (const auto* layer : live->map->getStyle().getLayers()) {
+    list->layers.push_back(
+      StyleLayerRecord{
+        .id = layer->getID(),
+        .type = layer->getTypeInfo()->type,
+        .source_id = layer->getSourceID(),
+        .source_layer = layer->getSourceLayer(),
+      }
+    );
+  }
+  *out_layers = handle_table<StyleLayerListObject>().insert(std::move(list));
+  return MLN_STATUS_OK;
+}
+
 auto map_move_style_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status {
@@ -7557,6 +7723,49 @@ auto map_lat_lngs_for_pixels_unwrapped(
   );
 }
 
+namespace {
+
+auto validate_latitude(double latitude) -> mln_status {
+  if (!std::isfinite(latitude) || latitude < -90.0 || latitude > 90.0) {
+    set_thread_error("latitude must be finite and within [-90, 90]");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto meters_per_pixel_at_latitude(
+  const mln::CameraOptions& camera, double latitude,
+  double* out_meters_per_pixel
+) -> mln_status {
+  if (out_meters_per_pixel == nullptr) {
+    set_thread_error("out_meters_per_pixel must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto latitude_status = validate_latitude(latitude);
+  if (latitude_status != MLN_STATUS_OK) {
+    return latitude_status;
+  }
+  *out_meters_per_pixel = mln::Projection::getMetersPerPixelAtLatitude(
+    latitude, camera.zoom.value_or(0.0)
+  );
+  return MLN_STATUS_OK;
+}
+
+}  // namespace
+
+auto map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, double* out_meters_per_pixel
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  return meters_per_pixel_at_latitude(
+    live->map->getCameraOptions(), latitude, out_meters_per_pixel
+  );
+}
+
 auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   -> mln_status {
   if (out_projection == nullptr) {
@@ -7577,6 +7786,25 @@ auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   owned_projection->projection =
     std::make_unique<mln::MapProjection>(*live->map);
 
+  *out_projection =
+    handle_table<MapProjectionObject>().insert(std::move(owned_projection));
+  return MLN_STATUS_OK;
+}
+
+auto map_projection_create_from_transform(
+  const mln::TransformState& transform, mln_map_projection* out_projection
+) -> mln_status {
+  if (out_projection == nullptr) {
+    set_thread_error("out_projection must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (*out_projection != MLN_HANDLE_NULL) {
+    set_thread_error("out_projection must point to the null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto owned_projection = std::make_shared<MapProjectionObject>();
+  owned_projection->projection =
+    std::make_unique<mln::MapProjection>(transform);
   *out_projection =
     handle_table<MapProjectionObject>().insert(std::move(owned_projection));
   return MLN_STATUS_OK;
@@ -7751,6 +7979,19 @@ auto map_projection_lat_lng_for_pixel_unwrapped(
 ) -> mln_status {
   return map_projection_lat_lng_for_pixel_with_wrap_mode(
     projection, point, out_coordinate, mln::LatLng::Unwrapped
+  );
+}
+
+auto map_projection_meters_per_pixel_at_latitude(
+  mln_map_projection projection, double latitude, double* out_meters_per_pixel
+) -> mln_status {
+  return with_map_projection(
+    projection,
+    [latitude, out_meters_per_pixel](mln::MapProjection& live) -> mln_status {
+      return meters_per_pixel_at_latitude(
+        live.getCamera(), latitude, out_meters_per_pixel
+      );
+    }
   );
 }
 

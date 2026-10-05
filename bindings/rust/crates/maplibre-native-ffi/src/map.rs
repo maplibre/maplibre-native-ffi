@@ -41,8 +41,8 @@ mod style;
 pub use style::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind,
     RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
-    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme,
-    TileSourceOptions, VectorTileEncoding,
+    StyleImageTextFit, StyleLayerInfo, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo,
+    TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 
 #[derive(Debug)]
@@ -705,6 +705,19 @@ impl MapHandle {
             sys::mln_map_lat_lng_for_pixel_unwrapped(map, point.to_native(), &mut raw_coordinate)
         })?;
         Ok(LatLng::from_native(raw_coordinate))
+    }
+
+    /// Reads the ground distance in meters covered by one logical map pixel at
+    /// a latitude for the current map zoom.
+    pub fn meters_per_pixel_at_latitude(&self, latitude: f64) -> Result<f64> {
+        let map = self.inner.native()?;
+        let mut meters_per_pixel = 0.0;
+        // SAFETY: map is live and meters_per_pixel is writable storage for the
+        // output.
+        maplibre_core::check(unsafe {
+            sys::mln_map_meters_per_pixel_at_latitude(map, latitude, &mut meters_per_pixel)
+        })?;
+        Ok(meters_per_pixel)
     }
 
     /// Converts geographic world coordinates to screen points for the current map.

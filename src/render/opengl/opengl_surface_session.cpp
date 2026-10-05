@@ -140,7 +140,7 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
     return *this;
   }
 
-  void resize(mln::Size size_) { size = size_; }
+  void resize(mln::Size size_) { setRenderableSize(size_); }
 
   // Presents through a different host surface from here on. The outgoing
   // surface is never touched, which a host may already have destroyed;
@@ -150,14 +150,16 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
     // session's GL context was created from it, and WGL context creation still
     // reads its device_context.
     descriptor_.surface = descriptor.surface;
-    size = mln::Size{
-      mln::core::physical_dimension(
-        descriptor.extent.width, descriptor.extent.scale_factor
-      ),
-      mln::core::physical_dimension(
-        descriptor.extent.height, descriptor.extent.scale_factor
-      )
-    };
+    setRenderableSize(
+      mln::Size{
+        mln::core::physical_dimension(
+          descriptor.extent.width, descriptor.extent.scale_factor
+        ),
+        mln::core::physical_dimension(
+          descriptor.extent.height, descriptor.extent.scale_factor
+        )
+      }
+    );
   }
 
   [[nodiscard]] auto context_descriptor() const
@@ -167,7 +169,7 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
 
   void updateAssumedState() override {
     assumeFramebufferBinding(0);
-    setViewport(0, 0, size);
+    setViewport(0, 0, getSize());
     assumeScissorTest(0, 0, 0, 0);
   }
 

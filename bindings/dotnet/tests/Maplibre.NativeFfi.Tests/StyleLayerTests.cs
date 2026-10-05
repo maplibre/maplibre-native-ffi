@@ -9,6 +9,31 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class StyleLayerTests
 {
+    [BindingSpecTest("BND-110")]
+    [Fact]
+    public void GlobalStateDefaultsUpdatesAndStyleReplacement()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions());
+        Assert.Throws<InvalidStateException>(() =>
+            map.SetGlobalStateProperty("theme", "true"u8.ToArray())
+        );
+        map.SetStyleJson(
+            """{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}"""u8.ToArray()
+        );
+        Assert.Equal("""{"theme":"light"}"""u8.ToArray(), map.GetGlobalState());
+        map.SetGlobalStateProperty("theme", """["dark",{"enabled":true}]"""u8.ToArray());
+        var snapshot = map.GetGlobalState();
+        map.SetGlobalStateProperty("theme", "null"u8.ToArray());
+        Assert.Equal("""{"theme":"light"}"""u8.ToArray(), map.GetGlobalState());
+        Assert.Equal("""{"theme":["dark",{"enabled":true}]}"""u8.ToArray(), snapshot);
+        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        Assert.Equal("{}"u8.ToArray(), map.GetGlobalState());
+        map.SetGlobalStateProperty("theme", "true"u8.ToArray());
+        map.SetGlobalStateProperty("theme", "null"u8.ToArray());
+        Assert.Equal("""{"theme":null}"""u8.ToArray(), map.GetGlobalState());
+    }
+
     [BindingSpecTest("BND-105")]
     [Fact]
     public void DemAndLocationLayerHelpersAdaptThroughNativeMap()

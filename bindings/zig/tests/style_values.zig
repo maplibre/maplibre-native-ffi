@@ -34,6 +34,73 @@ test "style ID lists are copied into owned Zig output" {
     try expectListContains(layer_ids, "point-circle");
 }
 
+// BND-105: style layer listing copies the layer stack in style order.
+test "style layer lists are copied into owned Zig output in style order" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+    try map.setStyleJson(testing.allocator,
+        \\{"version":8,"sources":{"tiles":{"type":"vector","tiles":["http://example.invalid/{z}/{x}/{y}.pbf"]}},
+        \\"layers":[{"id":"roads","type":"line","source":"tiles","source-layer":"transportation"},
+        \\{"id":"sky","type":"background"}]}
+    );
+    try testing.expect(try support.waitForEvent(&runtime, .map_style_loaded));
+
+    var layers = try map.listStyleLayers(testing.allocator);
+    defer layers.deinit();
+    try testing.expectEqual(@as(usize, 2), layers.items.len);
+
+    const roads = layers.items[0];
+    try testing.expectEqualStrings("roads", roads.id);
+    try testing.expectEqualStrings("line", roads.type);
+    try testing.expectEqualStrings("tiles", roads.source_id.?);
+    try testing.expectEqualStrings("transportation", roads.source_layer.?);
+
+    const sky = layers.items[1];
+    try testing.expectEqualStrings("sky", sky.id);
+    try testing.expectEqualStrings("background", sky.type);
+    try testing.expect(sky.source_id == null);
+    try testing.expect(sky.source_layer == null);
+}
+
+test "style layer infos compare copied strings by content" {
+    var left = maplibre.StyleLayerInfo{
+        .allocator = testing.allocator,
+        .id = try testing.allocator.dupe(u8, "roads"),
+        .type = try testing.allocator.dupe(u8, "line"),
+        .source_id = try testing.allocator.dupe(u8, "tiles"),
+        .source_layer = try testing.allocator.dupe(u8, "transportation"),
+    };
+    defer left.deinit();
+    var right = maplibre.StyleLayerInfo{
+        .allocator = testing.allocator,
+        .id = try testing.allocator.dupe(u8, "roads"),
+        .type = try testing.allocator.dupe(u8, "line"),
+        .source_id = try testing.allocator.dupe(u8, "tiles"),
+        .source_layer = try testing.allocator.dupe(u8, "transportation"),
+    };
+    defer right.deinit();
+    try testing.expect(left.eql(right));
+
+    var other_type = right;
+    other_type.type = "fill";
+    try testing.expect(!left.eql(other_type));
+
+    var absent_source_layer = right;
+    absent_source_layer.source_layer = null;
+    var empty_source_layer = right;
+    empty_source_layer.source_layer = "";
+    try testing.expect(!absent_source_layer.eql(empty_source_layer));
+
+    var left_items = [_]maplibre.StyleLayerInfo{left};
+    var right_items = [_]maplibre.StyleLayerInfo{right};
+    const left_list = maplibre.StyleLayerInfoList{ .allocator = testing.allocator, .items = left_items[0..] };
+    const right_list = maplibre.StyleLayerInfoList{ .allocator = testing.allocator, .items = right_items[0..] };
+    try testing.expect(left_list.eql(right_list));
+    try testing.expect(!left_list.eql(.{ .allocator = testing.allocator, .items = right_items[0..0] }));
+}
+
 test "style layer JSON helpers manage lifecycle and order" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
@@ -381,4 +448,36 @@ test "style transition options round trip through the C API" {
         error.InvalidArgument,
         map.setStyleTransitionOptions(.{ .delay_ms = -1.0 }),
     );
+}
+
+// BND-110: global-state lifetime and copied JSON values.
+test "global state defaults updates and style replacement" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+    try testing.expectError(error.InvalidState, map.setGlobalStateProperty(testing.allocator, "theme", "true"));
+    try map.setStyleJson(testing.allocator,
+        \\{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}
+    );
+    var defaults = try map.getGlobalState(testing.allocator);
+    defer defaults.deinit();
+    try testing.expectEqualStrings("{\"theme\":\"light\"}", defaults.value);
+    try map.setGlobalStateProperty(testing.allocator, "theme", "[\"dark\",{\"enabled\":true}]");
+    var snapshot = try map.getGlobalState(testing.allocator);
+    defer snapshot.deinit();
+    try map.setGlobalStateProperty(testing.allocator, "theme", "null");
+    var reset = try map.getGlobalState(testing.allocator);
+    defer reset.deinit();
+    try testing.expectEqualStrings(defaults.value, reset.value);
+    try testing.expectEqualStrings("{\"theme\":[\"dark\",{\"enabled\":true}]}", snapshot.value);
+    try map.setStyleJson(testing.allocator, "{\"version\":8,\"sources\":{},\"layers\":[]}");
+    var replaced = try map.getGlobalState(testing.allocator);
+    defer replaced.deinit();
+    try testing.expectEqualStrings("{}", replaced.value);
+    try map.setGlobalStateProperty(testing.allocator, "theme", "true");
+    try map.setGlobalStateProperty(testing.allocator, "theme", "null");
+    var cleared = try map.getGlobalState(testing.allocator);
+    defer cleared.deinit();
+    try testing.expectEqualStrings("{\"theme\":null}", cleared.value);
 }

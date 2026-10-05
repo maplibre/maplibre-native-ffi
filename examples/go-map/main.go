@@ -188,11 +188,11 @@ func run(mode renderTargetMode) (result error) {
 		}
 
 		if shared.consumeRenderRequest() && !view.empty() && running {
-			rendered, err := state.renderUpdate()
+			completed, err := state.renderUpdate()
 			if err != nil {
 				return err
 			}
-			if rendered {
+			if completed {
 				didWork = true
 			} else {
 				shared.requestRender()
@@ -296,8 +296,8 @@ func logSeverity(severity maplibre.LogSeverity) string {
 
 func logEvent(event maplibre.LogEvent) string {
 	switch event {
-	case maplibre.LogEventOpenGL:
-		return "opengl"
+	case maplibre.LogEventGraphicsBackend:
+		return "graphics-backend"
 	case maplibre.LogEventRender:
 		return "render"
 	case maplibre.LogEventHTTPRequest:

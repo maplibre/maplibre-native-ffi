@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.render
 
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapProjectionHandle
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -91,15 +92,35 @@ public expect class RenderSessionHandle : AutoCloseable {
   /**
    * Renders the latest available map render update into this session's render target.
    *
-   * The map retains its latest update, so repeated calls re-render it and report
-   * [RenderResult.RENDERED] again. Every other result names the wake to wait for:
-   * [RenderResult.NO_UPDATE] and [RenderResult.SIZE_PENDING] resolve on a render-update-available
-   * event, and [RenderResult.TARGET_NOT_READY] resolves when the host changes the render target.
+   * Drains queued render-thread work and renders each update once per target. Repeated calls report
+   * [RenderResult.NO_UPDATE] until map state or the target changes. Request a map repaint and pump
+   * the runtime to redraw a continuous map on demand; request a still image for a static map. Every
+   * other result names the wake to wait for: [RenderResult.NO_UPDATE] and
+   * [RenderResult.SIZE_PENDING] resolve on a render-update-available event, and
+   * [RenderResult.TARGET_NOT_READY] resolves when the host changes the render target or on a later
+   * retry after a backoff.
    *
    * [RenderUpdate.needsRepaint] reports whether the map asked for another frame while rendering
    * this one, so a host can re-arm its frame loop before it drains events.
    */
   public fun renderUpdate(): RenderUpdate
+
+  /**
+   * Copies the full projection of the last update that this session rendered.
+   *
+   * Call on the session owner thread after [renderUpdate] reports [RenderResult.RENDERED], before
+   * another render or target change. This is also allowed while an owned texture frame is acquired.
+   * Keep the projection with that frame and its presentation extent; GPU synchronization follows
+   * the render target's contract.
+   *
+   * Live-map changes and calls that produce no frame preserve the session snapshot. Resize and
+   * target replacement invalidate it until another frame renders. A detached session or a target
+   * without a rendered snapshot throws `InvalidStateException`.
+   *
+   * The returned helper owns an independent copy, usable from any thread after later renders,
+   * target changes, or session and map closure. Close it when finished.
+   */
+  public fun createProjection(): MapProjectionHandle
 
   public fun detach()
 

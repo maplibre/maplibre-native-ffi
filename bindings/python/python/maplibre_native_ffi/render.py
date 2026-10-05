@@ -58,7 +58,7 @@ class RenderUpdate:
 
     ``result`` names the wake to wait for before rendering again.
     ``needs_repaint`` reports whether the map asked for another frame while it
-    rendered this one, as during an ongoing camera transition. It is set only
+    rendered this one, as during an ongoing paint transition. It is set only
     when ``result`` is ``RENDERED``, and reads false for every other outcome.
     """
 
@@ -558,6 +558,15 @@ class RenderSessionHandle(NativeHandleMixin):
         """Return whether backend resources have been detached."""
         return bool(self._native.detached)
 
+    def create_projection(self) -> MapProjectionHandle:
+        """Snapshot the last rendered update on this session's owner thread.
+
+        Creation is allowed while a frame is acquired and requires a rendered
+        update after attaching, resizing, or replacing the target. The any-thread
+        snapshot remains usable after this session and its map close.
+        """
+        return MapProjectionHandle._from_native(self._native.create_projection())
+
     def resize(self, width: int, height: int, scale_factor: float) -> None:
         """Resize this attached render session.
 
@@ -730,13 +739,12 @@ class RenderSessionHandle(NativeHandleMixin):
         The returned :class:`RenderUpdate` carries a :class:`RenderResult` that
         names the wake to wait for before calling again:
 
-        - ``RENDERED``: the target holds a new frame. The map retains its latest
-          update, so redraw on demand after a resize or a surface expose, and
-          gate a frame loop on
-          ``RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE``.
-        - ``NO_UPDATE``: the call produced no frame. The map either has no
-          update yet, or the Metal backend has not created an owned texture
-          because content is not ready. Wait for
+        - ``RENDERED``: the target holds a new frame. Each update renders once
+          per target. Request a map repaint and pump the runtime to redraw a
+          continuous map on demand; request a still image for a static map.
+        - ``NO_UPDATE``: the call drained queued render-thread work without a
+          frame. The latest update already rendered, the map has no update yet, a static map is waiting for style or tile data, or the Metal
+          backend has not created an owned texture. Wait for
           ``RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE``.
         - ``SIZE_PENDING``: this session resized and the map, which applies its
           size on its own thread, is still behind. The map publishes an update
@@ -748,7 +756,7 @@ class RenderSessionHandle(NativeHandleMixin):
           and retry.
 
         ``needs_repaint`` reports whether the map asked for another frame
-        while it rendered this one, as during an ongoing camera transition.
+        while it rendered this one, as during an ongoing paint transition.
         It is set only when ``result`` is ``RENDERED``. This is the same signal
         the ``RuntimeEventType.MAP_RENDER_FRAME_FINISHED`` event carries in its
         ``needs_repaint`` field, delivered here without the event round trip,
@@ -1037,4 +1045,4 @@ __all__ = [
     "WglContextDescriptor",
 ]
 
-from .map import MapHandle
+from .map import MapHandle, MapProjectionHandle

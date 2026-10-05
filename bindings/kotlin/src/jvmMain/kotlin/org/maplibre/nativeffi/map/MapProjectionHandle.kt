@@ -60,6 +60,13 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
     }
   }
 
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Double {
+    NativeAccess.ensureLoaded()
+    return withLiveHandle { handle ->
+      NativeAccess.projectionMetersPerPixelAtLatitude(handle, latitude)
+    }
+  }
+
   public actual val isClosed: Boolean
     get() = core.isReleased()
 

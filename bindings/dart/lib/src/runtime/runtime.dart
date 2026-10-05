@@ -1849,6 +1849,31 @@ final class MapHandle {
     });
   }
 
+  /// Sets a global-state JSON value; JSON null restores its style default.
+  void setGlobalStateProperty(String propertyName, Uint8List value) {
+    withNativeArena((arena) {
+      final nativePropertyName = nativeStringView(propertyName, arena);
+      final nativeValue = nativeBufferView(value, arena);
+      _check(
+        raw.mln_map_set_global_state_property(
+          _handle.raw,
+          nativePropertyName.value,
+          nativeValue,
+        ),
+      );
+    });
+  }
+
+  /// Copies the current global-state JSON object, including defaults.
+  Uint8List getGlobalState() {
+    return withNativeArena((arena) {
+      final outState = arena<Uint64>();
+      outState.value = 0;
+      _check(raw.mln_map_get_global_state(_handle.raw, outState));
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outState.value));
+    });
+  }
+
   /// Sets per-feature state on this map.
   void setFeatureState(FeatureStateSelector selector, Uint8List state) {
     withNativeArena((arena) {
@@ -2416,6 +2441,22 @@ final class MapHandle {
         ),
       );
       return native_struct.latLngFromNative(outCoordinate.ref);
+    });
+  }
+
+  /// Gets the ground distance in meters covered by one logical pixel at
+  /// [latitude] for the current zoom.
+  double metersPerPixelAtLatitude(double latitude) {
+    return withNativeArena((arena) {
+      final outMetersPerPixel = arena<Double>();
+      _check(
+        raw.mln_map_meters_per_pixel_at_latitude(
+          _handle.raw,
+          latitude,
+          outMetersPerPixel,
+        ),
+      );
+      return outMetersPerPixel.value;
     });
   }
 
@@ -3877,6 +3918,16 @@ final class MapHandle {
       outList.value = 0;
       _check(raw.mln_map_list_style_layer_ids(_handle.raw, outList));
       return _copyStyleIdList(NativeStyleIdList(outList.value));
+    });
+  }
+
+  /// Copies every style layer in style order.
+  List<StyleLayerInfo> listStyleLayers() {
+    return withNativeArena((arena) {
+      final outList = arena<Uint64>();
+      outList.value = 0;
+      _check(raw.mln_map_list_style_layers(_handle.raw, outList));
+      return _copyStyleLayerList(NativeStyleLayerList(outList.value));
     });
   }
 

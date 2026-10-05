@@ -1782,6 +1782,32 @@ impl MapHandle {
         Ok(())
     }
 
+    fn set_global_state_property(
+        &self,
+        property_name: String,
+        value: &Bound<'_, PyBytes>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let property_name = maplibre_core::string::string_view(&property_name);
+        let value = maplibre_core::string::buffer_view(value.as_bytes());
+        // SAFETY: The C API validates the map pointer, property name, and JSON buffer view.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_global_state_property(state.handle(), property_name.raw(), value)
+        })
+        .map_err(map_error)
+    }
+
+    fn get_global_state(&self, py: Python<'_>) -> PyResult<Py<PyBytes>> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        // SAFETY: The C API validates the map and null-initialized output handle.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_global_state(state.handle(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        owned_buffer_to_py(py, out.get())
+    }
+
     fn set_feature_state(
         &self,
         source_id: String,
@@ -2375,6 +2401,21 @@ impl MapHandle {
         })
         .map_err(map_error)?;
         lat_lng_to_py(py, coordinate)
+    }
+
+    fn meters_per_pixel_at_latitude(&self, latitude: f64) -> PyResult<f64> {
+        let state = self.state();
+        let mut meters_per_pixel = 0.0;
+        // SAFETY: The C API validates the map pointer, latitude, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_meters_per_pixel_at_latitude(
+                state.handle(),
+                latitude,
+                &mut meters_per_pixel,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(meters_per_pixel)
     }
 
     fn pixels_for_lat_lngs(
@@ -3434,6 +3475,25 @@ impl MapHandle {
         unsafe { maplibre_core::style::copy_style_id_list(native) }.map_err(map_error)
     }
 
+    fn list_style_layers(&self, py: Python<'_>) -> PyResult<Py<PyList>> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_layer_list>::new();
+        // SAFETY: The C API validates the map pointer and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_list_style_layers(state.handle(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        let native = out.into_live("mln_style_layer_list").map_err(map_error)?;
+        // SAFETY: native is an owned style layer list returned by native.
+        let layers =
+            unsafe { maplibre_core::style::copy_style_layer_list(native) }.map_err(map_error)?;
+        let list = PyList::empty(py);
+        for layer in layers {
+            list.append(style_layer_info_to_py(py, layer)?)?;
+        }
+        Ok(list.unbind())
+    }
+
     fn move_style_layer(&self, layer_id: String, before_layer_id: Option<String>) -> PyResult<()> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
@@ -4136,6 +4196,22 @@ impl MapProjectionHandle {
         lat_lng_to_py(py, coordinate)
     }
 
+    fn meters_per_pixel_at_latitude(&self, latitude: f64) -> PyResult<f64> {
+        let state = self.state();
+        let mut meters_per_pixel = 0.0;
+        // SAFETY: The C API validates the projection pointer, latitude, and
+        // output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_meters_per_pixel_at_latitude(
+                state.handle(),
+                latitude,
+                &mut meters_per_pixel,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(meters_per_pixel)
+    }
+
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
@@ -4424,6 +4500,30 @@ impl RenderSessionHandle {
             // SAFETY: raw is fully initialized and lives for this call. The C
             // API validates the session pointer, state, and descriptor fields.
             unsafe { sys::mln_opengl_borrowed_texture_set_target(session, raw) }
+        })
+    }
+
+    fn create_projection(&self) -> PyResult<MapProjectionHandle> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map_projection>::new();
+        // SAFETY: The C API validates the session handle, owner-thread affinity, and
+        // output pointer. out starts null and is consumed immediately on success.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_projection_create(state.native(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        let native = out.into_live("mln_map_projection").map_err(map_error)?;
+        // SAFETY: ptr came from mln_render_session_projection_create and is paired with
+        // mln_map_projection_destroy in close.
+        let handle = unsafe {
+            maplibre_core::handle::NativeHandleState::from_handle(native, "mln_map_projection")
+        }
+        .map_err(map_error)?;
+        Ok(MapProjectionHandle {
+            state: Mutex::new(handle),
         })
     }
 
@@ -5602,7 +5702,7 @@ fn log_event_raw(event: LogEvent) -> u32 {
         LogEvent::HttpRequest => sys::MLN_LOG_EVENT_HTTP_REQUEST,
         LogEvent::Sprite => sys::MLN_LOG_EVENT_SPRITE,
         LogEvent::Image => sys::MLN_LOG_EVENT_IMAGE,
-        LogEvent::OpenGl => sys::MLN_LOG_EVENT_OPENGL,
+        LogEvent::GraphicsBackend => sys::MLN_LOG_EVENT_GRAPHICS_BACKEND,
         LogEvent::Jni => sys::MLN_LOG_EVENT_JNI,
         LogEvent::Android => sys::MLN_LOG_EVENT_ANDROID,
         LogEvent::Crash => sys::MLN_LOG_EVENT_CRASH,
@@ -6489,6 +6589,18 @@ fn queried_features_to_py(
         list.append(queried_feature_to_py(py, feature)?)?;
     }
     Ok(list.unbind())
+}
+
+fn style_layer_info_to_py(
+    py: Python<'_>,
+    layer: maplibre_core::StyleLayerInfo,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("id", layer.id)?;
+    dict.set_item("type", layer.layer_type)?;
+    dict.set_item("source_id", layer.source_id)?;
+    dict.set_item("source_layer", layer.source_layer)?;
+    Ok(dict.into_any().unbind())
 }
 
 fn source_info_to_py(py: Python<'_>, info: maplibre_core::SourceInfo) -> PyResult<Py<PyAny>> {
@@ -7467,6 +7579,13 @@ fn set_network_status_raw(raw_status: u32) -> PyResult<()> {
     maplibre_core::set_network_status(NetworkStatus::from_raw(raw_status)).map_err(map_error)
 }
 
+/// Returns the process-lifetime address of the v1 plugin registration function.
+#[pyfunction]
+fn plugin_register_function_v1() -> usize {
+    // SAFETY: the accessor borrows no data and returns a process-lifetime function.
+    unsafe { sys::mln_plugin_get_register_function_v1() }.expect("registration function") as usize
+}
+
 /// Test helper that calls the C size accessor with a raw map id, which the safe
 /// API cannot express: a test can replay a released id or one from another
 /// thread.
@@ -8406,6 +8525,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
     module.add_function(wrap_pyfunction!(lat_lng_for_projected_meters, module)?)?;
     module.add_function(wrap_pyfunction!(set_network_status_raw, module)?)?;
+    module.add_function(wrap_pyfunction!(plugin_register_function_v1, module)?)?;
     module.add_function(wrap_pyfunction!(set_log_callback, module)?)?;
     module.add_function(wrap_pyfunction!(clear_log_callback, module)?)?;
     module.add_function(wrap_pyfunction!(set_async_log_severity_mask, module)?)?;

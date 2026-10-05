@@ -519,6 +519,19 @@ enum NativeStyle {
     return try copyStyleIdList(list)
   }
 
+  static func layers(_ map: NativeMapHandle) throws -> [StyleLayerInfo] {
+    let listValue = try NativeMemory.withTemporary(UInt64(0)) { outHandle in
+      try checkStatus(mln_map_list_style_layers(map.raw, outHandle))
+    }.value
+    let list = NativeStyleLayerListHandle(raw: listValue)
+    guard !list.isNull
+    else {
+      throw NativeStatusFailure.swiftNativeError("layer list was null")
+    }
+    defer { mln_style_layer_list_destroy(list.raw) }
+    return try copyStyleLayerList(list)
+  }
+
   static func layerJSON(_ map: NativeMapHandle,
                         layerId: mln_buffer_view) throws -> Data?
   {
@@ -694,6 +707,34 @@ enum NativeStyle {
     return try bytes.withUnsafeBufferPointer { buffer in
       try NativeString.copyUTF8(data: buffer.baseAddress, size: size)
     }
+  }
+
+  private static func copyStyleLayerList(_ list: NativeStyleLayerListHandle)
+    throws -> [StyleLayerInfo]
+  {
+    let count = try NativeMemory.withTemporary(0) { count in
+      try checkStatus(mln_style_layer_list_count(list.raw, count))
+    }.value
+    return try (0 ..< count).map { index in
+      var layer = mln_style_layer_info_default()
+      try checkStatus(mln_style_layer_list_get(list.raw, index, &layer))
+      return try StyleLayerInfo(
+        id: copyUTF8(layer.id),
+        type: copyUTF8(layer.type),
+        sourceId: copyOptionalUTF8(layer.source_id),
+        sourceLayer: copyOptionalUTF8(layer.source_layer)
+      )
+    }
+  }
+
+  private static func copyUTF8(_ view: mln_buffer_view) throws -> String {
+    try NativeString.copyUTF8(data: view.data, size: view.size)
+  }
+
+  private static func copyOptionalUTF8(_ view: mln_buffer_view) throws
+    -> String?
+  {
+    view.size == 0 ? nil : try copyUTF8(view)
   }
 
   private static func copyStyleIdList(_ list: NativeStyleIdListHandle) throws

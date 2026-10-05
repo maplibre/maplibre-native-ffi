@@ -1,30 +1,27 @@
 include_guard(GLOBAL)
 
 function(mln_ffi_configure_apple_toolchain_defaults)
-  if(DEFINED CMAKE_SYSTEM_NAME)
-    if(NOT CMAKE_SYSTEM_NAME MATCHES "^(Darwin|iOS|tvOS|watchOS|visionOS)$")
-      return()
-    endif()
-  elseif(NOT CMAKE_HOST_APPLE)
-    return()
-  endif()
-
-  if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$")
-      # Match MapLibre Native's vendored CMake, which currently forces this
-      # value through maplibre-tile-spec even for iOS builds. tvOS shares the
-      # same numeric floor.
-      set(CMAKE_OSX_DEPLOYMENT_TARGET "14.3"
-          CACHE STRING "Minimum ${CMAKE_SYSTEM_NAME} deployment target" FORCE)
-    elseif(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
-      set(CMAKE_OSX_DEPLOYMENT_TARGET "14.3"
-          CACHE STRING "Minimum macOS deployment target" FORCE)
-    endif()
+  # MapLibre Native defaults and enforces the macOS floor itself, but it leaves
+  # iOS and tvOS to the caller. Default both to its iOS floor before the Apple
+  # toolchain derives compiler targets from this value.
+  if(NOT CMAKE_OSX_DEPLOYMENT_TARGET
+     AND CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "15.5"
+        CACHE STRING "Minimum ${CMAKE_SYSTEM_NAME} deployment target" FORCE)
   endif()
 endfunction()
 
 function(mln_ffi_apple_is_simulator out_var)
   if(CMAKE_OSX_SYSROOT MATCHES "[Ss]imulator")
+    set(${out_var} TRUE PARENT_SCOPE)
+  else()
+    set(${out_var} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
+function(mln_ffi_apple_is_maccatalyst out_var)
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
+     AND CMAKE_OSX_SYSROOT MATCHES "[Mm]ac[Oo][Ss][Xx]")
     set(${out_var} TRUE PARENT_SCOPE)
   else()
     set(${out_var} FALSE PARENT_SCOPE)
@@ -51,6 +48,7 @@ function(mln_ffi_configure_platform_dependencies target)
       MLN_FFI_SHARED_SUPPORTED TRUE)
 
   mln_ffi_apple_is_simulator(MLN_FFI_APPLE_SIMULATOR)
+  mln_ffi_apple_is_maccatalyst(MLN_FFI_APPLE_MACCATALYST)
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(
       ${target}
@@ -58,7 +56,14 @@ function(mln_ffi_configure_platform_dependencies target)
         MLN_FFI_TARGET_PLATFORM macos-arm64 MLN_FFI_ZIG_TARGET aarch64-macos
         MLN_FFI_TEST_SUPPORTED TRUE)
   elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    if(MLN_FFI_APPLE_SIMULATOR)
+    if(MLN_FFI_APPLE_MACCATALYST)
+      # Zig has no Catalyst ABI.
+      set_target_properties(
+        ${target}
+        PROPERTIES
+          MLN_FFI_TARGET_PLATFORM ios-maccatalyst-arm64 MLN_FFI_ZIG_TARGET ""
+          MLN_FFI_TEST_SUPPORTED TRUE)
+    elseif(MLN_FFI_APPLE_SIMULATOR)
       set_target_properties(
         ${target}
         PROPERTIES
@@ -128,9 +133,10 @@ endfunction()
 function(mln_ffi_configure_platform target)
   set(MLN_FFI_VENDOR_APPLE_SOURCES
       ${MLN_FFI_SOURCE_DIR}/platform/qt/src/mln/bidi.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/async_task.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/async_task.mm
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/collator.mm
       ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../src/platform/apple/http_file_source.mm
+      ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../src/platform/apple/i18n.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/image.mm
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/local_glyph_rasterizer.mm
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/logging_nslog.mm

@@ -432,6 +432,17 @@ public struct StyleSourceInfo: Equatable, Sendable {
   }
 }
 
+/// A copied snapshot of one style layer's identity and source binding.
+public struct StyleLayerInfo: Equatable, Sendable {
+  public let id: String
+  /// The style-spec layer type, such as `"line"` or `"background"`.
+  public let type: String
+  /// The source the layer reads, absent when the layer type takes no source.
+  public let sourceId: String?
+  /// The source layer the layer reads, absent when the layer names none.
+  public let sourceLayer: String?
+}
+
 public enum LocationIndicatorImageKind: UInt32, Sendable, Hashable {
   case top = 0
   case bearing = 1
@@ -1438,6 +1449,11 @@ public extension MapHandle {
     try mapNativeFailure { try NativeStyle.layerIds(requireLiveHandle()) }
   }
 
+  /// Returns every style layer in style order as one copied snapshot.
+  func styleLayers() throws -> [StyleLayerInfo] {
+    try mapNativeFailure { try NativeStyle.layers(requireLiveHandle()) }
+  }
+
   func moveStyleLayer(_ layerId: String, beforeLayerId: String? = nil) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
@@ -1458,6 +1474,31 @@ public extension MapHandle {
         requireLiveHandle(),
         layerId: arena.view(layerId)
       )
+    }
+  }
+
+  /// Sets a JSON value; JSON null restores its style default.
+  func setGlobalStateProperty(_ propertyName: String, value: Data) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      try checkStatus(mln_map_set_global_state_property(
+        requireLiveHandle().raw,
+        arena.view(propertyName),
+        arena.view(value)
+      ))
+    }
+  }
+
+  /// Copies the current global-state JSON object, including defaults.
+  func globalState() throws -> Data {
+    try mapNativeFailure {
+      var buffer: mln_buffer = 0
+      try checkStatus(mln_map_get_global_state(
+        requireLiveHandle().raw,
+        &buffer
+      ))
+      return try NativeMemory.copyBuffer(NativeBufferHandle(raw: buffer))
     }
   }
 

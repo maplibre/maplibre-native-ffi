@@ -78,6 +78,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_event_mask
 import org.maplibre.nativeffi.internal.c.mln_map_get_feature_state
 import org.maplibre.nativeffi.internal.c.mln_map_get_free_camera_options
+import org.maplibre.nativeffi.internal.c.mln_map_get_global_state
 import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_max_zoom
@@ -110,7 +111,9 @@ import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids
+import org.maplibre.nativeffi.internal.c.mln_map_list_style_layers
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids
+import org.maplibre.nativeffi.internal.c.mln_map_meters_per_pixel_at_latitude
 import org.maplibre.nativeffi.internal.c.mln_map_move_by
 import org.maplibre.nativeffi.internal.c.mln_map_move_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_move_style_layer
@@ -143,6 +146,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_synchronous_tiling
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_gesture_in_progress
+import org.maplibre.nativeffi.internal.c.mln_map_set_global_state_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_url
@@ -187,6 +191,7 @@ import org.maplibre.nativeffi.internal.lifecycle.mapProjectionHandle
 import org.maplibre.nativeffi.internal.lifecycle.ownedBufferHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.styleIdListHandle
+import org.maplibre.nativeffi.internal.lifecycle.styleLayerListHandle
 import org.maplibre.nativeffi.internal.lifecycle.styleStringListHandle
 import org.maplibre.nativeffi.internal.memory.CSize
 import org.maplibre.nativeffi.internal.memory.CSizeVar
@@ -223,6 +228,7 @@ import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
@@ -264,6 +270,25 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         )
       )
     }
+  }
+
+  public actual fun setGlobalStateProperty(propertyName: String, value: ByteArray) {
+    memScoped {
+      Status.check(
+        mln_map_set_global_state_property(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(propertyName, this),
+          ByteStructs.bufferView(value, this),
+        )
+      )
+    }
+  }
+
+  public actual fun getGlobalState(): ByteArray = memScoped {
+    val outState = alloc<ULongVar>()
+    outState.value = 0uL
+    Status.check(mln_map_get_global_state(state.requireLive().rawHandleValue, outState.ptr))
+    ByteStructs.ownedBuffer(outState.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
   public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
@@ -1159,6 +1184,15 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     StyleStructs.styleIdList(outList.value.asHandle("mln_map_list_style_ids", ::styleIdListHandle))
   }
 
+  public actual fun styleLayers(): List<StyleLayerInfo> = memScoped {
+    val outList = alloc<ULongVar>()
+    outList.value = 0uL
+    Status.check(mln_map_list_style_layers(state.requireLive().rawHandleValue, outList.ptr))
+    StyleStructs.styleLayerList(
+      outList.value.asHandle("mln_map_list_style_layers", ::styleLayerListHandle)
+    )
+  }
+
   public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
     memScoped {
       Status.check(
@@ -1929,6 +1963,18 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       )
     )
     CoreStructs.latLngArray(outCoordinates, pointSnapshot.size)
+  }
+
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Double = memScoped {
+    val outMetersPerPixel = alloc<DoubleVar>()
+    Status.check(
+      mln_map_meters_per_pixel_at_latitude(
+        state.requireLive().rawHandleValue,
+        latitude,
+        outMetersPerPixel.ptr,
+      )
+    )
+    outMetersPerPixel.value
   }
 
   public actual fun attachMetalOwnedTexture(

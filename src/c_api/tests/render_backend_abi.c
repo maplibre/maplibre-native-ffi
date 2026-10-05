@@ -455,7 +455,7 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
 }
 
 // The repaint flag a rendered frame carries: a settled static map reports
-// false, and a running camera transition reports true.
+// false, and a running paint transition reports true.
 static void render_update_reports_whether_the_map_needs_another_frame(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -488,14 +488,19 @@ static void render_update_reports_whether_the_map_needs_another_frame(void) {
   TEST_ASSERT_EQUAL_INT(MLN_RENDER_RESULT_RENDERED, result);
   TEST_ASSERT_FALSE(needs_repaint);
 
-  mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_ZOOM;
-  camera.zoom = 4.0;
-  mln_animation_options animation = mln_animation_options_default();
-  animation.fields = MLN_ANIMATION_OPTION_DURATION;
-  animation.duration_ms = 60000.0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_ease_to(map, &camera, &animation)
+    MLN_STATUS_OK, mln_map_set_layer_property(
+                     map, MLN_BUFFER_LITERAL("bg"),
+                     MLN_BUFFER_LITERAL("background-color-transition"),
+                     MLN_BUFFER_LITERAL("{\"duration\":60000}")
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_layer_property(
+      map, MLN_BUFFER_LITERAL("bg"), MLN_BUFFER_LITERAL("background-color"),
+      MLN_BUFFER_LITERAL("\"#0000ff\"")
+    )
   );
 
   bool saw_repaint_request = false;

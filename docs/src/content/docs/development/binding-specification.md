@@ -101,7 +101,8 @@ Requirements:
   emulator through the shared runners in `scripts/`
   (`run-android-emulator-test.sh`, `run-ohos-emulator-test.sh`, which boot the
   emulator on demand), iOS and tvOS simulator presets build a test bundle and
-  spawn it on a simulator, and Emscripten presets run in headless Chromium.
+  spawn it on a simulator, Mac Catalyst presets run that bundle on the host, and
+  Emscripten presets run in headless Chromium.
 - A preset that a binding cannot build or run MUST fail with a message that
   names what the binding supports. A device preset with no runner, such as
   `ios-arm64-metal` or `tvos-arm64-metal`, fails the same way and points at a
@@ -309,8 +310,9 @@ the parent. Releasing a parent while children are live MUST fail without
 consuming or destroying the parent.
 
 `MapProjectionHandle` is the exception: after creation it owns a standalone
-projection snapshot. It MUST remain valid after the source map closes, MUST be
-usable from any thread, and MUST release with `mln_map_projection_destroy()`.
+projection snapshot. It MUST remain valid after the source map or render session
+closes, MUST be usable from any thread, and MUST release with
+`mln_map_projection_destroy()`.
 
 ### Handle copying
 
@@ -568,6 +570,22 @@ value, then reports native status through the binding's ordinary error model. A
 volatile tile-backed source does not store fetched tiles in persistent storage.
 Other source types retain the value for inspection without changing their
 loading behavior.
+
+### Style layer listing
+
+Style layer listing returns the whole layer stack in style order as one copied,
+language-owned list of layer information values. Each value carries the layer
+ID, the style-spec layer type, an optional source ID, and an optional
+source-layer. The native layer-list handle is an internal copy mechanism and
+MUST NOT appear in the public API.
+
+An absent source ID means that the layer type takes no source, and an absent
+source-layer means that the layer names none. A binding represents each absence
+through its ordinary optional value rather than an empty string.
+
+Bindings copy every string before returning and destroy the native list on
+success and on copy failure. A returned list remains valid after later style
+changes, style replacement, and map release.
 
 ## Callbacks And Requests
 
@@ -926,6 +944,9 @@ The public handle exposes:
 - `render_update` for the latest available map render update, reporting a public
   `RenderUpdate` value that pairs the render result enum with the frame's
   repaint flag;
+- projection creation from the last successfully rendered update, returning an
+  independent `MapProjectionHandle` through
+  `mln_render_session_projection_create`;
 - `detach`, which keeps the public handle live after backend resources detach;
 - `close` or `destroy`, using the owned-handle release operation, on the thread
   that attached the session.
@@ -937,6 +958,12 @@ and `mln_*_borrowed_texture_set_target()` functions, and it is bound to the
 thread that attached the session like every other session operation. The C API
 rejects a descriptor whose graphics context differs from the session's, so
 bindings pass the descriptor through.
+
+Projection creation MUST run on the session owner thread and MUST remain
+available while an owned texture frame is acquired. Bindings MUST preserve the C
+API's snapshot lifetime and invalidation rules. Hosts pair the projection with
+the rendered image and its presentation extent, using the render target's GPU
+synchronization contract.
 
 ### Texture frames
 
@@ -1084,17 +1111,18 @@ the other isolate, which makes its id stale rather than live.
 
 ### Map, camera, projection, style, and query
 
-| ID      | Test                                                                                                                                                                                                          |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                                                                             |
-| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through a drain.                                                                                       |
-| BND-102 | Camera set/get, animated camera commands, transition cancellation, and gesture-in-progress bracketing produce the expected native camera state and statuses.                                                  |
-| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance. Unwrapped screen-to-coordinate conversion preserves visible world copies. |
-| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                                                                |
-| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                                                                               |
-| BND-106 | Query workflows return copied queried-feature values. Each value contains a GeoJSON Feature buffer, optional source and source-layer identifiers, and optional feature-state JSON.                            |
-| BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent.                                               |
-| BND-109 | Source inspection copies a URL-backed source URL and inline tile-source metadata, including multiple tile URLs and absent fields, and the result remains valid after the map no longer owns the source.       |
+| ID      | Test                                                                                                                                                                                                                                                                                                            |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                                                                                                                                                                               |
+| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through a drain.                                                                                                                                                                                         |
+| BND-102 | Camera set/get, animated camera commands, transition cancellation, and gesture-in-progress bracketing produce the expected native camera state and statuses.                                                                                                                                                    |
+| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance. Unwrapped screen-to-coordinate conversion preserves visible world copies. Map and projection helper meters-per-pixel queries agree for the same camera and follow its zoom. |
+| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                                                                                                                                                                  |
+| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                                                                                                                                                                                 |
+| BND-106 | Query workflows return copied queried-feature values. Each value contains a GeoJSON Feature buffer, optional source and source-layer identifiers, and optional feature-state JSON.                                                                                                                              |
+| BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent.                                                                                                                                                 |
+| BND-109 | Source inspection copies a URL-backed source URL and inline tile-source metadata, including multiple tile URLs and absent fields, and the result remains valid after the map no longer owns the source.                                                                                                         |
+| BND-110 | Global state supports style defaults, JSON value updates, null resets, independent snapshots, and reset on style replacement; writes before style loading report invalid state.                                                                                                                                 |
 
 ### Logging and callbacks
 
@@ -1161,6 +1189,7 @@ When the binding routes provider requests through
 | BND-172 | Bindings with fallible owned-frame wrapper construction release the native frame when construction fails after native frame acquisition.                  |
 | BND-173 | Stale frame handles cannot expose backend handles after release or reuse.                                                                                 |
 | BND-174 | Closing a map whose render session was attached on another thread reports the C API's invalid-state error and leaves both handles live.                   |
+| BND-177 | Projection creation snapshots the rendered update, works during frame acquisition, and returns a helper that survives session/map closure.                |
 
 ### Conditional tests
 

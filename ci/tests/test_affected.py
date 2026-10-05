@@ -13,9 +13,10 @@ import unittest
 from unittest.mock import patch
 
 from ci.affected import affected_roots, check_graph
-from ci.pr_matrix import plan, select
-from ci.tests.test_pr_matrix import pr
-from ci.workflow import consumer_roots
+from ci.coverage import selected_jobs, toolchain_writers
+from ci.plan import coverage_jobs
+from ci.tests.test_ci import ENV, pr
+from ci.workflow import consumer_roots, load_configuration
 
 ROOT = pathlib.Path.cwd()
 RUST = "bindings/rust/crates/maplibre-native-ffi"
@@ -147,12 +148,13 @@ class AffectedGraphTest(unittest.TestCase):
                 self.assertIn("docs", roots)
                 self.assertNotIn(".", roots)
                 self.assertNotIn("bindings/rust", roots)
-                result = plan("pull_request", pr(), roots)["expected"]
+                source, presets = load_configuration(ROOT)
+                selected = [
+                    *selected_jobs(source, presets, "baseline", "baseline", roots),
+                    *selected_jobs(source, presets, "ready", "ready", roots),
+                ]
                 self.assertEqual(
-                    sum(
-                        k.startswith("target-") and v == "success"
-                        for k, v in result.items()
-                    ),
+                    sum(job.startswith("target-") for job in selected),
                     count,
                 )
 
@@ -261,12 +263,14 @@ class AffectedGraphTest(unittest.TestCase):
             output = pathlib.Path(directory)
             (output / "event.json").write_text(json.dumps(event))
             subprocess.run(
-                [sys.executable, "-m", "ci.pr_matrix"],
+                [sys.executable, "-m", "ci.plan"],
                 cwd=self.root,
                 check=True,
                 env={
                     "PATH": os.environ["PATH"],
+                    **ENV,
                     "MISE_TRUSTED_CONFIG_PATHS": str(self.root),
+                    "CI_GROUP": "baseline",
                     "GITHUB_EVENT_NAME": "pull_request",
                     "GITHUB_EVENT_PATH": str(output / "event.json"),
                     "GITHUB_SHA": head,
@@ -278,10 +282,13 @@ class AffectedGraphTest(unittest.TestCase):
                 line.split("=", 1)
                 for line in (output / "output").read_text().splitlines()
             )
-            expected = plan("pull_request", event, {"bindings/python", "docs"})
-            self.assertEqual(json.loads(values["expected"]), expected["expected"])
+            source, presets = load_configuration(self.root)
+            roots = {"bindings/python", "docs"}
+            expected = selected_jobs(source, presets, "baseline", "baseline", roots)
+            self.assertEqual(json.loads(values["jobs"]), expected)
             self.assertEqual(
-                json.loads(values["toolchain_writers"]), expected["toolchain_writers"]
+                json.loads(values["toolchain_writers"]),
+                toolchain_writers(expected, presets),
             )
             self.assertIn("Affected project roots:", (output / "summary").read_text())
 
@@ -316,9 +323,11 @@ class SelectionValidationTest(unittest.TestCase):
             ):
                 affected_roots(ROOT, "a" * 40, "b" * 40)
 
-    def test_selection_errors_retain_the_tier_and_requested_platforms(self):
+    def test_selection_errors_retain_the_group_and_requested_platforms(self):
+        source, presets = load_configuration(ROOT)
         event = pr(True, ("ci:android",))
         event["pull_request"]["base"] = {"sha": "a" * 40}
+        env = {**ENV, "GITHUB_SHA": "b" * 40}
         for error in (
             ValueError("invalid graph"),
             TypeError("invalid graph schema"),
@@ -328,17 +337,26 @@ class SelectionValidationTest(unittest.TestCase):
         ):
             with (
                 self.subTest(error=error),
-                patch("ci.pr_matrix.affected_roots", side_effect=error),
+                patch("ci.plan.affected_roots", side_effect=error),
             ):
-                selection, explanation = select("pull_request", event, "b" * 40)
-                self.assertEqual(selection, plan("pull_request", event))
-                self.assertIn("retaining the complete tier", explanation)
+                selection, jobs, _, explanation = coverage_jobs(
+                    "baseline", "pull_request", event, env
+                )
+                self.assertEqual(selection, "baseline")
+                self.assertEqual(
+                    jobs, selected_jobs(source, presets, "baseline", "baseline")
+                )
+                self.assertIn("retaining the complete group", explanation)
         with patch(
-            "ci.pr_matrix.affected_roots",
+            "ci.plan.affected_roots",
             side_effect=AssertionError("unexpected query"),
         ):
-            selection, _ = select("pull_request", pr(True, ("ci:full",)), "")
-            self.assertEqual(selection["tier"], "full")
+            selection, jobs, _, explanation = coverage_jobs(
+                "extended", "pull_request", pr(True, ("ci:full",)), env
+            )
+            self.assertEqual(selection, "full")
+            self.assertEqual(explanation, "")
+            self.assertIn("kotlin-maven", jobs)
 
     def test_consumer_mapping_includes_nested_tasks_and_rejects_unknown_syntax(self):
         with patch(

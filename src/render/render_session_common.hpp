@@ -9,19 +9,20 @@
 #include <mutex>
 #include <optional>
 #include <string>
-#include <thread>
 #include <unordered_set>
 #include <vector>
 
 #include <mln/actor/scheduler.hpp>
 #include <mln/gfx/headless_backend.hpp>
 #include <mln/gfx/renderer_backend.hpp>
+#include <mln/map/transform_state.hpp>
 #include <mln/renderer/renderer.hpp>
 #include <mln/renderer/renderer_observer.hpp>
 #include <mln/util/feature.hpp>
 #include <mln/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
+#include "handles/owner_thread.hpp"
 #include "map/feature_state.hpp"
 #include "maplibre_native_c.h"
 #include "render/discard_present.hpp"
@@ -250,9 +251,10 @@ class RenderSessionScheduler final : public mln::Scheduler {
   // Drops queued work without running it, for detach.
   auto discard() -> void;
 
-  // Requests a host frame when work makes an idle queue nonempty. Cleared
+  // Wakes the render owner when work makes an idle queue nonempty. Cleared
   // before detach so late worker results are discarded.
-  auto set_repaint_request(std::function<void()> repaint_request) -> void;
+  auto set_work_available_callback(std::function<void()> work_available)
+    -> void;
 
  private:
   // Reopens the queue and wakes pending work if drain() exits through an
@@ -273,7 +275,7 @@ class RenderSessionScheduler final : public mln::Scheduler {
 
   std::mutex mutex_;
   std::vector<std::function<void()>> queue_;
-  std::function<void()> repaint_request_;
+  std::function<void()> work_available_;
   bool draining_ = false;
   mapbox::base::WeakPtrFactory<mln::Scheduler> weak_factory_{this};
   // Do not add members here, see `WeakPtrFactory`
@@ -322,6 +324,15 @@ class SessionFrameObserver final : public mln::RendererObserver {
 
   [[nodiscard]] auto needs_repaint() const -> bool { return needs_repaint_; }
 
+  auto begin_render() -> void {
+    frame_completed_ = false;
+    needs_repaint_ = false;
+  }
+
+  [[nodiscard]] auto frame_completed() const -> bool {
+    return frame_completed_;
+  }
+
   auto suppress_frame_callbacks(bool suppress) -> void {
     suppress_frame_callbacks_ = suppress;
   }
@@ -352,17 +363,21 @@ class SessionFrameObserver final : public mln::RendererObserver {
     delegate_->onWillStartRenderingFrame();
   }
 
+  // The renderer reports frames through the shared-pointer overload, and
+  // mln::Map::Impl implements only that one, so the delegate receives the
+  // same pointer rather than a copy of the stats.
   void onDidFinishRenderingFrame(
     RenderMode mode, bool repaint, bool placement_changed,
-    const mln::gfx::RenderingStats& stats
+    std::shared_ptr<mln::gfx::RenderingStats> stats
   ) override {
     if (suppress_frame_callbacks_) {
       return;
     }
     needs_repaint_ = repaint;
+    frame_completed_ = true;
     if (delegate_ != nullptr) {
       delegate_->onDidFinishRenderingFrame(
-        mode, repaint, placement_changed, stats
+        mode, repaint, placement_changed, std::move(stats)
       );
     }
   }
@@ -458,6 +473,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
  private:
   mln::RendererObserver* delegate_ = nullptr;
   bool needs_repaint_ = false;
+  bool frame_completed_ = false;
   bool suppress_frame_callbacks_ = false;
 };
 
@@ -480,7 +496,7 @@ struct mln_render_session_object {
   mln_map map = MLN_HANDLE_NULL;
   // The thread that attached the session, fixed for its lifetime. Set before
   // the session is registered.
-  std::thread::id owner_thread;
+  mln::core::OwnerThreadToken owner_thread = mln::core::kNoOwnerThread;
   uint32_t width = 0;
   uint32_t height = 0;
   uint32_t physical_width = 0;
@@ -488,6 +504,8 @@ struct mln_render_session_object {
   double scale_factor = 1.0;
   uint64_t generation = 1;
   uint64_t rendered_generation = 0;
+  std::weak_ptr<const mln::UpdateParameters> rendered_update;
+  std::optional<mln::TransformState> rendered_transform;
   bool attached = true;
 
   // Declared before `renderer` so reverse-order destruction tears the renderer
@@ -725,6 +743,9 @@ auto surface_session_set_target(
 auto render_session_render_update(
   mln_render_session session, mln_render_result* out_result,
   bool* out_needs_repaint
+) -> mln_status;
+auto render_session_projection_create(
+  mln_render_session session, mln_map_projection* out_projection
 ) -> mln_status;
 auto render_session_detach(mln_render_session session) -> mln_status;
 auto render_session_destroy(mln_render_session session) -> mln_status;

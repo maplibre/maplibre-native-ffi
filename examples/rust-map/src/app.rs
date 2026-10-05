@@ -182,8 +182,7 @@ impl App {
             .expect("render target is open")
             .render_update(&self.graphics)?
         {
-            // Nothing reached the screen: the map applies a new logical size on
-            // the runtime loop's next pump, so retry.
+            // Map work wakes the loop; only target availability needs a retry.
             self.shared.request_render();
         }
         Ok(())

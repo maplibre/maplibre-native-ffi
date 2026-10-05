@@ -440,6 +440,61 @@ pub const StringList = struct {
     }
 };
 
+/// One copied style layer. `type` is the style-spec layer type, such as
+/// `line`. `source_id` is absent for a layer type that takes no source, and
+/// `source_layer` is absent when the layer names none.
+pub const StyleLayerInfo = struct {
+    allocator: std.mem.Allocator,
+    id: []const u8,
+    type: []const u8,
+    source_id: ?[]const u8,
+    source_layer: ?[]const u8,
+
+    pub fn deinit(self: *StyleLayerInfo) void {
+        self.allocator.free(self.id);
+        self.allocator.free(self.type);
+        if (self.source_id) |value| self.allocator.free(value);
+        if (self.source_layer) |value| self.allocator.free(value);
+        self.id = "";
+        self.type = "";
+        self.source_id = null;
+        self.source_layer = null;
+    }
+
+    pub fn eql(self: StyleLayerInfo, other: StyleLayerInfo) bool {
+        return std.mem.eql(u8, self.id, other.id) and
+            std.mem.eql(u8, self.type, other.type) and
+            optionalSliceEql(self.source_id, other.source_id) and
+            optionalSliceEql(self.source_layer, other.source_layer);
+    }
+};
+
+/// The style layer stack in style order, copied into owned Zig values.
+pub const StyleLayerInfoList = struct {
+    allocator: std.mem.Allocator,
+    items: []StyleLayerInfo,
+
+    pub fn deinit(self: *StyleLayerInfoList) void {
+        for (self.items) |*item| item.deinit();
+        self.allocator.free(self.items);
+        self.items = &.{};
+    }
+
+    pub fn eql(self: StyleLayerInfoList, other: StyleLayerInfoList) bool {
+        if (self.items.len != other.items.len) return false;
+        for (self.items, other.items) |left, right| {
+            if (!left.eql(right)) return false;
+        }
+        return true;
+    }
+};
+
+fn optionalSliceEql(left: ?[]const u8, right: ?[]const u8) bool {
+    const left_value = left orelse return right == null;
+    const right_value = right orelse return false;
+    return std.mem.eql(u8, left_value, right_value);
+}
+
 pub const StyleSourceType = union(enum) {
     unknown,
     vector,

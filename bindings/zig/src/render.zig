@@ -157,7 +157,7 @@ pub const RenderUpdate = struct {
     /// Which outcome the call reached.
     result: RenderResult,
     /// Whether the map asked for another frame while it rendered this one, as
-    /// during an ongoing camera transition. True only when `result` is
+    /// during an ongoing paint transition. True only when `result` is
     /// `.rendered`; this is the same signal that a map-render-frame-finished
     /// event carries in its `needs_repaint` field, delivered without the
     /// event round trip.
@@ -496,6 +496,17 @@ pub const OpenGLOwnedTextureFrameInfo = struct {
 pub const RenderSessionHandle = enum(c.mln_render_session) {
     _,
 
+    /// Copies the last rendered transform into an independent, any-thread projection.
+    /// Call on the session owner thread, including while a texture frame is acquired.
+    /// Creation requires a rendered update after attachment, resize, or retargeting.
+    pub fn createProjection(self: *RenderSessionHandle) status.Error!@import("projection.zig").MapProjectionHandle {
+        const lease = try renderSessionLease(self.*);
+        defer lease.release();
+        var projection: c.mln_map_projection = 0;
+        try status.checkStatus(c.mln_render_session_projection_create(lease.native, &projection), lease.diagnostic_store);
+        return @import("projection.zig").fromNative(projection, lease.diagnostic_store);
+    }
+
     /// Resizes this attached render session. Borrowed texture targets are sized
     /// by their owner and return `error.Unsupported`; hand over a new texture
     /// with the backend's `set*BorrowedTextureTarget` method instead.
@@ -576,11 +587,14 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         return try setTarget(self.*, c.mln_opengl_borrowed_texture_set_target, &raw);
     }
 
-    /// Renders the latest available map render update. The map retains its
-    /// latest update, so repeated calls re-render it and report `.rendered`
-    /// again. Every other result names the wake to wait for: `.no_update` and
+    /// Drains queued render-thread work and renders each update once per target.
+    /// Repeated calls report `.no_update` until map state or the target changes.
+    /// Request a map repaint and pump the runtime to redraw a continuous map
+    /// on demand; request a still image for a static map.
+    /// Every other result names the wake to wait for: `.no_update` and
     /// `.size_pending` resolve on a render-update-available event, and
-    /// `.target_not_ready` resolves when the host changes the render target.
+    /// `.target_not_ready` resolves when the host changes the render target
+    /// or on a later retry after a backoff.
     pub fn renderUpdate(self: *RenderSessionHandle) status.Error!RenderUpdate {
         const lease = try renderSessionLease(self.*);
         defer lease.release();

@@ -1,10 +1,11 @@
 import Foundation
 import MaplibreNativeFFI
 
-/// A camera change decoded on the render loop and applied on the map's owner
+/// A map command queued on the render loop and applied on the map's owner
 /// thread. Commands carry deltas wherever the current camera is an input,
 /// because the read and write have to happen together on the owner thread.
-enum CameraCommand {
+enum MapCommand {
+  case requestRepaint
   case cancelTransitions
   case setGestureInProgress(Bool)
   case moveBy(dx: Double, dy: Double)
@@ -27,7 +28,7 @@ enum CameraCommand {
 /// different threads, producing `MLN_STATUS_WRONG_THREAD` failures.
 final class Channels: @unchecked Sendable {
   private let condition = NSCondition()
-  private var commands: [CameraCommand] = []
+  private var commands: [MapCommand] = []
   private var renderRequested = true
   private var publishedAttachRef: MapAttachRef?
   /// Releases the runtime loop's parked pump. Set once the loop has published.
@@ -36,12 +37,12 @@ final class Channels: @unchecked Sendable {
   private var failure: String?
   private var runtimeLoopFinished = false
 
-  // MARK: - Camera commands (render loop to runtime loop)
+  // MARK: - Map commands (render loop to runtime loop)
 
-  /// Render loop: queues a decoded camera change and wakes the runtime loop.
+  /// Render loop: queues a map command and wakes the runtime loop.
   /// The buffer grows rather than dropping, because deltas and gesture brackets
   /// are not recoverable once discarded.
-  func push(_ command: CameraCommand) {
+  func push(_ command: MapCommand) {
     condition.lock()
     commands.append(command)
     let source = wake
@@ -53,7 +54,7 @@ final class Channels: @unchecked Sendable {
 
   /// Runtime loop: swaps `batch` in for the pending commands, keeping the
   /// locked section to the swap alone.
-  func drainCommands(into batch: inout [CameraCommand]) {
+  func drainCommands(into batch: inout [MapCommand]) {
     // Clearing releases the elements just applied, so do it outside the lock.
     batch.removeAll(keepingCapacity: true)
     condition.lock()

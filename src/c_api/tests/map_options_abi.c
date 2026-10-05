@@ -2,6 +2,7 @@
 // structs, unknown raw masks/enums, and preinitialized outputs hidden by
 // bindings.
 
+#include <math.h>
 #include <stdint.h>
 
 #include "abi_tests.h"
@@ -447,6 +448,19 @@ static void map_coordinate_conversion_rejects_invalid_arguments(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_lat_lngs_for_pixels_unwrapped(fixture.map, NULL, 1, &coordinate)
   );
+  double meters_per_pixel = 0.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_meters_per_pixel_at_latitude(fixture.map, 0.0, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_meters_per_pixel_at_latitude(fixture.map, 91.0, &meters_per_pixel)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_meters_per_pixel_at_latitude(fixture.map, NAN, &meters_per_pixel)
+  );
   destroy_map_fixture(fixture);
 }
 
@@ -605,6 +619,17 @@ static void standalone_projection_rejects_invalid_arguments(void) {
     MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_lat_lng_for_pixel_unwrapped(
                                    projection, (mln_screen_point){0}, NULL
                                  )
+  );
+  double meters_per_pixel = 0.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_meters_per_pixel_at_latitude(projection, 0.0, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_meters_per_pixel_at_latitude(
+      projection, -91.0, &meters_per_pixel
+    )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_destroy(projection));
   destroy_map_fixture(fixture);

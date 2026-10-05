@@ -1,4 +1,4 @@
-headers = maplibre_native_c.h
+headers = maplibre_native_c.h maplibre_native_c/plugin.h
 headerFilter = maplibre_native_c.h maplibre_native_c/**
 package = org.maplibre.nativeffi.internal.c
 language = C

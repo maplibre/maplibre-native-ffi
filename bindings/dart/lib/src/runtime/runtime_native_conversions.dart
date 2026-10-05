@@ -1300,6 +1300,33 @@ List<String> _copyStyleIdList(NativeStyleIdList list) {
   }
 }
 
+List<StyleLayerInfo> _copyStyleLayerList(NativeStyleLayerList list) {
+  try {
+    return withNativeArena((arena) {
+      final outCount = arena<Size>();
+      _check(raw.mln_style_layer_list_count(list.raw, outCount));
+      final layers = <StyleLayerInfo>[];
+      final outLayer = arena<raw.mln_style_layer_info>();
+      for (var index = 0; index < outCount.value; index += 1) {
+        outLayer.ref = raw.mln_style_layer_info_default();
+        _check(raw.mln_style_layer_list_get(list.raw, index, outLayer));
+        final layer = outLayer.ref;
+        layers.add(
+          StyleLayerInfo(
+            id: _copyStringView(layer.id) ?? '',
+            type: _copyStringView(layer.type) ?? '',
+            sourceId: _copyStringView(layer.source_id),
+            sourceLayer: _copyStringView(layer.source_layer),
+          ),
+        );
+      }
+      return layers;
+    });
+  } finally {
+    raw.mln_style_layer_list_destroy(list.raw);
+  }
+}
+
 List<String> _copyStyleStringList(NativeStyleStringList list) {
   try {
     return withNativeArena((arena) {

@@ -1066,7 +1066,7 @@ pub struct RenderUpdate {
     /// variant names.
     pub result: RenderResult,
     /// Whether the map asked for another frame while it rendered this one, as
-    /// during an ongoing camera transition. Set only when `result` is
+    /// during an ongoing paint transition. Set only when `result` is
     /// [`RenderResult::Rendered`]; false for every other outcome. This is the
     /// same signal the render-frame-finished event carries, delivered here
     /// without the event round trip, so a host can re-arm its frame loop
@@ -1681,6 +1681,20 @@ impl RenderSessionHandle {
         })
     }
 
+    /// Copies the last rendered transform into an independent, any-thread projection.
+    ///
+    /// Call on the session owner thread, including while a texture frame is acquired.
+    /// Creation requires a rendered update after attachment, resize, or retargeting.
+    pub fn create_projection(&self) -> Result<crate::MapProjectionHandle> {
+        let session = self.inner.native()?;
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map_projection>::new();
+        // SAFETY: session is live and out is a valid output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_projection_create(session, out.as_mut_ptr())
+        })?;
+        crate::MapProjectionHandle::from_native(out_handle(out, "mln_map_projection")?)
+    }
+
     /// Explicitly destroys the render session.
     ///
     /// Native destruction errors are returned. When destruction fails, the
@@ -1853,12 +1867,15 @@ impl RenderSessionHandle {
 
     /// Processes the latest map render update for this render target.
     ///
-    /// The map retains its latest update, so repeated calls re-render it and
-    /// report [`RenderResult::Rendered`] again. Every other result names the
+    /// Drains queued render-thread work and renders each update once per target.
+    /// Repeated calls report [`RenderResult::NoUpdate`] until map state or the
+    /// target changes. Request a map repaint and pump the runtime to redraw a
+    /// continuous map on demand; request a still image for a static map.
+    /// Every other result names the
     /// wake to wait for: [`RenderResult::NoUpdate`] and
     /// [`RenderResult::SizePending`] resolve on a render-update-available
     /// event, and [`RenderResult::TargetNotReady`] resolves when the host
-    /// changes the render target.
+    /// changes the render target or on a later retry after a backoff.
     ///
     /// The returned [`RenderUpdate::needs_repaint`] reports whether the map
     /// asked for another frame while rendering this one, so a frame loop can

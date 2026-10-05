@@ -20,6 +20,7 @@ webgpu = ["maplibre-native-ffi-sys/webgpu"]
 
 [build-dependencies]
 bindgen = "0.72.1"
+gl_generator = "0.14.0"
 
 [dev-dependencies]
 serde_json = "1.0.145"

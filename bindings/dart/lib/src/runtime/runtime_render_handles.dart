@@ -139,6 +139,22 @@ final class MapProjectionHandle {
     });
   }
 
+  /// Gets the ground distance in meters covered by one logical pixel at
+  /// [latitude] for this projection helper's zoom.
+  double metersPerPixelAtLatitude(double latitude) {
+    return withNativeArena((arena) {
+      final outMetersPerPixel = arena<Double>();
+      _check(
+        raw.mln_map_projection_meters_per_pixel_at_latitude(
+          _handle.raw,
+          latitude,
+          outMetersPerPixel,
+        ),
+      );
+      return outMetersPerPixel.value;
+    });
+  }
+
   /// Explicitly destroys this projection helper.
   void close() {
     _state.close(
@@ -196,7 +212,7 @@ final class RenderUpdate {
   final RenderResult result;
 
   /// Whether the map asked for another frame while it rendered this one, as
-  /// during an ongoing camera transition.
+  /// during an ongoing paint transition.
   ///
   /// This is the same signal that
   /// [RuntimeEventType.mapRenderFrameFinished] carries in its
@@ -222,6 +238,21 @@ final class RenderSessionHandle {
   /// map's. It holds no Dart reference to the map; native reports an
   /// invalid-state status for destroying a map that still has a session.
   NativeRenderSession get _handle => _state.handle;
+
+  /// Creates an independent, any-thread projection from the last rendered update.
+  ///
+  /// Call on the session owner isolate, including while a texture frame is acquired.
+  /// Resize and target replacement require another rendered frame before creation.
+  MapProjectionHandle createProjection() {
+    return withNativeArena((arena) {
+      final outProjection = arena<Uint64>();
+      outProjection.value = 0;
+      _check(
+        raw.mln_render_session_projection_create(_handle.raw, outProjection),
+      );
+      return MapProjectionHandle._(NativeMapProjection(outProjection.value));
+    });
+  }
 
   /// Resizes an attached render session.
   ///
@@ -381,13 +412,12 @@ final class RenderSessionHandle {
   ///
   /// [RenderUpdate.result] names the wake to wait for before calling again:
   ///
-  /// - [RenderResult.rendered]: the target holds a new frame. The map retains
-  ///   its latest update, so a host redraws on demand after a resize or a
-  ///   surface expose, and gates a frame loop on
-  ///   [RuntimeEventType.mapRenderUpdateAvailable].
-  /// - [RenderResult.noUpdate]: the call produced no frame. The map either has
-  ///   no update yet, or the Metal backend has not created an owned texture
-  ///   because content is not ready. Wait for
+  /// - [RenderResult.rendered]: the target holds a new frame. Each update
+  ///   renders once per target. Request a map repaint and pump the runtime to
+  ///   redraw a continuous map on demand; request a still image for a static map.
+  /// - [RenderResult.noUpdate]: the call drained queued render-thread work
+  ///   without a frame. The latest update already rendered, the map has no update yet, a static map is waiting for style or tile data, or the Metal backend
+  ///   has not created an owned texture. Wait for
   ///   [RuntimeEventType.mapRenderUpdateAvailable].
   /// - [RenderResult.sizePending]: this session resized and the map, which
   ///   applies its size on its own thread, is still behind. The map publishes

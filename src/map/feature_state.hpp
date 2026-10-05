@@ -44,11 +44,11 @@ struct FeatureStateSnapshot {
 
 class FeatureStateStore {
  public:
-  void set(
+  bool set(
     std::string source_id, FeatureStateLayerId source_layer_id,
     std::string feature_id, mln::FeatureState state
   );
-  void remove(
+  bool remove(
     std::string source_id, FeatureStateLayerId source_layer_id,
     std::optional<std::string> feature_id, std::optional<std::string> state_key
   );

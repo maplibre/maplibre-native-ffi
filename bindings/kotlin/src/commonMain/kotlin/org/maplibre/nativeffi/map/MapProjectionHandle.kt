@@ -5,7 +5,7 @@ import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 
-/** Any-thread standalone projection snapshot created from a map. */
+/** Any-thread standalone projection snapshot created from a map or rendered update. */
 public expect class MapProjectionHandle : AutoCloseable {
   public val camera: CameraOptions
 
@@ -22,6 +22,12 @@ public expect class MapProjectionHandle : AutoCloseable {
 
   /** Converts a screen point to an unwrapped coordinate that preserves its visible world copy. */
   public fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng
+
+  /**
+   * Reads the ground distance in meters covered by one logical pixel at [latitude] for the helper
+   * camera zoom.
+   */
+  public fun metersPerPixelAtLatitude(latitude: Double): Double
 
   public val isClosed: Boolean
 

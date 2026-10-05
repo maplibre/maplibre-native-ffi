@@ -1,3 +1,4 @@
+#include <functional>
 #include <string>
 
 #include <mln/platform/thread.hpp>
@@ -20,6 +21,8 @@ void setCurrentThreadPriority(double) {}
 void attachThread() {}
 
 void detachThread() {}
+
+void runTask(const std::function<void()>& task) { task(); }
 
 }  // namespace platform
 }  // namespace mln

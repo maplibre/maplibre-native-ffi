@@ -263,6 +263,39 @@ public sealed class StyleJsonTests
         Assert.True(map.RemoveStyleSource("geo"));
     }
 
+    [BindingSpecTest("BND-105")]
+    [Fact]
+    public void StyleLayersListsLayerStackInStyleOrder()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.SetStyleJson(
+            """
+            {
+              "version": 8,
+              "sources": {
+                "vector": {
+                  "type": "vector",
+                  "tiles": ["https://example.test/vector/{z}/{x}/{y}.pbf"]
+                }
+              },
+              "layers": [
+                {"id": "background", "type": "background"},
+                {"id": "roads", "type": "line", "source": "vector", "source-layer": "transportation"}
+              ]
+            }
+            """u8.ToArray()
+        );
+
+        Assert.Equal(
+            [
+                new StyleLayerInfo("background", "background", null, null),
+                new StyleLayerInfo("roads", "line", "vector", "transportation"),
+            ],
+            map.StyleLayers()
+        );
+    }
+
     private static byte[] EmptyStyle() => """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();
 
     private static byte[] GeoJsonSource() =>

@@ -10,6 +10,7 @@
 namespace mln {
 class Map;
 class RendererObserver;
+class TransformState;
 class UpdateParameters;
 }  // namespace mln
 
@@ -45,6 +46,11 @@ auto create_map(
 ) -> mln_status;
 auto destroy_map(mln_map map) -> mln_status;
 auto map_request_repaint(mln_map map) -> mln_status;
+auto map_set_global_state_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
+) -> mln_status;
+auto map_get_global_state(mln_map map, mln_buffer* out_state) -> mln_status;
+
 auto map_set_feature_state(
   mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
 ) -> mln_status;
@@ -71,6 +77,12 @@ auto style_id_list_get(
   mln_style_id_list list, size_t index, mln_buffer_view* out_id
 ) -> mln_status;
 auto style_id_list_destroy(mln_style_id_list list) -> void;
+auto style_layer_list_count(mln_style_layer_list list, size_t* out_count)
+  -> mln_status;
+auto style_layer_list_get(
+  mln_style_layer_list list, size_t index, mln_style_layer_info* out_layer
+) -> mln_status;
+auto style_layer_list_destroy(mln_style_layer_list list) -> void;
 auto style_string_list_count(mln_style_string_list list, size_t* out_count)
   -> mln_status;
 auto style_string_list_get(
@@ -267,6 +279,8 @@ auto map_get_style_layer_type(
 ) -> mln_status;
 auto map_list_style_layer_ids(mln_map map, mln_style_id_list* out_layer_ids)
   -> mln_status;
+auto map_list_style_layers(mln_map map, mln_style_layer_list* out_layers)
+  -> mln_status;
 auto map_move_style_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status;
@@ -390,8 +404,14 @@ auto map_lat_lngs_for_pixels_unwrapped(
   mln_map map, const mln_screen_point* points, size_t point_count,
   mln_lat_lng* out_coordinates
 ) -> mln_status;
+auto map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, double* out_meters_per_pixel
+) -> mln_status;
 auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   -> mln_status;
+auto map_projection_create_from_transform(
+  const mln::TransformState& transform, mln_map_projection* out_projection
+) -> mln_status;
 auto map_projection_destroy(mln_map_projection projection) -> mln_status;
 auto map_projection_get_camera(
   mln_map_projection projection, mln_camera_options* out_camera
@@ -418,6 +438,9 @@ auto map_projection_lat_lng_for_pixel(
 auto map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate
+) -> mln_status;
+auto map_projection_meters_per_pixel_at_latitude(
+  mln_map_projection projection, double latitude, double* out_meters_per_pixel
 ) -> mln_status;
 auto projected_meters_for_lat_lng(
   mln_lat_lng coordinate, mln_projected_meters* out_meters
@@ -492,6 +515,9 @@ auto map_native(MapObject* map) -> mln::Map*;
 // MLN_STATUS_INVALID_ARGUMENT when the map handle is null or no longer live.
 auto map_post_set_size(mln_map map, uint32_t width, uint32_t height)
   -> mln_status;
+// Wake the render owner to service queued tasks without creating map state.
+auto map_post_render_work_available(mln_map map) -> mln_status;
+// Publish fresh map state after renderer resources have been reset.
 auto map_post_trigger_repaint(mln_map map) -> mln_status;
 auto map_latest_update(mln_map map) -> std::shared_ptr<mln::UpdateParameters>;
 // Copies the map's coalesced feature-state snapshot. Callable from a render

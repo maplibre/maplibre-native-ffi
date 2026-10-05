@@ -109,7 +109,9 @@ typedef struct mln_offline_region_status {
  *   failure came from a style-loading exception raised inside a C API call.
  *   Read message for the failure text in both cases; payload NONE.
  * - MAP_IDLE: code is 0; payload NONE.
- * - MAP_RENDER_UPDATE_AVAILABLE: code is 0; payload NONE.
+ * - MAP_RENDER_UPDATE_AVAILABLE: map state or queued render-thread work is
+ *   available. Call mln_render_session_render_update(), which can complete
+ *   the work without producing a frame; code is 0; payload NONE.
  * - MAP_RENDER_ERROR: code is 0; message carries the error text; payload NONE.
  * - MAP_STILL_IMAGE_FINISHED: code is 0; payload NONE.
  * - MAP_STILL_IMAGE_FAILED: code is 0; message carries the error text; payload
@@ -858,7 +860,9 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  * Creates a runtime handle.
  *
  * The creating thread becomes the runtime owner thread. Each owner thread may
- * hold one live runtime.
+ * hold one live runtime, and destroys it before the thread exits. A runtime
+ * that outlives its owner thread is orphaned: no thread can call or destroy
+ * it, and its handle stays allocated.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

@@ -1,6 +1,19 @@
 internal import CMaplibreNativeC
 
 enum NativeProjection {
+  static func create(_ session: NativeRenderSessionHandle) throws
+    -> NativeMapProjectionHandle
+  {
+    try NativeHandleFactory.create(
+      nullDiagnostic: "mln_render_session_projection_create returned a null projection"
+    ) { outHandle in
+      try checkStatus(mln_render_session_projection_create(
+        session.raw,
+        outHandle
+      ))
+    }
+  }
+
   static func create(_ map: NativeMapHandle) throws
     -> NativeMapProjectionHandle
   {
@@ -57,6 +70,20 @@ enum NativeProjection {
         projection.raw,
         point,
         coordinate
+      ))
+    }
+    return output.value
+  }
+
+  static func metersPerPixelAtLatitude(
+    _ projection: NativeMapProjectionHandle,
+    latitude: Double
+  ) throws -> Double {
+    let output = try NativeMemory.withTemporary(0.0) { metersPerPixel in
+      try checkStatus(mln_map_projection_meters_per_pixel_at_latitude(
+        projection.raw,
+        latitude,
+        metersPerPixel
       ))
     }
     return output.value

@@ -23,6 +23,22 @@ function(mln_ffi_configure_shared_exports target)
   endif()
 endfunction()
 
+# MapLibre Native defines mln_plugin_register_v1 in an object that nothing in
+# the C API references, so the linker would leave it out of the shared library
+# when it pulls the core's static archive. Naming the symbol keeps it in and,
+# with the export rules above, exported.
+function(mln_ffi_configure_plugin_exports target)
+  if(APPLE)
+    target_link_options(${target} PRIVATE "LINKER:-u,_mln_plugin_register_v1")
+  elseif(MSVC)
+    target_link_options(
+      ${target}
+      PRIVATE "LINKER:/INCLUDE:mln_plugin_register_v1")
+  else()
+    target_link_options(${target} PRIVATE "LINKER:-u,mln_plugin_register_v1")
+  endif()
+endfunction()
+
 function(mln_ffi_configure_install_rpath target)
   if(APPLE)
     set(install_rpath "@loader_path")
@@ -96,6 +112,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/map.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/network.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/plugin.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/render_session.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/runtime.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/surface.cpp
@@ -172,10 +189,13 @@ endfunction()
 
 function(mln_ffi_configure_c_api_wrapper target implementation_target)
   mln_ffi_link_c_api_implementation(${target} ${implementation_target})
+  # The plugin header includes upstream's mln/plugin/plugin_api.h, which the
+  # install copies next to this library's headers.
   target_include_directories(
     ${target}
     PUBLIC
       $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+      $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/third_party/maplibre-native/include>
       $<INSTALL_INTERFACE:include>)
   mln_ffi_set_c_api_output_properties(${target})
 endfunction()
@@ -188,6 +208,7 @@ endfunction()
 function(mln_ffi_configure_shared_c_api_wrapper target implementation_target)
   mln_ffi_configure_c_api_wrapper(${target} ${implementation_target})
   mln_ffi_configure_shared_exports(${target})
+  mln_ffi_configure_plugin_exports(${target})
   mln_ffi_configure_install_rpath(${target})
 endfunction()
 

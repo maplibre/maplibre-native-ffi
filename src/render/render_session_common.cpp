@@ -9,7 +9,6 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -32,6 +31,10 @@
 #include <mln/util/logging.hpp>
 #include <mln/util/size.hpp>
 #include <mln/util/string.hpp>
+
+#if defined(MLN_RENDER_BACKEND_VULKAN)
+#include <mln/vulkan/renderable_resource.hpp>
+#endif
 
 #include "bytes/buffer.hpp"
 #include "diagnostics/diagnostics.hpp"
@@ -864,17 +867,17 @@ auto register_render_session(std::shared_ptr<mln_render_session_object> session)
 }
 
 void RenderSessionScheduler::schedule(std::function<void()>&& task) {
-  auto request_repaint = std::function<void()>{};
+  auto notify_work = std::function<void()>{};
   {
     const auto lock = std::scoped_lock{mutex_};
     const auto was_empty = queue_.empty();
     queue_.push_back(std::move(task));
     if (was_empty && !draining_) {
-      request_repaint = repaint_request_;
+      notify_work = work_available_;
     }
   }
-  if (request_repaint) {
-    request_repaint();
+  if (notify_work) {
+    notify_work();
   }
 }
 
@@ -914,18 +917,18 @@ auto RenderSessionScheduler::drain() -> void {
 }
 
 RenderSessionScheduler::DrainGuard::~DrainGuard() {
-  auto request_repaint = std::function<void()>{};
+  auto notify_work = std::function<void()>{};
   {
     const auto lock = std::scoped_lock{scheduler_.mutex_};
     if (scheduler_.draining_) {
       scheduler_.draining_ = false;
       if (!scheduler_.queue_.empty()) {
-        request_repaint = scheduler_.repaint_request_;
+        notify_work = scheduler_.work_available_;
       }
     }
   }
-  if (request_repaint) {
-    request_repaint();
+  if (notify_work) {
+    notify_work();
   }
 }
 
@@ -935,11 +938,11 @@ auto RenderSessionScheduler::discard() -> void {
   batch.swap(queue_);
 }
 
-auto RenderSessionScheduler::set_repaint_request(
-  std::function<void()> repaint_request
+auto RenderSessionScheduler::set_work_available_callback(
+  std::function<void()> work_available
 ) -> void {
   const auto lock = std::scoped_lock{mutex_};
-  repaint_request_ = std::move(repaint_request);
+  work_available_ = std::move(work_available);
 }
 
 // Only the attaching thread destroys a session, so the borrowed object stays
@@ -951,7 +954,7 @@ auto validate_render_session(
   if (out_session == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (out_session->owner_thread != std::this_thread::get_id()) {
+  if (out_session->owner_thread != current_owner_thread()) {
     set_thread_error(
       "render session call must be made on the thread that attached it"
     );
@@ -997,7 +1000,7 @@ auto attach_render_session(
 
   // The attaching thread owns the session for its whole lifetime, and need not
   // be the map's thread.
-  session->owner_thread = std::this_thread::get_id();
+  session->owner_thread = current_owner_thread();
 
   const auto map = session->map;
   auto* handle = session.get();
@@ -1006,8 +1009,8 @@ auto attach_render_session(
     return attach_status;
   }
   try {
-    session->scheduler.set_repaint_request([map]() {
-      static_cast<void>(map_post_trigger_repaint(map));
+    session->scheduler.set_work_available_callback([map]() {
+      static_cast<void>(map_post_render_work_available(map));
     });
     // Set before priming: renderer_backend() dispatches on kind.
     session->kind = kind;
@@ -1024,7 +1027,7 @@ auto attach_render_session(
     const auto size_status =
       map_post_set_size(map, session->width, session->height);
     if (size_status != MLN_STATUS_OK) {
-      session->scheduler.set_repaint_request({});
+      session->scheduler.set_work_available_callback({});
       static_cast<void>(map_detach_render_target_session(map, handle));
       return size_status;
     }
@@ -1032,7 +1035,7 @@ auto attach_render_session(
 
     *out_session = register_render_session(std::move(session));
   } catch (...) {
-    session->scheduler.set_repaint_request({});
+    session->scheduler.set_work_available_callback({});
     static_cast<void>(map_detach_render_target_session(map, handle));
     throw;
   }
@@ -1105,7 +1108,9 @@ auto render_session_resize(
     live->renderer.reset();
     reset_pushed_feature_state(*live);
   }
+  live->rendered_update.reset();
   live->rendered_generation = 0;
+  live->rendered_transform.reset();
   live->width = width;
   live->height = height;
   live->physical_width = physical_width;
@@ -1198,7 +1203,9 @@ auto render_session_set_target(
     live->renderer.reset();
     reset_pushed_feature_state(*live);
   }
+  live->rendered_update.reset();
   live->rendered_generation = 0;
+  live->rendered_transform.reset();
   live->width = extent.width;
   live->height = extent.height;
   live->physical_width = physical_width;
@@ -1282,6 +1289,12 @@ auto render_session_render_update(
     return MLN_STATUS_OK;
   }
 
+  // A scheduler wake can deliver cleanup or superseded work. Acquire a target
+  // only when map state or the target changed since the last completed frame.
+  if (update == live->rendered_update.lock()) {
+    return MLN_STATUS_OK;
+  }
+
   // The map applies its logical size on its own thread, so after a resize an
   // update built for the previous extent would take its projection from the
   // update but its viewport from the backend, producing a stretched frame.
@@ -1336,14 +1349,23 @@ auto render_session_render_update(
     }
   }
 
-  const auto render_once = [&]() -> mln_status {
+  // Returns an early status, or nothing once the render attempt returns.
+  const auto render_once = [&]() -> std::optional<mln_status> {
     try {
+      live->frame_observer.begin_render();
       live->renderer->render(update);
+#if defined(MLN_RENDER_BACKEND_VULKAN)
+    } catch (const mln::vulkan::SurfaceNotReady&) {
+      // The swapchain had no free image within the acquire bound. The frame
+      // recorded nothing, so the host retries with this session.
+      *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
+      return MLN_STATUS_OK;
+#endif
     } catch (const std::exception& exception) {
       set_native_stage_error("rendering update", exception);
       return MLN_STATUS_NATIVE_ERROR;
     }
-    return MLN_STATUS_OK;
+    return std::nullopt;
   };
 
   auto desired = map_feature_state_snapshot(live->map);
@@ -1352,10 +1374,8 @@ auto render_session_render_update(
   if (warmup) {
     {
       const UnpresentedRender unpresented{live->frame_observer};
-      if (
-        const auto warmup_status = render_once(); warmup_status != MLN_STATUS_OK
-      ) {
-        return warmup_status;
+      if (const auto early = render_once()) {
+        return *early;
       }
     }
     if (const auto early = wait_surface()) {
@@ -1371,13 +1391,16 @@ auto render_session_render_update(
   }
   remember_rendered_sources(live->rendered_source_ids, *update);
 
-  if (
-    const auto render_status = render_once(); render_status != MLN_STATUS_OK
-  ) {
-    return render_status;
+  if (const auto early = render_once()) {
+    return *early;
   }
   // Absorb results that landed from worker threads during the render.
   live->scheduler.drain();
+  // Static maps can return without drawing while style or tile data is pending.
+  // Only a completed frame replaces the target's projection and backend state.
+  if (!live->frame_observer.frame_completed()) {
+    return MLN_STATUS_OK;
+  }
   if (live->kind == RenderSessionKind::Texture) {
     auto frame_rendered = true;
     const auto after_status =
@@ -1393,10 +1416,31 @@ auto render_session_render_update(
       return MLN_STATUS_OK;
     }
   }
+  live->rendered_update = update;
+  live->rendered_transform = update->transformState;
   live->rendered_generation = live->generation;
   *out_result = MLN_RENDER_RESULT_RENDERED;
   *out_needs_repaint = live->frame_observer.needs_repaint();
   return MLN_STATUS_OK;
+}
+
+auto render_session_projection_create(
+  mln_render_session session, mln_map_projection* out_projection
+) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    live->rendered_generation != live->generation || !live->rendered_transform
+  ) {
+    set_thread_error("render session target has no rendered projection");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  return map_projection_create_from_transform(
+    *live->rendered_transform, out_projection
+  );
 }
 
 auto render_session_detach(mln_render_session session) -> mln_status {
@@ -1410,7 +1454,7 @@ auto render_session_detach(mln_render_session session) -> mln_status {
     return MLN_STATUS_INVALID_STATE;
   }
 
-  live->scheduler.set_repaint_request({});
+  live->scheduler.set_work_available_callback({});
 
   // Tear the renderer down before releasing the map's slot. The renderer holds
   // the map's forwarding observer, which the map's frontend owns; releasing the
@@ -1432,7 +1476,9 @@ auto render_session_detach(mln_render_session session) -> mln_status {
     return detach_status;
   }
   live->attached = false;
+  live->rendered_update.reset();
   live->rendered_generation = 0;
+  live->rendered_transform.reset();
   live->texture.rendered_native_texture = nullptr;
   live->texture.acquired_native_texture = nullptr;
   live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
@@ -1497,7 +1543,8 @@ auto render_session_clear_data(mln_render_session session) -> mln_status {
   auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mln::gfx::BackendScope{*backend};
   live->renderer->clearData();
-  return MLN_STATUS_OK;
+  reset_pushed_feature_state(*live);
+  return map_post_trigger_repaint(live->map);
 }
 
 auto render_session_dump_debug_logs(mln_render_session session) -> mln_status {

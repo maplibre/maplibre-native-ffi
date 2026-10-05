@@ -35,6 +35,7 @@ sources = [
   "pubspec.lock",
   "../../include/maplibre_native_c.h",
   "../../include/maplibre_native_c/**/*.h",
+  "../../third_party/maplibre-native/include/mln/plugin/plugin_api.h",
 ]
 outputs = ["lib/src/internal/c/maplibre_native_c.g.dart"]
 

@@ -778,6 +778,29 @@ private func addMvtSourceReportingItsRelease(
   }
 }
 
+// BND-105: the layer stack is one copied list with absent fields as nil.
+@Test func styleLayersListTheWholeStackInStyleOrder() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 1, height: 1)
+  )
+  defer { try? map.close() }
+
+  try map.setStyleJSON(jsonData("""
+  {"version":8,"sources":{"tiles":{"type":"vector",  "tiles":["https://example.com/{z}/{x}/{y}.pbf"]}},  "layers":[{"id":"bg","type":"background"},  {"id":"roads","type":"line","source":"tiles","source-layer":"road"}]}
+  """))
+
+  #expect(try map.styleLayers() == [
+    StyleLayerInfo(id: "bg", type: "background", sourceId: nil,
+                   sourceLayer: nil),
+    StyleLayerInfo(id: "roads", type: "line", sourceId: "tiles",
+                   sourceLayer: "road"),
+  ])
+}
+
 @Test func geoJSONSourceOptionsMaterializeFieldMaskAndClusterProperties(
 ) throws {
   let options = StyleGeoJSONSourceOptions(
@@ -1128,4 +1151,42 @@ private func nearbyPoints() -> Data {
 
 private func jsonData(_ value: String) -> Data {
   Data(value.utf8)
+}
+
+// BND-110: global-state lifetime and copied JSON values.
+@Test func globalStateDefaultsUpdatesAndStyleReplacement() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 1, height: 1)
+  )
+  defer { try? map.close() }
+  do {
+    try map.setGlobalStateProperty("theme", value: jsonData("true"))
+    Issue.record("global state requires a loaded style")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+  }
+  try map
+    .setStyleJSON(
+      jsonData(
+        #"{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}"#
+      )
+    )
+  #expect(try map.globalState() == jsonData(#"{"theme":"light"}"#))
+  try map.setGlobalStateProperty(
+    "theme",
+    value: jsonData(#"["dark",{"enabled":true}]"#)
+  )
+  let snapshot = try map.globalState()
+  try map.setGlobalStateProperty("theme", value: jsonData("null"))
+  #expect(try map.globalState() == jsonData(#"{"theme":"light"}"#))
+  #expect(snapshot == jsonData(#"{"theme":["dark",{"enabled":true}]}"#))
+  try map.setStyleJSON(jsonData(#"{"version":8,"sources":{},"layers":[]}"#))
+  #expect(try map.globalState() == jsonData("{}"))
+  try map.setGlobalStateProperty("theme", value: jsonData("true"))
+  try map.setGlobalStateProperty("theme", value: jsonData("null"))
+  #expect(try map.globalState() == jsonData(#"{"theme":null}"#))
 }

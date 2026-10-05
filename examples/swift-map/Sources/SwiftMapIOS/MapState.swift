@@ -138,10 +138,12 @@ final class MapState {
     return renderPending
   }
 
-  /// Applies one decoded camera command on the map's owner thread, where
+  /// Applies one map command on the map's owner thread, where
   /// read-modify-write commands also read the current camera.
-  func apply(_ command: CameraCommand) throws {
+  func apply(_ command: MapCommand) throws {
     switch command {
+    case .requestRepaint:
+      try map.requestRepaint()
     case .cancelTransitions:
       try map.cancelTransitions()
     case let .setGestureInProgress(inProgress):

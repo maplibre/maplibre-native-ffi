@@ -561,7 +561,7 @@ public struct RenderUpdate: Equatable, Sendable {
   /// Which outcome the call reached.
   public let result: RenderResult
   /// Whether the map asked for another frame while it rendered this one, as
-  /// during an ongoing camera transition. True only when ``result`` is
+  /// during an ongoing paint transition. True only when ``result`` is
   /// ``RenderResult/rendered``; the same signal the map
   /// render-frame-finished event carries in ``RenderFrameEvent/needsRepaint``,
   /// delivered here without the event round trip.
@@ -734,13 +734,15 @@ public final class RenderSessionHandle {
   ///
   /// Each result names the wake that a host waits for before it calls again:
   ///
-  /// - ``RenderResult/rendered``: the target holds a new frame. The map retains
-  ///   its latest update, so a host redraws on demand after a resize or a
-  ///   surface expose, and paces a frame loop on the map
-  ///   render-update-available event.
-  /// - ``RenderResult/noUpdate``: the call produced no frame. The map either
-  ///   has no update yet, or the Metal backend has not created an owned texture
-  ///   because content is not ready. Wait for the map render-update-available
+  /// - ``RenderResult/rendered``: the target holds a new frame. Each update
+  ///   renders once per target. Request a map repaint and pump the runtime to
+  ///   redraw a continuous map on demand; request a still image for a static
+  /// map.
+  /// - ``RenderResult/noUpdate``: the call drained queued render-thread work
+  ///   without a frame. The latest update already rendered, the map has no
+  /// update yet,
+  ///   a static map is waiting for style or tile data, or the Metal backend has
+  ///   not created an owned texture. Wait for the map render-update-available
   ///   event.
   /// - ``RenderResult/sizePending``: the session resized and the map, which
   ///   applies its size on its own thread, is still behind. The map publishes

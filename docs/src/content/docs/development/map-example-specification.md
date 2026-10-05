@@ -480,18 +480,18 @@ Requirements:
 - The runtime loop MUST call `pump` once per iteration while it is running.
 - The runtime loop MUST drain runtime events once per iteration and set the
   render request when:
-  - `map_render_update_available` targets this map (new map content to draw), or
+  - `map_render_update_available` targets this map (map content or render-thread
+    work), or
   - `map_render_frame_finished` targets this map and `needs_repaint` is true
-    (continuous mode needs another frame, for example ongoing camera
-    transitions).
+    (continuous mode needs another frame, for example a paint transition).
 - The render loop MUST set the render request when input changes the camera and
   when a resize or reattach completes.
 - The render loop MUST call `render_update` only when it consumed a set request.
 - The render loop MUST consume the render request **before** calling
-  `render_update`, and MUST set it again when `render_update` reports any result
-  other than a rendered frame. Consuming afterwards would discard a request the
-  runtime loop published during the render call, and that frame would never be
-  drawn.
+  `render_update`. A target-not-ready result MUST re-arm the request for a later
+  display callback. A no-update or pending-size result MUST wait for the next
+  render-update-available event. Consuming afterwards would discard a request
+  that the runtime loop published during the render call.
 - When `render_update` reports a rendered frame, the render loop MAY set the
   render request again from the call's returned repaint flag instead of waiting
   for the frame's `map_render_frame_finished` event.
@@ -501,11 +501,7 @@ Requirements:
   iteration waiting for it.
 - After a session resize, the map applies its logical size on the runtime loop's
   next `pump`, so `render_update` reports a pending size until then. The render
-  loop MUST keep pacing and retry rather than treating it as a failure.
-- A compositor that cannot present the frame it was handed MUST report that as
-  no frame rendered, and the render loop MUST set the render request again. A
-  minimized or occluded window produces this, and so does a swapchain awaiting
-  its rebuild. The map retains the update, so the retry draws it.
+  loop MUST wait for the map's next update event.
 
 Texture modes: after `render_update` reports a rendered frame, MUST run the
 compositor pass to copy the map texture into the host swapchain before present.

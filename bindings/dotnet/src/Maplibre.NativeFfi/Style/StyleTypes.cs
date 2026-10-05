@@ -107,6 +107,14 @@ public sealed record SourceInfo(
     uint? RawRasterDemEncoding
 );
 
+/// <summary>One copied style layer from a style-ordered layer listing.</summary>
+/// <remarks>
+/// <see cref="Type" /> is the style-spec layer type, such as <c>line</c>.
+/// <see cref="SourceId" /> is null for a layer type that takes no source, and
+/// <see cref="SourceLayer" /> is null when the layer names no source layer.
+/// </remarks>
+public sealed record StyleLayerInfo(string Id, string Type, string? SourceId, string? SourceLayer);
+
 /// <remarks>
 /// Compares and hashes by property value; keep an instance unmodified while it is a key in a
 /// hash-based collection.

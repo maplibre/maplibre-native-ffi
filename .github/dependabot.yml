@@ -90,6 +90,16 @@ updates:
     groups:
       pub:
         patterns: ["*"]
+    # hooks 2.2, code_assets 2, and ffigen 22 pull record_use 1.0, which
+    # requires meta 1.19. Flutter 3.47 still pins meta 1.18, so the mobile
+    # smoke host cannot resolve those versions.
+    ignore:
+      - dependency-name: hooks
+        versions: [">=2.2.0"]
+      - dependency-name: code_assets
+        versions: [">=2.0.0"]
+      - dependency-name: ffigen
+        versions: [">=22.0.0"]
   - package-ecosystem: swift
     directories: ["/bindings/swift", "/examples/swift-map"]
     schedule:

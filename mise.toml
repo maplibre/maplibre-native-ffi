@@ -135,6 +135,9 @@ depends = ["ffi:dotnet"]
 root = "examples/go-map"
 depends = ["ffi:go"]
 
+[monorepo.projects."cargo:rust-map"]
+depends_add = ["ffi:rust"]
+
 [monorepo.projects."example:c-map"]
 root = "examples/c-map"
 depends = ["ffi:native"]
@@ -546,9 +549,9 @@ run = "python3 -m ci.python_snapshot"
 description = "Validate calendar release versions and source tags."
 run = "python3 -m ci.release_version"
 
-[tasks."ci:test-release-tools"]
-description = "Test release version and native package tooling."
-run = 'python3 -m unittest discover -s ci/tests -p "test_*.py"'
+[tasks."ci:test"]
+description = "Test CI planning, workflow generation, and release tooling."
+run = 'uv run --no-sync python -m unittest discover -s ci/tests -p "test_*.py"'
 
 [tasks."kotlin:prepare-release"]
 description = "Merge, sign, and publish Kotlin Maven repositories."
@@ -585,7 +588,3 @@ run = "python3 -m ci.kotlin_verify_staging"
 [tasks."kotlin:check-android-api-floor"]
 description = "Verify compiled androidMain bytecode stays on the android-minSdk floor."
 run = "python3 -m ci.kotlin_check_android_api_floor"
-
-[tasks."ci:plan"]
-description = "Select CI coverage from the GitHub event."
-run = "python3 -m ci.pr_matrix"

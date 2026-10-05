@@ -59,4 +59,11 @@ func TestRenderSessionWrongThreadReturnsWrongThreadDarwin(t *testing.T) {
 	if err := <-errCh; !errors.Is(err, ErrWrongThread) {
 		t.Fatalf("RenderUpdate() from another thread error = %v, want ErrWrongThread", err)
 	}
+	go func() {
+		_, err := session.NewProjection()
+		errCh <- err
+	}()
+	if err := <-errCh; !errors.Is(err, ErrWrongThread) {
+		t.Fatalf("NewProjection() from another thread error = %v, want ErrWrongThread", err)
+	}
 }

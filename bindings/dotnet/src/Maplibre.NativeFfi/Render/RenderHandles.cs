@@ -451,12 +451,14 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     }
 
     /// <summary>
-    /// Renders the latest available map render update into this session's render target. The map
-    /// retains its latest update, so repeated calls re-render it and report
-    /// <see cref="RenderResult.Rendered"/> again. Every other result names the wake to wait for:
+    /// Drains queued render-thread work and renders each update once per target.
+    /// Repeated calls report <see cref="RenderResult.NoUpdate"/> until map state or the target changes.
+    /// Request a map repaint and pump the runtime to redraw a continuous map on demand;
+    /// request a still image for a static map. Every other result names the wake to wait for:
     /// <see cref="RenderResult.NoUpdate"/> and <see cref="RenderResult.SizePending"/> resolve on a
     /// render-update-available event, and <see cref="RenderResult.TargetNotReady"/> resolves when
-    /// the host changes the render target. The returned <see cref="RenderUpdate.NeedsRepaint"/>
+    /// the host changes the render target or on a later retry after a backoff. The returned
+    /// <see cref="RenderUpdate.NeedsRepaint"/>
     /// flag tells whether the map asked for another frame while it rendered this one.
     /// </summary>
     public RenderUpdate RenderUpdate()
@@ -466,6 +468,18 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         var needsRepaint = false;
         NativeStatus.Check(RenderUpdateNative(Handle, &result, &needsRepaint));
         return new RenderUpdate((RenderResult)result, needsRepaint);
+    }
+
+    /// <summary>
+    /// Creates an independent, any-thread projection from the last rendered update.
+    /// Call on the session owner thread, including while a texture frame is acquired.
+    /// Resize and target replacement require another rendered frame before creation.
+    /// </summary>
+    public MapProjectionHandle CreateProjection()
+    {
+        MlnMapProjection projection = default;
+        NativeStatus.Check(NativeMethods.mln_render_session_projection_create(Handle, &projection));
+        return new MapProjectionHandle(projection);
     }
 
     public void Detach()

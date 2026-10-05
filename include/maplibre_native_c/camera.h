@@ -225,7 +225,9 @@ mln_map_get_camera(mln_map map, mln_camera_options* out_camera) MLN_NOEXCEPT;
 /**
  * Applies a camera jump command.
  *
- * Only fields indicated by camera->fields affect the map.
+ * Replaces animations of the fields indicated by camera->fields and applies
+ * those fields immediately. Other fields keep their current animations. The
+ * coupling rules on mln_map_ease_to() also apply to jumps.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -242,7 +244,16 @@ mln_map_jump_to(mln_map map, const mln_camera_options* camera) MLN_NOEXCEPT;
 /**
  * Applies a camera ease transition command.
  *
- * Only fields indicated by camera->fields affect the map.
+ * Each field indicated by camera->fields replaces that field's animation.
+ * Omitted fields keep their animations, including their original duration and
+ * easing. Submit a partial camera command to change independent properties;
+ * a camera snapshot selects every field that it contains.
+ *
+ * A flight couples center and zoom. Replacing either stops both parts of the
+ * flight. An anchor couples center with every field in its command. Replacing
+ * any of those fields stops that anchored command. An explicit center takes
+ * precedence over an anchor. Bounds and pitch constraints apply to the
+ * combined camera each frame, so they can also change an omitted field.
  *
  * MapLibre Native's default ease duration is zero, so a null animation, or one
  * that omits MLN_ANIMATION_OPTION_DURATION, moves the camera to the target
@@ -272,7 +283,9 @@ MLN_API mln_status mln_map_ease_to(
 /**
  * Applies a camera fly transition command.
  *
- * Only fields indicated by camera->fields affect the map.
+ * Center and zoom form one flight trajectory, including when either field is
+ * omitted. Other fields follow the independent animation and anchor rules on
+ * mln_map_ease_to().
  *
  * This is the one camera command that animates by default. When the animation
  * is null or omits MLN_ANIMATION_OPTION_DURATION, MapLibre Native derives a
@@ -843,6 +856,26 @@ MLN_API mln_status mln_map_lat_lngs_for_pixels(
 MLN_API mln_status mln_map_lat_lngs_for_pixels_unwrapped(
   mln_map map, const mln_screen_point* points, size_t point_count,
   mln_lat_lng* out_coordinates
+) MLN_NOEXCEPT;
+
+/**
+ * Reads the ground distance covered by one logical map pixel at a latitude for
+ * the current map zoom.
+ *
+ * MapLibre Native computes the scale, including its zoom and latitude clamps.
+ * Hosts can use it to draw scale bars or convert between meters and pixels.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live,
+ *   out_meters_per_pixel is null, or latitude is not finite or falls outside
+ *   the range from -90 to 90 degrees.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_meters_per_pixel_at_latitude(
+  mln_map map, double latitude, double* out_meters_per_pixel
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

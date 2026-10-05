@@ -533,6 +533,16 @@ public sealed unsafe class MapHandle : IDisposable
         return CoreStructs.FromNative(coordinate);
     }
 
+    /// <summary>Gets the ground distance in meters covered by one logical pixel at a latitude for the current zoom.</summary>
+    public double MetersPerPixelAtLatitude(double latitude)
+    {
+        double metersPerPixel = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_meters_per_pixel_at_latitude(Handle, latitude, &metersPerPixel)
+        );
+        return metersPerPixel;
+    }
+
     /// <summary>Converts geographic coordinates to screen pixels using the current map projection.</summary>
     public ScreenPoint[] PixelsForLatLngs(IReadOnlyList<LatLng> coordinates)
     {
@@ -1856,6 +1866,14 @@ public sealed unsafe class MapHandle : IDisposable
         return CopyStyleIdList(list);
     }
 
+    /// <summary>Lists every style layer in style order as one copied snapshot.</summary>
+    public StyleLayerInfo[] StyleLayers()
+    {
+        MlnStyleLayerList list = default;
+        NativeStatus.Check(NativeMethods.mln_map_list_style_layers(Handle, &list));
+        return CopyStyleLayerList(list);
+    }
+
     /// <summary>Moves a style layer before another layer, or to the top when beforeLayerId is empty.</summary>
     public void MoveStyleLayer(string layerId, string beforeLayerId)
     {
@@ -1880,6 +1898,28 @@ public sealed unsafe class MapHandle : IDisposable
             NativeMethods.mln_map_get_style_layer_json(Handle, nativeLayerId.Value, &buffer, &found)
         );
         return found ? ValueStructs.ReadBuffer(buffer) : null;
+    }
+
+    /// <summary>Sets a global-state JSON value; JSON null restores its style default.</summary>
+    public void SetGlobalStateProperty(string propertyName, byte[] value)
+    {
+        using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
+        using var nativeValue = NativeStringView.From(value, nameof(value));
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_global_state_property(
+                Handle,
+                nativePropertyName.Value,
+                nativeValue.Value
+            )
+        );
+    }
+
+    /// <summary>Copies the current global-state JSON object, including defaults.</summary>
+    public byte[] GetGlobalState()
+    {
+        MlnBuffer buffer = default;
+        NativeStatus.Check(NativeMethods.mln_map_get_global_state(Handle, &buffer));
+        return ValueStructs.ReadBuffer(buffer);
     }
 
     /// <summary>Sets the style light document from UTF-8 JSON bytes.</summary>
@@ -2298,6 +2338,50 @@ public sealed unsafe class MapHandle : IDisposable
         finally
         {
             NativeMethods.mln_style_id_list_destroy(list);
+        }
+    }
+
+    private static StyleLayerInfo[] CopyStyleLayerList(MlnStyleLayerList list)
+    {
+        if (list.IsNull)
+        {
+            return [];
+        }
+
+        try
+        {
+            nuint count = 0;
+            NativeStatus.Check(NativeMethods.mln_style_layer_list_count(list, &count));
+            var layers = new StyleLayerInfo[checked((int)count)];
+            for (var index = 0; index < layers.Length; index++)
+            {
+                var native = NativeMethods.mln_style_layer_info_default();
+                NativeStatus.Check(
+                    NativeMethods.mln_style_layer_list_get(list, (nuint)index, &native)
+                );
+                layers[index] = new StyleLayerInfo(
+                    RuntimeStructs.CopyUtf8((sbyte*)native.id.data, native.id.size),
+                    RuntimeStructs.CopyUtf8((sbyte*)native.type.data, native.type.size),
+                    native.source_id.size == 0
+                        ? null
+                        : RuntimeStructs.CopyUtf8(
+                            (sbyte*)native.source_id.data,
+                            native.source_id.size
+                        ),
+                    native.source_layer.size == 0
+                        ? null
+                        : RuntimeStructs.CopyUtf8(
+                            (sbyte*)native.source_layer.data,
+                            native.source_layer.size
+                        )
+                );
+            }
+
+            return layers;
+        }
+        finally
+        {
+            NativeMethods.mln_style_layer_list_destroy(list);
         }
     }
 

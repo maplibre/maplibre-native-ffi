@@ -38,22 +38,16 @@ function(mln_ffi_add_maplibre_native)
     target_include_directories(
       mbgl-core
       BEFORE
-      PRIVATE ${PROJECT_SOURCE_DIR}/src/platform/ohos/compat)
+      PRIVATE ${MLN_FFI_SOURCE_DIR}/platform/ohos/compat)
 
     foreach(MLN_FFI_MLT_TARGET mlt-cpp mlt-cpp-encoder)
       if(TARGET ${MLN_FFI_MLT_TARGET})
         target_include_directories(
           ${MLN_FFI_MLT_TARGET}
           BEFORE
-          PRIVATE ${PROJECT_SOURCE_DIR}/src/platform/ohos/compat)
+          PRIVATE ${MLN_FFI_SOURCE_DIR}/platform/ohos/compat)
       endif()
     endforeach()
-  endif()
-
-  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$")
-    # action_journal_impl.cpp selects ghc::filesystem whenever TARGET_OS_IPHONE
-    # is set, and that macro is true on tvOS as well as iOS.
-    target_link_libraries(mbgl-core PRIVATE mbgl-vendor-filesystem)
   endif()
 
   include("${MLN_FFI_SOURCE_DIR}/vendor/nunicode.cmake")

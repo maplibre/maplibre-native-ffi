@@ -22,7 +22,7 @@ public value class LogEvent(public val nativeValue: Int) {
     public val HTTP_REQUEST: LogEvent = LogEvent(8)
     public val SPRITE: LogEvent = LogEvent(9)
     public val IMAGE: LogEvent = LogEvent(10)
-    public val OPENGL: LogEvent = LogEvent(11)
+    public val GRAPHICS_BACKEND: LogEvent = LogEvent(11)
     public val JNI: LogEvent = LogEvent(12)
     public val ANDROID: LogEvent = LogEvent(13)
     public val CRASH: LogEvent = LogEvent(14)

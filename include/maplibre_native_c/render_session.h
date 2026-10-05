@@ -73,41 +73,45 @@ typedef enum mln_render_result : uint32_t {
 /**
  * Renders the map's latest render update into the session's render target.
  *
+ * Drains queued render-thread work before deciding whether a frame is needed.
  * A surface session presents the frame. A texture session writes it into the
- * target texture.
+ * target texture. Each update renders once per target. Resize and target
+ * replacement allow the latest update to render again. For a surface expose
+ * on a continuous map, call mln_map_request_repaint() and pump the runtime;
+ * for a static map, request another still image.
  *
  * *out_result reports which of these outcomes the call reached, and each one
  * names the wake that a host waits for before it calls again:
  *
- * - MLN_RENDER_RESULT_RENDERED means the target holds a new frame. The map
- *   retains its latest update, so a host redraws on demand after a resize or a
- *   surface expose and gates a frame loop on
- *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
- * - MLN_RENDER_RESULT_NO_UPDATE means the call produced no frame. The map
- *   either has no update yet, or the Metal backend has not created an owned
- *   texture because content is not ready. Wait for
+ * - MLN_RENDER_RESULT_RENDERED means the target holds a new frame. Gate a
+ *   frame loop on MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
+ * - MLN_RENDER_RESULT_NO_UPDATE means the call produced no frame. The latest
+ *   update already rendered, the map has no update yet, a static map is waiting
+ *   for style or tile data, or the Metal backend has not created an owned
+ *   texture. Wait for
  *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
  * - MLN_RENDER_RESULT_SIZE_PENDING means the session resized and the map,
  *   which applies its size on its own thread, is still behind. The map
  *   publishes an update for the new size on its own, so wait for the next
  *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
  * - MLN_RENDER_RESULT_TARGET_NOT_READY means the render target had no frame
- *   available, such as a Metal surface whose next drawable is nil. No map
- *   update resolves this, so wait for a host event that changes the target,
- *   or back off and retry.
+ *   available, such as a Metal surface whose next drawable is nil or an
+ *   Android Vulkan surface whose swapchain had no free image within the
+ *   acquire bound. No map update resolves this, so wait for a host event that
+ *   changes the target, or back off and retry.
  *
  * In MLN_MAP_MODE_STATIC, pump a resize through the map before requesting the
  * still image. The session applies its extent on the map's owner thread, and a
  * still image requested before that lands reports
  * MLN_RENDER_RESULT_SIZE_PENDING.
  *
- * *out_needs_repaint reports whether the map asked for another frame while it
- * rendered this one, as during an ongoing camera transition. It is set only
- * when *out_result is MLN_RENDER_RESULT_RENDERED, and reads false for every
- * other outcome. This is the same signal that
- * MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED carries in its needs_repaint
- * field, delivered here without the event round trip, so a host can re-arm its
- * frame loop before it drains events.
+ * *out_needs_repaint reports the renderer's need for another frame, such as
+ * during a paint transition. It is true only when *out_result is
+ * MLN_RENDER_RESULT_RENDERED. It matches the needs_repaint field of
+ * MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED. Camera animations advance
+ * separately on the map's owner thread. Pump the runtime and gate rendering
+ * on MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE to receive fresh updates
+ * for both camera animations and renderer transitions.
  *
  * Returns:
  * - MLN_STATUS_OK on success, with *out_result and *out_needs_repaint set.
@@ -123,6 +127,40 @@ typedef enum mln_render_result : uint32_t {
 MLN_API mln_status mln_render_session_render_update(
   mln_render_session session, mln_render_result* out_result,
   bool* out_needs_repaint
+) MLN_NOEXCEPT;
+
+/**
+ * Creates a standalone projection from the session's last rendered update.
+ *
+ * Call on the session owner thread after mln_render_session_render_update()
+ * reports MLN_RENDER_RESULT_RENDERED, before rendering another frame or
+ * changing the target. Creation is also allowed while an owned texture frame
+ * is acquired. Pair the projection with that frame and its presentation extent.
+ * The snapshot describes render coordinates; GPU completion and presentation
+ * follow the render target's synchronization contract.
+ *
+ * The session captures the full transform of the update passed to the renderer.
+ * Later live-map changes and render calls that produce no frame preserve this
+ * snapshot. Resize and target replacement invalidate it until a frame renders
+ * into the new target.
+ *
+ * The returned helper owns a separate copy of the transform. It remains usable
+ * after later renders, target changes, detach, and destruction of the session
+ * or map. Its projection and camera operations are synchronous and serialized
+ * across threads, as for mln_map_projection_create(). Destroy it with
+ * mln_map_projection_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success; *out_projection receives an owned handle.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live,
+ *   out_projection is null, or *out_projection is not null.
+ * - MLN_STATUS_INVALID_STATE when the session is detached or its current target
+ *   has no rendered projection.
+ * - MLN_STATUS_WRONG_THREAD when called outside the session owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_render_session_projection_create(
+  mln_render_session session, mln_map_projection* out_projection
 ) MLN_NOEXCEPT;
 
 /**
@@ -178,6 +216,10 @@ mln_render_session_reduce_memory_use(mln_render_session session) MLN_NOEXCEPT;
 
 /**
  * Clears renderer data for the session.
+ *
+ * The next frame rebuilds renderer data and restores the map's feature state.
+ * Continuous maps publish a render update. Static and tile maps rebuild when
+ * the host requests a still image.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

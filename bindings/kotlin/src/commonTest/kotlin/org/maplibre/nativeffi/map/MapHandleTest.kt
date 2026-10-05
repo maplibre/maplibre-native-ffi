@@ -42,6 +42,7 @@ import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileScheme
@@ -49,6 +50,41 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 import org.maplibre.nativeffi.style.VectorTileEncoding
 
 class MapHandleTest {
+
+  // BND-110: global-state lifetime and copied JSON values.
+  @Test
+  fun globalStateUsesStyleDefaultsAndResetsOnStyleReplacement() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      MapHandle.create(runtime, MapOptions()).use { map ->
+        assertEquals("{}", map.getGlobalState().decodeToString())
+        assertFailsWith<InvalidStateException> {
+          map.setGlobalStateProperty("theme", "true".encodeToByteArray())
+        }
+        val style =
+          """{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}"""
+            .encodeToByteArray()
+        map.setStyleJson(style)
+        assertEquals("""{"theme":"light"}""", map.getGlobalState().decodeToString())
+        val input = """["dark",{"enabled":true}]""".encodeToByteArray()
+        map.setGlobalStateProperty("theme", input)
+        input.fill(0)
+        val snapshot = map.getGlobalState()
+        assertEquals("""{"theme":["dark",{"enabled":true}]}""", snapshot.decodeToString())
+        assertFailsWith<InvalidArgumentException> {
+          map.setGlobalStateProperty("theme", "[".encodeToByteArray())
+        }
+        map.setGlobalStateProperty("theme", "null".encodeToByteArray())
+        assertEquals("""{"theme":"light"}""", map.getGlobalState().decodeToString())
+        assertEquals("""{"theme":["dark",{"enabled":true}]}""", snapshot.decodeToString())
+        assertIs<WrongThreadException>(failureFromBackgroundThread { map.getGlobalState() })
+        map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+        assertEquals("{}", map.getGlobalState().decodeToString())
+        map.setGlobalStateProperty("theme", "false".encodeToByteArray())
+        map.setGlobalStateProperty("theme", "null".encodeToByteArray())
+        assertEquals("""{"theme":null}""", map.getGlobalState().decodeToString())
+      }
+    }
+  }
 
   @Test
   fun layerBaseAccessorsReachNativeThroughDowncalls() {
@@ -674,6 +710,51 @@ class MapHandleTest {
     }
   }
 
+  // BND-105: the layer stack lists in style order with optional source fields.
+  @Test
+  fun styleLayersListTheLayerStackInStyleOrder() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.setStyleJson(
+        """
+        {
+          "version": 8,
+          "sources": {
+            "tiles": {"type": "vector", "tiles": ["https://example.invalid/{z}/{x}/{y}.pbf"]}
+          },
+          "layers": [
+            {"id": "roads", "type": "line", "source": "tiles", "source-layer": "transportation"},
+            {"id": "sky", "type": "background"}
+          ]
+        }
+        """
+          .trimIndent()
+          .encodeToByteArray()
+      )
+
+      assertEquals(
+        listOf(
+          StyleLayerInfo("roads", "line", "tiles", "transportation"),
+          StyleLayerInfo("sky", "background", null, null),
+        ),
+        map.styleLayers(),
+      )
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
   @Test
   fun styleImageCanBeSetCopiedInspectedAndRemoved() {
     val runtime = RuntimeHandle.create(RuntimeOptions())
@@ -1211,6 +1292,32 @@ class MapHandleTest {
           1e-10,
         )
       }
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun metersPerPixelMatchesProjectionAndFollowsZoom() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map = MapHandle.create(runtime, MapOptions().apply { mapMode = MapMode.STATIC })
+
+    try {
+      val latitude = 45.0
+      map.jumpTo(
+        CameraOptions().apply {
+          center = LatLng(latitude, 0.0)
+          zoom = 4.0
+        }
+      )
+      val metersPerPixel = map.metersPerPixelAtLatitude(latitude)
+      map.createProjection().use { projection ->
+        assertEquals(metersPerPixel, projection.metersPerPixelAtLatitude(latitude), 1e-9)
+      }
+
+      map.jumpTo(CameraOptions().apply { zoom = 5.0 })
+      assertEquals(metersPerPixel / 2.0, map.metersPerPixelAtLatitude(latitude), 1e-9)
     } finally {
       map.close()
       runtime.close()

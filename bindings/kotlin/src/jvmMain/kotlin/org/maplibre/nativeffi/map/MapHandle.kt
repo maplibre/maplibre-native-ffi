@@ -38,6 +38,7 @@ import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
@@ -81,6 +82,16 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun setStyleJson(json: ByteArray) {
     NativeAccess.ensureLoaded()
     NativeAccess.setMapStyleJson(requireLiveHandle(), json)
+  }
+
+  public actual fun setGlobalStateProperty(propertyName: String, value: ByteArray) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setGlobalStateProperty(requireLiveHandle(), propertyName, value)
+  }
+
+  public actual fun getGlobalState(): ByteArray {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.getGlobalState(requireLiveHandle())
   }
 
   public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
@@ -421,6 +432,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun styleLayerIds(): List<String> {
     NativeAccess.ensureLoaded()
     return NativeAccess.styleLayerIds(requireLiveHandle())
+  }
+
+  public actual fun styleLayers(): List<StyleLayerInfo> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleLayers(requireLiveHandle())
   }
 
   public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
@@ -785,6 +801,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng> {
     NativeAccess.ensureLoaded()
     return NativeAccess.latLngsForPixelsUnwrapped(requireLiveHandle(), points)
+  }
+
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Double {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.metersPerPixelAtLatitude(requireLiveHandle(), latitude)
   }
 
   public actual fun attachMetalOwnedTexture(

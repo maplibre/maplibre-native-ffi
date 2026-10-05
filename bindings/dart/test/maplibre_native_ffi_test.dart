@@ -52,6 +52,31 @@ int _dispatchLogRecord(
 }
 
 void main() {
+  test('plugin registration accessor reaches the native registry', () {
+    final address = Maplibre.pluginRegisterFunctionV1().address;
+    final register =
+        Pointer<
+              NativeFunction<raw.mln_plugin_register_function_v1Function>
+            >.fromAddress(address)
+            .asFunction<
+              int Function(
+                Pointer<raw.mln_plugin_descriptor_v1>,
+                Pointer<Char>,
+                int,
+              )
+            >();
+    final diagnostic = calloc<Char>(256);
+    try {
+      expect(
+        register(nullptr, diagnostic, 256),
+        raw.mln_plugin_status.MLN_PLUGIN_STATUS_INVALID_ARGUMENT.value,
+      );
+      expect(diagnostic.cast<Utf8>().toDartString(), isNotEmpty);
+    } finally {
+      calloc.free(diagnostic);
+    }
+  });
+
   test('map options carry FastPFOR decoding to native', () {
     expect(const MapOptions().fastPforEnabled, isFalse);
     expect(const MapOptions(fastPforEnabled: true), isNot(const MapOptions()));
@@ -997,6 +1022,40 @@ void main() {
     );
   });
 
+  test('meters per pixel matches the projection and halves per zoom level', () {
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap(
+      options: const MapOptions(width: 512, height: 512),
+    );
+    addTearDown(() {
+      map.close();
+      runtime.close();
+    });
+    map.jumpTo(const CameraOptions(center: LatLng(0, 0), zoom: 3));
+    final projection = map.createProjection();
+    addTearDown(projection.close);
+
+    final metersPerPixel = map.metersPerPixelAtLatitude(45);
+    expect(
+      projection.metersPerPixelAtLatitude(45),
+      closeTo(metersPerPixel, 1e-10),
+    );
+    map.jumpTo(const CameraOptions(zoom: 4));
+    expect(
+      map.metersPerPixelAtLatitude(45),
+      closeTo(metersPerPixel / 2, 1e-10),
+    );
+
+    expect(
+      () => map.metersPerPixelAtLatitude(91),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    expect(
+      () => projection.metersPerPixelAtLatitude(91),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+  });
+
   test('custom geometry tile callbacks reach their isolate', () async {
     final deliveredTiles = <CanonicalTileId>[];
     final callback =
@@ -1214,6 +1273,40 @@ void main() {
         () => map.getLayerMinZoom('missing'),
         throwsA(isA<InvalidArgumentException>()),
       );
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  });
+
+  // BND-110: global-state lifetime and copied JSON values.
+  test('global state defaults updates and style replacement', () {
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap();
+    try {
+      expect(
+        () => map.setGlobalStateProperty('theme', _jsonBytes('true')),
+        throwsA(isA<InvalidStateException>()),
+      );
+      map.setStyleJson(
+        _jsonBytes(
+          '{"version":8,"sources":{},"layers":[],"state":{"theme":{"default":"light"}}}',
+        ),
+      );
+      expect(map.getGlobalState(), _jsonBytes('{"theme":"light"}'));
+      map.setGlobalStateProperty(
+        'theme',
+        _jsonBytes('["dark",{"enabled":true}]'),
+      );
+      final snapshot = map.getGlobalState();
+      map.setGlobalStateProperty('theme', _jsonBytes('null'));
+      expect(map.getGlobalState(), _jsonBytes('{"theme":"light"}'));
+      expect(snapshot, _jsonBytes('{"theme":["dark",{"enabled":true}]}'));
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      expect(map.getGlobalState(), _jsonBytes('{}'));
+      map.setGlobalStateProperty('theme', _jsonBytes('true'));
+      map.setGlobalStateProperty('theme', _jsonBytes('null'));
+      expect(map.getGlobalState(), _jsonBytes('{"theme":null}'));
     } finally {
       map.close();
       runtime.close();
@@ -1729,12 +1822,9 @@ void main() {
       throwsA(isA<MaplibreException>()),
     );
 
-    final sourceIds = map.listStyleSourceIds();
-    expect(sourceIds, contains('org.maplibre.annotations'));
-    expect(
-      map.listStyleLayerIds(),
-      contains('org.maplibre.annotations.points'),
-    );
+    expect(map.listStyleSourceIds(), isEmpty);
+    expect(map.listStyleLayerIds(), isEmpty);
+    expect(map.listStyleLayers(), isEmpty);
     expect(map.styleSourceExists('missing-source'), isFalse);
     expect(map.styleLayerExists('missing-layer'), isFalse);
     expect(map.removeStyleSource('missing-source'), isFalse);
@@ -2174,6 +2264,40 @@ void main() {
     expect(TileScheme.fromRaw(91).rawValue, 91);
     expect(VectorTileEncoding.fromRaw(92).rawValue, 92);
     expect(RasterDemEncoding.fromRaw(93).rawValue, 93);
+  });
+
+  test('BND-105 style layer listing copies the layer stack in order', () {
+    final runtime = RuntimeHandle.create();
+    addTearDown(runtime.close);
+    final map = runtime.createMap();
+    addTearDown(map.close);
+    map.setStyleJson(
+      _jsonBytes(
+        '{"version":8,'
+        '"sources":{"roads":{"type":"vector",'
+        '"tiles":["https://example.com/{z}/{x}/{y}.mvt"]}},'
+        '"layers":['
+        '{"id":"road-lines","type":"line","source":"roads",'
+        '"source-layer":"transportation"},'
+        '{"id":"backdrop","type":"background"}'
+        ']}',
+      ),
+    );
+
+    final layers = map.listStyleLayers();
+
+    expect(layers, const [
+      StyleLayerInfo(
+        id: 'road-lines',
+        type: 'line',
+        sourceId: 'roads',
+        sourceLayer: 'transportation',
+      ),
+      StyleLayerInfo(id: 'backdrop', type: 'background'),
+    ]);
+    expect(layers[1].sourceId, isNull);
+    expect(layers[1].sourceLayer, isNull);
+    expect(layers.map((layer) => layer.id), map.listStyleLayerIds());
   });
 
   test('style source volatility round-trips through the public API', () {

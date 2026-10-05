@@ -31,6 +31,7 @@ HEADERS = (
     "style",
     "surface",
     "texture",
+    "plugin",
 )
 
 # The generator loads libclang from the ClangSharp package built for the host,

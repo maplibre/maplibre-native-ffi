@@ -143,9 +143,9 @@ static app_error render_loop_iteration(
   // Consume before rendering, so a request published during the render call is
   // not discarded.
   if (render_request_consume(request)) {
-    bool rendered = false;
-    MAP_TRY(render_target_render_update(target, *current_viewport, &rendered));
-    if (!rendered) {
+    bool completed = false;
+    MAP_TRY(render_target_render_update(target, *current_viewport, &completed));
+    if (!completed) {
       render_request_set(request);
     }
   }

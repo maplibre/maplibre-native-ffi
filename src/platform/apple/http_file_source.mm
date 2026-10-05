@@ -272,6 +272,8 @@ NSString* HTTPFileSource::Impl::getUserAgent() const {
   NSString* systemName = @"Darwin";
 #if TARGET_OS_TV
   systemName = @"tvOS";
+#elif TARGET_OS_MACCATALYST
+  systemName = @"Mac Catalyst";
 #elif TARGET_OS_IPHONE
   systemName = @"iOS";
 #elif TARGET_OS_MAC

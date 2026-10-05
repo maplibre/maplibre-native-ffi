@@ -200,14 +200,15 @@ generators usually live with the language package graph they serve.
 `mise run check`, and `mise run fix`. [`dprint`](https://dprint.dev/) owns
 repository-wide formatting defaults.
 
-GitHub Actions runs those checks. `ci/workflow.toml` declares the suites each
-target runs, and `mise run ci:generate-workflow` renders them into
-`.github/workflows/ci.yml`. `ci/pr_matrix.py` selects complete target jobs
-within the PR's coverage tier using mise's affected project graph. Cargo
-supplies crate dependencies; `[monorepo.projects]` in `mise.toml` connects
-native code, bindings, examples, and generated references across languages. Add
-those relationships when adding a project. `mise run ci:check-project-graph`
-verifies CI task ownership. `ci/snapshots.toml` declares the input scope of each
+GitHub Actions runs those checks. `ci/workflow.toml` declares the baseline and
+ready targets and the suites each target runs. `ci/generate_workflow.py` builds
+workflow objects and serializes them as YAML. `mise run ci:generate-workflow`
+updates the generated callers and reusable workflows under `.github/workflows/`;
+`--check` verifies that the checked-in files match. Cargo supplies crate
+dependencies; `[monorepo.projects]` in `mise.toml` connects native code,
+bindings, examples, and generated references across languages. Add those
+relationships when adding a project. `mise run ci:check-project-graph` verifies
+CI task ownership. `ci/snapshots.toml` declares the input scope of each
 component the daily snapshot workflow publishes, so a component republishes only
 when the paths it consumes changed; `mise run ci:check-snapshot-scopes` keeps
 every tracked path classified.
@@ -218,28 +219,47 @@ build the documentation site. Generated API reference HTML is installed into
 
 ## CI coverage
 
-Draft PRs use Linux x64 EGL/Vulkan coverage. Ready PRs add macOS Metal, Windows
-x64 WGL/Vulkan, Android x64 EGL/Vulkan, and browser WebGL/WebGPU. Mise's
-affected project graph selects complete target jobs within that tier; native
-changes and shared root files retain the complete tier. Docs and hygiene always
-run. Main, manual runs, and Dependabot-authored PRs use full coverage.
+CI has three required checks:
 
-Persistent PR labels expand coverage and combine across platforms:
+| Check                    | Coverage                                                          |
+| ------------------------ | ----------------------------------------------------------------- |
+| `ci-required (baseline)` | Hygiene, docs, and Linux x64 EGL/Vulkan on every PR code update   |
+| `ci-required (ready)`    | Additional representative targets when a PR leaves draft status   |
+| `ci-required`            | Requested platforms or full verification in the extended workflow |
 
-| Label        | Coverage                                                          |
-| ------------ | ----------------------------------------------------------------- |
-| `ci:apple`   | All macOS backends and iOS/tvOS device and simulator targets      |
-| `ci:android` | All Android ABIs/backends and multi-ABI packaging                 |
-| `ci:linux`   | All Linux GNU and musl targets                                    |
-| `ci:windows` | All Windows targets                                               |
-| `ci:ohos`    | OpenHarmony targets and emulator tests                            |
-| `ci:full`    | Every target and complete packaging verification, including Maven |
+Promotion starts ready coverage while baseline results remain valid. The
+extended workflow combines platform labels into one selection. It builds each
+selected target once and includes every producer needed by Android multi-ABI
+packaging. Extended coverage can repeat targets covered by baseline or ready CI.
 
-Readiness and label changes start a new run. Explicit labels retain their
-requested coverage even when the affected graph would omit it. If affected
-selection is unavailable, the planner retains the complete tier and reports the
-reason in the run summary. `ci-required` requires every selected job to succeed
-and accepts skips only for jobs omitted by the plan.
+Baseline and ready target jobs further narrow to complete jobs whose consumers
+intersect the change, using mise's affected project graph. Native and shared
+root files keep every target in that group. Explicit platform labels keep their
+requested coverage. If affected selection is unavailable, the planner keeps the
+complete group and reports the reason in the run summary.
+
+State changes reuse actual success, or a failure after its one retry, only for
+the same tested merge commit and complete coverage scope. Adding or removing a
+platform changes the scope; unrelated labels preserve it. Omitted checks and
+restated verdicts never prove that tests ran. Missing or cancelled coverage
+executes again, as does an explicit workflow rerun. An attempt-1 failure is also
+missing evidence, because CI retry may replace it. Selected jobs must succeed;
+only unselected jobs may be skipped.
+
+The extended workflow, `CI` (`ci.yml`), runs every target and complete packaging
+verification on main, manual runs, Dependabot PRs, and PRs with `ci:full`. All
+native packages and the verified Maven repository belong to that run. Snapshot
+publishing consumes that single successful main run. Main and manual runs have
+independent concurrency groups; a new PR commit cancels obsolete work in each PR
+workflow.
+
+Branch protection must require all three checks. Add baseline and ready
+alongside the existing `ci-required` before merging these workflows. An
+unrequested tier passes its check without running targets.
+
+`mise run ci:test` exercises coverage transitions, result reuse, generated job
+dependencies, required checks, retries, and release tooling. CI retries one
+primary failure once, including its dependent verification and required checks.
 
 ## Tests And Examples
 

@@ -53,28 +53,22 @@ pub const Session = union(enum) {
     pub fn renderUpdate(
         self: *Session,
         diagnostic_store: ?*const maplibre.DiagnosticStore,
-    ) !bool {
+    ) !maplibre.RenderResult {
         switch (self.*) {
-            .none => return false,
+            .none => return .no_update,
             .texture => |*texture| {
                 const update = texture.renderUpdate() catch |err| {
                     diagnostics.logError("texture render failed", err, diagnostic_store);
                     return types.AppError.TextureRenderFailed;
                 };
-                return switch (update.result) {
-                    .rendered => true,
-                    else => false,
-                };
+                return update.result;
             },
             .surface => |*surface| {
                 const update = surface.renderUpdate() catch |err| {
                     diagnostics.logError("surface render failed", err, diagnostic_store);
                     return types.AppError.SurfaceRenderFailed;
                 };
-                return switch (update.result) {
-                    .rendered => true,
-                    else => false,
-                };
+                return update.result;
             },
         }
     }

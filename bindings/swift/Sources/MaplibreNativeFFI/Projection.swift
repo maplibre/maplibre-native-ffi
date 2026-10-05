@@ -26,6 +26,23 @@ public final class MapProjectionHandle: @unchecked Sendable {
     )
   }
 
+  /// Creates a projection from the last successfully rendered update.
+  ///
+  /// Call on the session owner thread, including while a texture frame is
+  /// acquired. Keep the projection with that frame and its presentation extent.
+  /// Creation requires a rendered update after attachment, resize, or target
+  /// replacement. The returned projection remains usable from any thread after
+  /// later renders and after the session or map closes.
+  public init(session: RenderSessionHandle) throws {
+    let projection = try mapNativeFailure {
+      try NativeProjection.create(session.requireLiveHandle())
+    }
+    handle = try NativeHandleBox(
+      typeName: "MapProjectionHandle",
+      handle: projection
+    )
+  }
+
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -140,6 +157,19 @@ public final class MapProjectionHandle: @unchecked Sendable {
               projection,
               point: point.nativeInput.native
             )))
+      }
+    }
+  }
+
+  /// Returns the ground distance in meters covered by one logical map pixel at
+  /// a latitude for the helper camera zoom.
+  public func metersPerPixel(atLatitude latitude: Double) throws -> Double {
+    try mapNativeFailure {
+      try handle.withLive { projection in
+        try NativeProjection.metersPerPixelAtLatitude(
+          projection,
+          latitude: latitude
+        )
       }
     }
   }

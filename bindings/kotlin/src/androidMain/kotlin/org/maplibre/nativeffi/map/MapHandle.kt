@@ -28,6 +28,7 @@ import org.maplibre.nativeffi.internal.javacpp.GeoJsonSourceOptionsScope
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.javacpp.ownedBuffer
+import org.maplibre.nativeffi.internal.javacpp.readCameraSnapshot
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -60,6 +61,7 @@ import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileJson
@@ -111,6 +113,30 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     NativeAccess.ensureLoaded()
     ByteArrayViewScope(json).use { nativeJson ->
       Status.check(MaplibreNativeC.mln_map_set_style_json(requireLiveHandle(), nativeJson.view))
+    }
+  }
+
+  public actual fun setGlobalStateProperty(propertyName: String, value: ByteArray) {
+    NativeAccess.ensureLoaded()
+    StringViewScope(propertyName).use { nativePropertyName ->
+      ByteArrayViewScope(value).use { nativeValue ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_global_state_property(
+            requireLiveHandle(),
+            nativePropertyName.view,
+            nativeValue.view,
+          )
+        )
+      }
+    }
+  }
+
+  public actual fun getGlobalState(): ByteArray {
+    NativeAccess.ensureLoaded()
+    LongPointer(1).use { outState ->
+      outState.put(0, 0L)
+      Status.check(MaplibreNativeC.mln_map_get_global_state(requireLiveHandle(), outState))
+      return ownedBuffer(outState.get())
     }
   }
 
@@ -1000,6 +1026,17 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     }
   }
 
+  public actual fun styleLayers(): List<StyleLayerInfo> {
+    NativeAccess.ensureLoaded()
+    LongPointer(1).use { outList ->
+      outList.put(0, 0L)
+      Status.check(MaplibreNativeC.mln_map_list_style_layers(requireLiveHandle(), outList))
+      val list = outList.get()
+      require(list != 0L) { "mln_map_list_style_layers returned the null handle" }
+      return styleLayerList(list)
+    }
+  }
+
   public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
     NativeAccess.ensureLoaded()
     StringViewScope(layerId).use { nativeLayerId ->
@@ -1442,9 +1479,8 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
   public actual val camera: CameraOptions
     get() {
       NativeAccess.ensureLoaded()
-      MaplibreNativeC.mln_camera_options_default().use { outCamera ->
-        Status.check(MaplibreNativeC.mln_map_get_camera(requireLiveHandle(), outCamera))
-        return cameraOptions(outCamera)
+      return readCameraSnapshot { outCamera ->
+        AndroidNativeBridge.mapGetCamera(requireLiveHandle(), outCamera)
       }
     }
 
@@ -1724,40 +1760,34 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_screen_point().use { outPoint ->
-      Status.check(
-        MaplibreNativeC.mln_map_pixel_for_lat_lng(requireLiveHandle(), latLng(coordinate), outPoint)
+    val out = DoubleArray(2)
+    Status.check(
+      AndroidNativeBridge.mapPixelForLatLng(
+        requireLiveHandle(),
+        coordinate.latitude,
+        coordinate.longitude,
+        out,
       )
-      return screenPoint(outPoint)
-    }
+    )
+    return ScreenPoint(out[0], out[1])
   }
 
   public actual fun latLngForPixel(point: ScreenPoint): LatLng {
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
-      Status.check(
-        MaplibreNativeC.mln_map_lat_lng_for_pixel(
-          requireLiveHandle(),
-          screenPoint(point),
-          outCoordinate,
-        )
-      )
-      return latLng(outCoordinate)
-    }
+    val out = DoubleArray(2)
+    Status.check(
+      AndroidNativeBridge.mapLatLngForPixel(requireLiveHandle(), point.x, point.y, false, out)
+    )
+    return LatLng(out[0], out[1])
   }
 
   public actual fun latLngForPixelUnwrapped(point: ScreenPoint): LatLng {
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
-      Status.check(
-        MaplibreNativeC.mln_map_lat_lng_for_pixel_unwrapped(
-          requireLiveHandle(),
-          screenPoint(point),
-          outCoordinate,
-        )
-      )
-      return latLng(outCoordinate)
-    }
+    val out = DoubleArray(2)
+    Status.check(
+      AndroidNativeBridge.mapLatLngForPixel(requireLiveHandle(), point.x, point.y, true, out)
+    )
+    return LatLng(out[0], out[1])
   }
 
   public actual fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> {
@@ -1826,6 +1856,19 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
         return outCoordinates.toList(Math.toIntExact(nativePoints.count))
       }
     }
+  }
+
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Double {
+    NativeAccess.ensureLoaded()
+    val outMetersPerPixel = doubleArrayOf(0.0)
+    Status.check(
+      MaplibreNativeC.mln_map_meters_per_pixel_at_latitude(
+        requireLiveHandle(),
+        latitude,
+        outMetersPerPixel,
+      )
+    )
+    return outMetersPerPixel[0]
   }
 
   public actual fun attachMetalOwnedTexture(
@@ -2028,6 +2071,27 @@ private fun styleIdList(list: Long): List<String> =
     }
   } finally {
     MaplibreNativeC.mln_style_id_list_destroy(list)
+  }
+
+private fun styleLayerList(list: Long): List<StyleLayerInfo> =
+  try {
+    SizeTPointer(1).use { outCount ->
+      Status.check(MaplibreNativeC.mln_style_layer_list_count(list, outCount))
+      List(Math.toIntExact(outCount.get())) { index ->
+        MaplibreNativeC.mln_style_layer_info().use { outLayer ->
+          outLayer.size(outLayer.sizeof())
+          Status.check(MaplibreNativeC.mln_style_layer_list_get(list, index.toLong(), outLayer))
+          StyleLayerInfo(
+            stringView(outLayer.id()),
+            stringView(outLayer.type()),
+            stringView(outLayer.source_id()).ifEmpty { null },
+            stringView(outLayer.source_layer()).ifEmpty { null },
+          )
+        }
+      }
+    }
+  } finally {
+    MaplibreNativeC.mln_style_layer_list_destroy(list)
   }
 
 private fun styleStringList(list: Long): List<String> =

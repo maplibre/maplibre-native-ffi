@@ -147,6 +147,14 @@ auto mln_queried_feature_list_destroy(mln_queried_feature_list list) noexcept
   mln::core::queried_feature_list_destroy(list);
 }
 
+auto mln_render_session_projection_create(
+  mln_render_session session, mln_map_projection* out_projection
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::render_session_projection_create(session, out_projection);
+  });
+}
+
 auto mln_render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,

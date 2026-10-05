@@ -1,10 +1,12 @@
 package org.maplibre.nativeffi.map
 
+import kotlinx.cinterop.DoubleVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.value
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.geo.LatLng
@@ -15,6 +17,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_projection_destroy
 import org.maplibre.nativeffi.internal.c.mln_map_projection_get_camera
 import org.maplibre.nativeffi.internal.c.mln_map_projection_lat_lng_for_pixel
 import org.maplibre.nativeffi.internal.c.mln_map_projection_lat_lng_for_pixel_unwrapped
+import org.maplibre.nativeffi.internal.c.mln_map_projection_meters_per_pixel_at_latitude
 import org.maplibre.nativeffi.internal.c.mln_map_projection_pixel_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_projection_set_camera
 import org.maplibre.nativeffi.internal.c.mln_map_projection_set_visible_coordinates
@@ -127,6 +130,20 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
       )
     }
     CoreStructs.latLng(outCoordinate)
+  }
+
+  public actual fun metersPerPixelAtLatitude(latitude: Double): Double = memScoped {
+    val outMetersPerPixel = alloc<DoubleVar>()
+    state.withLive { handle ->
+      Status.check(
+        mln_map_projection_meters_per_pixel_at_latitude(
+          handle.rawHandleValue,
+          latitude,
+          outMetersPerPixel.ptr,
+        )
+      )
+    }
+    outMetersPerPixel.value
   }
 
   public actual override fun close() {

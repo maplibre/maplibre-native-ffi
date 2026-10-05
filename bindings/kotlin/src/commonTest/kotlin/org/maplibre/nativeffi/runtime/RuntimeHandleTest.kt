@@ -515,9 +515,9 @@ class RuntimeHandleTest {
         val lastKind = AtomicReference<ResourceKind?>(null)
         runtime.setResourceTransform(
           ResourceTransformCallback { request ->
-            calls.addAndFetch(1)
             lastUrl.store(request.url)
             lastKind.store(request.kind)
+            calls.addAndFetch(1)
             "unsupported://rewritten-style.json"
           }
         )

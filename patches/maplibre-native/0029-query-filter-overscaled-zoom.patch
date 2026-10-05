@@ -1,0 +1,153 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index c8c03057ca79..0d126e2483e8 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -34,6 +34,7 @@
+ ### 🐞 Bug fixes
+ 
+ - *...Add new stuff here...*
++- [core] Evaluate rendered-feature query filters at overscaled tile zoom, matching layer filters and source queries when overzoomed.
+ - [core] Evaluate rendered-feature hit-test paint properties at camera zoom, including fractional zoom and overzooming.
+ - [core] Fix rendered-feature queries near the final endpoint of an offset line.
+ - [OpenGL] Fix invisible raster layers on Adreno 3xx by avoiding an in-place alpha assignment in the fragment shader.
+diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
+index f63904c2136b..3366ce49f538 100644
+--- a/src/mln/geometry/feature_index.cpp
++++ b/src/mln/geometry/feature_index.cpp
+@@ -155,7 +155,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
+                          const double scale,
+                          const RenderedQueryOptions& queryOptions,
+                          const GlobalStateMap* globalState,
+-                         const UnwrappedTileID& tileID,
++                         const OverscaledTileID& tileID,
+                          const std::unordered_map<std::string, const RenderLayer*>& layers,
+                          const float additionalQueryPadding,
+                          const SourceFeatureState& sourceFeatureState) const {
+@@ -186,7 +186,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
+                    indexedFeature,
+                    queryOptions,
+                    globalState,
+-                   tileID.canonical,
++                   tileID,
+                    layers,
+                    queryGeometry,
+                    transformState,
+@@ -239,7 +239,7 @@ std::unordered_map<std::string, std::vector<Feature>> FeatureIndex::lookupSymbol
+                    symbolFeature,
+                    queryOptions,
+                    globalState,
+-                   tileID.canonical,
++                   tileID,
+                    layers,
+                    GeometryCoordinates(),
+                    {},
+@@ -254,7 +254,7 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
+                               const RefIndexedSubfeature& indexedFeature,
+                               const RenderedQueryOptions& options,
+                               const GlobalStateMap* globalState,
+-                              const CanonicalTileID& tileID,
++                              const OverscaledTileID& tileID,
+                               const std::unordered_map<std::string, const RenderLayer*>& layers,
+                               const GeometryCoordinates& queryGeometry,
+                               const TransformState& transformState,
+@@ -302,13 +302,14 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
+             continue;
+         }
+ 
+-        if (options.filter && !(*options.filter)(style::expression::EvaluationContext{static_cast<float>(tileID.z),
+-                                                                                      geometryTileFeature.get()}
++        // Match layer filters and source queries, including overzoomed tiles.
++        if (options.filter && !(*options.filter)(style::expression::EvaluationContext{
++                                  static_cast<float>(tileID.overscaledZ), geometryTileFeature.get()}
+                                                      .withGlobalState(globalState))) {
+             continue;
+         }
+ 
+-        Feature feature = convertFeature(*geometryTileFeature, tileID);
++        Feature feature = convertFeature(*geometryTileFeature, tileID.canonical);
+         feature.source = renderLayer->baseImpl->source;
+         feature.sourceLayer = sourceLayer->getName();
+         feature.state = state;
+diff --git a/src/mln/geometry/feature_index.hpp b/src/mln/geometry/feature_index.hpp
+index 84eacdf3bebe..4d337e6f2f94 100644
+--- a/src/mln/geometry/feature_index.hpp
++++ b/src/mln/geometry/feature_index.hpp
+@@ -126,7 +126,7 @@ public:
+                double scale,
+                const RenderedQueryOptions& options,
+                const GlobalStateMap* globalState,
+-               const UnwrappedTileID&,
++               const OverscaledTileID&,
+                const std::unordered_map<std::string, const RenderLayer*>&,
+                float additionalQueryPadding,
+                const SourceFeatureState& sourceFeatureState) const;
+@@ -152,7 +152,7 @@ private:
+                     const RefIndexedSubfeature&,
+                     const RenderedQueryOptions& options,
+                     const GlobalStateMap* globalState,
+-                    const CanonicalTileID&,
++                    const OverscaledTileID&,
+                     const std::unordered_map<std::string, const RenderLayer*>&,
+                     const GeometryCoordinates& queryGeometry,
+                     const TransformState& transformState,
+diff --git a/src/mln/tile/geometry_tile.cpp b/src/mln/tile/geometry_tile.cpp
+index a817b5d0f226..999ae01a5787 100644
+--- a/src/mln/tile/geometry_tile.cpp
++++ b/src/mln/tile/geometry_tile.cpp
+@@ -535,7 +535,7 @@ void GeometryTile::queryRenderedFeatures(std::unordered_map<std::string, std::ve
+                                       std::pow(2, transformState.getZoom() - id.overscaledZ),
+                                       options,
+                                       globalState,
+-                                      id.toUnwrapped(),
++                                      id,
+                                       layers,
+                                       queryPadding * transformState.maxPitchScaleFactor(),
+                                       featureState);
+diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
+index b94f10253df4..332ece1727ac 100644
+--- a/test/api/query.test.cpp
++++ b/test/api/query.test.cpp
+@@ -1,4 +1,5 @@
+ #include <mln/layermanager/layer_manager.hpp>
++#include <mln/style/layers/circle_layer.hpp>
+ #include <mln/style/layers/location_indicator_layer.hpp>
+ #include <mln/test/map_adapter.hpp>
+ 
+@@ -494,3 +495,37 @@ TEST(Query, QueryRenderedFeaturesCompositePaintZoom) {
+         }
+     }
+ }
++
++TEST(Query, QueryRenderedFeaturesFilterUsesOverscaledZoom) {
++    for (const double cameraZoom : {16.5, 20.5}) {
++        SCOPED_TRACE(cameraZoom);
++        QueryTest test;
++        // Keep the point away from tile boundaries so source queries return one copy.
++        test.map.getStyle().getSource("source1")->as<GeoJSONSource>()->setGeoJSON(
++            Geometry<double>{Point<double>{1.003, 1.003}});
++        test.map.getStyle().addLayer(std::make_unique<CircleLayer>("circle_layer", "source1"));
++        const auto tileZoom = std::to_string(static_cast<int>(cameraZoom));
++        const auto equalZoom = parseFilter(R"(["==", ["zoom"], )" + tileZoom + "]");
++        const auto lowerZoom = parseFilter(R"(["<", ["zoom"], )" + tileZoom + "]");
++        const auto higherZoom = parseFilter(R"([">", ["zoom"], )" + tileZoom + "]");
++
++        // Layer filters and query filters should agree on the integer bucket zoom.
++        // Cover both the collision-index symbol path and the geometry-index circle path.
++        for (const auto& layerID : {"layer1", "circle_layer"}) {
++            test.map.getStyle().getLayer(layerID)->setFilter(equalZoom);
++        }
++        test.map.jumpTo(CameraOptions().withCenter(LatLng{1.003, 1.003}).withZoom(cameraZoom));
++        test.frontend.render(test.map);
++        const auto point = test.map.pixelForLatLng({1.003, 1.003});
++        for (const auto& layerID : {"layer1", "circle_layer"}) {
++            SCOPED_TRACE(layerID);
++            auto* renderer = test.frontend.getRenderer();
++            EXPECT_EQ(renderer->queryRenderedFeatures(point, {{{layerID}}, {}}).size(), 1u);
++            EXPECT_EQ(renderer->queryRenderedFeatures(point, {{{layerID}}, {equalZoom}}).size(), 1u);
++            // Reject canonical zoom when overzoomed, and fractional camera zoom at either zoom.
++            EXPECT_TRUE(renderer->queryRenderedFeatures(point, {{{layerID}}, {lowerZoom}}).empty());
++            EXPECT_TRUE(renderer->queryRenderedFeatures(point, {{{layerID}}, {higherZoom}}).empty());
++        }
++        EXPECT_EQ(test.frontend.getRenderer()->querySourceFeatures("source1", {{}, {equalZoom}}).size(), 1u);
++    }
++}

@@ -127,4 +127,12 @@ public static unsafe class Maplibre
         );
         return CoreStructs.FromNative(output);
     }
+
+    /// <summary>Returns the process-lifetime address of the v1 plugin registration function.</summary>
+    /// <remarks>Pass it to the plugin's own registration entry point before loading dependent styles.</remarks>
+    public static NativePointer PluginRegisterFunctionV1()
+    {
+        NativeLibraryLoader.EnsureLoaded();
+        return NativePointer.FromNativeAddress(NativeMethods.mln_plugin_get_register_function_v1());
+    }
 }

@@ -20,6 +20,9 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_render_session_render_update([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_render_result* out_result, bool* out_needs_repaint);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_render_session_projection_create([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_map_projection *")] MlnMapProjection* out_projection);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_render_session_detach([NativeTypeName("mln_render_session")] MlnRenderSession session);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

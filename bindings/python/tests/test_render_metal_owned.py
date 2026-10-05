@@ -434,6 +434,7 @@ def test_real_metal_render_session_reports_wrong_thread_errors(
     calls: tuple[Callable[[], object], ...] = (
         lambda: metal_owned_session.session.resize(16, 16, 1.0),
         metal_owned_session.session.render_update,
+        metal_owned_session.session.create_projection,
         metal_owned_session.session.acquire_metal_owned_texture_frame,
         metal_owned_session.session.close,
         *set_target_calls(metal_owned_session.session),
@@ -499,3 +500,39 @@ def test_typed_geojson_source_options_cluster_nearby_points(
         metal_owned_session.map,
         metal_owned_session.session,
     )
+
+
+def test_rendered_projection_keeps_rendered_camera_and_outlives_session(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    fixture = metal_owned_session
+    with pytest.raises(mln.InvalidStateError):
+        fixture.session.create_projection()
+    fixture.map.jump_to(camera.CameraOptions(zoom=3))
+    fixture.render_once()
+    with fixture.session.acquire_metal_owned_texture_frame():
+        fixture.map.jump_to(camera.CameraOptions(zoom=6))
+        fixture.runtime.pump()
+        projection = fixture.session.create_projection()
+    try:
+        assert fixture.map.get_camera().zoom == pytest.approx(6)
+        assert projection.get_camera().zoom == pytest.approx(3)
+        fixture.session.resize(16, 8, 1.0)
+        with pytest.raises(mln.InvalidStateError):
+            fixture.session.create_projection()
+        fixture.session.close()
+        fixture.map.close()
+        results: list[float | None] = []
+
+        def use_snapshot() -> None:
+            results.append(projection.get_camera().zoom)
+            projection.close()
+
+        thread = threading.Thread(target=use_snapshot)
+        thread.start()
+        thread.join()
+        assert results == [pytest.approx(3)]
+        assert projection.closed
+    finally:
+        if not projection.closed:
+            projection.close()

@@ -100,49 +100,78 @@ void FeatureStateStore::prune(
   }
 }
 
-void FeatureStateStore::set(
+bool FeatureStateStore::set(
   std::string source_id, FeatureStateLayerId source_layer_id,
   std::string feature_id, mln::FeatureState state
 ) {
   const std::scoped_lock lock{mutex_};
+  if (state.empty()) {
+    return false;
+  }
+  const auto source = published_->sources.find(source_id);
+  if (source != published_->sources.end()) {
+    const auto layer = source->second.find(source_layer_id);
+    if (layer != source->second.end()) {
+      const auto feature = layer->second.find(feature_id);
+      if (
+        feature != layer->second.end() &&
+        std::ranges::all_of(state, [&](const auto& entry) {
+          const auto current = feature->second.find(entry.first);
+          return current != feature->second.end() &&
+                 current->second == entry.second;
+        })
+      ) {
+        return false;
+      }
+    }
+  }
   ensure_unique();
   auto& feature =
     published_->sources[std::move(source_id)][std::move(source_layer_id)]
                        [std::move(feature_id)];
   merge_state(feature, state);
+  return true;
 }
 
-void FeatureStateStore::remove(
+bool FeatureStateStore::remove(
   std::string source_id, FeatureStateLayerId source_layer_id,
   std::optional<std::string> feature_id, std::optional<std::string> state_key
 ) {
   const std::scoped_lock lock{mutex_};
-  ensure_unique();
   const auto source = published_->sources.find(source_id);
   if (source == published_->sources.end()) {
-    return;
+    return false;
   }
   const auto layer = source->second.find(source_layer_id);
   if (layer == source->second.end()) {
-    return;
+    return false;
   }
-  if (!feature_id.has_value()) {
-    source->second.erase(layer);
-    if (source->second.empty()) {
-      published_->sources.erase(source);
+  if (feature_id) {
+    const auto feature = layer->second.find(*feature_id);
+    if (
+      feature == layer->second.end() ||
+      (state_key && !feature->second.contains(*state_key))
+    ) {
+      return false;
     }
-    return;
   }
-  const auto feature = layer->second.find(*feature_id);
-  if (feature == layer->second.end()) {
-    return;
-  }
-  if (!state_key.has_value()) {
-    layer->second.erase(feature);
+  ensure_unique();
+  auto& layers = published_->sources.at(source_id);
+  if (!feature_id) {
+    layers.erase(source_layer_id);
+    if (layers.empty()) {
+      published_->sources.erase(source_id);
+    }
   } else {
-    feature->second.erase(*state_key);
+    auto& features = layers.at(source_layer_id);
+    if (state_key) {
+      features.at(*feature_id).erase(*state_key);
+    } else {
+      features.erase(*feature_id);
+    }
+    prune(published_->sources, source_id, source_layer_id, &*feature_id);
   }
-  prune(published_->sources, source_id, source_layer_id, &*feature_id);
+  return true;
 }
 
 auto FeatureStateStore::get(

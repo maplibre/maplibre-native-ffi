@@ -58,9 +58,9 @@ void render_target_deinit(render_target* target);
 [[nodiscard]] app_error render_target_finish_frame(render_target* target);
 
 /// Consumes one render request: renders, composites when the mode needs it,
-/// and presents. Reports whether the session rendered an update.
+/// and presents. Reports completion; false requests a target retry.
 [[nodiscard]] app_error render_target_render_update(
-  render_target* target, viewport current_viewport, bool* out_rendered
+  render_target* target, viewport current_viewport, bool* out_completed
 );
 
 #endif  // C_MAP_RENDER_RENDER_H

@@ -9,6 +9,10 @@ zig_cross_args=()
 
 apple_sdk=
 case "$1" in
+  ios-maccatalyst-*)
+    echo "Zig has no Mac Catalyst target; the Zig binding leaves $1 out." >&2
+    exit 2
+    ;;
   ios-simulator-*) apple_sdk=iphonesimulator ;;
   ios-*) apple_sdk=iphoneos ;;
   tvos-simulator-*) apple_sdk=appletvsimulator ;;

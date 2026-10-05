@@ -279,4 +279,18 @@ enum NativeMap {
     }
     return rawCoordinates.map(NativeLatLng.init)
   }
+
+  static func metersPerPixelAtLatitude(
+    _ map: NativeMapHandle,
+    latitude: Double
+  ) throws -> Double {
+    let output = try NativeMemory.withTemporary(0.0) { metersPerPixel in
+      try checkStatus(mln_map_meters_per_pixel_at_latitude(
+        map.raw,
+        latitude,
+        metersPerPixel
+      ))
+    }
+    return output.value
+  }
 }

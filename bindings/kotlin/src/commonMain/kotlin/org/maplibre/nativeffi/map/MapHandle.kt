@@ -34,6 +34,7 @@ import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerInfo
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
@@ -71,6 +72,12 @@ public expect class MapHandle : AutoCloseable {
    * @see org.maplibre.nativeffi.runtime.RuntimeHandle.drainEvents
    */
   public fun setStyleJson(json: ByteArray)
+
+  /** Sets a JSON value in the loaded style. JSON null restores its style default. */
+  public fun setGlobalStateProperty(propertyName: String, value: ByteArray)
+
+  /** Copies the current global-state JSON object, including style defaults. */
+  public fun getGlobalState(): ByteArray
 
   public fun setFeatureState(selector: FeatureStateSelector, value: ByteArray)
 
@@ -266,6 +273,12 @@ public expect class MapHandle : AutoCloseable {
 
   public fun styleLayerIds(): List<String>
 
+  /**
+   * Copies every style layer in style order. The returned list remains valid after later style
+   * changes and after this map closes.
+   */
+  public fun styleLayers(): List<StyleLayerInfo>
+
   public fun moveStyleLayer(layerId: String, beforeLayerId: String)
 
   public fun styleLayerJson(layerId: String): ByteArray?
@@ -411,16 +424,37 @@ public expect class MapHandle : AutoCloseable {
    */
   public var isGestureInProgress: Boolean
 
+  /**
+   * Computes a camera that fits geographic bounds in the current viewport.
+   *
+   * A null [fitOptions] uses zero padding with no bearing or pitch override. Invalid bounds throw
+   * [org.maplibre.nativeffi.error.InvalidArgumentException].
+   */
   public fun cameraForLatLngBounds(
     bounds: LatLngBounds,
     fitOptions: CameraFitOptions?,
   ): CameraOptions
 
+  /**
+   * Computes a camera that fits geographic coordinates in the current viewport.
+   *
+   * [coordinates] is read only for the duration of the call. A null [fitOptions] uses zero padding
+   * with no bearing or pitch override. An empty list or an invalid coordinate throws
+   * [org.maplibre.nativeffi.error.InvalidArgumentException].
+   */
   public fun cameraForLatLngs(
     coordinates: List<LatLng>,
     fitOptions: CameraFitOptions?,
   ): CameraOptions
 
+  /**
+   * Computes a camera that fits a geometry in the current viewport.
+   *
+   * [geometry] holds UTF-8 GeoJSON Geometry bytes and is read only for the duration of the call. A
+   * null [fitOptions] uses zero padding with no bearing or pitch override. Empty or malformed
+   * geometry, and geometry with no coordinates, throw
+   * [org.maplibre.nativeffi.error.InvalidArgumentException].
+   */
   public fun cameraForGeometry(geometry: ByteArray, fitOptions: CameraFitOptions?): CameraOptions
 
   /**
@@ -462,6 +496,12 @@ public expect class MapHandle : AutoCloseable {
 
   /** Converts screen points to unwrapped coordinates that preserve their visible world copies. */
   public fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): List<LatLng>
+
+  /**
+   * Reads the ground distance in meters covered by one logical pixel at [latitude] for the current
+   * map zoom.
+   */
+  public fun metersPerPixelAtLatitude(latitude: Double): Double
 
   /**
    * Attaches a render target to this map, returning the map's one live render session.

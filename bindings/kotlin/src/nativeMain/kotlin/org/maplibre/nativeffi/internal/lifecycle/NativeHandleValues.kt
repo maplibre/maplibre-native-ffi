@@ -30,6 +30,9 @@ internal fun styleIdListHandle(value: ULong): NativeStyleIdList = NativeStyleIdL
 internal fun styleStringListHandle(value: ULong): NativeStyleStringList =
   NativeStyleStringList(value.toLong())
 
+internal fun styleLayerListHandle(value: ULong): NativeStyleLayerList =
+  NativeStyleLayerList(value.toLong())
+
 internal fun queriedFeatureListHandle(value: ULong): NativeQueriedFeatureList =
   NativeQueriedFeatureList(value.toLong())
 

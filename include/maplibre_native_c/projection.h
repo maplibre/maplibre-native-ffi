@@ -185,6 +185,24 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
 ) MLN_NOEXCEPT;
 
 /**
+ * Reads the ground distance covered by one logical map pixel at a latitude for
+ * the helper camera zoom.
+ *
+ * MapLibre Native computes the scale, including its zoom and latitude clamps.
+ * This function may be called from any thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live,
+ *   out_meters_per_pixel is null, or latitude is not finite or falls outside
+ *   the range from -90 to 90 degrees.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_projection_meters_per_pixel_at_latitude(
+  mln_map_projection projection, double latitude, double* out_meters_per_pixel
+) MLN_NOEXCEPT;
+
+/**
  * Converts a geographic coordinate to spherical Mercator projected meters.
  *
  * Returns:

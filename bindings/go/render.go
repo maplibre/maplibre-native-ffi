@@ -75,7 +75,7 @@ type RenderUpdate struct {
 	// waits for before it calls again.
 	Result RenderResult
 	// NeedsRepaint reports whether the map asked for another frame while it
-	// rendered this one, as during an ongoing camera transition. It is true
+	// rendered this one, as during an ongoing paint transition. It is true
 	// only when Result is RenderResultRendered and reads false for every other
 	// outcome. This is the same signal a RuntimeEventMapRenderFrameFinished
 	// event carries in its NeedsRepaint field, delivered here without the
@@ -959,11 +959,14 @@ func (session *RenderSessionHandle) setTarget(call func(nativeRenderSession) int
 // RenderUpdate renders the latest available map render update into the attached
 // render target.
 //
-// The map retains its latest update, so repeated calls re-render it and report
-// RenderResultRendered again. Every other result names the wake to wait for:
+// Drains queued render-thread work and renders each update once per target.
+// Repeated calls report RenderResultNoUpdate until map state or the target changes.
+// Request a map repaint and pump the runtime to redraw a continuous map on demand;
+// request a still image for a static map. Every other result names the wake to wait for:
 // RenderResultNoUpdate and RenderResultSizePending resolve on a
 // RuntimeEventMapRenderUpdateAvailable event, and RenderResultTargetNotReady
-// resolves when the host changes the render target.
+// resolves when the host changes the render target or on a later retry after
+// a backoff.
 func (session *RenderSessionHandle) RenderUpdate() (RenderUpdate, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {

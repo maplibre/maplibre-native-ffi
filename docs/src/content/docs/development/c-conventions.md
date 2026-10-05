@@ -16,10 +16,26 @@ directly when useful.
 include/                 # public C API headers
   maplibre_native_c.h    # public umbrella header
   maplibre_native_c/     # public domain headers
+    plugin.h             # layer plugin registration, outside the umbrella
 src/
   c_api/                 # exported C definitions and C boundary validation
   <subsystem>/           # implementation semantics
 ```
+
+`plugin.h` is the one domain header that the umbrella leaves out. It includes
+MapLibre Native's `mln/plugin/plugin_api.h`, which the install copies next to
+this library's headers, and the shared library exports upstream's
+`mln_plugin_register_v1`. Upstream owns that contract and versions its structs
+independently of `mln_c_version()`, and a plugin is native code whose callbacks
+run on tile workers and the render thread for the process lifetime. Bindings
+expose the registration function for plugin integrations; plugin authoring uses
+the raw C contract.
+
+Plugin integrations obtain the host's registration function through
+`mln_plugin_get_register_function_v1()` and pass it to their own registration
+entry point. The integration loads the plugin and keeps its code loaded for the
+process lifetime. The plugin registers its descriptors through the supplied
+function, into the host's copy of MapLibre Native.
 
 ## ABI Rules
 
@@ -96,8 +112,8 @@ drives the graphics API the way a host does. An artifact carries the C API and
 nothing else that loads, so repackaging it copies no implementation along, and a
 host that loads its own still runs one: handles that one copy mints are opaque
 pointers another copy does not own. An artifact carries the C API's own headers
-alone, because the headers that a host builds surface descriptors against arrive
-with the implementation that it loads.
+and the plugin header, because the headers that a host builds surface
+descriptors against arrive with the implementation that it loads.
 
 A local stand-in for the implementation, its headers included, reaches the
 install tree through the CMake `loader` component, which a full installation and
@@ -194,13 +210,14 @@ Objects that cross the C boundary are retained rather than autoreleased, which
 keeps them valid after the entry point that produced them returns.
 
 MapLibre's `RunLoop` is owner-thread scheduler state. Each owner thread may hold
-one live runtime. `mln_runtime_pump()` advances that runtime: it parks the owner
-thread when asked, then drains the queued tasks, expired timers, and ready I/O
-it finds, including work enqueued while it runs. The budget bounds one pump's
-drain at a task boundary: the first queued task always runs, a task runs to
-completion once started, and tasks left behind re-arm the wake flag so the next
-pump continues them without parking. Document a budgeted pump as bounding the
-task queues alone, because timers and ready I/O are serviced regardless.
+one live runtime, and destroys it before the thread exits. `mln_runtime_pump()`
+advances that runtime: it parks the owner thread when asked, then drains the
+queued tasks, expired timers, and ready I/O it finds, including work enqueued
+while it runs. The budget bounds one pump's drain at a task boundary: the first
+queued task always runs, a task runs to completion once started, and tasks left
+behind re-arm the wake flag so the next pump continues them without parking.
+Document a budgeted pump as bounding the task queues alone, because timers and
+ready I/O are serviced regardless.
 
 One entry point carries both cadence sources: the timeout selects the cadence,
 with zero for hosts driven by a callback they do not own and a positive value

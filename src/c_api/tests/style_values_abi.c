@@ -671,6 +671,84 @@ static void layer_text_accessors_report_required_capacity(void) {
 }
 
 // An unbounded zoom range crosses the ABI as infinities.
+static void style_layer_list_snapshots_the_layer_stack(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(layer_accessor_style_json))
+  );
+
+  mln_style_layer_list layers = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_list_style_layers(map, &layers));
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, layers);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_list_style_layers(map, &layers)
+  );
+
+  // The build disables legacy annotations, so the style carries only the two
+  // layers that the document declares.
+  size_t count = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_style_layer_list_count(layers, &count)
+  );
+  TEST_ASSERT_EQUAL_size_t(2, count);
+
+  mln_style_layer_info info = mln_style_layer_info_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_style_layer_list_get(layers, 0, &info)
+  );
+  TEST_ASSERT_EQUAL_size_t(5, info.id.size);
+  TEST_ASSERT_EQUAL_INT(0, memcmp(info.id.data, "lines", 5));
+  TEST_ASSERT_EQUAL_size_t(4, info.type.size);
+  TEST_ASSERT_EQUAL_INT(0, memcmp(info.type.data, "line", 4));
+  TEST_ASSERT_EQUAL_size_t(3, info.source_id.size);
+  TEST_ASSERT_EQUAL_INT(0, memcmp(info.source_id.data, "vec", 3));
+  TEST_ASSERT_EQUAL_size_t(5, info.source_layer.size);
+  TEST_ASSERT_EQUAL_INT(0, memcmp(info.source_layer.data, "roads", 5));
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_style_layer_list_get(layers, 1, &info)
+  );
+  TEST_ASSERT_EQUAL_size_t(2, info.id.size);
+  TEST_ASSERT_EQUAL_INT(0, memcmp(info.id.data, "bg", 2));
+  TEST_ASSERT_EQUAL_size_t(10, info.type.size);
+  TEST_ASSERT_EQUAL_size_t(0, info.source_id.size);
+  TEST_ASSERT_EQUAL_size_t(0, info.source_layer.size);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_style_layer_list_get(layers, 2, &info)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_style_layer_list_get(layers, 0, NULL)
+  );
+  info.size = sizeof(uint32_t);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_style_layer_list_get(layers, 0, &info)
+  );
+
+  // The list is a snapshot, so removing a layer leaves it unchanged.
+  bool removed = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_remove_style_layer(map, MLN_STRING_LITERAL("lines"), &removed)
+  );
+  TEST_ASSERT_TRUE(removed);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_style_layer_list_count(layers, &count)
+  );
+  TEST_ASSERT_EQUAL_size_t(2, count);
+
+  mln_style_layer_list_destroy(layers);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_style_layer_list_count(layers, &count)
+  );
+  mln_style_layer_list_destroy(MLN_HANDLE_NULL);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void layer_zoom_and_visibility_accessors_carry_raw_domains(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -1691,8 +1769,34 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void global_state_preserves_output_ownership_and_checks_views(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_buffer state = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_get_global_state(map, &state));
+  const mln_buffer original = state;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_global_state(map, &state)
+  );
+  TEST_ASSERT_EQUAL_UINT64(original, state);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_global_state(map, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_global_state_property(
+      map, (mln_buffer_view){.data = NULL, .size = 1},
+      MLN_BUFFER_LITERAL("true")
+    )
+  );
+  mln_buffer_destroy(state);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
+  RUN_TEST(global_state_preserves_output_ownership_and_checks_views);
   RUN_TEST(style_value_helpers_reject_unsafe_raw_descriptors);
   RUN_TEST(geojson_source_options_reject_unsafe_raw_values);
   RUN_TEST(clustered_geojson_data_reports_non_point_geometry);
@@ -1701,6 +1805,7 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(optional_json_style_values_return_null_handles);
   RUN_TEST(layer_source_accessors_reject_sourceless_layer_types);
   RUN_TEST(layer_text_accessors_report_required_capacity);
+  RUN_TEST(style_layer_list_snapshots_the_layer_stack);
   RUN_TEST(layer_zoom_and_visibility_accessors_carry_raw_domains);
   RUN_TEST(style_image_stretch_descriptors_reject_unsafe_raw_values);
   RUN_TEST(copy_entry_points_answer_a_null_buffer_as_a_size_probe);

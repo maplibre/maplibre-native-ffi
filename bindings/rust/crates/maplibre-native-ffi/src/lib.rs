@@ -16,6 +16,7 @@ mod handle;
 mod logging;
 mod map;
 mod options;
+mod plugin;
 mod projection;
 mod render;
 mod resource;
@@ -44,8 +45,8 @@ pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, se
 pub use map::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, MapAttachRef,
     MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo,
-    StyleImageOptions, StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions,
-    TileJsonInfo, TileScheme, TileSourceOptions, VectorTileEncoding,
+    StyleImageOptions, StyleImageTextFit, StyleLayerInfo, StyleLayerVisibility,
+    StyleTransitionOptions, TileJsonInfo, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 pub use maplibre_core::{
     AmbientCacheOperation, CameraChangeMode, ConstrainMode, Error, ErrorKind, LogEvent,
@@ -58,6 +59,7 @@ pub use maplibre_core::{
     RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
 };
 pub use maplibre_native_ffi_core::handle::{NativeHandleLeak, set_leak_reporter};
+pub use plugin::plugin_register_function_v1;
 pub use projection::MapProjectionHandle;
 pub use render::{
     DetachedRenderSessionHandle, EglContextDescriptor, FeatureStateSelector, FrameNativePointer,

@@ -8,8 +8,8 @@ pub(crate) use maplibre_core::style::{
 pub use maplibre_core::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind,
     RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
-    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme,
-    TileSourceOptions, VectorTileEncoding,
+    StyleImageTextFit, StyleLayerInfo, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo,
+    TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_core::ptr::const_ptr_or_null;
@@ -52,6 +52,27 @@ impl super::MapHandle {
         // completes before a successful return, so the C API has already
         // released the callback state of the sources this load dropped.
         maplibre_core::check(unsafe { sys::mln_map_set_style_json(map, json) })
+    }
+
+    /// Sets a global-state JSON value. JSON null restores its style default.
+    pub fn set_global_state_property(&self, property_name: &str, value: &[u8]) -> Result<()> {
+        let map = self.inner.native()?;
+        let property_name = maplibre_core::string::string_view(property_name);
+        let value = maplibre_core::string::buffer_view(value);
+        // SAFETY: map is live, and property_name and value remain valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_global_state_property(map, property_name.raw(), value)
+        })
+    }
+
+    /// Copies the current global-state JSON object, including defaults.
+    pub fn get_global_state(&self) -> Result<Vec<u8>> {
+        let map = self.inner.native()?;
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        // SAFETY: map is live and out is a null-initialized writable handle.
+        maplibre_core::check(unsafe { sys::mln_map_get_global_state(map, out.as_mut_ptr()) })?;
+        // SAFETY: Success transfers the owned buffer to this call.
+        unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }
     }
 
     /// Sets per-feature state on this map.
@@ -1573,6 +1594,22 @@ impl super::MapHandle {
         // SAFETY: On success, the C API returns an owned style ID list handle;
         // core copies and releases it.
         unsafe { maplibre_core::style::copy_style_id_list(out.into_live("mln_style_id_list")?) }
+    }
+
+    /// Copies the ID, type, source ID, and source-layer of every style layer in
+    /// style order.
+    pub fn style_layers(&self) -> Result<Vec<StyleLayerInfo>> {
+        let map = self.inner.native()?;
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_layer_list>::new();
+        // SAFETY: map is live and out is a null-initialized out-pointer owned by
+        // this call. On success the returned handle is wrapped and destroyed by
+        // the copying helper below.
+        maplibre_core::check(unsafe { sys::mln_map_list_style_layers(map, out.as_mut_ptr()) })?;
+        // SAFETY: On success, the C API returns an owned style layer list handle;
+        // core copies and releases it.
+        unsafe {
+            maplibre_core::style::copy_style_layer_list(out.into_live("mln_style_layer_list")?)
+        }
     }
 }
 

@@ -32,6 +32,7 @@ enum class HandleKind : std::uint8_t {
   StyleStringList = 13,
   GeoJsonSourceData = 14,
   QueriedFeatureList = 15,
+  StyleLayerList = 16,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};

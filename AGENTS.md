@@ -50,12 +50,39 @@ for setup, cross-compilation SDKs, and tooling details.
 Follow the repository PR template and [AI policy](AI_POLICY.md). Keep
 **Summary** and **Test plan** to at most one sentence each.
 
-Request `ci:full` coverage for CI, ABI, shared toolchain, dependency, or
-publishing changes. Use platform labels when the change needs additional
-platform coverage; see
-[CI coverage](docs/src/content/docs/development/overview.md#ci-coverage).
+Every PR code update runs baseline coverage: hygiene, docs, and Linux x64
+EGL/Vulkan with their binding suites. Promotion adds macOS Metal, Windows x64
+WGL/Vulkan, Android x64 EGL/Vulkan, and browser WebGL/WebGPU in a separate ready
+workflow. Main, manual runs, Dependabot-authored PRs, and `ci:full` run complete
+coverage and packaging verification in one workflow.
 
-## Project invariants
+Use persistent PR labels to add coverage to either PR tier:
+
+| Label        | Additional coverage                                               |
+| ------------ | ----------------------------------------------------------------- |
+| `ci:apple`   | All macOS backends and the iOS, Mac Catalyst, and tvOS targets    |
+| `ci:android` | All Android ABIs/backends and multi-ABI packaging                 |
+| `ci:linux`   | Linux ARM64 and musl variants                                     |
+| `ci:windows` | Windows ARM64 variants                                            |
+| `ci:ohos`    | OpenHarmony targets and emulator tests                            |
+| `ci:full`    | Every target and complete packaging verification, including Maven |
+
+Labels combine and persist across pushes. The extended workflow combines the
+requested platforms, including the producers needed by its packaging checks.
+Baseline and ready target jobs further narrow to consumers that the change
+affects. Readiness and label changes reuse actual coverage for the same tested
+merge commit and coverage scope; missing evidence runs coverage again. An
+explicit workflow rerun also executes coverage again. Every job in a selected
+group must succeed.
+
+Extended CI retains `ci-required`; baseline and ready each have one additional
+required check; see
+[CI coverage](docs/src/content/docs/development/overview.md#ci-coverage) for the
+branch protection configuration. For CI, shared toolchain, dependency, or
+publishing changes, request full coverage with
+`gh pr edit <number> --add-label 'ci:full'`.
+
+## Project Invariants
 
 ### General
 
