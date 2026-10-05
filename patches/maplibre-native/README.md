@@ -171,9 +171,10 @@ before and after hiding a layer; the Rust browser regression also covers the
 binding’s statistics. Upstream:
 [maplibre-native#4719](https://github.com/maplibre/maplibre-native/pull/4719).
 
-`0033-in-memory-database-reset.patch` resets SQLite's in-memory database without
-deleting a file named `:memory:`. The Native database regression checks that an
-unrelated file with that name survives the reset. Upstream:
+`0033-in-memory-database-reset.patch` uses SQLite's resolved filename when
+resetting a database. In-memory databases, including URI spellings, close
+without filesystem deletion. The Native database regression checks that
+unrelated files with those names survive the reset. Upstream:
 [maplibre-native#4720](https://github.com/maplibre/maplibre-native/pull/4720).
 
 `0034-opengl-large-uniform-blocks.patch` fixes allocator alignment at the 8 KiB
