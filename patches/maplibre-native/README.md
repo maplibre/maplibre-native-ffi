@@ -130,8 +130,8 @@ at commit `02ddb45fbfad`.
 `0026-empty-symbol-placement.patch` clears deferred symbol placement and query
 state when no layers supply placement data. Source fade bookkeeping and paint
 transitions continue, and symbols that return receive a fresh placement. Native
-regressions cover repeated background-only frames, paint transitions, and symbol
-removal and reappearance within the placement update interval. Upstream:
+regression checks that repeated background-only frames stop requesting repaints
+while paint transitions still request frames. Upstream:
 [maplibre-native#4722](https://github.com/maplibre/maplibre-native/pull/4722).
 See [issue #735](https://github.com/maplibre/maplibre-native-ffi/issues/735).
 
