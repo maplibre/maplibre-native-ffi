@@ -1233,6 +1233,43 @@ mod tests {
     }
 
     #[test]
+    fn two_runtimes_can_use_the_same_cache_database() {
+        let base = TempDir::new("maplibre-rust-shared-cache");
+        let mut options = RuntimeOptions::default();
+        options.cache_path = Some(base.path().join("shared.db").to_string_lossy().into_owned());
+        let creation = Mutex::new(());
+        let started = std::sync::Barrier::new(2);
+        let touch_cache = || {
+            let result = (|| -> Result<_> {
+                let _creation = creation.lock().unwrap();
+                let runtime = RuntimeHandle::with_options(&options)?;
+                let operation =
+                    runtime.start_ambient_cache_operation(AmbientCacheOperation::Invalidate)?;
+                Ok((runtime, operation))
+            })();
+            started.wait();
+
+            let (mut runtime, operation) = result.unwrap();
+            let completed =
+                wait_for_operation(&mut runtime, &operation, Op::AmbientCache, OpResult::None);
+            let discarded = operation.discard();
+            let closed = runtime.close();
+            completed.unwrap();
+            discarded.unwrap();
+            closed.unwrap();
+        };
+
+        std::thread::scope(|scope| {
+            let first = scope.spawn(touch_cache);
+            let second = scope.spawn(touch_cache);
+            let first_result = first.join();
+            let second_result = second.join();
+            first_result.unwrap();
+            second_result.unwrap();
+        });
+    }
+
+    #[test]
     // Spec coverage: BND-084.
     fn runtime_set_maximum_ambient_cache_size_reports_completion() {
         let base = TempDir::new("maplibre-rust-cache-size");
