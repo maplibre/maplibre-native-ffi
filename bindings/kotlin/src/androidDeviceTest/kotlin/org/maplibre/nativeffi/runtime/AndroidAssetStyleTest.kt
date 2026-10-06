@@ -4,6 +4,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 import org.maplibre.nativeffi.Maplibre
@@ -16,6 +17,7 @@ class AndroidAssetStyleTest {
   @Test
   fun styleLoadsFromAssetScheme() {
     assertTrue(loadStyle("asset://style.json"))
+    assertTrue(loadStyle("asset://style.json", assetPath = ""))
   }
 
   @Test
@@ -34,7 +36,65 @@ class AndroidAssetStyleTest {
   }
 
   @Test
+  fun styleLoadsFromApkAssetRoot() {
+    for (assetPath in listOf("/android_asset/maps", "/android_asset/maps/")) {
+      assertTrue(
+        loadStyle(
+          "asset://style%20with%20spaces.json?revision=1#style",
+          assetPath = assetPath,
+          expectedLayer = "custom-root",
+        )
+      )
+    }
+  }
+
+  @Test
+  fun styleLoadsFromFilesystemAssetRoot() {
+    val directory = downloadedAssets()
+    assertTrue(loadStyle("asset://style.json", directory.absolutePath, "custom-root"))
+  }
+
+  @Test
+  fun explicitFileUrisIgnoreAssetRoot() {
+    val directory = downloadedAssets()
+    assertTrue(loadStyle("file:///android_asset/style.json", directory.absolutePath))
+    assertTrue(
+      loadStyle(
+        "file://${File(directory, "style.json").toURI().rawPath}",
+        "/android_asset",
+        "custom-root",
+      )
+    )
+  }
+
+  @Test
   fun pmtilesAssetSourceReadsRangedMetadata() {
+    checkPmtiles("asset://range-check.pmtiles")
+  }
+
+  @Test
+  fun pmtilesAssetFileUriReadsRangedMetadata() {
+    checkPmtiles("file:///android_asset/range-check.pmtiles")
+  }
+
+  @Test
+  fun pmtilesFilesystemAssetRootReadsRangedMetadata() {
+    checkPmtiles("asset://downloaded.pmtiles", downloadedAssets().absolutePath)
+  }
+
+  private fun downloadedAssets(): File {
+    val instrumentation = InstrumentationRegistry.getInstrumentation()
+    // A directory path is literal; only the requested URL is percent-decoded.
+    val directory = File(instrumentation.targetContext.filesDir, "asset root %20")
+    directory.mkdirs()
+    File(directory, "style.json").writeText(CUSTOM_ROOT_STYLE)
+    instrumentation.context.assets.open("range-check.pmtiles").use { input ->
+      File(directory, "downloaded.pmtiles").outputStream().use { input.copyTo(it) }
+    }
+    return directory
+  }
+
+  private fun checkPmtiles(archiveUrl: String, assetPath: String? = null) {
     val sourceErrors = ConcurrentLinkedQueue<String>()
     Maplibre.setLogCallback(
       LogCallback { record ->
@@ -45,7 +105,7 @@ class AndroidAssetStyleTest {
       }
     )
     try {
-      RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      RuntimeHandle.create(RuntimeOptions().apply { this.assetPath = assetPath }).use { runtime ->
         MapHandle.create(
             runtime,
             MapOptions().apply {
@@ -55,7 +115,10 @@ class AndroidAssetStyleTest {
             },
           )
           .use { map ->
-            map.setStyleJson(PMTILES_STYLE.encodeToByteArray())
+            map.setStyleJson(
+              """{"version":8,"sources":{"tiles":{"type":"vector","url":"pmtiles://$archiveUrl"}},"layers":[]}"""
+                .encodeToByteArray()
+            )
             assertTrue(waitForStyleLoaded(runtime, map))
             assertTrue(map.styleSourceExists("tiles"))
             // URL sources do not expose parsed TileJSON through styleSourceInfo.
@@ -81,9 +144,13 @@ class AndroidAssetStyleTest {
     }
   }
 
-  private fun loadStyle(styleUrl: String): Boolean {
+  private fun loadStyle(
+    styleUrl: String,
+    assetPath: String? = null,
+    expectedLayer: String? = null,
+  ): Boolean {
     var loaded = false
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+    RuntimeHandle.create(RuntimeOptions().apply { this.assetPath = assetPath }).use { runtime ->
       MapHandle.create(
           runtime,
           MapOptions().apply {
@@ -95,6 +162,9 @@ class AndroidAssetStyleTest {
         .use { map ->
           map.setStyleUrl(styleUrl)
           loaded = waitForStyleLoaded(runtime, map)
+          if (loaded) {
+            assertEquals(listOfNotNull(expectedLayer), map.styleLayerIds())
+          }
         }
     }
     return loaded
@@ -103,11 +173,11 @@ class AndroidAssetStyleTest {
   private fun waitForStyleLoaded(runtime: RuntimeHandle, map: MapHandle): Boolean {
     repeat(10_000) {
       runtime.pump(0)
-      if (
-        runtime.drainEvents().events.any {
-          it.type == RuntimeEventType.MAP_STYLE_LOADED && it.mapSource == map
-        }
-      ) {
+      val events = runtime.drainEvents().events
+      events
+        .firstOrNull { it.type == RuntimeEventType.MAP_LOADING_FAILED }
+        ?.let { fail(it.message) }
+      if (events.any { it.type == RuntimeEventType.MAP_STYLE_LOADED && it.mapSource == map }) {
         return true
       }
       runtime.pump(1)
@@ -117,5 +187,5 @@ class AndroidAssetStyleTest {
   }
 }
 
-private const val PMTILES_STYLE =
-  """{"version":8,"sources":{"tiles":{"type":"vector","url":"pmtiles://asset://range-check.pmtiles"}},"layers":[]}"""
+private const val CUSTOM_ROOT_STYLE =
+  """{"version":8,"sources":{},"layers":[{"id":"custom-root","type":"background"}]}"""

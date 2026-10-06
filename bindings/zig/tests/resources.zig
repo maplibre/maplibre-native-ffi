@@ -261,11 +261,6 @@ test "file URL style loads through public binding" {
 }
 
 test "asset URL style loads through public binding runtime asset path" {
-    // Android asset:// URLs read the APK AssetManager after mln_android_init.
-    // These emulator tests are native binaries without a JNI Context, so they
-    // cannot initialize that manager. Kotlin androidDeviceTest covers APK assets.
-    if (builtin.abi == .android) return error.SkipZigTest;
-
     var fixture = try writeTempStyle();
     defer fixture.deinit();
 

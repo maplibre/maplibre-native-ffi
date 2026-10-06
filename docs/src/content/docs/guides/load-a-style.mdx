@@ -42,7 +42,11 @@ style URL can name a file in the APK `assets/` directory.
 Prefix the same URL with `pmtiles://` for a PMTiles archive in that directory.
 Add `pmtiles` to the app's `androidResources.noCompress` list so MapLibre can
 read byte ranges from that archive. Other `file://` URLs still read the
-filesystem, including files the host downloaded into app storage.
+filesystem, including files that the host downloaded into app storage.
+
+Set the runtime's asset path to `/android_asset/maps` to load `asset://style.json`
+from `assets/maps/style.json`. Set it to an app-storage directory to load
+`asset://` URLs from that directory. Explicit `file://` URLs use their own paths.
 
 ## Replay additions after a style load
 

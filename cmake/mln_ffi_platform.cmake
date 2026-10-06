@@ -54,7 +54,6 @@ function(mln_ffi_configure_platform_support target)
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/database_file_source.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/file_source_request.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/local_file_request.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/local_file_source.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/main_resource_loader.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/mbtiles_file_source.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/offline.cpp
@@ -83,8 +82,10 @@ function(mln_ffi_configure_platform_support target)
   endif()
 
   if(NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
-    list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
-         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/asset_file_source.cpp)
+    list(
+      APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/asset_file_source.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/storage/local_file_source.cpp)
   endif()
 
   if(MLN_WITH_PMTILES)
