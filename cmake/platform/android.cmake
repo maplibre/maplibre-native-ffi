@@ -57,7 +57,7 @@ function(mln_ffi_configure_platform target)
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/string_stdlib.cpp)
 
   set(MLN_FFI_ANDROID_SOURCES
-      ${PROJECT_SOURCE_DIR}/src/platform/android/asset_file_source.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/file_sources.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/asset_manager.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/logging_logcat.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/thread.cpp

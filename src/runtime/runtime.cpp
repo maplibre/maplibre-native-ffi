@@ -3224,6 +3224,9 @@ auto runtime_run_loop(RuntimeObject* runtime) -> mln::util::RunLoop& {
 
 auto resource_options_for_runtime(mln_runtime runtime) -> mln::ResourceOptions {
   auto options = mln::ResourceOptions::Default();
+#if defined(__ANDROID__)
+  options.withAssetPath("/android_asset");
+#endif
   const auto* live = handle_table<RuntimeObject>().try_resolve(runtime);
   if (live == nullptr) {
     return options;
