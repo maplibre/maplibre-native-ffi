@@ -1,0 +1,93 @@
+diff --git a/src/mln/mtl/drawable.cpp b/src/mln/mtl/drawable.cpp
+index edb763b78b9..a3aee9a2ede 100644
+--- a/src/mln/mtl/drawable.cpp
++++ b/src/mln/mtl/drawable.cpp
+@@ -321,6 +321,7 @@ void Drawable::draw(PaintParameters& parameters) const {
+             }
+ 
+             context.renderingStats().numDrawCalls++;
++            context.renderingStats().totalDrawCalls++;
+         }
+     }
+ 
+diff --git a/src/mln/vulkan/drawable.cpp b/src/mln/vulkan/drawable.cpp
+index 0d8c863de58..4a5ba75ebd8 100644
+--- a/src/mln/vulkan/drawable.cpp
++++ b/src/mln/vulkan/drawable.cpp
+@@ -368,6 +368,7 @@ void Drawable::draw(PaintParameters& parameters) const {
+         }
+ 
+         context.renderingStats().numDrawCalls++;
++        context.renderingStats().totalDrawCalls++;
+     }
+ }
+ 
+diff --git a/src/mln/webgpu/context.cpp b/src/mln/webgpu/context.cpp
+index 44f1498156e..b534ded0209 100644
+--- a/src/mln/webgpu/context.cpp
++++ b/src/mln/webgpu/context.cpp
+@@ -67,6 +67,8 @@ void Context::endFrame() {
+ 
+ void Context::performCleanup() {
+     backend.getThreadPool().runRenderJobs();
++    stats.numDrawCalls = 0;
++    stats.numFrames++;
+ }
+ 
+ void Context::reduceMemoryUsage() {
+diff --git a/src/mln/webgpu/drawable.cpp b/src/mln/webgpu/drawable.cpp
+index ccf060f4f24..00a303d2d3f 100644
+--- a/src/mln/webgpu/drawable.cpp
++++ b/src/mln/webgpu/drawable.cpp
+@@ -975,6 +975,7 @@ void Drawable::draw(PaintParameters& parameters) const {
+                                              baseInstance);                                // firstInstance
+ 
+             context.renderingStats().numDrawCalls++;
++            context.renderingStats().totalDrawCalls++;
+         }
+     }
+ }
+diff --git a/src/mln/webgpu/render_pass.cpp b/src/mln/webgpu/render_pass.cpp
+index 72ad3745ca5..d6562049880 100644
+--- a/src/mln/webgpu/render_pass.cpp
++++ b/src/mln/webgpu/render_pass.cpp
+@@ -179,6 +179,7 @@ RenderPass::RenderPass(CommandEncoder& commandEncoder_, const char* name, const
+     impl->encoder = wgpuCommandEncoderBeginRenderPass(impl->commandEncoder, &renderPassDesc);
+ 
+     if (impl->encoder) {
++        context.performCleanup();
+         auto size = descriptor.renderable.getSize();
+         wgpuRenderPassEncoderSetViewport(
+             impl->encoder, 0.0f, 0.0f, static_cast<float>(size.width), static_cast<float>(size.height), 0.0f, 1.0f);
+diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
+index 383efcc7784..e909f443da0 100644
+--- a/test/map/map.test.cpp
++++ b/test/map/map.test.cpp
+@@ -2200,6 +2200,27 @@ TEST(Map, FeatureStateChangesRenderedStyle) {
+     }
+ }
+ 
++TEST(Map, RenderingStatisticsTrackDrawsAcrossFrames) {
++    MapTest<> test;
++    test.map.getStyle().loadJSON(R"({"version":8,"sources":{"points":{"type":"geojson","data":{
++        "type":"Point","coordinates":[0,0]}}},"layers":[{"id":"circle","type":"circle","source":"points"}]})");
++    const auto first = test.frontend.render(test.map).stats;
++    ASSERT_GT(first.numFrames, 0);
++    ASSERT_GT(first.numDrawCalls, 0);
++    EXPECT_GE(first.totalDrawCalls, first.numDrawCalls);
++
++    const auto second = test.frontend.render(test.map).stats;
++    EXPECT_EQ(first.numFrames + 1, second.numFrames);
++    EXPECT_GT(second.numDrawCalls, 0);
++    EXPECT_EQ(first.totalDrawCalls + second.numDrawCalls, second.totalDrawCalls);
++
++    test.map.getStyle().getLayer("circle")->setVisibility(VisibilityType::None);
++    const auto empty = test.frontend.render(test.map).stats;
++    EXPECT_EQ(second.numFrames + 1, empty.numFrames);
++    EXPECT_EQ(0, empty.numDrawCalls);
++    EXPECT_EQ(second.totalDrawCalls, empty.totalDrawCalls);
++}
++
+ TEST(Map, LocationIndicatorWithoutImages) {
+     MapTest<> test;
+     test.map.getStyle().loadJSON(R"STYLE({

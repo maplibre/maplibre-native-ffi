@@ -1,5 +1,5 @@
 diff --git a/src/mln/renderer/render_orchestrator.cpp b/src/mln/renderer/render_orchestrator.cpp
-index 48e3532a8c8..6f545d55764 100644
+index 48e3532a8c8c..6f545d55764b 100644
 --- a/src/mln/renderer/render_orchestrator.cpp
 +++ b/src/mln/renderer/render_orchestrator.cpp
 @@ -254,9 +254,9 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
@@ -16,14 +16,17 @@ index 48e3532a8c8..6f545d55764 100644
      // Remove removed images from sprite atlas.
      for (const auto& entry : imageDiff.removed) {
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 1a8a5512b95..babba1a8436 100644
+index 81bf8c6ee450..31b9f633faea 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -2368,6 +2368,63 @@ TEST_P(GeoJSONSymbolTest, RetainsIconsAndTextAcrossZoom) {
-     }
+@@ -2525,3 +2525,76 @@ TEST(Map, TileSelectionOptionsPublishUpdates) {
+     check(&Map::setTileLodZoomShift, &UpdateParameters::tileLodZoomShift, 1.0);
+     check(&Map::setTileLodMode, &UpdateParameters::tileLodMode, TileLodMode::Distance);
  }
- 
-+TEST_P(GeoJSONSymbolTest, RendersImageAddedAfterLayout) {
++
++class LateStyleImageTest : public testing::TestWithParam<std::tuple<bool, bool>> {};
++
++TEST_P(LateStyleImageTest, RendersImageAddedAfterLayout) {
 +    const auto [synchronous, withText] = GetParam();
 +    MapTest<> test;
 +    test.frontend.setSize({512, 512});
@@ -59,13 +62,16 @@ index 1a8a5512b95..babba1a8436 100644
 +    test.map.getStyle().addLayer(std::move(layer));
 +
 +    // Complete tile layout with the image missing, then add it without changing the camera or layers.
++    const Size iconSize{32, 32};
 +    const auto before = test.frontend.render(test.map).image;
-+    const size_t offset = (240 * before.size.width + 256) * 4;
-+    ASSERT_EQ(before.data[offset], 255);
-+    ASSERT_EQ(before.data[offset + 1], 255);
-+    ASSERT_EQ(before.data[offset + 2], 255);
++    const auto x = before.size.width / 2;
++    const auto y = before.size.height / 2 - iconSize.height / 2;
++    const auto* beforePixel = before.data.get() + y * before.stride() + x * before.channels;
++    ASSERT_EQ(beforePixel[0], 255);
++    ASSERT_EQ(beforePixel[1], 255);
++    ASSERT_EQ(beforePixel[2], 255);
 +
-+    PremultipliedImage icon({32, 32});
++    PremultipliedImage icon(iconSize);
 +    for (size_t i = 0; i < icon.bytes(); i += 4) {
 +        icon.data[i] = 255;
 +        icon.data[i + 1] = 0;
@@ -74,12 +80,19 @@ index 1a8a5512b95..babba1a8436 100644
 +    }
 +    test.map.getStyle().addImage(std::make_unique<style::Image>("marker", std::move(icon), 1.0f));
 +    const auto after = test.frontend.render(test.map).image;
-+    EXPECT_EQ(after.data[offset], 255);
-+    EXPECT_EQ(after.data[offset + 1], 0);
-+    EXPECT_EQ(after.data[offset + 2], 0);
-+    EXPECT_EQ(after.data[offset + 3], 255);
++    const auto* afterPixel = after.data.get() + y * after.stride() + x * after.channels;
++    EXPECT_EQ(afterPixel[0], 255);
++    EXPECT_EQ(afterPixel[1], 0);
++    EXPECT_EQ(afterPixel[2], 0);
++    EXPECT_EQ(afterPixel[3], 255);
 +}
 +
- INSTANTIATE_TEST_SUITE_P(GeoJSON,
-                          GeoJSONSymbolTest,
-                          testing::Combine(testing::Bool(), testing::Bool()),
++INSTANTIATE_TEST_SUITE_P(GeoJSON,
++                         LateStyleImageTest,
++                         testing::Combine(testing::Bool(), testing::Bool()),
++                         [](const testing::TestParamInfo<std::tuple<bool, bool>>& paramInfo) {
++                             const bool synchronous = std::get<0>(paramInfo.param);
++                             const bool withText = std::get<1>(paramInfo.param);
++                             return std::string(synchronous ? "Synchronous" : "Asynchronous") +
++                                    (withText ? "WithText" : "IconOnly");
++                         });

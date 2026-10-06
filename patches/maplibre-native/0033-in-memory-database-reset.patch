@@ -1,0 +1,86 @@
+diff --git a/platform/default/include/mln/storage/sqlite3.hpp b/platform/default/include/mln/storage/sqlite3.hpp
+index 3c815013d85..6fa28b4487e 100644
+--- a/platform/default/include/mln/storage/sqlite3.hpp
++++ b/platform/default/include/mln/storage/sqlite3.hpp
+@@ -84,6 +84,7 @@ public:
+     ~Database();
+     Database& operator=(Database&&) noexcept;
+ 
++    std::string getFilename() const;
+     void setBusyTimeout(std::chrono::milliseconds);
+     void exec(const std::string& sql);
+ 
+diff --git a/platform/default/src/mln/storage/offline_database.cpp b/platform/default/src/mln/storage/offline_database.cpp
+index 4607a475d3c..73b953e32b1 100644
+--- a/platform/default/src/mln/storage/offline_database.cpp
++++ b/platform/default/src/mln/storage/offline_database.cpp
+@@ -161,10 +161,13 @@ void OfflineDatabase::handleError(const char* action) {
+ void OfflineDatabase::removeExisting() {
+     Log::Warning(Event::Database, "Removing existing incompatible offline database");
+ 
++    const auto filename = db ? db->getFilename() : path;
+     statements.clear();
+     db.reset();
+ 
+-    util::deleteFile(path);
++    if (!filename.empty()) {
++        util::deleteFile(filename);
++    }
+ }
+ 
+ void OfflineDatabase::removeOldCacheTable() {
+diff --git a/platform/default/src/mln/storage/sqlite3.cpp b/platform/default/src/mln/storage/sqlite3.cpp
+index 2e29f0832b5..b94ccb960b3 100644
+--- a/platform/default/src/mln/storage/sqlite3.cpp
++++ b/platform/default/src/mln/storage/sqlite3.cpp
+@@ -166,6 +166,12 @@ Database& Database::operator=(Database&& other) noexcept {
+ 
+ Database::~Database() = default;
+ 
++std::string Database::getFilename() const {
++    assert(impl);
++    const auto* filename = sqlite3_db_filename(impl->db, "main");
++    return filename ? filename : "";
++}
++
+ void Database::setBusyTimeout(std::chrono::milliseconds timeout) {
+     assert(impl);
+     impl->setBusyTimeout(timeout);
+diff --git a/test/storage/offline_database.test.cpp b/test/storage/offline_database.test.cpp
+index 876c08d9299..c9be85d7183 100644
+--- a/test/storage/offline_database.test.cpp
++++ b/test/storage/offline_database.test.cpp
+@@ -7,6 +7,7 @@
+ #include <mln/storage/response.hpp>
+ #include <mln/util/io.hpp>
+ #include <mln/util/string.hpp>
++#include <mln/util/scoped.hpp>
+ 
+ #include <mln/storage/sqlite3.hpp>
+ #include <mln/util/variant.hpp>
+@@ -2043,6 +2044,25 @@ TEST(OfflineDatabase, ResetDatabase) {
+     EXPECT_EQ(0u, log.uncheckedCount());
+ }
+ 
++#ifndef WIN32 // Windows filenames cannot contain a colon.
++TEST(OfflineDatabase, ResetInMemoryDatabase) {
++    for (const auto* path : {":memory:", "file::memory:", "file::memory:?cache=shared", "file:reset-test?mode=memory"}) {
++        SCOPED_TRACE(path);
++        FixtureLog log;
++        const Scoped cleanup([path] { util::deleteFile(path); });
++        util::write_file(path, "unrelated file");
++
++        OfflineDatabase db(path, fixture::tileServerOptions);
++        EXPECT_FALSE(db.resetDatabase());
++        EXPECT_EQ("unrelated file", util::read_file(path));
++        EXPECT_EQ(
++            1u,
++            log.count({EventSeverity::Warning, Event::Database, -1, "Removing existing incompatible offline database"}));
++        EXPECT_EQ(0u, log.uncheckedCount());
++    }
++}
++#endif
++
+ TEST(OfflineDatabase, PutResourceReadOnlyMode) {
+     FixtureLog log;
+     OfflineDatabase db(":memory:", fixture::tileServerOptions);
