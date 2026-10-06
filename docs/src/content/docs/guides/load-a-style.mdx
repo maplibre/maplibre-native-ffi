@@ -33,20 +33,18 @@ style has parsed and its sources exist. A loading-failed event carries the
 failure text.
 [Handle events](/maplibre-native-ffi/guides/handle-events/) covers reading both.
 
-## Load a bundled style on Android
+## Load a local style
 
-After
-[Android platform initialization](/maplibre-native-ffi/install/#android), a
-style URL can name a file in the APK `assets/` directory.
-`asset://style.json` and `file:///android_asset/style.json` both read that file.
-Prefix the same URL with `pmtiles://` for a PMTiles archive in that directory.
-Add `pmtiles` to the app's `androidResources.noCompress` list so MapLibre can
-read byte ranges from that archive. Other `file://` URLs still read the
-filesystem, including files that the host downloaded into app storage.
+Use a `file://` URL for an explicit file path. Use `asset://style.json` to load
+`style.json` from the runtime's asset path, which you can set to any directory.
 
-Set the runtime's asset path to `/android_asset/maps` to load `asset://style.json`
-from `assets/maps/style.json`. Set it to an app-storage directory to load
-`asset://` URLs from that directory. Explicit `file://` URLs use their own paths.
+On Android, the asset path defaults to `/android_asset`. After
+[platform initialization](/maplibre-native-ffi/install/#android), both
+`asset://style.json` and `file:///android_asset/style.json` read APK
+`assets/style.json`.
+
+For APK-bundled PMTiles sources, use `pmtiles://asset://map.pmtiles`. Add `pmtiles`
+to the app's `androidResources.noCompress` list for byte-range reads.
 
 ## Replay additions after a style load
 
