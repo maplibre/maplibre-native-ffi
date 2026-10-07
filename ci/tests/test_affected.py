@@ -191,6 +191,13 @@ class AffectedGraphTest(unittest.TestCase):
             with self.subTest(path=path):
                 self.git("reset", "--hard", self.base)
                 self.assertEqual(self.roots(self.changed(path)), expected)
+        source, presets = load_configuration(ROOT)
+        docs = {"docs"}
+        self.assertEqual(
+            selected_jobs(source, presets, "baseline", "baseline", docs),
+            ["docs", "hygiene"],
+        )
+        self.assertEqual(selected_jobs(source, presets, "ready", "ready", docs), [])
         self.git("reset", "--hard", self.base)
         roots = self.roots(self.changed("gradle/libs.versions.toml"))
         self.assertTrue(

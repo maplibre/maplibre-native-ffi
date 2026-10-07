@@ -269,7 +269,7 @@ def suite(source: dict, presets: dict, group: str) -> dict:
         "steps": [
             run(
                 'jq -e -n --argjson expected "$EXPECTED" --argjson results "$RESULTS" --argjson selected "$SELECTED" '
-                "  '($expected == ($results | keys)) and ($selected | length > 0)\n"
+                "  '($expected == ($results | keys))\n"
                 "   and (($selected - $expected) | length == 0)\n"
                 "   and all($expected[]; . as $job | $results[$job].result ==\n"
                 '     (if $selected | index($job) then "success" else "skipped" end))\'\n',

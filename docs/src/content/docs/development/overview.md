@@ -235,7 +235,8 @@ packaging. Extended coverage can repeat targets covered by baseline or ready CI.
 Baseline and ready target jobs further narrow to complete jobs whose consumers
 intersect the change, using mise's affected project graph. Native and shared
 root files keep every target in that group. Explicit platform labels keep their
-requested coverage. If affected selection is unavailable, the planner keeps the
+requested coverage. A selection with no intersecting consumers verifies with
+every job skipped. If affected selection is unavailable, the planner keeps the
 complete group and reports the reason in the run summary.
 
 State changes reuse actual success, or a failure after its one retry, only for

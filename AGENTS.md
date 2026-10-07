@@ -70,7 +70,8 @@ Use persistent PR labels to add coverage to either PR tier:
 Labels combine and persist across pushes. The extended workflow combines the
 requested platforms, including the producers needed by its packaging checks.
 Baseline and ready target jobs further narrow to consumers that the change
-affects. Readiness and label changes reuse actual coverage for the same tested
+affects. A selection with no intersecting consumers verifies with every job
+skipped. Readiness and label changes reuse actual coverage for the same tested
 merge commit and coverage scope; missing evidence runs coverage again. An
 explicit workflow rerun also executes coverage again. Every job in a selected
 group must succeed.

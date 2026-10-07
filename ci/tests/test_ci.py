@@ -369,6 +369,12 @@ class CoverageTest(unittest.TestCase):
         self.assertEqual(native, selected_jobs(source, presets, "baseline", "baseline"))
         empty = selected_jobs(source, presets, "ready", "ready", set())
         self.assertEqual(empty, [])
+        docs = {"docs"}
+        self.assertEqual(
+            selected_jobs(source, presets, "baseline", "baseline", docs),
+            ["docs", "hygiene"],
+        )
+        self.assertEqual(selected_jobs(source, presets, "ready", "ready", docs), [])
 
     def test_toolchain_writers_follow_selected_runners(self):
         _, presets = load_configuration(ROOT)
@@ -516,6 +522,7 @@ class WorkflowTest(unittest.TestCase):
 
         self.assertTrue(accepts(results))
         self.assertFalse(accepts(results, []))
+        self.assertTrue(accepts({name: {"result": "skipped"} for name in expected}, []))
         self.assertFalse(accepts(results, [*selected, "unknown"]))
         for name in expected:
             for result in {"success", "failure", "skipped", "cancelled"} - {

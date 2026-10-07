@@ -1853,7 +1853,7 @@ jobs:
           RESULTS: ${{ toJSON(needs) }}
           SELECTED: ${{ inputs.jobs }}
         run: |
-          jq -e -n --argjson expected "$EXPECTED" --argjson results "$RESULTS" --argjson selected "$SELECTED"   '($expected == ($results | keys)) and ($selected | length > 0)
+          jq -e -n --argjson expected "$EXPECTED" --argjson results "$RESULTS" --argjson selected "$SELECTED"   '($expected == ($results | keys))
              and (($selected - $expected) | length == 0)
              and all($expected[]; . as $job | $results[$job].result ==
                (if $selected | index($job) then "success" else "skipped" end))'
