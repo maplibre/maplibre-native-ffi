@@ -31,6 +31,7 @@ struct Viewport: Equatable {
 final class MapState {
   private let runtime: RuntimeHandle
   private let map: MapHandle
+  private var globeEnabled = true
   private var isClosed = false
 
   init(viewport: Viewport) throws {
@@ -117,6 +118,11 @@ final class MapState {
     try runtime.wakeSource()
   }
 
+  private func selectProjection() throws {
+    let projection = globeEnabled ? #"{"type":"globe"}"# : #"{"type":"mercator"}"#
+    try map.setStyleProjectionJSON(Data(projection.utf8))
+  }
+
   /// Drains one batch of runtime events, reporting whether the map wants
   /// another frame.
   func drainEvents() throws -> Bool {
@@ -126,7 +132,7 @@ final class MapState {
       guard map.isSource(of: event) else { continue }
       switch event.type {
       case .mapStyleLoaded:
-        try map.setStyleProjectionJSON(Data(#"{"type":"globe"}"#.utf8))
+        try selectProjection()
         renderPending = true
       case .mapRenderUpdateAvailable:
         renderPending = true
@@ -145,6 +151,9 @@ final class MapState {
   /// read-modify-write commands also read the current camera.
   func apply(_ command: CameraCommand) throws {
     switch command {
+    case .toggleProjection:
+      globeEnabled.toggle()
+      try selectProjection()
     case .cancelTransitions:
       try map.cancelTransitions()
     case let .setGestureInProgress(inProgress):

@@ -224,6 +224,12 @@ static input_result handle_key_down(
 
   camera_command command;
   switch (key->scancode) {
+    case SDL_SCANCODE_G:
+      if (key->repeat) {
+        return (input_result){.handled = true};
+      }
+      command = (camera_command){.kind = CAMERA_COMMAND_TOGGLE_PROJECTION};
+      break;
     case SDL_SCANCODE_LEFT:
     case SDL_SCANCODE_A:
       command = pan_animated(pan_step, 0);
@@ -309,5 +315,6 @@ void input_log_controls(void) {
     "  Q / E: rotate\n"
     "  ] / [: pitch\n"
     "  0: reset pitch and bearing\n"
+    "  G: toggle globe/Mercator\n"
   );
 }

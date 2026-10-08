@@ -4,10 +4,11 @@
 const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
-/// A camera change decoded on the render loop and applied on the map's owner
+/// A map change decoded on the render loop and applied on the map's owner
 /// thread. Commands carry deltas rather than absolute targets, because reading
 /// the camera and writing the new one has to happen together on that thread.
 pub const CameraCommand = union(enum) {
+    toggle_projection,
     cancel_transitions,
     set_gesture_in_progress: struct { in_progress: bool },
     move_by: struct { dx: f64, dy: f64 },

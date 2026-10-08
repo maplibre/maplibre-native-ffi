@@ -92,6 +92,7 @@ fn pump(
 }
 
 struct MapState {
+    globe_enabled: bool,
     runtime: RuntimeHandle,
     map: MapHandle,
 }
@@ -133,12 +134,16 @@ impl MapState {
                 Some(runtime),
             ));
         }
-        Ok(Self { runtime, map })
+        Ok(Self {
+            runtime,
+            map,
+            globe_enabled: true,
+        })
     }
 
     /// Applies every queued camera command on the map's owner thread.
     fn apply_commands(
-        &self,
+        &mut self,
         commands: &Receiver<CameraCommand>,
     ) -> maplibre_native_ffi::Result<()> {
         for command in commands.try_iter() {
@@ -149,9 +154,13 @@ impl MapState {
 
     /// Applies one decoded camera command on the map's owner thread, where
     /// read-modify-write commands also read the current camera.
-    fn apply(&self, command: CameraCommand) -> maplibre_native_ffi::Result<()> {
+    fn apply(&mut self, command: CameraCommand) -> maplibre_native_ffi::Result<()> {
         let map = &self.map;
         match command {
+            CameraCommand::ToggleProjection => {
+                self.globe_enabled = !self.globe_enabled;
+                select_projection(&self.map, self.globe_enabled)
+            }
             CameraCommand::CancelTransitions => map.cancel_transitions(),
             CameraCommand::SetGestureInProgress { in_progress } => {
                 map.set_gesture_in_progress(in_progress)
@@ -209,7 +218,7 @@ impl MapState {
             }
             match event.event_type() {
                 RuntimeEventType::MapStyleLoaded => {
-                    self.map.set_style_projection_json(br#"{"type":"globe"}"#)?;
+                    select_projection(&self.map, self.globe_enabled)?;
                     render_update_available = true;
                 }
                 RuntimeEventType::MapRenderUpdateAvailable => render_update_available = true,
@@ -238,6 +247,14 @@ impl MapState {
             None => Ok(()),
         }
     }
+}
+
+fn select_projection(map: &MapHandle, globe_enabled: bool) -> maplibre_native_ffi::Result<()> {
+    map.set_style_projection_json(if globe_enabled {
+        br#"{"type":"globe"}"#
+    } else {
+        br#"{"type":"mercator"}"#
+    })
 }
 
 fn configure_map(map: &MapHandle) -> maplibre_native_ffi::Result<()> {

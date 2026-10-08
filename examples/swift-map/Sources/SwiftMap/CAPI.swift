@@ -33,6 +33,7 @@ func logControls() {
       Q / E: rotate
       ] / [: pitch
       0: reset pitch and bearing
+      G: toggle globe/Mercator
 
     """
   )

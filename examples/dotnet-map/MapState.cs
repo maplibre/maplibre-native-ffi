@@ -13,6 +13,7 @@ internal sealed class MapState : IDisposable
     private const double MaximumPitch = 60.0;
 
     private readonly RuntimeHandle runtime;
+    private bool globeEnabled = true;
     private bool closed;
 
     private MapState(RuntimeHandle runtime, MapHandle map)
@@ -103,6 +104,15 @@ internal sealed class MapState : IDisposable
         }
     }
 
+    private void SelectProjection()
+    {
+        Map.SetStyleProjectionJson(
+            globeEnabled
+                ? """{"type":"globe"}"""u8.ToArray()
+                : """{"type":"mercator"}"""u8.ToArray()
+        );
+    }
+
     private bool DrainEvents()
     {
         var renderUpdateAvailable = false;
@@ -116,7 +126,7 @@ internal sealed class MapState : IDisposable
 
             if (runtimeEvent.Type == RuntimeEventType.MapStyleLoaded)
             {
-                Map.SetStyleProjectionJson("""{"type":"globe"}"""u8.ToArray());
+                SelectProjection();
                 renderUpdateAvailable = true;
             }
 
@@ -180,6 +190,10 @@ internal sealed class MapState : IDisposable
                     },
                     pitch.Animation
                 );
+                break;
+            case ToggleProjectionCommand:
+                globeEnabled = !globeEnabled;
+                SelectProjection();
                 break;
             case ResetOrientationCommand reset:
                 Map.EaseTo(new CameraOptions { Bearing = 0.0, Pitch = 0.0 }, reset.Animation);

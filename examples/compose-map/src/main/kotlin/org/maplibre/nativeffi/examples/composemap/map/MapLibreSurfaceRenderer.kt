@@ -148,6 +148,10 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     enqueue(CameraCommand.AdjustPitchAnimated(deltaDegrees))
   }
 
+  fun toggleProjection() {
+    enqueue(CameraCommand.ToggleProjection)
+  }
+
   fun resetPitchAndBearing() {
     enqueue(CameraCommand.ResetOrientation)
   }

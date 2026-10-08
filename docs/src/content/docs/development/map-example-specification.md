@@ -824,6 +824,7 @@ Controls:
   Q / E: rotate
   ] / [: pitch
   0: reset pitch and bearing
+  G: toggle globe/Mercator
 ```
 
 #### Behavioral constants
@@ -839,6 +840,7 @@ Controls:
 | `]`                           | Pitch +`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                     |
 | `[`                           | Pitch −`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                     |
 | `0`                           | Animate bearing and pitch to `0` with keyboard animation.                                                                                                                              |
+| `G`                           | Toggle between the globe preset and Mercator, preserving camera state and the selection across style loads.                                                                            |
 
 Keyboard animated moves SHOULD use ~`160` ms duration. Pointer drags use
 immediate `move_by` / `jump_to` / `pitch_by`.
@@ -849,7 +851,7 @@ when the drag ends, and hold it for the whole drag when a second button goes
 down and up during one. Keyboard interactions are discrete commands and leave
 the state clear.
 
-Input handlers return whether the camera changed so the render loop can set the
+Input handlers return whether the map changed so the render loop can set the
 render request.
 
 ### Resize triggers
@@ -939,7 +941,7 @@ concurrently share one state, so a gesture ending while another is still live
 leaves it set, and the last one to end clears it. Double-tap is a discrete
 animated command and leaves the state clear.
 
-Input handlers return whether the camera changed so the render loop can set the
+Input handlers return whether the map changed so the render loop can set the
 render request.
 
 ### Resize triggers

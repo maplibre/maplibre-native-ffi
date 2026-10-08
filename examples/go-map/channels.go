@@ -24,6 +24,7 @@ type cameraCommandKind int
 
 const (
 	commandCancelTransitions cameraCommandKind = iota
+	commandToggleProjection
 	commandSetGestureInProgress
 	commandMoveBy
 	commandMoveByAnimated

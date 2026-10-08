@@ -65,6 +65,7 @@ internal sealed unsafe class InputController : IDisposable
               Q / E: rotate
               ] / [: pitch
               0: reset pitch and bearing
+              G: toggle globe/Mercator
             """
         );
     }
@@ -177,6 +178,13 @@ internal sealed unsafe class InputController : IDisposable
         var changed = true;
         switch (key)
         {
+            case Keys.G:
+                if (action == InputAction.Repeat)
+                {
+                    return;
+                }
+                commands.Push(new ToggleProjectionCommand());
+                break;
             case Keys.Left:
             case Keys.A:
                 commands.Push(new MoveByCommand(KeyboardPan, 0.0, KeyboardAnimation));

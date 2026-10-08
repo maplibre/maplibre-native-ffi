@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "map_state.h"
 
 #include "diagnostics.h"
@@ -38,10 +40,26 @@ static mln_animation_options animation(double duration_ms) {
   return options;
 }
 
+static app_error select_projection(map_state* state) {
+  const char* projection =
+    state->globe_enabled ? "{\"type\":\"globe\"}" : "{\"type\":\"mercator\"}";
+  const mln_buffer_view json = {.data = projection, .size = strlen(projection)};
+  return expect_camera_status(
+    mln_map_set_style_projection_json(state->map, json),
+    "projection selection failed"
+  );
+}
+
 /// Applies one decoded camera command. Runs on the map's owner thread, so the
 /// read-modify-write commands read the current camera here.
-static app_error apply_camera_command(mln_map map, camera_command command) {
+static app_error apply_camera_command(
+  map_state* state, camera_command command
+) {
+  const mln_map map = state->map;
   switch (command.kind) {
+    case CAMERA_COMMAND_TOGGLE_PROJECTION:
+      state->globe_enabled = !state->globe_enabled;
+      return select_projection(state);
     case CAMERA_COMMAND_CANCEL_TRANSITIONS:
       return expect_camera_status(
         mln_map_cancel_transitions(map), "cancel camera transitions failed"
@@ -193,6 +211,7 @@ app_error map_state_init(map_state* out_state, viewport initial_viewport) {
   *out_state = (map_state){
     .runtime = MLN_HANDLE_NULL,
     .map = MLN_HANDLE_NULL,
+    .globe_enabled = true,
   };
 
   mln_runtime_options runtime_options = mln_runtime_options_default();
@@ -246,7 +265,7 @@ app_error map_state_apply_commands(
 ) {
   command_queue_drain_into(commands, batch);
   for (size_t i = 0; i < batch->len; i += 1) {
-    const app_error error = apply_camera_command(state->map, batch->items[i]);
+    const app_error error = apply_camera_command(state, batch->items[i]);
     if (error != APP_OK) {
       return error;
     }
@@ -276,16 +295,7 @@ app_error map_state_drain_events(map_state* state, bool* out_render_update) {
     }
     switch (event->type) {
       case MLN_RUNTIME_EVENT_MAP_STYLE_LOADED: {
-        static const char projection[] = "{\"type\":\"globe\"}";
-        const mln_buffer_view json = {
-          .data = projection, .size = sizeof(projection) - 1
-        };
-        const mln_status projection_status =
-          mln_map_set_style_projection_json(state->map, json);
-        if (projection_status != MLN_STATUS_OK) {
-          diagnostics_log_status("globe selection failed", projection_status);
-          return APP_ERROR_STYLE_LOAD_FAILED;
-        }
+        MAP_TRY(select_projection(state));
         *out_render_update = true;
         break;
       }

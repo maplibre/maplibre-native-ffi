@@ -9,12 +9,14 @@ import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.runtime.WakeSource
 
 /**
- * A camera change decoded on the render loop and applied on the map's thread.
+ * A map change decoded on the render loop and applied on the map's thread.
  *
  * Commands carry deltas rather than absolute targets, because reading the camera and writing the
  * new one has to happen together on the thread that owns the map.
  */
 internal sealed interface CameraCommand {
+  data object ToggleProjection : CameraCommand
+
   data object CancelTransitions : CameraCommand
 
   data class SetGestureInProgress(val inProgress: Boolean) : CameraCommand

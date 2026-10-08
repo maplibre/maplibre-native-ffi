@@ -51,6 +51,8 @@ internal class MapRuntimeLoop(
 
   @Volatile private var wake: WakeSource? = null
 
+  private var globeEnabled = true
+
   private val thread = Thread({ run() }, "compose-map-runtime").apply { isDaemon = true }
 
   init {
@@ -150,6 +152,10 @@ internal class MapRuntimeLoop(
    */
   private fun apply(map: MapHandle, command: CameraCommand) {
     when (command) {
+      CameraCommand.ToggleProjection -> {
+        globeEnabled = !globeEnabled
+        selectProjection(map)
+      }
       CameraCommand.CancelTransitions -> map.cancelTransitions()
       is CameraCommand.SetGestureInProgress -> map.isGestureInProgress = command.inProgress
       is CameraCommand.MoveBy -> map.moveBy(command.deltaX, command.deltaY)
@@ -190,6 +196,11 @@ internal class MapRuntimeLoop(
     }
   }
 
+  private fun selectProjection(map: MapHandle) {
+    val projection = if (globeEnabled) """{"type":"globe"}""" else """{"type":"mercator"}"""
+    map.setStyleProjectionJson(projection.encodeToByteArray())
+  }
+
   /** Drains one batch of runtime events, reporting whether the map wants another frame. */
   private fun drainEvents(runtime: RuntimeHandle, map: MapHandle): Boolean {
     var renderUpdateAvailable = false
@@ -199,7 +210,7 @@ internal class MapRuntimeLoop(
         continue
       }
       if (event.type == RuntimeEventType.MAP_STYLE_LOADED) {
-        map.setStyleProjectionJson("""{"type":"globe"}""".encodeToByteArray())
+        selectProjection(map)
         renderUpdateAvailable = true
       } else if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
         renderUpdateAvailable = true

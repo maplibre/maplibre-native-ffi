@@ -140,6 +140,10 @@ private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer, scaleFactor:
 
 private fun Modifier.mapKeyboard(renderer: MapLibreSurfaceRenderer): Modifier =
   onPreviewKeyEvent { event ->
+    if (event.key == Key.G) {
+      if (event.type == KeyEventType.KeyUp) renderer.toggleProjection()
+      return@onPreviewKeyEvent true
+    }
     if (event.type != KeyEventType.KeyDown) {
       return@onPreviewKeyEvent false
     }

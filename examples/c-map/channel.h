@@ -12,6 +12,7 @@
 #include "types.h"
 
 typedef enum camera_command_kind : uint8_t {
+  CAMERA_COMMAND_TOGGLE_PROJECTION,
   CAMERA_COMMAND_CANCEL_TRANSITIONS,
   CAMERA_COMMAND_SET_GESTURE_IN_PROGRESS,
   CAMERA_COMMAND_MOVE_BY,
@@ -25,7 +26,7 @@ typedef enum camera_command_kind : uint8_t {
   CAMERA_COMMAND_RESET_ORIENTATION,
 } camera_command_kind;
 
-/// A camera change decoded on the render loop and applied on the map's owner
+/// A map change decoded on the render loop and applied on the map's owner
 /// thread. Commands carry deltas rather than absolute targets, because reading
 /// the camera and writing the new one has to happen together on that thread.
 typedef struct camera_command {

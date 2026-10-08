@@ -7,6 +7,7 @@ import org.lwjgl.glfw.GLFW.GLFW_KEY_D
 import org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN
 import org.lwjgl.glfw.GLFW.GLFW_KEY_E
 import org.lwjgl.glfw.GLFW.GLFW_KEY_EQUAL
+import org.lwjgl.glfw.GLFW.GLFW_KEY_G
 import org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT
 import org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_BRACKET
 import org.lwjgl.glfw.GLFW.GLFW_KEY_MINUS
@@ -113,6 +114,11 @@ internal class InputController(
     }
     val command =
       when (key) {
+        GLFW_KEY_G -> {
+          if (action == GLFW_REPEAT) return
+          CameraCommand.ToggleProjection
+        }
+
         GLFW_KEY_LEFT,
         GLFW_KEY_A -> CameraCommand.MoveByAnimated(KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION_MS)
 
@@ -185,6 +191,7 @@ internal class InputController(
       println("  Q / E: rotate")
       println("  ] / [: pitch")
       println("  0: reset pitch and bearing")
+      println("  G: toggle globe/Mercator")
     }
   }
 }

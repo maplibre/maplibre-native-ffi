@@ -7,6 +7,7 @@ const types = @import("types.zig");
 
 /// Runtime and map, owned for their whole lifetime by the runtime loop thread.
 pub const MapState = struct {
+    globe_enabled: bool = true,
     allocator: std.mem.Allocator,
     diagnostic_store: *maplibre.DiagnosticStore,
     runtime: maplibre.RuntimeHandle,
@@ -65,19 +66,28 @@ pub const MapState = struct {
     ) !void {
         commands.drainInto(batch);
         for (batch.items) |command| {
-            try applyCameraCommand(&self.map, command, self.diagnostic_store);
+            try applyCameraCommand(self, command);
         }
     }
 };
 
+fn selectProjection(state: *MapState) !void {
+    try state.map.setStyleProjectionJson(state.allocator, if (state.globe_enabled) "{\"type\":\"globe\"}" else "{\"type\":\"mercator\"}");
+}
+
 /// Applies one decoded camera command. Runs on the map's owner thread, so the
 /// read-modify-write commands read the current camera here.
 pub fn applyCameraCommand(
-    map: *maplibre.MapHandle,
+    state: *MapState,
     command: channel.CameraCommand,
-    diagnostic_store: *const maplibre.DiagnosticStore,
 ) !void {
+    const map = &state.map;
+    const diagnostic_store = state.diagnostic_store;
     switch (command) {
+        .toggle_projection => {
+            state.globe_enabled = !state.globe_enabled;
+            try selectProjection(state);
+        },
         .cancel_transitions => try expectCameraStatus(
             map.cancelTransitions(),
             "cancel camera transitions failed",
@@ -153,11 +163,10 @@ pub fn applyCameraCommand(
 
 /// Drains one batch of runtime events, reporting whether the map wants another
 /// frame.
-pub fn drainEvents(
-    allocator: std.mem.Allocator,
-    runtime: *maplibre.RuntimeHandle,
-    map: *maplibre.MapHandle,
-) !bool {
+pub fn drainEvents(state: *MapState) !bool {
+    const allocator = state.allocator;
+    const runtime = &state.runtime;
+    const map = &state.map;
     const map_id = try map.id();
     var render_update_available = false;
     var batch = try runtime.drainEvents(allocator, 0);
@@ -167,7 +176,7 @@ pub fn drainEvents(
         if (event.source_type != .map or event.source_id == null or !std.meta.eql(event.source_id.?, map_id)) continue;
         switch (event.event_type) {
             .map_style_loaded => {
-                try map.setStyleProjectionJson(allocator, "{\"type\":\"globe\"}");
+                try selectProjection(state);
                 render_update_available = true;
             },
             .map_render_update_available => render_update_available = true,

@@ -23,6 +23,8 @@ import org.maplibre.nativeffi.runtime.WakeSource
 internal class MapState
 private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : AutoCloseable {
 
+  private var globeEnabled = true
+
   /** Acquires the wake source the render loop uses to release this loop's parked pump. */
   fun acquireWakeSource(): WakeSource = runtime.acquireWakeSource()
 
@@ -48,6 +50,10 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
    */
   private fun apply(command: CameraCommand) {
     when (command) {
+      CameraCommand.ToggleProjection -> {
+        globeEnabled = !globeEnabled
+        selectProjection()
+      }
       is CameraCommand.CancelTransitions -> map.cancelTransitions()
       is CameraCommand.SetGestureInProgress -> map.isGestureInProgress = command.inProgress
       is CameraCommand.MoveBy -> map.moveBy(command.dx, command.dy)
@@ -77,6 +83,11 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
     }
   }
 
+  private fun selectProjection() {
+    val projection = if (globeEnabled) """{"type":"globe"}""" else """{"type":"mercator"}"""
+    map.setStyleProjectionJson(projection.encodeToByteArray())
+  }
+
   private fun bearingCamera(delta: Double): CameraOptions =
     CameraOptions().apply { bearing = (map.camera.bearing ?: 0.0) + delta }
 
@@ -92,7 +103,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
         continue
       }
       if (event.type == RuntimeEventType.MAP_STYLE_LOADED) {
-        map.setStyleProjectionJson("""{"type":"globe"}""".encodeToByteArray())
+        selectProjection()
         renderUpdateAvailable = true
       } else if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
         renderUpdateAvailable = true
