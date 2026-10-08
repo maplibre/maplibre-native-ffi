@@ -1039,6 +1039,44 @@ pub const MapHandle = enum(c.mln_map) {
         return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
     }
 
+    pub fn setStyleProjectionJson(self: *MapHandle, allocator: std.mem.Allocator, value: []const u8) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_style_projection_json(try native(self), try temp.stringView(value)),
+            diagnosticStore(self),
+        );
+    }
+
+    pub fn setStyleProjectionProperty(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        property_name: []const u8,
+        value: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_style_projection_property(try native(self), try temp.stringView(property_name), try temp.stringView(value)),
+            diagnosticStore(self),
+        );
+    }
+
+    pub fn getStyleProjectionProperty(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        property_name: []const u8,
+    ) status.Error!?values.OwnedString {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var buffer: c.mln_buffer = 0;
+        try status.checkStatus(
+            c.mln_map_get_style_projection_property(try native(self), try temp.stringView(property_name), &buffer),
+            diagnosticStore(self),
+        );
+        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
+    }
+
     /// Sets the style's global transition options, replacing the whole
     /// configuration: absent duration and delay clear the style-wide override.
     /// Loading a style replaces these options, so apply an override afterwards.
@@ -1991,6 +2029,16 @@ pub const MapHandle = enum(c.mln_map) {
         var mode = c.mln_projection_mode_default();
         try status.checkStatus(c.mln_map_get_projection_mode(try native(self), &mode), diagnosticStore(self));
         return values.projectionModeFromNative(mode);
+    }
+
+    /// Reports whether the globe hides a location from the current camera.
+    pub fn isLocationOccluded(self: *MapHandle, coordinate: values.LatLng) status.Error!bool {
+        var occluded: bool = false;
+        try status.checkStatus(
+            c.mln_map_is_location_occluded(try native(self), values.latLngToNative(coordinate), &occluded),
+            diagnosticStore(self),
+        );
+        return occluded;
     }
 
     pub fn pixelForLatLng(self: *MapHandle, coordinate: values.LatLng) status.Error!values.ScreenPoint {

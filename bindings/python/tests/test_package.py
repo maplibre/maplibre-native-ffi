@@ -4625,3 +4625,32 @@ def test_global_state_defaults_updates_and_style_replacement() -> None:
         map_handle.set_global_state_property("theme", b"true")
         map_handle.set_global_state_property("theme", b"null")
         assert json.loads(map_handle.get_global_state()) == {"theme": None}
+
+
+def test_runtime_projection_controls_occlusion_and_resets_with_the_style() -> None:
+    front, back = geo.LatLng(0.0, 0.0), geo.LatLng(0.0, 180.0)
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map(mln.MapOptions(width=512, height=512)) as map_handle,
+    ):
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        map_handle.set_style_projection_json(b'{"type":"globe"}')
+        snapshot = map_handle.get_style_projection_property("type")
+        assert snapshot is not None
+        map_handle.jump_to(camera.CameraOptions(center=front, zoom=0.0))
+        assert not map_handle.is_location_occluded(front)
+        assert map_handle.is_location_occluded(back)
+        map_handle.set_style_projection_property(
+            "type",
+            b'["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]',
+        )
+        map_handle.jump_to(camera.CameraOptions(zoom=4.0))
+        assert not map_handle.is_location_occluded(back)
+        map_handle.jump_to(camera.CameraOptions(zoom=0.0))
+        assert map_handle.is_location_occluded(back)
+        map_handle.set_style_projection_json(b"{}")
+        assert not map_handle.is_location_occluded(back)
+        map_handle.set_style_projection_json(b'{"type":"globe"}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        assert not map_handle.is_location_occluded(back)
+    assert json.loads(snapshot) == "globe"

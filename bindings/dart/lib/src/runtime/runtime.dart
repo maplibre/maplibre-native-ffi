@@ -2395,6 +2395,21 @@ final class MapHandle {
     });
   }
 
+  /// Reports whether the globe hides a location from the current camera.
+  bool isLocationOccluded(LatLng coordinate) {
+    return withNativeArena((arena) {
+      final outOccluded = arena<Bool>();
+      _check(
+        raw.mln_map_is_location_occluded(
+          _handle.raw,
+          native_struct.latLngToNative(coordinate),
+          outOccluded,
+        ),
+      );
+      return outOccluded.value;
+    });
+  }
+
   /// Converts a geographic world coordinate to a screen point.
   ScreenPoint pixelForLatLng(LatLng coordinate) {
     return withNativeArena((arena) {
@@ -3596,6 +3611,52 @@ final class MapHandle {
       outValue.value = 0;
       _check(
         raw.mln_map_get_style_light_property(
+          _handle.raw,
+          nativePropertyName.value,
+          outValue,
+        ),
+      );
+      final buffer = NativeOwnedBufferHandle(outValue.value);
+      return buffer.isNull ? null : copyOwnedBuffer(buffer);
+    });
+  }
+
+  /// Sets the style projection from a style-spec projection JSON object.
+  void setStyleProjectionJson(Uint8List projectionJson) {
+    withNativeArena((arena) {
+      final nativeProjectionJson = nativeBufferView(projectionJson, arena);
+      _check(
+        raw.mln_map_set_style_projection_json(
+          _handle.raw,
+          nativeProjectionJson,
+        ),
+      );
+    });
+  }
+
+  /// Sets one style projection property by style-spec property name.
+  void setStyleProjectionProperty(String propertyName, Uint8List value) {
+    withNativeArena((arena) {
+      final nativePropertyName = nativeStringView(propertyName, arena);
+      final nativeValue = nativeBufferView(value, arena);
+      _check(
+        raw.mln_map_set_style_projection_property(
+          _handle.raw,
+          nativePropertyName.value,
+          nativeValue,
+        ),
+      );
+    });
+  }
+
+  /// Copies one style projection property, or null when the property is undefined.
+  Uint8List? getStyleProjectionProperty(String propertyName) {
+    return withNativeArena((arena) {
+      final nativePropertyName = nativeStringView(propertyName, arena);
+      final outValue = arena<Uint64>();
+      outValue.value = 0;
+      _check(
+        raw.mln_map_get_style_projection_property(
           _handle.raw,
           nativePropertyName.value,
           outValue,

@@ -40,9 +40,10 @@
 #include <mln/renderer/update_parameters.hpp>
 #include <mln/style/conversion.hpp>
 #include <mln/style/conversion/json.hpp>
-#include <mln/style/conversion/layer.hpp>   // IWYU pragma: keep
-#include <mln/style/conversion/light.hpp>   // IWYU pragma: keep
-#include <mln/style/conversion/source.hpp>  // IWYU pragma: keep
+#include <mln/style/conversion/layer.hpp>       // IWYU pragma: keep
+#include <mln/style/conversion/light.hpp>       // IWYU pragma: keep
+#include <mln/style/conversion/projection.hpp>  // IWYU pragma: keep
+#include <mln/style/conversion/source.hpp>      // IWYU pragma: keep
 #include <mln/style/conversion_impl.hpp>
 #include <mln/style/image.hpp>
 #include <mln/style/layer.hpp>
@@ -50,6 +51,7 @@
 #include <mln/style/layers/hillshade_layer.hpp>
 #include <mln/style/layers/location_indicator_layer.hpp>
 #include <mln/style/light.hpp>
+#include <mln/style/projection.hpp>
 #include <mln/style/rapidjson_conversion.hpp>
 #include <mln/style/source.hpp>
 #include <mln/style/sources/custom_geometry_source.hpp>
@@ -6736,6 +6738,107 @@ auto map_get_style_light_property(
   return create_buffer(serialize_json_value(property.getValue()), out_value);
 }
 
+auto map_set_style_projection_json(mln_map map, mln_buffer_view projection_json)
+  -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (!validate_bytes(projection_json, "style projection")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto error = mln::style::conversion::Error{};
+  auto projection = mln::style::conversion::convertJSON<mln::style::Projection>(
+    string_from_view(projection_json), error
+  );
+  if (!projection) {
+    set_style_conversion_error("style projection", error);
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  live->map->getStyle().setProjection(
+    std::make_unique<mln::style::Projection>(*projection)
+  );
+  return MLN_STATUS_OK;
+}
+
+auto map_set_style_projection_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (!validate_string_view(property_name, "property_name")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (property_name.size == 0) {
+    set_thread_error("property_name must not be empty");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto document = mln::JSDocument{};
+  if (!parse_json_document(value, "style projection property", document)) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto* projection = live->map->getStyle().getProjection();
+  if (projection == nullptr) {
+    set_thread_error("style projection does not exist");
+    return MLN_STATUS_INVALID_STATE;
+  }
+
+  auto error = projection->setProperty(
+    string_from_view(property_name),
+    mln::style::conversion::Convertible{
+      static_cast<const mln::JSValue*>(&document)
+    }
+  );
+  if (error) {
+    set_style_conversion_error("style projection property", *error);
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto map_get_style_projection_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer* out_value
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (!validate_string_view(property_name, "property_name")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (property_name.size == 0) {
+    set_thread_error("property_name must not be empty");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
+    set_thread_error(
+      "out_value must not be null and *out_value must be the null handle"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto* projection = live->map->getStyle().getProjection();
+  if (projection == nullptr) {
+    set_thread_error("style projection does not exist");
+    return MLN_STATUS_INVALID_STATE;
+  }
+
+  const auto property =
+    projection->getProperty(string_from_view(property_name));
+  if (property.getKind() == mln::style::StyleProperty::Kind::Undefined) {
+    return MLN_STATUS_OK;
+  }
+  return create_buffer(serialize_json_value(property.getValue()), out_value);
+}
+
 auto map_set_style_transition_options(
   mln_map map, const mln_style_transition_options* options
 ) -> mln_status {
@@ -7560,6 +7663,26 @@ auto map_set_tile_options(mln_map map, const mln_map_tile_options* options)
   if ((options->fields & MLN_MAP_TILE_OPTION_LOD_MODE) != 0U) {
     live->map->setTileLodMode(to_native_tile_lod_mode(options->lod_mode));
   }
+  return MLN_STATUS_OK;
+}
+
+auto map_is_location_occluded(
+  mln_map map, mln_lat_lng coordinate, bool* out_occluded
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (out_occluded == nullptr) {
+    set_thread_error("out_occluded must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto coordinate_status = validate_lat_lng(coordinate);
+  if (coordinate_status != MLN_STATUS_OK) {
+    return coordinate_status;
+  }
+  *out_occluded = live->map->isLocationOccluded(to_native_lat_lng(coordinate));
   return MLN_STATUS_OK;
 }
 

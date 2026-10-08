@@ -567,6 +567,22 @@ enum NativeStyle {
     return buffer.isNull ? nil : try NativeMemory.copyBuffer(buffer)
   }
 
+  static func projectionProperty(
+    _ map: NativeMapHandle,
+    propertyName: mln_buffer_view
+  ) throws -> Data? {
+    let snapshotValue = try NativeMemory
+      .withTemporary(UInt64(0)) { outHandle in
+        try checkStatus(mln_map_get_style_projection_property(
+          map.raw,
+          propertyName,
+          outHandle
+        ))
+      }.value
+    let buffer = NativeBufferHandle(raw: snapshotValue)
+    return buffer.isNull ? nil : try NativeMemory.copyBuffer(buffer)
+  }
+
   static func layerProperty(
     _ map: NativeMapHandle,
     layerId: mln_buffer_view,

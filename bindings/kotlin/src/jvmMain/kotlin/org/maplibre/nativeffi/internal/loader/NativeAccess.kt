@@ -1438,6 +1438,35 @@ internal object NativeAccess {
       ownedBuffer(NativeOwnedBuffer(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))
     }
 
+  internal fun setStyleProjectionJson(map: NativeMap, projectionJson: ByteArray) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_set_style_projection_json")
+          .invokeNative(map, byteArrayView(arena, projectionJson)) as Int
+      )
+    }
+  }
+
+  internal fun setStyleProjectionProperty(map: NativeMap, propertyName: String, value: ByteArray) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_set_style_projection_property")
+          .invokeNative(map, stringView(arena, propertyName), byteArrayView(arena, value)) as Int
+      )
+    }
+  }
+
+  internal fun styleProjectionProperty(map: NativeMap, propertyName: String): ByteArray? =
+    Arena.ofConfined().use { arena ->
+      val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
+      outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_get_style_projection_property")
+          .invokeNative(map, stringView(arena, propertyName), outSnapshot) as Int
+      )
+      ownedBuffer(NativeOwnedBuffer(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))
+    }
+
   internal fun setStyleTransitionOptions(map: NativeMap, options: StyleTransitionOptions) {
     Arena.ofConfined().use { arena ->
       Status.check(
@@ -2093,6 +2122,16 @@ internal object NativeAccess {
       )
     }
   }
+
+  internal fun isLocationOccluded(map: NativeMap, coordinate: LatLng): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outOccluded = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapLatLngAddressStatusFunction("mln_map_is_location_occluded")
+          .invokeNative(map, latLng(coordinate, arena), outOccluded) as Int
+      )
+      outOccluded.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
 
   internal fun pixelForLatLng(map: NativeMap, coordinate: LatLng): ScreenPoint =
     Arena.ofConfined().use { arena ->

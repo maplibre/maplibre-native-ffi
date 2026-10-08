@@ -22,6 +22,10 @@ public final class AndroidNativeBridge {
   public static native @Cast("mln_status") int projectionGetCamera(
       @Cast("mln_map_projection") long projection, double[] out);
 
+  @Name("mln_android_map_is_location_occluded")
+  public static native @Cast("mln_status") int mapIsLocationOccluded(
+      @Cast("mln_map") long map, double latitude, double longitude, @Cast("bool*") boolean[] out);
+
   @Name("mln_android_map_pixel_for_lat_lng")
   public static native @Cast("mln_status") int mapPixelForLatLng(
       @Cast("mln_map") long map, double latitude, double longitude, double[] out);

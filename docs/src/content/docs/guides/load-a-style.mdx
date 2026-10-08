@@ -56,4 +56,10 @@ A host adds its own data after the style-loaded event and repeats those changes
 after every later style load. A host that switches base maps keeps the changes
 that it needs to replay.
 
+To render a globe, select the globe projection after the style loads. The globe
+preset transitions to Mercator between zoom 11 and 12. Repeat the override
+after each later style load.
+
+<Code code={region(loadStyle, "globe")} lang="c" title="load-style.c" />
+
 Camera state survives a style load unchanged.

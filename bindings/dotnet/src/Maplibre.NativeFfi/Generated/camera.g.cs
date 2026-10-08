@@ -137,6 +137,9 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_set_projection_mode([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_projection_mode *")] mln_projection_mode* mode);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_is_location_occluded([NativeTypeName("mln_map")] MlnMap map, mln_lat_lng coordinate, bool* out_occluded);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_pixel_for_lat_lng([NativeTypeName("mln_map")] MlnMap map, mln_lat_lng coordinate, mln_screen_point* out_point);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

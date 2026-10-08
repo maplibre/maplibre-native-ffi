@@ -1706,3 +1706,45 @@ fn coordinate_projection_follows_the_camera_world_copy_after_anchored_moves() {
     map.close().unwrap();
     runtime.close().unwrap();
 }
+
+#[test]
+fn runtime_projection_controls_occlusion_and_resets_with_the_style() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+    let front = LatLng::new(0.0, 0.0);
+    let back = LatLng::new(0.0, 180.0);
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    map.set_style_projection_json(br#"{"type":"globe"}"#)
+        .unwrap();
+    let snapshot = map.style_projection_property("type").unwrap().unwrap();
+    let mut camera = CameraOptions::default();
+    camera.center = Some(front);
+    camera.zoom = Some(0.0);
+    map.jump_to(&camera).unwrap();
+    assert!(!map.is_location_occluded(front).unwrap());
+    assert!(map.is_location_occluded(back).unwrap());
+    map.set_style_projection_property(
+        "type",
+        br#"["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]"#,
+    )
+    .unwrap();
+    camera.zoom = Some(4.0);
+    map.jump_to(&camera).unwrap();
+    assert!(!map.is_location_occluded(back).unwrap());
+    camera.zoom = Some(0.0);
+    map.jump_to(&camera).unwrap();
+    assert!(map.is_location_occluded(back).unwrap());
+    map.set_style_projection_json(b"{}").unwrap();
+    assert!(!map.is_location_occluded(back).unwrap());
+    map.set_style_projection_json(br#"{"type":"globe"}"#)
+        .unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    assert!(!map.is_location_occluded(back).unwrap());
+    map.close().unwrap();
+    runtime.close().unwrap();
+    assert_eq!(
+        serde_json::from_slice::<JsonValue>(&snapshot).unwrap(),
+        json!("globe")
+    );
+
+}

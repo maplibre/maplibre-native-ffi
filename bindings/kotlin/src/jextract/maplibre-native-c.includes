@@ -59,6 +59,7 @@
 --include-function mln_map_pitch_by
 --include-function mln_map_pitch_by_animated
 --include-function mln_map_pixel_for_lat_lng
+--include-function mln_map_is_location_occluded
 --include-function mln_map_pixels_for_lat_lngs
 --include-function mln_map_rotate_by
 --include-function mln_map_rotate_by_animated
@@ -631,6 +632,7 @@
 --include-function mln_map_get_style_layer_json
 --include-function mln_map_get_style_layer_type
 --include-function mln_map_get_style_light_property
+--include-function mln_map_get_style_projection_property
 --include-function mln_map_get_style_source_info
 --include-function mln_map_get_style_source_tile_urls
 --include-function mln_map_get_style_source_type
@@ -662,7 +664,9 @@
 --include-function mln_map_set_location_indicator_location
 --include-function mln_map_set_style_image
 --include-function mln_map_set_style_light_json
+--include-function mln_map_set_style_projection_json
 --include-function mln_map_set_style_light_property
+--include-function mln_map_set_style_projection_property
 --include-function mln_map_set_style_source_volatile
 --include-function mln_map_set_style_transition_options
 --include-function mln_map_style_image_exists

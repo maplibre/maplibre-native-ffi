@@ -9,6 +9,37 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class MapCameraOptionsTests
 {
+    [Fact]
+    public void RuntimeProjectionControlsOcclusionAndResetsWithTheStyle()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        var front = new LatLng(0, 0);
+        var back = new LatLng(0, 180);
+        var style = """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();
+        map.SetStyleJson(style);
+        map.SetStyleProjectionJson("""{"type":"globe"}"""u8.ToArray());
+        var snapshot = map.GetStyleProjectionProperty("type");
+        map.JumpTo(new CameraOptions { Center = front, Zoom = 0 });
+        Assert.False(map.IsLocationOccluded(front));
+        Assert.True(map.IsLocationOccluded(back));
+        map.SetStyleProjectionProperty(
+            "type",
+            """["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]"""u8.ToArray()
+        );
+        map.JumpTo(new CameraOptions { Zoom = 4 });
+        Assert.False(map.IsLocationOccluded(back));
+        map.JumpTo(new CameraOptions { Zoom = 0 });
+        Assert.True(map.IsLocationOccluded(back));
+        map.SetStyleProjectionJson("{}"u8.ToArray());
+        Assert.False(map.IsLocationOccluded(back));
+        map.SetStyleProjectionJson("""{"type":"globe"}"""u8.ToArray());
+        map.SetStyleJson(style);
+        Assert.False(map.IsLocationOccluded(back));
+        map.Close();
+        Assert.Equal("\"globe\""u8.ToArray(), snapshot);
+    }
+
     private const int CoordinatePrecision = 10;
 
     private static void AssertClose(LatLng expected, LatLng actual)

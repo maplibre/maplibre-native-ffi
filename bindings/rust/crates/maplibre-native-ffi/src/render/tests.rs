@@ -4570,7 +4570,7 @@ fn projection_captures_last_rendered_update_and_survives_session() {
 }
 
 #[test]
-fn globe_background_renders_a_sphere_and_projection_snapshot_survives_map() {
+fn runtime_projection_changes_rendered_background_and_snapshot() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
@@ -4581,11 +4581,13 @@ fn globe_background_renders_a_sphere_and_projection_snapshot_survives_map() {
         RenderTargetExtent::new(512, 512, 1.0),
     )
     .unwrap();
-    map.set_style_json(br##"{"version":8,"projection":{"type":"globe"},"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#0000ff"}}]}"##).unwrap();
+    map.set_style_json(br##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#0000ff"}}]}"##).unwrap();
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(0.0, 0.0));
     camera.zoom = Some(0.0);
     map.jump_to(&camera).unwrap();
+    map.set_style_projection_json(br#"{"type":"globe"}"#)
+        .unwrap();
     let deadline = Instant::now() + Duration::from_secs(5);
     let image = loop {
         runtime.pump(Some(Duration::ZERO), None).unwrap();
@@ -4595,7 +4597,7 @@ fn globe_background_renders_a_sphere_and_projection_snapshot_survives_map() {
                 let mut pixels = vec![0; info.byte_length];
                 session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
                 let center = (256 * 512 + 256) * 4;
-                if pixels[center..center + 4] == [0, 0, 255, 255] {
+                if pixels[center..center + 4] == [0, 0, 255, 255] && pixels[3] == 0 {
                     break pixels;
                 }
             }

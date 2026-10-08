@@ -1113,6 +1113,50 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     }
   }
 
+  public actual fun setStyleProjectionJson(projectionJson: ByteArray) {
+    NativeAccess.ensureLoaded()
+    ByteArrayViewScope(projectionJson).use { nativeProjectionJson ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_style_projection_json(
+          requireLiveHandle(),
+          nativeProjectionJson.view,
+        )
+      )
+    }
+  }
+
+  public actual fun setStyleProjectionProperty(propertyName: String, value: ByteArray) {
+    NativeAccess.ensureLoaded()
+    StringViewScope(propertyName).use { nativePropertyName ->
+      ByteArrayViewScope(value).use { nativeValue ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_style_projection_property(
+            requireLiveHandle(),
+            nativePropertyName.view,
+            nativeValue.view,
+          )
+        )
+      }
+    }
+  }
+
+  public actual fun styleProjectionProperty(propertyName: String): ByteArray? {
+    NativeAccess.ensureLoaded()
+    StringViewScope(propertyName).use { nativePropertyName ->
+      LongPointer(1).use { outSnapshot ->
+        outSnapshot.put(0, 0L)
+        Status.check(
+          MaplibreNativeC.mln_map_get_style_projection_property(
+            requireLiveHandle(),
+            nativePropertyName.view,
+            outSnapshot,
+          )
+        )
+        return outSnapshot.get().takeIf { it != 0L }?.let(::ownedBuffer)
+      }
+    }
+  }
+
   public actual fun setStyleTransitionOptions(options: StyleTransitionOptions) {
     NativeAccess.ensureLoaded()
     StyleTransitionOptionsScope(options).use { nativeOptions ->
@@ -1757,6 +1801,20 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
         )
       }
     }
+
+  public actual fun isLocationOccluded(coordinate: LatLng): Boolean {
+    NativeAccess.ensureLoaded()
+    val out = BooleanArray(1)
+    Status.check(
+      AndroidNativeBridge.mapIsLocationOccluded(
+        requireLiveHandle(),
+        coordinate.latitude,
+        coordinate.longitude,
+        out,
+      )
+    )
+    return out[0]
+  }
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
     NativeAccess.ensureLoaded()

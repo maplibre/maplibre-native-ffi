@@ -8741,6 +8741,68 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_map_is_location_occluded {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_lat_lng.layout(),
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_is_location_occluded");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_is_location_occluded(mln_map map, mln_lat_lng coordinate, bool *out_occluded)
+     * }
+     */
+    public static FunctionDescriptor mln_map_is_location_occluded$descriptor() {
+        return mln_map_is_location_occluded.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_is_location_occluded(mln_map map, mln_lat_lng coordinate, bool *out_occluded)
+     * }
+     */
+    public static MethodHandle mln_map_is_location_occluded$handle() {
+        return mln_map_is_location_occluded.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_is_location_occluded(mln_map map, mln_lat_lng coordinate, bool *out_occluded)
+     * }
+     */
+    public static MemorySegment mln_map_is_location_occluded$address() {
+        return mln_map_is_location_occluded.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_is_location_occluded(mln_map map, mln_lat_lng coordinate, bool *out_occluded)
+     * }
+     */
+    public static int mln_map_is_location_occluded(long map, MemorySegment coordinate, MemorySegment out_occluded) {
+        var mh$ = mln_map_is_location_occluded.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_is_location_occluded", map, coordinate, out_occluded);
+            }
+            return (int)mh$.invokeExact(map, coordinate, out_occluded);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_map_pixel_for_lat_lng {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
@@ -17464,6 +17526,191 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         try {
             if (TRACE_DOWNCALLS) {
                 traceDowncall("mln_map_get_style_light_property", map, property_name, out_value);
+            }
+            return (int)mh$.invokeExact(map, property_name, out_value);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_set_style_projection_json {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_buffer_view.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_set_style_projection_json");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_projection_json(mln_map map, mln_buffer_view projection_json)
+     * }
+     */
+    public static FunctionDescriptor mln_map_set_style_projection_json$descriptor() {
+        return mln_map_set_style_projection_json.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_projection_json(mln_map map, mln_buffer_view projection_json)
+     * }
+     */
+    public static MethodHandle mln_map_set_style_projection_json$handle() {
+        return mln_map_set_style_projection_json.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_projection_json(mln_map map, mln_buffer_view projection_json)
+     * }
+     */
+    public static MemorySegment mln_map_set_style_projection_json$address() {
+        return mln_map_set_style_projection_json.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_projection_json(mln_map map, mln_buffer_view projection_json)
+     * }
+     */
+    public static int mln_map_set_style_projection_json(long map, MemorySegment projection_json) {
+        var mh$ = mln_map_set_style_projection_json.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_set_style_projection_json", map, projection_json);
+            }
+            return (int)mh$.invokeExact(map, projection_json);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_set_style_projection_property {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_buffer_view.layout(),
+            mln_buffer_view.layout()
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_set_style_projection_property");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_projection_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value)
+     * }
+     */
+    public static FunctionDescriptor mln_map_set_style_projection_property$descriptor() {
+        return mln_map_set_style_projection_property.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_projection_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value)
+     * }
+     */
+    public static MethodHandle mln_map_set_style_projection_property$handle() {
+        return mln_map_set_style_projection_property.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_projection_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value)
+     * }
+     */
+    public static MemorySegment mln_map_set_style_projection_property$address() {
+        return mln_map_set_style_projection_property.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_set_style_projection_property(mln_map map, mln_buffer_view property_name, mln_buffer_view value)
+     * }
+     */
+    public static int mln_map_set_style_projection_property(long map, MemorySegment property_name, MemorySegment value) {
+        var mh$ = mln_map_set_style_projection_property.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_set_style_projection_property", map, property_name, value);
+            }
+            return (int)mh$.invokeExact(map, property_name, value);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_get_style_projection_property {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_get_style_projection_property");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_style_projection_property(mln_map map, mln_buffer_view property_name, mln_buffer *out_value)
+     * }
+     */
+    public static FunctionDescriptor mln_map_get_style_projection_property$descriptor() {
+        return mln_map_get_style_projection_property.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_style_projection_property(mln_map map, mln_buffer_view property_name, mln_buffer *out_value)
+     * }
+     */
+    public static MethodHandle mln_map_get_style_projection_property$handle() {
+        return mln_map_get_style_projection_property.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_style_projection_property(mln_map map, mln_buffer_view property_name, mln_buffer *out_value)
+     * }
+     */
+    public static MemorySegment mln_map_get_style_projection_property$address() {
+        return mln_map_get_style_projection_property.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_get_style_projection_property(mln_map map, mln_buffer_view property_name, mln_buffer *out_value)
+     * }
+     */
+    public static int mln_map_get_style_projection_property(long map, MemorySegment property_name, MemorySegment out_value) {
+        var mh$ = mln_map_get_style_projection_property.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_get_style_projection_property", map, property_name, out_value);
             }
             return (int)mh$.invokeExact(map, property_name, out_value);
         } catch (Error | RuntimeException ex) {
