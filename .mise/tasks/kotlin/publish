@@ -384,6 +384,11 @@ case "$operation" in
     staging_root="${staging_base}/maven-staging-${partition}"
     rm -rf "$staging_root"
     prepare_native_inputs "$partition"
+    if [[ "$partition" == linux ]]; then
+      # The Linux partition generates the Android JavaCPP JNI bridge with the
+      # pinned NDK compiler. Hosted runner images rotate the NDKs they ship.
+      mise run //:android-sdk-packages
+    fi
     release_version_args=()
     if [[ -n "$version" ]]; then
       release_version_args=("-Pmaplibre.maven.version=$version")
