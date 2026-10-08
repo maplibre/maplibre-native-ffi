@@ -87,7 +87,7 @@ mise run build linux-gnu-x64-egl
 The Android, Emscripten, and OpenHarmony targets each build against a
 cross-compilation SDK. Every one is several gigabytes, so mise installs them on
 request rather than during the bootstrap. Each build reads the SDK path from the
-environment, and a machine that already carries an SDK is ready as it stands:
+environment:
 
 | Target         | Environment variable |
 | -------------- | -------------------- |
