@@ -70,13 +70,6 @@ Upstream:
 The Android and macOS SDK camera entry points cancel transitions before partial
 commands to preserve their existing behavior.
 
-`0016-location-indicator-color-transitions.patch` refreshes the location
-indicator's evaluated paint properties each frame so that accuracy-circle fill
-and border colors reach their transition targets. It includes the upstream
-pixel-readback regression. Upstream:
-[maplibre-native#4639](https://github.com/maplibre/maplibre-native/pull/4639),
-at commit `a1823f138f306133cdba462ed1f07575a134b6b4`.
-
 `0017-location-indicator-top-image-hit-testing.patch` includes the location
 indicator's top image in rendered-feature queries. Each top and bearing image
 has independent bounds, and a hit returns the feature once with

@@ -1,5 +1,5 @@
 diff --git a/src/mln/mtl/drawable.cpp b/src/mln/mtl/drawable.cpp
-index edb763b78b9..a3aee9a2ede 100644
+index edb763b78b9b5175c611cc22cffc688b18a6120b..a3aee9a2ede22331f8f7228c5aef495c29da35c2 100644
 --- a/src/mln/mtl/drawable.cpp
 +++ b/src/mln/mtl/drawable.cpp
 @@ -321,6 +321,7 @@ void Drawable::draw(PaintParameters& parameters) const {
@@ -11,7 +11,7 @@ index edb763b78b9..a3aee9a2ede 100644
      }
  
 diff --git a/src/mln/vulkan/drawable.cpp b/src/mln/vulkan/drawable.cpp
-index 0d8c863de58..4a5ba75ebd8 100644
+index 0d8c863de58b83dcfcaaae2f9c2d0f4b6136d9ce..4a5ba75ebd80b721d059e9d7e68840da3d21e76d 100644
 --- a/src/mln/vulkan/drawable.cpp
 +++ b/src/mln/vulkan/drawable.cpp
 @@ -368,6 +368,7 @@ void Drawable::draw(PaintParameters& parameters) const {
@@ -23,7 +23,7 @@ index 0d8c863de58..4a5ba75ebd8 100644
  }
  
 diff --git a/src/mln/webgpu/context.cpp b/src/mln/webgpu/context.cpp
-index 44f1498156e..b534ded0209 100644
+index 44f1498156ecb6a6b37caa37df062753055415c3..b534ded02096fd7d256158f5d867a34f29568549 100644
 --- a/src/mln/webgpu/context.cpp
 +++ b/src/mln/webgpu/context.cpp
 @@ -67,6 +67,8 @@ void Context::endFrame() {
@@ -36,7 +36,7 @@ index 44f1498156e..b534ded0209 100644
  
  void Context::reduceMemoryUsage() {
 diff --git a/src/mln/webgpu/drawable.cpp b/src/mln/webgpu/drawable.cpp
-index ccf060f4f24..00a303d2d3f 100644
+index ccf060f4f24b8340b033d822a12a8b6a65858341..00a303d2d3f1370dd82b43aa0cf2332162ea4b95 100644
 --- a/src/mln/webgpu/drawable.cpp
 +++ b/src/mln/webgpu/drawable.cpp
 @@ -975,6 +975,7 @@ void Drawable::draw(PaintParameters& parameters) const {
@@ -48,7 +48,7 @@ index ccf060f4f24..00a303d2d3f 100644
      }
  }
 diff --git a/src/mln/webgpu/render_pass.cpp b/src/mln/webgpu/render_pass.cpp
-index 72ad3745ca5..d6562049880 100644
+index 72ad3745ca5e17ab6782abae792e428fb5a85cb8..d656204988057e47246092ee18c7ef509be00d7b 100644
 --- a/src/mln/webgpu/render_pass.cpp
 +++ b/src/mln/webgpu/render_pass.cpp
 @@ -179,6 +179,7 @@ RenderPass::RenderPass(CommandEncoder& commandEncoder_, const char* name, const
@@ -60,11 +60,11 @@ index 72ad3745ca5..d6562049880 100644
          wgpuRenderPassEncoderSetViewport(
              impl->encoder, 0.0f, 0.0f, static_cast<float>(size.width), static_cast<float>(size.height), 0.0f, 1.0f);
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index 383efcc7784..e909f443da0 100644
+index 91328fbc4b66a9664c384259e5769d6a9d882fa5..e3e4fa317cff92d9ebe9786a45645fcb04a8f9aa 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -2200,6 +2200,27 @@ TEST(Map, FeatureStateChangesRenderedStyle) {
-     }
+@@ -2475,6 +2475,27 @@ TEST(Map, LocationIndicatorAccuracyColorsTransition) {
+     EXPECT_GT(countGreenPixels(result), 0u) << "The accuracy border should finish transitioning to green";
  }
  
 +TEST(Map, RenderingStatisticsTrackDrawsAcrossFrames) {
