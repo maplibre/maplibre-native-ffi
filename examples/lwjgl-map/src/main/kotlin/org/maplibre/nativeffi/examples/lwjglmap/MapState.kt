@@ -91,7 +91,10 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
       if (event.mapSource != map) {
         continue
       }
-      if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
+      if (event.type == RuntimeEventType.MAP_STYLE_LOADED) {
+        map.setStyleProjectionJson("""{"type":"globe"}""".encodeToByteArray())
+        renderUpdateAvailable = true
+      } else if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
         renderUpdateAvailable = true
       } else if (
         event.type == RuntimeEventType.MAP_RENDER_FRAME_FINISHED &&
@@ -125,11 +128,12 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
           height = viewport.height()
           scaleFactor = viewport.scaleFactor()
           mapMode = MapMode.CONTINUOUS
-          // The two event types the runtime loop reads. A map queues no event of an
+          // The three event types the runtime loop reads. A map queues no event of an
           // unselected type, so nothing accumulates before the style load.
           eventMask =
             RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
-              RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
+              RuntimeEventMask.MAP_RENDER_FRAME_FINISHED +
+              RuntimeEventMask.MAP_STYLE_LOADED
         }
       val map =
         try {
@@ -143,7 +147,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
         map.jumpTo(
           CameraOptions().apply {
             center = LatLng(37.7749, -122.4194)
-            zoom = 13.0
+            zoom = 1.0
             bearing = 12.0
             pitch = 30.0
           }

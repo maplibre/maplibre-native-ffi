@@ -102,13 +102,14 @@ packaging/installer UX.
 
 - Style URL: `https://tiles.openfreemap.org/styles/bright`
 - Load the style during map initialization, before the first render.
+- Select `{"type":"globe"}` after each style-loaded event.
 
 #### Initial camera
 
 | Field   | Value                                                     |
 | ------- | --------------------------------------------------------- |
 | Center  | latitude `37.7749`, longitude `-122.4194` (San Francisco) |
-| Zoom    | `13.0`                                                    |
+| Zoom    | `1.0`                                                     |
 | Bearing | `12.0` degrees                                            |
 | Pitch   | `30.0` degrees                                            |
 

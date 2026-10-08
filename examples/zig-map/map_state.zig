@@ -166,6 +166,10 @@ pub fn drainEvents(
         const event = try batch.at(index);
         if (event.source_type != .map or event.source_id == null or !std.meta.eql(event.source_id.?, map_id)) continue;
         switch (event.event_type) {
+            .map_style_loaded => {
+                try map.setStyleProjectionJson(allocator, "{\"type\":\"globe\"}");
+                render_update_available = true;
+            },
             .map_render_update_available => render_update_available = true,
             .map_render_frame_finished => switch (event.payload) {
                 .render_frame => |frame| render_update_available = render_update_available or frame.needs_repaint,
@@ -204,7 +208,7 @@ fn clamp(value: f64, min: f64, max: f64) f64 {
     return value;
 }
 
-/// Selects the two event types the runtime loop reads. The map queues no other
+/// Selects the three event types the runtime loop reads. The map queues no other
 /// type once this returns, and it runs before the style load, because a map
 /// keeps the events it has already queued.
 fn selectEvents(
@@ -214,6 +218,7 @@ fn selectEvents(
     map.setEventMask(.{
         .map_render_update_available = true,
         .map_render_frame_finished = true,
+        .map_style_loaded = true,
     }) catch |err| {
         diagnostics.logError("event mask select failed", err, diagnostic_store);
         return types.AppError.EventMaskFailed;
@@ -237,7 +242,7 @@ fn setCamera(
 ) !void {
     map.jumpTo(.{
         .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
-        .zoom = 13.0,
+        .zoom = 1.0,
         .bearing = 12.0,
         .pitch = 30.0,
     }) catch |err| {

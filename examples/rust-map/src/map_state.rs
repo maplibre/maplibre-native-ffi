@@ -208,6 +208,10 @@ impl MapState {
                 continue;
             }
             match event.event_type() {
+                RuntimeEventType::MapStyleLoaded => {
+                    self.map.set_style_projection_json(br#"{"type":"globe"}"#)?;
+                    render_update_available = true;
+                }
                 RuntimeEventType::MapRenderUpdateAvailable => render_update_available = true,
                 RuntimeEventType::MapRenderFrameFinished => {
                     if let RuntimeEventPayload::RenderFrame(frame) = event.payload() {
@@ -237,15 +241,17 @@ impl MapState {
 }
 
 fn configure_map(map: &MapHandle) -> maplibre_native_ffi::Result<()> {
-    // The two event types the runtime loop reads. A map queues no event of an
+    // The three event types the runtime loop reads. A map queues no event of an
     // unselected type, so this runs before the style load.
     map.set_event_mask(
-        RuntimeEventMask::MAP_RENDER_UPDATE_AVAILABLE | RuntimeEventMask::MAP_RENDER_FRAME_FINISHED,
+        RuntimeEventMask::MAP_RENDER_UPDATE_AVAILABLE
+            | RuntimeEventMask::MAP_RENDER_FRAME_FINISHED
+            | RuntimeEventMask::MAP_STYLE_LOADED,
     )?;
     map.set_style_url(STYLE_URL)?;
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(37.7749, -122.4194));
-    camera.zoom = Some(13.0);
+    camera.zoom = Some(1.0);
     camera.bearing = Some(12.0);
     camera.pitch = Some(30.0);
     map.jump_to(&camera)?;

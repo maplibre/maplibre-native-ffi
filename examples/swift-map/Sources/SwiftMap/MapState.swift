@@ -59,13 +59,17 @@ final class MapState {
       )
     )
     createdMap = map
-    // The two event types the runtime loop reads. A map queues no event of an
+    // The three event types the runtime loop reads. A map queues no event of an
     // unselected type, so this runs before the style load.
-    try map.setEventMask([.mapRenderUpdateAvailable, .mapRenderFrameFinished])
+    try map.setEventMask([
+      .mapRenderUpdateAvailable,
+      .mapRenderFrameFinished,
+      .mapStyleLoaded,
+    ])
     try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
     try map.jump(to: CameraOptions(
       center: LatLng(latitude: 37.7749, longitude: -122.4194),
-      zoom: 13.0,
+      zoom: 1.0,
       bearing: 12.0,
       pitch: 30.0
     ))
@@ -121,6 +125,9 @@ final class MapState {
     for event in try runtime.drainEvents().events {
       guard map.isSource(of: event) else { continue }
       switch event.type {
+      case .mapStyleLoaded:
+        try map.setStyleProjectionJSON(Data(#"{"type":"globe"}"#.utf8))
+        renderPending = true
       case .mapRenderUpdateAvailable:
         renderPending = true
       case .mapRenderFrameFinished:

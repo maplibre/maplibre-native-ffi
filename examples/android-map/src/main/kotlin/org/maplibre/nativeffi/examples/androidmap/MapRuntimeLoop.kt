@@ -120,11 +120,12 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
             height = initialViewport.logicalHeight
             scaleFactor = initialViewport.scaleFactor
             mapMode = MapMode.CONTINUOUS
-            // The two event types this loop reads. A map queues no event of an
+            // The three event types this loop reads. A map queues no event of an
             // unselected type, so nothing accumulates before the style load.
             eventMask =
               RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
-                RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
+                RuntimeEventMask.MAP_RENDER_FRAME_FINISHED +
+                RuntimeEventMask.MAP_STYLE_LOADED
           },
         )
       owned = createdMap
@@ -132,7 +133,7 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
       createdMap.jumpTo(
         CameraOptions().apply {
           center = LatLng(37.7749, -122.4194)
-          zoom = 13.0
+          zoom = 1.0
           bearing = 12.0
           pitch = 30.0
         }
@@ -207,7 +208,10 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
     // One drain takes every event the pump produced.
     for (event in runtime.drainEvents().events) {
       if (event.mapSource != map) continue
-      if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
+      if (event.type == RuntimeEventType.MAP_STYLE_LOADED) {
+        map.setStyleProjectionJson("""{"type":"globe"}""".encodeToByteArray())
+        renderUpdateAvailable = true
+      } else if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
         renderUpdateAvailable = true
       } else if (
         event.type == RuntimeEventType.MAP_RENDER_FRAME_FINISHED &&

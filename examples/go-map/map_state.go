@@ -50,7 +50,7 @@ func runRuntimeLoop(v viewport, commands *commandQueue, published chan<- runtime
 			shared.fail(fmt.Errorf("runtime pump failed: %w", err))
 			break
 		}
-		renderRequested, err := drainEvents(state.runtime, state.mapID)
+		renderRequested, err := drainEvents(state.runtime, state.mapRef, state.mapID)
 		if err != nil {
 			shared.fail(err)
 			break
@@ -104,7 +104,7 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 	}
 	initialCamera := maplibre.CameraOptions{}.
 		WithCenter(maplibre.LatLng{Latitude: 37.7749, Longitude: -122.4194}).
-		WithZoom(13).
+		WithZoom(1).
 		WithBearing(12).
 		WithPitch(30)
 	if err := mapHandle.JumpTo(initialCamera); err != nil {
@@ -205,7 +205,7 @@ func (state *runtimeMapState) adjustPitch(delta float64, animation *maplibre.Ani
 	return state.mapRef.EaseTo(maplibre.CameraOptions{}.WithPitch(clamp(pitch, 0, 60)), animation)
 }
 
-func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (bool, error) {
+func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapHandle *maplibre.MapHandle, mapID maplibre.MapID) (bool, error) {
 	renderRequested := false
 	// One drain takes every event the pump produced.
 	batch, err := runtimeHandle.DrainEvents(0)
@@ -217,6 +217,11 @@ func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (b
 			continue
 		}
 		switch event.Type {
+		case maplibre.RuntimeEventMapStyleLoaded:
+			if err := mapHandle.SetStyleProjectionJSON([]byte(`{"type":"globe"}`)); err != nil {
+				return false, fmt.Errorf("globe selection failed: %w", err)
+			}
+			renderRequested = true
 		case maplibre.RuntimeEventMapRenderUpdateAvailable:
 			renderRequested = true
 		case maplibre.RuntimeEventMapRenderFrameFinished:
