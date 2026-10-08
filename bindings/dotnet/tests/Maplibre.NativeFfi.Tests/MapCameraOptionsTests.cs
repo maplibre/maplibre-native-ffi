@@ -23,6 +23,9 @@ public sealed class MapCameraOptionsTests
         map.JumpTo(new CameraOptions { Center = front, Zoom = 0 });
         Assert.False(map.IsLocationOccluded(front));
         Assert.True(map.IsLocationOccluded(back));
+        using var projection = map.CreateProjection();
+        Assert.False(projection.IsLocationOccluded(front));
+        Assert.True(projection.IsLocationOccluded(back));
         map.SetStyleProjectionProperty(
             "type",
             """["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]"""u8.ToArray()
@@ -37,6 +40,10 @@ public sealed class MapCameraOptionsTests
         map.SetStyleJson(style);
         Assert.False(map.IsLocationOccluded(back));
         map.Close();
+        Assert.True(projection.IsLocationOccluded(back));
+        projection.SetCamera(new CameraOptions { Center = back });
+        Assert.False(projection.IsLocationOccluded(back));
+        Assert.True(projection.IsLocationOccluded(front));
         Assert.Equal("\"globe\""u8.ToArray(), snapshot);
     }
 

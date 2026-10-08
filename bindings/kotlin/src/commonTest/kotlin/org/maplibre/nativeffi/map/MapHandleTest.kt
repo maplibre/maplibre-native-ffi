@@ -76,21 +76,30 @@ class MapHandleTest {
             )
             assertFalse(map.isLocationOccluded(front))
             assertTrue(map.isLocationOccluded(back))
-            map.setStyleProjectionProperty(
-              "type",
-              """["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]"""
-                .encodeToByteArray(),
-            )
-            map.jumpTo(CameraOptions().apply { zoom = 4.0 })
-            assertFalse(map.isLocationOccluded(back))
-            map.jumpTo(CameraOptions().apply { zoom = 0.0 })
-            assertTrue(map.isLocationOccluded(back))
-            map.setStyleProjectionJson("{}".encodeToByteArray())
-            assertFalse(map.isLocationOccluded(back))
-            map.setStyleProjectionJson("""{"type":"globe"}""".encodeToByteArray())
-            map.setStyleJson(style)
-            assertFalse(map.isLocationOccluded(back))
-            snapshot
+            map.createProjection().use { projection ->
+              assertFalse(projection.isLocationOccluded(front))
+              assertTrue(projection.isLocationOccluded(back))
+              map.setStyleProjectionProperty(
+                "type",
+                """["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]"""
+                  .encodeToByteArray(),
+              )
+              map.jumpTo(CameraOptions().apply { zoom = 4.0 })
+              assertFalse(map.isLocationOccluded(back))
+              map.jumpTo(CameraOptions().apply { zoom = 0.0 })
+              assertTrue(map.isLocationOccluded(back))
+              map.setStyleProjectionJson("{}".encodeToByteArray())
+              assertFalse(map.isLocationOccluded(back))
+              map.setStyleProjectionJson("""{"type":"globe"}""".encodeToByteArray())
+              map.setStyleJson(style)
+              assertFalse(map.isLocationOccluded(back))
+              map.close()
+              assertTrue(projection.isLocationOccluded(back))
+              projection.setCamera(CameraOptions().apply { center = back })
+              assertFalse(projection.isLocationOccluded(back))
+              assertTrue(projection.isLocationOccluded(front))
+              snapshot
+            }
           }
       }
     assertEquals(""""globe"""", snapshot.decodeToString())

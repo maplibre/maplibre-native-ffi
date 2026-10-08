@@ -256,6 +256,10 @@ test "runtime projection controls occlusion and resets with the style" {
     try map.jumpTo(.{ .center = front, .zoom = 0 });
     try testing.expect(!(try map.isLocationOccluded(front)));
     try testing.expect(try map.isLocationOccluded(back));
+    var projection = try maplibre.MapProjectionHandle.create(&map);
+    defer projection.close() catch @panic("projection close failed");
+    try testing.expect(!(try projection.isLocationOccluded(front)));
+    try testing.expect(try projection.isLocationOccluded(back));
     try map.setStyleProjectionProperty(testing.allocator, "type", "[\"interpolate\",[\"linear\"],[\"zoom\"],1,\"vertical-perspective\",3,\"mercator\"]");
     try map.jumpTo(.{ .zoom = 4 });
     try testing.expect(!(try map.isLocationOccluded(back)));
@@ -266,5 +270,9 @@ test "runtime projection controls occlusion and resets with the style" {
     try map.setStyleProjectionJson(testing.allocator, "{\"type\":\"globe\"}");
     try map.setStyleJson(testing.allocator, style);
     try testing.expect(!(try map.isLocationOccluded(back)));
+    try testing.expect(try projection.isLocationOccluded(back));
+    try projection.setCamera(.{ .center = back });
+    try testing.expect(!(try projection.isLocationOccluded(back)));
+    try testing.expect(try projection.isLocationOccluded(front));
     try testing.expectEqualStrings("\"globe\"", snapshot.value);
 }

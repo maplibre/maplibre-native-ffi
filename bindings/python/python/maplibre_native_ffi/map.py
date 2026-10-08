@@ -442,6 +442,12 @@ class MapProjectionHandle(NativeHandleMixin):
             (padding.top, padding.left, padding.bottom, padding.right),
         )
 
+    def is_location_occluded(self, coordinate: LatLng) -> bool:
+        """Report whether the globe hides a location from the helper camera."""
+        return self._native.is_location_occluded(
+            coordinate.latitude, coordinate.longitude
+        )
+
     def pixel_for_lat_lng(self, coordinate: LatLng) -> ScreenPoint:
         """Convert a geographic coordinate to a screen-space point."""
         from .camera import ScreenPoint

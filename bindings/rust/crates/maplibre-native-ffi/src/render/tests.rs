@@ -4610,6 +4610,11 @@ fn runtime_projection_changes_rendered_background_and_snapshot() {
     let coordinate = LatLng::new(20.0, 30.0);
     let map_point = map.pixel_for_lat_lng(coordinate).unwrap();
     let projection = session.create_projection().unwrap();
+    let back = LatLng::new(0.0, 180.0);
+    assert!(projection.is_location_occluded(back).unwrap());
+    map.set_style_projection_json(b"{}").unwrap();
+    assert!(!map.is_location_occluded(back).unwrap());
+    assert!(projection.is_location_occluded(back).unwrap());
     let point = projection.pixel_for_lat_lng(coordinate).unwrap();
     assert!((point.x - map_point.x).abs() < 1e-6);
     assert!((point.y - map_point.y).abs() < 1e-6);
@@ -4617,6 +4622,7 @@ fn runtime_projection_changes_rendered_background_and_snapshot() {
     map.close().unwrap();
     runtime.close().unwrap();
     std::thread::spawn(move || {
+        assert!(projection.is_location_occluded(back).unwrap());
         let result = projection.lat_lng_for_pixel(point).unwrap();
         assert!((result.latitude - coordinate.latitude).abs() < 1e-6);
         assert!((result.longitude - coordinate.longitude).abs() < 1e-6);

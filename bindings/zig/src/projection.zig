@@ -100,6 +100,15 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
         );
     }
 
+    /// Reports whether the globe hides a location from the helper camera.
+    pub fn isLocationOccluded(self: *MapProjectionHandle, coordinate: values.LatLng) status.Error!bool {
+        var occluded = false;
+        const lease = try projectionLease(self.*);
+        defer lease.release();
+        try status.checkStatus(c.mln_map_projection_is_location_occluded(lease.native, values.latLngToNative(coordinate), &occluded), lease.diagnostic_store);
+        return occluded;
+    }
+
     pub fn pixelForLatLng(self: *MapProjectionHandle, coordinate: values.LatLng) status.Error!values.ScreenPoint {
         var point: c.mln_screen_point = undefined;
         const lease = try projectionLease(self.*);

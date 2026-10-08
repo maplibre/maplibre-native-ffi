@@ -61,6 +61,14 @@ inline mln_status mln_android_map_pixel_for_lat_lng(
   return status;
 }
 
+inline mln_status mln_android_projection_is_location_occluded(
+  mln_map_projection projection, double latitude, double longitude, bool* out
+) {
+  return mln_map_projection_is_location_occluded(
+    projection, {latitude, longitude}, out
+  );
+}
+
 inline mln_status mln_android_projection_pixel_for_lat_lng(
   mln_map_projection projection, double latitude, double longitude, double* out
 ) {

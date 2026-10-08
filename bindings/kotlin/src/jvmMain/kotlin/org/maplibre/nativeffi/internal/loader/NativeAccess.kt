@@ -2734,6 +2734,19 @@ internal object NativeAccess {
     }
   }
 
+  internal fun projectionIsLocationOccluded(
+    projection: NativeMapProjection,
+    coordinate: LatLng,
+  ): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outOccluded = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        projectionLatLngAddressStatusFunction("mln_map_projection_is_location_occluded")
+          .invokeNative(projection, latLng(coordinate, arena), outOccluded) as Int
+      )
+      outOccluded.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
   internal fun projectionPixelForLatLng(
     projection: NativeMapProjection,
     coordinate: LatLng,

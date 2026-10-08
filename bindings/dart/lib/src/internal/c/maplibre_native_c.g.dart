@@ -1215,6 +1215,15 @@ external int mln_map_projection_get_camera(
 );
 
 @ffi.Native<
+  ffi.Int32 Function(mln_map_projection, mln_lat_lng, ffi.Pointer<ffi.Bool>)
+>()
+external int mln_map_projection_is_location_occluded(
+  int projection,
+  mln_lat_lng coordinate,
+  ffi.Pointer<ffi.Bool> out_occluded,
+);
+
+@ffi.Native<
   ffi.Int32 Function(
     mln_map_projection,
     mln_screen_point,

@@ -1209,6 +1209,10 @@ private func jsonData(_ value: String) -> Data {
   try map.jump(to: CameraOptions(center: front, zoom: 0))
   #expect(try !map.isLocationOccluded(front))
   #expect(try map.isLocationOccluded(back))
+  let projection = try MapProjectionHandle(map: map)
+  defer { try? projection.close() }
+  #expect(try !projection.isLocationOccluded(front))
+  #expect(try projection.isLocationOccluded(back))
   try map.setStyleProjectionProperty(
     "type",
     value: Data(#"["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]"#
@@ -1224,5 +1228,9 @@ private func jsonData(_ value: String) -> Data {
   try map.setStyleJSON(style)
   #expect(try !map.isLocationOccluded(back))
   try map.close()
+  #expect(try projection.isLocationOccluded(back))
+  try projection.setCamera(CameraOptions(center: back))
+  #expect(try !projection.isLocationOccluded(back))
+  #expect(try projection.isLocationOccluded(front))
   #expect(String(decoding: snapshot, as: UTF8.self) == #""globe""#)
 }

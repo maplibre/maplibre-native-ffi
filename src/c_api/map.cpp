@@ -1290,6 +1290,16 @@ auto mln_map_projection_set_visible_geometry(
   });
 }
 
+auto mln_map_projection_is_location_occluded(
+  mln_map_projection projection, mln_lat_lng coordinate, bool* out_occluded
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_projection_is_location_occluded(
+      projection, coordinate, out_occluded
+    );
+  });
+}
+
 auto mln_map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
   mln_screen_point* out_point

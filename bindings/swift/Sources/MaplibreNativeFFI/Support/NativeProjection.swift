@@ -33,6 +33,19 @@ enum NativeProjection {
     return camera
   }
 
+  static func isLocationOccluded(
+    _ projection: NativeMapProjectionHandle,
+    coordinate: NativeLatLng
+  ) throws -> Bool {
+    try NativeMemory.withTemporary(false) { occluded in
+      try checkStatus(mln_map_projection_is_location_occluded(
+        projection.raw,
+        coordinate.native,
+        occluded
+      ))
+    }.value
+  }
+
   static func pixelForLatLng(
     _ projection: NativeMapProjectionHandle,
     coordinate: mln_lat_lng

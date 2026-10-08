@@ -15,6 +15,9 @@ public expect class MapProjectionHandle : AutoCloseable {
 
   public fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets)
 
+  /** Reports whether the globe hides a location from the helper camera. */
+  public fun isLocationOccluded(coordinate: LatLng): Boolean
+
   public fun pixelForLatLng(coordinate: LatLng): ScreenPoint
 
   /** Converts a screen point to a coordinate with longitude wrapped to -180 through 180. */

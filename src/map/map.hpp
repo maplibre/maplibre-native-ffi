@@ -438,6 +438,10 @@ auto map_projection_set_visible_geometry(
   mln_map_projection projection, mln_buffer_view geometry,
   mln_edge_insets padding
 ) -> mln_status;
+auto map_projection_is_location_occluded(
+  mln_map_projection projection, mln_lat_lng coordinate, bool* out_occluded
+) -> mln_status;
+
 auto map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
   mln_screen_point* out_point

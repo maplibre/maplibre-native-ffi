@@ -90,6 +90,21 @@ final class MapProjectionHandle {
     });
   }
 
+  /// Reports whether the globe hides a location from the helper camera.
+  bool isLocationOccluded(LatLng coordinate) {
+    return withNativeArena((arena) {
+      final outOccluded = arena<Bool>();
+      _check(
+        raw.mln_map_projection_is_location_occluded(
+          _handle.raw,
+          native_struct.latLngToNative(coordinate),
+          outOccluded,
+        ),
+      );
+      return outOccluded.value;
+    });
+  }
+
   /// Converts a geographic world coordinate to a screen point.
   ScreenPoint pixelForLatLng(LatLng coordinate) {
     return withNativeArena((arena) {

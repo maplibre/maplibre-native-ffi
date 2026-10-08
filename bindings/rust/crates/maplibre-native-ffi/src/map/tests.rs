@@ -1723,6 +1723,9 @@ fn runtime_projection_controls_occlusion_and_resets_with_the_style() {
     map.jump_to(&camera).unwrap();
     assert!(!map.is_location_occluded(front).unwrap());
     assert!(map.is_location_occluded(back).unwrap());
+    let projection = map.create_projection().unwrap();
+    assert!(!projection.is_location_occluded(front).unwrap());
+    assert!(projection.is_location_occluded(back).unwrap());
     map.set_style_projection_property(
         "type",
         br#"["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]"#,
@@ -1742,6 +1745,17 @@ fn runtime_projection_controls_occlusion_and_resets_with_the_style() {
     assert!(!map.is_location_occluded(back).unwrap());
     map.close().unwrap();
     runtime.close().unwrap();
+    std::thread::spawn(move || {
+        assert!(projection.is_location_occluded(back).unwrap());
+        let mut camera = CameraOptions::default();
+        camera.center = Some(back);
+        projection.set_camera(&camera).unwrap();
+        assert!(!projection.is_location_occluded(back).unwrap());
+        assert!(projection.is_location_occluded(front).unwrap());
+        projection.close().unwrap();
+    })
+    .join()
+    .unwrap();
     assert_eq!(
         serde_json::from_slice::<JsonValue>(&snapshot).unwrap(),
         json!("globe")

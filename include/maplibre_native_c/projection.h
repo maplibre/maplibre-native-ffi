@@ -130,6 +130,23 @@ MLN_API mln_status mln_map_projection_set_visible_geometry(
 ) MLN_NOEXCEPT;
 
 /**
+ * Reports whether the globe hides a location from the helper camera.
+ *
+ * Uses the helper's copied transform, including later helper camera changes.
+ * Mercator helpers report false. This function may be called from any thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live,
+ *   out_occluded is null, or coordinate contains invalid latitude or longitude
+ *   values.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_projection_is_location_occluded(
+  mln_map_projection projection, mln_lat_lng coordinate, bool* out_occluded
+) MLN_NOEXCEPT;
+
+/**
  * Converts a geographic world coordinate using a standalone projection helper.
  *
  * The output point uses logical map pixels with an origin at the top-left of

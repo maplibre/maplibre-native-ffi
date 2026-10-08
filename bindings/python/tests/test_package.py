@@ -4640,6 +4640,9 @@ def test_runtime_projection_controls_occlusion_and_resets_with_the_style() -> No
         map_handle.jump_to(camera.CameraOptions(center=front, zoom=0.0))
         assert not map_handle.is_location_occluded(front)
         assert map_handle.is_location_occluded(back)
+        projection = map_handle.create_projection()
+        assert not projection.is_location_occluded(front)
+        assert projection.is_location_occluded(back)
         map_handle.set_style_projection_property(
             "type",
             b'["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]',
@@ -4653,4 +4656,9 @@ def test_runtime_projection_controls_occlusion_and_resets_with_the_style() -> No
         map_handle.set_style_projection_json(b'{"type":"globe"}')
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         assert not map_handle.is_location_occluded(back)
+    with projection:
+        assert projection.is_location_occluded(back)
+        projection.set_camera(camera.CameraOptions(center=back))
+        assert not projection.is_location_occluded(back)
+        assert projection.is_location_occluded(front)
     assert json.loads(snapshot) == "globe"

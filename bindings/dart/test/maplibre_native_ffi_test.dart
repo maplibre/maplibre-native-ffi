@@ -67,6 +67,10 @@ void main() {
     map.jumpTo(const CameraOptions(center: front, zoom: 0));
     expect(map.isLocationOccluded(front), isFalse);
     expect(map.isLocationOccluded(back), isTrue);
+    final projection = map.createProjection();
+    addTearDown(projection.close);
+    expect(projection.isLocationOccluded(front), isFalse);
+    expect(projection.isLocationOccluded(back), isTrue);
     map.setStyleProjectionProperty(
       'type',
       _jsonBytes(
@@ -83,6 +87,10 @@ void main() {
     map.setStyleJson(_jsonBytes(_emptyStyleJson));
     expect(map.isLocationOccluded(back), isFalse);
     map.close();
+    expect(projection.isLocationOccluded(back), isTrue);
+    projection.setCamera(const CameraOptions(center: back));
+    expect(projection.isLocationOccluded(back), isFalse);
+    expect(projection.isLocationOccluded(front), isTrue);
     expect(jsonDecode(utf8.decode(snapshot)), 'globe');
   });
 

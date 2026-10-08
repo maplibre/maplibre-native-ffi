@@ -86,6 +86,22 @@ public actual class MapProjectionHandle internal constructor(private val handleI
     }
   }
 
+  public actual fun isLocationOccluded(coordinate: LatLng): Boolean {
+    NativeAccess.ensureLoaded()
+    val out = BooleanArray(1)
+    withLiveHandle { handle ->
+      Status.check(
+        AndroidNativeBridge.projectionIsLocationOccluded(
+          handle,
+          coordinate.latitude,
+          coordinate.longitude,
+          out,
+        )
+      )
+    }
+    return out[0]
+  }
+
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
     NativeAccess.ensureLoaded()
     val out = DoubleArray(2)

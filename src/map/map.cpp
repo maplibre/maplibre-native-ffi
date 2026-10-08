@@ -8037,6 +8037,26 @@ auto map_projection_set_visible_geometry(
   );
 }
 
+auto map_projection_is_location_occluded(
+  mln_map_projection projection, mln_lat_lng coordinate, bool* out_occluded
+) -> mln_status {
+  return with_map_projection(
+    projection,
+    [coordinate, out_occluded](mln::MapProjection& live) -> mln_status {
+      if (out_occluded == nullptr) {
+        set_thread_error("out_occluded must not be null");
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      const auto coordinate_status = validate_lat_lng(coordinate);
+      if (coordinate_status != MLN_STATUS_OK) {
+        return coordinate_status;
+      }
+      *out_occluded = live.isLocationOccluded(to_native_lat_lng(coordinate));
+      return MLN_STATUS_OK;
+    }
+  );
+}
+
 auto map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
   mln_screen_point* out_point

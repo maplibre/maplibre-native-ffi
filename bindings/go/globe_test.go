@@ -36,6 +36,9 @@ func TestRuntimeProjectionControlsOcclusionAndResetsWithTheStyle(t *testing.T) {
 	if !occluded {
 		t.Fatal("the globe must hide the far-side location")
 	}
+	projection, err := m.NewProjection()
+	check(err)
+	defer func() { check(projection.Close()) }()
 	check(m.SetStyleProjectionProperty("type", []byte(`["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]`)))
 	check(m.JumpTo(CameraOptions{}.WithZoom(4)))
 	occluded, err = m.IsLocationOccluded(back)
@@ -63,6 +66,22 @@ func TestRuntimeProjectionControlsOcclusionAndResetsWithTheStyle(t *testing.T) {
 		t.Fatal("a style load should replace the projection override")
 	}
 	check(m.Close())
+	occluded, err = projection.IsLocationOccluded(back)
+	check(err)
+	if !occluded {
+		t.Fatal("the snapshot must retain the globe after map closure")
+	}
+	check(projection.SetCamera(CameraOptions{}.WithCenter(back)))
+	occluded, err = projection.IsLocationOccluded(back)
+	check(err)
+	if occluded {
+		t.Fatal("the helper camera center must be visible")
+	}
+	occluded, err = projection.IsLocationOccluded(front)
+	check(err)
+	if !occluded {
+		t.Fatal("the helper camera must hide the opposite side")
+	}
 	var copied string
 	check(json.Unmarshal(snapshot, &copied))
 	if copied != "globe" {

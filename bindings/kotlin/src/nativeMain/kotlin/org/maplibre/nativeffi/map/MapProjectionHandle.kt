@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.map
 
+import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.DoubleVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
@@ -15,6 +16,7 @@ import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_projection_destroy
 import org.maplibre.nativeffi.internal.c.mln_map_projection_get_camera
+import org.maplibre.nativeffi.internal.c.mln_map_projection_is_location_occluded
 import org.maplibre.nativeffi.internal.c.mln_map_projection_lat_lng_for_pixel
 import org.maplibre.nativeffi.internal.c.mln_map_projection_lat_lng_for_pixel_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_projection_meters_per_pixel_at_latitude
@@ -88,6 +90,20 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
         )
       }
     }
+  }
+
+  public actual fun isLocationOccluded(coordinate: LatLng): Boolean = memScoped {
+    val outOccluded = alloc<BooleanVar>()
+    state.withLive { handle ->
+      Status.check(
+        mln_map_projection_is_location_occluded(
+          handle.rawHandleValue,
+          CoreStructs.latLng(coordinate),
+          outOccluded.ptr,
+        )
+      )
+    }
+    outOccluded.value
   }
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint = memScoped {

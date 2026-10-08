@@ -2015,10 +2015,11 @@ MLN_API mln_status mln_map_get_style_light_property(
 /**
  * Sets the style projection from a style-spec projection JSON object.
  *
- * The type accepts "mercator", "vertical-perspective", "globe", a projection
- * transition, or a zoom expression. The globe preset transitions to Mercator
- * between zoom 11 and 12. An empty object restores the default projection.
- * Loading another style replaces this override; apply it after the style loads.
+ * The object's type property accepts "mercator", "vertical-perspective",
+ * "globe", a projection transition, or a zoom expression. The globe preset
+ * transitions to Mercator between zoom 11 and 12. An empty object restores the
+ * default projection. Loading another style replaces this override; apply it
+ * after the style loads.
  *
  * projection_json is borrowed for the call. The function parses and copies the
  * accepted projection into MapLibre Native before return.
@@ -2042,6 +2043,8 @@ MLN_API mln_status mln_map_set_style_projection_json(
  * property_name and value are borrowed for the call. value is a style-spec JSON
  * value. The function parses and copies the accepted value into
  * MapLibre Native's typed projection property storage before return.
+ * The supported property is "type"; its value may be a constant projection
+ * definition or a zoom expression.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

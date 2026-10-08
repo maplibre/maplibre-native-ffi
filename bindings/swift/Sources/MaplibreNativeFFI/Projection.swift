@@ -119,6 +119,18 @@ public final class MapProjectionHandle: @unchecked Sendable {
     }
   }
 
+  /// Reports whether the globe hides a location from the helper camera.
+  public func isLocationOccluded(_ coordinate: LatLng) throws -> Bool {
+    try mapNativeFailure {
+      try handle.withLive { projection in
+        try NativeProjection.isLocationOccluded(
+          projection,
+          coordinate: coordinate.nativeInput
+        )
+      }
+    }
+  }
+
   public func pixel(for coordinate: LatLng) throws -> ScreenPoint {
     try mapNativeFailure {
       try handle.withLive { projection in

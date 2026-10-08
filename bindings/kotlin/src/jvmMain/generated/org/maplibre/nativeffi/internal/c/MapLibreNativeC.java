@@ -10070,6 +10070,68 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_map_projection_is_location_occluded {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_lat_lng.layout(),
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_projection_is_location_occluded");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_is_location_occluded(mln_map_projection projection, mln_lat_lng coordinate, bool *out_occluded)
+     * }
+     */
+    public static FunctionDescriptor mln_map_projection_is_location_occluded$descriptor() {
+        return mln_map_projection_is_location_occluded.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_is_location_occluded(mln_map_projection projection, mln_lat_lng coordinate, bool *out_occluded)
+     * }
+     */
+    public static MethodHandle mln_map_projection_is_location_occluded$handle() {
+        return mln_map_projection_is_location_occluded.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_is_location_occluded(mln_map_projection projection, mln_lat_lng coordinate, bool *out_occluded)
+     * }
+     */
+    public static MemorySegment mln_map_projection_is_location_occluded$address() {
+        return mln_map_projection_is_location_occluded.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_projection_is_location_occluded(mln_map_projection projection, mln_lat_lng coordinate, bool *out_occluded)
+     * }
+     */
+    public static int mln_map_projection_is_location_occluded(long projection, MemorySegment coordinate, MemorySegment out_occluded) {
+        var mh$ = mln_map_projection_is_location_occluded.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_projection_is_location_occluded", projection, coordinate, out_occluded);
+            }
+            return (int)mh$.invokeExact(projection, coordinate, out_occluded);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_map_projection_pixel_for_lat_lng {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,

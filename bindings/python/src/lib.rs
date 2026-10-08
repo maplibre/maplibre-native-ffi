@@ -4107,6 +4107,24 @@ impl MapHandle {
 
 #[pymethods]
 impl MapProjectionHandle {
+    fn is_location_occluded(&self, latitude: f64, longitude: f64) -> PyResult<bool> {
+        let state = self.state();
+        let mut occluded = false;
+        // SAFETY: The C API validates the projection, coordinate, and writable output.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_is_location_occluded(
+                state.handle(),
+                sys::mln_lat_lng {
+                    latitude,
+                    longitude,
+                },
+                &mut occluded,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(occluded)
+    }
+
     fn close(&self) -> PyResult<()> {
         let state = self.state();
         // SAFETY: state owns an mln_map_projection handle created by
