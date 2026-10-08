@@ -232,3 +232,8 @@ moves the query away from visible features. The check includes the rectangle
 center to detect a real antimeridian crossing when all four corners lie in the
 sky. This patch follows the globe import and remains separate for submission to
 its upstream branch.
+
+`0039-projection-location-occlusion.patch` exposes the globe horizon query on
+Native’s standalone `MapProjection` helper. It delegates to the copied
+transform, so coordinate conversion and occlusion can use the same camera
+snapshot.
