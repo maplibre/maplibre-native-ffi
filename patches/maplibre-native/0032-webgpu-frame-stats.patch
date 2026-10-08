@@ -23,10 +23,10 @@ index 0d8c863de58b83dcfcaaae2f9c2d0f4b6136d9ce..4a5ba75ebd80b721d059e9d7e68840da
  }
  
 diff --git a/src/mln/webgpu/context.cpp b/src/mln/webgpu/context.cpp
-index 44f1498156ecb6a6b37caa37df062753055415c3..b534ded02096fd7d256158f5d867a34f29568549 100644
+index b7c167d8013235430e7827836dc26d396c1bed6d..ce199f89d2c63bdefa121af28799a53dd819ea4d 100644
 --- a/src/mln/webgpu/context.cpp
 +++ b/src/mln/webgpu/context.cpp
-@@ -67,6 +67,8 @@ void Context::endFrame() {
+@@ -69,6 +69,8 @@ void Context::endFrame() {
  
  void Context::performCleanup() {
      backend.getThreadPool().runRenderJobs();
@@ -36,10 +36,10 @@ index 44f1498156ecb6a6b37caa37df062753055415c3..b534ded02096fd7d256158f5d867a34f
  
  void Context::reduceMemoryUsage() {
 diff --git a/src/mln/webgpu/drawable.cpp b/src/mln/webgpu/drawable.cpp
-index ccf060f4f24b8340b033d822a12a8b6a65858341..00a303d2d3f1370dd82b43aa0cf2332162ea4b95 100644
+index 3d2f017c00f2fddf50c9c42ecc55ed66b3f65b91..ac7607398c8bc131f9cd95ca41701eaabe75eba3 100644
 --- a/src/mln/webgpu/drawable.cpp
 +++ b/src/mln/webgpu/drawable.cpp
-@@ -975,6 +975,7 @@ void Drawable::draw(PaintParameters& parameters) const {
+@@ -980,6 +980,7 @@ void Drawable::draw(PaintParameters& parameters) const {
                                               baseInstance);                                // firstInstance
  
              context.renderingStats().numDrawCalls++;

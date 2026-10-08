@@ -1,8 +1,8 @@
 diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
-index 08160f6f3f5528a942ead01ee6d0b616cd0cc8aa..ef034b4bd8b10fe9b940b748e8f3ca7ab98ba0c1 100644
+index 68bf5464b75097e23f692955774ff50d2fdb18bf..5028e570c35cd11e03e6efdefae45b26f43f51ce 100644
 --- a/src/mln/map/map.cpp
 +++ b/src/mln/map/map.cpp
-@@ -529,7 +529,9 @@ void Map::enableRenderingStatsView(bool value) {
+@@ -713,7 +713,9 @@ void Map::enableRenderingStatsView(bool value) {
  }
  
  void Map::setPrefetchZoomDelta(uint8_t delta) {
@@ -12,7 +12,7 @@ index 08160f6f3f5528a942ead01ee6d0b616cd0cc8aa..ef034b4bd8b10fe9b940b748e8f3ca7a
  }
  
  uint8_t Map::getPrefetchZoomDelta() const {
-@@ -561,7 +563,9 @@ FreeCameraOptions Map::getFreeCameraOptions() const {
+@@ -745,7 +747,9 @@ FreeCameraOptions Map::getFreeCameraOptions() const {
  }
  
  void Map::setTileLodMinRadius(double radius) {
@@ -22,7 +22,7 @@ index 08160f6f3f5528a942ead01ee6d0b616cd0cc8aa..ef034b4bd8b10fe9b940b748e8f3ca7a
  }
  
  double Map::getTileLodMinRadius() const {
-@@ -569,7 +573,9 @@ double Map::getTileLodMinRadius() const {
+@@ -753,7 +757,9 @@ double Map::getTileLodMinRadius() const {
  }
  
  void Map::setTileLodScale(double scale) {
@@ -32,7 +32,7 @@ index 08160f6f3f5528a942ead01ee6d0b616cd0cc8aa..ef034b4bd8b10fe9b940b748e8f3ca7a
  }
  
  double Map::getTileLodScale() const {
-@@ -577,7 +583,9 @@ double Map::getTileLodScale() const {
+@@ -761,7 +767,9 @@ double Map::getTileLodScale() const {
  }
  
  void Map::setTileLodPitchThreshold(double threshold) {
@@ -42,7 +42,7 @@ index 08160f6f3f5528a942ead01ee6d0b616cd0cc8aa..ef034b4bd8b10fe9b940b748e8f3ca7a
  }
  
  double Map::getTileLodPitchThreshold() const {
-@@ -585,7 +593,9 @@ double Map::getTileLodPitchThreshold() const {
+@@ -769,7 +777,9 @@ double Map::getTileLodPitchThreshold() const {
  }
  
  void Map::setTileLodZoomShift(double shift) {
@@ -52,7 +52,7 @@ index 08160f6f3f5528a942ead01ee6d0b616cd0cc8aa..ef034b4bd8b10fe9b940b748e8f3ca7a
  }
  
  double Map::getTileLodZoomShift() const {
-@@ -593,7 +603,9 @@ double Map::getTileLodZoomShift() const {
+@@ -777,7 +787,9 @@ double Map::getTileLodZoomShift() const {
  }
  
  void Map::setTileLodMode(TileLodMode mode) {
@@ -839,10 +839,10 @@ index dd5ccf0814676200ec263ca090fb7d0748edec77..1ec9862a4aaf189caa8e93e5b9229ba1
  
  TransitionOptions SymbolLayer::getTextTranslateAnchorTransition() const {
 diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
-index 5c9634227e40b666406e4f8020e88b804bbe7825..6240b4106283e5c9a728c89c5dd18f4967fc9db0 100644
+index 0707b3ade64013f3164e5c6bc98bd96a3c67e20d..f6b016ee0c9d2aa3e22be526279b009f88ba7bf0 100644
 --- a/src/mln/style/style_impl.cpp
 +++ b/src/mln/style/style_impl.cpp
-@@ -160,7 +160,11 @@ std::string Style::Impl::getURL() const {
+@@ -164,7 +164,11 @@ std::string Style::Impl::getURL() const {
  }
  
  void Style::Impl::setTransitionOptions(const TransitionOptions& options) {
@@ -854,7 +854,7 @@ index 5c9634227e40b666406e4f8020e88b804bbe7825..6240b4106283e5c9a728c89c5dd18f49
  }
  
  namespace {
-@@ -254,6 +258,7 @@ void Style::Impl::addSource(std::unique_ptr<Source> source) {
+@@ -258,6 +262,7 @@ void Style::Impl::addSource(std::unique_ptr<Source> source) {
      if (fileSource) {
          item->loadDescription(*fileSource);
      }
@@ -862,7 +862,7 @@ index 5c9634227e40b666406e4f8020e88b804bbe7825..6240b4106283e5c9a728c89c5dd18f49
  }
  
  std::unique_ptr<Source> Style::Impl::removeSource(const std::string& id) {
-@@ -269,6 +274,7 @@ std::unique_ptr<Source> Style::Impl::removeSource(const std::string& id) {
+@@ -273,6 +278,7 @@ std::unique_ptr<Source> Style::Impl::removeSource(const std::string& id) {
  
      if (source) {
          source->setObserver(nullptr);
@@ -870,7 +870,7 @@ index 5c9634227e40b666406e4f8020e88b804bbe7825..6240b4106283e5c9a728c89c5dd18f49
      }
  
      return source;
-@@ -410,6 +416,7 @@ void Style::Impl::removeImage(const std::string& id) {
+@@ -424,6 +430,7 @@ void Style::Impl::removeImage(const std::string& id) {
      }
      newImages->erase(found);
      images = std::move(newImages);

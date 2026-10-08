@@ -4568,3 +4568,193 @@ fn projection_captures_last_rendered_update_and_survives_session() {
     .join()
     .unwrap();
 }
+
+#[test]
+fn globe_background_renders_a_sphere_and_projection_snapshot_survives_map() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+    let (_context, session) = create_owned_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(512, 512, 1.0),
+    )
+    .unwrap();
+    map.set_style_json(br##"{"version":8,"projection":{"type":"globe"},"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#0000ff"}}]}"##).unwrap();
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(0.0, 0.0));
+    camera.zoom = Some(0.0);
+    map.jump_to(&camera).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let image = loop {
+        runtime.pump(Some(Duration::ZERO), None).unwrap();
+        session.render_update().unwrap();
+        match session.texture_image_info() {
+            Ok(info) => {
+                let mut pixels = vec![0; info.byte_length];
+                session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+                let center = (256 * 512 + 256) * 4;
+                if pixels[center..center + 4] == [0, 0, 255, 255] {
+                    break pixels;
+                }
+            }
+            Err(error) if error.kind() == ErrorKind::InvalidState => {}
+            Err(error) => panic!("unexpected globe readback error: {error:?}"),
+        }
+        assert!(Instant::now() < deadline, "globe background did not render");
+    };
+    assert_eq!(image[3], 0, "the corner lies outside the globe");
+    let coordinate = LatLng::new(20.0, 30.0);
+    let map_point = map.pixel_for_lat_lng(coordinate).unwrap();
+    let projection = session.create_projection().unwrap();
+    let point = projection.pixel_for_lat_lng(coordinate).unwrap();
+    assert!((point.x - map_point.x).abs() < 1e-6);
+    assert!((point.y - map_point.y).abs() < 1e-6);
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+    std::thread::spawn(move || {
+        let result = projection.lat_lng_for_pixel(point).unwrap();
+        assert!((result.latitude - coordinate.latitude).abs() < 1e-6);
+        assert!((result.longitude - coordinate.longitude).abs() < 1e-6);
+        projection.close().unwrap();
+    })
+    .join()
+    .unwrap();
+}
+
+#[test]
+fn globe_rendered_query_excludes_the_point_behind_the_horizon() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+    let (_context, session) = create_owned_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(512, 512, 1.0),
+    )
+    .unwrap();
+    map.set_style_json(br##"{"version":8,"projection":{"type":"globe"},"sources":{"points":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"front","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}},{"type":"Feature","id":"back","properties":{},"geometry":{"type":"Point","coordinates":[180,0]}}]}}},"layers":[{"id":"points","type":"circle","source":"points","paint":{"circle-radius":12,"circle-color":"red"}}]}"##).unwrap();
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(0.0, 0.0));
+    camera.zoom = Some(0.0);
+    map.jump_to(&camera).unwrap();
+    let geometry = RenderedQueryGeometry::box_(ScreenBox::new(
+        ScreenPoint::new(0.0, 0.0),
+        ScreenPoint::new(512.0, 512.0),
+    ));
+    let mut options = RenderedFeatureQueryOptions::default();
+    options.layer_ids = Some(vec!["points".into()]);
+    for (longitude, expected_id) in [(0.0, "front"), (180.0, "back")] {
+        camera.center = Some(LatLng::new(0.0, longitude));
+        map.jump_to(&camera).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let features = loop {
+            runtime.pump(Some(Duration::ZERO), None).unwrap();
+            session.render_update().unwrap();
+            let features = session
+                .query_rendered_features(&geometry, Some(&options))
+                .unwrap();
+            if !features.is_empty() {
+                break features;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "the visible globe point did not render at {longitude}"
+            );
+        };
+        assert_eq!(features.len(), 1);
+        let feature: JsonValue = serde_json::from_slice(&features[0].feature).unwrap();
+        assert_eq!(feature["id"], expected_id);
+        let center_query = RenderedQueryGeometry::point(ScreenPoint::new(256.0, 256.0));
+        let center = session
+            .query_rendered_features(&center_query, Some(&options))
+            .unwrap();
+        assert_eq!(center.len(), 1);
+        let feature: JsonValue = serde_json::from_slice(&center[0].feature).unwrap();
+        assert_eq!(feature["id"], expected_id);
+    }
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+fn location_bearing_accuracy_sector_keeps_its_direction_on_globe_and_mercator() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(256, 256, 1.0)).unwrap();
+    let (_context, session) = create_owned_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(256, 256, 1.0),
+    )
+    .unwrap();
+    for projection in ["mercator", "globe"] {
+        for bearing in [0, 90] {
+            let style = json!({"version":8,"transition":{"duration":0},"projection":{"type":projection},"sources":{},"layers":[{
+                "id":"location","type":"location-indicator","paint":{
+                    "location":[0,0,0], "bearing":bearing, "bearing-accuracy":30,
+                    "bearing-accuracy-radius":40, "bearing-accuracy-color":"red"
+                }
+            }]});
+            map.set_style_json(&serde_json::to_vec(&style).unwrap())
+                .unwrap();
+            let mut camera = CameraOptions::default();
+            camera.center = Some(LatLng::new(0.0, 0.0));
+            camera.zoom = Some(3.0);
+            map.jump_to(&camera).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let pixels = loop {
+                runtime.pump(Some(Duration::ZERO), None).unwrap();
+                session.render_update().unwrap();
+                if let Ok(info) = session.texture_image_info() {
+                    let mut pixels = vec![0; info.byte_length];
+                    session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+                    if pixels.chunks_exact(4).any(|p| p[0] > 100) {
+                        break pixels;
+                    }
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "bearing sector did not render on {projection}"
+                );
+            };
+            let mut north = 0u64;
+            let mut south = 0u64;
+            let mut east = 0u64;
+            let mut west = 0u64;
+            for (i, pixel) in pixels.chunks_exact(4).enumerate() {
+                let x = i % 256;
+                let y = i / 256;
+                if y < 128 {
+                    north += u64::from(pixel[0]);
+                } else {
+                    south += u64::from(pixel[0]);
+                }
+                if x < 128 {
+                    west += u64::from(pixel[0]);
+                } else {
+                    east += u64::from(pixel[0]);
+                }
+            }
+            if bearing == 0 {
+                assert!(
+                    north > 4 * south,
+                    "north sector points elsewhere on {projection}"
+                );
+            } else {
+                assert!(
+                    east > 4 * west,
+                    "east sector points elsewhere on {projection}: N={north} S={south} E={east} W={west}"
+                );
+            }
+        }
+    }
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}

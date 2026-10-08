@@ -54,6 +54,7 @@ mlt_vendor_paths=(
 # applied to the worktree rather than tracked as a fork, so the submodule keeps
 # pointing at maplibre/maplibre-native. See patches/maplibre-native/README.md.
 mln_patches=(
+  "$repo_root/patches/maplibre-native/0037-globe-projection.patch"
   "$repo_root/patches/maplibre-native/0002-windows-local-file-urls.patch"
   "$repo_root/patches/maplibre-native/0003-run-loop-budget.patch"
   "$repo_root/patches/maplibre-native/0004-opengl-valid-api-calls.patch"
@@ -77,6 +78,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0032-webgpu-frame-stats.patch"
   "$repo_root/patches/maplibre-native/0034-opengl-large-uniform-blocks.patch"
   "$repo_root/patches/maplibre-native/0035-plugin-gl-attributes-by-name.patch"
+  "$repo_root/patches/maplibre-native/0038-globe-query-horizon-roundoff.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the

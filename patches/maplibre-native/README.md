@@ -197,3 +197,22 @@ every listed patch's paths, the sync prints the path first. A forced checkout
 also removes an untracked file that sits where a new pin adds a tracked one, and
 the sync removes a file that a listed patch adds before applying that patch
 again.
+
+`0037-globe-projection.patch` imports globe projection for OpenGL, Metal,
+Vulkan, and WebGPU from
+[maplibre-native#4533](https://github.com/maplibre/maplibre-native/pull/4533),
+at commit `17547886bf59ec76a3d99eba8337b28139c0ce2c`. It carries the core,
+shader, and CMake changes; upstream tests, fixtures, and SDK examples stay
+upstream. A style selects the globe with `"projection": {"type": "globe"}`. The
+patch applies before the other carried changes so that camera animations,
+location indicators, queries, and source-free styles preserve their FFI
+behavior.
+
+`0038-globe-query-horizon-roundoff.patch` allows projection roundoff when the
+globe query path checks whether a rectangle crosses the antimeridian. Shrinking
+corners outside the sphere preserves their horizon locations, but floating-point
+roundoff can move them just outside the original bounds. Treating that as a wrap
+moves the query away from visible features. The check includes the rectangle
+center to detect a real antimeridian crossing when all four corners lie in the
+sky. This patch follows the globe import and remains separate for submission to
+its upstream branch.
