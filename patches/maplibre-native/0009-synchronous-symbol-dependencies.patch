@@ -1,8 +1,8 @@
 diff --git a/src/mln/tile/geometry_tile_worker.cpp b/src/mln/tile/geometry_tile_worker.cpp
-index 2b3a193d09fb2dbb1d6bb0d3f8ed470c5d2d4fe5..885d61897eabc3f56a4226998653bdf7915f46a9 100644
+index 6203eae200182fa544cb92ffcf69a2b3a92043a2..efbee9b8010d018cf507fc7645fe35582c3eb899 100644
 --- a/src/mln/tile/geometry_tile_worker.cpp
 +++ b/src/mln/tile/geometry_tile_worker.cpp
-@@ -376,7 +376,8 @@ void GeometryTileWorker::onImagesAvailable(ImageMap newIconMap,
+@@ -378,7 +378,8 @@ void GeometryTileWorker::onImagesAvailable(ImageMap newIconMap,
      symbolDependenciesChanged();
  }
  
@@ -12,7 +12,7 @@ index 2b3a193d09fb2dbb1d6bb0d3f8ed470c5d2d4fe5..885d61897eabc3f56a4226998653bdf7
      MLN_TRACE_FUNC();
  
      for (auto& fontDependencies : glyphDependencies.glyphs) {
-@@ -397,16 +398,14 @@ void GeometryTileWorker::requestNewGlyphs(const GlyphDependencies& glyphDependen
+@@ -399,16 +400,14 @@ void GeometryTileWorker::requestNewGlyphs(const GlyphDependencies& glyphDependen
              }
          }
      }
@@ -34,7 +34,7 @@ index 2b3a193d09fb2dbb1d6bb0d3f8ed470c5d2d4fe5..885d61897eabc3f56a4226998653bdf7
      if (!pendingImageDependencies.empty()) {
          parent.invoke(&GeometryTile::getImages, std::make_pair(pendingImageDependencies, ++imageCorrelationID));
      }
-@@ -530,8 +529,7 @@ void GeometryTileWorker::parse() {
+@@ -533,8 +532,7 @@ void GeometryTileWorker::parse() {
          }
      }
  
@@ -45,10 +45,10 @@ index 2b3a193d09fb2dbb1d6bb0d3f8ed470c5d2d4fe5..885d61897eabc3f56a4226998653bdf7
      MBGL_TIMING_FINISH(watch,
                         " Action: " << "Parsing,"
 diff --git a/src/mln/tile/geometry_tile_worker.hpp b/src/mln/tile/geometry_tile_worker.hpp
-index dd3bb48c53546332d4c17d3cad3d16c3aec9c76e..d488206f573992917e2dee4fd3166c20843c5095 100644
+index 86ad75063fabf5fd45e908efaae3db78ebc5cd09..ff8619639642951a9230ae4b3877bfb3aff4f1aa 100644
 --- a/src/mln/tile/geometry_tile_worker.hpp
 +++ b/src/mln/tile/geometry_tile_worker.hpp
-@@ -76,8 +76,7 @@ private:
+@@ -78,8 +78,7 @@ private:
  
      void coalesce();
  

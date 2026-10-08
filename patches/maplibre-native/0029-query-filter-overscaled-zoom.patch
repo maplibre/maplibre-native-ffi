@@ -1,5 +1,5 @@
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index c8c03057ca79..0d126e2483e8 100644
+index c8c03057ca790f88538a792ba5775a436e546a48..0d126e2483e8c674484d3d886af58547df83e581 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
 @@ -34,6 +34,7 @@
@@ -11,10 +11,10 @@ index c8c03057ca79..0d126e2483e8 100644
  - [core] Fix rendered-feature queries near the final endpoint of an offset line.
  - [OpenGL] Fix invisible raster layers on Adreno 3xx by avoiding an in-place alpha assignment in the fragment shader.
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
-index f63904c2136b..3366ce49f538 100644
+index 45b72e1246f48eb9233946b1f5ed1f94489af018..c04c3f80ca7403faf68a416482e2c9774ea75d7c 100644
 --- a/src/mln/geometry/feature_index.cpp
 +++ b/src/mln/geometry/feature_index.cpp
-@@ -155,7 +155,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
+@@ -156,7 +156,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
                           const double scale,
                           const RenderedQueryOptions& queryOptions,
                           const GlobalStateMap* globalState,
@@ -23,7 +23,7 @@ index f63904c2136b..3366ce49f538 100644
                           const std::unordered_map<std::string, const RenderLayer*>& layers,
                           const float additionalQueryPadding,
                           const SourceFeatureState& sourceFeatureState) const {
-@@ -186,7 +186,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
+@@ -187,7 +187,7 @@ void FeatureIndex::query(std::unordered_map<std::string, std::vector<Feature>>&
                     indexedFeature,
                     queryOptions,
                     globalState,
@@ -32,7 +32,7 @@ index f63904c2136b..3366ce49f538 100644
                     layers,
                     queryGeometry,
                     transformState,
-@@ -239,7 +239,7 @@ std::unordered_map<std::string, std::vector<Feature>> FeatureIndex::lookupSymbol
+@@ -241,7 +241,7 @@ std::unordered_map<std::string, std::vector<Feature>> FeatureIndex::lookupSymbol
                     symbolFeature,
                     queryOptions,
                     globalState,
@@ -40,8 +40,8 @@ index f63904c2136b..3366ce49f538 100644
 +                   tileID,
                     layers,
                     GeometryCoordinates(),
-                    {},
-@@ -254,7 +254,7 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
+                    unusedState,
+@@ -256,7 +256,7 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
                                const RefIndexedSubfeature& indexedFeature,
                                const RenderedQueryOptions& options,
                                const GlobalStateMap* globalState,
@@ -50,7 +50,7 @@ index f63904c2136b..3366ce49f538 100644
                                const std::unordered_map<std::string, const RenderLayer*>& layers,
                                const GeometryCoordinates& queryGeometry,
                                const TransformState& transformState,
-@@ -302,13 +302,14 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
+@@ -298,13 +298,14 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
              continue;
          }
  
@@ -69,10 +69,10 @@ index f63904c2136b..3366ce49f538 100644
          feature.sourceLayer = sourceLayer->getName();
          feature.state = state;
 diff --git a/src/mln/geometry/feature_index.hpp b/src/mln/geometry/feature_index.hpp
-index 84eacdf3bebe..4d337e6f2f94 100644
+index b790fee45d2f9b10bd5c72bf9770bfcebc296943..7639d3cd6a00209fff119e82237832da32e8f921 100644
 --- a/src/mln/geometry/feature_index.hpp
 +++ b/src/mln/geometry/feature_index.hpp
-@@ -126,7 +126,7 @@ public:
+@@ -127,7 +127,7 @@ public:
                 double scale,
                 const RenderedQueryOptions& options,
                 const GlobalStateMap* globalState,
@@ -81,7 +81,7 @@ index 84eacdf3bebe..4d337e6f2f94 100644
                 const std::unordered_map<std::string, const RenderLayer*>&,
                 float additionalQueryPadding,
                 const SourceFeatureState& sourceFeatureState) const;
-@@ -152,7 +152,7 @@ private:
+@@ -153,7 +153,7 @@ private:
                      const RefIndexedSubfeature&,
                      const RenderedQueryOptions& options,
                      const GlobalStateMap* globalState,
@@ -91,10 +91,10 @@ index 84eacdf3bebe..4d337e6f2f94 100644
                      const GeometryCoordinates& queryGeometry,
                      const TransformState& transformState,
 diff --git a/src/mln/tile/geometry_tile.cpp b/src/mln/tile/geometry_tile.cpp
-index a817b5d0f226..999ae01a5787 100644
+index 18c2cb95810088ab2e83072e1bbf2d7ee16d2d12..ec8d1e1ec562ab226eede7e6de9ff8c6f74f3b62 100644
 --- a/src/mln/tile/geometry_tile.cpp
 +++ b/src/mln/tile/geometry_tile.cpp
-@@ -535,7 +535,7 @@ void GeometryTile::queryRenderedFeatures(std::unordered_map<std::string, std::ve
+@@ -542,7 +542,7 @@ void GeometryTile::queryRenderedFeatures(std::unordered_map<std::string, std::ve
                                        std::pow(2, transformState.getZoom() - id.overscaledZ),
                                        options,
                                        globalState,
@@ -104,7 +104,7 @@ index a817b5d0f226..999ae01a5787 100644
                                        queryPadding * transformState.maxPitchScaleFactor(),
                                        featureState);
 diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
-index b94f10253df4..332ece1727ac 100644
+index b94f10253df4cf7364875a8e80c27f65b7ee2b6a..332ece1727acb037704d85a86a91ad8337547af0 100644
 --- a/test/api/query.test.cpp
 +++ b/test/api/query.test.cpp
 @@ -1,4 +1,5 @@

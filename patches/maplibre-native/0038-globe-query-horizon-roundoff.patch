@@ -1,0 +1,27 @@
+diff --git a/src/mln/renderer/tile_pyramid.cpp b/src/mln/renderer/tile_pyramid.cpp
+index de32beede499d973f0b30d8c030c933d1cd61265..2d3faebc03d55cc9cdf58086ae81b6ac5d26d107 100644
+--- a/src/mln/renderer/tile_pyramid.cpp
++++ b/src/mln/renderer/tile_pyramid.cpp
+@@ -395,11 +395,19 @@ std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRendered
+         screenBox.max.y -= shrink;
+         const auto bounds = mapbox::geometry::envelope(queryGeometry);
+         const bool covered = std::ranges::all_of(
+-            std::array<ScreenCoordinate, 4>{
+-                screenBox.min, {screenBox.max.x, screenBox.min.y}, {screenBox.min.x, screenBox.max.y}, screenBox.max},
++            std::array<ScreenCoordinate, 5>{
++                screenBox.min,
++                {screenBox.max.x, screenBox.min.y},
++                {screenBox.min.x, screenBox.max.y},
++                screenBox.max,
++                {(screenBox.min.x + screenBox.max.x) * 0.5, (screenBox.min.y + screenBox.max.y) * 0.5}},
+             [&](const ScreenCoordinate& corner) {
+                 const auto c = toWorld(corner);
+-                return bounds.min.x <= c.x && c.x <= bounds.max.x && bounds.min.y <= c.y && c.y <= bounds.max.y;
++                // Shrinking sky corners preserves their horizon location. Allow projection roundoff before
++                // interpreting a bounds miss as an antimeridian crossing.
++                constexpr double epsilon = 16.0 * std::numeric_limits<double>::epsilon();
++                return bounds.min.x - epsilon <= c.x && c.x <= bounds.max.x + epsilon &&
++                       bounds.min.y - epsilon <= c.y && c.y <= bounds.max.y + epsilon;
+             });
+         if (!covered) {
+             for (auto& c : queryGeometry) {
