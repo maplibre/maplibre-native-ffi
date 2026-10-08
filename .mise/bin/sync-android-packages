@@ -32,6 +32,38 @@ if [[ -z "$sdk_root" ]]; then
   exit 1
 fi
 
+# A post-install step runs from wherever mise invoked it.
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+compile_sdk="$(
+  sed -n 's/^android-compileSdk = "\([0-9][0-9]*\)"/\1/p' "$repository_root/gradle/libs.versions.toml" |
+    head -n1
+)"
+if [[ -z "$compile_sdk" ]]; then
+  echo "${0##*/}: could not read android-compileSdk from gradle/libs.versions.toml" >&2
+  exit 1
+fi
+
+# Each package with the directory that proves it is installed, so a rerun against an
+# SDK that already has them starts no JVM and reaches no network. Command-line tools
+# are only needed when a package is missing; a complete Studio SDK may omit them.
+packages=(
+  "ndk;${ndk_version}|ndk/${ndk_version}"
+  "cmake;${cmake_version}|cmake/${cmake_version}"
+  "platforms;android-${compile_sdk}|platforms/android-${compile_sdk}"
+  "platform-tools|platform-tools"
+)
+
+missing=()
+for entry in "${packages[@]}"; do
+  if [[ ! -d "$sdk_root/${entry#*|}" ]]; then
+    missing+=("${entry%%|*}")
+  fi
+done
+
+if [[ ${#missing[@]} -eq 0 ]]; then
+  exit 0
+fi
+
 # mise installs the command-line tools under their version, while an SDK from
 # Android Studio or a CI image keeps them under `latest`, which sorts last.
 sdkmanager="$sdk_root/cmdline-tools/${MISE_TOOL_VERSION:-}/bin/sdkmanager"
@@ -55,37 +87,6 @@ tools_version_dir="$(cd "$(dirname "$sdkmanager")/.." && pwd)"
 latest_tools="$sdk_root/cmdline-tools/latest"
 if [[ ! -e "$latest_tools" ]]; then
   ln -s "${tools_version_dir##*/}" "$latest_tools"
-fi
-
-# A post-install step runs from wherever mise invoked it.
-repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-compile_sdk="$(
-  sed -n 's/^android-compileSdk = "\([0-9][0-9]*\)"/\1/p' "$repository_root/gradle/libs.versions.toml" |
-    head -n1
-)"
-if [[ -z "$compile_sdk" ]]; then
-  echo "${0##*/}: could not read android-compileSdk from gradle/libs.versions.toml" >&2
-  exit 1
-fi
-
-# Each package with the directory that proves it is installed, so a rerun against an
-# SDK that already has them starts no JVM and reaches no network.
-packages=(
-  "ndk;${ndk_version}|ndk/${ndk_version}"
-  "cmake;${cmake_version}|cmake/${cmake_version}"
-  "platforms;android-${compile_sdk}|platforms/android-${compile_sdk}"
-  "platform-tools|platform-tools"
-)
-
-missing=()
-for entry in "${packages[@]}"; do
-  if [[ ! -d "$sdk_root/${entry#*|}" ]]; then
-    missing+=("${entry%%|*}")
-  fi
-done
-
-if [[ ${#missing[@]} -eq 0 ]]; then
-  exit 0
 fi
 
 echo "Installing Android SDK packages: ${missing[*]}"
