@@ -740,6 +740,24 @@ MLN_API mln_status mln_map_set_projection_mode(
 ) MLN_NOEXCEPT;
 
 /**
+ * Reports whether the globe hides a location from the current map camera.
+ *
+ * Mercator maps report false. Screen projection alone can place a hidden
+ * location inside the viewport; use this query to check globe visibility.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_occluded is
+ *   null, or coordinate contains invalid latitude or longitude values.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_is_location_occluded(
+  mln_map map, mln_lat_lng coordinate, bool* out_occluded
+) MLN_NOEXCEPT;
+
+/**
  * Converts a geographic world coordinate to a screen point for the current map.
  *
  * The output point uses logical map pixels with an origin at the top-left of

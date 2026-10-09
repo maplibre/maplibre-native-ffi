@@ -43,6 +43,13 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
     }
   }
 
+  public actual fun isLocationOccluded(coordinate: LatLng): Boolean {
+    NativeAccess.ensureLoaded()
+    return withLiveHandle { handle ->
+      NativeAccess.projectionIsLocationOccluded(handle, coordinate)
+    }
+  }
+
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
     NativeAccess.ensureLoaded()
     return withLiveHandle { handle -> NativeAccess.projectionPixelForLatLng(handle, coordinate) }

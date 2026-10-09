@@ -1282,6 +1282,44 @@ impl super::MapHandle {
         unsafe { maplibre_core::string::copy_owned_buffer(buffer) }.map(Some)
     }
 
+    /// Sets the style projection from a style-spec projection JSON object.
+    pub fn set_style_projection_json(&self, projection_json: &[u8]) -> Result<()> {
+        let map = self.inner.native()?;
+        let projection_json = maplibre_core::string::buffer_view(projection_json);
+        // SAFETY: map is live and projection_json remains valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_projection_json(map, projection_json)
+        })
+    }
+
+    /// Sets one style projection property.
+    pub fn set_style_projection_property(&self, property_name: &str, value: &[u8]) -> Result<()> {
+        let map = self.inner.native()?;
+        let property_name = maplibre_core::string::string_view(property_name);
+        let value = maplibre_core::string::buffer_view(value);
+        // SAFETY: map is live, and property_name and value remain valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_projection_property(map, property_name.raw(), value)
+        })
+    }
+
+    /// Copies one style projection property as a style-spec JSON value.
+    pub fn style_projection_property(&self, property_name: &str) -> Result<Option<Vec<u8>>> {
+        let map = self.inner.native()?;
+        let property_name = maplibre_core::string::string_view(property_name);
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        // SAFETY: map is live, property_name is valid for this call, and out is
+        // a null-initialized out-pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_projection_property(map, property_name.raw(), out.as_mut_ptr())
+        })?;
+        let Some(buffer) = out.into_option() else {
+            return Ok(None);
+        };
+        // SAFETY: Success transfers the owned buffer to this call.
+        unsafe { maplibre_core::string::copy_owned_buffer(buffer) }.map(Some)
+    }
+
     /// Sets the style's global transition options. This replaces the whole
     /// configuration rather than merging, and loading a style replaces it
     /// again, so apply an override after the style loads.

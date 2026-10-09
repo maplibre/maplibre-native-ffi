@@ -92,6 +92,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_type
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_projection_property
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_tile_urls
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_type
@@ -103,6 +104,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_sour
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_mvt_vector_source_tile
 import org.maplibre.nativeffi.internal.c.mln_map_is_fully_loaded
 import org.maplibre.nativeffi.internal.c.mln_map_is_gesture_in_progress
+import org.maplibre.nativeffi.internal.c.mln_map_is_location_occluded
 import org.maplibre.nativeffi.internal.c.mln_map_jump_to
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera_unwrapped
@@ -167,6 +169,8 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_property
+import org.maplibre.nativeffi.internal.c.mln_map_set_style_projection_json
+import org.maplibre.nativeffi.internal.c.mln_map_set_style_projection_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_source_volatile
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_url
@@ -1259,6 +1263,43 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     else ByteStructs.ownedBuffer(outValue.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
+  public actual fun setStyleProjectionJson(projectionJson: ByteArray) {
+    memScoped {
+      Status.check(
+        mln_map_set_style_projection_json(
+          state.requireLive().rawHandleValue,
+          ByteStructs.bufferView(projectionJson, this),
+        )
+      )
+    }
+  }
+
+  public actual fun setStyleProjectionProperty(propertyName: String, value: ByteArray) {
+    memScoped {
+      Status.check(
+        mln_map_set_style_projection_property(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(propertyName, this),
+          ByteStructs.bufferView(value, this),
+        )
+      )
+    }
+  }
+
+  public actual fun styleProjectionProperty(propertyName: String): ByteArray? = memScoped {
+    val outValue = alloc<ULongVar>()
+    outValue.value = 0uL
+    Status.check(
+      mln_map_get_style_projection_property(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(propertyName, this),
+        outValue.ptr,
+      )
+    )
+    if (outValue.value == 0uL) null
+    else ByteStructs.ownedBuffer(outValue.value.asHandle("mln_buffer", ::ownedBufferHandle))
+  }
+
   public actual fun setStyleTransitionOptions(options: StyleTransitionOptions) {
     memScoped {
       Status.check(
@@ -1871,6 +1912,18 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         )
       }
     }
+
+  public actual fun isLocationOccluded(coordinate: LatLng): Boolean = memScoped {
+    val outOccluded = alloc<BooleanVar>()
+    Status.check(
+      mln_map_is_location_occluded(
+        state.requireLive().rawHandleValue,
+        CoreStructs.latLng(coordinate),
+        outOccluded.ptr,
+      )
+    )
+    outOccluded.value
+  }
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint = memScoped {
     val outPoint = alloc<mln_screen_point>()

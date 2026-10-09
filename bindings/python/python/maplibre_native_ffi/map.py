@@ -442,6 +442,12 @@ class MapProjectionHandle(NativeHandleMixin):
             (padding.top, padding.left, padding.bottom, padding.right),
         )
 
+    def is_location_occluded(self, coordinate: LatLng) -> bool:
+        """Report whether the globe hides a location from the helper camera."""
+        return self._native.is_location_occluded(
+            coordinate.latitude, coordinate.longitude
+        )
+
     def pixel_for_lat_lng(self, coordinate: LatLng) -> ScreenPoint:
         """Convert a geographic coordinate to a screen-space point."""
         from .camera import ScreenPoint
@@ -998,6 +1004,18 @@ class MapHandle(NativeHandleMixin):
         """Return one style light property as a style-spec JSON value."""
         return self._native.get_style_light_property(property_name)
 
+    def set_style_projection_json(self, projection_json: bytes) -> None:
+        """Set the style projection from a style-spec projection JSON object."""
+        self._native.set_style_projection_json(projection_json)
+
+    def set_style_projection_property(self, property_name: str, value: bytes) -> None:
+        """Set one style projection property by style-spec property name."""
+        self._native.set_style_projection_property(property_name, value)
+
+    def get_style_projection_property(self, property_name: str) -> bytes | None:
+        """Return one style projection property as a style-spec JSON value."""
+        return self._native.get_style_projection_property(property_name)
+
     def set_style_transition_options(self, options: StyleTransitionOptions) -> None:
         """Set the style's global transition options.
 
@@ -1478,6 +1496,12 @@ class MapHandle(NativeHandleMixin):
     def set_projection_mode(self, mode: ProjectionMode) -> None:
         """Apply axonometric rendering option fields to the map."""
         self._native.set_projection_mode(mode.axonometric, mode.x_skew, mode.y_skew)
+
+    def is_location_occluded(self, coordinate: LatLng) -> bool:
+        """Return whether the globe hides a location from the current camera."""
+        return self._native.is_location_occluded(
+            coordinate.latitude, coordinate.longitude
+        )
 
     def pixel_for_lat_lng(self, coordinate: LatLng) -> ScreenPoint:
         """Convert a geographic world coordinate to a screen point for this map."""

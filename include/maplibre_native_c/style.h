@@ -2013,6 +2013,72 @@ MLN_API mln_status mln_map_get_style_light_property(
 ) MLN_NOEXCEPT;
 
 /**
+ * Sets the style projection from a style-spec projection JSON object.
+ *
+ * The object's type property accepts "mercator", "vertical-perspective",
+ * "globe", a projection transition, or a zoom expression. The globe preset
+ * transitions to Mercator between zoom 11 and 12. An empty object restores the
+ * default projection. Loading another style replaces this override; apply it
+ * after the style loads.
+ *
+ * projection_json is borrowed for the call. The function parses and copies the
+ * accepted projection into MapLibre Native before return.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, projection_json
+ * is empty or invalid, or the projection JSON cannot be converted.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_style_projection_json(
+  mln_map map, mln_buffer_view projection_json
+) MLN_NOEXCEPT;
+
+/**
+ * Sets one style projection property using its MapLibre style-spec property
+ * name.
+ *
+ * property_name and value are borrowed for the call. value is a style-spec JSON
+ * value. The function parses and copies the accepted value into
+ * MapLibre Native's typed projection property storage before return.
+ * The supported property is "type"; its value may be a constant projection
+ * definition or a zoom expression.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, property_name is
+ *   invalid or empty, value is empty or invalid, the property name is unknown,
+ *   or the property value cannot be converted for that property.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_style_projection_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
+) MLN_NOEXCEPT;
+
+/**
+ * Serializes one style projection property as a style-spec JSON value.
+ *
+ * On success, *out_value receives an owned UTF-8 JSON buffer. Destroy it
+ * with mln_buffer_destroy(). Undefined native style projection properties
+ * return null buffers.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, property_name is
+ *   invalid or empty, out_value is null, or *out_value is not null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_style_projection_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer* out_value
+) MLN_NOEXCEPT;
+
+/**
  * Sets the style's global transition options.
  *
  * options is borrowed for the call and copied into MapLibre Native before

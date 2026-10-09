@@ -2344,6 +2344,24 @@ impl MapHandle {
             .map_err(map_error)
     }
 
+    fn is_location_occluded(&self, latitude: f64, longitude: f64) -> PyResult<bool> {
+        let state = self.state();
+        let mut occluded = false;
+        // SAFETY: The C API validates the map, coordinate, and writable output.
+        maplibre_core::check(unsafe {
+            sys::mln_map_is_location_occluded(
+                state.handle(),
+                sys::mln_lat_lng {
+                    latitude,
+                    longitude,
+                },
+                &mut occluded,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(occluded)
+    }
+
     fn pixel_for_lat_lng(
         &self,
         py: Python<'_>,
@@ -3174,6 +3192,53 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, property name, and out pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_get_style_light_property(
+                state.handle(),
+                property_name.raw(),
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        out.into_option()
+            .map(|buffer| owned_buffer_to_py(py, buffer))
+            .transpose()
+    }
+
+    fn set_style_projection_json(&self, projection_json: &Bound<'_, PyBytes>) -> PyResult<()> {
+        let state = self.state();
+        let projection_json = maplibre_core::string::buffer_view(projection_json.as_bytes());
+        // SAFETY: The C API validates the map pointer and JSON buffer view.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_projection_json(state.handle(), projection_json)
+        })
+        .map_err(map_error)
+    }
+
+    fn set_style_projection_property(
+        &self,
+        property_name: String,
+        value: &Bound<'_, PyBytes>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let property_name = maplibre_core::string::string_view(&property_name);
+        let value = maplibre_core::string::buffer_view(value.as_bytes());
+        // SAFETY: The C API validates the map pointer, property name, and JSON buffer view.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_projection_property(state.handle(), property_name.raw(), value)
+        })
+        .map_err(map_error)
+    }
+
+    fn get_style_projection_property(
+        &self,
+        py: Python<'_>,
+        property_name: String,
+    ) -> PyResult<Option<Py<PyBytes>>> {
+        let state = self.state();
+        let property_name = maplibre_core::string::string_view(&property_name);
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        // SAFETY: The C API validates the map pointer, property name, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_projection_property(
                 state.handle(),
                 property_name.raw(),
                 out.as_mut_ptr(),
@@ -4042,6 +4107,24 @@ impl MapHandle {
 
 #[pymethods]
 impl MapProjectionHandle {
+    fn is_location_occluded(&self, latitude: f64, longitude: f64) -> PyResult<bool> {
+        let state = self.state();
+        let mut occluded = false;
+        // SAFETY: The C API validates the projection, coordinate, and writable output.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_is_location_occluded(
+                state.handle(),
+                sys::mln_lat_lng {
+                    latitude,
+                    longitude,
+                },
+                &mut occluded,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(occluded)
+    }
+
     fn close(&self) -> PyResult<()> {
         let state = self.state();
         // SAFETY: state owns an mln_map_projection handle created by

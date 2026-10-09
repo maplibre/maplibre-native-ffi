@@ -970,6 +970,23 @@ func (m *MapHandle) SetProjectionMode(options ProjectionModeOptions) error {
 	})
 }
 
+// IsLocationOccluded reports whether the globe hides a location from the current camera.
+func (m *MapHandle) IsLocationOccluded(coordinate LatLng) (bool, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return false, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	var occluded C.bool
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_is_location_occluded(C.mln_map(ptr), cLatLng(coordinate), &occluded))
+	}); err != nil {
+		return false, err
+	}
+	return bool(occluded), nil
+}
+
 // PixelForLatLng converts a geographic coordinate to a logical screen point for
 // the current map.
 func (m *MapHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {

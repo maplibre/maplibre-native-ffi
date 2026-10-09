@@ -915,6 +915,15 @@ external int mln_map_get_style_light_property(
 );
 
 @ffi.Native<
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_buffer>)
+>()
+external int mln_map_get_style_projection_property(
+  int map,
+  mln_buffer_view property_name,
+  ffi.Pointer<mln_buffer> out_value,
+);
+
+@ffi.Native<
   ffi.Int32 Function(
     mln_map,
     mln_buffer_view,
@@ -1013,6 +1022,13 @@ external int mln_map_is_fully_loaded(int map, ffi.Pointer<ffi.Bool> out_loaded);
 external int mln_map_is_gesture_in_progress(
   int map,
   ffi.Pointer<ffi.Bool> out_in_progress,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_map, mln_lat_lng, ffi.Pointer<ffi.Bool>)>()
+external int mln_map_is_location_occluded(
+  int map,
+  mln_lat_lng coordinate,
+  ffi.Pointer<ffi.Bool> out_occluded,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_camera_options>)>()
@@ -1196,6 +1212,15 @@ external int mln_map_projection_destroy(int projection);
 external int mln_map_projection_get_camera(
   int projection,
   ffi.Pointer<mln_camera_options> out_camera,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_map_projection, mln_lat_lng, ffi.Pointer<ffi.Bool>)
+>()
+external int mln_map_projection_is_location_occluded(
+  int projection,
+  mln_lat_lng coordinate,
+  ffi.Pointer<ffi.Bool> out_occluded,
 );
 
 @ffi.Native<
@@ -1629,6 +1654,19 @@ external int mln_map_set_style_light_json(int map, mln_buffer_view light_json);
 
 @ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_set_style_light_property(
+  int map,
+  mln_buffer_view property_name,
+  mln_buffer_view value,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view)>()
+external int mln_map_set_style_projection_json(
+  int map,
+  mln_buffer_view projection_json,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+external int mln_map_set_style_projection_property(
   int map,
   mln_buffer_view property_name,
   mln_buffer_view value,

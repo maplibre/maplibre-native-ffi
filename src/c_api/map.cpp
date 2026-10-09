@@ -857,6 +857,34 @@ auto mln_map_get_style_light_property(
   });
 }
 
+auto mln_map_set_style_projection_json(
+  mln_map map, mln_buffer_view projection_json
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_style_projection_json(map, projection_json);
+  });
+}
+
+auto mln_map_set_style_projection_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_style_projection_property(
+      map, property_name, value
+    );
+  });
+}
+
+auto mln_map_get_style_projection_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer* out_value
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_get_style_projection_property(
+      map, property_name, out_value
+    );
+  });
+}
+
 auto mln_map_set_style_transition_options(
   mln_map map, const mln_style_transition_options* options
 ) noexcept -> mln_status {
@@ -1132,6 +1160,14 @@ auto mln_map_set_tile_options(
   });
 }
 
+auto mln_map_is_location_occluded(
+  mln_map map, mln_lat_lng coordinate, bool* out_occluded
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_is_location_occluded(map, coordinate, out_occluded);
+  });
+}
+
 auto mln_map_pixel_for_lat_lng(
   mln_map map, mln_lat_lng coordinate, mln_screen_point* out_point
 ) noexcept -> mln_status {
@@ -1250,6 +1286,16 @@ auto mln_map_projection_set_visible_geometry(
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_projection_set_visible_geometry(
       projection, geometry, padding
+    );
+  });
+}
+
+auto mln_map_projection_is_location_occluded(
+  mln_map_projection projection, mln_lat_lng coordinate, bool* out_occluded
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_projection_is_location_occluded(
+      projection, coordinate, out_occluded
     );
   });
 }

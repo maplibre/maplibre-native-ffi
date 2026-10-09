@@ -666,6 +666,17 @@ impl MapHandle {
         maplibre_core::check(unsafe { sys::mln_map_set_projection_mode(map, &raw) })
     }
 
+    /// Reports whether the globe hides a location from the current camera.
+    pub fn is_location_occluded(&self, coordinate: LatLng) -> Result<bool> {
+        let map = self.inner.native()?;
+        let mut occluded = false;
+        // SAFETY: map is live, coordinate is passed by value, and occluded is writable.
+        maplibre_core::check(unsafe {
+            sys::mln_map_is_location_occluded(map, coordinate.to_native(), &mut occluded)
+        })?;
+        Ok(occluded)
+    }
+
     /// Converts a geographic world coordinate to a screen point for the current map.
     pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<ScreenPoint> {
         let map = self.inner.native()?;

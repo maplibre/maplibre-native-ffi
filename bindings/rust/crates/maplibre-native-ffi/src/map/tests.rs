@@ -1706,3 +1706,104 @@ fn coordinate_projection_follows_the_camera_world_copy_after_anchored_moves() {
     map.close().unwrap();
     runtime.close().unwrap();
 }
+
+#[test]
+fn runtime_projection_controls_occlusion_and_resets_with_the_style() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+    let front = LatLng::new(0.0, 0.0);
+    let back = LatLng::new(0.0, 180.0);
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    map.set_style_projection_json(br#"{"type":"globe"}"#)
+        .unwrap();
+    let snapshot = map.style_projection_property("type").unwrap().unwrap();
+    let mut camera = CameraOptions::default();
+    camera.center = Some(front);
+    camera.zoom = Some(0.0);
+    map.jump_to(&camera).unwrap();
+    assert!(!map.is_location_occluded(front).unwrap());
+    assert!(map.is_location_occluded(back).unwrap());
+    let projection = map.create_projection().unwrap();
+    assert!(!projection.is_location_occluded(front).unwrap());
+    assert!(projection.is_location_occluded(back).unwrap());
+    map.set_style_projection_property(
+        "type",
+        br#"["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]"#,
+    )
+    .unwrap();
+    camera.zoom = Some(4.0);
+    map.jump_to(&camera).unwrap();
+    assert!(!map.is_location_occluded(back).unwrap());
+    camera.zoom = Some(0.0);
+    map.jump_to(&camera).unwrap();
+    assert!(map.is_location_occluded(back).unwrap());
+    map.set_style_projection_json(b"{}").unwrap();
+    assert!(!map.is_location_occluded(back).unwrap());
+    map.set_style_projection_json(br#"{"type":"globe"}"#)
+        .unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    assert!(!map.is_location_occluded(back).unwrap());
+    map.close().unwrap();
+    runtime.close().unwrap();
+    std::thread::spawn(move || {
+        assert!(projection.is_location_occluded(back).unwrap());
+        let mut camera = CameraOptions::default();
+        camera.center = Some(back);
+        projection.set_camera(&camera).unwrap();
+        assert!(!projection.is_location_occluded(back).unwrap());
+        assert!(projection.is_location_occluded(front).unwrap());
+        projection.close().unwrap();
+    })
+    .join()
+    .unwrap();
+    assert_eq!(
+        serde_json::from_slice::<JsonValue>(&snapshot).unwrap(),
+        json!("globe")
+    );
+}
+
+#[test]
+fn screen_unprojection_keeps_horizon_locations_visible() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+    map.set_style_json(br#"{"version":8,"projection":{"type":"globe"},"sources":{},"layers":[]}"#)
+        .unwrap();
+    for latitude in [0.0, 40.0, 80.0] {
+        for pitch in [0.0, 30.0, 60.0] {
+            for bearing in [0.0, 45.0, 90.0, 135.0] {
+                let mut camera = CameraOptions::default();
+                camera.center = Some(LatLng::new(latitude, 100.0));
+                camera.zoom = Some(0.0);
+                camera.pitch = Some(pitch);
+                camera.bearing = Some(bearing);
+                map.jump_to(&camera).unwrap();
+                let projection = map.create_projection().unwrap();
+                for (x, y) in [
+                    (0.0, 0.0),
+                    (512.0, 0.0),
+                    (512.0, 512.0),
+                    (0.0, 512.0),
+                    (-512.0, 256.0),
+                    (256.0, -512.0),
+                    (1024.0, 256.0),
+                    (256.0, 1024.0),
+                ] {
+                    let pixel = ScreenPoint::new(x, y);
+                    let location = map.lat_lng_for_pixel(pixel).unwrap();
+                    assert!(
+                        !map.is_location_occluded(location).unwrap(),
+                        "{camera:?} {pixel:?} {location:?}"
+                    );
+                    let copied_location = projection.lat_lng_for_pixel(pixel).unwrap();
+                    assert!(!projection.is_location_occluded(copied_location).unwrap());
+                }
+                let back = LatLng::new(-latitude, -80.0);
+                assert!(map.is_location_occluded(back).unwrap());
+                assert!(projection.is_location_occluded(back).unwrap());
+                projection.close().unwrap();
+            }
+        }
+    }
+    map.close().unwrap();
+    runtime.close().unwrap();
+}

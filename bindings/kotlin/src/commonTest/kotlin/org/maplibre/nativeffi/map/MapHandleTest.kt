@@ -50,6 +50,60 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 import org.maplibre.nativeffi.style.VectorTileEncoding
 
 class MapHandleTest {
+  @Test
+  fun runtimeProjectionControlsOcclusionAndResetsWithTheStyle() {
+    val snapshot =
+      RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 512
+              height = 512
+            },
+          )
+          .use { map ->
+            val front = LatLng(0.0, 0.0)
+            val back = LatLng(0.0, 180.0)
+            val style = """{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()
+            map.setStyleJson(style)
+            map.setStyleProjectionJson("""{"type":"globe"}""".encodeToByteArray())
+            val snapshot = assertNotNull(map.styleProjectionProperty("type"))
+            map.jumpTo(
+              CameraOptions().apply {
+                center = front
+                zoom = 0.0
+              }
+            )
+            assertFalse(map.isLocationOccluded(front))
+            assertTrue(map.isLocationOccluded(back))
+            map.createProjection().use { projection ->
+              assertFalse(projection.isLocationOccluded(front))
+              assertTrue(projection.isLocationOccluded(back))
+              map.setStyleProjectionProperty(
+                "type",
+                """["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]"""
+                  .encodeToByteArray(),
+              )
+              map.jumpTo(CameraOptions().apply { zoom = 4.0 })
+              assertFalse(map.isLocationOccluded(back))
+              map.jumpTo(CameraOptions().apply { zoom = 0.0 })
+              assertTrue(map.isLocationOccluded(back))
+              map.setStyleProjectionJson("{}".encodeToByteArray())
+              assertFalse(map.isLocationOccluded(back))
+              map.setStyleProjectionJson("""{"type":"globe"}""".encodeToByteArray())
+              map.setStyleJson(style)
+              assertFalse(map.isLocationOccluded(back))
+              map.close()
+              assertTrue(projection.isLocationOccluded(back))
+              projection.setCamera(CameraOptions().apply { center = back })
+              assertFalse(projection.isLocationOccluded(back))
+              assertTrue(projection.isLocationOccluded(front))
+              snapshot
+            }
+          }
+      }
+    assertEquals(""""globe"""", snapshot.decodeToString())
+  }
 
   // BND-110: global-state lifetime and copied JSON values.
   @Test

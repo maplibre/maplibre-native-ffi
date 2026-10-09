@@ -52,6 +52,48 @@ int _dispatchLogRecord(
 }
 
 void main() {
+  test('runtime projection controls occlusion and resets with the style', () {
+    final runtime = RuntimeHandle.create();
+    addTearDown(runtime.close);
+    final map = runtime.createMap(
+      options: const MapOptions(width: 512, height: 512),
+    );
+    addTearDown(map.close);
+    const front = LatLng(0, 0);
+    const back = LatLng(0, 180);
+    map.setStyleJson(_jsonBytes(_emptyStyleJson));
+    map.setStyleProjectionJson(_jsonBytes('{"type":"globe"}'));
+    final snapshot = map.getStyleProjectionProperty('type')!;
+    map.jumpTo(const CameraOptions(center: front, zoom: 0));
+    expect(map.isLocationOccluded(front), isFalse);
+    expect(map.isLocationOccluded(back), isTrue);
+    final projection = map.createProjection();
+    addTearDown(projection.close);
+    expect(projection.isLocationOccluded(front), isFalse);
+    expect(projection.isLocationOccluded(back), isTrue);
+    map.setStyleProjectionProperty(
+      'type',
+      _jsonBytes(
+        '["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]',
+      ),
+    );
+    map.jumpTo(const CameraOptions(zoom: 4));
+    expect(map.isLocationOccluded(back), isFalse);
+    map.jumpTo(const CameraOptions(zoom: 0));
+    expect(map.isLocationOccluded(back), isTrue);
+    map.setStyleProjectionJson(_jsonBytes('{}'));
+    expect(map.isLocationOccluded(back), isFalse);
+    map.setStyleProjectionJson(_jsonBytes('{"type":"globe"}'));
+    map.setStyleJson(_jsonBytes(_emptyStyleJson));
+    expect(map.isLocationOccluded(back), isFalse);
+    map.close();
+    expect(projection.isLocationOccluded(back), isTrue);
+    projection.setCamera(const CameraOptions(center: back));
+    expect(projection.isLocationOccluded(back), isFalse);
+    expect(projection.isLocationOccluded(front), isTrue);
+    expect(jsonDecode(utf8.decode(snapshot)), 'globe');
+  });
+
   test('plugin registration accessor reaches the native registry', () {
     final address = Maplibre.pluginRegisterFunctionV1().address;
     final register =

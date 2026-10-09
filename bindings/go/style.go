@@ -2237,6 +2237,58 @@ func (m *MapHandle) StyleLightProperty(propertyName string) ([]byte, error) {
 	return goOwnedBuffer(buffer)
 }
 
+// SetStyleProjectionJSON sets the style projection from a style-spec projection JSON object.
+func (m *MapHandle) SetStyleProjectionJSON(projectionJSON []byte) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	rawJSON := newCBufferView(projectionJSON)
+	defer rawJSON.free()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_style_projection_json(C.mln_map(ptr), rawJSON.raw()))
+	})
+}
+
+// SetStyleProjectionProperty sets one style projection property.
+func (m *MapHandle) SetStyleProjectionProperty(propertyName string, value []byte) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	propertyView := newCStringView(propertyName)
+	defer propertyView.free()
+	rawValue := newCBufferView(value)
+	defer rawValue.free()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_style_projection_property(C.mln_map(ptr), propertyView.raw(), rawValue.raw()))
+	})
+}
+
+// StyleProjectionProperty returns one copied style projection property as a style-spec
+// JSON value.
+func (m *MapHandle) StyleProjectionProperty(propertyName string) ([]byte, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	propertyView := newCStringView(propertyName)
+	defer propertyView.free()
+	var buffer C.mln_buffer
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_style_projection_property(C.mln_map(ptr), propertyView.raw(), &buffer))
+	}); err != nil {
+		return nil, err
+	}
+	return goOwnedBuffer(buffer)
+}
+
 // SetStyleTransitionOptions replaces the style's global transition options
 // rather than merging into them, so absent duration and delay clear the
 // style-wide override. Loading a style replaces these options with the ones

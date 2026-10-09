@@ -1190,3 +1190,47 @@ private func jsonData(_ value: String) -> Data {
   try map.setGlobalStateProperty("theme", value: jsonData("null"))
   #expect(try map.globalState() == jsonData(#"{"theme":null}"#))
 }
+
+@Test func runtimeProjectionControlsOcclusionAndResetsWithTheStyle() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 512, height: 512)
+  )
+  defer { try? map.close() }
+  let front = LatLng(latitude: 0, longitude: 0)
+  let back = LatLng(latitude: 0, longitude: 180)
+  let style = Data(#"{"version":8,"sources":{},"layers":[]}"#.utf8)
+  try map.setStyleJSON(style)
+  try map.setStyleProjectionJSON(Data(#"{"type":"globe"}"#.utf8))
+  let snapshot = try #require(try map.styleProjectionProperty("type"))
+  try map.jump(to: CameraOptions(center: front, zoom: 0))
+  #expect(try !map.isLocationOccluded(front))
+  #expect(try map.isLocationOccluded(back))
+  let projection = try MapProjectionHandle(map: map)
+  defer { try? projection.close() }
+  #expect(try !projection.isLocationOccluded(front))
+  #expect(try projection.isLocationOccluded(back))
+  try map.setStyleProjectionProperty(
+    "type",
+    value: Data(#"["interpolate",["linear"],["zoom"],1,"vertical-perspective",3,"mercator"]"#
+      .utf8)
+  )
+  try map.jump(to: CameraOptions(zoom: 4))
+  #expect(try !map.isLocationOccluded(back))
+  try map.jump(to: CameraOptions(zoom: 0))
+  #expect(try map.isLocationOccluded(back))
+  try map.setStyleProjectionJSON(Data("{}".utf8))
+  #expect(try !map.isLocationOccluded(back))
+  try map.setStyleProjectionJSON(Data(#"{"type":"globe"}"#.utf8))
+  try map.setStyleJSON(style)
+  #expect(try !map.isLocationOccluded(back))
+  try map.close()
+  #expect(try projection.isLocationOccluded(back))
+  try projection.setCamera(CameraOptions(center: back))
+  #expect(try !projection.isLocationOccluded(back))
+  #expect(try projection.isLocationOccluded(front))
+  #expect(String(decoding: snapshot, as: UTF8.self) == #""globe""#)
+}

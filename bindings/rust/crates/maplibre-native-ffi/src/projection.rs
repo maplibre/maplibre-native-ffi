@@ -145,6 +145,21 @@ impl MapProjectionHandle {
         })
     }
 
+    /// Reports whether the globe hides a location from the helper camera.
+    pub fn is_location_occluded(&self, coordinate: LatLng) -> Result<bool> {
+        let projection = self.inner.native()?;
+        let mut occluded = false;
+        // SAFETY: projection is live, coordinate is passed by value, and occluded is writable.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_is_location_occluded(
+                projection,
+                coordinate.to_native(),
+                &mut occluded,
+            )
+        })?;
+        Ok(occluded)
+    }
+
     /// Converts a geographic world coordinate to a screen point.
     pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<ScreenPoint> {
         let projection = self.inner.native()?;

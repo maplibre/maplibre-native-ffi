@@ -295,6 +295,14 @@ auto map_set_style_light_property(
 auto map_get_style_light_property(
   mln_map map, mln_buffer_view property_name, mln_buffer* out_value
 ) -> mln_status;
+auto map_set_style_projection_json(mln_map map, mln_buffer_view projection_json)
+  -> mln_status;
+auto map_set_style_projection_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
+) -> mln_status;
+auto map_get_style_projection_property(
+  mln_map map, mln_buffer_view property_name, mln_buffer* out_value
+) -> mln_status;
 auto map_set_style_transition_options(
   mln_map map, const mln_style_transition_options* options
 ) -> mln_status;
@@ -383,6 +391,9 @@ auto map_get_tile_options(mln_map map, mln_map_tile_options* out_options)
   -> mln_status;
 auto map_set_tile_options(mln_map map, const mln_map_tile_options* options)
   -> mln_status;
+auto map_is_location_occluded(
+  mln_map map, mln_lat_lng coordinate, bool* out_occluded
+) -> mln_status;
 auto map_pixel_for_lat_lng(
   mln_map map, mln_lat_lng coordinate, mln_screen_point* out_point
 ) -> mln_status;
@@ -427,6 +438,10 @@ auto map_projection_set_visible_geometry(
   mln_map_projection projection, mln_buffer_view geometry,
   mln_edge_insets padding
 ) -> mln_status;
+auto map_projection_is_location_occluded(
+  mln_map_projection projection, mln_lat_lng coordinate, bool* out_occluded
+) -> mln_status;
+
 auto map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
   mln_screen_point* out_point

@@ -98,6 +98,24 @@ public sealed unsafe class MapProjectionHandle : IDisposable
         });
     }
 
+    /// <summary>Reports whether the globe hides a location from the helper camera.</summary>
+    public bool IsLocationOccluded(LatLng coordinate)
+    {
+        return state.WithLive(handle =>
+        {
+            var nativeCoordinate = CoreStructs.ToNative(coordinate);
+            bool occluded = false;
+            NativeStatus.Check(
+                NativeMethods.mln_map_projection_is_location_occluded(
+                    handle,
+                    nativeCoordinate,
+                    &occluded
+                )
+            );
+            return occluded;
+        });
+    }
+
     /// <summary>Converts a geographic coordinate to a screen pixel using this projection snapshot.</summary>
     public ScreenPoint PixelForLatLng(LatLng coordinate)
     {

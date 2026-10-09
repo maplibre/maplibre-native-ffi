@@ -42,6 +42,12 @@ inline mln_status mln_android_projection_get_camera(
   return status;
 }
 
+inline mln_status mln_android_map_is_location_occluded(
+  mln_map map, double latitude, double longitude, bool* out
+) {
+  return mln_map_is_location_occluded(map, {latitude, longitude}, out);
+}
+
 inline mln_status mln_android_map_pixel_for_lat_lng(
   mln_map map, double latitude, double longitude, double* out
 ) {
@@ -53,6 +59,14 @@ inline mln_status mln_android_map_pixel_for_lat_lng(
     out[1] = point.y;
   }
   return status;
+}
+
+inline mln_status mln_android_projection_is_location_occluded(
+  mln_map_projection projection, double latitude, double longitude, bool* out
+) {
+  return mln_map_projection_is_location_occluded(
+    projection, {latitude, longitude}, out
+  );
 }
 
 inline mln_status mln_android_projection_pixel_for_lat_lng(

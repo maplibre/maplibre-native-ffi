@@ -173,6 +173,19 @@ enum NativeMap {
     return mode
   }
 
+  static func isLocationOccluded(
+    _ map: NativeMapHandle,
+    coordinate: NativeLatLng
+  ) throws -> Bool {
+    try NativeMemory.withTemporary(false) { occluded in
+      try checkStatus(mln_map_is_location_occluded(
+        map.raw,
+        coordinate.native,
+        occluded
+      ))
+    }.value
+  }
+
   static func pixelForLatLng(_ map: NativeMapHandle,
                              coordinate: NativeLatLng) throws
     -> NativeScreenPoint

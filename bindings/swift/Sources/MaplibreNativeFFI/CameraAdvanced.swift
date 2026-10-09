@@ -589,6 +589,16 @@ public extension MapHandle {
     }
   }
 
+  /// Reports whether the globe hides a location from the current camera.
+  func isLocationOccluded(_ coordinate: LatLng) throws -> Bool {
+    try mapNativeFailure {
+      try NativeMap.isLocationOccluded(
+        requireLiveHandle(),
+        coordinate: coordinate.nativeInput
+      )
+    }
+  }
+
   func pixel(for coordinate: LatLng) throws -> ScreenPoint {
     try mapNativeFailure { try ScreenPoint(native: NativeMap.pixelForLatLng(
       requireLiveHandle(),

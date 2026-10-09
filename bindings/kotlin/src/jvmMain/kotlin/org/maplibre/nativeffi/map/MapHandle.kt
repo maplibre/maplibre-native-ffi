@@ -464,6 +464,21 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     return NativeAccess.styleLightProperty(requireLiveHandle(), propertyName)
   }
 
+  public actual fun setStyleProjectionJson(projectionJson: ByteArray) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setStyleProjectionJson(requireLiveHandle(), projectionJson)
+  }
+
+  public actual fun setStyleProjectionProperty(propertyName: String, value: ByteArray) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setStyleProjectionProperty(requireLiveHandle(), propertyName, value)
+  }
+
+  public actual fun styleProjectionProperty(propertyName: String): ByteArray? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleProjectionProperty(requireLiveHandle(), propertyName)
+  }
+
   public actual fun setStyleTransitionOptions(options: StyleTransitionOptions) {
     NativeAccess.ensureLoaded()
     NativeAccess.setStyleTransitionOptions(requireLiveHandle(), options)
@@ -772,6 +787,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       NativeAccess.ensureLoaded()
       NativeAccess.setProjectionMode(requireLiveHandle(), value)
     }
+
+  public actual fun isLocationOccluded(coordinate: LatLng): Boolean {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.isLocationOccluded(requireLiveHandle(), coordinate)
+  }
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
     NativeAccess.ensureLoaded()

@@ -240,3 +240,39 @@ test "projection free helpers preserve native diagnostics" {
 
     try testing.expectError(error.InvalidArgument, maplibre.latLngForProjectedMeters(.{ .northing = std.math.nan(f64), .easting = 0.0 }, null));
 }
+
+test "runtime projection controls occlusion and resets with the style" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 512, .height = 512 });
+    defer map.close() catch @panic("map close failed");
+    const front = maplibre.LatLng{ .latitude = 0, .longitude = 0 };
+    const back = maplibre.LatLng{ .latitude = 0, .longitude = 180 };
+    const style = "{\"version\":8,\"sources\":{},\"layers\":[]}";
+    try map.setStyleJson(testing.allocator, style);
+    try map.setStyleProjectionJson(testing.allocator, "{\"type\":\"globe\"}");
+    var snapshot = (try map.getStyleProjectionProperty(testing.allocator, "type")).?;
+    defer snapshot.deinit();
+    try map.jumpTo(.{ .center = front, .zoom = 0 });
+    try testing.expect(!(try map.isLocationOccluded(front)));
+    try testing.expect(try map.isLocationOccluded(back));
+    var projection = try maplibre.MapProjectionHandle.create(&map);
+    defer projection.close() catch @panic("projection close failed");
+    try testing.expect(!(try projection.isLocationOccluded(front)));
+    try testing.expect(try projection.isLocationOccluded(back));
+    try map.setStyleProjectionProperty(testing.allocator, "type", "[\"interpolate\",[\"linear\"],[\"zoom\"],1,\"vertical-perspective\",3,\"mercator\"]");
+    try map.jumpTo(.{ .zoom = 4 });
+    try testing.expect(!(try map.isLocationOccluded(back)));
+    try map.jumpTo(.{ .zoom = 0 });
+    try testing.expect(try map.isLocationOccluded(back));
+    try map.setStyleProjectionJson(testing.allocator, "{}");
+    try testing.expect(!(try map.isLocationOccluded(back)));
+    try map.setStyleProjectionJson(testing.allocator, "{\"type\":\"globe\"}");
+    try map.setStyleJson(testing.allocator, style);
+    try testing.expect(!(try map.isLocationOccluded(back)));
+    try testing.expect(try projection.isLocationOccluded(back));
+    try projection.setCamera(.{ .center = back });
+    try testing.expect(!(try projection.isLocationOccluded(back)));
+    try testing.expect(try projection.isLocationOccluded(front));
+    try testing.expectEqualStrings("\"globe\"", snapshot.value);
+}

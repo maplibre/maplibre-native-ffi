@@ -290,6 +290,16 @@ public expect class MapHandle : AutoCloseable {
   public fun styleLightProperty(propertyName: String): ByteArray?
 
   /**
+   * Replaces the style projection from UTF-8 JSON. Loading a style replaces this override, so apply
+   * it after the style loads.
+   */
+  public fun setStyleProjectionJson(projectionJson: ByteArray)
+
+  public fun setStyleProjectionProperty(propertyName: String, value: ByteArray)
+
+  public fun styleProjectionProperty(propertyName: String): ByteArray?
+
+  /**
    * Sets the style's global transition options, replacing rather than merging. Loading a style
    * replaces these options with the ones that style declares, so apply an override after the load.
    */
@@ -480,6 +490,9 @@ public expect class MapHandle : AutoCloseable {
   public var freeCameraOptions: FreeCameraOptions
 
   public var projectionMode: ProjectionModeOptions
+
+  /** Reports whether the globe hides a location from the current camera. */
+  public fun isLocationOccluded(coordinate: LatLng): Boolean
 
   public fun pixelForLatLng(coordinate: LatLng): ScreenPoint
 

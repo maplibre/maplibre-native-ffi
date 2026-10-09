@@ -1536,6 +1536,40 @@ public extension MapHandle {
     }
   }
 
+  func setStyleProjectionJSON(_ projectionJSON: Data) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      try checkStatus(mln_map_set_style_projection_json(
+        requireLiveHandle().raw,
+        arena.view(projectionJSON)
+      ))
+    }
+  }
+
+  func setStyleProjectionProperty(_ propertyName: String, value: Data) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      try checkStatus(mln_map_set_style_projection_property(
+        requireLiveHandle().raw,
+        arena.view(propertyName),
+        arena.view(value)
+      ))
+    }
+  }
+
+  func styleProjectionProperty(_ propertyName: String) throws -> Data? {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.projectionProperty(
+        requireLiveHandle(),
+        propertyName: arena.view(propertyName)
+      )
+    }
+  }
+
   /// Replaces the style's global transition options; absent fields clear the
   /// style-wide override rather than merging. Loading a style replaces these
   /// options, so apply an override after the style loads.

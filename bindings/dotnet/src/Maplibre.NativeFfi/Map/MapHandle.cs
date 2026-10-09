@@ -498,6 +498,17 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_set_free_camera_options(Handle, &nativeOptions));
     }
 
+    /// <summary>Reports whether the globe hides a location from the current camera.</summary>
+    public bool IsLocationOccluded(LatLng coordinate)
+    {
+        var nativeCoordinate = CoreStructs.ToNative(coordinate);
+        bool occluded = false;
+        NativeStatus.Check(
+            NativeMethods.mln_map_is_location_occluded(Handle, nativeCoordinate, &occluded)
+        );
+        return occluded;
+    }
+
     /// <summary>Converts a geographic coordinate to a screen pixel using the current map projection.</summary>
     public ScreenPoint PixelForLatLng(LatLng coordinate)
     {
@@ -1950,6 +1961,44 @@ public sealed unsafe class MapHandle : IDisposable
         MlnBuffer buffer = default;
         NativeStatus.Check(
             NativeMethods.mln_map_get_style_light_property(
+                Handle,
+                nativePropertyName.Value,
+                &buffer
+            )
+        );
+        return ValueStructs.ReadOptionalBuffer(buffer);
+    }
+
+    /// <summary>Sets the style projection document from UTF-8 JSON bytes.</summary>
+    public void SetStyleProjectionJson(byte[] projectionJson)
+    {
+        using var nativeJson = NativeStringView.From(projectionJson, nameof(projectionJson));
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_style_projection_json(Handle, nativeJson.Value)
+        );
+    }
+
+    /// <summary>Sets one style projection property from UTF-8 JSON bytes.</summary>
+    public void SetStyleProjectionProperty(string propertyName, byte[] value)
+    {
+        using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
+        using var nativeValue = NativeStringView.From(value, nameof(value));
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_style_projection_property(
+                Handle,
+                nativePropertyName.Value,
+                nativeValue.Value
+            )
+        );
+    }
+
+    /// <summary>Gets one style projection property snapshot, or null when undefined.</summary>
+    public byte[]? GetStyleProjectionProperty(string propertyName)
+    {
+        using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
+        MlnBuffer buffer = default;
+        NativeStatus.Check(
+            NativeMethods.mln_map_get_style_projection_property(
                 Handle,
                 nativePropertyName.Value,
                 &buffer
