@@ -5,6 +5,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 mod invalidation;
+#[cfg(all(target_os = "linux", not(target_env = "ohos")))]
+mod locale;
 
 use crate::events::{RuntimeEventPayload, RuntimeEventSource, RuntimeEventType};
 use crate::{
