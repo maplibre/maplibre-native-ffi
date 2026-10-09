@@ -201,7 +201,7 @@ again.
 `0037-globe-projection.patch` imports globe projection for OpenGL, Metal,
 Vulkan, and WebGPU from
 [maplibre-native#4533](https://github.com/maplibre/maplibre-native/pull/4533),
-at commit `17547886bf59ec76a3d99eba8337b28139c0ce2c`. It carries the core,
+at commit `ba5cdfee6d5da8d6497ee2d13f8a6af4a2ac2470`. It carries the core,
 shader, CMake, and sample n-gon plugin changes; upstream tests, fixtures, and
 SDK examples stay upstream. A style selects the globe with
 `"projection": {"type": "globe"}`. The patch applies before the other carried

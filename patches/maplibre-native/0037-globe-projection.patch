@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 77756c64ef195d1025d6f0e5d2f8cf8f5b0a5d42..ca53e16518dae9963d4393e601d639444e46a25d 100644
+index 77756c64ef195d1025d6f0e5d2f8cf8f5b0a5d42..37cf38f0d17d81667b72334289cdc04112661bd0 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -198,7 +198,6 @@ list(APPEND SRC_FILES
@@ -49,7 +49,15 @@ index 77756c64ef195d1025d6f0e5d2f8cf8f5b0a5d42..ca53e16518dae9963d4393e601d63944
      ${PROJECT_SOURCE_DIR}/include/mln/util/tile_server_options.hpp
      ${PROJECT_SOURCE_DIR}/include/mln/util/tileset.hpp
      ${PROJECT_SOURCE_DIR}/include/mln/util/timer.hpp
-@@ -567,10 +574,16 @@ list(APPEND SRC_FILES
+@@ -520,6 +527,7 @@ list(APPEND SRC_FILES
+     ${PROJECT_SOURCE_DIR}/src/mln/gfx/offscreen_texture.hpp
+     ${PROJECT_SOURCE_DIR}/src/mln/gfx/polyline_generator.cpp
+     ${PROJECT_SOURCE_DIR}/src/mln/gfx/fill_generator.cpp
++    ${PROJECT_SOURCE_DIR}/src/mln/gfx/fill_large_mesh_arrays.hpp
+     ${PROJECT_SOURCE_DIR}/src/mln/gfx/render_pass.hpp
+     ${PROJECT_SOURCE_DIR}/src/mln/gfx/renderer_backend.cpp
+     ${PROJECT_SOURCE_DIR}/src/mln/gfx/rendering_stats.cpp
+@@ -567,10 +575,16 @@ list(APPEND SRC_FILES
      ${PROJECT_SOURCE_DIR}/src/mln/map/map_impl.hpp
      ${PROJECT_SOURCE_DIR}/src/mln/map/map_options.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/map/map_projection.cpp
@@ -66,7 +74,7 @@ index 77756c64ef195d1025d6f0e5d2f8cf8f5b0a5d42..ca53e16518dae9963d4393e601d63944
      ${PROJECT_SOURCE_DIR}/src/mln/map/zoom_history.hpp
      ${PROJECT_SOURCE_DIR}/src/mln/math/log2.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/platform/settings.cpp
-@@ -600,6 +613,9 @@ list(APPEND SRC_FILES
+@@ -600,6 +614,9 @@ list(APPEND SRC_FILES
      ${PROJECT_SOURCE_DIR}/src/mln/renderer/cross_faded_property_evaluator.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/renderer/cross_faded_property_evaluator.hpp
      ${PROJECT_SOURCE_DIR}/src/mln/renderer/data_driven_property_evaluator.hpp
@@ -76,7 +84,7 @@ index 77756c64ef195d1025d6f0e5d2f8cf8f5b0a5d42..ca53e16518dae9963d4393e601d63944
      ${PROJECT_SOURCE_DIR}/src/mln/renderer/group_by_layout.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/renderer/group_by_layout.hpp
      ${PROJECT_SOURCE_DIR}/src/mln/renderer/image_manager.cpp
-@@ -720,6 +736,7 @@ list(APPEND SRC_FILES
+@@ -720,6 +737,7 @@ list(APPEND SRC_FILES
      ${PROJECT_SOURCE_DIR}/src/mln/style/conversion/layer.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/style/conversion/light.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/style/conversion/position.cpp
@@ -84,7 +92,7 @@ index 77756c64ef195d1025d6f0e5d2f8cf8f5b0a5d42..ca53e16518dae9963d4393e601d63944
      ${PROJECT_SOURCE_DIR}/src/mln/style/conversion/property_value.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/style/conversion/hillshade_conversions.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/style/conversion/rotation.cpp
-@@ -841,6 +858,10 @@ list(APPEND SRC_FILES
+@@ -841,6 +859,10 @@ list(APPEND SRC_FILES
      ${PROJECT_SOURCE_DIR}/src/mln/style/paint_property.hpp
      ${PROJECT_SOURCE_DIR}/src/mln/style/parser.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/style/parser.hpp
@@ -95,7 +103,7 @@ index 77756c64ef195d1025d6f0e5d2f8cf8f5b0a5d42..ca53e16518dae9963d4393e601d63944
      ${PROJECT_SOURCE_DIR}/src/mln/style/properties.hpp
      ${PROJECT_SOURCE_DIR}/src/mln/style/property_expression.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/style/rapidjson_conversion.hpp
-@@ -1004,6 +1025,7 @@ list(APPEND SRC_FILES
+@@ -1004,6 +1026,7 @@ list(APPEND SRC_FILES
      ${PROJECT_SOURCE_DIR}/src/mln/util/stopwatch.hpp
      ${PROJECT_SOURCE_DIR}/src/mln/util/string.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/util/string_indexer.cpp
@@ -103,7 +111,7 @@ index 77756c64ef195d1025d6f0e5d2f8cf8f5b0a5d42..ca53e16518dae9963d4393e601d63944
      ${PROJECT_SOURCE_DIR}/src/mln/util/thread.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/util/thread_local.hpp
      ${PROJECT_SOURCE_DIR}/src/mln/util/thread_pool.cpp
-@@ -1013,6 +1035,9 @@ list(APPEND SRC_FILES
+@@ -1013,6 +1036,9 @@ list(APPEND SRC_FILES
      ${PROJECT_SOURCE_DIR}/src/mln/util/tile_cover.hpp
      ${PROJECT_SOURCE_DIR}/src/mln/util/tile_cover_impl.cpp
      ${PROJECT_SOURCE_DIR}/src/mln/util/tile_cover_impl.hpp
@@ -6254,10 +6262,10 @@ index bb23817b3831af739465d1d6619f08212495c691..3c4bf8873ebab01e6deebabf3209db29
  public:
 diff --git a/include/mln/util/subdivision.hpp b/include/mln/util/subdivision.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..a23dbc91f60d71723053df6e459dddfbae25b5c4
+index 0000000000000000000000000000000000000000..8a2aa29f7ea00435b9270be681908d42da9eb0b9
 --- /dev/null
 +++ b/include/mln/util/subdivision.hpp
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,44 @@
 +#pragma once
 +
 +#include <mln/tile/tile_id.hpp>
@@ -6288,14 +6296,6 @@ index 0000000000000000000000000000000000000000..a23dbc91f60d71723053df6e459dddfb
 +                                   const CanonicalTileID& canonical,
 +                                   uint32_t granularity,
 +                                   bool generateOutlineLines = true);
-+
-+/// `subdividePolygon` at the finest granularity whose result fits in `maxVertices` (the 16-bit index space of a
-+/// segment), halving from `granularity` down to 2. A polygon that cannot fit even unsubdivided comes back as is.
-+SubdivisionResult subdividePolygonWithinLimit(const GeometryCollection& polygon,
-+                                              const CanonicalTileID& canonical,
-+                                              uint32_t granularity,
-+                                              bool generateOutlineLines,
-+                                              std::size_t maxVertices);
 +
 +/// Inserts a vertex wherever the line crosses a cell boundary; `isRing` closes the line first.
 +GeometryCoordinates subdivideVertexLine(const GeometryCoordinates& line, uint32_t granularity, bool isRing = false);
@@ -6542,6 +6542,244 @@ index bf66c6e672f7cbc077a5679305704a7daec8056f..8314cfa0c589e93804ea06efe34c55f6
  };
  
  } // namespace webgpu
+diff --git a/plugins/ngon-layer/scripts/generate-shaders.mjs b/plugins/ngon-layer/scripts/generate-shaders.mjs
+index e9ce74655e6eb71524bf624634f1e5b0bc1520b7..eb5fac2c78a9ff91e19791a44fba44a2119debe0 100644
+--- a/plugins/ngon-layer/scripts/generate-shaders.mjs
++++ b/plugins/ngon-layer/scripts/generate-shaders.mjs
+@@ -34,6 +34,10 @@ const uniformFields = `
+     vec4 interpolation1;
+     vec4 interpolation2;
+     vec4 interpolation3;
++    mat4 projection;
++    vec4 tile_mercator;
++    vec4 clipping_plane;
++    vec4 globe;
+ `;
+ const varyings = [['vec2', 'local'], ['vec4', 'shape'], ['vec4', 'paint'], ['vec4', 'color'], ['vec4', 'stroke_color']];
+ const macro = name => `MLN_PLUGIN_PROPERTY_NGON_${name.toUpperCase()}_IS_UNIFORM`;
+@@ -69,6 +73,34 @@ function evaluate(backend) {
+   return result;
+ }
+ 
++// The globe, as the host's own shaders project it. `globe` is the transition
++// and the angle of a pixel on the sphere.
++const sphere = `
++vec3 ngon_sphere(vec2 tile_position, vec4 tile_mercator) {
++    vec2 mercator = tile_mercator.xy + tile_mercator.zw * tile_position;
++    float x = mercator.x * 6.283185307179586 + 3.141592653589793;
++    float t = exp(3.141592653589793 - mercator.y * 6.283185307179586);
++    return vec3(sin(x) * 2.0 * t, t * t - 1.0, cos(x) * 2.0 * t) / (t * t + 1.0);
++}
++
++vec3 ngon_rotate(vec3 direction, vec2 angles) {
++    vec3 right = vec3(direction.z, 0.0, -direction.x);
++    vec3 up = normalize(cross(right, direction));
++    vec2 t = tan(angles);
++    return normalize(direction + normalize(right) * t.x + up * t.y);
++}
++
++vec4 ngon_project(vec2 tile_position, vec3 direction, mat4 tile_matrix, mat4 projection, vec4 plane, vec4 globe) {
++    vec4 result = projection * vec4(direction, 1.0);
++    result.z = (1.0 - (dot(direction, plane.xyz) + plane.w)) * result.w;
++    if (globe.x > 0.999) return result;
++    vec4 flat_position = tile_matrix * vec4(tile_position, 0.0, 1.0);
++    result.z = mix(0.0, result.z, clamp((globe.x - 0.2) / 0.8, 0.0, 1.0));
++    result.xyw = mix(flat_position.xyw, result.xyw, globe.x);
++    return result;
++}
++`;
++
+ // Pixel coordinates have positive y downwards. Corner zero points up; rotation
+ // is clockwise. A constant quad allows even corner count to be feature-driven.
+ const projection = `
+@@ -84,7 +116,10 @@ const projection = `
+         translate = vec2(c * translate.x - s * translate.y, s * translate.x + c * translate.y);
+     }
+     center += translate * u.camera.z;
++    bool on_globe = u.globe.x > 0.0;
++    vec3 center_vector = ngon_sphere(center, u.tile_mercator);
+     vec4 projected = u.matrix * vec4(center, 0.0, 1.0);
++    if (on_globe) projected = ngon_project(center, center_vector, u.matrix, u.projection, u.clipping_plane, u.globe);
+     float outer_radius = radius + stroke_width / cos(3.141592653589793 / corners);
+     float extent = outer_radius + 2.0 / max(u.view.y, 1.0);
+     vec2 local = corner * extent;
+@@ -93,9 +128,16 @@ const projection = `
+         vec2 offset = local * u.camera.z;
+         if (pitch_scale > 0.5) offset *= projected.w / u.camera.w;
+         position = u.matrix * vec4(center + offset, 0.0, 1.0);
++        if (on_globe) {
++            vec2 angles = offset * (u.globe.y / u.camera.z);
++            position = ngon_project(center + offset, ngon_rotate(center_vector, angles), u.matrix, u.projection,
++                                    u.clipping_plane, u.globe);
++        }
+     } else {
+         float scale = pitch_scale < 0.5 ? u.camera.w : projected.w;
+         position = projected + vec4(local * u.camera.xy * scale, 0.0, 0.0);
++        // Behind the horizon.
++        if (on_globe && projected.z > projected.w) position.xy = vec2(10000.0);
+     }
+     OUT_local = local;
+     OUT_shape = vec4(radius, stroke_width, corners, rotate * 0.017453292519943295);
+@@ -131,6 +173,7 @@ struct NgonVaryings {
+     float4 position [[position]];
+ ${varyings.map(([t, n]) => `    ${metal(t)} ${n};`).join('\n')}
+ };
++${metal(sphere)}
+ vertex NgonVaryings ngonVertex(NgonVertex in [[stage_in]],
+     constant NgonDrawableUBO& u [[buffer(MLN_PLUGIN_UNIFORM_0_BINDING)]]) {
+     NgonVaryings out;
+@@ -147,7 +190,7 @@ ${metal(coverage.replaceAll('IN_', 'in.'))}    return half4(result);
+     const layout = backend === 'vulkan'
+       ? 'layout(std140, set = DRAWABLE_UBO_SET_INDEX, binding = MLN_PLUGIN_UNIFORM_0_BINDING)'
+       : 'layout(std140)';
+-    emit(backend + 'Vertex', `${attributes(backend)}\n${layout} uniform NgonDrawableUBO {${uniformFields}} u;\n${io('out')}
++    emit(backend + 'Vertex', `${attributes(backend)}\n${layout} uniform NgonDrawableUBO {${uniformFields}} u;\n${io('out')}${sphere}
+ void main() {
+ ${vertexBody}    gl_Position = position;
+ ${backend === 'vulkan' ? '    applySurfaceTransform();\n' : ''}}
+diff --git a/plugins/ngon-layer/shared/cpp/ngon_layer.cpp b/plugins/ngon-layer/shared/cpp/ngon_layer.cpp
+index cd9cbec227b9daf19f1229a4aba3078e09c3d8c7..6a8c263f0c9bf05388273eabf08e3113fbdf98dc 100644
+--- a/plugins/ngon-layer/shared/cpp/ngon_layer.cpp
++++ b/plugins/ngon-layer/shared/cpp/ngon_layer.cpp
+@@ -175,12 +175,16 @@ struct alignas(16) DrawableUBO {
+     float color[4], stroke_color[4];
+     float translate[2], pitch_alignment, pitch_scale;
+     float interpolation[16];
++    float projection[16];
++    float tile_mercator[4], clipping_plane[4];
++    float globe[4];
+ };
+ static_assert(offsetof(DrawableUBO, radius) == 96);
+ static_assert(offsetof(DrawableUBO, color) == 128);
+ static_assert(offsetof(DrawableUBO, translate) == 160);
+ static_assert(offsetof(DrawableUBO, interpolation) == 176);
+-static_assert(sizeof(DrawableUBO) == 240);
++static_assert(offsetof(DrawableUBO, projection) == 240);
++static_assert(sizeof(DrawableUBO) == 352);
+ 
+ #include "ngon_shader_sources.hpp"
+ 
+@@ -188,7 +192,9 @@ mln_plugin_status updateUniform(const mln_plugin_uniform_context_v1* context,
+                                 uint32_t id,
+                                 uint8_t* output,
+                                 size_t size) {
+-    if (!context || context->struct_size < sizeof(*context) || id != 0 || !output || size != sizeof(DrawableUBO)) {
++    // A host older than the projection fields passes the context without them, and the n-gons draw on Mercator.
++    if (!context || context->struct_size < offsetof(mln_plugin_uniform_context_v1, projection_transition) || id != 0 ||
++        !output || size != sizeof(DrawableUBO)) {
+         return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
+     }
+     DrawableUBO value{};
+@@ -199,6 +205,13 @@ mln_plugin_status updateUniform(const mln_plugin_uniform_context_v1* context,
+     value.camera[3] = context->camera_to_center_distance;
+     value.view[0] = static_cast<float>(context->bearing);
+     value.view[1] = context->pixel_ratio;
++    if (context->struct_size >= sizeof(*context)) {
++        std::copy_n(context->projection_matrix, 16, value.projection);
++        std::copy_n(context->tile_mercator_coords, 4, value.tile_mercator);
++        std::copy_n(context->clipping_plane, 4, value.clipping_plane);
++        value.globe[0] = context->projection_transition;
++        value.globe[1] = context->pixels_to_sphere_radians;
++    }
+     std::memcpy(output, &value, sizeof(value));
+     return MLN_PLUGIN_STATUS_OK;
+ }
+@@ -331,13 +344,46 @@ Point screen(const std::array<double, 4>& p, const mln_plugin_query_context_v1&
+     return {(p[0] / p[3] + 1) * 0.5 * c.viewport_width, (1 - p[1] / p[3]) * 0.5 * c.viewport_height};
+ }
+ 
++// The globe as the vertex shader projects it: ngon_sphere, ngon_rotate and ngon_project.
++using Direction = std::array<double, 3>;
++Direction normalized(const Direction& v) {
++    const double length = std::hypot(v[0], v[1], v[2]);
++    return length > 0 ? Direction{v[0] / length, v[1] / length, v[2] / length} : v;
++}
++Direction sphere(Point p, const double* mercator) {
++    const double x = (mercator[0] + mercator[2] * p.x) * 2 * pi + pi;
++    const double t = std::exp(pi - (mercator[1] + mercator[3] * p.y) * 2 * pi);
++    return {std::sin(x) * 2 * t / (t * t + 1), (t * t - 1) / (t * t + 1), std::cos(x) * 2 * t / (t * t + 1)};
++}
++Direction rotate(const Direction& d, Point angles) {
++    const Direction right = normalized({d[2], 0, -d[0]});
++    const Direction up = normalized(
++        {right[1] * d[2] - right[2] * d[1], right[2] * d[0] - right[0] * d[2], right[0] * d[1] - right[1] * d[0]});
++    const double x = std::tan(angles.x), y = std::tan(angles.y);
++    return normalized(
++        {d[0] + right[0] * x + up[0] * y, d[1] + right[1] * x + up[1] * y, d[2] + right[2] * x + up[2] * y});
++}
++std::array<double, 4> projectOnGlobe(Point p, const Direction& d, const mln_plugin_query_context_v1& c, double t) {
++    const double* m = c.projection_matrix;
++    std::array<double, 4> result{};
++    for (int i = 0; i < 4; ++i) result[i] = m[i] * d[0] + m[4 + i] * d[1] + m[8 + i] * d[2] + m[12 + i];
++    const double* plane = c.clipping_plane;
++    result[2] = (1 - (d[0] * plane[0] + d[1] * plane[1] + d[2] * plane[2] + plane[3])) * result[3];
++    if (t > 0.999) return result;
++    const auto flat = project(p, c.tile_matrix);
++    result[2] *= std::clamp((t - 0.2) / 0.8, 0.0, 1.0);
++    for (const int i : {0, 1, 3}) result[i] = flat[i] + (result[i] - flat[i]) * t;
++    return result;
++}
++
+ uint8_t queryFeature(const mln_plugin_feature_v1* feature,
+                      const mln_plugin_tile_point_v1* query,
+                      size_t queryCount,
+                      const mln_plugin_query_context_v1* context,
+                      const mln_plugin_property_value_v1* values,
+                      size_t count) try {
+-    if (!feature || !feature->points || !context || context->struct_size < sizeof(*context) || !query || !queryCount ||
++    if (!feature || !feature->points || !context ||
++        context->struct_size < offsetof(mln_plugin_query_context_v1, projection_transition) || !query || !queryCount ||
+         (count && !values) || context->camera_to_center_distance <= 0)
+         return 0;
+     const double radius = std::max(0.0, scalar(values, count, "ngon-radius", 5));
+@@ -355,15 +401,23 @@ uint8_t queryFeature(const mln_plugin_feature_v1* feature,
+         const double c = std::cos(-context->bearing), s = std::sin(-context->bearing);
+         offset = {c * offset.x - s * offset.y, s * offset.x + c * offset.y};
+     }
++    // A host older than the projection fields passes the context without them: hit test on Mercator.
++    const bool globe = context->struct_size >= sizeof(*context) && context->projection_transition > 0;
++    const auto at = [&](Point p, double transition) {
++        return globe ? projectOnGlobe(p, sphere(p, context->tile_mercator_coords), *context, transition)
++                     : project(p, context->tile_matrix);
++    };
++    // The host finds the query on the globe itself, unblended, so that is where it goes back to the screen.
+     std::vector<Point> queryScreen;
+     for (size_t i = 0; i < queryCount; ++i)
+-        queryScreen.push_back(
+-            screen(project({double(query[i].x), double(query[i].y)}, context->tile_matrix), *context));
++        queryScreen.push_back(screen(at({double(query[i].x), double(query[i].y)}, 1), *context));
+     for (size_t i = 0; i < feature->point_count; ++i) {
+         const Point center = {feature->points[i].x + offset.x * context->pixels_to_tile_units,
+                               feature->points[i].y + offset.y * context->pixels_to_tile_units};
+-        const auto clip = project(center, context->tile_matrix);
++        const auto clip = at(center, context->projection_transition);
+         if (clip[3] <= 0) continue;
++        // Behind the horizon: the shader moves an n-gon facing the viewport off the screen, and clips one on the map.
++        if (globe && clip[2] > clip[3]) continue;
+         const auto centerScreen = screen(clip, *context);
+         const double scale = alignViewport ? (scaleViewport ? 1 : context->camera_to_center_distance / clip[3])
+                                            : context->pixels_to_tile_units *
+@@ -373,10 +427,16 @@ uint8_t queryFeature(const mln_plugin_feature_v1* feature,
+         for (int n = 0; n < corners; ++n) {
+             const double theta = rotation + 2 * pi * n / corners;
+             const Point delta = {std::sin(theta) * outer * scale, -std::cos(theta) * outer * scale};
+-            polygon.push_back(
+-                alignViewport
+-                    ? Point{centerScreen.x + delta.x, centerScreen.y + delta.y}
+-                    : screen(project({center.x + delta.x, center.y + delta.y}, context->tile_matrix), *context));
++            const Point corner = {center.x + delta.x, center.y + delta.y};
++            const double angle = context->pixels_to_sphere_radians / context->pixels_to_tile_units;
++            polygon.push_back(alignViewport ? Point{centerScreen.x + delta.x, centerScreen.y + delta.y}
++                              : globe       ? screen(projectOnGlobe(corner,
++                                                              rotate(sphere(center, context->tile_mercator_coords),
++                                                                           {delta.x * angle, delta.y * angle}),
++                                                              *context,
++                                                              context->projection_transition),
++                                               *context)
++                                            : screen(project(corner, context->tile_matrix), *context));
+         }
+         if (overlaps(polygon, queryScreen)) return 1;
+     }
 diff --git a/shaders/_prelude.fragment.glsl b/shaders/_prelude.fragment.glsl
 index 8716b728e7755272c21b929dcf49ba6f744ef8d7..ceae8b62e6d55dd3aebd8635678a1f4aacbffeb0 100644
 --- a/shaders/_prelude.fragment.glsl
@@ -7609,18 +7847,19 @@ index 7cf4f7ff35d07446ec37a9933b4c9e1c1f674de9..682e3c7a02dd1dba0cd8bda67fc12b58
  
      GridIndex<RefIndexedSubfeature> grid;
 diff --git a/src/mln/gfx/fill_generator.cpp b/src/mln/gfx/fill_generator.cpp
-index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..055b18fee2d6262f286a39d703af062b3d105d74 100644
+index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..d5a5c65d8f22f19de96a895d506953b716f8fd68 100644
 --- a/src/mln/gfx/fill_generator.cpp
 +++ b/src/mln/gfx/fill_generator.cpp
-@@ -1,5 +1,7 @@
+@@ -1,5 +1,8 @@
  #include <mln/gfx/fill_generator.hpp>
++#include <mln/gfx/fill_large_mesh_arrays.hpp>
  #include <mln/gfx/polyline_generator.hpp>
 +#include <mln/util/constants.hpp>
 +#include <mln/util/subdivision.hpp>
  
  #ifdef _MSC_VER
  #pragma warning(push)
-@@ -12,6 +14,7 @@
+@@ -12,6 +15,7 @@
  #pragma warning(pop)
  #endif
  
@@ -7628,7 +7867,7 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..055b18fee2d6262f286a39d703af062b
  #include <cassert>
  #include <limits>
  
-@@ -104,6 +107,75 @@ void addOutlineIndices(const std::size_t base,
+@@ -104,6 +108,57 @@ void addOutlineIndices(const std::size_t base,
      lineSegment.indexLength += nVertices * 2;
  }
  
@@ -7671,40 +7910,22 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..055b18fee2d6262f286a39d703af062b
 +                          SegmentVector& fillSegments,
 +                          gfx::IndexVector<gfx::Lines>& lineIndexes,
 +                          SegmentVector& lineSegments) {
-+    const std::size_t totalVertices = subdivided.vertices.size() / 2;
-+    if (totalVertices > maxSegmentVertices) {
-+        throw GeometryTooLongException();
-+    }
-+    const std::size_t startVertices = fillVertices.elements();
-+    for (std::size_t i = 0; i < totalVertices; i++) {
-+        fillVertices.emplace_back(
-+            FillBucket::layoutVertex({subdivided.vertices[i * 2], subdivided.vertices[i * 2 + 1]}));
-+    }
-+    addFillIndices(fillSegments, fillIndexes, subdivided.triangleIndices, startVertices, totalVertices);
-+
-+    for (const auto& line : subdivided.lineIndexLists) {
-+        if (line.empty()) {
-+            continue;
-+        }
-+        if (lineSegments.empty() || lineSegments.back().vertexLength + totalVertices > maxSegmentVertices) {
-+            lineSegments.emplace_back(startVertices, lineIndexes.elements());
-+        }
-+        auto& lineSegment = lineSegments.back();
-+        const auto base = static_cast<uint16_t>(lineSegment.vertexLength);
-+        for (std::size_t i = 0; i + 1 < line.size(); i += 2) {
-+            lineIndexes.emplace_back(static_cast<uint16_t>(base + line[i]), static_cast<uint16_t>(base + line[i + 1]));
-+        }
-+        lineSegment.indexLength += line.size();
-+    }
-+    if (!lineSegments.empty()) {
-+        lineSegments.back().vertexLength += totalVertices;
-+    }
++    fillLargeMeshArrays(
++        fillVertices,
++        [](int16_t x, int16_t y) { return FillBucket::layoutVertex({x, y}); },
++        fillSegments,
++        fillIndexes,
++        subdivided.vertices,
++        subdivided.triangleIndices,
++        &lineSegments,
++        &lineIndexes,
++        &subdivided.lineIndexLists);
 +}
 +
  } // namespace
  
  void generateFillBuffers(const GeometryCollection& geometry,
-@@ -131,11 +203,27 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
+@@ -131,11 +186,26 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
                                    gfx::IndexVector<gfx::Triangles>& fillIndexes,
                                    SegmentVector& fillSegments,
                                    gfx::IndexVector<gfx::Lines>& lineIndexes,
@@ -7717,11 +7938,10 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..055b18fee2d6262f286a39d703af062b
          limitHoles(polygon, 500);
  
 +        if (subdivisionGranularity >= 2) {
-+            addSubdividedPolygon(util::subdividePolygonWithinLimit(polygon,
-+                                                                   canonical,
-+                                                                   subdivisionGranularity,
-+                                                                   /*generateOutlineLines=*/true,
-+                                                                   maxSegmentVertices),
++            addSubdividedPolygon(util::subdividePolygon(polygon,
++                                                        canonical,
++                                                        subdivisionGranularity,
++                                                        /*generateOutlineLines=*/true),
 +                                 vertices,
 +                                 fillIndexes,
 +                                 fillSegments,
@@ -7733,7 +7953,7 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..055b18fee2d6262f286a39d703af062b
          std::size_t totalVertices = totalVerticesCheck(polygon);
          std::size_t startVertices = vertices.elements();
  
-@@ -195,7 +283,9 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
+@@ -195,7 +265,9 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
                                    gfx::IndexVector<gfx::Triangles>& lineIndexes,
                                    SegmentVector& lineSegments,
                                    gfx::IndexVector<gfx::Lines>& basicLineIndexes,
@@ -7744,7 +7964,7 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..055b18fee2d6262f286a39d703af062b
      gfx::PolylineGenerator<LineLayoutVertex, SegmentBase> lineGenerator(
          lineVertices,
          LineBucket::layoutVertex,
-@@ -211,7 +301,8 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
+@@ -211,7 +283,8 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
  
      // If we have pre-tessellated geometry, multi-polygons are tessellated
      // together, so we need to add them to the fill segment all at once.
@@ -7754,7 +7974,7 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..055b18fee2d6262f286a39d703af062b
          const std::size_t startVertices = fillVertices.elements();
          std::size_t totalVertices = 0;
          for (const auto& polygon : geometry) {
-@@ -226,6 +317,26 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
+@@ -226,6 +299,25 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
          // Optimize polygons with many interior rings for earcut tessellation.
          limitHoles(polygon, 500);
  
@@ -7765,11 +7985,10 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..055b18fee2d6262f286a39d703af062b
 +                                canonical,
 +                                lineOptions);
 +            }
-+            addSubdividedPolygon(util::subdividePolygonWithinLimit(polygon,
-+                                                                   canonical,
-+                                                                   subdivisionGranularity,
-+                                                                   /*generateOutlineLines=*/true,
-+                                                                   maxSegmentVertices),
++            addSubdividedPolygon(util::subdividePolygon(polygon,
++                                                        canonical,
++                                                        subdivisionGranularity,
++                                                        /*generateOutlineLines=*/true),
 +                                 fillVertices,
 +                                 fillIndexes,
 +                                 fillSegments,
@@ -7781,6 +8000,176 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..055b18fee2d6262f286a39d703af062b
          const std::size_t totalVertices = totalVerticesCheck(polygon);
          const std::size_t startVertices = fillVertices.elements();
  
+diff --git a/src/mln/gfx/fill_large_mesh_arrays.hpp b/src/mln/gfx/fill_large_mesh_arrays.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e66f9afa52e68005650d2f1af7e9d2ca2151bff
+--- /dev/null
++++ b/src/mln/gfx/fill_large_mesh_arrays.hpp
+@@ -0,0 +1,164 @@
++#pragma once
++
++#include <mln/gfx/index_vector.hpp>
++#include <mln/shaders/segment.hpp>
++
++#include <algorithm>
++#include <array>
++#include <cstdint>
++#include <limits>
++#include <span>
++#include <vector>
++
++namespace mln {
++namespace gfx {
++
++namespace detail {
++
++/// The last segment when the new vertices continue it and fit, otherwise a new one.
++inline SegmentBase& prepareSegment(SegmentVector& segments,
++                                   std::size_t vertexCount,
++                                   std::size_t indexCount,
++                                   std::size_t newVertices,
++                                   std::size_t maxVertices) {
++    if (segments.empty() || segments.back().vertexOffset + segments.back().vertexLength != vertexCount ||
++        segments.back().vertexLength + newVertices > maxVertices) {
++        segments.emplace_back(vertexCount, indexCount);
++    }
++    return segments.back();
++}
++
++/// Appends the primitives of `Size` vertices in each list, starting a new segment whenever a primitive's missing
++/// vertices would not fit the current one; each segment holds copies of the vertices its primitives use.
++template <std::size_t Size, typename Vertices, typename LayoutVertex, typename Indexes, typename Lists>
++void fillSegments(Vertices& vertices,
++                  LayoutVertex& layoutVertex,
++                  SegmentVector& segments,
++                  Indexes& indexes,
++                  std::span<const int16_t> flattened,
++                  const Lists& lists,
++                  std::size_t maxVertices) {
++    constexpr std::size_t unset = std::numeric_limits<std::size_t>::max();
++    std::vector<std::size_t> copies(flattened.size() / 2, unset);
++    SegmentBase* segment = nullptr;
++    const auto missing = [&](uint32_t index) {
++        return copies[index] == unset || copies[index] < segment->vertexOffset;
++    };
++    for (const auto& primitives : lists) {
++        for (std::size_t p = 0; p + Size <= primitives.size(); p += Size) {
++            if (!segment) {
++                segment = &prepareSegment(segments, vertices.elements(), indexes.elements(), Size, maxVertices);
++            }
++            std::size_t needed = 0;
++            for (std::size_t k = 0; k < Size; ++k) {
++                needed += missing(primitives[p + k]) ? 1 : 0;
++            }
++            if (segment->vertexLength + needed > maxVertices) {
++                segments.emplace_back(vertices.elements(), indexes.elements());
++                segment = &segments.back();
++            }
++            std::array<uint16_t, Size> local{};
++            for (std::size_t k = 0; k < Size; ++k) {
++                const uint32_t index = primitives[p + k];
++                if (missing(index)) {
++                    copies[index] = vertices.elements();
++                    vertices.emplace_back(layoutVertex(flattened[index * 2], flattened[index * 2 + 1]));
++                    segment->vertexLength++;
++                }
++                local[k] = static_cast<uint16_t>(copies[index] - segment->vertexOffset);
++            }
++            if constexpr (Size == 3) {
++                indexes.emplace_back(local[0], local[1], local[2]);
++            } else {
++                indexes.emplace_back(local[0], local[1]);
++            }
++            segment->indexLength += Size;
++        }
++    }
++}
++
++} // namespace detail
++
++/// GL JS's `fillLargeMeshArrays`: appends a triangle mesh, and the outline lines over the same vertices when there
++/// are any, to the vertex buffer through `layoutVertex(x, y)`. A mesh that fits one segment goes in whole, its
++/// triangles and lines sharing its vertices; a larger one is spread over as many segments as it needs. Unlike GL JS,
++/// no segment is started without indices to draw. `maxVertices` is the 16-bit index space unless a test asks for
++/// less.
++template <typename Vertices, typename LayoutVertex>
++void fillLargeMeshArrays(Vertices& vertices,
++                         LayoutVertex&& layoutVertex,
++                         SegmentVector& triangleSegments,
++                         IndexVector<Triangles>& triangleIndexes,
++                         std::span<const int16_t> flattened,
++                         std::span<const uint32_t> triangleIndices,
++                         SegmentVector* lineSegments = nullptr,
++                         IndexVector<Lines>* lineIndexes = nullptr,
++                         const std::vector<std::vector<uint32_t>>* lineLists = nullptr,
++                         std::size_t maxVertices = maxSegmentVertices) {
++    const std::size_t vertexCount = flattened.size() / 2;
++    const bool hasTriangles = triangleIndices.size() >= 3;
++    const bool hasLines = lineSegments && lineIndexes && lineLists &&
++                          std::any_of(
++                              lineLists->begin(), lineLists->end(), [](const auto& line) { return line.size() >= 2; });
++    if (!hasTriangles && !hasLines) {
++        return;
++    }
++
++    if (vertexCount < maxVertices) {
++        SegmentBase* triangleSegment = hasTriangles ? &detail::prepareSegment(triangleSegments,
++                                                                              vertices.elements(),
++                                                                              triangleIndexes.elements(),
++                                                                              vertexCount,
++                                                                              maxVertices)
++                                                    : nullptr;
++        const std::size_t triangleBase = triangleSegment ? triangleSegment->vertexLength : 0;
++        SegmentBase* lineSegment =
++            hasLines ? &detail::prepareSegment(
++                           *lineSegments, vertices.elements(), lineIndexes->elements(), vertexCount, maxVertices)
++                     : nullptr;
++        const std::size_t lineBase = lineSegment ? lineSegment->vertexLength : 0;
++
++        for (std::size_t i = 0; i + 1 < flattened.size(); i += 2) {
++            vertices.emplace_back(layoutVertex(flattened[i], flattened[i + 1]));
++        }
++        if (triangleSegment) {
++            for (std::size_t i = 0; i + 2 < triangleIndices.size(); i += 3) {
++                triangleIndexes.emplace_back(static_cast<uint16_t>(triangleBase + triangleIndices[i]),
++                                             static_cast<uint16_t>(triangleBase + triangleIndices[i + 1]),
++                                             static_cast<uint16_t>(triangleBase + triangleIndices[i + 2]));
++            }
++            triangleSegment->vertexLength += vertexCount;
++            triangleSegment->indexLength += triangleIndices.size();
++        }
++        if (lineSegment) {
++            for (const auto& line : *lineLists) {
++                for (std::size_t i = 0; i + 1 < line.size(); i += 2) {
++                    lineIndexes->emplace_back(static_cast<uint16_t>(lineBase + line[i]),
++                                              static_cast<uint16_t>(lineBase + line[i + 1]));
++                }
++                lineSegment->indexLength += line.size();
++            }
++            lineSegment->vertexLength += vertexCount;
++        }
++        return;
++    }
++
++    // Too many vertices for one segment: the triangles, then the lines, each go through segments of their own, copying
++    // the vertices they reuse into each segment that needs them.
++    if (hasTriangles) {
++        detail::fillSegments<3>(vertices,
++                                layoutVertex,
++                                triangleSegments,
++                                triangleIndexes,
++                                flattened,
++                                std::array<std::span<const uint32_t>, 1>{triangleIndices},
++                                maxVertices);
++    }
++    if (hasLines) {
++        detail::fillSegments<2>(
++            vertices, layoutVertex, *lineSegments, *lineIndexes, flattened, *lineLists, maxVertices);
++    }
++}
++
++} // namespace gfx
++} // namespace mln
 diff --git a/src/mln/gfx/image_drawable_data.hpp b/src/mln/gfx/image_drawable_data.hpp
 deleted file mode 100644
 index 9842a6f4640c194ebc571ec8f3fef060d8255bca..0000000000000000000000000000000000000000
@@ -9602,7 +9991,7 @@ index d9ec6acf284a32d391f2b836e212fc93c82ba13f..f032ad1f499b4d8d821f85371823454d
  
  } // namespace mln
 diff --git a/src/mln/map/transform_state.cpp b/src/mln/map/transform_state.cpp
-index 537a318eb67dbfc52b2cc8c25be1567d890f156a..fba26fab260648d0f5a69c9d736c3081b849e5a0 100644
+index 537a318eb67dbfc52b2cc8c25be1567d890f156a..81ea00ab202dddb3c7434f6e562832e624e28838 100644
 --- a/src/mln/map/transform_state.cpp
 +++ b/src/mln/map/transform_state.cpp
 @@ -1,4 +1,6 @@
@@ -9767,11 +10156,11 @@ index 537a318eb67dbfc52b2cc8c25be1567d890f156a..fba26fab260648d0f5a69c9d736c3081
 +}
 +
 +double TransformState::getMinZoomAtLatitude(double latitude, bool globe) const {
-+    const double minZoom = getMinZoom();
 +    if (!globe) {
-+        return minZoom;
++        return getMinZoom();
 +    }
-+    return minZoom + VerticalPerspectiveProjection::zoomAdjustment(0, latitude);
++    // The globe's constraint never raises the scale, whichever projection the map is in now.
++    return scaleZoom(min_scale) + VerticalPerspectiveProjection::zoomAdjustment(0, latitude);
 +}
 +
 +LatLng TransformState::constrainedCenter(const LatLng& latLng) const {
@@ -11267,10 +11656,17 @@ index f4492e67594950926e9df47bab7df4549e086988..1dafd14287e9e4f55e8b1b12ddfc59be
                           const ImagePositions&,
                           const PatternLayerMap&,
 diff --git a/src/mln/renderer/buckets/fill_extrusion_bucket.cpp b/src/mln/renderer/buckets/fill_extrusion_bucket.cpp
-index cd4861a2a8671527592872eaf8490483685ef5a1..1add6bf8b128c5fe6cc37f4aa93d5a2a9f73e2a7 100644
+index cd4861a2a8671527592872eaf8490483685ef5a1..ac11c97dcf0aa28a99024185e9ba390cd6b5cf44 100644
 --- a/src/mln/renderer/buckets/fill_extrusion_bucket.cpp
 +++ b/src/mln/renderer/buckets/fill_extrusion_bucket.cpp
-@@ -7,7 +7,9 @@
+@@ -1,5 +1,6 @@
+ #include <mln/renderer/buckets/fill_extrusion_bucket.hpp>
+ 
++#include <mln/gfx/fill_large_mesh_arrays.hpp>
+ #include <mln/map/transform_state.hpp>
+ #include <mln/renderer/bucket_parameters.hpp>
+ #include <mln/renderer/layers/render_fill_extrusion_layer.hpp>
+@@ -7,7 +8,9 @@
  #include <mln/style/layers/fill_extrusion_layer_impl.hpp>
  #include <mln/util/constants.hpp>
  #include <mln/util/math.hpp>
@@ -11280,29 +11676,92 @@ index cd4861a2a8671527592872eaf8490483685ef5a1..1add6bf8b128c5fe6cc37f4aa93d5a2a
  #include <variant>
  
  #ifdef _MSC_VER
-@@ -89,7 +91,20 @@ void FillExtrusionBucket::addFeature(const GeometryTileFeature& feature,
+@@ -53,6 +56,13 @@ using namespace style;
+ 
+ struct GeometryTooLongException : std::exception {};
+ 
++namespace {
++// Each ring vertex can add a wall quad beside itself.
++std::size_t wallVertexCount(std::size_t ringVertices) {
++    return ringVertices == 0 ? 0 : 5 * (ringVertices - 1) + 1;
++}
++} // namespace
++
+ FillExtrusionBucket::FillExtrusionBucket(
+     const FillExtrusionBucket::PossiblyEvaluatedLayoutProperties& layout_,
+     const std::map<std::string, Immutable<style::LayerProperties>>& layerPaintProperties,
+@@ -89,6 +99,23 @@ void FillExtrusionBucket::addFeature(const GeometryTileFeature& feature,
              polyVariant = roundPolygonCorners(polygon, roundedCornerDistance);
          }
  
--        std::size_t totalVertices = 0;
-+        // On the globe the walls follow subdivided rings and the roof is a subdivided mesh of its own.
++        // On the globe the walls follow subdivided rings and the roof is a subdivided mesh of its own, spread over as
++        // many segments as it needs. Walls too long for a segment are drawn as on Mercator.
 +        const uint32_t granularity = subdivisionGranularity.fill.getGranularityForZoomLevel(canonical.z);
 +        std::optional<util::SubdivisionResult> roof;
 +        if (granularity >= 2 && roundedCornerDistance <= 0) {
 +            GeometryCollection subdividedRings;
++            std::size_t ringVertices = 0;
 +            for (const auto& ring : polygon) {
 +                subdividedRings.push_back(util::subdivideVertexLine(ring, granularity, /*isRing=*/true));
++                ringVertices += subdividedRings.back().size();
 +            }
-+            polyVariant = std::move(subdividedRings);
-+            roof = util::subdividePolygonWithinLimit(
-+                polygon, canonical, granularity, /*generateOutlineLines=*/false, maxSegmentVertices);
++            if (wallVertexCount(ringVertices) <= maxSegmentVertices) {
++                polyVariant = std::move(subdividedRings);
++                roof = util::subdividePolygon(polygon, canonical, granularity, /*generateOutlineLines=*/false);
++            }
 +        }
 +
-+        std::size_t totalVertices = roof ? roof->vertices.size() / 2 : 0;
+         std::size_t totalVertices = 0;
  
          std::visit(
-             [&totalVertices](const auto& poly) {
-@@ -170,7 +185,7 @@ void FillExtrusionBucket::addFeature(const GeometryTileFeature& feature,
+@@ -102,21 +129,30 @@ void FillExtrusionBucket::addFeature(const GeometryTileFeature& feature,
+ 
+         if (totalVertices == 0) continue;
+ 
++        const std::size_t wallVertices = wallVertexCount(totalVertices);
++
+         std::vector<uint32_t> flatIndices;
+         flatIndices.reserve(totalVertices);
+ 
+         std::size_t startVertices = vertices.elements();
+ 
+-        if (triangleSegments.empty() || triangleSegments.back().vertexLength + (5 * (totalVertices - 1) + 1) >
+-                                            std::numeric_limits<uint16_t>::max()) {
++#if MLN_USE_FILL_EXTRUSION_INSTANCING
++        // Instanced walls are drawn from the vertices alone, so beside a roof of its own no triangle indexes them, and
++        // a segment holding only them would have nothing to draw.
++        const bool wallsTakeASegment = !roof;
++#else
++        const bool wallsTakeASegment = true;
++#endif
++        if (wallsTakeASegment && (triangleSegments.empty() || triangleSegments.back().vertexLength + wallVertices >
++                                                                  std::numeric_limits<uint16_t>::max())) {
+             triangleSegments.emplace_back(startVertices, triangles.elements());
+         }
+ 
+-        auto& triangleSegment = triangleSegments.back();
+-        assert(triangleSegment.vertexLength <= std::numeric_limits<uint16_t>::max());
+-        auto triangleIndex = static_cast<uint16_t>(triangleSegment.vertexLength);
++        SegmentBase* triangleSegment = wallsTakeASegment ? &triangleSegments.back() : nullptr;
++        assert(!triangleSegment || triangleSegment->vertexLength <= std::numeric_limits<uint16_t>::max());
++        auto triangleIndex = static_cast<uint16_t>(triangleSegment ? triangleSegment->vertexLength : 0);
+ 
+-        assert(triangleIndex + (5 * (totalVertices - 1) + 1) <= std::numeric_limits<uint16_t>::max());
++        assert(triangleIndex + wallVertices <= std::numeric_limits<uint16_t>::max());
+ 
+         const auto processRingPoints =
+             [&](const Point<double>& p1, const std::optional<Point<double>>& p2, std::size_t& edgeDistance) {
+@@ -162,15 +198,15 @@ void FillExtrusionBucket::addFeature(const GeometryTileFeature& feature,
+                     triangles.emplace_back(triangleIndex, triangleIndex + 2, triangleIndex + 1);
+                     triangles.emplace_back(triangleIndex + 1, triangleIndex + 2, triangleIndex + 3);
+                     triangleIndex += 4;
+-                    triangleSegment.vertexLength += 4;
+-                    triangleSegment.indexLength += 6;
++                    triangleSegment->vertexLength += 4;
++                    triangleSegment->indexLength += 6;
+                 }
+ #endif
+             };
  
          std::vector<uint32_t> indices;
          std::visit(
@@ -11311,7 +11770,7 @@ index cd4861a2a8671527592872eaf8490483685ef5a1..1add6bf8b128c5fe6cc37f4aa93d5a2a
                  for (const auto& ring : poly) {
                      std::size_t nVertices = ring.size();
  
-@@ -189,18 +204,41 @@ void FillExtrusionBucket::addFeature(const GeometryTileFeature& feature,
+@@ -189,7 +225,9 @@ void FillExtrusionBucket::addFeature(const GeometryTileFeature& feature,
                      }
                  }
  
@@ -11322,43 +11781,40 @@ index cd4861a2a8671527592872eaf8490483685ef5a1..1add6bf8b128c5fe6cc37f4aa93d5a2a
              },
              polyVariant);
  
-         std::size_t nIndices = indices.size();
-         assert(nIndices % 3 == 0);
- 
--        for (std::size_t i = 0; i < nIndices; i += 3) {
--            // Counter-Clockwise winding order.
--            triangles.emplace_back(static_cast<uint16_t>(flatIndices[indices[i]]),
--                                   static_cast<uint16_t>(flatIndices[indices[i + 2]]),
--                                   static_cast<uint16_t>(flatIndices[indices[i + 1]]));
-+        if (roof) {
-+            const auto base = triangleIndex;
-+            for (std::size_t i = 0; i + 1 < roof->vertices.size(); i += 2) {
-+                const Point<double> p{static_cast<double>(roof->vertices[i]),
-+                                      static_cast<double>(roof->vertices[i + 1])};
-+#if MLN_USE_FILL_EXTRUSION_INSTANCING
-+                vertices.emplace_back(layoutVertex(p, 0, true));
-+#else
-+                vertices.emplace_back(FillExtrusionBucket::layoutVertex(p, 0, 0, 1, 0));
-+#endif
-+                triangleIndex++;
-+            }
-+            nIndices = roof->triangleIndices.size();
-+            assert(nIndices % 3 == 0);
-+            for (std::size_t i = 0; i + 2 < nIndices; i += 3) {
-+                triangles.emplace_back(static_cast<uint16_t>(base + roof->triangleIndices[i]),
-+                                       static_cast<uint16_t>(base + roof->triangleIndices[i + 1]),
-+                                       static_cast<uint16_t>(base + roof->triangleIndices[i + 2]));
-+            }
-+        } else {
-+            for (std::size_t i = 0; i < nIndices; i += 3) {
-+                // Counter-Clockwise winding order.
-+                triangles.emplace_back(static_cast<uint16_t>(flatIndices[indices[i]]),
-+                                       static_cast<uint16_t>(flatIndices[indices[i + 2]]),
-+                                       static_cast<uint16_t>(flatIndices[indices[i + 1]]));
-+            }
+@@ -203,13 +241,30 @@ void FillExtrusionBucket::addFeature(const GeometryTileFeature& feature,
+                                    static_cast<uint16_t>(flatIndices[indices[i + 1]]));
          }
  
-         triangleSegment.vertexLength += totalVertices;
+-        triangleSegment.vertexLength += totalVertices;
+-        triangleSegment.indexLength += nIndices;
++        if (triangleSegment) {
++            triangleSegment->vertexLength += totalVertices;
++            triangleSegment->indexLength += nIndices;
++        }
++
++        // The roof's triangles index only its own vertices, so it continues the walls' segment or starts its own.
++        const std::size_t roofStart = vertices.elements();
++        if (roof) {
++            const auto roofVertex = [](int16_t x, int16_t y) {
++#if MLN_USE_FILL_EXTRUSION_INSTANCING
++                return FillExtrusionBucket::layoutVertex(Point<double>(x, y), 0, true);
++#else
++                return FillExtrusionBucket::layoutVertex(Point<double>(x, y), 0, 0, 1, 0);
++#endif
++            };
++            gfx::fillLargeMeshArrays(
++                vertices, roofVertex, triangleSegments, triangles, roof->vertices, roof->triangleIndices);
++        }
++        const std::size_t roofVertices = vertices.elements() - roofStart;
+ 
+         if (instanceSegments.empty()) {
+             instanceSegments.emplace_back(RenderStaticData::fillExtrusionSegment());
+         }
+-        instanceSegments.back().instanceCount += totalVertices;
++        instanceSegments.back().instanceCount += totalVertices + roofVertices;
+     }
+ 
+     for (auto& pair : paintPropertyBinders) {
 diff --git a/src/mln/renderer/buckets/fill_extrusion_bucket.hpp b/src/mln/renderer/buckets/fill_extrusion_bucket.hpp
 index 6b67e1c989d810aad4b273823737be43dfa125d4..a8f7fef2494c5396ff38ed48809bd5f2032cd557 100644
 --- a/src/mln/renderer/buckets/fill_extrusion_bucket.hpp
@@ -11786,10 +12242,10 @@ index 0000000000000000000000000000000000000000..b7e9dc6773396551be7ffba722e1b437
 +} // namespace mln
 diff --git a/src/mln/renderer/globe_tile_mesh.hpp b/src/mln/renderer/globe_tile_mesh.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..fa04a695528a724214d34f318f07446600fd74ee
+index 0000000000000000000000000000000000000000..72360fa9d995dc4225a9f3461d216801f6ff14a2
 --- /dev/null
 +++ b/src/mln/renderer/globe_tile_mesh.hpp
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,134 @@
 +#pragma once
 +
 +#include <mln/gfx/index_vector.hpp>
@@ -11870,22 +12326,30 @@ index 0000000000000000000000000000000000000000..fa04a695528a724214d34f318f074466
 +        auto key = std::make_tuple(canonical.z, canonical.y == 0, canonical.y == (1u << canonical.z) - 1, mask);
 +        auto it = meshes.find(key);
 +        if (it == meshes.end()) {
-+            // Tiles that are loading go through many masks; start over rather than keep every one of them. The
-+            // drawables share the meshes' buffers, so they keep theirs.
++            // Tiles that are loading go through many masks; the one used longest ago makes room, so the meshes every
++            // frame draws stay. The drawables share the meshes' buffers, so they keep theirs.
 +            if (meshes.size() >= maxMeshes) {
-+                meshes.clear();
++                meshes.erase(std::min_element(meshes.begin(), meshes.end(), [](const auto& a, const auto& b) {
++                    return a.second.lastUse < b.second.lastUse;
++                }));
 +            }
-+            it = meshes.emplace(std::move(key), GlobeTileMesh<Vertex, LayoutVertexFn>(canonical, mask, layoutVertex))
-+                     .first;
++            GlobeTileMesh<Vertex, LayoutVertexFn> mesh(canonical, mask, layoutVertex);
++            it = meshes.emplace(std::move(key), Entry{std::move(mesh)}).first;
 +        }
-+        return it->second;
++        it->second.lastUse = ++uses;
++        return it->second.mesh;
 +    }
 +    void clear() { meshes.clear(); }
 +    std::size_t size() const { return meshes.size(); }
 +
 +private:
++    struct Entry {
++        GlobeTileMesh<Vertex, LayoutVertexFn> mesh;
++        uint64_t lastUse = 0;
++    };
 +    static constexpr std::size_t maxMeshes = 64;
-+    std::map<std::tuple<uint8_t, bool, bool, TileMask>, GlobeTileMesh<Vertex, LayoutVertexFn>> meshes;
++    uint64_t uses = 0;
++    std::map<std::tuple<uint8_t, bool, bool, TileMask>, Entry> meshes;
 +};
 +
 +/// The same grid as raw `Short2` positions, for drawables built from raw vertex bytes.
@@ -12772,7 +13236,7 @@ index 1a0e95554c9b5e6ef597d3372efbc31163f3ce79..7e8255de28c6ae3064dd5b8121552777
  #include <mln/style/layers/background_layer_properties.hpp>
  
 diff --git a/src/mln/renderer/layers/render_circle_layer.cpp b/src/mln/renderer/layers/render_circle_layer.cpp
-index c8761e9f81dd556d09e07683c3fe6d57adefa677..1f77edb9252b602f531b79b828d14ab3df4e183b 100644
+index c8761e9f81dd556d09e07683c3fe6d57adefa677..20cd1aa5c7d5bfccdf365861d97b60917d712ef0 100644
 --- a/src/mln/renderer/layers/render_circle_layer.cpp
 +++ b/src/mln/renderer/layers/render_circle_layer.cpp
 @@ -5,6 +5,7 @@
@@ -12818,7 +13282,7 @@ index c8761e9f81dd556d09e07683c3fe6d57adefa677..1f77edb9252b602f531b79b828d14ab3
                                                 const FeatureState& featureState) const {
      const auto& evaluated = static_cast<const CircleLayerProperties&>(*evaluatedProperties).evaluated;
      // Translate query geometry
-@@ -123,7 +123,7 @@ bool RenderCircleLayer::queryIntersectsFeature(const GeometryCoordinates& queryG
+@@ -123,26 +123,36 @@ bool RenderCircleLayer::queryIntersectsFeature(const GeometryCoordinates& queryG
      bool alignWithMap = evaluated.evaluate<style::CirclePitchAlignment>(zoom, feature) == AlignmentType::Map;
      const GeometryCoordinates& transformedQueryGeometry = alignWithMap ? translatedQueryGeometry
                                                                         : projectQueryGeometry(translatedQueryGeometry,
@@ -12827,18 +13291,25 @@ index c8761e9f81dd556d09e07683c3fe6d57adefa677..1f77edb9252b602f531b79b828d14ab3
                                                                                                transformState.getSize());
      auto transformedSize = alignWithMap ? size * pixelsToTileUnits : size;
  
-@@ -132,17 +132,21 @@ bool RenderCircleLayer::queryIntersectsFeature(const GeometryCoordinates& queryG
++    // The shader hides a circle whose center the horizon covers where it draws it: translated, and through the
++    // projection as blended. The query finds none there either.
++    const auto drawnTranslation = RenderTile::tileUnitTranslation(projector.getTileID(),
++                                                                  evaluated.get<style::CircleTranslate>(),
++                                                                  evaluated.get<style::CircleTranslateAnchor>(),
++                                                                  transformState);
+     const auto& geometry = feature.getGeometries();
+     for (auto& ring : geometry) {
          for (auto& point : ring) {
++            if (transformState.isGlobeRendering() &&
++                projector.projectAsDrawn({point.x + drawnTranslation[0], point.y + drawnTranslation[1]}).occluded) {
++                continue;
++            }
              const GeometryCoordinate& transformedPoint = alignWithMap
                                                               ? point
 -                                                             : projectPoint(point, posMatrix, transformState.getSize());
 +                                                             : projectPoint(point, projector, transformState.getSize());
  
 +            const auto projected = projector.project({static_cast<double>(point.x), static_cast<double>(point.y)});
-+            // The shader hides a circle whose center the horizon covers, so the query finds none there either.
-+            if (projected.occluded) {
-+                continue;
-+            }
              float adjustedSize = transformedSize;
 -            vec4 center = {{static_cast<double>(point.x), static_cast<double>(point.y), 0, 1}};
 -            matrix::transformMat4(center, center, posMatrix);
@@ -12854,7 +13325,7 @@ index c8761e9f81dd556d09e07683c3fe6d57adefa677..1f77edb9252b602f531b79b828d14ab3
              }
  
              if (util::polygonIntersectsBufferedPoint(transformedQueryGeometry, transformedPoint, adjustedSize))
-@@ -266,6 +270,12 @@ void RenderCircleLayer::captureRenderedFeatures(const CircleBucket& bucket,
+@@ -266,6 +276,12 @@ void RenderCircleLayer::captureRenderedFeatures(const CircleBucket& bucket,
  
      std::optional<mat4> tileMatrix;
  
@@ -12867,7 +13338,7 @@ index c8761e9f81dd556d09e07683c3fe6d57adefa677..1f77edb9252b602f531b79b828d14ab3
      const auto& features = bucket.getRetainedFeatures();
      stats.renderedFeatures.reserve(features.size());
  
-@@ -298,7 +308,7 @@ void RenderCircleLayer::captureRenderedFeatures(const CircleBucket& bucket,
+@@ -298,7 +314,7 @@ void RenderCircleLayer::captureRenderedFeatures(const CircleBucket& bucket,
          }
  
          // Compute the tile matrix once
@@ -12876,7 +13347,7 @@ index c8761e9f81dd556d09e07683c3fe6d57adefa677..1f77edb9252b602f531b79b828d14ab3
              tileMatrix = LayerTweaker::getTileMatrix(tileID.toUnwrapped(),
                                                       state,
                                                       transformParams,
-@@ -319,8 +329,38 @@ void RenderCircleLayer::captureRenderedFeatures(const CircleBucket& bucket,
+@@ -319,8 +335,38 @@ void RenderCircleLayer::captureRenderedFeatures(const CircleBucket& bucket,
              const bool useProjectedCenter = !pitchWithMap || !scaleWithMap;
              return getVertexImpl({vertex, *tileMatrix, radius, strokeWidth, extrudeScale, useProjectedCenter});
          };
@@ -12917,7 +13388,7 @@ index c8761e9f81dd556d09e07683c3fe6d57adefa677..1f77edb9252b602f531b79b828d14ab3
              stats.addRenderedFeature(featureID, *bound, {tileID});
          }
      }
-@@ -333,6 +373,7 @@ void RenderCircleLayer::update(gfx::ShaderRegistry& shaders,
+@@ -333,6 +379,7 @@ void RenderCircleLayer::update(gfx::ShaderRegistry& shaders,
                                 const PaintParameters&,
                                 const RenderTree& renderTree,
                                 UniqueChangeRequestVec& changes) {
@@ -12925,7 +13396,7 @@ index c8761e9f81dd556d09e07683c3fe6d57adefa677..1f77edb9252b602f531b79b828d14ab3
      stats.renderedFeatures.clear();
  
      if (!renderTiles || renderTiles->empty()) {
-@@ -425,7 +466,8 @@ void RenderCircleLayer::update(gfx::ShaderRegistry& shaders,
+@@ -425,7 +472,8 @@ void RenderCircleLayer::update(gfx::ShaderRegistry& shaders,
                                                           CircleStrokeOpacity>(
              paintPropertyBinders, evaluated, propertiesAsUniforms, idCircleColorVertexAttribute);
  
@@ -13765,7 +14236,7 @@ index f0035ea3cd6e080d985fbc39236eafb94b56f6b0..8987f5584dcfb717cbbb0a8835a9f00a
  private:
      bool contextDestroyed = false;
 diff --git a/src/mln/renderer/layers/render_plugin_style_layer.cpp b/src/mln/renderer/layers/render_plugin_style_layer.cpp
-index 377d9a6a31a47a83209d755c10fe11c263f5c384..7253e8907f575b2ad5994353475680ca57bfe98e 100644
+index ac6fb3907beee6082241f64678c0e9f1f16d25de..0e8317370b823812ea92e8710cc393d1defa7e8c 100644
 --- a/src/mln/renderer/layers/render_plugin_style_layer.cpp
 +++ b/src/mln/renderer/layers/render_plugin_style_layer.cpp
 @@ -9,11 +9,13 @@
@@ -13790,7 +14261,7 @@ index 377d9a6a31a47a83209d755c10fe11c263f5c384..7253e8907f575b2ad5994353475680ca
  #include <set>
  
  namespace mln {
-@@ -150,6 +153,11 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
+@@ -152,6 +155,11 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
                                      const RenderTree&,
                                      UniqueChangeRequestVec& changes) {
      const auto& registration = pluginImpl(baseImpl).registration;
@@ -13802,7 +14273,7 @@ index 377d9a6a31a47a83209d755c10fe11c263f5c384..7253e8907f575b2ad5994353475680ca
      if (!renderTiles || renderTiles->empty()) {
          removeAllDrawables();
          return;
-@@ -205,6 +213,10 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
+@@ -207,6 +215,10 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
              removeTile(renderPass, tileID);
          }
          setRenderTileBucketID(tileID, bucket.getID());
@@ -13813,7 +14284,7 @@ index 377d9a6a31a47a83209d755c10fe11c263f5c384..7253e8907f575b2ad5994353475680ca
          if (updateTile(renderPass, tileID, [&](gfx::Drawable& drawable) {
                  return drawable.getLayerTweaker() == layerTweaker;
              })) {
-@@ -217,7 +229,8 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
+@@ -219,7 +231,8 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
              auto* paintBinders = bucket.paintBinders(getID(), definition.key);
              auto attributes = context.createVertexAttributeArray();
              if (paintBinders) paintBinders->populateVertexAttributes(*attributes, propertiesAsUniforms);
@@ -13823,7 +14294,7 @@ index 377d9a6a31a47a83209d755c10fe11c263f5c384..7253e8907f575b2ad5994353475680ca
                                              : gfx::ShaderPtr{};
              if (!shader || definition.segments.empty()) {
                  continue;
-@@ -248,7 +261,7 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
+@@ -250,7 +263,7 @@ void RenderPluginStyleLayer::update(gfx::ShaderRegistry& shaders,
              } else if (definition.depthMode == PluginDrawableDepthMode::ReadWrite) {
                  builder->setEnableDepth(true);
                  builder->setDepthType(gfx::DepthMaskType::ReadWrite);
@@ -13832,7 +14303,7 @@ index 377d9a6a31a47a83209d755c10fe11c263f5c384..7253e8907f575b2ad5994353475680ca
                  builder->setEnableStencil(false);
                  if (definition.cullBackFaces) {
                      builder->setCullFaceMode(gfx::CullFaceMode::backCCW());
-@@ -290,7 +303,7 @@ bool RenderPluginStyleLayer::queryIntersectsFeature(const GeometryCoordinates& q
+@@ -292,7 +305,7 @@ bool RenderPluginStyleLayer::queryIntersectsFeature(const GeometryCoordinates& q
                                                      float zoom,
                                                      const TransformState& transformState,
                                                      float pixelsToTileUnits,
@@ -13841,7 +14312,7 @@ index 377d9a6a31a47a83209d755c10fe11c263f5c384..7253e8907f575b2ad5994353475680ca
                                                      const FeatureState& featureState) const {
      const auto& registration = pluginImpl(baseImpl).registration;
      if (!registration->queryFeature) return false;
-@@ -320,9 +333,20 @@ bool RenderPluginStyleLayer::queryIntersectsFeature(const GeometryCoordinates& q
+@@ -322,9 +335,20 @@ bool RenderPluginStyleLayer::queryIntersectsFeature(const GeometryCoordinates& q
      queryContext.pixels_to_tile_units = pixelsToTileUnits;
      queryContext.camera_to_center_distance = transformState.getCameraToCenterDistance();
      queryContext.bearing = transformState.getBearing();
@@ -18999,10 +19470,10 @@ index 4de580764b2d8fc099cdc1038f725f843cce7813..b162faea4abb51abcf623014db6750b2
  void identity(mat3& out) noexcept;
 diff --git a/src/mln/util/subdivision.cpp b/src/mln/util/subdivision.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..f5626d1abc6516585b1cc106e8186e36851eae12
+index 0000000000000000000000000000000000000000..5ee691266a33ee660f5505cf7963319ccf774e66
 --- /dev/null
 +++ b/src/mln/util/subdivision.cpp
-@@ -0,0 +1,594 @@
+@@ -0,0 +1,585 @@
 +#include <mln/util/subdivision.hpp>
 +#include <mln/util/constants.hpp>
 +
@@ -19254,32 +19725,32 @@ index 0000000000000000000000000000000000000000..f5626d1abc6516585b1cc106e8186e36
 +        const double dirY = bY - aY;
 +        const double dir2X = cX - bX;
 +        const double dir2Y = cY - bY;
-+        const double t2Top = (cellRowYTop - bY) / dir2Y;
-+        const double t2Bottom = (cellRowYBottom - bY) / dir2Y;
-+        const double t2Enter = std::min(t2Top, t2Bottom);
-+        const double t2Exit = std::max(t2Top, t2Bottom);
-+        const double enter2X = bX + dir2X * t2Enter;
-+
-+        auto leftCellX = static_cast<int32_t>(std::floor(std::min(enter2X, exitX) / cellSize)) + 1;
-+        auto rightCellX = static_cast<int32_t>(std::ceil(std::max(enter2X, exitX) / cellSize)) - 1;
-+        bool leftToRight = exitX < enter2X;
-+
 +        const bool isParallelX2 = dir2Y == 0;
 +        if (isParallelX2 && (cY == cellRowYTop || cY == cellRowYBottom)) {
 +            return;
 +        }
 +
-+        if (isParallelX2 || t2Enter >= 1 || t2Exit <= 0) {
++        // Where the next edge enters the cell row, or the edge after it when the next one stays out of the row; a
++        // horizontal next edge never enters it, and has no crossing to compute.
++        double enterX = 0;
++        bool nextEdgeEnters = false;
++        if (!isParallelX2) {
++            const double t2Top = (cellRowYTop - bY) / dir2Y;
++            const double t2Bottom = (cellRowYBottom - bY) / dir2Y;
++            const double t2Enter = std::min(t2Top, t2Bottom);
++            nextEdgeEnters = t2Enter < 1 && std::max(t2Top, t2Bottom) > 0;
++            enterX = bX + dir2X * t2Enter;
++        }
++        if (!nextEdgeEnters) {
 +            const double dir3X = aX - cX;
 +            const double dir3Y = aY - cY;
 +            const double t3Top = (cellRowYTop - cY) / dir3Y;
 +            const double t3Bottom = (cellRowYBottom - cY) / dir3Y;
-+            const double t3Enter = std::min(t3Top, t3Bottom);
-+            const double enter3X = cX + dir3X * t3Enter;
-+            leftCellX = static_cast<int32_t>(std::floor(std::min(enter3X, exitX) / cellSize)) + 1;
-+            rightCellX = static_cast<int32_t>(std::ceil(std::max(enter3X, exitX) / cellSize)) - 1;
-+            leftToRight = exitX < enter3X;
++            enterX = cX + dir3X * std::min(t3Top, t3Bottom);
 +        }
++        const auto leftCellX = static_cast<int32_t>(std::floor(std::min(enterX, exitX) / cellSize)) + 1;
++        const auto rightCellX = static_cast<int32_t>(std::ceil(std::max(enterX, exitX) / cellSize)) - 1;
++        const bool leftToRight = exitX < enterX;
 +
 +        const double boundaryY = dirY > 0 ? cellRowYBottom : cellRowYTop;
 +        if (leftToRight) {
@@ -19307,14 +19778,19 @@ index 0000000000000000000000000000000000000000..f5626d1abc6516585b1cc106e8186e36
 +        return lines;
 +    }
 +
++    // Moves any vertex on a pole row off it, so the caps get pole vertices of their own. The dictionary moves with the
++    // vertex, or a cap would find the moved one again under its old position.
 +    void ensureNoPoleVertices() {
 +        for (std::size_t i = 1; i < vertices.size(); i += 2) {
-+            if (vertices[i] == NORTH_POLE_Y) {
-+                vertices[i] = NORTH_POLE_Y + 1;
++            const int16_t y = vertices[i];
++            if (y != NORTH_POLE_Y && y != SOUTH_POLE_Y) {
++                continue;
 +            }
-+            if (vertices[i] == SOUTH_POLE_Y) {
-+                vertices[i] = SOUTH_POLE_Y - 1;
-+            }
++            const int16_t x = vertices[i - 1];
++            const int16_t moved = y == NORTH_POLE_Y ? NORTH_POLE_Y + 1 : SOUTH_POLE_Y - 1;
++            vertices[i] = moved;
++            dictionary.erase(key(x, y));
++            dictionary.try_emplace(key(x, moved), static_cast<uint32_t>(i / 2));
 +        }
 +    }
 +
@@ -19407,20 +19883,6 @@ index 0000000000000000000000000000000000000000..f5626d1abc6516585b1cc106e8186e36
 +                                   uint32_t granularity,
 +                                   bool generateOutlineLines) {
 +    return Subdivider(granularity, canonical).subdivide(polygon, generateOutlineLines);
-+}
-+
-+SubdivisionResult subdividePolygonWithinLimit(const GeometryCollection& polygon,
-+                                              const CanonicalTileID& canonical,
-+                                              uint32_t granularity,
-+                                              bool generateOutlineLines,
-+                                              std::size_t maxVertices) {
-+    while (true) {
-+        SubdivisionResult result = subdividePolygon(polygon, canonical, granularity, generateOutlineLines);
-+        if (result.vertices.size() / 2 <= maxVertices || granularity < 2) {
-+            return result;
-+        }
-+        granularity /= 2;
-+    }
 +}
 +
 +GeometryCoordinates subdivideVertexLine(const GeometryCoordinates& line, uint32_t granularity, bool isRing) {
@@ -20930,241 +21392,3 @@ index 59f109178bef2e129908535d4b1e98a51a3fb76e..9c2648ce987afb6ddc164bd8bf3a6cd0
              drawableWebGPU.setDepthModeFor3D(depth);
              drawableWebGPU.setStencilModeFor3D(stencil);
          }
-diff --git a/plugins/ngon-layer/scripts/generate-shaders.mjs b/plugins/ngon-layer/scripts/generate-shaders.mjs
-index e9ce74655e6eb71524bf624634f1e5b0bc1520b7..eb5fac2c78a9ff91e19791a44fba44a2119debe0 100644
---- a/plugins/ngon-layer/scripts/generate-shaders.mjs
-+++ b/plugins/ngon-layer/scripts/generate-shaders.mjs
-@@ -34,6 +34,10 @@ const uniformFields = `
-     vec4 interpolation1;
-     vec4 interpolation2;
-     vec4 interpolation3;
-+    mat4 projection;
-+    vec4 tile_mercator;
-+    vec4 clipping_plane;
-+    vec4 globe;
- `;
- const varyings = [['vec2', 'local'], ['vec4', 'shape'], ['vec4', 'paint'], ['vec4', 'color'], ['vec4', 'stroke_color']];
- const macro = name => `MLN_PLUGIN_PROPERTY_NGON_${name.toUpperCase()}_IS_UNIFORM`;
-@@ -69,6 +73,34 @@ function evaluate(backend) {
-   return result;
- }
- 
-+// The globe, as the host's own shaders project it. `globe` is the transition
-+// and the angle of a pixel on the sphere.
-+const sphere = `
-+vec3 ngon_sphere(vec2 tile_position, vec4 tile_mercator) {
-+    vec2 mercator = tile_mercator.xy + tile_mercator.zw * tile_position;
-+    float x = mercator.x * 6.283185307179586 + 3.141592653589793;
-+    float t = exp(3.141592653589793 - mercator.y * 6.283185307179586);
-+    return vec3(sin(x) * 2.0 * t, t * t - 1.0, cos(x) * 2.0 * t) / (t * t + 1.0);
-+}
-+
-+vec3 ngon_rotate(vec3 direction, vec2 angles) {
-+    vec3 right = vec3(direction.z, 0.0, -direction.x);
-+    vec3 up = normalize(cross(right, direction));
-+    vec2 t = tan(angles);
-+    return normalize(direction + normalize(right) * t.x + up * t.y);
-+}
-+
-+vec4 ngon_project(vec2 tile_position, vec3 direction, mat4 tile_matrix, mat4 projection, vec4 plane, vec4 globe) {
-+    vec4 result = projection * vec4(direction, 1.0);
-+    result.z = (1.0 - (dot(direction, plane.xyz) + plane.w)) * result.w;
-+    if (globe.x > 0.999) return result;
-+    vec4 flat_position = tile_matrix * vec4(tile_position, 0.0, 1.0);
-+    result.z = mix(0.0, result.z, clamp((globe.x - 0.2) / 0.8, 0.0, 1.0));
-+    result.xyw = mix(flat_position.xyw, result.xyw, globe.x);
-+    return result;
-+}
-+`;
-+
- // Pixel coordinates have positive y downwards. Corner zero points up; rotation
- // is clockwise. A constant quad allows even corner count to be feature-driven.
- const projection = `
-@@ -84,7 +116,10 @@ const projection = `
-         translate = vec2(c * translate.x - s * translate.y, s * translate.x + c * translate.y);
-     }
-     center += translate * u.camera.z;
-+    bool on_globe = u.globe.x > 0.0;
-+    vec3 center_vector = ngon_sphere(center, u.tile_mercator);
-     vec4 projected = u.matrix * vec4(center, 0.0, 1.0);
-+    if (on_globe) projected = ngon_project(center, center_vector, u.matrix, u.projection, u.clipping_plane, u.globe);
-     float outer_radius = radius + stroke_width / cos(3.141592653589793 / corners);
-     float extent = outer_radius + 2.0 / max(u.view.y, 1.0);
-     vec2 local = corner * extent;
-@@ -93,9 +128,16 @@ const projection = `
-         vec2 offset = local * u.camera.z;
-         if (pitch_scale > 0.5) offset *= projected.w / u.camera.w;
-         position = u.matrix * vec4(center + offset, 0.0, 1.0);
-+        if (on_globe) {
-+            vec2 angles = offset * (u.globe.y / u.camera.z);
-+            position = ngon_project(center + offset, ngon_rotate(center_vector, angles), u.matrix, u.projection,
-+                                    u.clipping_plane, u.globe);
-+        }
-     } else {
-         float scale = pitch_scale < 0.5 ? u.camera.w : projected.w;
-         position = projected + vec4(local * u.camera.xy * scale, 0.0, 0.0);
-+        // Behind the horizon.
-+        if (on_globe && projected.z > projected.w) position.xy = vec2(10000.0);
-     }
-     OUT_local = local;
-     OUT_shape = vec4(radius, stroke_width, corners, rotate * 0.017453292519943295);
-@@ -131,6 +173,7 @@ struct NgonVaryings {
-     float4 position [[position]];
- ${varyings.map(([t, n]) => `    ${metal(t)} ${n};`).join('\n')}
- };
-+${metal(sphere)}
- vertex NgonVaryings ngonVertex(NgonVertex in [[stage_in]],
-     constant NgonDrawableUBO& u [[buffer(MLN_PLUGIN_UNIFORM_0_BINDING)]]) {
-     NgonVaryings out;
-@@ -147,7 +190,7 @@ ${metal(coverage.replaceAll('IN_', 'in.'))}    return half4(result);
-     const layout = backend === 'vulkan'
-       ? 'layout(std140, set = DRAWABLE_UBO_SET_INDEX, binding = MLN_PLUGIN_UNIFORM_0_BINDING)'
-       : 'layout(std140)';
--    emit(backend + 'Vertex', `${attributes(backend)}\n${layout} uniform NgonDrawableUBO {${uniformFields}} u;\n${io('out')}
-+    emit(backend + 'Vertex', `${attributes(backend)}\n${layout} uniform NgonDrawableUBO {${uniformFields}} u;\n${io('out')}${sphere}
- void main() {
- ${vertexBody}    gl_Position = position;
- ${backend === 'vulkan' ? '    applySurfaceTransform();\n' : ''}}
-diff --git a/plugins/ngon-layer/shared/cpp/ngon_layer.cpp b/plugins/ngon-layer/shared/cpp/ngon_layer.cpp
-index cd9cbec227b9daf19f1229a4aba3078e09c3d8c7..6a8c263f0c9bf05388273eabf08e3113fbdf98dc 100644
---- a/plugins/ngon-layer/shared/cpp/ngon_layer.cpp
-+++ b/plugins/ngon-layer/shared/cpp/ngon_layer.cpp
-@@ -175,12 +175,16 @@ struct alignas(16) DrawableUBO {
-     float color[4], stroke_color[4];
-     float translate[2], pitch_alignment, pitch_scale;
-     float interpolation[16];
-+    float projection[16];
-+    float tile_mercator[4], clipping_plane[4];
-+    float globe[4];
- };
- static_assert(offsetof(DrawableUBO, radius) == 96);
- static_assert(offsetof(DrawableUBO, color) == 128);
- static_assert(offsetof(DrawableUBO, translate) == 160);
- static_assert(offsetof(DrawableUBO, interpolation) == 176);
--static_assert(sizeof(DrawableUBO) == 240);
-+static_assert(offsetof(DrawableUBO, projection) == 240);
-+static_assert(sizeof(DrawableUBO) == 352);
- 
- #include "ngon_shader_sources.hpp"
- 
-@@ -188,7 +192,9 @@ mln_plugin_status updateUniform(const mln_plugin_uniform_context_v1* context,
-                                 uint32_t id,
-                                 uint8_t* output,
-                                 size_t size) {
--    if (!context || context->struct_size < sizeof(*context) || id != 0 || !output || size != sizeof(DrawableUBO)) {
-+    // A host older than the projection fields passes the context without them, and the n-gons draw on Mercator.
-+    if (!context || context->struct_size < offsetof(mln_plugin_uniform_context_v1, projection_transition) || id != 0 ||
-+        !output || size != sizeof(DrawableUBO)) {
-         return MLN_PLUGIN_STATUS_INVALID_ARGUMENT;
-     }
-     DrawableUBO value{};
-@@ -199,6 +205,13 @@ mln_plugin_status updateUniform(const mln_plugin_uniform_context_v1* context,
-     value.camera[3] = context->camera_to_center_distance;
-     value.view[0] = static_cast<float>(context->bearing);
-     value.view[1] = context->pixel_ratio;
-+    if (context->struct_size >= sizeof(*context)) {
-+        std::copy_n(context->projection_matrix, 16, value.projection);
-+        std::copy_n(context->tile_mercator_coords, 4, value.tile_mercator);
-+        std::copy_n(context->clipping_plane, 4, value.clipping_plane);
-+        value.globe[0] = context->projection_transition;
-+        value.globe[1] = context->pixels_to_sphere_radians;
-+    }
-     std::memcpy(output, &value, sizeof(value));
-     return MLN_PLUGIN_STATUS_OK;
- }
-@@ -331,13 +344,46 @@ Point screen(const std::array<double, 4>& p, const mln_plugin_query_context_v1&
-     return {(p[0] / p[3] + 1) * 0.5 * c.viewport_width, (1 - p[1] / p[3]) * 0.5 * c.viewport_height};
- }
- 
-+// The globe as the vertex shader projects it: ngon_sphere, ngon_rotate and ngon_project.
-+using Direction = std::array<double, 3>;
-+Direction normalized(const Direction& v) {
-+    const double length = std::hypot(v[0], v[1], v[2]);
-+    return length > 0 ? Direction{v[0] / length, v[1] / length, v[2] / length} : v;
-+}
-+Direction sphere(Point p, const double* mercator) {
-+    const double x = (mercator[0] + mercator[2] * p.x) * 2 * pi + pi;
-+    const double t = std::exp(pi - (mercator[1] + mercator[3] * p.y) * 2 * pi);
-+    return {std::sin(x) * 2 * t / (t * t + 1), (t * t - 1) / (t * t + 1), std::cos(x) * 2 * t / (t * t + 1)};
-+}
-+Direction rotate(const Direction& d, Point angles) {
-+    const Direction right = normalized({d[2], 0, -d[0]});
-+    const Direction up = normalized(
-+        {right[1] * d[2] - right[2] * d[1], right[2] * d[0] - right[0] * d[2], right[0] * d[1] - right[1] * d[0]});
-+    const double x = std::tan(angles.x), y = std::tan(angles.y);
-+    return normalized(
-+        {d[0] + right[0] * x + up[0] * y, d[1] + right[1] * x + up[1] * y, d[2] + right[2] * x + up[2] * y});
-+}
-+std::array<double, 4> projectOnGlobe(Point p, const Direction& d, const mln_plugin_query_context_v1& c, double t) {
-+    const double* m = c.projection_matrix;
-+    std::array<double, 4> result{};
-+    for (int i = 0; i < 4; ++i) result[i] = m[i] * d[0] + m[4 + i] * d[1] + m[8 + i] * d[2] + m[12 + i];
-+    const double* plane = c.clipping_plane;
-+    result[2] = (1 - (d[0] * plane[0] + d[1] * plane[1] + d[2] * plane[2] + plane[3])) * result[3];
-+    if (t > 0.999) return result;
-+    const auto flat = project(p, c.tile_matrix);
-+    result[2] *= std::clamp((t - 0.2) / 0.8, 0.0, 1.0);
-+    for (const int i : {0, 1, 3}) result[i] = flat[i] + (result[i] - flat[i]) * t;
-+    return result;
-+}
-+
- uint8_t queryFeature(const mln_plugin_feature_v1* feature,
-                      const mln_plugin_tile_point_v1* query,
-                      size_t queryCount,
-                      const mln_plugin_query_context_v1* context,
-                      const mln_plugin_property_value_v1* values,
-                      size_t count) try {
--    if (!feature || !feature->points || !context || context->struct_size < sizeof(*context) || !query || !queryCount ||
-+    if (!feature || !feature->points || !context ||
-+        context->struct_size < offsetof(mln_plugin_query_context_v1, projection_transition) || !query || !queryCount ||
-         (count && !values) || context->camera_to_center_distance <= 0)
-         return 0;
-     const double radius = std::max(0.0, scalar(values, count, "ngon-radius", 5));
-@@ -355,15 +401,23 @@ uint8_t queryFeature(const mln_plugin_feature_v1* feature,
-         const double c = std::cos(-context->bearing), s = std::sin(-context->bearing);
-         offset = {c * offset.x - s * offset.y, s * offset.x + c * offset.y};
-     }
-+    // A host older than the projection fields passes the context without them: hit test on Mercator.
-+    const bool globe = context->struct_size >= sizeof(*context) && context->projection_transition > 0;
-+    const auto at = [&](Point p, double transition) {
-+        return globe ? projectOnGlobe(p, sphere(p, context->tile_mercator_coords), *context, transition)
-+                     : project(p, context->tile_matrix);
-+    };
-+    // The host finds the query on the globe itself, unblended, so that is where it goes back to the screen.
-     std::vector<Point> queryScreen;
-     for (size_t i = 0; i < queryCount; ++i)
--        queryScreen.push_back(
--            screen(project({double(query[i].x), double(query[i].y)}, context->tile_matrix), *context));
-+        queryScreen.push_back(screen(at({double(query[i].x), double(query[i].y)}, 1), *context));
-     for (size_t i = 0; i < feature->point_count; ++i) {
-         const Point center = {feature->points[i].x + offset.x * context->pixels_to_tile_units,
-                               feature->points[i].y + offset.y * context->pixels_to_tile_units};
--        const auto clip = project(center, context->tile_matrix);
-+        const auto clip = at(center, context->projection_transition);
-         if (clip[3] <= 0) continue;
-+        // Behind the horizon: the shader moves an n-gon facing the viewport off the screen, and clips one on the map.
-+        if (globe && clip[2] > clip[3]) continue;
-         const auto centerScreen = screen(clip, *context);
-         const double scale = alignViewport ? (scaleViewport ? 1 : context->camera_to_center_distance / clip[3])
-                                            : context->pixels_to_tile_units *
-@@ -373,10 +427,16 @@ uint8_t queryFeature(const mln_plugin_feature_v1* feature,
-         for (int n = 0; n < corners; ++n) {
-             const double theta = rotation + 2 * pi * n / corners;
-             const Point delta = {std::sin(theta) * outer * scale, -std::cos(theta) * outer * scale};
--            polygon.push_back(
--                alignViewport
--                    ? Point{centerScreen.x + delta.x, centerScreen.y + delta.y}
--                    : screen(project({center.x + delta.x, center.y + delta.y}, context->tile_matrix), *context));
-+            const Point corner = {center.x + delta.x, center.y + delta.y};
-+            const double angle = context->pixels_to_sphere_radians / context->pixels_to_tile_units;
-+            polygon.push_back(alignViewport ? Point{centerScreen.x + delta.x, centerScreen.y + delta.y}
-+                              : globe       ? screen(projectOnGlobe(corner,
-+                                                              rotate(sphere(center, context->tile_mercator_coords),
-+                                                                           {delta.x * angle, delta.y * angle}),
-+                                                              *context,
-+                                                              context->projection_transition),
-+                                               *context)
-+                                            : screen(project(corner, context->tile_matrix), *context));
-         }
-         if (overlaps(polygon, queryScreen)) return 1;
-     }
