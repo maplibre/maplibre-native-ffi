@@ -1280,8 +1280,7 @@ internal fun readRenderedQueryGeometry(source: Long): RenderedQueryGeometry =
           1u -> RenderedQueryGeometryData.Point(readScreenPoint(source + 8))
           2u -> RenderedQueryGeometryData.Box(readScreenBox(source + 8))
           3u -> RenderedQueryGeometryData.LineString(readScreenLineString(source + 8))
-          else ->
-            RenderedQueryGeometryData.Unknown(tag.toUInt(), NativeMemory.getBytes(source + 8, 32))
+          else -> RenderedQueryGeometryData.Unknown(tag, NativeMemory.getBytes(source + 8, 32))
         }
       }
   )
@@ -1454,8 +1453,8 @@ internal fun readRuntimeEventBatchView(source: Long): RuntimeEventBatchView =
           readItem(
               readAddress(source + w(16, 24)),
               readSize(source + w(20, 32)),
-              (readU64(item + 24)).toULong(),
-              (readU32(item + 32)).toULong(),
+              readU64(item + 24),
+              readU32(item + 32).toULong(),
             )
             .decodeToString(),
         )
@@ -1632,7 +1631,7 @@ internal fun NativeCall.putWake(target: Long, value: Wake) {
   writeU32(target, w(16, 32).toUInt())
   if (value.callback == null) return
   writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), if (value.callback == null) 0L else UpcallStubs.wakeCallback)
+  writeAddress(target + w(4, 8), UpcallStubs.wakeCallback)
   writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
 }
 
@@ -1881,7 +1880,7 @@ internal fun readOpenglContextDescriptor(source: Long): OpenglContextDescriptor 
           3u -> OpenglContextDescriptorData.Webgl(readWebglContextDescriptor(source + w(12, 16)))
           else ->
             OpenglContextDescriptorData.Unknown(
-              tag.toUInt(),
+              tag,
               NativeMemory.getBytes(source + w(12, 16), w(24, 48)),
             )
         }
@@ -1962,7 +1961,7 @@ internal fun readRuntimeEvent(source: Long, message: String = ""): RuntimeEvent 
               readRuntimeEventCameraTransitionFinished(source + 40)
             )
           0u -> RuntimeEventPayload.None
-          else -> RuntimeEventPayload.Unknown(tag.toUInt(), NativeMemory.getBytes(source + 40, 72))
+          else -> RuntimeEventPayload.Unknown(tag, NativeMemory.getBytes(source + 40, 72))
         }
       },
     message = message,
@@ -2014,10 +2013,7 @@ internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition 
           2u ->
             OfflineRegionDefinitionData.Geometry(readOfflineGeometryRegionDefinition(source + 8))
           else ->
-            OfflineRegionDefinitionData.Unknown(
-              tag.toUInt(),
-              NativeMemory.getBytes(source + 8, w(64, 72)),
-            )
+            OfflineRegionDefinitionData.Unknown(tag, NativeMemory.getBytes(source + 8, w(64, 72)))
         }
       }
   )

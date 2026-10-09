@@ -946,20 +946,20 @@ class Values:
             return f"{reader}({address})"
         data = f"readAddress({self.at('source', record, item_buffer.data)})"
         size = self.read_count(record, item_buffer.size)
-        offset = self.decode(
-            self.field_plan(element, item_buffer.offset).value,
-            self.at(address, element, item_buffer.offset),
-        )
-        length = self.decode(
-            self.field_plan(element, item_buffer.length).value,
-            self.at(address, element, item_buffer.length),
-        )
-        message = (
-            f"readItem({data}, {size}, ({offset}).toULong(), ({length}).toULong())"
-        )
+        offset = self.item_count(element, address, item_buffer.offset)
+        length = self.item_count(element, address, item_buffer.length)
+        message = f"readItem({data}, {size}, {offset}, {length})"
         if item_buffer.encoding == "utf8":
             message += ".decodeToString()"
         return f"{reader}({address}, {message})"
+
+    def item_count(self, element, address, path):
+        """An item field's offset or length, read as a ULong."""
+        value = self.field_plan(element, path).value
+        decoded = self.decode(value, self.at(address, element, path))
+        if value.kind != "scalar":
+            return f"({decoded}).toULong()"
+        return decoded if self.accessor(value)[1] == "ULong" else f"{decoded}.toULong()"
 
     def read_count(self, record, path):
         field = self.field_plan(record, path)
@@ -997,7 +997,7 @@ class Values:
             self.abi.size_align(self.abi.classify(field.value.ctype), 64)[0],
         )
         arms.append(
-            f"else -> {public}.Unknown(tag.toUInt(), NativeMemory.getBytes({union}, {width_expression(sizes)}))"
+            f"else -> {public}.Unknown({'tag' if tag_type == 'UInt' else 'tag.toUInt()'}, NativeMemory.getBytes({union}, {width_expression(sizes)}))"
         )
         return (
             f"read{tag_suffix}({self.at('source', record, field.presence.tag)}).let {{ tag -> when (tag) {{ "

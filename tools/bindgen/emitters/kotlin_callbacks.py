@@ -394,7 +394,10 @@ def put_function(value, values):
             lines.append(f"  {expression}?.let {{ {mark}; {'; '.join(writes)} }}")
         else:
             lines += ["  " + line for line in writes]
-    if all(f.value.nullable for f in callbacks):
+    # With every callback nullable, the descriptor stays unregistered when all
+    # are absent. A lone callback is then known present past that return.
+    all_nullable = all(f.value.nullable for f in callbacks)
+    if all_nullable:
         lines.append(
             "  if ("
             + " && ".join(f"value.{identifier(f.name)} == null" for f in callbacks)
@@ -412,7 +415,7 @@ def put_function(value, values):
             values,
         )
         stub = f"UpcallStubs.{site}"
-        if field.value.nullable:
+        if field.value.nullable and not (all_nullable and len(callbacks) == 1):
             stub = f"if (value.{identifier(field.name)} == null) 0L else {stub}"
         lines.append(
             f"  writeAddress({values.at('target', value, field.name)}, {stub})"
