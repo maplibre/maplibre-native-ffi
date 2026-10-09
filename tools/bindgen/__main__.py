@@ -1,4 +1,4 @@
-"""Generate bindings and report the declarations that still need lowering rules."""
+"""Generate bindings and report the declarations that lack lowering rules."""
 
 from __future__ import annotations
 
@@ -35,53 +35,28 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
     bound = compile_api(api)
     if bound.diagnostics:
         raise ModelError(list(bound.diagnostics))
-    source_api = api
     outputs = native_capture.generate(bound)
     outputs.update(copy_cases.generate(bound))
-    outputs.update(
-        {f"bindings/go/{path}": source for path, source in go.generate(bound).items()}
-    )
-    outputs.update(
-        {
-            f"bindings/dotnet/src/Maplibre.NativeFfi/{path}": source
-            for path, source in dotnet.generate(bound).items()
-        }
-    )
-    outputs.update(
-        {
-            f"bindings/rust/{path}": source
-            for path, source in rust.generate(bound).items()
-        }
-    )
-    outputs.update(
-        {
-            f"bindings/python/{path}": source
-            for path, source in python.generate(bound).items()
-        }
-    )
-    outputs.update(
-        {
-            f"bindings/swift/Sources/MaplibreNativeFFI/{path}": source
-            for path, source in swift.generate(bound).items()
-        }
-    )
+    for directory, emitter in (
+        ("bindings/go", go),
+        ("bindings/dotnet/src/Maplibre.NativeFfi", dotnet),
+        ("bindings/rust", rust),
+        ("bindings/python", python),
+        ("bindings/swift/Sources/MaplibreNativeFFI", swift),
+        ("bindings/kotlin", kotlin),
+        ("bindings/zig/src", zig),
+    ):
+        outputs.update(
+            {
+                f"{directory}/{path}": source
+                for path, source in emitter.generate(bound).items()
+            }
+        )
     outputs["bindings/dart/lib/src/runtime/generated_operations.dart"] = dart.generate(
         bound
     )
     outputs["bindings/dart/lib/src/generated_values.dart"] = dart.generate_values(bound)
     outputs[dart_native.PATH] = dart_native.generate(bound)
-    outputs.update(
-        {
-            f"bindings/kotlin/{path}": source
-            for path, source in kotlin.generate(bound).items()
-        }
-    )
-    outputs.update(
-        {
-            f"bindings/zig/src/{path}": source
-            for path, source in zig.generate(bound).items()
-        }
-    )
     reports = {
         language: emitter.coverage(bound)
         for language, emitter in {
@@ -115,10 +90,10 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
         )
     )
     report = {
-        "schema_version": source_api.schema_version,
-        "function_count": len(source_api.functions),
-        "public_function_count": len(source_api.public_functions),
-        "runtime_exports": list(source_api.runtime_exports),
+        "schema_version": api.schema_version,
+        "function_count": len(api.functions),
+        "public_function_count": len(api.public_functions),
+        "runtime_exports": list(api.runtime_exports),
         "semantic": {
             "resolved_operations": len(bound.operations),
             "resolved_callbacks": len(bound.callbacks),
@@ -137,207 +112,110 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
     return outputs, report
 
 
+def run_tool(*command: str, cwd: Path = ROOT, quiet: bool = False, **options):
+    """Run a repository tool through mise and fail on a nonzero exit."""
+    if quiet:
+        options["stdout"] = subprocess.DEVNULL
+    return subprocess.run(
+        ["mise", "exec", "--no-deps", "--", *command], cwd=cwd, check=True, **options
+    )
+
+
 def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
     """Run each language's formatter over the outputs in a staging directory."""
     for path, source in outputs.items():
         target = staging / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(source)
-    native_files = [path for path in outputs if path.endswith((".h", ".inc", ".c"))]
-    for path in native_files:
+
+    def staged(*suffixes: str) -> list[str]:
+        return [str(staging / path) for path in outputs if path.endswith(suffixes)]
+
+    for path in outputs:
+        if not path.endswith((".h", ".inc", ".c")):
+            continue
         target = staging / path
-        formatted = subprocess.run(
-            [
-                "mise",
-                "exec",
-                "--no-deps",
-                "--",
-                "dprint",
-                "fmt",
-                "--stdin",
-                "cpp" if target.suffix == ".inc" else "h",
-            ],
-            cwd=ROOT,
+        formatted = run_tool(
+            "dprint",
+            "fmt",
+            "--stdin",
+            "cpp" if target.suffix == ".inc" else "h",
             input=target.read_text(),
             capture_output=True,
             text=True,
-            check=True,
         )
         target.write_text(formatted.stdout)
-    subprocess.run(
-        [
-            "mise",
-            "exec",
-            "--no-deps",
-            "--",
-            "gofumpt",
-            "-w",
-            str(staging / "bindings/go/generated_api.go"),
-        ],
+    run_tool(
+        "gofumpt",
+        "-w",
+        str(staging / "bindings/go/generated_api.go"),
         cwd=ROOT / "bindings/go",
-        check=True,
     )
-    csharp = [str(staging / path) for path in outputs if path.endswith(".cs")]
-    if csharp:
+    if csharp := staged(".cs"):
         csharp_ignore = staging / "csharpier.ignore"
         csharp_ignore.write_text("")
-        subprocess.run(
-            [
-                "mise",
-                "exec",
-                "--no-deps",
-                "--",
-                "dotnet",
-                "tool",
-                "restore",
-                "--tool-manifest",
-                str(ROOT / ".config/dotnet-tools.json"),
-                "--verbosity",
-                "quiet",
-            ],
-            cwd=ROOT / "bindings/dotnet",
-            check=True,
-            stdout=subprocess.DEVNULL,
+        dotnet = ROOT / "bindings/dotnet"
+        run_tool(
+            "dotnet",
+            "tool",
+            "restore",
+            "--tool-manifest",
+            str(ROOT / ".config/dotnet-tools.json"),
+            "--verbosity",
+            "quiet",
+            cwd=dotnet,
+            quiet=True,
         )
-        subprocess.run(
-            [
-                "mise",
-                "exec",
-                "--no-deps",
-                "--",
-                "python",
-                "-c",
-                "import os, sys; os.chdir(sys.argv[1]); os.execvp(sys.argv[2], sys.argv[2:])",
-                str(ROOT),
-                "dotnet",
-                "tool",
-                "run",
-                "csharpier",
-                "format",
-                "--include-generated",
-                "--no-cache",
-                "--ignore-path",
-                str(csharp_ignore),
-                *csharp,
-            ],
-            cwd=ROOT / "bindings/dotnet",
-            check=True,
-            stdout=subprocess.DEVNULL,
+        run_tool(
+            "python",
+            "-c",
+            "import os, sys; os.chdir(sys.argv[1]); os.execvp(sys.argv[2], sys.argv[2:])",
+            str(ROOT),
+            "dotnet",
+            "tool",
+            "run",
+            "csharpier",
+            "format",
+            "--include-generated",
+            "--no-cache",
+            "--ignore-path",
+            str(csharp_ignore),
+            *csharp,
+            cwd=dotnet,
+            quiet=True,
         )
-    rust_files = [str(staging / path) for path in outputs if path.endswith(".rs")]
-    subprocess.run(
-        [
-            "mise",
-            "exec",
-            "--no-deps",
-            "--",
-            "rustfmt",
-            "--edition",
-            "2024",
-            *rust_files,
-        ],
-        cwd=ROOT,
-        check=True,
+    run_tool("rustfmt", "--edition", "2024", *staged(".rs"))
+    python_files = staged(".py", ".pyi")
+    run_tool(
+        "uv", "run", "--no-sync", "ruff", "check", "--fix", *python_files, quiet=True
     )
-    python_files = [
-        str(staging / path) for path in outputs if path.endswith((".py", ".pyi"))
-    ]
-    subprocess.run(
-        [
-            "mise",
-            "exec",
-            "--no-deps",
-            "--",
-            "uv",
-            "run",
-            "--no-sync",
-            "ruff",
-            "check",
-            "--fix",
-            *python_files,
-        ],
-        cwd=ROOT,
-        check=True,
-        stdout=subprocess.DEVNULL,
+    run_tool("uv", "run", "--no-sync", "ruff", "format", *python_files, quiet=True)
+    run_tool(
+        "swiftformat",
+        "--indent",
+        "2",
+        "--max-width",
+        "80",
+        "--quiet",
+        str(staging / "bindings/swift/Sources/MaplibreNativeFFI/Generated"),
     )
-    subprocess.run(
-        [
-            "mise",
-            "exec",
-            "--no-deps",
-            "--",
-            "uv",
-            "run",
-            "--no-sync",
-            "ruff",
-            "format",
-            *python_files,
-        ],
-        cwd=ROOT,
-        check=True,
-        stdout=subprocess.DEVNULL,
-    )
-    subprocess.run(
-        [
-            "mise",
-            "exec",
-            "--no-deps",
-            "--",
-            "swiftformat",
-            "--indent",
-            "2",
-            "--max-width",
-            "80",
-            "--quiet",
-            str(staging / "bindings/swift/Sources/MaplibreNativeFFI/Generated"),
-        ],
-        cwd=ROOT,
-        check=True,
-    )
-    subprocess.run(
-        [
-            "mise",
-            "exec",
-            "--no-deps",
-            "--",
-            "dart",
-            "format",
-            *(str(staging / path) for path in outputs if path.endswith(".dart")),
-        ],
-        cwd=ROOT / "bindings/dart",
-        check=True,
-        stdout=subprocess.DEVNULL,
-    )
-    kotlin_files = [str(staging / path) for path in outputs if path.endswith(".kt")]
-    subprocess.run(
-        [
-            "mise",
-            "exec",
-            "--no-deps",
-            "--",
-            "env",
-            "MLN_FFI_DPRINT_SCOPED_TOOLS=1",
-            "bash",
-            str(ROOT / ".mise/bin/dprint-ktfmt"),
-            "--google-style",
-            *kotlin_files,
-        ],
+    run_tool("dart", "format", *staged(".dart"), cwd=ROOT / "bindings/dart", quiet=True)
+    run_tool(
+        "env",
+        "MLN_FFI_DPRINT_SCOPED_TOOLS=1",
+        "bash",
+        str(ROOT / ".mise/bin/dprint-ktfmt"),
+        "--google-style",
+        *staged(".kt"),
         cwd=ROOT / "bindings/kotlin",
-        check=True,
-        stdout=subprocess.DEVNULL,
+        quiet=True,
     )
-    zig_files = [str(staging / path) for path in outputs if path.endswith(".zig")]
-    subprocess.run(
-        ["mise", "exec", "--no-deps", "--", "zig", "fmt", *zig_files],
-        cwd=ROOT / "bindings/zig",
-        check=True,
-        stdout=subprocess.DEVNULL,
-    )
+    run_tool("zig", "fmt", *staged(".zig"), cwd=ROOT / "bindings/zig", quiet=True)
     return {path: (staging / path).read_text() for path in outputs}
 
 
 def generated_files(root: Path = ROOT) -> set[str]:
-    """Discover stale owned outputs without trusting an old coverage manifest."""
+    """Find generated files on disk, stale ones included, by their header line."""
     candidates = [
         root / "bindings/.gitattributes",
         root / "bindings/go/generated_api.go",

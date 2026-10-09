@@ -62,36 +62,36 @@ CARRIER = {
     "ULong": ".toLong()",
 }
 
-# The conversion from a native-call carrier back to a public scalar type.
-PUBLIC = {
-    "Boolean": "",
-    "Double": "",
-    "Float": "",
-    "Byte": "",
-    "Short": "",
-    "Int": "",
-    "Long": "",
-    "UByte": ".toUByte()",
-    "UShort": ".toUShort()",
-    "UInt": ".toUInt()",
-    "ULong": ".toULong()",
-}
-
+# Kotlin's hard keywords, which an identifier can use only in backticks.
 KEYWORDS = {
-    "class",
-    "object",
-    "when",
-    "in",
-    "is",
     "as",
+    "break",
+    "class",
+    "continue",
+    "do",
+    "else",
+    "false",
+    "for",
     "fun",
+    "if",
+    "in",
+    "interface",
+    "is",
+    "null",
+    "object",
+    "package",
+    "return",
+    "super",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "typealias",
+    "typeof",
     "val",
     "var",
-    "return",
-    "interface",
-    "null",
-    "true",
-    "false",
+    "when",
+    "while",
 }
 
 
@@ -144,6 +144,10 @@ class Values:
         self.readers = {}
         # The C functions that codecs call, which the native shims declare.
         self.functions = {}
+        # Callback values that direct registrations wrap, by native name.
+        self.direct_callbacks = {}
+        # Upcall sites by name, which kotlin_callbacks.sites fills on first use.
+        self.sites = None
 
     def default_call(self, value):
         """Initialize a record at `target` with its C default constructor."""
@@ -567,7 +571,7 @@ class Values:
         """An expression for [value] as a native-call carrier, in a NativeArena receiver."""
         from . import kotlin_callbacks
 
-        callback = kotlin_callbacks.argument(value, expression, self)
+        callback = kotlin_callbacks.argument(value, expression)
         if callback is not None:
             return callback
         if value.kind == "handle":
@@ -813,9 +817,7 @@ class Values:
         """An expression that copies the [value] stored at [address]."""
         from . import kotlin_callbacks
 
-        callback = kotlin_callbacks.decode(value, address, self)
-        if callback is not None:
-            return callback
+        kotlin_callbacks.check_decode(value)
         if value.kind == "native_pointer":
             raw = (
                 f"readAddress({address})"

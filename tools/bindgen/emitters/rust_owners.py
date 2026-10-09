@@ -11,10 +11,6 @@ def owner_name(native: str) -> str:
     return pascal(native) + "Handle"
 
 
-def state_name(native: str) -> str:
-    return owner_name(native) + "State"
-
-
 def module_name(native: str) -> str:
     return native.removeprefix("mln_")
 

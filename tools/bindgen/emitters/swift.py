@@ -1,4 +1,4 @@
-"""Emit Swift operations directly over the native completion runtime."""
+"""Emit Swift operations over the native completion runtime."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
+from tools.bindgen.names import camel
 from tools.bindgen.semantic import BoundApi, OperationPlan
 
 SCALARS = {
@@ -39,11 +40,6 @@ def name(value: str) -> str:
     return "".join(part[:1].upper() + part[1:] for part in value.split("_"))
 
 
-def camel(value: str) -> str:
-    value = name(value)
-    return value[:1].lower() + value[1:]
-
-
 def native(type_: CType) -> str:
     return type_.declaration or type_.spelling.removeprefix("const ")
 
@@ -64,7 +60,7 @@ def unsupported(function: Function | Record, detail: str) -> ModelError:
     return ModelError([f"{function.location}: Swift: {function.name}: {detail}"])
 
 
-def operation(plan: OperationPlan, api: Api, value_types) -> tuple[str, str | None]:
+def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
     from .swift_dynamic_values import dynamic
     from .swift_ownership import owner_name
 
@@ -493,7 +489,7 @@ def lower(
         function = plan.function
         previous = dict(value_types.used)
         try:
-            chunk, extended = operation(plan, api, value_types)
+            chunk, extended = operation(plan, value_types)
             if extended:
                 # Operations on one type share one extension per file.
                 chunk = (extended, chunk)

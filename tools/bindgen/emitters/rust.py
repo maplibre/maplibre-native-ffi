@@ -1,8 +1,9 @@
-"""Generate Rust operations using the stable completion and handle runtimes."""
+"""Generate Rust operations over the completion and handle runtimes."""
 
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import replace
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.semantic import BoundApi, OperationPlan
@@ -168,10 +169,8 @@ def adopt_owned(owned, raw, value_types, parent="parent"):
     return public, f"{public}::adopt({raw}, {source})"
 
 
-def result_rule(api: Api, plan: OperationPlan, value_types) -> tuple[str, str]:
+def result_rule(plan: OperationPlan, value_types) -> tuple[str, str]:
     """The completion's public result type and the converter that copies it."""
-    from dataclasses import replace
-
     from .rust_dynamic_values import decode
 
     result = plan.result
@@ -239,7 +238,7 @@ def reads_receiver(plan: OperationPlan) -> bool:
     )
 
 
-def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str]:
+def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
     from .rust_dynamic_values import decode, dynamic, encode
 
     function = plan.function
@@ -604,7 +603,7 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str]:
             completed = "NativeFuture<CommandCompletion>"
             expression = f"call.command({closure} {native})"
         else:
-            result, converter = result_rule(api, plan, value_types)
+            result, converter = result_rule(plan, value_types)
             completed = f"NativeFuture<{result}>"
             expression = f"call.complete({closure} {native}, {converter})"
         if outputs:
@@ -696,7 +695,6 @@ def operation(api: Api, plan: OperationPlan, value_types) -> tuple[str, str]:
 def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str]]:
     chunks, generated, unsupported = defaultdict(list), [], {}
     bound = compile_api(api)
-    api = bound.source
     from . import rust_owners
     from .rust_values import Values
 
@@ -720,7 +718,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
             name: set(known) for name, known in value_types.directions.items()
         }
         try:
-            module, code = operation(api, plan, value_types)
+            module, code = operation(plan, value_types)
             if code:
                 chunks[module].append(code)
             generated.append(function.name)

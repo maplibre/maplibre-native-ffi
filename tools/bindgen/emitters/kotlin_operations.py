@@ -2,7 +2,7 @@
 
 A generated operation names its C function, maps its parameters, and decodes
 its result. Admission, keep-alive, arenas, completions, status checks, and
-callback acceptance live in the hand-written `internal/call/NativeCall.kt`.
+callback acceptance live in the handwritten `internal/call/NativeCall.kt`.
 """
 
 from __future__ import annotations

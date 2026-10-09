@@ -1,4 +1,4 @@
-"""Shared semantic compilation entry point for every static backend."""
+"""Bind a parsed API once for every emitter that receives it."""
 
 from .model import Api
 from .semantic import BoundApi, bind

@@ -7,6 +7,7 @@ as an array's count or a presence mask.
 """
 
 from dataclasses import replace
+from os.path import commonprefix
 
 from .rust import Unsupported, identifier, native_identifier, pascal
 
@@ -180,8 +181,6 @@ def declaration(values, value):
                 f"raw.{native_identifier(field.name)} = std::mem::size_of::<{raw}>() as _;",
             )
     for flag in value.mask_flags:
-        from os.path import commonprefix
-
         mask_plan = next(f.value for f in value.fields if f.name == flag.mask)
         prefix = (
             commonprefix([key for key, _ in mask_plan.enum_values]).rsplit("_", 1)[0]

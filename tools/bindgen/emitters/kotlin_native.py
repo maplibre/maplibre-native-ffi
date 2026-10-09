@@ -234,7 +234,7 @@ class NativeShims:
         )
 
     def runtime_layouts(self):
-        """Offsets of the records the hand-written completion runtime reads."""
+        """Offsets of the records the handwritten completion runtime reads."""
         objects = []
         for record, public in (
             ("mln_completion", "CompletionLayout"),

@@ -264,7 +264,7 @@ class Values:
                     continue
                 emitted.add(key)
                 if key[1]:
-                    name = self.flag_name(plan, key[1])
+                    name = self.flag_name(key[1])
                 else:
                     name = pascal(key[0].removeprefix("has_"))
                 members.append(
@@ -559,7 +559,7 @@ class Values:
                 return f"{enum.name}.{name}"
         raise Unsupported(f"unknown enum constant {name}")
 
-    def flag_name(self, plan: ValuePlan, constant: str) -> str:
+    def flag_name(self, constant: str) -> str:
         values = next(
             enum.values
             for enum in self.api.enums
@@ -653,7 +653,7 @@ class Values:
                     for (name, fields), value in zip(members, values, strict=True)
                 )
                 + "".join(
-                    f", {self.flag_name(plan, flag.name)} = {self.has_bit(plan, flag.mask, flag.name)}"
+                    f", {self.flag_name(flag.name)} = {self.has_bit(plan, flag.mask, flag.name)}"
                     for flag in plan.mask_flags
                 )
                 + " }"
@@ -877,7 +877,7 @@ class Values:
                 lines.append("        }")
         for flag in plan.mask_flags:
             lines.append(
-                f"        if (value.{self.flag_name(plan, flag.name)}) native.{member(flag.mask)} |= {self.bit(plan, flag.mask, flag.name)};"
+                f"        if (value.{self.flag_name(flag.name)}) native.{member(flag.mask)} |= {self.bit(plan, flag.mask, flag.name)};"
             )
         return "\n".join([*lines, "        return native;", "    }", ""])
 
@@ -1262,7 +1262,7 @@ class Values:
                     f"    public {required}{type_} {name} {{ get; set; }}"
                 )
             properties.extend(
-                f"    public bool {self.flag_name(plan, flag.name)} {{ get; set; }}"
+                f"    public bool {self.flag_name(flag.name)} {{ get; set; }}"
                 for flag in plan.mask_flags
             )
             return (

@@ -116,8 +116,5 @@ def operation(plan, values):
         declaration
         + f"pub fn {camel(plan.name.removeprefix('mln_'))}({', '.join(signature)}) status.Error!{return_type} {{\n    "
         + "\n    ".join(setup)
-        + "\n}\n",
-        "global",
-        "",
-        None,
+        + "\n}\n"
     )

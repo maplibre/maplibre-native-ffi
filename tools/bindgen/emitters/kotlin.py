@@ -26,7 +26,7 @@ COMMON = "src/commonMain/kotlin/org/maplibre/nativeffi"
 PLATFORMS = {"jvmMain": "jvm", "nativeMain": "native", "androidMain": "android"}
 JNI = "src/androidMain/jni/mln_jni_generated.c"
 
-# C functions the hand-written runtime calls through `C`.
+# C functions the handwritten runtime calls through `C`.
 RUNTIME_FUNCTIONS = (
     "mln_c_version",
     "mln_plugin_get_register_function_v1",

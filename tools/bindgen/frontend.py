@@ -443,8 +443,8 @@ def parse_headers(
             )
             for name, entries in manifest.items()
         }
-        # Every exported declaration belongs to an explicit entrypoint closure.
-        # An accidentally omitted new header cannot silently become private.
+        # Every exported declaration belongs to an explicit entrypoint closure,
+        # so a header that the manifest omits fails generation.
         for kind in ("functions", "records", "enums", "typedefs"):
             reachable = {
                 item.name

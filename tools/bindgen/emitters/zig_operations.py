@@ -134,7 +134,7 @@ def copier(plan, values):
     return copy, public
 
 
-def operation(plan, api, values):
+def operation(plan, values):
     function = plan.function
     if plan.consumes == "always" and function.return_type.kind != "void":
         raise failure(
@@ -312,7 +312,7 @@ def operation(plan, api, values):
         + "\n    ".join(body)
         + "\n}\n"
     )
-    return code, "global", "", None
+    return code
 
 
 def view_operation(plan, values):
@@ -341,4 +341,4 @@ def view_operation(plan, values):
     return use(context, {typ}.fromNative(raw));
 }}
 '''
-    return code, "global", "", None
+    return code

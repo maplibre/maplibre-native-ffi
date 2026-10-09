@@ -54,7 +54,8 @@ class GenerateCommandTests(unittest.TestCase):
             self.assertEqual(self.generate(root, ("keywords",), check=True), (0, ""))
 
     def test_require_complete_fails_while_a_declaration_is_unsupported(self):
-        # Some emitters cannot yet represent a nullable counted input.
+        # The values group declares a nullable counted input that some emitters
+        # report unsupported.
         with TemporaryDirectory() as directory:
             root = Path(directory)
             self.assertEqual(self.generate(root, ("values",))[0], 0)

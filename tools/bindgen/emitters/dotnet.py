@@ -1002,7 +1002,8 @@ def emit(api: Api | BoundApi) -> Emission:
             else ""
         )
         extra_argument = ", completion" if immediate_completion else ""
-        # A pending decision is only ever borrowed through BorrowDecision.
+        # Adopt takes no pendingDecision, because a pending decision is
+        # borrowed through BorrowDecision.
         adopt_extra = ", Task completion" if immediate_completion else ""
         cleanup = handle.dispose or handle.release
         cleanup_function = api.functions_by_name[cleanup]

@@ -950,12 +950,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         + f"\nif TYPE_CHECKING:\n    from ._generated_owners import {', '.join([*OWNERS.values(), *scope_owners.values()]) or '__name__'}\n\n"
         + public_values
     )
-    scope_owners = {
-        name: public_name(name) + "Scope"
-        for name, value in values.records.items()
-        if value.response
-    }
-    for native, owner in scope_owners.items():
+    for owner in scope_owners.values():
         files["src/generated_operations.rs"] += f"""\n#[pyclass(name = "_{owner}")]
 struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
 """

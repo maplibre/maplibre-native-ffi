@@ -9,7 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import TypedDict
 
-from .model import Api, CType, Field, Function, ModelError
+from .model import Api, CType, Function, ModelError
+from .names import type_name
 from .schema import is_completion, validate
 
 
@@ -286,31 +287,6 @@ class BoundApi:
     @property
     def operations_by_name(self) -> dict[str, OperationPlan]:
         return {operation.name: operation for operation in self.operations}
-
-
-def type_name(value: CType) -> str:
-    return value.declaration or value.spelling.removeprefix("const ")
-
-
-def layout_control(field: Field) -> str | None:
-    """Return the validated initialization role of an ABI-only field."""
-    if field.bit_width is not None:
-        return None
-    if (
-        field.metadata == {"kind": "size", "default": "sizeof"}
-        and field.type.canonical == "unsigned int"
-    ):
-        return "size"
-    if field.metadata == {
-        "kind": "reserved",
-        "default": "0",
-    } and field.type.canonical in {
-        "unsigned int",
-        "unsigned long long",
-        "unsigned long",
-    }:
-        return "reserved"
-    return None
 
 
 SCALAR_CANONICAL_TYPES = frozenset(
@@ -1286,9 +1262,3 @@ class Binder:
 
 def bind(api: Api, *, require_complete: bool = False) -> BoundApi:
     return Binder(api).bind(require_complete=require_complete)
-
-
-def resolve_value(
-    api: Api, type_: CType, metadata: dict[str, str], context: str
-) -> ValuePlan:
-    return Binder(api).value(type_, metadata, context)

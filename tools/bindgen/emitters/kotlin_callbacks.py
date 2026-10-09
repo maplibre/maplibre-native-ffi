@@ -8,13 +8,10 @@ only primitives, so the C side of every site has the same shape.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from types import SimpleNamespace
+from dataclasses import dataclass, replace
 
 from ..model import CType
 from .kotlin_values import Unsupported, identifier, name, owner_class
-
-ADMISSION = "CallbackAdmission"
 
 
 @dataclass(frozen=True)
@@ -98,7 +95,7 @@ def common(values):
             result.append(
                 f"public data class {public_name}(\n" + ",\n".join(parameters) + "\n)"
             )
-    for callback in getattr(values, "direct_callbacks", {}).values():
+    for callback in values.direct_callbacks.values():
         result.append(
             f"internal class {registration_class(callback)}(val callback: {values.public(callback)})"
         )
@@ -109,13 +106,14 @@ def registration_class(callback):
     return f"Generated{name(callback.native)}Registration"
 
 
-def argument(value, expression, values):
+def argument(value, expression):
     if value.response:
         return f"{expression}.bindingAddress.also {{ {expression}.bindingScope.ensureActive() }}"
     return None
 
 
-def decode(value, address, values):
+def check_decode(value):
+    """Rejects callback values that native cannot hand back to Kotlin."""
     if value.registration:
         if any(
             not field.value.nullable
@@ -125,10 +123,8 @@ def decode(value, address, values):
             raise Unsupported(
                 "callback descriptor output has no host callback identity"
             )
-        return
-    if value.response:
+    elif value.response:
         raise Unsupported("a callback response is valid only during its callback")
-    return
 
 
 # Upcall sites.
@@ -142,7 +138,7 @@ VOID = CType("void", "void", "void")
 
 def sites(values):
     """The registry of upcall sites, starting with the runtime's own."""
-    if not hasattr(values, "sites"):
+    if values.sites is None:
         values.sites = {}
         typedefs = values.bound.source.typedefs_by_name
         completion = typedefs.get("mln_completion_callback")
@@ -577,13 +573,11 @@ def direct_operation(plan, values, native):
             "direct callback registration takes only its registration parameters"
         )
     values.check(callback_value)
-    if not hasattr(values, "direct_callbacks"):
-        values.direct_callbacks = {}
     values.direct_callbacks[callback_value.native] = callback_value
     wrapper = registration_class(callback_value)
     site = callback_site(
         name(callback_value.native)[0].lower() + name(callback_value.native)[1:],
-        SimpleNamespace(native=callback_value.native, nullable=False),
+        replace(callback_value, nullable=False),
         "callback",
         wrapper,
         values,

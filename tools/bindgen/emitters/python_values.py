@@ -251,7 +251,8 @@ class Values:
                 group = grouped[field.name]
                 if field.name != group.fields[0]:
                     continue
-                # The group bit is the semantic name; common prefix belongs to the mask domain.
+                # The group bit names the field, without the prefix that every
+                # bit in the mask shares.
                 bits = [g.bit for g in plan.presence_groups if g.bit]
                 prefix = os.path.commonprefix(bits).rsplit("_", 1)[0] + "_"
                 name = (
