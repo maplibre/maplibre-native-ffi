@@ -758,6 +758,8 @@ internal object WindowsD3D12Interop {
       val device = resourceDevice(resource.address, arena)
       try {
         val allocationInfo = arena.allocate(16)
+        // A COM method that returns a struct takes the result buffer after `this`, as the C
+        // declaration in d3d12.h spells out, on both x64 and ARM64.
         invokeAddress(
           comMethod(device, ID3D12_DEVICE_GET_RESOURCE_ALLOCATION_INFO_INDEX),
           FunctionDescriptor.of(
@@ -768,8 +770,8 @@ internal object WindowsD3D12Interop {
             ValueLayout.JAVA_INT,
             ValueLayout.ADDRESS,
           ),
-          allocationInfo,
           address(device),
+          allocationInfo,
           0,
           1,
           textureDesc(arena, extent, dxgiFormat),
