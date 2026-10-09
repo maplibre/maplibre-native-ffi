@@ -79,6 +79,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0035-plugin-gl-attributes-by-name.patch"
   "$repo_root/patches/maplibre-native/0036-platform-locale-expression-options.patch"
   "$repo_root/patches/maplibre-native/0037-platform-locale-expression-errors.patch"
+  "$repo_root/patches/maplibre-native/0038-apple-locale-expressions.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the
