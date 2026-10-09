@@ -7,6 +7,7 @@ import java.lang.invoke.MethodHandle
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.NoSuchElementException
+import java.util.concurrent.ConcurrentHashMap
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.BoundsConstraint
@@ -210,6 +211,7 @@ internal object NativeAccess {
   const val DEFAULT_LOG_SEVERITY_MASK: Int = (1 shl 1) or (1 shl 2)
 
   private val lock = Any()
+  private val downcalls = ConcurrentHashMap<String, MethodHandle>()
 
   @Volatile private var initialized = false
 
@@ -5594,7 +5596,9 @@ internal object NativeAccess {
     invokeWithArguments(args.map { if (it is NativeHandle) it.raw else it })
 
   private fun downcall(name: String): MethodHandle =
-    MapLibreNativeC::class.java.getMethod("${name}\$handle").invoke(null) as MethodHandle
+    downcalls.computeIfAbsent(name) {
+      MapLibreNativeC::class.java.getMethod("${it}\$handle").invoke(null) as MethodHandle
+    }
 
   private fun nativeAccessFailure(cause: Throwable): IllegalStateException =
     IllegalStateException(
