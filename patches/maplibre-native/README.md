@@ -241,3 +241,8 @@ pixel a full world away from the viewport center.
 displacement direction at the globe puck and handles coincident horizon samples.
 Sampling the viewport bottom can produce a zero direction when that pixel lies
 outside the globe, causing location images to disappear.
+
+`0044-location-indicator-drawable-recreation.patch` binds cached geometry and
+textures to newly created location drawables. Changing projection rebuilds the
+drawables with different shaders; the previous dirty flags suppressed their
+initial vertex uploads and texture bindings, making the images disappear.

@@ -4838,3 +4838,80 @@ fn globe_location_top_image_renders_when_the_viewport_bottom_is_in_the_sky() {
         runtime.close().unwrap();
     }
 }
+
+#[test]
+fn location_drawables_keep_images_and_accuracy_circle_across_projection_changes() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+    let (_context, session) = create_owned_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(512, 512, 1.0),
+    )
+    .unwrap();
+    for projection in ["mercator", "mercator", "globe", "globe", "mercator"] {
+        map.set_style_json(&serde_json::to_vec(&json!({"version":8,"transition":{"duration":0},"projection":{"type":projection},"sources":{},"layers":[{
+            "id":"location","type":"location-indicator","layout":{"top-image":"green","bearing-image":"blue","shadow-image":"yellow"},"paint":{"location":[0,0,0],"accuracy-radius":3000000,"accuracy-radius-color":"red"}
+        }]})).unwrap()).unwrap();
+        for (name, size, color) in [
+            ("green", 8, [0u8, 255, 0, 255]),
+            ("blue", 16, [0u8, 0, 255, 255]),
+            ("yellow", 24, [255u8, 255, 0, 255]),
+        ] {
+            let pixels = color.repeat((size * size) as usize);
+            let image = PremultipliedRgba8Image::new(
+                TextureImageInfo::new(size, size, size * 4, pixels.len()),
+                pixels,
+            );
+            map.set_style_image(name, &image, None).unwrap();
+        }
+        let mut camera = CameraOptions::default();
+        camera.center = Some(LatLng::new(0.0, 0.0));
+        camera.zoom = Some(0.0);
+        map.jump_to(&camera).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            runtime.pump(Some(Duration::ZERO), None).unwrap();
+            session.render_update().unwrap();
+            if let Ok(info) = session.texture_image_info() {
+                let mut pixels = vec![0; info.byte_length];
+                session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+                let center = (256 * 512 + 256) * 4;
+                let blue = pixels
+                    .chunks_exact(4)
+                    .filter(|p| p[2] > 200 && p[0] < 20 && p[1] < 20)
+                    .count();
+                let yellow = pixels
+                    .chunks_exact(4)
+                    .filter(|p| p[0] > 200 && p[1] > 200 && p[2] < 20)
+                    .count();
+                let red = pixels
+                    .chunks_exact(4)
+                    .filter(|p| p[0] > 200 && p[1] < 20 && p[2] < 20)
+                    .count();
+                if pixels[center + 1] > 200
+                    && pixels[center] < 20
+                    && blue > 100
+                    && yellow > 100
+                    && red > 100
+                {
+                    break;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "location components disappeared on {projection}: center={:?} blue={blue} yellow={yellow} red={red}",
+                    &pixels[center..center + 4]
+                );
+            }
+            assert!(
+                Instant::now() < deadline,
+                "location frame did not render on {projection}"
+            );
+        }
+    }
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
