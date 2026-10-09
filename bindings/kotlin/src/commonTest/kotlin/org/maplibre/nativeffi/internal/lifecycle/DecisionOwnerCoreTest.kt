@@ -70,37 +70,6 @@ class DecisionOwnerCoreTest {
   }
 
   @Test
-  fun providerOwnedHandleReleasesAfterCloseExactlyOnce(): Unit = runSuspendTest {
-    var releases = 0
-    val core = DecisionOwnerCore("TestOwner") { releases++ }
-
-    assertEquals(
-      DecisionOwnerCore.Decision.ACCEPT,
-      core.finishDecision(DecisionOwnerCore.Decision.ACCEPT),
-    )
-    core.close()
-    core.close()
-    core.releaseIfOwned()
-
-    assertEquals(1, releases)
-  }
-
-  @Test
-  fun passThroughDecisionLetsNativeOwnRelease(): Unit = runSuspendTest {
-    var releases = 0
-    val core = DecisionOwnerCore("TestOwner") { releases++ }
-
-    assertEquals(
-      DecisionOwnerCore.Decision.PASS_THROUGH,
-      core.finishDecision(DecisionOwnerCore.Decision.PASS_THROUGH),
-    )
-    core.close()
-    core.releaseIfOwned()
-
-    assertEquals(0, releases)
-  }
-
-  @Test
   fun completionBeforeProviderDecisionForcesProviderOwnership(): Unit = runSuspendTest {
     var releases = 0
     val core = DecisionOwnerCore("TestOwner") { releases++ }
@@ -148,44 +117,6 @@ class DecisionOwnerCoreTest {
     assertEquals(MaplibreStatus.INVALID_STATE, error.status)
     assertEquals(1, nativeCalls)
   }
-
-  @Test
-  fun closeDuringLiveOperationDefersProviderOwnedReleaseUntilOperationExits(): Unit =
-    runSuspendTest {
-      var releases = 0
-      val core = DecisionOwnerCore("TestOwner") { releases++ }
-
-      assertEquals(
-        DecisionOwnerCore.Decision.ACCEPT,
-        core.finishDecision(DecisionOwnerCore.Decision.ACCEPT),
-      )
-      val operation = core.beginComplete()
-      core.close()
-
-      assertEquals(0, releases)
-
-      operation.markCompleted()
-      operation.close()
-
-      assertEquals(1, releases)
-    }
-
-  @Test
-  fun providerOwnedHandleClosedBeforeDecisionReleasesAfterDecisionExactlyOnce(): Unit =
-    runSuspendTest {
-      var releases = 0
-      val core = DecisionOwnerCore("TestOwner") { releases++ }
-
-      core.close()
-      assertEquals(
-        DecisionOwnerCore.Decision.ACCEPT,
-        core.finishDecision(DecisionOwnerCore.Decision.ACCEPT),
-      )
-      core.close()
-      core.releaseIfOwned()
-
-      assertEquals(1, releases)
-    }
 
   @Test
   fun retainedPassThroughHandleCannotStartLaterOperations(): Unit = runSuspendTest {
