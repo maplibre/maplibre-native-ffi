@@ -34,7 +34,7 @@ reference, and contributor notes.
 - [Usage guides](https://maplibre.org/maplibre-native-ffi/guides/create-a-map/)
 - [Reference](https://maplibre.org/maplibre-native-ffi/reference/c/)
 - [Development overview](https://maplibre.org/maplibre-native-ffi/development/overview/)
-- [Binding generation](https://maplibre.org/maplibre-native-ffi/development/binding-generation/)
+- [Contributing](./CONTRIBUTING.md)
 
 ## Status
 

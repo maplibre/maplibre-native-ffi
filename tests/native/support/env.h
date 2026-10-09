@@ -53,6 +53,11 @@ mln_runtime mln_test_create_runtime(void);
 // The same, from options the case fills in. The fixture's event wake replaces
 // options->event_wake.
 mln_runtime mln_test_create_runtime_with_options(mln_runtime_options options);
+// Submits a runtime barrier and waits for its terminal status. A barrier
+// completes once every earlier submission has a terminal result. It cannot
+// fence work that the runtime worker starts on its own, such as handling a
+// frame that a render session finished; a map command queued after that work
+// can, because its completion runs after the work.
 mln_status mln_test_runtime_barrier(mln_runtime runtime);
 mln_status mln_test_runtime_close(mln_runtime runtime);
 mln_map mln_test_create_map(mln_runtime runtime);

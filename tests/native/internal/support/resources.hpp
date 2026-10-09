@@ -1,6 +1,13 @@
 #pragma once
 
 // Resource configuration helpers for the internal suite's resource cases.
+//
+// A case makes the library call a provider or transform on a file source
+// thread, with no network, by setting a `custom://` style URL on a map. A case
+// in which runtime teardown races the callback starts an offline download of
+// that style instead: a runtime releases only once its maps are released, and
+// a download requests the style with no map. Sync points then order the
+// callback against the thread that it races.
 
 #include <cstdint>
 

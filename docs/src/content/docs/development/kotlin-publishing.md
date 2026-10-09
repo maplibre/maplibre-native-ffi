@@ -80,13 +80,13 @@ AAR and excludes that AAR's `libmaplibre-native-c.so`. The AAR contributes the
 Rustls platform verifier classes, consumer keep rule, and licenses. The final
 Kotlin/Native host library already contains the static runtime from the KLIB.
 
-The native runtime publications are OpenGL and Vulkan for Android arm64, Android
-x64, Linux arm64, Linux x64, and macOS arm64, plus Metal for macOS arm64, iOS
-arm64, the iOS arm64 simulator, tvOS arm64, and the tvOS arm64 simulator. Each
-published Kotlin/Native target has a matching runtime variant. A Linux x64 host
-cross-compiles the Linux arm64 publications because Kotlin/Native does not run
-on Linux arm64 hosts. Publication compiles and links the arm64 test binary
-without executing it.
+The native runtime publications are OpenGL and Vulkan for Android arm32, Android
+arm64, Android x64, Linux arm64, Linux x64, and macOS arm64, plus Metal for
+macOS arm64, iOS arm64, the iOS arm64 simulator, tvOS arm64, and the tvOS arm64
+simulator. Each published Kotlin/Native target has a matching runtime variant. A
+Linux x64 host cross-compiles the Linux arm64 publications because Kotlin/Native
+does not run on Linux arm64 hosts. Publication compiles and links the arm64 test
+binary without executing it.
 
 The Kotlin/Native Linux toolchain is the tightest consumer of the Linux archive.
 Its sysroot supplies glibc 2.19 and GCC 8.3, and it statically links its own
@@ -108,9 +108,8 @@ Kotlin/Native test binaries in this repository link the C API shared library
 instead of the archive. That library carries the same glibc floor, so the
 Kotlin/Native sysroot resolves its references directly.
 
-The Kotlin/Native Android targets are build-only. CI cross-compiles both
-architectures and publishes their KLIBs. An emulator test harness will add
-execution coverage separately.
+The Kotlin/Native Android targets are build-only. CI cross-compiles all three
+architectures and publishes their KLIBs.
 
 Gradle registers this target set consistently on every host. Local and CI
 workflows invoke target-specific KLIB and test tasks, leaving targets
@@ -183,12 +182,12 @@ build artifacts produced by the platform and backend CI matrix.
 
 A daily schedule drives publication rather than each push to `main`: the Publish
 snapshots workflow picks the latest successful CI run on `main` and publishes
-from its artifacts. Each publishable component — the Kotlin modules, the native
-package release, and the docs site — carries an input scope in
-`ci/snapshots.toml`, and the workflow hashes that scope at the source commit. A
-component publishes when its hash differs from the hash of the commit it last
-published from, so a change confined to another binding leaves the Kotlin
-modules alone. That commit is recorded as a floating
+from its artifacts. Each publishable component, such as the native package
+release, the Kotlin modules, the Python and .NET packages, and the docs site,
+carries an input scope in `ci/snapshots.toml`, and the workflow hashes that
+scope at the source commit. A component publishes when its hash differs from the
+hash of the commit it last published from, so a change confined to another
+binding leaves the Kotlin modules alone. That commit is recorded as a floating
 `snapshot-state/<component>` tag, whose annotated message carries the timestamp
 and run URL of the publish, and only components that published successfully have
 their tag moved, so a failure is retried the next day.
@@ -221,7 +220,7 @@ the verified repository that the CI run on `main` uploaded, and adds only
 signing and the Central Portal upload. Tagged releases stage again at their
 release version, through the same workflow.
 
-The initial snapshot workflow validates:
+Verification checks:
 
 - Maven and Gradle module metadata for every publication;
 - native archive presence in published KLIBs;
@@ -232,9 +231,7 @@ The initial snapshot workflow validates:
 - published JVM consumption through the Compose and LWJGL examples;
 - published Android consumption through the Android map example.
 
-Existing binding tests continue to cover Kotlin/Native behavior. An iOS target
-for the Compose map example is a separate follow-up and is not required for the
-initial snapshot publication.
+The binding suites cover Kotlin/Native behavior.
 
 ## Tagged release finalization
 

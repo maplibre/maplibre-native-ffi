@@ -3,6 +3,11 @@
 
 // Frame demands and their results through the render fixture, for the render
 // suites. The helpers that return a value assert, so a failure ends the case.
+//
+// A case that checks that something on the driver has not happened yet, such
+// as a barrier that must still be pending, fences the driver first with a
+// session maintenance command such as mln_render_session_reduce_memory_use().
+// That command runs after every work item that the driver already holds.
 
 #include <stddef.h>
 #include <stdint.h>
