@@ -83,9 +83,8 @@ typedef struct mln_offline_region_status {
  *   failure came from a style-loading exception raised inside a C API call.
  *   Read message for the failure text in both cases; payload NONE.
  * - MAP_IDLE: code is 0; payload NONE.
- * - MAP_RENDER_UPDATE_AVAILABLE: map state or queued render-thread work is
- *   available. Call mln_render_session_render_update(), which can complete
- *   the work without producing a frame; code is 0; payload NONE.
+ * - MAP_RENDER_UPDATE_AVAILABLE: the map published new render state, which the
+ *   next render-if-needed frame demand renders; code is 0; payload NONE.
  * - MAP_RENDER_ERROR: code is 0; message carries the error text; payload NONE.
  * - MAP_STILL_IMAGE_FINISHED: code is 0; payload NONE.
  * - MAP_STILL_IMAGE_FAILED: code is 0; message carries the error text; payload
@@ -222,8 +221,8 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
 /**
  * Source kinds used by mln_runtime_event.source_type.
  *
- * Value 2 is retired and no version reuses it. It named a projection source;
- * projection calls are now synchronous and emit no events.
+ * Value 2 is retired and no version reuses it. It named a projection source,
+ * and projection calls are synchronous and emit no events.
  */
 typedef enum mln_runtime_event_source_type : uint32_t {
   MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0,
@@ -235,8 +234,8 @@ typedef enum mln_runtime_event_source_type : uint32_t {
  *
  * Values 3 and 8 are retired and no version reuses them. Value 3 was a
  * style-image-missing payload whose only content was the image ID that the
- * event message carries. Value 8 was an offline-operation completion payload;
- * one-shot work now reports completion directly.
+ * event message carries. Value 8 was an offline-operation completion payload,
+ * and one-shot work reports its outcome through a completion.
  */
 typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0,

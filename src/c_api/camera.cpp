@@ -1,21 +1,11 @@
 #define MLN_BUILDING_C
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
-#include <memory>
-#include <optional>
-#include <string>
-#include <utility>
-#include <vector>
 
-#include "bytes/buffer.hpp"
 #include "c_api/boundary.hpp"
-#include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
-#include "runtime/runtime.hpp"
 
 auto mln_camera_options_default(void) noexcept -> mln_camera_options {
   return mln::core::camera_options_default();
@@ -24,9 +14,11 @@ auto mln_camera_options_default(void) noexcept -> mln_camera_options {
 auto mln_animation_options_default(void) noexcept -> mln_animation_options {
   return mln::core::animation_options_default();
 }
+
 auto mln_camera_delta_default(void) noexcept -> mln_camera_delta {
   return mln::core::camera_delta_default();
 }
+
 auto mln_camera_update_default(void) noexcept -> mln_camera_update {
   return mln::core::camera_update_default();
 }

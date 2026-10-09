@@ -5,9 +5,8 @@ namespace mln::core {
 // Process exit with live runtimes.
 //
 // A process may exit while runtimes and maps are live and native threads are
-// at work. Nothing at exit stops or joins those threads;
-// they keep running until the operating system ends the process. Three rules
-// keep that safe:
+// at work. Nothing at exit stops or joins those threads, so they keep running
+// until the operating system ends the process. Three rules keep that safe:
 //
 // - Nothing that a native thread reads is destroyed at exit. The library
 //   compiles without static destructors, so every object with static storage

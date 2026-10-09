@@ -34,9 +34,6 @@
 
 namespace {
 
-using AdapterResourceRewriteRules = mln_adapter_resource_rewrite_rules;
-using AdapterHttpHeaderTransformRules = mln_adapter_http_header_transform_rules;
-using AdapterResourceProviderRules = mln_adapter_resource_provider_rules;
 using AdapterCompletionRecord = mln::capture::Record;
 
 // Dart native API major version 2 fixes this integer-message prefix. Only
@@ -826,7 +823,7 @@ extern "C" MLN_API auto mln_adapter_resource_transform_rewrite_callback(
   }
 
   const auto& table =
-    *static_cast<const AdapterResourceRewriteRules*>(user_data);
+    *static_cast<const mln_adapter_resource_rewrite_rules*>(user_data);
   for (const auto& rule : std::span{table.rules, table.count}) {
     if (
       matches_rule(rule.kind, kind) &&
@@ -853,7 +850,7 @@ extern "C" MLN_API auto mln_adapter_http_header_transform_callback(
   }
 
   const auto& table =
-    *static_cast<const AdapterHttpHeaderTransformRules*>(user_data);
+    *static_cast<const mln_adapter_http_header_transform_rules*>(user_data);
   if (table.rules == nullptr && table.count != 0) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -907,7 +904,7 @@ extern "C" MLN_API auto mln_adapter_resource_provider_rules_callback(
   }
 
   const auto& table =
-    *static_cast<const AdapterResourceProviderRules*>(user_data);
+    *static_cast<const mln_adapter_resource_provider_rules*>(user_data);
   for (const auto& rule : std::span{table.rules, table.count}) {
     if (
       matches_rule(rule.kind, request->kind) &&

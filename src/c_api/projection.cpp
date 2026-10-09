@@ -1,21 +1,10 @@
 #define MLN_BUILDING_C
 
-#include <algorithm>
 #include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <memory>
-#include <optional>
-#include <string>
-#include <utility>
-#include <vector>
 
-#include "bytes/buffer.hpp"
 #include "c_api/boundary.hpp"
-#include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
-#include "runtime/runtime.hpp"
 
 auto mln_map_projection_create(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic

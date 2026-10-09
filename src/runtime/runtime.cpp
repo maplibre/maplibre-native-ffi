@@ -844,16 +844,6 @@ auto database_source_for_runtime(RuntimeObject* runtime)
 
 }  // namespace
 
-auto validate_runtime(mln_runtime runtime, RuntimeObject*& out_runtime)
-  -> mln_status {
-  out_runtime = handle_table<RuntimeObject>().resolve(runtime);
-  if (out_runtime != nullptr && out_runtime->disposal_requested.load()) {
-    out_runtime = nullptr;
-    set_thread_error("runtime handle has been disposed");
-  }
-  return out_runtime == nullptr ? MLN_STATUS_INVALID_ARGUMENT : MLN_STATUS_OK;
-}
-
 auto lease_runtime(mln_runtime runtime) -> std::shared_ptr<RuntimeObject> {
   auto live = handle_table<RuntimeObject>().lease(runtime);
   if (live != nullptr && live->disposal_requested.load()) {
@@ -1982,8 +1972,8 @@ auto offline_regions_list_start(
 namespace {
 
 // Opening the side database blocks, so it happens on the calling thread rather
-// than on the runtime worker, which also keeps the diagnostic on the thread
-// that reads mln_thread_last_error_message().
+// than on the runtime worker. A failure then reaches the caller as the call's
+// own diagnostic.
 auto validate_offline_side_database_path(const char* side_database_path)
   -> mln_status {
   if (side_database_path == nullptr) {

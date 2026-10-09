@@ -16,7 +16,7 @@
 extern "C" {
 #endif
 
-/** Metal native surface session attachment options. */
+/** Metal attachment options for a native surface. */
 typedef struct mln_metal_surface_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Logical surface extent. */
@@ -29,7 +29,7 @@ typedef struct mln_metal_surface_descriptor {
   "default=mln_metal_surface_descriptor_default"
 );
 
-/** Vulkan native surface session attachment options. */
+/** Vulkan attachment options for a native surface. */
 typedef struct mln_vulkan_surface_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Logical surface extent. */
@@ -46,7 +46,7 @@ typedef struct mln_vulkan_surface_descriptor {
   "default=mln_vulkan_surface_descriptor_default"
 );
 
-/** WebGPU native surface session attachment options. */
+/** WebGPU attachment options for a native surface. */
 typedef struct mln_webgpu_surface_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Logical surface extent. */
@@ -68,7 +68,7 @@ typedef struct mln_webgpu_surface_descriptor {
   "default=mln_webgpu_surface_descriptor_default"
 );
 
-/** OpenGL native surface session attachment options. */
+/** OpenGL attachment options for a native surface. */
 typedef struct mln_opengl_surface_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Logical surface extent. */

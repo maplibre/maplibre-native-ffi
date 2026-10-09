@@ -1043,9 +1043,9 @@ auto lease_valid_acquired_frame(
   std::shared_ptr<mln_acquired_frame_object>& out_frame
 ) -> mln_status;
 
-// Slot count a session-owned texture ring is granted. Attachment rejects null
-// options; the clamp keeps a ring sane for the backends that size themselves
-// before reaching that check.
+// Slot count a session-owned texture ring is granted, between one and three.
+// Attachment rejects null options, but some backends size their ring before
+// they reach that check, so null options take one slot.
 inline auto attach_ring_depth(const mln_render_session_attach_options* options)
   -> uint32_t {
   constexpr auto max_ring_depth = 3U;

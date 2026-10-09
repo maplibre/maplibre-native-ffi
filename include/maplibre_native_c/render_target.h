@@ -171,7 +171,7 @@ typedef struct mln_vulkan_context_descriptor {
 /** WebGPU backend context fields shared by WebGPU render targets. */
 typedef struct mln_webgpu_context_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  /** Borrowed WGPUInstance. Optional for texture sessions. */
+  /** Borrowed WGPUInstance. Optional for texture targets. */
   void* instance MLN_BINDING("kind=native_pointer;ownership=borrowed");
   /** Borrowed WGPUDevice. Required. */
   void* device MLN_BINDING("kind=native_pointer;ownership=borrowed");
@@ -255,7 +255,7 @@ typedef struct mln_egl_context_descriptor {
   void* display MLN_BINDING("kind=native_pointer;ownership=borrowed");
   /**
    * Borrowed EGLConfig used to create the session context. Required.
-   * OpenGL texture sessions require EGL_SURFACE_TYPE to include
+   * OpenGL texture targets require EGL_SURFACE_TYPE to include
    * EGL_PBUFFER_BIT.
    */
   void* config MLN_BINDING("kind=native_pointer;ownership=borrowed");

@@ -17,7 +17,7 @@
 extern "C" {
 #endif
 
-/** Metal texture session attachment options for a session-owned target. */
+/** Metal attachment options for an owned texture target. */
 typedef struct mln_metal_owned_texture_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Logical texture extent. */
@@ -28,7 +28,7 @@ typedef struct mln_metal_owned_texture_descriptor {
   "default=mln_metal_owned_texture_descriptor_default"
 );
 
-/** Metal caller-owned texture session attachment options. */
+/** Metal attachment options for a borrowed texture target. */
 typedef struct mln_metal_borrowed_texture_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /**
@@ -76,7 +76,7 @@ typedef struct mln_metal_owned_texture_frame {
   uint64_t pixel_format;
 } mln_metal_owned_texture_frame;
 
-/** Vulkan texture session attachment options for a session-owned target. */
+/** Vulkan attachment options for an owned texture target. */
 typedef struct mln_vulkan_owned_texture_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Logical texture extent. */
@@ -87,7 +87,7 @@ typedef struct mln_vulkan_owned_texture_descriptor {
   "default=mln_vulkan_owned_texture_descriptor_default"
 );
 
-/** Vulkan caller-owned texture session attachment options. */
+/** Vulkan attachment options for a borrowed texture target. */
 typedef struct mln_vulkan_borrowed_texture_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /**
@@ -161,7 +161,7 @@ typedef struct mln_vulkan_owned_texture_frame {
   uint32_t layout;
 } mln_vulkan_owned_texture_frame;
 
-/** OpenGL texture session attachment options for a session-owned target. */
+/** OpenGL attachment options for an owned texture target. */
 typedef struct mln_opengl_owned_texture_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Logical texture extent. */
@@ -176,7 +176,7 @@ typedef struct mln_opengl_owned_texture_descriptor {
   "default=mln_opengl_owned_texture_descriptor_default"
 );
 
-/** OpenGL caller-owned texture session attachment options. */
+/** OpenGL attachment options for a borrowed texture target. */
 typedef struct mln_opengl_borrowed_texture_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /**
@@ -211,7 +211,7 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
   "default=mln_opengl_borrowed_texture_descriptor_default"
 );
 
-/** WebGPU texture session attachment options for a session-owned target. */
+/** WebGPU attachment options for an owned texture target. */
 typedef struct mln_webgpu_owned_texture_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Logical texture extent. */
@@ -222,7 +222,7 @@ typedef struct mln_webgpu_owned_texture_descriptor {
   "default=mln_webgpu_owned_texture_descriptor_default"
 );
 
-/** WebGPU caller-owned texture session attachment options. */
+/** WebGPU attachment options for a borrowed texture target. */
 typedef struct mln_webgpu_borrowed_texture_descriptor {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Logical texture extent. */
@@ -303,7 +303,7 @@ typedef struct mln_opengl_owned_texture_frame {
   uint32_t type;
 } mln_opengl_owned_texture_frame;
 
-/** CPU image readback metadata for a texture session frame. */
+/** CPU image readback metadata for a texture target frame. */
 typedef struct mln_texture_image_info {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");
   /** Physical image width in device pixels. */

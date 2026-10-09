@@ -34,7 +34,8 @@ typedef void (*mln_wake_release)(
  *
  * A descriptor whose callback is null disables waking; size must still be
  * sizeof(mln_wake), and a disabled wake must not carry release_user_data.
- * Polling remains valid when the owning API permits an omitted wake.
+ * When the owning API permits an omitted wake, the receiver services its queue
+ * or driver on its own schedule instead.
  */
 typedef struct mln_wake {
   uint32_t size MLN_BINDING("kind=size;default=sizeof");

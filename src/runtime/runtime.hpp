@@ -374,8 +374,6 @@ auto offline_region_delete_start(
 ) -> mln_status;
 auto retain_runtime_map(mln_runtime runtime) -> mln_status;
 auto release_runtime_map(mln_runtime runtime) noexcept -> void;
-auto validate_runtime(mln_runtime runtime, RuntimeObject*& out_runtime)
-  -> mln_status;
 [[nodiscard]] auto lease_runtime(mln_runtime runtime)
   -> std::shared_ptr<RuntimeObject>;
 auto submit_runtime_command(

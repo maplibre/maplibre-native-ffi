@@ -2262,8 +2262,8 @@ auto settle_barriers(mln_render_session_object& session) noexcept -> void {
 
 // Delivers queued worker results and forwarded observer messages to the
 // session and the map without rendering. Tile and placement continuations,
-// and the observer deliveries that complete a still image, ride the session
-// scheduler; delivering them must not wait for a demand that happens to
+// and the observer deliveries that complete a still image, run on the session
+// scheduler, so delivering them must not wait for a demand that happens to
 // render.
 auto deliver_pending_session_work(
   const std::shared_ptr<mln_render_session_object>& session
