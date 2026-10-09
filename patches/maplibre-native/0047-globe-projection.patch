@@ -7847,7 +7847,7 @@ index 7cf4f7ff35d07446ec37a9933b4c9e1c1f674de9..682e3c7a02dd1dba0cd8bda67fc12b58
  
      GridIndex<RefIndexedSubfeature> grid;
 diff --git a/src/mln/gfx/fill_generator.cpp b/src/mln/gfx/fill_generator.cpp
-index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..d5a5c65d8f22f19de96a895d506953b716f8fd68 100644
+index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..e63f88ae41eff1bb67675266abd9a2335b2c960e 100644
 --- a/src/mln/gfx/fill_generator.cpp
 +++ b/src/mln/gfx/fill_generator.cpp
 @@ -1,5 +1,8 @@
@@ -7867,7 +7867,7 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..d5a5c65d8f22f19de96a895d506953b7
  #include <cassert>
  #include <limits>
  
-@@ -104,6 +108,57 @@ void addOutlineIndices(const std::size_t base,
+@@ -104,6 +108,56 @@ void addOutlineIndices(const std::size_t base,
      lineSegment.indexLength += nVertices * 2;
  }
  
@@ -7910,6 +7910,7 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..d5a5c65d8f22f19de96a895d506953b7
 +                          SegmentVector& fillSegments,
 +                          gfx::IndexVector<gfx::Lines>& lineIndexes,
 +                          SegmentVector& lineSegments) {
++    const MeshLines lines{lineSegments, lineIndexes, subdivided.lineIndexLists};
 +    fillLargeMeshArrays(
 +        fillVertices,
 +        [](int16_t x, int16_t y) { return FillBucket::layoutVertex({x, y}); },
@@ -7917,15 +7918,13 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..d5a5c65d8f22f19de96a895d506953b7
 +        fillIndexes,
 +        subdivided.vertices,
 +        subdivided.triangleIndices,
-+        &lineSegments,
-+        &lineIndexes,
-+        &subdivided.lineIndexLists);
++        &lines);
 +}
 +
  } // namespace
  
  void generateFillBuffers(const GeometryCollection& geometry,
-@@ -131,11 +186,26 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
+@@ -131,11 +185,26 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
                                    gfx::IndexVector<gfx::Triangles>& fillIndexes,
                                    SegmentVector& fillSegments,
                                    gfx::IndexVector<gfx::Lines>& lineIndexes,
@@ -7953,7 +7952,7 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..d5a5c65d8f22f19de96a895d506953b7
          std::size_t totalVertices = totalVerticesCheck(polygon);
          std::size_t startVertices = vertices.elements();
  
-@@ -195,7 +265,9 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
+@@ -195,7 +264,9 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
                                    gfx::IndexVector<gfx::Triangles>& lineIndexes,
                                    SegmentVector& lineSegments,
                                    gfx::IndexVector<gfx::Lines>& basicLineIndexes,
@@ -7964,7 +7963,7 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..d5a5c65d8f22f19de96a895d506953b7
      gfx::PolylineGenerator<LineLayoutVertex, SegmentBase> lineGenerator(
          lineVertices,
          LineBucket::layoutVertex,
-@@ -211,7 +283,8 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
+@@ -211,7 +282,8 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
  
      // If we have pre-tessellated geometry, multi-polygons are tessellated
      // together, so we need to add them to the fill segment all at once.
@@ -7974,7 +7973,7 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..d5a5c65d8f22f19de96a895d506953b7
          const std::size_t startVertices = fillVertices.elements();
          std::size_t totalVertices = 0;
          for (const auto& polygon : geometry) {
-@@ -226,6 +299,25 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
+@@ -226,6 +298,25 @@ void generateFillAndOutineBuffers(const GeometryCollection& geometry,
          // Optimize polygons with many interior rings for earcut tessellation.
          limitHoles(polygon, 500);
  
@@ -8002,10 +8001,10 @@ index 4a890cd1a7b6e573accb8cd02fdffdca3dc506a8..d5a5c65d8f22f19de96a895d506953b7
  
 diff --git a/src/mln/gfx/fill_large_mesh_arrays.hpp b/src/mln/gfx/fill_large_mesh_arrays.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..4e66f9afa52e68005650d2f1af7e9d2ca2151bff
+index 0000000000000000000000000000000000000000..ea6c5251f475e80329e5e3c5d29f17bdcd8a56ef
 --- /dev/null
 +++ b/src/mln/gfx/fill_large_mesh_arrays.hpp
-@@ -0,0 +1,164 @@
+@@ -0,0 +1,169 @@
 +#pragma once
 +
 +#include <mln/gfx/index_vector.hpp>
@@ -8087,6 +8086,13 @@ index 0000000000000000000000000000000000000000..4e66f9afa52e68005650d2f1af7e9d2c
 +
 +} // namespace detail
 +
++/// The outline lines drawn over a mesh's vertices, one list of vertex pairs per ring.
++struct MeshLines {
++    SegmentVector& segments;
++    IndexVector<Lines>& indexes;
++    const std::vector<std::vector<uint32_t>>& lists;
++};
++
 +/// GL JS's `fillLargeMeshArrays`: appends a triangle mesh, and the outline lines over the same vertices when there
 +/// are any, to the vertex buffer through `layoutVertex(x, y)`. A mesh that fits one segment goes in whole, its
 +/// triangles and lines sharing its vertices; a larger one is spread over as many segments as it needs. Unlike GL JS,
@@ -8099,15 +8105,13 @@ index 0000000000000000000000000000000000000000..4e66f9afa52e68005650d2f1af7e9d2c
 +                         IndexVector<Triangles>& triangleIndexes,
 +                         std::span<const int16_t> flattened,
 +                         std::span<const uint32_t> triangleIndices,
-+                         SegmentVector* lineSegments = nullptr,
-+                         IndexVector<Lines>* lineIndexes = nullptr,
-+                         const std::vector<std::vector<uint32_t>>* lineLists = nullptr,
++                         const MeshLines* lines = nullptr,
 +                         std::size_t maxVertices = maxSegmentVertices) {
 +    const std::size_t vertexCount = flattened.size() / 2;
 +    const bool hasTriangles = triangleIndices.size() >= 3;
-+    const bool hasLines = lineSegments && lineIndexes && lineLists &&
-+                          std::any_of(
-+                              lineLists->begin(), lineLists->end(), [](const auto& line) { return line.size() >= 2; });
++    const bool hasLines = lines && std::any_of(lines->lists.begin(), lines->lists.end(), [](const auto& line) {
++                              return line.size() >= 2;
++                          });
 +    if (!hasTriangles && !hasLines) {
 +        return;
 +    }
@@ -8122,7 +8126,7 @@ index 0000000000000000000000000000000000000000..4e66f9afa52e68005650d2f1af7e9d2c
 +        const std::size_t triangleBase = triangleSegment ? triangleSegment->vertexLength : 0;
 +        SegmentBase* lineSegment =
 +            hasLines ? &detail::prepareSegment(
-+                           *lineSegments, vertices.elements(), lineIndexes->elements(), vertexCount, maxVertices)
++                           lines->segments, vertices.elements(), lines->indexes.elements(), vertexCount, maxVertices)
 +                     : nullptr;
 +        const std::size_t lineBase = lineSegment ? lineSegment->vertexLength : 0;
 +
@@ -8139,10 +8143,10 @@ index 0000000000000000000000000000000000000000..4e66f9afa52e68005650d2f1af7e9d2c
 +            triangleSegment->indexLength += triangleIndices.size();
 +        }
 +        if (lineSegment) {
-+            for (const auto& line : *lineLists) {
++            for (const auto& line : lines->lists) {
 +                for (std::size_t i = 0; i + 1 < line.size(); i += 2) {
-+                    lineIndexes->emplace_back(static_cast<uint16_t>(lineBase + line[i]),
-+                                              static_cast<uint16_t>(lineBase + line[i + 1]));
++                    lines->indexes.emplace_back(static_cast<uint16_t>(lineBase + line[i]),
++                                                static_cast<uint16_t>(lineBase + line[i + 1]));
 +                }
 +                lineSegment->indexLength += line.size();
 +            }
@@ -8164,7 +8168,7 @@ index 0000000000000000000000000000000000000000..4e66f9afa52e68005650d2f1af7e9d2c
 +    }
 +    if (hasLines) {
 +        detail::fillSegments<2>(
-+            vertices, layoutVertex, *lineSegments, *lineIndexes, flattened, *lineLists, maxVertices);
++            vertices, layoutVertex, lines->segments, lines->indexes, flattened, lines->lists, maxVertices);
 +    }
 +}
 +
@@ -8433,7 +8437,7 @@ index baad4945996ba3f1277d8ba9553ab6db9977601d..3bab6e6903692bccc61707ca3df3b6fe
      }
  
 diff --git a/src/mln/gl/layer_group_gl.cpp b/src/mln/gl/layer_group_gl.cpp
-index 0621c62ba935febf916666360532fc08e4c380ef..0e8a21b0dac8716d95f27382ab324f520371ef58 100644
+index 0621c62ba935febf916666360532fc08e4c380ef..9a9e017265933cfb1a2cb66f84b15c7bd0094505 100644
 --- a/src/mln/gl/layer_group_gl.cpp
 +++ b/src/mln/gl/layer_group_gl.cpp
 @@ -11,6 +11,7 @@
@@ -8444,7 +8448,7 @@ index 0621c62ba935febf916666360532fc08e4c380ef..0e8a21b0dac8716d95f27382ab324f52
  namespace mln {
  namespace gl {
  
-@@ -57,12 +58,15 @@ void TileLayerGroupGL::render(RenderOrchestrator&, PaintParameters& parameters)
+@@ -57,12 +58,16 @@ void TileLayerGroupGL::render(RenderOrchestrator&, PaintParameters& parameters)
      auto& context = static_cast<gl::Context&>(parameters.context);
  
      // `stencilModeFor3D` uses a different stencil mask value each time its called, so if the
@@ -8459,10 +8463,11 @@ index 0621c62ba935febf916666360532fc08e4c380ef..0e8a21b0dac8716d95f27382ab324f52
      gfx::StencilMode stencilMode3d;
 +    const bool hasStencilTiles = stencilTiles && !stencilTiles->empty();
 +    std::unordered_map<const gfx::Drawable*, gfx::StencilMode> ownStencilModes;
++    bool ownStencilModesTaken = true;
  
      parameters.stencilClippingAvailable = parameters.renderTargetHasStencilBuffer;
  
-@@ -73,25 +77,30 @@ void TileLayerGroupGL::render(RenderOrchestrator&, PaintParameters& parameters)
+@@ -73,25 +78,30 @@ void TileLayerGroupGL::render(RenderOrchestrator&, PaintParameters& parameters)
          const auto debugGroupClip = parameters.encoder->createDebugGroup(label_clip.c_str());
  #endif
  
@@ -8490,7 +8495,7 @@ index 0621c62ba935febf916666360532fc08e4c380ef..0e8a21b0dac8716d95f27382ab324f52
 -        }
 +            }
 +        });
-+        parameters.stencilModesFor3D(ownStencilModes);
++        ownStencilModesTaken = parameters.stencilModesFor3D(ownStencilModes);
  
          // If we're doing 3D stenciling and have any features
          // to draw, set up the single-value stencil mask.
@@ -8504,12 +8509,15 @@ index 0621c62ba935febf916666360532fc08e4c380ef..0e8a21b0dac8716d95f27382ab324f52
              if (!parameters.renderTileClippingMasks(stencilTiles)) {
                  parameters.stencilClippingAvailable = false;
              }
-@@ -136,7 +145,10 @@ void TileLayerGroupGL::render(RenderOrchestrator&, PaintParameters& parameters)
+@@ -136,7 +146,13 @@ void TileLayerGroupGL::render(RenderOrchestrator&, PaintParameters& parameters)
          // stencil mode for features with stencil enabled or disable stenciling.
          // 2D drawables will set their own stencil mode within `draw`.
          if (features3d) {
 -            context.setStencilMode(drawable.getEnableStencil() ? stencilMode3d : gfx::StencilMode::disabled());
 +            const auto own = ownStencilModes.find(&drawable);
++            if (own != ownStencilModes.end() && !ownStencilModesTaken) {
++                own->second = parameters.stencilModeFor3D();
++            }
 +            context.setStencilMode(!drawable.getEnableStencil()   ? gfx::StencilMode::disabled()
 +                                   : own != ownStencilModes.end() ? own->second
 +                                                                  : stencilMode3d);
@@ -9991,7 +9999,7 @@ index d9ec6acf284a32d391f2b836e212fc93c82ba13f..f032ad1f499b4d8d821f85371823454d
  
  } // namespace mln
 diff --git a/src/mln/map/transform_state.cpp b/src/mln/map/transform_state.cpp
-index 537a318eb67dbfc52b2cc8c25be1567d890f156a..81ea00ab202dddb3c7434f6e562832e624e28838 100644
+index 537a318eb67dbfc52b2cc8c25be1567d890f156a..19ca709748b6ba2c856476a2af229371f5194634 100644
 --- a/src/mln/map/transform_state.cpp
 +++ b/src/mln/map/transform_state.cpp
 @@ -1,4 +1,6 @@
@@ -10136,18 +10144,20 @@ index 537a318eb67dbfc52b2cc8c25be1567d890f156a..81ea00ab202dddb3c7434f6e562832e6
  }
  
  const mat4& TransformState::getProjectionMatrix() const {
-@@ -470,8 +538,9 @@ void TransformState::setViewportMode(ViewportMode val) {
+@@ -470,8 +538,11 @@ void TransformState::setViewportMode(ViewportMode val) {
  // MARK: - Camera options
  
  CameraOptions TransformState::getCameraOptions(const std::optional<EdgeInsets>& padding) const {
-+    // Bounds across the antimeridian keep the center in their range, past 180 degrees, where it has to stay.
++    // The globe keeps the center on the world copy nearest the previous one, which its coordinate conversions do not
++    // depend on, and reports it wrapped. Mercator's conversions use the copy the transform is on, and bounds across
++    // the antimeridian keep the center in their range, past 180 degrees: both report the center as it is.
      return CameraOptions()
 -        .withCenter(getLatLng())
-+        .withCenter(getLatLng(bounds == LatLngBounds() ? LatLng::Wrapped : LatLng::Unwrapped))
++        .withCenter(getLatLng(isGlobeRendering() && bounds == LatLngBounds() ? LatLng::Wrapped : LatLng::Unwrapped))
          .withCenterAltitude(getCenterAltitude())
          .withPadding(padding ? padding : edgeInsets)
          .withZoom(getZoom())
-@@ -516,8 +585,27 @@ double TransformState::getZoom() const {
+@@ -516,8 +587,27 @@ double TransformState::getZoom() const {
      return scaleZoom(scale);
  }
  
@@ -10176,7 +10186,7 @@ index 537a318eb67dbfc52b2cc8c25be1567d890f156a..81ea00ab202dddb3c7434f6e562832e6
  }
  
  double TransformState::getZoomFraction() const {
-@@ -769,17 +857,40 @@ ScreenCoordinate TransformState::latLngToScreenCoordinate(const LatLng& latLng,
+@@ -769,17 +859,40 @@ ScreenCoordinate TransformState::latLngToScreenCoordinate(const LatLng& latLng,
          return {};
      }
  
@@ -10218,7 +10228,7 @@ index 537a318eb67dbfc52b2cc8c25be1567d890f156a..81ea00ab202dddb3c7434f6e562832e6
      float targetZ = 0;
  
      double flippedY = size.height - point.y;
-@@ -810,8 +921,11 @@ TileCoordinate TransformState::screenCoordinateToTileCoordinate(const ScreenCoor
+@@ -810,8 +923,11 @@ TileCoordinate TransformState::screenCoordinateToTileCoordinate(const ScreenCoor
  }
  
  LatLng TransformState::screenCoordinateToLatLng(const ScreenCoordinate& point, LatLng::WrapMode wrapMode) const {
@@ -10231,7 +10241,7 @@ index 537a318eb67dbfc52b2cc8c25be1567d890f156a..81ea00ab202dddb3c7434f6e562832e6
  }
  
  mat4 TransformState::coordinatePointMatrix(const mat4& projMatrix) const {
-@@ -860,6 +974,13 @@ void TransformState::constrain(double& scale_, double& x_, double& y_) const {
+@@ -860,6 +976,13 @@ void TransformState::constrain(double& scale_, double& x_, double& y_) const {
          return;
      }
  
@@ -10245,7 +10255,7 @@ index 537a318eb67dbfc52b2cc8c25be1567d890f156a..81ea00ab202dddb3c7434f6e562832e6
      // Constrain scale to avoid zooming out far enough to show off-world areas on the Y axis.
      const double ratioY = (rotatedNorth() ? size.width : size.height) / util::tileSize_D;
      scale_ = util::max(scale_, ratioY);
-@@ -1005,6 +1126,15 @@ ScreenCoordinate TransformState::getCenterOffset() const {
+@@ -1005,6 +1128,15 @@ ScreenCoordinate TransformState::getCenterOffset() const {
  }
  
  void TransformState::moveLatLng(const LatLng& latLng, const ScreenCoordinate& anchor) {
@@ -10261,7 +10271,7 @@ index 537a318eb67dbfc52b2cc8c25be1567d890f156a..81ea00ab202dddb3c7434f6e562832e6
      auto centerCoord = Projection::project(getLatLng(LatLng::Unwrapped), scale);
      auto latLngCoord = Projection::project(latLng, scale);
      auto anchorCoord = Projection::project(screenCoordinateToLatLng(anchor), scale);
-@@ -1012,10 +1142,25 @@ void TransformState::moveLatLng(const LatLng& latLng, const ScreenCoordinate& an
+@@ -1012,10 +1144,25 @@ void TransformState::moveLatLng(const LatLng& latLng, const ScreenCoordinate& an
  }
  
  void TransformState::setLatLngZoom(const LatLng& latLng, double zoom) {
@@ -10290,7 +10300,7 @@ index 537a318eb67dbfc52b2cc8c25be1567d890f156a..81ea00ab202dddb3c7434f6e562832e6
      const double newWorldSize = newScale * util::tileSize_D;
      Bc = newWorldSize / util::DEGREES_MAX;
      Cc = newWorldSize / util::M2PI;
-@@ -1062,9 +1207,11 @@ float TransformState::maxPitchScaleFactor() const {
+@@ -1062,9 +1209,11 @@ float TransformState::maxPitchScaleFactor() const {
      if (size.isEmpty()) {
          return {};
      }
@@ -10424,10 +10434,10 @@ index 4ef5d1aefb929ccfa716ad65c486d8dd52f07f2b..867e6f12f2fec75430babd7f7fae87c6
  } // namespace mln
 diff --git a/src/mln/map/vertical_perspective_projection.cpp b/src/mln/map/vertical_perspective_projection.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..b1bda15e97775600b376b947c629f345aa1387c7
+index 0000000000000000000000000000000000000000..fa36a4bafa9b151664a95b6e9f95ee5d66e984c7
 --- /dev/null
 +++ b/src/mln/map/vertical_perspective_projection.cpp
-@@ -0,0 +1,549 @@
+@@ -0,0 +1,555 @@
 +#include <mln/map/vertical_perspective_projection.hpp>
 +#include <mln/map/transform_state.hpp>
 +#include <mln/math/angles.hpp>
@@ -10715,6 +10725,12 @@ index 0000000000000000000000000000000000000000..b1bda15e97775600b376b947c629f345
 +    return add(horizonCenter, scaled(relative, horizonRadius / length(relative)));
 +}
 +
++bool VerticalPerspectiveProjection::screenCoordinateHitsGlobe(const TransformState& state,
++                                                              const ScreenCoordinate& point) {
++    const vec3 direction = rayDirectionFromPixel(state, point, state.getInverseGlobeViewProjectionMatrix());
++    return raySphereIntersection(state.getGlobeCameraPosition(), direction).has_value();
++}
++
 +LatLng VerticalPerspectiveProjection::screenCoordinateToLatLng(const TransformState& state,
 +                                                               const ScreenCoordinate& point,
 +                                                               LatLng::WrapMode wrapMode) {
@@ -10979,10 +10995,10 @@ index 0000000000000000000000000000000000000000..b1bda15e97775600b376b947c629f345
 +} // namespace mln
 diff --git a/src/mln/map/vertical_perspective_projection.hpp b/src/mln/map/vertical_perspective_projection.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..7e0b530ea36303b2e3e726a05f2687dd4a7c2c7f
+index 0000000000000000000000000000000000000000..2176d95b1bdc343756e66225a0343e8b3206a9f0
 --- /dev/null
 +++ b/src/mln/map/vertical_perspective_projection.hpp
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,90 @@
 +#pragma once
 +
 +#include <mln/map/projection_base.hpp>
@@ -11040,6 +11056,8 @@ index 0000000000000000000000000000000000000000..7e0b530ea36303b2e3e726a05f2687dd
 +    /// Unit-sphere point under a screen pixel (y up, as `TransformState` takes it); pixels off the globe snap to
 +    /// the nearest point on the horizon.
 +    static vec3 screenCoordinateToSurface(const TransformState&, const ScreenCoordinate&);
++    /// Whether a screen pixel (y up) looks at the globe rather than past it.
++    static bool screenCoordinateHitsGlobe(const TransformState&, const ScreenCoordinate&);
 +    static LatLng screenCoordinateToLatLng(const TransformState&, const ScreenCoordinate&, LatLng::WrapMode);
 +    static ScreenCoordinate latLngToScreenCoordinate(const TransformState&, const LatLng&, vec4& clip);
 +
@@ -11415,7 +11433,7 @@ index 0e0c322f44e13bdc3c97818a06aa00fe069ec087..d15e68987b2c1b7a86336ba2d907c276
                    shaders::BuiltIn::HeatmapTextureShader,
                    shaders::BuiltIn::HillshadeShader,
 diff --git a/src/mln/mtl/tile_layer_group.cpp b/src/mln/mtl/tile_layer_group.cpp
-index 845346db4125caf50b1a3ce3da9a415c01d8f679..624d6fad44832d731a98aaa3da4ab9cb9d6930e1 100644
+index 845346db4125caf50b1a3ce3da9a415c01d8f679..a599ef03e2ff75cdd9b90cbedcb89b46aef3573b 100644
 --- a/src/mln/mtl/tile_layer_group.cpp
 +++ b/src/mln/mtl/tile_layer_group.cpp
 @@ -12,6 +12,7 @@
@@ -11464,7 +11482,7 @@ index 845346db4125caf50b1a3ce3da9a415c01d8f679..624d6fad44832d731a98aaa3da4ab9cb
 -    }
 +        }
 +    });
-+    parameters.stencilModesFor3D(ownStencilModes);
++    const bool ownStencilModesTaken = parameters.stencilModesFor3D(ownStencilModes);
  
  #if !defined(NDEBUG)
      const auto debugGroupRender = parameters.encoder->createDebugGroup(getName() + "-render");
@@ -11482,11 +11500,19 @@ index 845346db4125caf50b1a3ce3da9a415c01d8f679..624d6fad44832d731a98aaa3da4ab9cb
          parameters.renderTileClippingMasks(stencilTiles);
      }
  
-@@ -138,6 +145,10 @@ void TileLayerGroup::render(RenderOrchestrator&, PaintParameters& parameters) {
+@@ -138,6 +145,18 @@ void TileLayerGroup::render(RenderOrchestrator&, PaintParameters& parameters) {
          // stencil mode for features with stencil enabled or disable stenciling.
          // 2D drawables will set their own stencil mode within `draw`.
          if (features3d) {
 +            if (const auto own = ownStencilModes.find(&drawable); own != ownStencilModes.end()) {
++                if (!ownStencilModesTaken) {
++                    // A clear between two draws draws over the zoom 0 tile with buffers of its own.
++                    const auto clears = context.renderingStats().stencilClears;
++                    own->second = parameters.stencilModeFor3D();
++                    if (context.renderingStats().stencilClears != clears) {
++                        uniformBuffers.bindMtl(renderPass);
++                    }
++                }
 +                stencilMode3d = own->second;
 +                encoder->setStencilReferenceValue(stencilMode3d.ref);
 +            }
@@ -13988,18 +14014,19 @@ index 1739796b3c1d99a1dbe52b70d3dba44cebdbea07..b1c083f76ad07eacec5e01e0fde024bb
  
      void captureRenderedFeatures(const LineBucket &,
 diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
-index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d607586f06 100644
+index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..93d9b9eb30428e0e85c7096db5701638090260d4 100644
 --- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
 +++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
-@@ -10,6 +10,7 @@
+@@ -10,6 +10,8 @@
  #include <mln/renderer/bucket.hpp>
  #include <mln/renderer/image_manager.hpp>
  #include <mln/renderer/layers/render_location_indicator_layer.hpp>
 +#include <mln/map/tile_projector.hpp>
++#include <mln/map/vertical_perspective_projection.hpp>
  #include <mln/renderer/paint_parameters.hpp>
  #include <mln/renderer/render_tree.hpp>
  #include <mln/renderer/update_parameters.hpp>
-@@ -17,6 +18,7 @@
+@@ -17,6 +19,7 @@
  #include <mln/style/layers/location_indicator_layer_properties.hpp>
  #include <mln/util/mat4.hpp>
  #include <mln/util/tile_cover.hpp>
@@ -14007,7 +14034,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
  
  #if MLN_RENDER_BACKEND_OPENGL
  #include <mln/gl/context.hpp>
-@@ -60,6 +62,18 @@ using namespace std::numbers;
+@@ -60,6 +63,18 @@ using namespace std::numbers;
  
  namespace mln {
  
@@ -14026,7 +14053,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
  struct LocationIndicatorRenderParameters {
      LocationIndicatorRenderParameters() = default;
      explicit LocationIndicatorRenderParameters(const TransformParameters& tp)
-@@ -522,7 +536,7 @@ public:
+@@ -522,7 +537,7 @@ public:
  #endif
  
          projectionCircle = params.projectionMatrix;
@@ -14035,7 +14062,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
          matrix::identity(translation);
          matrix::translate(translation, translation, positionMercator.x, positionMercator.y, 0.0);
          matrix::multiply(projectionCircle, projectionCircle, translation);
-@@ -569,6 +583,7 @@ public:
+@@ -569,6 +584,7 @@ public:
  
      const auto& getProjectionCircle() const { return projectionCircle; }
      const auto& getProjectionPuck() const { return projectionPuck; }
@@ -14043,7 +14070,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
  
      auto getPuckGeometry() const {
  #ifdef MLN_DRAWABLE_LOCATION_INDICATOR
-@@ -581,7 +596,7 @@ public:
+@@ -581,7 +597,7 @@ public:
  protected:
      static ScreenCoordinate latLngToScreenCoordinate(const LatLng& p, const TransformState& s) {
          LatLng unwrappedLatLng = p.wrapped();
@@ -14052,7 +14079,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
          ScreenCoordinate point = s.latLngToScreenCoordinate(unwrappedLatLng);
          point.y = s.getSize().height - point.y;
          return point;
-@@ -589,13 +604,13 @@ protected:
+@@ -589,13 +605,13 @@ protected:
  
      static Point<double> project(const LatLng& c, const TransformState& s) {
          LatLng unwrappedLatLng = c.wrapped();
@@ -14068,7 +14095,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
          return Projection::project(unwrappedLatLng, s.getScale());
      }
  
-@@ -624,6 +639,13 @@ protected:
+@@ -624,6 +640,13 @@ protected:
  
      // Size in "map pixels" for a screen pixel
      static float pixelSizeToWorldSizeH(const LatLng& pos, const TransformState& s) {
@@ -14082,7 +14109,30 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
          ScreenCoordinate posScreen = latLngToScreenCoordinate(pos, s);
          ScreenCoordinate posScreenLeftPx = posScreen;
          posScreenLeftPx.x -= 1;
-@@ -712,10 +734,21 @@ protected:
+@@ -650,14 +673,20 @@ protected:
+     static vec2 verticalDirectionMercator(const Point<double>& posMerc, const Point<double>& posMercDy) {
+         Point<double> verticalShiftMercator = posMercDy - posMerc;
+         vec2 res(verticalShiftMercator);
+-        return res.normalized();
++        return res.length() > 0 ? res.normalized() : vec2{0.0f, 0.0f};
+     }
+ 
+     static Point<double> hatShadowShiftVector(const LatLng& position,
+                                               const mln::LocationIndicatorRenderParameters& params) {
+         const TransformState& s = *params.state;
+         ScreenCoordinate posScreen = latLngToScreenCoordinate(position, s);
+-        posScreen.y = params.height - 1; // moving it to bottom
++        // The bottom of the window can be past the globe's edge, where a point stands for the nearest point on the
++        // horizon: there the direction is taken at the puck.
++        const ScreenCoordinate bottom{posScreen.x, params.height - 1.0};
++        if (!drawsOnGlobe(s) ||
++            VerticalPerspectiveProjection::screenCoordinateHitsGlobe(s, {bottom.x, s.getSize().height - bottom.y})) {
++            posScreen = bottom;
++        }
+         Point<double> posMerc = project(screenCoordinateToLatLng(posScreen, s), s);
+         vec2 verticalShiftAtPos = verticalDirectionMercator(posScreen, posMerc, s);
+         return {verticalShiftAtPos.x, verticalShiftAtPos.y};
+@@ -712,10 +741,21 @@ protected:
          // edge of the screen going toward the top.
  
          Point<double> verticalShift = hatShadowShiftVector(params.puckPosition, params);
@@ -14107,7 +14157,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
          //     ^ clamping this to 0.8 to avoid growing the puck too much close to the camera.
  
  #ifndef MLN_DRAWABLE_LOCATION_INDICATOR
-@@ -878,6 +911,7 @@ protected:
+@@ -878,6 +918,7 @@ protected:
      mln::mat4 translation{};
      mln::mat4 projectionCircle{};
      mln::mat4 projectionPuck{};
@@ -14115,7 +14165,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
  
      bool positionChanged = false;
      bool radiusChanged = false;
-@@ -1031,7 +1065,7 @@ void RenderLocationIndicatorLayer::render(PaintParameters& paintParameters) {
+@@ -1031,7 +1072,7 @@ void RenderLocationIndicatorLayer::render(PaintParameters& paintParameters) {
      auto& glContext = static_cast<gl::Context&>(paintParameters.context);
  
      if (paintParameters.captureRenderedFeatures) {
@@ -14124,7 +14174,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
      }
  
      // Reset GL state to a known state so the CustomLayer always has a clean slate.
-@@ -1050,19 +1084,38 @@ void RenderLocationIndicatorLayer::render(PaintParameters& paintParameters) {
+@@ -1050,19 +1091,38 @@ void RenderLocationIndicatorLayer::render(PaintParameters& paintParameters) {
  }
  #endif
  
@@ -14165,7 +14215,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
          stats.addRenderedFeature(locationID, *bound, {/* no tile */});
      }
  }
-@@ -1071,7 +1124,7 @@ void RenderLocationIndicatorLayer::captureRenderedFeatures() {
+@@ -1071,7 +1131,7 @@ void RenderLocationIndicatorLayer::captureRenderedFeatures() {
  
  void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
                                            gfx::Context& context,
@@ -14174,7 +14224,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
                                            const std::shared_ptr<UpdateParameters>& updateParameters,
                                            [[maybe_unused]] const PaintParameters& paintParameters,
                                            const RenderTree&,
-@@ -1086,8 +1139,17 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+@@ -1086,8 +1146,17 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
          return;
      }
  
@@ -14193,7 +14243,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
      }
  
      if (!quadShader) {
-@@ -1096,7 +1158,7 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+@@ -1096,7 +1165,7 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
      }
  
      if (!circleShader) {
@@ -14202,7 +14252,7 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
      }
  
      if (!circleShader) {
-@@ -1113,13 +1175,16 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+@@ -1113,13 +1182,16 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
      }
  
      if (!layerTweaker) {
@@ -14222,6 +14272,15 @@ index 7ffa7f1669a8ee8e3e548ecebeeffbebd96bc4e7..9dbd902bfa6c6ecb8b3b098c1c3851d6
      }
  
      auto* localLayerGroup = static_cast<LayerGroup*>(layerGroup.get());
+@@ -1176,6 +1248,8 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+             drawable->setShader(quadShader);
+ 
+             createQuadGeometry(*drawable, drawableInfo.geometry);
++            drawableInfo.dirty = true;
++            drawableInfo.textureInfo.dirty = true;
+ 
+             drawableInfo.drawable.emplace(*drawable);
+ 
 diff --git a/src/mln/renderer/layers/render_location_indicator_layer.hpp b/src/mln/renderer/layers/render_location_indicator_layer.hpp
 index f0035ea3cd6e080d985fbc39236eafb94b56f6b0..8987f5584dcfb717cbbb0a8835a9f00a26530b99 100644
 --- a/src/mln/renderer/layers/render_location_indicator_layer.hpp
@@ -15010,7 +15069,7 @@ index 152cd7d3b5b4e92f33d72b339f2791088617e91d..d4529aace74085496fcb6acfb81d7f54
  }
  
 diff --git a/src/mln/renderer/paint_parameters.cpp b/src/mln/renderer/paint_parameters.cpp
-index f4909b278cf44dffa7c4f7b7388ef1913107ff05..6f0915c02baf9b4733f04a82590aa206a0c33fbf 100644
+index f4909b278cf44dffa7c4f7b7388ef1913107ff05..a233585e142d121b873d787e848569aa89e72201 100644
 --- a/src/mln/renderer/paint_parameters.cpp
 +++ b/src/mln/renderer/paint_parameters.cpp
 @@ -4,6 +4,7 @@
@@ -15247,24 +15306,28 @@ index f4909b278cf44dffa7c4f7b7388ef1913107ff05..6f0915c02baf9b4733f04a82590aa206
      auto program = staticData.shaders->getLegacyGroup().get<ClippingMaskProgram>();
  
      if (!program) {
-@@ -396,6 +486,15 @@ gfx::StencilMode PaintParameters::stencilModeFor3D() {
+@@ -396,6 +486,19 @@ gfx::StencilMode PaintParameters::stencilModeFor3D() {
                              .pass = gfx::StencilOpType::Replace};
  }
  
-+void PaintParameters::stencilModesFor3D(std::unordered_map<const gfx::Drawable*, gfx::StencilMode>& modes) {
++bool PaintParameters::stencilModesFor3D(std::unordered_map<const gfx::Drawable*, gfx::StencilMode>& modes) {
++    if (modes.size() >= maxStencilValue) {
++        return false;
++    }
 +    if (nextStencilID + modes.size() > maxStencilValue) {
 +        clearStencil();
 +    }
 +    for (auto& [drawable, mode] : modes) {
 +        mode = stencilModeFor3D();
 +    }
++    return true;
 +}
 +
  gfx::ColorMode PaintParameters::colorModeForRenderPass() const {
      if (debugOptions & MapDebugOptions::Overdraw) {
          constexpr float overdraw = 1.0f / 8.0f;
 diff --git a/src/mln/renderer/paint_parameters.hpp b/src/mln/renderer/paint_parameters.hpp
-index 537f96c84492cd7c0cf820acb8486edd75c58882..729137baec7931f5f4c5591fb4ae25c75e6d7236 100644
+index 537f96c84492cd7c0cf820acb8486edd75c58882..c870162ce9433461f4b9240b895da54981487dac 100644
 --- a/src/mln/renderer/paint_parameters.hpp
 +++ b/src/mln/renderer/paint_parameters.hpp
 @@ -13,6 +13,7 @@
@@ -15291,13 +15354,16 @@ index 537f96c84492cd7c0cf820acb8486edd75c58882..729137baec7931f5f4c5591fb4ae25c7
  
      // Stencil handling
  public:
-@@ -124,6 +127,10 @@ public:
+@@ -124,6 +127,13 @@ public:
      /// @return The stencil mode, each value is unique.
      gfx::StencilMode stencilModeFor3D();
  
 +    /// @brief Give each drawable a 3D stencil mode of its own, clearing the stencil buffer first if they would not all
 +    ///        fit, so no value handed out before the clear is drawn after it.
-+    void stencilModesFor3D(std::unordered_map<const gfx::Drawable*, gfx::StencilMode>& modes);
++    /// @return false, handing out none, when there are more drawables than the buffer holds values: the caller then
++    /// takes
++    ///         each one's value with `stencilModeFor3D` as it draws it, so a clear falls between two draws.
++    bool stencilModesFor3D(std::unordered_map<const gfx::Drawable*, gfx::StencilMode>& modes);
 +
  private:
      template <typename TIter>
@@ -16391,18 +16457,20 @@ index ff99d2b4e460d9e1647a4aeaff64895e34ca096a..a1a871aa087ac4d60588ebcf28575bf0
      std::shared_ptr<const GlobalStateMap> globalState = nullptr;
      bool isUpdateSynchronous = false;
 diff --git a/src/mln/renderer/tile_pyramid.cpp b/src/mln/renderer/tile_pyramid.cpp
-index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d1cd61265 100644
+index a45781207b0e290075d0b1016298e3fcaf11d340..534227150d29a04bd1e03c402a87307a5da77115 100644
 --- a/src/mln/renderer/tile_pyramid.cpp
 +++ b/src/mln/renderer/tile_pyramid.cpp
-@@ -5,6 +5,7 @@
+@@ -4,7 +4,9 @@
+ #include <mln/renderer/tile_parameters.hpp>
  #include <mln/renderer/query.hpp>
  #include <mln/map/transform.hpp>
++#include <mln/map/vertical_perspective_projection.hpp>
  #include <mln/math/clamp.hpp>
 +#include <mln/math/log2.hpp>
  #include <mln/actor/scheduler.hpp>
  #include <mln/util/tile_cover.hpp>
  #include <mln/util/tile_range.hpp>
-@@ -17,6 +18,10 @@
+@@ -17,6 +19,10 @@
  
  #include <cmath>
  #include <algorithm>
@@ -16413,7 +16481,7 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
  
  namespace mln {
  
-@@ -62,8 +67,12 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
+@@ -62,8 +68,12 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
                           const Range<uint8_t> zoomRange,
                           std::optional<LatLngBounds> bounds,
                           std::function<std::unique_ptr<Tile>(const OverscaledTileID&, TileObserver*)> createTile) {
@@ -16427,7 +16495,7 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
          cache.clear();
      }
  
-@@ -71,7 +80,7 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
+@@ -71,7 +81,7 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
      // the cache (if they're not stale) or abandon them, and return.
      if (!needsRendering) {
          for (auto& entry : tiles) {
@@ -16436,7 +16504,7 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
                  // These tiles are invisible, we set optional necessity
                  // for them and thus suppress network requests on
                  // tiles expiration (see `OnlineFileRequest`).
-@@ -110,11 +119,14 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
+@@ -110,11 +120,14 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
      std::vector<OverscaledTileID> idealTiles;
      std::vector<OverscaledTileID> panTiles;
  
@@ -16456,7 +16524,7 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
  
      if (std::cmp_greater_equal(overscaledZoom, zoomRange.min)) {
          int32_t idealZoom = std::min<int32_t>(zoomRange.max, overscaledZoom);
-@@ -136,7 +148,11 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
+@@ -136,7 +149,11 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
              }
  
              if (panZoom < idealZoom) {
@@ -16469,7 +16537,7 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
              }
          }
  
-@@ -163,7 +179,8 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
+@@ -163,7 +180,8 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
              tile.setNecessity(necessity);
          }
  
@@ -16479,7 +16547,7 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
              tile.setLayers(layers, parameters.globalState);
          }
      };
-@@ -175,11 +192,13 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
+@@ -175,11 +193,13 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
      // The min and max zoom for TileRange are based on the updateRenderables
      // algorithm. Tiles are created at the ideal tile zoom or at lower zoom
      // levels. Child tiles are used from the cache, but not created.
@@ -16496,7 +16564,7 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
          tileRange = util::TileRange::fromLatLngBounds(*bounds, zoomRange.min, maxZoom);
      }
      auto createTileFn = [&](const OverscaledTileID& tileID) -> Tile* {
-@@ -190,6 +209,7 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
+@@ -190,6 +210,7 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
          if (!tile) {
              tile = createTile(tileID, observer);
              if (!tile) return nullptr;
@@ -16504,7 +16572,7 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
              tile->setLayers(layers, parameters.globalState);
          }
  
-@@ -260,7 +280,7 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
+@@ -260,7 +281,7 @@ void TilePyramid::update(const std::vector<Immutable<style::LayerProperties>>& l
                  // If it requires re-layout, discard it asynchronously, otherwise keep it in the cache
                  const auto key = tilesIt->first;
                  if (std::unique_ptr<Tile> tile = std::move(tiles.extract(tilesIt++).mapped())) {
@@ -16513,23 +16581,46 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
                          cache.deferredRelease(std::move(tile));
                      } else {
                          tile->setNecessity(TileNecessity::Optional);
-@@ -352,17 +372,52 @@ std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRendered
+@@ -352,17 +373,87 @@ std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRendered
          return result;
      }
  
+-    LineString<double> queryGeometry;
+-    queryGeometry.reserve(geometry.size());
 +    const auto toWorld = [&](const ScreenCoordinate& p) {
 +        return TileCoordinate::fromScreenCoordinate(transformState, 0, {p.x, transformState.getSize().height - p.y}).p;
 +    };
-     LineString<double> queryGeometry;
-     queryGeometry.reserve(geometry.size());
++    const bool globe = transformState.isGlobeRendering();
++    const auto onPlanet = [&](const ScreenCoordinate& p) {
++        return VerticalPerspectiveProjection::screenCoordinateHitsGlobe(transformState,
++                                                                        {p.x, transformState.getSize().height - p.y});
++    };
  
-     for (const auto& p : geometry) {
+-    for (const auto& p : geometry) {
 -        queryGeometry.push_back(
 -            TileCoordinate::fromScreenCoordinate(transformState, 0, {p.x, transformState.getSize().height - p.y}).p);
++    // Past the planet's edge a query meets the planet only at the horizon, and a point there stands for the nearest
++    // horizon point, so a query's corners alone would cut the planet's limb off; its edges are followed in steps.
++    ScreenLineString traced;
++    if (globe && geometry.size() > 1 && !std::ranges::all_of(geometry, onPlanet)) {
++        constexpr int steps = 32;
++        for (std::size_t i = 0; i + 1 < geometry.size(); ++i) {
++            for (int k = 0; k < steps; ++k) {
++                const double t = static_cast<double>(k) / steps;
++                traced.push_back({geometry[i].x + (geometry[i + 1].x - geometry[i].x) * t,
++                                  geometry[i].y + (geometry[i + 1].y - geometry[i].y) * t});
++            }
++        }
++        traced.push_back(geometry.back());
++    }
++    const ScreenLineString& screenGeometry = traced.empty() ? geometry : traced;
++    LineString<double> queryGeometry;
++    queryGeometry.reserve(screenGeometry.size());
++
++    for (const auto& p : screenGeometry) {
 +        queryGeometry.push_back(toWorld(p));
 +    }
 +
-+    const bool globe = transformState.isGlobeRendering();
 +    if (globe) {
 +        // GL JS's `transformBbox`: the globe has no world copies, so a box across the antimeridian lands on the rest
 +        // of the world, which shows when its slightly shrunken corners fall outside it. It moves to the copy west of
@@ -16541,13 +16632,28 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
 +        screenBox.max.x -= shrink;
 +        screenBox.max.y -= shrink;
 +        const auto bounds = mapbox::geometry::envelope(queryGeometry);
-+        const bool covered = std::ranges::all_of(
-+            std::array<ScreenCoordinate, 4>{
-+                screenBox.min, {screenBox.max.x, screenBox.min.y}, {screenBox.min.x, screenBox.max.y}, screenBox.max},
-+            [&](const ScreenCoordinate& corner) {
-+                const auto c = toWorld(corner);
-+                return bounds.min.x <= c.x && c.x <= bounds.max.x && bounds.min.y <= c.y && c.y <= bounds.max.y;
-+            });
++        // A corner past the planet stands for the nearest point on the horizon, which tells nothing about the
++        // antimeridian, so GL JS's check lost boxes that reach into space, such as the whole view of a small globe.
++        // Such corners are left out, and the box's center, when it is on the planet, decides by longitude for them.
++        bool covered = true;
++        bool reachesIntoSpace = false;
++        for (const ScreenCoordinate& corner : std::array<ScreenCoordinate, 4>{screenBox.min,
++                                                                              {screenBox.max.x, screenBox.min.y},
++                                                                              {screenBox.min.x, screenBox.max.y},
++                                                                              screenBox.max}) {
++            if (!onPlanet(corner)) {
++                reachesIntoSpace = true;
++                continue;
++            }
++            const auto c = toWorld(corner);
++            covered = covered && bounds.min.x <= c.x && c.x <= bounds.max.x && bounds.min.y <= c.y &&
++                      c.y <= bounds.max.y;
++        }
++        const ScreenCoordinate center{(screenBox.min.x + screenBox.max.x) / 2, (screenBox.min.y + screenBox.max.y) / 2};
++        if (reachesIntoSpace && onPlanet(center)) {
++            const auto c = toWorld(center);
++            covered = covered && bounds.min.x <= c.x && c.x <= bounds.max.x;
++        }
 +        if (!covered) {
 +            for (auto& c : queryGeometry) {
 +                if (c.x > 0.5) {
@@ -16569,11 +16675,11 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
          return std::tie(a.canonical.z, a.canonical.y, a.wrap, a.canonical.x) <
                 std::tie(b.canonical.z, b.canonical.y, b.wrap, b.canonical.x);
      };
-@@ -372,6 +427,11 @@ std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRendered
+@@ -372,6 +463,11 @@ std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRendered
  
      auto maxPitchScaleFactor = transformState.maxPitchScaleFactor();
  
-+    // The globe returns a feature once per tile, as GL JS does, though the tile is tested at two copies and can be
++    // The globe returns a feature once per tile, as GL JS does, though the tile is tested at three copies and can be
 +    // rendered at two wraps: these are where this tile's features start in each layer's results.
 +    std::optional<CanonicalTileID> canonicalTile;
 +    std::unordered_map<std::string, std::size_t> canonicalTileStart;
@@ -16581,7 +16687,7 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
      for (const auto& entry : sortedTiles) {
          const UnwrappedTileID& id = entry.first;
          Tile& tile = entry.second;
-@@ -382,25 +442,64 @@ std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRendered
+@@ -382,25 +478,66 @@ std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRendered
          auto queryPadding = maxPitchScaleFactor * tile.getQueryPadding(layers) * util::EXTENT / util::tileSize_D /
                              scale;
  
@@ -16601,9 +16707,11 @@ index a45781207b0e290075d0b1016298e3fcaf11d340..de32beede499d973f0b30d8c030c933d
 -        if (tileSpaceBoundsMax.x + queryPadding < 0 || tileSpaceBoundsMax.y + queryPadding < 0) {
 -            continue;
 -        }
-+        // GL JS tests a globe tile at its copies on and west of the main world, where the query geometry lies.
-+        const std::array<UnwrappedTileID, 2> globeCopies{UnwrappedTileID(-1, id.canonical),
-+                                                         UnwrappedTileID(0, id.canonical)};
++        // The query geometry lies on the main world or, across the antimeridian, west of it, and its padding reaches
++        // past either side of it: a globe tile is tested at its copies west of, on and east of the main world. GL JS
++        // leaves out the east copy and misses features just east of the antimeridian under a query just west of it.
++        const std::array<UnwrappedTileID, 3> globeCopies{
++            UnwrappedTileID(-1, id.canonical), UnwrappedTileID(0, id.canonical), UnwrappedTileID(1, id.canonical)};
 +        for (const auto& copy :
 +             globe ? std::span<const UnwrappedTileID>(globeCopies) : std::span<const UnwrappedTileID>(&id, 1)) {
 +            GeometryCoordinate tileSpaceBoundsMin = TileCoordinate::toGeometryCoordinate(copy, box.min);
@@ -17562,16 +17670,19 @@ index d78c0e8bda1efc80f3b2e04f3cc7885a86eab925..c0c0ab0c836eb8a117468b45c6dbad93
      void parseSprites(const JSValue&);
 diff --git a/src/mln/style/projection.cpp b/src/mln/style/projection.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..30f0e1fd4d05486b1c12046c661b4f5cb2426097
+index 0000000000000000000000000000000000000000..801764d5b57ca59c5ba8dd0a53604e0e632c5ec7
 --- /dev/null
 +++ b/src/mln/style/projection.cpp
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,112 @@
 +#include <mln/style/projection.hpp>
 +#include <mln/style/projection_impl.hpp>
 +#include <mln/style/projection_observer.hpp>
 +#include <mln/style/conversion/property_value.hpp>
 +#include <mln/style/conversion_impl.hpp>
 +#include <mln/renderer/property_evaluator.hpp>
++#include <mln/util/interpolate.hpp>
++
++#include <algorithm>
 +
 +namespace mln {
 +namespace style {
@@ -17645,20 +17756,32 @@ index 0000000000000000000000000000000000000000..30f0e1fd4d05486b1c12046c661b4f5c
 +    const PropertyEvaluationParameters parameters(zoom);
 +    const auto definition = type.evaluate(
 +        PropertyEvaluator<ProjectionDefinition>(parameters, Projection::getDefaultType()));
-+    // `globe` is the vertical perspective up to the first zoom and Mercator from the second, blended in between.
++    if (definition.from != ProjectionType::Globe && definition.to != ProjectionType::Globe) {
++        return definition;
++    }
++    // `globe` is the vertical perspective up to the first zoom and Mercator from the second, blended in between, at
++    // either end of a definition: each end counts with its share of the globe at this zoom.
 +    constexpr float globeToMercatorStartZoom = 11;
 +    constexpr float globeToMercatorEndZoom = 12;
-+    if (definition.from == ProjectionType::Globe && definition.to == ProjectionType::Globe) {
-+        if (zoom <= globeToMercatorStartZoom) {
-+            return ProjectionDefinition(ProjectionType::VerticalPerspective);
-+        }
-+        if (zoom >= globeToMercatorEndZoom) {
-+            return ProjectionDefinition(ProjectionType::Mercator);
-+        }
-+        return ProjectionDefinition(
-+            ProjectionType::VerticalPerspective, ProjectionType::Mercator, zoom - globeToMercatorStartZoom);
++    const double globeShare = 1.0 - std::clamp(static_cast<double>(zoom - globeToMercatorStartZoom) /
++                                                   (globeToMercatorEndZoom - globeToMercatorStartZoom),
++                                               0.0,
++                                               1.0);
++    const auto share = [&](ProjectionType end) {
++        return end == ProjectionType::Globe ? globeShare : end == ProjectionType::Mercator ? 0.0 : 1.0;
++    };
++    const double globe = definition.from == definition.to
++                             ? share(definition.from)
++                             : util::interpolate(share(definition.from),
++                                                 share(definition.to),
++                                                 std::clamp(definition.transition, 0.0, 1.0));
++    if (globe >= 1) {
++        return ProjectionDefinition(ProjectionType::VerticalPerspective);
 +    }
-+    return definition;
++    if (globe <= 0) {
++        return ProjectionDefinition(ProjectionType::Mercator);
++    }
++    return ProjectionDefinition(ProjectionType::VerticalPerspective, ProjectionType::Mercator, 1 - globe);
 +}
 +
 +} // namespace style
@@ -20971,7 +21094,7 @@ index d12b0196190854fc6bd9ef86606f4215b84c6078..ea524e249e901e3e46e5ed4d2cc6dc96
                    shaders::BuiltIn::HeatmapTextureShader,
                    shaders::BuiltIn::HillshadeShader,
 diff --git a/src/mln/vulkan/tile_layer_group.cpp b/src/mln/vulkan/tile_layer_group.cpp
-index 6e02b4695f58bff16aa024ac70a8b0f3af1b0fce..57eca0eded791d73d5009ff0f20b5277a18e65c9 100644
+index 6e02b4695f58bff16aa024ac70a8b0f3af1b0fce..16b5766394bc8957d0b33a1bf02ddb0e0a814dd5 100644
 --- a/src/mln/vulkan/tile_layer_group.cpp
 +++ b/src/mln/vulkan/tile_layer_group.cpp
 @@ -12,6 +12,7 @@
@@ -21022,7 +21145,7 @@ index 6e02b4695f58bff16aa024ac70a8b0f3af1b0fce..57eca0eded791d73d5009ff0f20b5277
 -    }
 +        }
 +    });
-+    parameters.stencilModesFor3D(ownStencilModes);
++    const bool ownStencilModesTaken = parameters.stencilModesFor3D(ownStencilModes);
  
  #if !defined(NDEBUG)
      const auto debugGroupRender = parameters.encoder->createDebugGroup(getName() + "-render");
@@ -21039,13 +21162,16 @@ index 6e02b4695f58bff16aa024ac70a8b0f3af1b0fce..57eca0eded791d73d5009ff0f20b5277
          parameters.renderTileClippingMasks(stencilTiles);
      }
  
-@@ -107,8 +113,11 @@ void TileLayerGroup::render(RenderOrchestrator&, PaintParameters& parameters) {
+@@ -107,8 +113,14 @@ void TileLayerGroup::render(RenderOrchestrator&, PaintParameters& parameters) {
              const auto& depth = drawableImpl.getEnableDepth() ? depthMode3d.value() : gfx::DepthMode::disabled();
              drawableImpl.setDepthModeFor3D(depth);
  
 -            const auto& stencil = drawableImpl.getEnableStencil() ? stencilMode3d.value()
 -                                                                  : gfx::StencilMode::disabled();
 +            const auto own = ownStencilModes.find(&drawable);
++            if (own != ownStencilModes.end() && !ownStencilModesTaken) {
++                own->second = parameters.stencilModeFor3D();
++            }
 +            const auto& stencil = !drawableImpl.getEnableStencil() ? gfx::StencilMode::disabled()
 +                                  : own != ownStencilModes.end()   ? own->second
 +                                  : stencilMode3d                  ? *stencilMode3d
@@ -21323,7 +21449,7 @@ index 262d770cb40b710b6ff88c8349eed7d9b0951f78..d49c93efe07ecc6c6e4de566891fe1ea
                    shaders::BuiltIn::HeatmapTextureShader,
                    shaders::BuiltIn::HillshadeShader,
 diff --git a/src/mln/webgpu/tile_layer_group.cpp b/src/mln/webgpu/tile_layer_group.cpp
-index 59f109178bef2e129908535d4b1e98a51a3fb76e..9c2648ce987afb6ddc164bd8bf3a6cd0912df02f 100644
+index 59f109178bef2e129908535d4b1e98a51a3fb76e..3f52ac8edbbe73fc0fd92aba61f9db9731b027bb 100644
 --- a/src/mln/webgpu/tile_layer_group.cpp
 +++ b/src/mln/webgpu/tile_layer_group.cpp
 @@ -15,6 +15,7 @@
@@ -21361,7 +21487,7 @@ index 59f109178bef2e129908535d4b1e98a51a3fb76e..9c2648ce987afb6ddc164bd8bf3a6cd0
 -    }
 +        }
 +    });
-+    parameters.stencilModesFor3D(ownStencilModes);
++    const bool ownStencilModesTaken = parameters.stencilModesFor3D(ownStencilModes);
  
  #if !defined(NDEBUG)
      const auto debugGroup = parameters.encoder->createDebugGroup(getName() + "-render");
@@ -21378,13 +21504,21 @@ index 59f109178bef2e129908535d4b1e98a51a3fb76e..9c2648ce987afb6ddc164bd8bf3a6cd0
          // Handle stencil tiles if present (2D stenciling)
          parameters.renderTileClippingMasks(stencilTiles);
      }
-@@ -125,8 +132,11 @@ void TileLayerGroup::render(RenderOrchestrator&, PaintParameters& parameters) {
+@@ -125,8 +132,19 @@ void TileLayerGroup::render(RenderOrchestrator&, PaintParameters& parameters) {
  
          if (features3d) {
              const auto depth = (drawable.getEnableDepth() && depthMode3d) ? *depthMode3d : gfx::DepthMode::disabled();
 -            const auto stencil = (drawable.getEnableStencil() && stencilMode3d) ? *stencilMode3d
 -                                                                                : gfx::StencilMode::disabled();
 +            const auto own = ownStencilModes.find(&drawable);
++            if (own != ownStencilModes.end() && !ownStencilModesTaken) {
++                // A clear between two draws draws over the zoom 0 tile with buffers of its own.
++                const auto clears = parameters.context.renderingStats().stencilClears;
++                own->second = parameters.stencilModeFor3D();
++                if (parameters.context.renderingStats().stencilClears != clears) {
++                    static_cast<webgpu::UniformBufferArray&>(uniformBuffers).bindWebgpu(renderPass);
++                }
++            }
 +            const auto stencil = !drawable.getEnableStencil()   ? gfx::StencilMode::disabled()
 +                                 : own != ownStencilModes.end() ? own->second
 +                                 : stencilMode3d                ? *stencilMode3d

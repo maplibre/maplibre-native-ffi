@@ -4629,12 +4629,16 @@ fn globe_rendered_query_excludes_the_point_behind_the_horizon() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    for (size, pitch, bearing) in [(512, 0.0, 0.0), (64, 40.0, 25.0)] {
+    for (width, height, pitch, bearing) in [
+        (512, 512, 0.0, 0.0),
+        (64, 64, 40.0, 25.0),
+        (512, 128, 0.0, 0.0),
+    ] {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let map = MapHandle::with_options(&runtime, &MapOptions::new(size, size, 1.0)).unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::new(width, height, 1.0)).unwrap();
         let (_context, session) = create_owned_texture_session(
             &map.attach_ref().unwrap(),
-            RenderTargetExtent::new(size, size, 1.0),
+            RenderTargetExtent::new(width, height, 1.0),
         )
         .unwrap();
         map.set_style_json(br##"{"version":8,"projection":{"type":"globe"},"sources":{"points":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"front","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}},{"type":"Feature","id":"back","properties":{},"geometry":{"type":"Point","coordinates":[180,0]}}]}}},"layers":[{"id":"points","type":"circle","source":"points","paint":{"circle-radius":12,"circle-color":"red"}}]}"##).unwrap();
@@ -4646,7 +4650,7 @@ fn globe_rendered_query_excludes_the_point_behind_the_horizon() {
         map.jump_to(&camera).unwrap();
         let geometry = RenderedQueryGeometry::box_(ScreenBox::new(
             ScreenPoint::new(0.0, 0.0),
-            ScreenPoint::new(f64::from(size), f64::from(size)),
+            ScreenPoint::new(f64::from(width), f64::from(height)),
         ));
         let mut options = RenderedFeatureQueryOptions::default();
         options.layer_ids = Some(vec!["points".into()]);
@@ -4667,7 +4671,7 @@ fn globe_rendered_query_excludes_the_point_behind_the_horizon() {
                 if let Ok(info) = session.texture_image_info() {
                     let mut pixels = vec![0; info.byte_length];
                     session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
-                    let center = ((size / 2 * size + size / 2) * 4) as usize;
+                    let center = ((height / 2 * width + width / 2) * 4) as usize;
                     if pixels[center] > 200 {
                         break session
                             .query_rendered_features(&geometry, Some(&options))
@@ -4682,13 +4686,13 @@ fn globe_rendered_query_excludes_the_point_behind_the_horizon() {
             assert_eq!(
                 features.len(),
                 1,
-                "size={size} pitch={pitch} bearing={bearing} longitude={longitude}"
+                "width={width} height={height} pitch={pitch} bearing={bearing} longitude={longitude}"
             );
             let feature: JsonValue = serde_json::from_slice(&features[0].feature).unwrap();
             assert_eq!(feature["id"], expected_id);
             let center_query = RenderedQueryGeometry::point(ScreenPoint::new(
-                f64::from(size) / 2.0,
-                f64::from(size) / 2.0,
+                f64::from(width) / 2.0,
+                f64::from(height) / 2.0,
             ));
             let center = session
                 .query_rendered_features(&center_query, Some(&options))
@@ -4696,7 +4700,7 @@ fn globe_rendered_query_excludes_the_point_behind_the_horizon() {
             assert_eq!(
                 center.len(),
                 1,
-                "size={size} pitch={pitch} bearing={bearing} longitude={longitude}"
+                "width={width} height={height} pitch={pitch} bearing={bearing} longitude={longitude}"
             );
             let feature: JsonValue = serde_json::from_slice(&center[0].feature).unwrap();
             assert_eq!(feature["id"], expected_id);
