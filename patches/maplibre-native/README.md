@@ -70,13 +70,6 @@ Upstream:
 The Android and macOS SDK camera entry points cancel transitions before partial
 commands to preserve their existing behavior.
 
-`0016-location-indicator-color-transitions.patch` refreshes the location
-indicator's evaluated paint properties each frame so that accuracy-circle fill
-and border colors reach their transition targets. It includes the upstream
-pixel-readback regression. Upstream:
-[maplibre-native#4639](https://github.com/maplibre/maplibre-native/pull/4639),
-at commit `a1823f138f306133cdba462ed1f07575a134b6b4`.
-
 `0017-location-indicator-top-image-hit-testing.patch` includes the location
 indicator's top image in rendered-feature queries. Each top and bearing image
 has independent bounds, and a hit returns the feature once with
@@ -171,12 +164,6 @@ before and after hiding a layer; the Rust browser regression also covers the
 binding’s statistics. Upstream:
 [maplibre-native#4719](https://github.com/maplibre/maplibre-native/pull/4719).
 
-`0033-in-memory-database-reset.patch` uses SQLite's resolved filename when
-resetting a database. In-memory databases, including URI spellings, close
-without filesystem deletion. The Native database regression checks that
-unrelated files with those names survive the reset. Upstream:
-[maplibre-native#4720](https://github.com/maplibre/maplibre-native/pull/4720).
-
 `0034-opengl-large-uniform-blocks.patch` fixes allocator alignment at the 8 KiB
 page boundary and updates dedicated OpenGL uniform buffers without reading an
 absent CPU copy. The regression reads back allocations and repeated updates at
@@ -189,19 +176,11 @@ order. Regressions cover reordered locations and plugin paint switching between
 uniform and feature-driven bindings. Upstream:
 [maplibre-native#4708](https://github.com/maplibre/maplibre-native/pull/4708).
 
-`0036-plugin-paint-dependencies.patch` reports plugin paint dependencies when
-creating a render layer and updating its properties. This refreshes camera paint
-expressions when zoom changes; a rendering regression switches a constant paint
-property to a camera expression and checks the values passed to the plugin
-callback at two zoom levels. Upstream:
-[maplibre-native#4721](https://github.com/maplibre/maplibre-native/pull/4721).
-
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 publication patch includes the transition setters for our bearing-accuracy
 properties, and the query-filter patch preserves the preceding camera-zoom fix.
-Tests reuse includes from earlier patches, and the plugin camera patch extends
-the paint fixture from the preceding OpenGL attribute patch.
+Tests reuse includes from earlier patches.
 
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied

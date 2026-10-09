@@ -270,7 +270,7 @@ description = "Verify the SDK a cross-compilation preset builds against is avail
 hide = true
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 # A preset whose SDK is missing says how to get one rather than failing inside CMake
-# on a toolchain path with an empty prefix.
+# on a toolchain path that is empty or that names an NDK the SDK does not carry.
 run = '''
 case "$usage_preset" in
   android-*) variable=ANDROID_HOME environment=android ;;
@@ -284,6 +284,16 @@ if [[ -z "${!variable:-}" ]]; then
   echo "Point $variable at an SDK of your own, or install the pinned one with:" >&2
   echo "  mise -E $environment install" >&2
   exit 1
+fi
+
+if [[ "$environment" == android ]]; then
+  toolchain="$ANDROID_HOME/ndk/${MLN_FFI_ANDROID_NDK_VERSION}/build/cmake/android.toolchain.cmake"
+  if [[ ! -f "$toolchain" ]]; then
+    echo "error: $usage_preset needs NDK $MLN_FFI_ANDROID_NDK_VERSION under $ANDROID_HOME" >&2
+    echo "Install the pinned packages with:" >&2
+    echo "  mise run android-sdk-packages" >&2
+    exit 1
+  fi
 fi
 '''
 

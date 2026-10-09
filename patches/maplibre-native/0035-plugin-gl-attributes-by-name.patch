@@ -1,5 +1,5 @@
 diff --git a/src/mln/shaders/gl/shader_program_gl.cpp b/src/mln/shaders/gl/shader_program_gl.cpp
-index d46d0d2..3b4bbf2 100644
+index d46d0d29b2a9f38a06baaa24435b997d7488db3e..3b4bbf28238ef69bef5a934e2781ba53b9172a4f 100644
 --- a/src/mln/shaders/gl/shader_program_gl.cpp
 +++ b/src/mln/shaders/gl/shader_program_gl.cpp
 @@ -7,6 +7,7 @@
@@ -30,7 +30,7 @@ index d46d0d2..3b4bbf2 100644
  
          return std::make_shared<ShaderProgramGL>(std::move(program), std::move(attrs), std::move(samplerLocations));
 diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
-index f1e9f30..f99d287 100644
+index f1e9f30e7c6d4cbf8beae94ee32c8b57fc8c789d..f99d287753a3ae958584046e64f83dcb8653bede 100644
 --- a/test/CMakeLists.txt
 +++ b/test/CMakeLists.txt
 @@ -153,6 +153,7 @@ if(MLN_WITH_OPENGL)
@@ -43,7 +43,7 @@ index f1e9f30..f99d287 100644
              ${PROJECT_SOURCE_DIR}/test/util/offscreen_texture.test.cpp
 diff --git a/test/gl/shader_program.test.cpp b/test/gl/shader_program.test.cpp
 new file mode 100644
-index 0000000..5fffd1d
+index 0000000000000000000000000000000000000000..5fffd1dd9d2716cd72a34c9d9b467d0b28069123
 --- /dev/null
 +++ b/test/gl/shader_program.test.cpp
 @@ -0,0 +1,39 @@
@@ -87,10 +87,10 @@ index 0000000..5fffd1d
 +
 +#endif
 diff --git a/test/plugin/rendering.test.cpp b/test/plugin/rendering.test.cpp
-index 97b8363..cdb060f 100644
+index 5e0a4f486c7ee27ecbb4fb4a91a6b1641b744b37..0403357dc39263cc467f253b59d6a2b94c281d25 100644
 --- a/test/plugin/rendering.test.cpp
 +++ b/test/plugin/rendering.test.cpp
-@@ -45,14 +45,17 @@ void registerTriangles(const std::string& pluginID,
+@@ -46,14 +46,17 @@ void registerTriangles(const std::string& pluginID,
      const mln_plugin_shader_attribute_v1 attribute = {
          sizeof(attribute), 0, 0, {"a_pos", 5}, MLN_PLUGIN_VERTEX_FLOAT_X2};
      const mln_plugin_shader_attribute_v1 uniformAttributes[] = {
@@ -111,11 +111,9 @@ index 97b8363..cdb060f 100644
      static const uint8_t colors[] = {128, 64, 0, 255, 128, 64, 0, 255, 128, 64, 0, 255};
      static const mln_plugin_vertex_stream_v1 colorStreams[] = {stream,
                                                                 {sizeof(stream), 1, colors, sizeof(colors), 3, 4}};
-@@ -80,7 +83,11 @@ void registerTriangles(const std::string& pluginID,
-     radius.struct_size = sizeof(radius);
-     radius.name = {"test-radius", 11};
+@@ -83,6 +86,9 @@ void registerTriangles(const std::string& pluginID,
      radius.type = MLN_PLUGIN_VALUE_FLOAT;
-+    radius.expression_capabilities = MLN_PLUGIN_EXPRESSION_FEATURE;
+     radius.expression_capabilities = MLN_PLUGIN_EXPRESSION_FEATURE | MLN_PLUGIN_EXPRESSION_CAMERA;
      radius.default_value = {sizeof(mln_plugin_value), MLN_PLUGIN_VALUE_FLOAT, {.float_value = 1}};
 +    auto opacity = radius;
 +    opacity.name = {"test-opacity", 12};
@@ -123,7 +121,7 @@ index 97b8363..cdb060f 100644
      for (std::size_t i = 0; i < layers.size(); ++i) {
          const std::string offset = i == 0 ? "-1.0" : "+1.0";
          const std::string color = i == 0 ? "1,0,0,1" : "0,1,0,1";
-@@ -109,27 +116,86 @@ void registerTriangles(const std::string& pluginID,
+@@ -111,27 +117,86 @@ void registerTriangles(const std::string& pluginID,
                             "fragment half4 triangleFragment(Output in [[stage_in]]){return half4(in.color);}"};
          }
          if (withUniforms) {
@@ -231,7 +229,7 @@ index 97b8363..cdb060f 100644
          }
          if (scopedUniforms) {
              // Use instance names to keep uniform members distinct across GL shader stages.
-@@ -182,11 +248,11 @@ void registerTriangles(const std::string& pluginID,
+@@ -184,11 +249,11 @@ void registerTriangles(const std::string& pluginID,
                        sources[i].data(),
                        3,
                        withUniforms ? uniformAttributes : (packedColor ? colorAttributes : &attribute),
@@ -246,7 +244,7 @@ index 97b8363..cdb060f 100644
          auto& layer = layers[i];
          layer.struct_size = sizeof(layer);
          layer.layer_type = view(types[i]);
-@@ -194,8 +260,8 @@ void registerTriangles(const std::string& pluginID,
+@@ -196,8 +261,8 @@ void registerTriangles(const std::string& pluginID,
          layer.geometry_type_mask = MLN_PLUGIN_GEOMETRY_POINT;
          layer.shaders = &shaders[i];
          layer.shader_count = 1;
@@ -255,9 +253,9 @@ index 97b8363..cdb060f 100644
 +        layer.properties = withUniforms ? properties : nullptr;
 +        layer.property_count = withUniforms ? 2u : 0u;
          layer.enable_stencil_overlap_dedup = stencilOverlapDedup;
+         layer.should_animate = shouldAnimate;
          layer.update_uniform_block = [](const mln_plugin_uniform_context_v1*, uint32_t, uint8_t*, size_t) {
-             return MLN_PLUGIN_STATUS_OK;
-@@ -300,6 +366,42 @@ TEST(PluginRendering, StencilOverlapDedupGeneratesStencilUpdates) {
+@@ -303,6 +368,42 @@ TEST(PluginRendering, StencilOverlapDedupGeneratesStencilUpdates) {
      EXPECT_GT(result.stats.stencilUpdates, 0u);
  }
  
@@ -297,6 +295,6 @@ index 97b8363..cdb060f 100644
 +    }
 +}
 +
- TEST(PluginRendering, UnchangedUniformUploadsAreSkippedButPaintChangesUpload) {
-     ASSERT_NO_FATAL_FAILURE(registerTriangles("test.cached-uniforms", false, true));
-     RenderTest test;
+ TEST(PluginRendering, CameraPaintRefreshesAfterPropertyAndZoomChanges) {
+     static float radius;
+     const auto recordRadius = [](const mln_plugin_property_value_v1* properties, size_t) -> uint8_t {
