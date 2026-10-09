@@ -80,6 +80,10 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0035-plugin-gl-attributes-by-name.patch"
   "$repo_root/patches/maplibre-native/0038-globe-query-horizon-roundoff.patch"
   "$repo_root/patches/maplibre-native/0039-projection-location-occlusion.patch"
+  "$repo_root/patches/maplibre-native/0040-globe-query-longitude-wrap.patch"
+  "$repo_root/patches/maplibre-native/0041-globe-horizon-visibility.patch"
+  "$repo_root/patches/maplibre-native/0042-coordinate-projection-world-copy.patch"
+  "$repo_root/patches/maplibre-native/0043-globe-location-image-displacement.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the
@@ -114,6 +118,8 @@ apply_mln_patches() {
       while read -r path; do
         git -C "$mln_path" clean -fq -- "$path"
       done
+  done
+  for patch in "${mln_patches[@]}"; do
     git -C "$mln_path" apply "$patch"
   done
   mln_state > "$(mln_stamp_path)"

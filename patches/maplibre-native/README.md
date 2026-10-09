@@ -221,3 +221,23 @@ its upstream branch.
 Native’s standalone `MapProjection` helper. It delegates to the copied
 transform, so coordinate conversion and occlusion can use the same camera
 snapshot.
+
+`0040-globe-query-longitude-wrap.patch` checks longitude alone when identifying
+an antimeridian crossing. Shrinking a screen rectangle can expand its latitude
+bounds at the globe horizon; this previously moved the query to another world
+copy and excluded visible features, including the n-gon sample plugin.
+
+`0041-globe-horizon-visibility.patch` converts sphere vectors with `atan2` and
+uses one roundoff-aware horizon predicate for location and tile-point queries.
+Locations returned by off-globe screen unprojection remain visible at the
+horizon, while points beyond it remain occluded.
+
+`0042-coordinate-projection-world-copy.patch` projects coordinates into the
+camera's internal world copy in both `Map` and `MapProjection`. An anchored
+Mercator move across the antimeridian previously left the reported center's
+pixel a full world away from the viewport center.
+
+`0043-globe-location-image-displacement.patch` computes the top-image and shadow
+displacement direction at the globe puck and handles coincident horizon samples.
+Sampling the viewport bottom can produce a zero direction when that pixel lies
+outside the globe, causing location images to disappear.
