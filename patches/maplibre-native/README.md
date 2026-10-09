@@ -262,3 +262,8 @@ outside the globe, causing location images to disappear.
 textures to newly created location drawables. Changing projection rebuilds the
 drawables with different shaders; the previous dirty flags suppressed their
 initial vertex uploads and texture bindings, making the images disappear.
+
+`0045-globe-query-east-copy.patch` includes the eastern tile copy in globe
+feature queries. Query padding near the eastern antimeridian can reach a feature
+on a tile's western edge, even when the query itself does not cross the seam.
+The existing per-tile deduplication preserves one result per feature.
