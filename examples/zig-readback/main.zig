@@ -47,10 +47,11 @@ fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
     });
     defer map.close() catch {};
 
-    // The five event types the runtime loop reads. A map queues no event of an
+    // The six event types the runtime loop reads. A map queues no event of an
     // unselected type, so this runs before the style load.
     try map.setEventMask(.{
         .map_render_update_available = true,
+        .map_style_loaded = true,
         .map_still_image_finished = true,
         .map_still_image_failed = true,
         .map_loading_failed = true,
@@ -97,6 +98,7 @@ fn pumpUntilSessionCloses(
             if (event.source_type != .map or event.source_id == null or
                 !std.meta.eql(event.source_id.?, map_id)) continue;
             switch (event.event_type) {
+                .map_style_loaded => try map.setStyleProjectionJson(args.allocator, "{\"type\":\"globe\"}"),
                 .map_render_update_available => shared.requestRender(),
                 .map_still_image_finished => shared.finishStillImage(),
                 .map_loading_failed => return error.MapLoadingFailed,
@@ -710,7 +712,7 @@ fn expectVk(result: if (build_options.supports_vulkan) vk.VkResult else i32) !vo
 fn setInitialCamera(map: *maplibre.MapHandle) !void {
     try map.jumpTo(.{
         .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
-        .zoom = 13.0,
+        .zoom = 1.0,
         .bearing = 12.0,
         .pitch = 30.0,
     });

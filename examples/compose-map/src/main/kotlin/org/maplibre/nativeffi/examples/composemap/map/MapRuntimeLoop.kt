@@ -51,6 +51,8 @@ internal class MapRuntimeLoop(
 
   @Volatile private var wake: WakeSource? = null
 
+  private var globeEnabled = true
+
   private val thread = Thread({ run() }, "compose-map-runtime").apply { isDaemon = true }
 
   init {
@@ -78,11 +80,12 @@ internal class MapRuntimeLoop(
             height = extent.height
             scaleFactor = extent.scaleFactor
             mapMode = MapMode.CONTINUOUS
-            // The two event types this loop reads. A map queues no event of an
+            // The three event types this loop reads. A map queues no event of an
             // unselected type, so nothing accumulates before the style load.
             eventMask =
               RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
-                RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
+                RuntimeEventMask.MAP_RENDER_FRAME_FINISHED +
+                RuntimeEventMask.MAP_STYLE_LOADED
           },
         )
       map = createdMap
@@ -90,7 +93,7 @@ internal class MapRuntimeLoop(
       createdMap.jumpTo(
         CameraOptions().apply {
           center = LatLng(37.7749, -122.4194)
-          zoom = 13.0
+          zoom = 1.0
           bearing = 12.0
           pitch = 30.0
         }
@@ -149,6 +152,10 @@ internal class MapRuntimeLoop(
    */
   private fun apply(map: MapHandle, command: CameraCommand) {
     when (command) {
+      CameraCommand.ToggleProjection -> {
+        globeEnabled = !globeEnabled
+        selectProjection(map)
+      }
       CameraCommand.CancelTransitions -> map.cancelTransitions()
       is CameraCommand.SetGestureInProgress -> map.isGestureInProgress = command.inProgress
       is CameraCommand.MoveBy -> map.moveBy(command.deltaX, command.deltaY)
@@ -189,6 +196,11 @@ internal class MapRuntimeLoop(
     }
   }
 
+  private fun selectProjection(map: MapHandle) {
+    val projection = if (globeEnabled) """{"type":"globe"}""" else """{"type":"mercator"}"""
+    map.setStyleProjectionJson(projection.encodeToByteArray())
+  }
+
   /** Drains one batch of runtime events, reporting whether the map wants another frame. */
   private fun drainEvents(runtime: RuntimeHandle, map: MapHandle): Boolean {
     var renderUpdateAvailable = false
@@ -197,7 +209,10 @@ internal class MapRuntimeLoop(
       if (event.mapSource != map) {
         continue
       }
-      if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
+      if (event.type == RuntimeEventType.MAP_STYLE_LOADED) {
+        selectProjection(map)
+        renderUpdateAvailable = true
+      } else if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
         renderUpdateAvailable = true
       } else if (
         event.type == RuntimeEventType.MAP_RENDER_FRAME_FINISHED &&

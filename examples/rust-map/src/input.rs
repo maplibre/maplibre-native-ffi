@@ -40,6 +40,7 @@ impl Controller {
         println!("  Q / E: rotate");
         println!("  ] / [: pitch");
         println!("  0: reset pitch and bearing");
+        println!("  G: toggle globe/Mercator");
     }
 
     /// Reports whether the camera changed.
@@ -57,9 +58,13 @@ impl Controller {
             ),
             WindowEvent::MouseInput { state, button, .. } => self.mouse(commands, *button, *state),
             WindowEvent::MouseWheel { delta, .. } => self.wheel(commands, viewport, *delta),
-            WindowEvent::KeyboardInput { event, .. } => {
-                keyboard(commands, viewport, event.physical_key, event.state)
-            }
+            WindowEvent::KeyboardInput { event, .. } => keyboard(
+                commands,
+                viewport,
+                event.physical_key,
+                event.state,
+                event.repeat,
+            ),
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = modifiers.state();
                 false
@@ -163,6 +168,7 @@ fn keyboard(
     viewport: Viewport,
     physical_key: PhysicalKey,
     state: ElementState,
+    repeat: bool,
 ) -> bool {
     if state != ElementState::Pressed {
         return false;
@@ -175,6 +181,12 @@ fn keyboard(
         f64::from(viewport.logical_height) / 2.0,
     );
     let command = match code {
+        KeyCode::KeyG => {
+            if repeat {
+                return false;
+            }
+            CameraCommand::ToggleProjection
+        }
         KeyCode::ArrowLeft | KeyCode::KeyA => pan(KEYBOARD_PAN, 0.0),
         KeyCode::ArrowRight | KeyCode::KeyD => pan(-KEYBOARD_PAN, 0.0),
         KeyCode::ArrowUp | KeyCode::KeyW => pan(0.0, KEYBOARD_PAN),

@@ -31,6 +31,7 @@ struct Viewport: Equatable {
 final class MapState {
   private let runtime: RuntimeHandle
   private let map: MapHandle
+  private var globeEnabled = true
   private var isClosed = false
 
   init(viewport: Viewport) throws {
@@ -59,13 +60,17 @@ final class MapState {
       )
     )
     createdMap = map
-    // The two event types the runtime loop reads. A map queues no event of an
+    // The three event types the runtime loop reads. A map queues no event of an
     // unselected type, so this runs before the style load.
-    try map.setEventMask([.mapRenderUpdateAvailable, .mapRenderFrameFinished])
+    try map.setEventMask([
+      .mapRenderUpdateAvailable,
+      .mapRenderFrameFinished,
+      .mapStyleLoaded,
+    ])
     try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
     try map.jump(to: CameraOptions(
       center: LatLng(latitude: 37.7749, longitude: -122.4194),
-      zoom: 13.0,
+      zoom: 1.0,
       bearing: 12.0,
       pitch: 30.0
     ))
@@ -113,6 +118,11 @@ final class MapState {
     try runtime.wakeSource()
   }
 
+  private func selectProjection() throws {
+    let projection = globeEnabled ? #"{"type":"globe"}"# : #"{"type":"mercator"}"#
+    try map.setStyleProjectionJSON(Data(projection.utf8))
+  }
+
   /// Drains one batch of runtime events, reporting whether the map wants
   /// another frame.
   func drainEvents() throws -> Bool {
@@ -121,6 +131,9 @@ final class MapState {
     for event in try runtime.drainEvents().events {
       guard map.isSource(of: event) else { continue }
       switch event.type {
+      case .mapStyleLoaded:
+        try selectProjection()
+        renderPending = true
       case .mapRenderUpdateAvailable:
         renderPending = true
       case .mapRenderFrameFinished:
@@ -138,6 +151,9 @@ final class MapState {
   /// read-modify-write commands also read the current camera.
   func apply(_ command: CameraCommand) throws {
     switch command {
+    case .toggleProjection:
+      globeEnabled.toggle()
+      try selectProjection()
     case .cancelTransitions:
       try map.cancelTransitions()
     case let .setGestureInProgress(inProgress):

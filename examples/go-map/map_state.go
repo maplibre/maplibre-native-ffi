@@ -50,7 +50,7 @@ func runRuntimeLoop(v viewport, commands *commandQueue, published chan<- runtime
 			shared.fail(fmt.Errorf("runtime pump failed: %w", err))
 			break
 		}
-		renderRequested, err := drainEvents(state.runtime, state.mapID)
+		renderRequested, err := drainEvents(state.runtime, state.mapRef, state.mapID, state.globeEnabled)
 		if err != nil {
 			shared.fail(err)
 			break
@@ -67,10 +67,11 @@ func runRuntimeLoop(v viewport, commands *commandQueue, published chan<- runtime
 }
 
 type runtimeMapState struct {
-	runtime *maplibre.RuntimeHandle
-	mapRef  *maplibre.MapHandle
-	mapID   maplibre.MapID
-	batch   []cameraCommand
+	globeEnabled bool
+	runtime      *maplibre.RuntimeHandle
+	mapRef       *maplibre.MapHandle
+	mapID        maplibre.MapID
+	batch        []cameraCommand
 }
 
 func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
@@ -78,13 +79,14 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 	if err != nil {
 		return nil, fmt.Errorf("runtime create failed: %w", err)
 	}
-	state := &runtimeMapState{runtime: runtimeHandle}
+	state := &runtimeMapState{runtime: runtimeHandle, globeEnabled: true}
 
 	mapOptions := maplibre.NewMapOptions(v.logicalWidth, v.logicalHeight, v.scaleFactor)
-	// The two event types the runtime loop reads. A map queues no event of an
+	// The three event types the runtime loop reads. A map queues no event of an
 	// unselected type, so the first style load already queues nothing else.
 	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable |
-		maplibre.RuntimeEventMaskMapRenderFrameFinished
+		maplibre.RuntimeEventMaskMapRenderFrameFinished |
+		maplibre.RuntimeEventMaskMapStyleLoaded
 	mapHandle, err := runtimeHandle.NewMapWithOptions(mapOptions)
 	if err != nil {
 		_ = state.Close()
@@ -104,7 +106,7 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 	}
 	initialCamera := maplibre.CameraOptions{}.
 		WithCenter(maplibre.LatLng{Latitude: 37.7749, Longitude: -122.4194}).
-		WithZoom(13).
+		WithZoom(1).
 		WithBearing(12).
 		WithPitch(30)
 	if err := mapHandle.JumpTo(initialCamera); err != nil {
@@ -146,6 +148,9 @@ func (state *runtimeMapState) applyCommand(command cameraCommand) error {
 	animation := maplibre.AnimationOptions{}.WithDurationMS(command.durationMS)
 	var err error
 	switch command.kind {
+	case commandToggleProjection:
+		state.globeEnabled = !state.globeEnabled
+		err = selectProjection(m, state.globeEnabled)
 	case commandCancelTransitions:
 		err = m.CancelTransitions()
 	case commandSetGestureInProgress:
@@ -205,7 +210,15 @@ func (state *runtimeMapState) adjustPitch(delta float64, animation *maplibre.Ani
 	return state.mapRef.EaseTo(maplibre.CameraOptions{}.WithPitch(clamp(pitch, 0, 60)), animation)
 }
 
-func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (bool, error) {
+func selectProjection(m *maplibre.MapHandle, globeEnabled bool) error {
+	projection := []byte(`{"type":"mercator"}`)
+	if globeEnabled {
+		projection = []byte(`{"type":"globe"}`)
+	}
+	return m.SetStyleProjectionJSON(projection)
+}
+
+func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapHandle *maplibre.MapHandle, mapID maplibre.MapID, globeEnabled bool) (bool, error) {
 	renderRequested := false
 	// One drain takes every event the pump produced.
 	batch, err := runtimeHandle.DrainEvents(0)
@@ -217,6 +230,11 @@ func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (b
 			continue
 		}
 		switch event.Type {
+		case maplibre.RuntimeEventMapStyleLoaded:
+			if err := selectProjection(mapHandle, globeEnabled); err != nil {
+				return false, fmt.Errorf("projection selection failed: %w", err)
+			}
+			renderRequested = true
 		case maplibre.RuntimeEventMapRenderUpdateAvailable:
 			renderRequested = true
 		case maplibre.RuntimeEventMapRenderFrameFinished:

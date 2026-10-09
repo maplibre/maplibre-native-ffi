@@ -139,6 +139,7 @@ pub fn logControls() void {
         \\  Q / E: rotate
         \\  ] / [: pitch
         \\  0: reset pitch and bearing
+        \\  G: toggle globe/Mercator
         \\
     , .{});
 }
@@ -172,6 +173,10 @@ fn handleKeyDown(
     );
 
     switch (key.scancode) {
+        scancode(c.SDL_SCANCODE_G) => {
+            if (key.repeat) return .{ .handled = true };
+            commands.push(.toggle_projection);
+        },
         scancode(c.SDL_SCANCODE_LEFT), scancode(c.SDL_SCANCODE_A) => {
             commands.push(.{ .move_by_animated = .{ .dx = pan_step, .dy = 0, .duration_ms = keyboard_animation_ms } });
         },

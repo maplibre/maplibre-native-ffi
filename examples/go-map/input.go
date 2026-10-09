@@ -32,7 +32,8 @@ func logControls() {
   + / -: zoom at center
   Q / E: rotate
   ] / [: pitch
-  0: reset pitch and bearing`)
+  0: reset pitch and bearing
+  G: toggle globe/Mercator`)
 }
 
 func (input *inputController) handleEvent(event *sdl.Event, commands *commandQueue, v viewport) bool {
@@ -139,6 +140,11 @@ func handleKeyDown(event *sdl.KeyboardEvent, commands *commandQueue, v viewport)
 	command := cameraCommand{durationMS: 160}
 
 	switch event.Scancode {
+	case sdl.ScancodeG:
+		if event.Repeat {
+			return false
+		}
+		command.kind = commandToggleProjection
 	case sdl.ScancodeLeft, sdl.ScancodeA:
 		command.kind, command.deltaX = commandMoveByAnimated, panStep
 	case sdl.ScancodeRight, sdl.ScancodeD:

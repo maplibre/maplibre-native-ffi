@@ -6,11 +6,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use maplibre_native_ffi::ScreenPoint;
 
-/// A camera change decoded on the render loop and applied on the map's owner
+/// A map change decoded on the render loop and applied on the map's owner
 /// thread. Commands carry deltas wherever the current camera is an input,
 /// because the read and write have to happen together on the owner thread.
 #[derive(Clone, Copy, Debug)]
 pub enum CameraCommand {
+    ToggleProjection,
     CancelTransitions,
     SetGestureInProgress {
         in_progress: bool,

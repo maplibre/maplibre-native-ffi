@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "map_state.h"
 
 #include "diagnostics.h"
@@ -38,10 +40,26 @@ static mln_animation_options animation(double duration_ms) {
   return options;
 }
 
+static app_error select_projection(map_state* state) {
+  const char* projection =
+    state->globe_enabled ? "{\"type\":\"globe\"}" : "{\"type\":\"mercator\"}";
+  const mln_buffer_view json = {.data = projection, .size = strlen(projection)};
+  return expect_camera_status(
+    mln_map_set_style_projection_json(state->map, json),
+    "projection selection failed"
+  );
+}
+
 /// Applies one decoded camera command. Runs on the map's owner thread, so the
 /// read-modify-write commands read the current camera here.
-static app_error apply_camera_command(mln_map map, camera_command command) {
+static app_error apply_camera_command(
+  map_state* state, camera_command command
+) {
+  const mln_map map = state->map;
   switch (command.kind) {
+    case CAMERA_COMMAND_TOGGLE_PROJECTION:
+      state->globe_enabled = !state->globe_enabled;
+      return select_projection(state);
     case CAMERA_COMMAND_CANCEL_TRANSITIONS:
       return expect_camera_status(
         mln_map_cancel_transitions(map), "cancel camera transitions failed"
@@ -146,13 +164,14 @@ static app_error apply_camera_command(mln_map map, camera_command command) {
   return APP_ERROR_CAMERA_COMMAND_FAILED;
 }
 
-/// Selects the two event types the runtime loop reads. The map queues no other
-/// type once this returns, and it runs before the style load, because a map
-/// keeps the events it has already queued.
+/// Selects the three event types the runtime loop reads. The map queues no
+/// other type once this returns, and it runs before the style load, because a
+/// map keeps the events it has already queued.
 static app_error select_events(mln_map map) {
   const mln_status status = mln_map_set_event_mask(
     map, MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
-           MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED
+           MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED |
+           MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED
   );
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("event mask select failed", status);
@@ -177,7 +196,7 @@ static app_error set_camera(mln_map map) {
                   MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
   camera.latitude = 37.7749;
   camera.longitude = -122.4194;
-  camera.zoom = 13.0;
+  camera.zoom = 1.0;
   camera.bearing = 12.0;
   camera.pitch = 30.0;
   const mln_status status = mln_map_jump_to(map, &camera);
@@ -192,6 +211,7 @@ app_error map_state_init(map_state* out_state, viewport initial_viewport) {
   *out_state = (map_state){
     .runtime = MLN_HANDLE_NULL,
     .map = MLN_HANDLE_NULL,
+    .globe_enabled = true,
   };
 
   mln_runtime_options runtime_options = mln_runtime_options_default();
@@ -245,7 +265,7 @@ app_error map_state_apply_commands(
 ) {
   command_queue_drain_into(commands, batch);
   for (size_t i = 0; i < batch->len; i += 1) {
-    const app_error error = apply_camera_command(state->map, batch->items[i]);
+    const app_error error = apply_camera_command(state, batch->items[i]);
     if (error != APP_OK) {
       return error;
     }
@@ -274,6 +294,11 @@ app_error map_state_drain_events(map_state* state, bool* out_render_update) {
       continue;
     }
     switch (event->type) {
+      case MLN_RUNTIME_EVENT_MAP_STYLE_LOADED: {
+        MAP_TRY(select_projection(state));
+        *out_render_update = true;
+        break;
+      }
       case MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE:
         *out_render_update = true;
         break;

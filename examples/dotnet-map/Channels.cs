@@ -8,12 +8,14 @@ using Maplibre.NativeFfi.Runtime;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-/// <summary>A camera change decoded on the render loop and applied on the map's owner thread.</summary>
+/// <summary>A map change decoded on the render loop and applied on the map's owner thread.</summary>
 /// <remarks>
 /// Commands carry deltas wherever the current camera is an input, because the read and the write
 /// have to happen together on the owner thread. A null animation applies the command immediately.
 /// </remarks>
 internal abstract record CameraCommand;
+
+internal sealed record ToggleProjectionCommand : CameraCommand;
 
 internal sealed record CancelTransitionsCommand : CameraCommand;
 

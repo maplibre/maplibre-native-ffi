@@ -11,6 +11,7 @@
 
 typedef struct map_state {
   mln_runtime runtime;
+  bool globe_enabled;
   mln_map map;
 } map_state;
 

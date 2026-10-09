@@ -5,12 +5,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.maplibre.nativeffi.geo.ScreenPoint
 
 /**
- * A camera change decoded on the render loop and applied on the map's owner thread.
+ * A map change decoded on the render loop and applied on the map's owner thread.
  *
  * Commands carry deltas rather than absolute targets, because reading the camera and writing the
  * new one has to happen together on the thread that owns the map.
  */
 internal sealed interface CameraCommand {
+  data object ToggleProjection : CameraCommand
+
   data object CancelTransitions : CameraCommand
 
   data class SetGestureInProgress(val inProgress: Boolean) : CameraCommand

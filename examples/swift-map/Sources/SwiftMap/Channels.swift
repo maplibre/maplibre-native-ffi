@@ -1,10 +1,11 @@
 import Foundation
 import MaplibreNativeFFI
 
-/// A camera change decoded on the render loop and applied on the map's owner
+/// A map change decoded on the render loop and applied on the map's owner
 /// thread. Commands carry deltas wherever the current camera is an input,
 /// because the read and write have to happen together on the owner thread.
 enum CameraCommand {
+  case toggleProjection
   case cancelTransitions
   case setGestureInProgress(Bool)
   case moveBy(dx: Double, dy: Double)

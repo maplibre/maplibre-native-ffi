@@ -139,6 +139,9 @@ final class InputController {
     )
 
     switch event.keyCode {
+    case 5:
+      if event.isARepeat { return false }
+      commands.push(.toggleProjection)
     case 123, 0:
       commands.push(.moveByAnimated(dx: panStep, dy: 0, animation: animation))
     case 124, 2:
