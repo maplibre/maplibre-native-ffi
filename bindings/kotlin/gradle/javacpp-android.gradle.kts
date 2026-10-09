@@ -36,6 +36,20 @@ val androidNdkPrebuilt = androidSdkDirectory.map {
 val androidNdkNotice = androidSdkDirectory.map { it.file("ndk/$androidNdkVersion/NOTICE") }
 val repositoryRoot = rootProject.layout.projectDirectory.asFile
 
+val androidSdkPackages =
+  tasks.register<Exec>("androidSdkPackages") {
+    group = "build setup"
+    description = "Installs the pinned packages into the SDK selected by Gradle."
+    workingDir(repositoryRoot)
+    commandLine(
+      "mise",
+      "run",
+      "//:android-sdk-packages",
+      "--sdk-root",
+      androidSdkDirectory.get().asFile.absolutePath,
+    )
+  }
+
 val javaCppConfigSources =
   listOf(
     "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/MaplibreNativeCConfig.java",
@@ -135,6 +149,7 @@ val packageAndroidNativeLibraries =
 // NDK-licensed code and must carry the notice itself.
 tasks.withType<Zip>().configureEach {
   if (name == "bundleAndroidMainAar") {
+    dependsOn(androidSdkPackages)
     from(androidNdkNotice) { into("META-INF/licenses/android-ndk") }
   }
 }
@@ -166,6 +181,7 @@ androidTargets.forEach { target ->
     tasks.register<Exec>("buildMaplibreNativeCAndroid${target.taskSuffix}") {
       group = "build"
       description = "Builds and installs MapLibre Native C for Android ${target.ndkAbi}."
+      dependsOn(androidSdkPackages)
       doNotTrackState("CMake owns native incremental build state")
       workingDir(repositoryRoot)
       executable("cmake")
@@ -178,7 +194,7 @@ androidTargets.forEach { target ->
     tasks.register<JavaExec>("generateAndroidJavaCppNativeLibrary${target.taskSuffix}") {
       group = "build"
       description = "Generates the Android ${target.ndkAbi} JavaCPP JNI library."
-      dependsOn(buildNative, compileGeneratedJavaCppBindings)
+      dependsOn(androidSdkPackages, buildNative, compileGeneratedJavaCppBindings)
       classpath = files(generatedJavaCppClasses, javaCppConfigClasses) + javaCppToolClasspath
       mainClass = "org.bytedeco.javacpp.tools.Builder"
       args(

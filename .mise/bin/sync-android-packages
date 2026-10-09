@@ -15,31 +15,17 @@ set -euo pipefail
 
 # The versions arrive as arguments because a tool's post-install step gets neither
 # the repository's environment nor its tools, only the paths of the tool it follows.
-if [[ $# -ne 3 ]]; then
-  echo "usage: ${0##*/} <java-version> <ndk-version> <cmake-version>" >&2
+if [[ $# -lt 4 || $# -gt 5 || ( $# -eq 5 && "$5" != --ndk-only ) ]]; then
+  echo "usage: ${0##*/} <sdk-root> <java-version> <ndk-version> <cmake-version> [--ndk-only]" >&2
   exit 2
 fi
 
-java_version="$1"
-ndk_version="$2"
-cmake_version="$3"
-
-# A post-install step names the SDK it follows; every other caller means the SDK the
-# builds resolve.
-sdk_root="${MISE_TOOL_INSTALL_PATH:-${ANDROID_HOME:-}}"
-if [[ -z "$sdk_root" ]]; then
-  echo "${0##*/}: set ANDROID_HOME to the SDK to install into" >&2
-  exit 1
-fi
-
-# A post-install step runs from wherever mise invoked it.
-repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-compile_sdk="$(
-  sed -n 's/^android-compileSdk = "\([0-9][0-9]*\)"/\1/p' "$repository_root/gradle/libs.versions.toml" |
-    head -n1
-)"
-if [[ -z "$compile_sdk" ]]; then
-  echo "${0##*/}: could not read android-compileSdk from gradle/libs.versions.toml" >&2
+sdk_root="$1"
+java_version="$2"
+ndk_version="$3"
+cmake_version="$4"
+if [[ -z "$sdk_root" || ! -d "$sdk_root" ]]; then
+  echo "${0##*/}: the selected Android SDK directory does not exist: $sdk_root" >&2
   exit 1
 fi
 
@@ -48,10 +34,24 @@ fi
 # are only needed when a package is missing; a complete Studio SDK may omit them.
 packages=(
   "ndk;${ndk_version}|ndk/${ndk_version}"
-  "cmake;${cmake_version}|cmake/${cmake_version}"
-  "platforms;android-${compile_sdk}|platforms/android-${compile_sdk}"
-  "platform-tools|platform-tools"
 )
+if [[ "${5:-}" != --ndk-only ]]; then
+  # A post-install step runs from wherever mise invoked it.
+  repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  compile_sdk="$(
+    sed -n 's/^android-compileSdk = "\([0-9][0-9]*\)"/\1/p' "$repository_root/gradle/libs.versions.toml" |
+      head -n1
+  )"
+  if [[ -z "$compile_sdk" ]]; then
+    echo "${0##*/}: could not read android-compileSdk from gradle/libs.versions.toml" >&2
+    exit 1
+  fi
+  packages+=(
+    "cmake;${cmake_version}|cmake/${cmake_version}"
+    "platforms;android-${compile_sdk}|platforms/android-${compile_sdk}"
+    "platform-tools|platform-tools"
+  )
+fi
 
 missing=()
 for entry in "${packages[@]}"; do

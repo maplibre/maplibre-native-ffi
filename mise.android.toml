@@ -7,4 +7,4 @@
 #
 # A post-install command runs through the platform shell, so name Git Bash on
 # Windows, which also keeps Windows from resolving its WSL launcher.
-android-sdk = { version = "{{vars.android_cmdline_tools_version}}", postinstall = '{% if os() == "windows" %}"C:/Program Files/Git/bin/bash.exe"{% else %}bash{% endif %} .mise/bin/sync-android-packages {{vars.java_version}} {{vars.android_ndk_version}} {{vars.android_cmake_version}}' }
+android-sdk = { version = "{{vars.android_cmdline_tools_version}}", postinstall = '{% if os() == "windows" %}"C:/Program Files/Git/bin/bash.exe"{% else %}bash{% endif %} .mise/bin/sync-android-packages "$MISE_TOOL_INSTALL_PATH" {{vars.java_version}} {{vars.android_ndk_version}} {{vars.android_cmake_version}}' }
