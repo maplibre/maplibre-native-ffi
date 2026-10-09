@@ -29,12 +29,6 @@ inputs:
       instead of one per job.
     required: false
     default: "false"
-  android-sdk-packages:
-    description: >-
-      Install the pinned Android NDK and CMake packages into ANDROID_HOME. Android
-      targets always do this; other jobs set it when they still need that NDK.
-    required: false
-    default: "false"
 
 outputs:
   zig-cache-key:
@@ -68,9 +62,8 @@ runs:
 
     # Each job asks for the SDK its target builds with, and every other job installs
     # none. No Windows target cross-compiles. Android reuses the SDK the runner image
-    # already points ANDROID_HOME at, then installs the pinned NDK into that SDK.
-    # Hosted images rotate the NDKs they ship. The Android emulator job also installs
-    # its emulator and system image there when it boots.
+    # already points ANDROID_HOME at. Repository build tasks install missing Android
+    # packages there, and the emulator task installs its system image when it boots.
     #
     # The Oniro emulator image ships with the OpenHarmony SDK, and only the suite
     # that boots it needs the image, so the other ohos jobs subtract it.
@@ -448,13 +441,6 @@ runs:
           ~/.rustup
           ~/.cargo/bin
         key: ${{ steps.toolchain-key.outputs.key }}
-
-    # The runner SDK is reused rather than installing `android-sdk` through mise.
-    # `android-sdk-packages` writes the pinned NDK into that SDK if it is missing.
-    - name: Install pinned Android SDK packages
-      if: ${{ startsWith(inputs.target, 'android-') || inputs.android-sdk-packages == 'true' }}
-      shell: bash
-      run: mise run android-sdk-packages
 
     # The R2 backend lives here rather than in mise.toml, because its keys carry
     # the toolchain paths of the runner that produced them; a contributor

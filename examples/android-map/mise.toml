@@ -3,6 +3,7 @@
 
 [tasks.build]
 description = "Build the Android map example."
+depends = ["//:android-sdk-packages"]
 usage = '''
 arg "[backend]" default="opengl" {
   choices "opengl" "vulkan"
@@ -33,6 +34,7 @@ fi
 
 [tasks.run]
 description = "Build, install, and start the Android map example."
+depends = ["//:android-sdk-packages"]
 usage = '''
 arg "[backend]" default="opengl" {
   choices "opengl" "vulkan"

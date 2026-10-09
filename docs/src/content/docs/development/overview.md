@@ -114,15 +114,26 @@ export MISE_ENV=android,ohos
 
 A build for a target whose SDK is missing reports both ways to supply it.
 
-An Android SDK that mise does not own still needs the pinned NDK and CMake
-packages, which the `android-*` presets name:
+Android native build tasks install the pinned NDK into the selected SDK when it
+is missing. Kotlin Android builds, device tests, examples, and Linux Maven
+staging also install the SDK packages they need. These tasks reuse installed
+packages on subsequent runs.
+
+To prepare the SDK before invoking Gradle or CMake directly:
 
 ```bash
 mise run android-sdk-packages
 ```
 
-The Android package versions are `mise.toml` variables, and the Git-ignored
-`mise.local.toml` at the repository root overrides them.
+Pass `--ndk-only` to prepare an SDK for native compilation alone. The repository
+pins an NDK LTS release in `mise.toml`; runner image updates affect download
+cost rather than compiler selection. The Android package versions are
+`mise.toml` variables, and the Git-ignored `mise.local.toml` at the repository
+root overrides them.
+
+After changing the NDK version, run `mise run clean <preset>` for each Android
+preset that you previously built, then `mise run --force build <preset>`. CMake
+caches the compiler path across configuration runs.
 
 The Android emulator and its system image are Android SDK packages rather than
 mise tools. `//:android-emulator:boot` installs them into `ANDROID_HOME` the

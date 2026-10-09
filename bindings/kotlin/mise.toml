@@ -215,6 +215,7 @@ esac
 
 [tasks."android-build"]
 description = "Build the Kotlin Android binding."
+depends = ["//:android-sdk-packages"]
 usage = '''
 arg "[backend]" default="opengl" {
   choices "opengl" "vulkan"

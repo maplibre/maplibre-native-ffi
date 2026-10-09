@@ -26,6 +26,7 @@ case "$preset" in
     ;;
 esac
 
+mise run //:android-sdk-packages
 emulator_args=("$abi")
 if [[ "$preset" == android-x64-egl ]]; then
   emulator_args+=(--api 26)
