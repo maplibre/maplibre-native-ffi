@@ -146,8 +146,10 @@ queries before delivery and after parsing. Upstream:
 advances the frame count when a render pass begins, matching Metal and Vulkan
 cleanup. Each drawable draw also advances the cumulative count in WebGPU, Metal,
 and Vulkan. A Native map regression checks frame progression and draw counts
-before and after hiding a layer; the Rust browser regression also covers the
-binding’s statistics. Upstream:
+before and after hiding a layer, and the C suite's
+`frame_statistics_count_each_frame_and_its_draws` case in
+`tests/native/abi/render/invalidation.c` checks the statistics that frame events
+report. Upstream:
 [maplibre-native#4719](https://github.com/maplibre/maplibre-native/pull/4719).
 
 `0034-opengl-large-uniform-blocks.patch` fixes allocator alignment at the 8 KiB

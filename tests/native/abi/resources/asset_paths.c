@@ -3,10 +3,10 @@
 #include "support/resources.h"
 #include "support/test_support.h"
 
-// Android resolves asset:// against the application's packaged assets, which
-// need mln_android_init, and the browser and OpenHarmony have no asset
-// directory on disk, so the case runs on the desktop and simulator targets.
-#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__) && !defined(__OHOS__)
+// The browser and OpenHarmony have no asset directory on disk. Android reads
+// its packaged assets only for a path under /android_asset/, so a directory on
+// disk resolves there as it does on the desktop and simulator targets.
+#if !defined(__EMSCRIPTEN__) && !defined(__OHOS__)
 
 static const char empty_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
@@ -50,7 +50,7 @@ static void an_asset_style_resolves_under_the_runtime_asset_path(void) {
 #endif
 
 MLN_TEST_GROUP {
-#if !defined(__ANDROID__) && !defined(__EMSCRIPTEN__) && !defined(__OHOS__)
+#if !defined(__EMSCRIPTEN__) && !defined(__OHOS__)
   RUN_TEST(an_asset_style_resolves_under_the_runtime_asset_path);
 #endif
 }

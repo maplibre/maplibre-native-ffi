@@ -11,9 +11,13 @@ typedef struct idle_probe {
   const mln_test_render_fixture* fixture;
   bool dirty;
   bool idle;
+  // The statistics of the latest finished frame, if any.
+  bool has_stats;
+  mln_rendering_stats stats;
 } idle_probe;
 
-// An update clears an earlier idle, and an idle after it ends the wait.
+// An update clears an earlier idle, and an idle after it ends the wait. Each
+// finished frame's statistics replace the ones before.
 static bool record_update_or_idle(
   const mln_runtime_event* event, const char* messages, void* context
 ) {
@@ -24,6 +28,9 @@ static bool record_update_or_idle(
     probe->idle = false;
   } else if (event->type == MLN_RUNTIME_EVENT_MAP_IDLE) {
     probe->idle = true;
+  } else if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED) {
+    probe->has_stats = true;
+    probe->stats = event->payload.render_frame.stats;
   }
   return false;
 }
@@ -39,8 +46,9 @@ static bool update_or_idle_arrived(void* context) {
 
 // Renders the way a host driven by render updates does: one frame per batch
 // of updates, until the map reports idle. The barrier orders every earlier
-// command before the first drain.
-static void render_to_idle(
+// command before the first drain. Returns the probe, which holds the
+// statistics of the latest frame that finished on the way.
+static idle_probe render_to_idle(
   mln_runtime runtime, const mln_test_render_fixture* fixture
 ) {
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
@@ -55,7 +63,7 @@ static void render_to_idle(
       "the map never reported idle"
     );
     if (probe.idle) {
-      return;
+      return probe;
     }
     mln_frame_demand demand = mln_frame_demand_default();
     MLN_TEST_OK(
@@ -618,8 +626,80 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// The backends whose renderer counts frames and draws per render pass, which
+// the 0032-webgpu-frame-stats patch carries for WebGPU, Metal, and Vulkan.
+#if defined(MLN_FFI_TEST_BACKEND_WEBGPU) || \
+  defined(MLN_FFI_TEST_BACKEND_METAL) || defined(MLN_FFI_TEST_BACKEND_VULKAN)
+#define COUNTS_DRAWS_PER_FRAME 1
+#endif
+
+#ifdef COUNTS_DRAWS_PER_FRAME
+static mln_rendering_stats render_stats_to_idle(
+  mln_runtime runtime, const mln_test_render_fixture* fixture
+) {
+  const idle_probe probe = render_to_idle(runtime, fixture);
+  TEST_ASSERT_TRUE_MESSAGE(
+    probe.has_stats, "rendering to idle finished no frame"
+  );
+  return probe.stats;
+}
+
+// Each frame advances the frame count and adds its draws to the total. A frame
+// with nothing visible draws nothing and leaves the total as it was.
+static void frame_statistics_count_each_frame_and_its_draws(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  MLN_TEST_OK(mln_test_map_set_style_json(
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"sources\":{\"point\":{\"type\":\"geojson\","
+           "\"data\":{\"type\":\"Feature\",\"properties\":{},\"geometry\":"
+           "{\"type\":\"Point\",\"coordinates\":[0,0]}}}},\"layers\":[{\"id\":"
+           "\"circle\",\"type\":\"circle\",\"source\":\"point\",\"paint\":"
+           "{\"circle-radius\":5}}]}"
+         )
+  ));
+
+  const mln_rendering_stats first = render_stats_to_idle(runtime, &fixture);
+  TEST_ASSERT_GREATER_THAN_INT64(0, first.frame_count);
+  TEST_ASSERT_GREATER_THAN_INT64(0, first.draw_call_count);
+  TEST_ASSERT_GREATER_OR_EQUAL_INT64(
+    first.draw_call_count, first.total_draw_call_count
+  );
+
+  MLN_TEST_OK(mln_test_map_request_repaint(map));
+  const mln_rendering_stats second = render_stats_to_idle(runtime, &fixture);
+  TEST_ASSERT_GREATER_THAN_INT64(0, second.draw_call_count);
+  TEST_ASSERT_EQUAL_INT64(first.frame_count + 1, second.frame_count);
+  TEST_ASSERT_EQUAL_INT64(
+    first.total_draw_call_count + second.draw_call_count,
+    second.total_draw_call_count
+  );
+
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+    map, MLN_BUFFER_LITERAL("circle"), MLN_BUFFER_LITERAL("visibility"),
+    MLN_BUFFER_LITERAL("\"none\""), &completion.descriptor, NULL
+  ));
+  const mln_rendering_stats empty = render_stats_to_idle(runtime, &fixture);
+  // Source fading can request several empty frames after the layer hides.
+  TEST_ASSERT_GREATER_THAN_INT64(second.frame_count, empty.frame_count);
+  TEST_ASSERT_EQUAL_INT64(0, empty.draw_call_count);
+  TEST_ASSERT_EQUAL_INT64(
+    second.total_draw_call_count, empty.total_draw_call_count
+  );
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+#endif
+
 MLN_TEST_GROUP {
   RUN_TEST(each_mutation_reaches_the_pixels_of_an_update_driven_host);
   RUN_TEST(each_mutation_publishes_a_render_update_only_when_it_changes);
   RUN_TEST(frame_results_report_whether_the_map_needs_another_frame);
+#ifdef COUNTS_DRAWS_PER_FRAME
+  RUN_TEST(frame_statistics_count_each_frame_and_its_draws);
+#endif
 }

@@ -167,7 +167,88 @@ static void ambient_cache_changes_reach_the_next_request(void) {
   }
 }
 
+typedef struct shared_cache_probe {
+  const char* cache_path;
+  // How many threads have a runtime with an operation in flight. Each thread
+  // creates its runtime after the threads before it, and finishes only once
+  // every thread has one.
+  atomic_int started;
+} shared_cache_probe;
+
+typedef struct shared_cache_thread {
+  shared_cache_probe* probe;
+  int index;
+  mln_status create_status;
+  mln_status operation_status;
+  mln_status close_status;
+} shared_cache_thread;
+
+static void touch_shared_cache(void* argument) {
+  shared_cache_thread* thread = argument;
+  shared_cache_probe* probe = thread->probe;
+  (void)mln_test_wait_for_count(&probe->started, thread->index);
+
+  mln_runtime_options options = mln_runtime_options_default();
+  options.cache_path = probe->cache_path;
+  mln_runtime runtime = MLN_HANDLE_NULL;
+  thread->create_status = mln_runtime_create(&options, &runtime, NULL);
+  mln_test_completion operation = mln_test_completion_default(0);
+  bool submitted = false;
+  if (thread->create_status == MLN_STATUS_OK) {
+    thread->operation_status = mln_runtime_run_ambient_cache_operation(
+      runtime, MLN_AMBIENT_CACHE_OPERATION_INVALIDATE, &operation.descriptor,
+      NULL
+    );
+    submitted = thread->operation_status == MLN_STATUS_OK;
+  }
+  if (!submitted) {
+    mln_test_completion_reject(&operation);
+    mln_test_completion_destroy(&operation);
+  }
+  atomic_fetch_add(&probe->started, 1);
+  mln_test_pulse();
+  (void)mln_test_wait_for_count(&probe->started, 2);
+
+  if (submitted) {
+    thread->operation_status = mln_test_completion_settle(&operation);
+  }
+  if (thread->create_status == MLN_STATUS_OK) {
+    thread->close_status = mln_test_runtime_close(runtime);
+  }
+}
+
+// Two runtimes on two threads open one cache database and run an operation on
+// it at the same time.
+static void two_runtimes_can_use_the_same_cache_database(void) {
+  char cache_path[1024];
+  mln_test_temp_path("shared-cache.db", cache_path, sizeof(cache_path));
+  shared_cache_probe probe = {.cache_path = cache_path};
+  atomic_init(&probe.started, 0);
+  shared_cache_thread threads[2];
+  mln_test_thread* handles[2];
+  for (int index = 0; index < 2; index += 1) {
+    threads[index] = (shared_cache_thread){
+      .probe = &probe,
+      .index = index,
+      .create_status = MLN_STATUS_NATIVE_ERROR,
+      .operation_status = MLN_STATUS_NATIVE_ERROR,
+      .close_status = MLN_STATUS_NATIVE_ERROR,
+    };
+    handles[index] = mln_test_thread_start(touch_shared_cache, &threads[index]);
+  }
+  for (int index = 0; index < 2; index += 1) {
+    mln_test_thread_join(handles[index]);
+  }
+  (void)remove(cache_path);
+  for (int index = 0; index < 2; index += 1) {
+    MLN_TEST_OK(threads[index].create_status);
+    MLN_TEST_OK(threads[index].operation_status);
+    MLN_TEST_OK(threads[index].close_status);
+  }
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(ambient_cache_calls_validate_their_arguments);
   RUN_TEST(ambient_cache_changes_reach_the_next_request);
+  RUN_TEST(two_runtimes_can_use_the_same_cache_database);
 }
