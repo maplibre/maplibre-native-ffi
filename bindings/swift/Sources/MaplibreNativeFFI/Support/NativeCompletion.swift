@@ -8,7 +8,7 @@ private protocol AnyNativeCompletionState: AnyObject {
 private final class NativeCompletionState<Value: Sendable>:
   AnyNativeCompletionState, @unchecked Sendable
 {
-  private let lock = NSCondition()
+  private let lock = NSLock()
   private let convert: (UnsafePointer<mln_completion_result>) throws -> Value
   private let acceptErrorStatus: Bool
   private var result: Result<Value, Error>?
@@ -48,7 +48,6 @@ private final class NativeCompletionState<Value: Sendable>:
         return waiter
       }
       result = converted
-      lock.broadcast()
       return nil
     }
     waiter?.resume(with: converted)
@@ -83,22 +82,6 @@ private final class NativeCompletionState<Value: Sendable>:
       waiter?.resume(throwing: CancellationError())
     }
   }
-
-  /// Blocks the calling thread until the completion runs.
-  ///
-  /// Native runs the completion on its own thread, so this suits a host that
-  /// must not return before native work finishes, such as one that releases a
-  /// runtime before tearing down state its callbacks use.
-  func valueBlocking() throws -> Value {
-    lock.lock()
-    defer { lock.unlock() }
-    while result == nil {
-      lock.wait()
-    }
-    let completed = result
-    result = nil
-    return try completed!.get()
-  }
 }
 
 struct NativeFuture<Value: Sendable> {
@@ -106,10 +89,6 @@ struct NativeFuture<Value: Sendable> {
 
   func value() async throws -> Value {
     try await state.value()
-  }
-
-  func valueBlocking() throws -> Value {
-    try state.valueBlocking()
   }
 }
 
@@ -220,16 +199,6 @@ enum NativeCompletion {
     _ result: UnsafePointer<mln_completion_result>
   ) throws -> Data {
     let view: mln_buffer_view = try value(result)
-    guard view.size > 0 else { return Data() }
-    guard let bytes = view.data else {
-      throw NativeStatusFailure.swiftNativeError(
-        "native completion returned a null buffer"
-      )
-    }
-    return Data(bytes: bytes, count: view.size)
-  }
-
-  static func dataView(_ view: mln_buffer_view) throws -> Data {
     guard view.size > 0 else { return Data() }
     guard let bytes = view.data else {
       throw NativeStatusFailure.swiftNativeError(

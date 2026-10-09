@@ -34,8 +34,8 @@ enum NativeCallbackGuard {
     guard let policy = Thread.current
       .threadDictionary[key] as? NativeCallbackPolicy else { return }
     guard owner === policy.owner, policy.operations.contains(operation) else {
-      throw MaplibreError(kind: .invalidState, rawStatus: nil,
-                          diagnostic: "Native operation is forbidden inside this callback")
+      throw MaplibreError
+        .invalidState("Native operation is forbidden inside this callback")
     }
   }
 

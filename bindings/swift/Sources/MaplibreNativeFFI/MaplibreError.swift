@@ -44,6 +44,10 @@ public struct MaplibreError: Error, Sendable, Equatable,
     Self(kind: .invalidArgument, rawStatus: nil, diagnostic: diagnostic)
   }
 
+  static func invalidState(_ diagnostic: String) -> Self {
+    Self(kind: .invalidState, rawStatus: nil, diagnostic: diagnostic)
+  }
+
   static func fromNativeFailure(_ failure: NativeStatusFailure) -> Self {
     Self(
       kind: kind(forRawStatus: failure.rawStatus),

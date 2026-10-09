@@ -12,14 +12,6 @@ struct NativeStatusFailure: Error, Equatable {
     self.isNativeStatus = isNativeStatus
   }
 
-  static func swiftInvalidArgument(_ diagnostic: String) -> Self {
-    Self(
-      rawStatus: MLN_STATUS_INVALID_ARGUMENT.rawValue,
-      diagnostic: diagnostic,
-      isNativeStatus: false
-    )
-  }
-
   static func swiftNativeError(_ diagnostic: String) -> Self {
     Self(
       rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue,

@@ -146,26 +146,6 @@ final class NativeInputArena {
     )
   }
 
-  static func copyDataSlice<
-    Size: BinaryInteger,
-    Offset: BinaryInteger,
-    Length: BinaryInteger
-  >(
-    data: UnsafeRawPointer?, size: Size, offset: Offset, length: Length
-  ) throws -> Data {
-    guard let size = Int(exactly: size), let offset = Int(exactly: offset),
-          let length = Int(exactly: length), size >= 0, offset >= 0,
-          length >= 0,
-          offset <= size, length <= size - offset, size == 0 || data != nil
-    else {
-      throw NativeStringError("native byte slice exceeds its arena")
-    }
-    return try NativeString.copyData(
-      data: data?.advanced(by: offset),
-      size: length
-    )
-  }
-
   func view(_ text: String) -> mln_buffer_view {
     view(Data(text.utf8))
   }

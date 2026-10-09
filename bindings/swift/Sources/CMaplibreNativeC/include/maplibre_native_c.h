@@ -1,5 +1,5 @@
 #include "../../../../../include/maplibre_native_c.h"
-// Layer plugin registration stays outside the umbrella header; the raw C
-// layer exposes it here. See include/maplibre_native_c/plugin.h.
+// The callback adapter and layer plugin headers sit outside the umbrella
+// header, and the generated code calls both.
 #include "../../../../../include/maplibre_native_c/callback_adapter.h"
 #include "../../../../../include/maplibre_native_c/plugin.h"

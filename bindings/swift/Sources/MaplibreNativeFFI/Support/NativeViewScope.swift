@@ -8,8 +8,9 @@ final class NativeViewScope {
   func check() throws {
     try lock.withLock {
       guard active, Thread.current === thread else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil,
-                            diagnostic: "Native view access requires its active callback thread")
+        throw MaplibreError.invalidState(
+          "Native view access requires its active callback thread"
+        )
       }
     }
   }

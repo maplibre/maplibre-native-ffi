@@ -1,7 +1,7 @@
-
-/// Its only stored property is the lock-guarded `NativeHandleState`, so the box
-/// itself is safe to share. Each public handle chooses whether its API contract
-/// permits sharing.
+/// Holds a public handle's native handle and reports its state failures as
+/// ``MaplibreError``. Its only stored property is the lock-guarded
+/// `NativeHandleState`, so the box itself is safe to share. Each public handle
+/// chooses whether its API contract permits sharing.
 class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
   private let state: NativeHandleState<Handle>
 
@@ -31,21 +31,10 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
     state.issued
   }
 
-  /// Holds the owner through the native call and any borrowed-data copy.
-  func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
-    let access = try borrow()
-    defer { access.end() }
-    return try use(access.handle)
-  }
-
   func borrow() throws -> NativeHandleRead<Handle> {
     do { return try state.borrow() }
     catch let failure as NativeStatusFailure {
-      throw MaplibreError(
-        kind: .invalidState,
-        rawStatus: nil,
-        diagnostic: failure.diagnostic
-      )
+      throw MaplibreError.invalidState(failure.diagnostic)
     }
   }
 
@@ -53,11 +42,7 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
     do {
       return try state.requireLive()
     } catch let failure as NativeStatusFailure {
-      throw MaplibreError(
-        kind: .invalidState,
-        rawStatus: nil,
-        diagnostic: failure.diagnostic
-      )
+      throw MaplibreError.invalidState(failure.diagnostic)
     }
   }
 
@@ -66,11 +51,7 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
       try state.closeOnce(destroy)
     } catch let failure as NativeStatusFailure {
       if failure.rawStatus == 0 {
-        throw MaplibreError(
-          kind: .invalidState,
-          rawStatus: nil,
-          diagnostic: failure.diagnostic
-        )
+        throw MaplibreError.invalidState(failure.diagnostic)
       }
       throw MaplibreError.fromNativeFailure(failure)
     }

@@ -1,12 +1,8 @@
 package maplibre
 
 /*
-#include <stdlib.h>
-#include <stdint.h>
 #include "binding_callback.h"
 #include "maplibre_native_c.h"
-#include "maplibre_native_c/callback_adapter.h"
-
 */
 import "C"
 
@@ -327,8 +323,6 @@ var bindingGlobalRoots = struct {
 	values map[cgo.Handle]*bindingCallbackTicket
 }{values: make(map[cgo.Handle]*bindingCallbackTicket)}
 
-var bindingCallbackCount atomic.Int64
-
 type bindingCallbackTicket struct {
 	mu sync.Mutex
 	id cgo.Handle
@@ -345,7 +339,6 @@ func (arena *bindingArena) register(value any, identity uint64) unsafe.Pointer {
 	ticket := &bindingCallbackTicket{value: value, identity: identity}
 	ticket.id = cgo.NewHandle(weak.Make(ticket))
 	ticket.cell = bindingHandleCell(ticket.id)
-	bindingCallbackCount.Add(1)
 	arena.callbacks = append(arena.callbacks, ticket)
 	return ticket.cell
 }
@@ -382,7 +375,6 @@ func (ticket *bindingCallbackTicket) release() {
 	ticket.retired = true
 	ticket.id.Delete()
 	C.binding_handle_free(ticket.cell)
-	bindingCallbackCount.Add(-1)
 	if owner := ticket.owner.Value(); owner != nil {
 		owner.rootsMu.Lock()
 		delete(owner.roots, ticket.id)
@@ -422,7 +414,6 @@ func mlnGoCallbackRelease(pointer unsafe.Pointer) {
 		// The collector reclaimed the ticket, whose cell native still held.
 		bindingHandleOf(pointer).Delete()
 		C.binding_handle_free(pointer)
-		bindingCallbackCount.Add(-1)
 	}
 }
 
@@ -532,7 +523,7 @@ func (state *bindingState) closeDecision() {
 	}
 }
 
-// ID returns the live generation ID used to correlate native events.
+// Id returns the live generation ID used to correlate native events.
 func (owner *bindingOwner) Id() (uint64, error) {
 	return bindingCall(func() uint64 { raw, done := owner.bindingAcquire(false); defer done(); return raw })
 }
